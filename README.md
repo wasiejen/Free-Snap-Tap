@@ -5,9 +5,7 @@ Snap Tapping is when the last input of e.g. a direction key will always be prior
 Tap Grouping can be defined in the py file under '# Tap Groups'. (Just Add or remove new lists with the keys as chars.)
 Tap Groupings are a set of keys that are observed and the output of each group is seperately handled.
 
-Execution can be toggle paused via DELETE key.
-
-Execution can be stopped vai END key.
+Execution can be toggle-paused with the DELETE key and stopped with the END key.
 
 Tested with Python 12.4.
 
