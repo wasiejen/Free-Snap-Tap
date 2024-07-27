@@ -35,13 +35,13 @@ Tap Groupings are a set of keys that are observed and the output of each group i
 **Example:**
 
   ```python
-  # Tap Groups
-  tap_groups = [
-      ['w', 's'], # WASD keys for movement
-      ['a', 'd'],  
-      ['up', 'down'], # Arrow keys for movement
-      ['left', 'right']  
-  ]
+# Tap Groups
+tap_groups = [
+    ['w', 's'], # WASD keys for movement
+    ['a', 'd'],  
+    #['q', 'e'],
+    #['1', '2', '3', '4'],  
+]
   ```
 
 ## Controls
