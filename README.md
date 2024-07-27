@@ -18,8 +18,9 @@ Consider a gaming scenario where you are using the WASD keys for movement:
 
 ## Easy Usage
 
-- Just execute the snap-tapping.exe
-- If you want to configure the tap grouping you have to see Installation and Usage
+- Start via snap-tapping.exe and a Command Window will open with further explanations.
+- If you want to configure the Tap Grouping you have to see Installation and Usage.
+- Have fun. :-)
 
 ## Controls
 
