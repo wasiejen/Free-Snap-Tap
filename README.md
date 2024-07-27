@@ -1,4 +1,4 @@
-# Snap-Tap
+# Snap-Tap:
 Python based Snap Tapping program which is usable for all keyboards and not only for Razer or Wooting keyboards.
 Snap Tapping is when the last input of e.g. a direction key will always be prioritized even when the opposing direction key is still pressed.
 
@@ -8,12 +8,12 @@ Tap Groupings are a set of keys that are observed and the output of each group i
 
 Tested with Python 12.4.
 
-# requirements:
+# Requirements:
 ```
 pip install pynput 
 ```
 
-# howto
+# Howto:
 install python
 
 install pynput package via
