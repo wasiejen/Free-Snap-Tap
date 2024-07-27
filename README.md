@@ -3,6 +3,11 @@
 A Python-based Snap Tapping program compatible with all keyboards, providing enhanced input prioritization for smoother gaming and typing experiences.
 Snap Tapping ensures that the most recent key input is prioritized, even if an opposing key is still pressed. This feature is particularly useful in gaming scenarios where precise control is crucial.
 
+With Tap Groupings you can define your own sets of keys to be oberserved together and be seperately handled.
+E.g. Movement, leaning direction, fast weapon switching and more. 
+
+No oberservation of special keys (eg ctrl, alt, space, enter, ...) or arrow keys at the moment.
+
 ## How Snap Tapping Works
 Snap Tapping is a feature that enhances your keyboard's responsiveness by prioritizing the most recent key input when multiple keys are pressed simultaneously. Here’s how it operates:
 
