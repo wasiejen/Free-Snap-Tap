@@ -6,7 +6,10 @@ Snap Tapping ensures that the most recent key input is prioritized, even if an o
 With Tap Groupings you can define your own sets of keys to be oberserved together and be seperately handled.
 E.g. Movement, leaning direction, fast weapon switching and more. 
 
-No oberservation of special keys (eg ctrl, alt, space, enter, ...) or arrow keys at the moment.
+V0.2: 
+- Now special keys like ctrl, space, alt, win, numpad keys, F-keys usable in Tap Groups.
+- Just use the string representation (found in py_file in vk_codes dict) or directly the vk-codes. Mixing of both in the same Tap Group possible.
+- Added an icon! :-D (icons created by Vector Squad - Flaticon)
 
 ## How Snap Tapping Works
 Snap Tapping is a feature that enhances your keyboard's responsiveness by prioritizing the most recent key input when multiple keys are pressed simultaneously. Here’s how it operates:
@@ -67,10 +70,11 @@ Tap Groupings are a set of keys that are observed and the output of each group i
 ### Example:
 
   ```python
-# Tap Groups
+# Tap Groups (input can be char/str and/or vk-codes (mixes possible) - see dicts directly above)
 tap_groups = [
-    ['w', 's'], # WASD keys for movement
+    ['w', 's'], 
     ['a', 'd'],  
+    #['ctrl', 'space'],  # that is working now
     #['q', 'e'],
     #['1', '2', '3', '4'],  
 ]
