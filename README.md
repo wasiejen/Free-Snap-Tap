@@ -9,4 +9,10 @@ Tap Groupings are a set of keys that are observed and the output of each group i
 Tested with Python 12.4.
 
 # requirements:
-pip install pynput
+''' pip install pynput '''
+
+# howto
+install python
+install pynput package via
+''' pip install pynput '''
+start via snap.tap.bat(ch) file
