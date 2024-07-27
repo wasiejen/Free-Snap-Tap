@@ -19,8 +19,8 @@ simulating_key_press = False
 tap_groups = [
     ['w', 's'], # WASD keys for movement
     ['a', 'd'],  
-    ['up', 'down'], # Arrow keys for movement
-    ['left', 'right']  
+    #['q', 'e'],
+    #['1', '2', '3', '4'],  
 ]
 
 if DEBUG: print(tap_groups)
