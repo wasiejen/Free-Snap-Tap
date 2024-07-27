@@ -6,6 +6,7 @@ Tap Grouping can be defined in the py file under '# Tap Groups'. (Just Add or re
 Tap Groupings are a set of keys that are observed and the output of each group is seperately handled.
 
 Execution can be toggle paused via DELETE key.
+
 Execution can be stopped vai END key.
 
 Tested with Python 12.4.
