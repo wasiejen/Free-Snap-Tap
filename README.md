@@ -16,6 +16,16 @@ Consider a gaming scenario where you are using the WASD keys for movement:
 - **Without Snap Tapping:** Pressing "A" (left) and then "D" (right) simultaneously might cause your character to stop moving because the game receives conflicting inputs.
 - **With Snap Tapping:** Pressing "A" (left) and then "D" (right) will result in the program sending only the "D" input, allowing your character to move right without interruption.
 
+## Easy Usage
+
+- Just execute the snap-tapping.exe
+- If you want to configure the tap grouping you have to see Installation and Usage
+
+## Controls
+
+- **Toggle Pause:** Press the DELETE key to pause or resume the program.
+- **Stop Execution:** Press the END key to stop the program.
+
 ## Requirements
 
 - Python 3.6 or higher
@@ -26,7 +36,6 @@ Install the `pynput` library using pip:
 ```bash
 pip install pynput
 ```
-
 ## Installation and Usage
 
 1. **Install Python**: Ensure Python 3.6 or higher is installed on your system. You can download it from [python.org](https://www.python.org/).
@@ -37,9 +46,9 @@ pip install pynput
    ```
 3. **Start the Program:** Run the snap.tap.bat file to start the Snap-Tap program:
    ```bash
-   ./snap-tap.bat
+   ./snap-tapping.bat
    ```
-  or by directly clicking/executing the snap-tap.bat file.
+  or by directly clicking/executing the snap-tapping.bat file.
 
 ## Configuration
 You can define Tap Groupings in the Python file under the # Tap Groups section. Add or remove lists with the keys as characters. 
@@ -57,7 +66,3 @@ tap_groups = [
 ]
   ```
 
-## Controls
-
-- **Toggle Pause:** Press the DELETE key to pause or resume the program.
-- **Stop Execution:** Press the END key to stop the program.
