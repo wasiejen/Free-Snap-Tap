@@ -16,11 +16,12 @@ TOGGLE_ON_OFF_KEY = keyboard.Key.delete
 simulating_key_press = False
 
 # Tap Groups
-tap_groups = [['a', 'd'], 
-              ['w', 's'],
-              ['1', '2', '3', '4'],
-              ['q', 'e'],
-              ]
+tap_groups = [
+    ['w', 's'], # WASD keys for movement
+    ['a', 'd'],  
+    ['up', 'down'], # Arrow keys for movement
+    ['left', 'right']  
+]
 
 if DEBUG: print(tap_groups)
 
@@ -136,17 +137,15 @@ def win32_event_filter(msg, data):
                     key_to_press = which_key_to_send(group_index)
                     send_keys(key_to_press, group_index)
                 
-
                 listener.suppress_event()
 
 if __name__ == "__main__":
-    print('--- Snap-Tapping started ---')
+    print('--- Snap-Tap started ---')
     print('')
-    print('--- toggle PAUSE with delete key ---')
+    print('--- toggle PAUSE with DELETE key ---')
     print('--- STOP with END key ---')
     print('')
     with keyboard.Listener(#on_press=on_press, 
                             on_release=on_release, 
                             win32_event_filter=win32_event_filter) as listener:
         listener.join()
-
