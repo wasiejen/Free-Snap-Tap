@@ -49,6 +49,10 @@ pip install pynput
    ```bash
    ./snap-tapping.bat
    ```
+   or
+   ```bash
+   python ./snap-tapping.py
+   ```
   or by directly clicking/executing the snap-tapping.bat file.
 
 ## Configuration
