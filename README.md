@@ -26,7 +26,7 @@ pip install pynput
    ```bash
    ./snap-tap.bat
    ```
-  or by directly klicking the snap-tap.bat file.
+  or by directly clicking/executing the snap-tap.bat file.
 
 ## Configuration
 You can define Tap Groupings in the Python file under the # Tap Groups section. Add or remove lists with the keys as characters. 
