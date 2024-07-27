@@ -24,7 +24,7 @@ pip install pynput
    ```
 3. **Start the Program:** Run the snap.tap.bat file to start the Snap-Tap program:
    ```bash
-   ./snap.tap.bat
+   ./snap-tap.bat
    ```
   or by directly klicking the snap-tap.bat file.
 
