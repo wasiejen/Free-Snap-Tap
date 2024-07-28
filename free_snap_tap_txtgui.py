@@ -208,13 +208,13 @@ def display_menu():
         
         # clear the command line interface
         os.system('cls||clear')
-        print("Active Tap Tap Groups:")
+        print("Active Tap Groups:")
         display_tap_groups()
         print('\n --- Options ---')
         print("1. Add Tap Group")
         print("2. Delete Tap Group")
         print("3. Reset tap_groups.txt file")
-        print("4. Start Execution\n")
+        print("4. Start Snap Tapping :-)\n")
 
         choice = input("Enter your choice: ")
 
