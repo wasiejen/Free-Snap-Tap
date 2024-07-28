@@ -1,4 +1,4 @@
-## Free Snap Tap: Universal Keyboard Snap Tap Program
+## Free Snap Tap: Universal Keyboard Snap Tap Program with Tap Groupings
 
 **aka Snap Tapping**
 
@@ -6,7 +6,7 @@ A Python-based Snap Tapping program compatible with all keyboards, providing enh
 
 Snap Tapping ensures that the most recent key input is prioritized, even if an opposing key is still pressed. This feature is particularly useful in gaming scenarios where precise control is crucial.
 
-With Tap Groupings, you can define your own sets of keys to be observed together and be separately handled. The key presses for each Tap Grouping are mutually exclusive — only one will be pressed as output.
+With **Tap Groupings**, you can define your own sets of keys to be observed together and be separately handled. The key presses for each Tap Grouping are mutually exclusive — only one will be pressed as output.
 
 Now with CLI User Interface to manage Tap Groupings:
 
@@ -27,9 +27,9 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
 - Flight/Space Sim:
   - Throttle Up/Down
   - Movement Up/Down
-  - Yaw
-  - Pitch
-  - Roll
+  - Yaw Left/Right
+  - Pitch Up/Down
+  - Roll Left/Right
 
 ### Version History
 
@@ -62,7 +62,7 @@ Consider a gaming scenario where you are using the WASD keys for movement:
 
 ## Easy Usage
 
-- Start via `free_snap_tap_txtgui.exe` and a Command Line Interface will open with further explanations.
+- Start via `free_snap_tap.exe` and a Command Line Interface will open with further explanations.
 - Nothing more to do—Tap Groups can be defined via CLI.
 - Have fun. :-)
 
@@ -100,13 +100,13 @@ pip install pynput
 3. **Start the Program:** Run the `snap_tap.bat` file to start the Snap-Tap program:
 
 ```bash
-./free_snap_tap_txtgui.bat
+./free_snap_tap.bat
 ```
 
 or
 
 ```bash
-python ./free_snap_tap_txtgui.py
+python ./free_snap_tap.py
 ```
 
-or by directly clicking/executing the `free_snap_tap_txtgui.bat` file.
+or by directly clicking/executing the `free_snap_tap.bat` file.
