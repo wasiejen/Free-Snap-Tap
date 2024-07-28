@@ -1,4 +1,4 @@
-# Snap-Tap: Universal Keyboard Snap Tapping Program
+# Snap-Tapping: Universal Keyboard Snap Tap Program
 
 A Python-based Snap Tapping program compatible with all keyboards, providing enhanced input prioritization for smoother gaming and typing experiences.
 Snap Tapping ensures that the most recent key input is prioritized, even if an opposing key is still pressed. This feature is particularly useful in gaming scenarios where precise control is crucial.
