@@ -1,5 +1,5 @@
 from pynput import keyboard
-
+import os
 DEBUG = False
 PAUSED = False
 
@@ -112,7 +112,7 @@ def initialize_tap_groups():
                     key = vk_codes_dict[key]
                 except KeyError as error_msg:
                     print("!!! Wrong string as a key used: ", error_msg)
-                    exit()
+                    break
             group_state[key] = 0
         tap_groups_states_dict.append(group_state)
 
@@ -183,7 +183,7 @@ def win32_event_filter(msg, data):
             print('--- resumed ---')
             PAUSED = False
         else:
-            print('--- PAUSEDd ---')
+            print('--- paused ---')
             PAUSED = True
             # display_menu()
     # Intercept key events if not PAUSEDd and not simulating key press
@@ -205,34 +205,53 @@ def display_menu():
     """
 
     while True:
-        print("\n1. Display Tap Groups")
-        print("2. Add Tap Group")
-        print("3. Delete Tap Group")
-        print("4. Start Execution")
-        #print("5. Quit")
+        
+        # clear the command line interface
+        os.system('cls||clear')
+        print("Active Tap Tap Groups:")
+        display_tap_groups()
+        print('\n --- Options ---')
+        print("1. Add Tap Group")
+        print("2. Delete Tap Group")
+        print("3. Reset tap_groups.txt file")
+        print("4. Start Execution\n")
+
         choice = input("Enter your choice: ")
 
-        if choice == '1':
+        if choice == '0':
             display_tap_groups()
-        elif choice == '2':
+        elif choice == '1':
             new_group = input("Enter new tap group (keys separated by commas): ").split(',')
             add_tap_group(new_group)
             initialize_tap_groups()
-        elif choice == '3':
+        elif choice == '1':
             index = int(input("Enter the index of the tap group to delete: "))
             delete_tap_group(index)
             initialize_tap_groups()
+        elif choice == '3':
+            reset_tap_groups_txt()
         elif choice == '4':
             break
 
         else:
             print("Invalid choice. Please try again.")
 
+def reset_tap_groups_txt():
+    global tap_groups
+    tap_groups = []
+    add_tap_group(['a','d'])
+    add_tap_group(['w','s'])
+    save_tap_groups()
 
 if __name__ == "__main__":
 
 
-    load_tap_groups()
+    try:
+        load_tap_groups()
+    except:
+        # if not tap_groups.txt file exist make initialis tap_groups and write new file out
+        reset_tap_groups_txt()
+
     initialize_tap_groups()
 
     display_menu()
