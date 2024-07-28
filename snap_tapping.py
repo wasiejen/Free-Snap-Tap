@@ -6,8 +6,8 @@ PAUSE = False
 # Constants for key events
 WM_KEYDOWN = 0x0100
 WM_KEYUP = 0x0101
-EXIT_KEY = keyboard.Key.end   # END key vkcode 35
-TOGGLE_ON_OFF_KEY = keyboard.Key.delete # DELETE key vkcode 46
+EXIT_KEY = 35 #keyboard.Key.end   # END key vkcode 35
+TOGGLE_ON_OFF_KEY = 46 #yboard.Key.delete # DELETE key vkcode 46
 press = True
 release = False
 
@@ -17,8 +17,7 @@ simulating_key_press = False
 # Initialize the Controller
 controller = keyboard.Controller()
 
-# vk codes dicts
-# 'a': 65, ...
+# vk codes and string representation to be used in tap groups
 vk_codes_dict = {
     'a': 65, 'b': 66, 'c': 67, 'd': 68, 'e': 69, 'f': 70, 'g': 71,
     'h': 72, 'i': 73, 'j': 74, 'k': 75, 'l': 76, 'm': 77, 'n': 78,
@@ -56,46 +55,8 @@ vk_codes_dict = {
     'exsel': 248, 'erase_eof': 249, 'play': 250, 'zoom': 251,
     'pa1': 253, 'oem_clear': 254
 }
-# 65: 'a', ...
-reversed_vk_codes_dict = {
-    65: 'a', 66: 'b', 67: 'c', 68: 'd', 69: 'e', 70: 'f', 71: 'g',
-    72: 'h', 73: 'i', 74: 'j', 75: 'k', 76: 'l', 77: 'm', 78: 'n',
-    79: 'o', 80: 'p', 81: 'q', 82: 'r', 83: 's', 84: 't', 85: 'u',
-    86: 'v', 87: 'w', 88: 'x', 89: 'y', 90: 'z',
-    48: '0', 49: '1', 50: '2', 51: '3', 52: '4', 53: '5', 54: '6',
-    55: '7', 56: '8', 57: '9',
-    112: 'F1', 113: 'F2', 114: 'F3', 115: 'F4', 116: 'F5', 117: 'F6',
-    118: 'F7', 119: 'F8', 120: 'F9', 121: 'F10', 122: 'F11', 123: 'F12',
-    96: 'num0', 97: 'num1', 98: 'num2', 99: 'num3', 100: 'num4',
-    101: 'num5', 102: 'num6', 103: 'num7', 104: 'num8', 105: 'num9',
-    106: 'multiply', 107: 'add', 108: 'separator', 109: 'subtract',
-    110: 'decimal', 111: 'divide',
-    8: 'backspace', 9: 'tab', 13: 'enter', 16: 'shift', 17: 'ctrl',
-    18: 'alt', 19: 'pause', 20: 'caps_lock', 27: 'esc', 32: 'space',
-    33: 'page_up', 34: 'page_down', 35: 'end', 36: 'home',
-    37: 'left_arrow', 38: 'up_arrow', 39: 'right_arrow', 40: 'down_arrow',
-    41: 'select', 42: 'print', 43: 'execute', 44: 'print_screen',
-    45: 'insert', 46: 'delete', 47: 'help',
-    91: 'left_windows', 92: 'right_windows', 93: 'applications',
-    95: 'sleep', 144: 'num_lock', 145: 'scroll_lock',
-    160: 'left_shift', 161: 'right_shift', 162: 'left_control',
-    163: 'right_control', 164: 'left_menu', 165: 'right_menu',
-    166: 'browser_back', 167: 'browser_forward', 168: 'browser_refresh',
-    169: 'browser_stop', 170: 'browser_search', 171: 'browser_favorites',
-    172: 'browser_home', 173: 'volume_mute', 174: 'volume_down',
-    175: 'volume_up', 176: 'media_next_track', 177: 'media_prev_track',
-    178: 'media_stop', 179: 'media_play_pause', 180: 'launch_mail',
-    181: 'launch_media_select', 182: 'launch_app1', 183: 'launch_app2',
-    186: 'semicolon', 187: 'plus', 188: 'comma', 189: 'minus',
-    190: 'period', 191: 'slash', 192: 'grave_accent',
-    219: 'open_bracket', 220: 'backslash', 221: 'close_bracket',
-    222: 'quote', 223: 'oem_8', 226: 'oem_102',
-    229: 'process_key', 231: 'packet', 246: 'attn', 247: 'crsel',
-    248: 'exsel', 249: 'erase_eof', 250: 'play', 251: 'zoom',
-    253: 'pa1', 254: 'oem_clear'
-}
 
-# Tap Groups (input can be char/str and/or vk-codes (mixes possible) - see dicts directly above)
+# Tap Groups (input can be char/str and/or vk-codes (mixes possible) - see dict directly above)
 tap_groups = [
     ['w', 's'], 
     ['a', 'd'],  
@@ -107,7 +68,6 @@ tap_groups = [
 if DEBUG: print(tap_groups) 
 
 # Creation of helper dict and lists for saving the states of the tap groups
-
 tap_groups_states_dict = []
 for group_index, group in enumerate(tap_groups):
     tap_groups_states_dict.append({})
@@ -168,7 +128,6 @@ def send_keys(key_to_send, group_index):
             if last_key_send == None:
                 pass
             else:
-
                 touch_key(release, last_key_send)
                 tap_groups_last_key_send[group_index] = None
         else:
@@ -176,7 +135,7 @@ def send_keys(key_to_send, group_index):
                 touch_key(release, last_key_send)
             touch_key(press, key_to_send)
 
-# small wrapper - decorator maybe in future?
+# small wrapper for turning off supression of simulated key event
 def touch_key(is_press, key):
     global simulating_key_press
     if DEBUG: print("KeyCode: ", keyboard.KeyCode.from_vk(key))
@@ -184,17 +143,18 @@ def touch_key(is_press, key):
     controller.touch(keyboard.KeyCode.from_vk(key),is_press)
     simulating_key_press = False
 
-
-# mainly for CMD Control Key listening still here - replace with vkcodes
-def on_release(key):
+def win32_event_filter(msg, data):
     global PAUSE
-    if DEBUG: print(f"Key {key} released")
-    if key == EXIT_KEY:
-        # STOP Listener
+    global tap_groups_states_dict
+
+    vk_code = data.vkCode
+
+    # STOP listeners
+    if vk_code == EXIT_KEY and msg == WM_KEYUP:
         print('\n--- Stopping execution ---')
         return False
-    elif key == TOGGLE_ON_OFF_KEY:
-        # PAUSE Listener
+    # PAUSE Listener
+    elif vk_code == TOGGLE_ON_OFF_KEY and msg == WM_KEYUP:
         if PAUSE: 
             print('--- resumed ---')
             PAUSE = False
@@ -202,16 +162,10 @@ def on_release(key):
             print ('--- paused ---')
             PAUSE = True
 
-def win32_event_filter(msg, data):
-    global tap_groups_states_dict
-    if not PAUSE and not simulating_key_press:
-
-        vk_code = data.vkCode
-        #key_char = chr(vk_code).lower()
+    # only intercept key event if it is not paused or no simulated key press is send
+    elif not PAUSE and not simulating_key_press:    
         if DEBUG: print("vk_code: ", vk_code)
-        #if DEBUG: print("key_char: ", key_char)
         for group_index, group in enumerate(tap_groups_states_dict):
-
             if vk_code in list(group.keys()):
                 # Check if the event is a key press or release
                 if msg == WM_KEYDOWN:
@@ -235,7 +189,5 @@ if __name__ == "__main__":
     print('--- STOP execution with END key ---')
     print('')
 
-    with keyboard.Listener(#on_press=on_press, 
-                            on_release=on_release, 
-                            win32_event_filter=win32_event_filter) as listener:
+    with keyboard.Listener(win32_event_filter=win32_event_filter) as listener:
         listener.join()
