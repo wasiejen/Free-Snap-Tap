@@ -9,8 +9,7 @@ With Tap Groupings you can define your own sets of keys to be oberserved togethe
 
 Now with CLI User Interfave to manage Tap Groupings:
 
-<img src="https://github.com/user-attachments/assets/e9226387-cc8e-40cf-9415-976abe365903" width="400" />
-
+<img src="https://github.com/user-attachments/assets/044bf4e5-f433-46e0-9d19-6f3ba11b8685" width="400" />
 
 Tap Groupings are now saved in a seperate tap_groups.txt file which can be edited.
 
