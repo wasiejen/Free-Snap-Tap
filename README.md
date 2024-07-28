@@ -8,10 +8,14 @@ Snap Tapping ensures that the most recent key input is prioritized, even if an o
 With Tap Groupings you can define your own sets of keys to be oberserved together and be seperately handled. The key presses for each Tap Grouping are mutually exclusive - only one will be pressed as output.
 
 Now with CLI User Interfave to manage Tap Groupings:
+
 <img src="https://github.com/user-attachments/assets/e9226387-cc8e-40cf-9415-976abe365903" width="400" />
 
-Tap Groupings are now saved in a seperate tap_groups.txt file which can be edited. 
+
+Tap Groupings are now saved in a seperate tap_groups.txt file which can be edited.
+
 Each Line represents on Tap Group and each key is to be seperated by a comma.
+
 String representation or vk-codes (virtual keyboard Codes - list in py file) can be used.
 
 ### Examples Use Cases
