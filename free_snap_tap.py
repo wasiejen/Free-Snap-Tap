@@ -100,8 +100,20 @@ def delete_tap_group(index):
         del tap_groups[index]
         save_tap_groups()
 
-# Initialize the state of each tap group
+def reset_tap_groups_txt():
+    """
+    Reset Tap Groups and save new tap_group.txt with a+d and w+s tap groups
+    """
+    global tap_groups
+    tap_groups = []
+    add_tap_group(['a','d'])
+    add_tap_group(['w','s'])
+    save_tap_groups()
+
 def initialize_tap_groups():
+    """
+    Initialize the state of each tap group
+    """
     global tap_groups_states_dict, tap_groups_last_key_pressed, tap_groups_last_key_send
     tap_groups_states_dict = []
     for group in tap_groups:
@@ -203,10 +215,8 @@ def display_menu():
     """
     Display the menu and handle user input when the script is PAUSEDd.
     """
-
-    while True:
-        
-        # clear the command line interface
+    while True:       
+        # clear the CLI
         os.system('cls||clear')
         print("Active Tap Groups:")
         display_tap_groups()
@@ -230,22 +240,12 @@ def display_menu():
             initialize_tap_groups()
         elif choice == '3':
             reset_tap_groups_txt()
-        elif choice == '4':
+        elif choice == '4' or choice == '':
             break
-
         else:
             print("Invalid choice. Please try again.")
 
-def reset_tap_groups_txt():
-    global tap_groups
-    tap_groups = []
-    add_tap_group(['a','d'])
-    add_tap_group(['w','s'])
-    save_tap_groups()
-
 if __name__ == "__main__":
-
-
     try:
         load_tap_groups()
     except:
