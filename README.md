@@ -7,8 +7,14 @@ Snap Tapping ensures that the most recent key input is prioritized, even if an o
 
 With Tap Groupings you can define your own sets of keys to be oberserved together and be seperately handled. The key presses for each Tap Grouping are mutually exclusive - only one will be pressed as output.
 
-### Examples Use Cases
+Now with CLI User Interfave to manage Tap Groupings:
+<img src="https://github.com/user-attachments/assets/e9226387-cc8e-40cf-9415-976abe365903" width="400" />
 
+Tap Groupings are now saved in a seperate tap_groups.txt file which can be edited. 
+Each Line represents on Tap Group and each key is to be seperated by a comma.
+String representation or vk-codes (virtual keyboard Codes - list in py file) can be used.
+
+### Examples Use Cases
 - Movement Left Right
 - Movement Forward and Backwards
 - Leaning to the sides
@@ -20,6 +26,9 @@ With Tap Groupings you can define your own sets of keys to be oberserved togethe
     - Pitch
     - Roll
 
+V0.3
+- added cli UI to manage tap groupings
+- tap_groups.txt is used to save actual tap groupings, can be edited by hand if needed
 
 V0.22
 - renamed to Free Snap Tap
@@ -44,16 +53,21 @@ Consider a gaming scenario where you are using the WASD keys for movement:
 
 ## Easy Usage
 
-- Start via free_snap_tap.exe and a Command Window will open with further explanations. (Tap Groupings are active for a+d and w+s)
-- If you want to configure the Tap Grouping you have to see "Installation to Edit Tap Groupings".
+- Start via free_snap_tap_txtgui.exe and a Command Line Interface will open with further explanations.
+- Nothing more to do - Tap Groups can be defined via CLI.
 - Have fun. :-)
+
+## Configuration
+Tap Groupings are a set of keys that are observed and the output of each group is seperately handled. Activtaion of a key is mutually exclusive to all others - so there will always be only one activated key.
+
+You can define Tap Groupings via Command Line, via tap_groups.txt or in the Python file under the # Tap Groups section. 
 
 ## Controls
 
 - **Toggle Pause:** Press the DELETE key to pause or resume the program.
 - **Stop Execution:** Press the END key to stop the program.
 
-## Requirements
+## Requirements if you want to use the py file direcly
 
 - Python 3.6 or higher
 - `pynput` library
@@ -63,7 +77,8 @@ Install the `pynput` library using pip:
 ```bash
 pip install pynput
 ```
-## Installation to Edit Tap Groupings
+
+## Installation 
 
 1. **Install Python**: Ensure Python 3.6 or higher is installed on your system. You can download it from [python.org](https://www.python.org/).
 
@@ -71,31 +86,14 @@ pip install pynput
    ```bash
    pip install pynput
    ```
-3. **Start the Program:** Run the snap.tap.bat file to start the Snap-Tap program:
+3. **Start the Program:** Run the snap_tap.bat file to start the Snap-Tap program:
    ```bash
-   ./free_snap_tap.bat
+   ./free_snap_tap_txtgui.bat
    ```
    or
    ```bash
-   python ./free_snap_tap.py
+   python ./free_snap_tap_txtgui.py
    ```
   or by directly clicking/executing the free_snap_tap.bat file.
 
-## Configuration
-Tap Groupings are a set of keys that are observed and the output of each group is seperately handled. Activtaion of a key is mutually explusive to all others - so there will always be only one activated key.
-
-You can define Tap Groupings in the Python file under the # Tap Groups section. Add or remove lists with the keys as characters/strings or vk_code (overview of most found in .py file). 
-
-### Example:
-
-  ```python
-# Tap Groups (input can be char/str and/or vk-codes (mixes possible) - see dicts directly above)
-tap_groups = [
-    ['w', 's'], 
-    ['a', 'd'],  
-    #['ctrl', 'space'], 
-    #['q', 'e'],
-    #['1', '2', '3', '4'],  
-]
-  ```
 
