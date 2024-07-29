@@ -6,15 +6,17 @@ A Python-based Snap Tapping program compatible with all keyboards, providing enh
 
 Snap Tapping ensures that the most recent key input is prioritized, even if an opposing key is still pressed. This feature is particularly useful in gaming scenarios where precise control is crucial.
 
-With **Tap Groupings**, you can define your own sets of keys to be observed together and be separately handled. The key presses for each Tap Grouping are mutually exclusive — only one will be pressed as output.
+With **Tap Groupings**, you can define your own sets of keys to be observed together and be separately handled. The key presses for each Tap Grouping are mutually exclusive — only one will be pressed at a time. 
+As long as one key is still pressed it will be send as output - so e.g. fast tapping `D` while holding `A` (or reversed) and so rapid switching between `A` and `D` is possible.
 
 Now with CLI User Interface to manage Tap Groupings:
 
-<img src="https://github.com/user-attachments/assets/044bf4e5-f433-46e0-9d19-6f3ba11b8685" width="400" />
+<img src="https://github.com/user-attachments/assets/044bf4e5-f433-46e0-9d19-6f3ba11b8685" width="400"/>
 
 Tap Groupings are now saved in a separate `tap_groups.txt` file which can be edited.
 
-Each line represents one Tap Group, and each key is to be separated by a comma.
+Each line represents one Tap Group, and each key is to be separated by a comma and can have 2 or more keys in it. 
+(e.g. `1, 2, 3, 4` or `left_shift, left_control, alt` would also be possible)
 
 String representation or vk-codes (virtual keyboard codes—list in py file) can be used.
 
@@ -51,14 +53,14 @@ Snap Tapping is a feature that enhances your keyboard's responsiveness by priori
 
 1. **Intercepting Keyboard Input:** The program monitors the keys defined in the Tap Groupings. When you press any of these keys, the program intercepts the input.
 2. **Suppressing Original Input:** Instead of allowing the original key press to be sent directly to your computer, the program suppresses it. This means the original input is not immediately processed by your system or application.
-3. **Sending Idealized Input:** The program then determines the ideal input based on the most recent key press. For example, if you press "A" and then "D" without releasing "A", the program will prioritize "D". This idealized input is then sent to your system, ensuring that the most recent direction is registered.
+3. **Sending Idealized Input:** The program then determines the ideal input based on the most recent key press. For example, if you press `A` and then `D` without releasing `A`, the program will prioritize `D` and if you release `D`, `A` will be pressed again as long it is pressed. This idealized input is then sent to your system, ensuring that the most recent direction is registered.
 
 ### Example Scenario
 
 Consider a gaming scenario where you are using the WASD keys for movement:
 
-- **Without Snap Tapping:** Pressing "A" (left) and then "D" (right) simultaneously might cause your character to stop moving because the game receives conflicting inputs.
-- **With Snap Tapping:** Pressing "A" (left) and then "D" (right) will result in the program sending only the "D" input, allowing your character to move right without interruption.
+- **Without Snap Tapping:** Pressing `A` (left) and then `D` (right) simultaneously might cause your character to stop moving because the game receives conflicting inputs.
+- **With Snap Tapping:** Pressing `A` (left) and then `D` (right) will result in the program sending only the `D` input, allowing your character to move right without interruption.
 
 ## Easy Usage
 
