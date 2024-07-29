@@ -2,7 +2,7 @@
 
 **aka Snap Tapping**
 
-A minimalistic Python-based Snap Tapping program compatible with all keyboards, providing enhanced input prioritization for smoother gaming and typing experiences. Inspired by Razer Snap Tap Wooting SOCD & Null Bind.
+A minimalistic Python-based Snap Tapping program compatible with all keyboards, providing enhanced input prioritization for smoother gaming and typing experiences. Inspired by Razer Snap Tap and Wooting SOCD & Null Bind.
 
 Snap Tapping ensures that the most recent key input is prioritized, even if an opposing key is still pressed. This feature is particularly useful in gaming scenarios where precise control is crucial.
 
