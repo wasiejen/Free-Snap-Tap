@@ -1,8 +1,12 @@
 from pynput import keyboard
-import os
+import os # to use clearing of CLI for better menu usage
+import sys # to get arguments
+
 DEBUG = False
 PAUSED = False
+SKIP_MENU = False
 
+FILE_NAME = 'tap_groups.txt'
 # Constants for key events
 WM_KEYDOWN = 0x0100
 WM_KEYUP = 0x0101
@@ -57,7 +61,7 @@ vk_codes_dict = {
 # Tap groups define which keys are mutually exclusive
 tap_groups = []
 
-def load_tap_groups(filename='tap_groups.txt'):
+def load_tap_groups(filename=FILE_NAME):
     """
     Load tap groups from a text file.
     Each line in the file represents a tap group with keys separated by commas.
@@ -69,7 +73,7 @@ def load_tap_groups(filename='tap_groups.txt'):
             group = line.strip().split(',')
             tap_groups.append(group)
 
-def save_tap_groups(filename='tap_groups.txt'):
+def save_tap_groups(filename=FILE_NAME):
     """
     Save tap groups to a text file.
     Each line in the file represents a tap group with keys separated by commas.
@@ -108,7 +112,6 @@ def reset_tap_groups_txt():
     tap_groups = []
     add_tap_group(['a','d'])
     add_tap_group(['w','s'])
-    save_tap_groups()
 
 def initialize_tap_groups():
     """
@@ -210,14 +213,21 @@ def win32_event_filter(msg, data):
                     group[vk_code] = 0
                     send_keys(which_key_to_send(group_index), group_index)
                 listener.suppress_event()
+                # only the first instance of a key will be actualized 
+                # - no handling for a single key in multiple tap groups
+                break
 
 def display_menu():
     """
-    Display the menu and handle user input when the script is PAUSEDd.
+    Display the menu and handle user input when the script is PAUSED.
     """
+    invalid_input = False
     while True:       
         # clear the CLI
         os.system('cls||clear')
+        if invalid_input:
+            print("Invalid choice. Please try again.\n")
+            invalid_input = False
         print("Active Tap Groups:")
         display_tap_groups()
         print('\n --- Options ---')
@@ -243,18 +253,37 @@ def display_menu():
         elif choice == '4' or choice == '':
             break
         else:
-            print("Invalid choice. Please try again.")
-
+            invalid_input = True
+      
 if __name__ == "__main__":
+
+        # check if arguments are passed
+    if len(sys.argv) > 1:
+        for arg in sys.argv[1:]:
+            if DEBUG: print(arg)
+            if arg == "-direct_start" or arg == "-nomenu":
+                SKIP_MENU = True
+            # TODO: not working right now - do not know why
+            # I get a correct file name out of it but the overwritten FILE_NAME will just be ignored
+            # elif arg[:5] == '-txt=' and len(arg) > 5:
+            #     FILE_NAME = arg[5:]
+            #     if DEBUG: print(FILE_NAME)
+            elif arg == "-debug":
+                DEBUG = True
+            else:
+                print("unknown start argument: ", arg)
+
+    # try loading tap groups from file
     try:
         load_tap_groups()
     except:
-        # if not tap_groups.txt file exist make initialis tap_groups and write new file out
+        # if no tap_groups.txt file exist create new one
         reset_tap_groups_txt()
 
     initialize_tap_groups()
 
-    display_menu()
+    if not SKIP_MENU:
+        display_menu()
 
     print('\n--- Free Snap Tap started ---')
     print('--- toggle PAUSED with DELETE key ---')
