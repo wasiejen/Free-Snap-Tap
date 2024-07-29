@@ -15,23 +15,28 @@ Now with CLI User Interface to manage Tap Groupings:
 
 Tap Groupings are now saved in a separate `tap_groups.txt` file which can be edited.
 
-Each line represents one Tap Group, and each key is to be separated by a comma and can have 2 or more keys in it. 
-(e.g. `1, 2, 3, 4` or `left_shift, left_control, alt` would also be possible)
+Each line represents one Tap Group, and each key is to be separated by a comma and can have 1 or more keys in it. 
+(e.g. `1, 2, 3, 4` or `left_shift, left_control, alt` or just `v` would also be possible)
 
 String representation or vk-codes (virtual keyboard codes—list in py file) can be used.
 
 ### Example Use Cases
 
-- Movement Left/Right
-- Movement Forward/Backward
-- Leaning to the sides
-- Fast weapon switching
+- Movement Left/Right (Tap Group `a, d` and/or `left_arrow, right_arrow`)
+- Movement Forward/Backward (Tap Group `w, s` and/or `up_arrow, down_arrow`)
+- Leaning to the sides (Tap Group `e, q`)
+- Fast weapon switching (Tap Group `1, 2, 3, 4`)
 - Flight/Space Sim:
   - Throttle Up/Down
-  - Movement Up/Down
+  - Movement Up/Down (Tap Group `r, f`)
   - Yaw Left/Right
   - Pitch Up/Down
   - Roll Left/Right
+ 
+- Single key Tap Groups:
+  - e.g. (Tap Group `v`) would transform output while holding the key from "vvvvvvvvvvv..." to just "v". (might depend on keyboard used)
+    - Use case you ask? I have no idea right now. ;-D
+    - Might be useful for people who want to have only one character written at a time independent from how long the key is pressed. Add every key each to a Tap Group and all keys will always only write one character.
 
 ### Version History
 
