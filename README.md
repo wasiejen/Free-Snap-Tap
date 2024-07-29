@@ -6,8 +6,8 @@ A Python-based Snap Tapping program compatible with all keyboards, providing enh
 
 Snap Tapping ensures that the most recent key input is prioritized, even if an opposing key is still pressed. This feature is particularly useful in gaming scenarios where precise control is crucial.
 
-With **Tap Groupings**, you can define your own sets of keys to be observed together and be separately handled. The key presses for each Tap Grouping are mutually exclusive — only one will be pressed at a time. 
-As long as one key is still pressed it will be send as output - so e.g. fast tapping `D` while holding `A` (or reversed) and so rapid switching between `A` and `D` is possible.
+With **Tap Groupings**, you can define your own sets of keys to be observed together and be separately handled. The key presses for each Tap Grouping are mutually exclusive — only one will be sent as input at any time. 
+As long as one key is still pressed it will be send as input - so e.g. fast tapping `D` while holding `A` (or reversed) and so rapid switching between `A` and `D` is possible.
 
 Now with CLI User Interface to manage Tap Groupings:
 
