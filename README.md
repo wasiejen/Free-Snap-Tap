@@ -43,8 +43,8 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
 **V0.31:**
 - added small fixes
   - no handling of a single key in multiple tap Groups any more - resulted in strange behavior
-  - added option to start without menu
-    - just ad -nomenu or use prepared bat file to start directly with defined Tap Groupings in tap_groups.txt
+- added option to start without menu
+  - just ad -nomenu or use prepared bat file to start directly with defined Tap Groupings in tap_groups.txt
 
 **V0.3:**
 - Added CLI UI to manage tap groupings.
