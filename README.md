@@ -109,8 +109,11 @@ pip install pynput
 ```bash
 pip install pynput
 ```
+3. **Starting the Program:**
 
-3. **Start the Program:** Run the `snap_tap.bat` file to start the Snap-Tap program:
+    3.1 **Option A: directly:** By  clicking/executing the `free_snap_tap.bat` file.
+
+    3.2 **Option B: via Command Line:** Start a Command Line/Terminal, navigate to the folder containing the .py file and use one of the follwing commands:
 
 ```bash
 ./free_snap_tap.bat
@@ -121,5 +124,3 @@ or
 ```bash
 python ./free_snap_tap.py
 ```
-
-or by directly clicking/executing the `free_snap_tap.bat` file.
