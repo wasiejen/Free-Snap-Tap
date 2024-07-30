@@ -40,6 +40,12 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
 
 ### Version History
 
+**V0.32**
+- added option to load and save tap groupings to custom files.
+  - add `-txt=` followed with filename (e.g. -txt=starcitizen.txt) to the bat file or the link to the execution file
+- small edits in py file
+- some comments
+
 **V0.31:**
 - added small fixes
   - no handling of a single key in multiple tap Groups any more - resulted in strange behavior
