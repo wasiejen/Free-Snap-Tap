@@ -1,20 +1,27 @@
 from pynput import keyboard
 import os # to use clearing of CLI for better menu usage
-import sys # to get arguments
+import sys # to get start arguments
 
 DEBUG = False
 PAUSED = False
 SKIP_MENU = False
 
+# Define File name for saving of Tap Groupings
 FILE_NAME = 'tap_groups.txt'
+
 # Constants for key events
 WM_KEYDOWN = 0x0100
 WM_KEYUP = 0x0101
 EXIT_KEY = 35  # END key vkcode 35
 TOGGLE_ON_OFF_KEY = 46  # DELETE key vkcode 46
+PRESS = True
+RELEASE = False
 
 # Flag to indicate when a key press should not be suppressed
 simulating_key_press = False
+
+# Tap groups define which keys are mutually exclusive
+tap_groups = []
 
 # Initialize the Controller
 controller = keyboard.Controller()
@@ -58,27 +65,24 @@ vk_codes_dict = {
     'pa1': 253, 'oem_clear': 254
 }
 
-# Tap groups define which keys are mutually exclusive
-tap_groups = []
-
-def load_tap_groups(filename=FILE_NAME):
+def load_tap_groups():
     """
     Load tap groups from a text file.
     Each line in the file represents a tap group with keys separated by commas.
     """
     global tap_groups
     tap_groups = []
-    with open(filename, 'r') as file:
+    with open(FILE_NAME, 'r') as file:
         for line in file:
             group = line.strip().split(',')
             tap_groups.append(group)
 
-def save_tap_groups(filename=FILE_NAME):
+def save_tap_groups():
     """
     Save tap groups to a text file.
     Each line in the file represents a tap group with keys separated by commas.
     """
-    with open(filename, 'w') as file:
+    with open(FILE_NAME, 'w') as file:
         for group in tap_groups:
             file.write(','.join(group) + '\n')
 
@@ -162,21 +166,20 @@ def send_keys(key_to_send, group_index):
     if key_to_send != last_key_send:
         if key_to_send is None:
             if last_key_send is not None:
-                touch_key(False, last_key_send)
+                simulate_key_event(RELEASE, last_key_send)
             tap_groups_last_key_send[group_index] = None
         else:
             if last_key_send is not None:
-                touch_key(False, last_key_send)
-            touch_key(True, key_to_send)
+                simulate_key_event(RELEASE, last_key_send)
+            simulate_key_event(PRESS, key_to_send)
             tap_groups_last_key_send[group_index] = key_to_send
 
-def touch_key(is_press, key):
+def simulate_key_event(is_press, key):
     """
     Simulate a key press or release.
     """
     global simulating_key_press
-    if DEBUG:
-        print("KeyCode: ", keyboard.KeyCode.from_vk(key))
+    if DEBUG: print("KeyCode: ", keyboard.KeyCode.from_vk(key))
     simulating_key_press = True
     controller.touch(keyboard.KeyCode.from_vk(key), is_press)
     simulating_key_press = False
@@ -192,7 +195,8 @@ def win32_event_filter(msg, data):
     if vk_code == EXIT_KEY and msg == WM_KEYUP:
         print('\n--- Stopping execution ---')
         listener.stop()
-    # Toggle PAUSED/resume if the DELETE key is released
+
+    # Toggle paused/resume if the DELETE key is released
     elif vk_code == TOGGLE_ON_OFF_KEY and msg == WM_KEYUP:
         if PAUSED:
             print('--- resumed ---')
@@ -200,8 +204,8 @@ def win32_event_filter(msg, data):
         else:
             print('--- paused ---')
             PAUSED = True
-            # display_menu()
-    # Intercept key events if not PAUSEDd and not simulating key press
+
+    # Intercept key events if not PAUSED and not simulating key press
     elif not PAUSED and not simulating_key_press:
         for group_index, group in enumerate(tap_groups_states_dict):
             if vk_code in group:
@@ -219,7 +223,7 @@ def win32_event_filter(msg, data):
 
 def display_menu():
     """
-    Display the menu and handle user input when the script is PAUSED.
+    Display the menu and handle user input
     """
     invalid_input = False
     while True:       
@@ -257,17 +261,18 @@ def display_menu():
       
 if __name__ == "__main__":
 
-        # check if arguments are passed
+    # check if start arguments are passed
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             if DEBUG: print(arg)
+            # start directly without showing the menu
             if arg == "-direct_start" or arg == "-nomenu":
                 SKIP_MENU = True
-            # TODO: not working right now - do not know why
-            # I get a correct file name out of it but the overwritten FILE_NAME will just be ignored
-            # elif arg[:5] == '-txt=' and len(arg) > 5:
-            #     FILE_NAME = arg[5:]
-            #     if DEBUG: print(FILE_NAME)
+            # use custom tap groups file for loading and saving
+            elif arg[:5] == '-txt=' and len(arg) > 5:
+                FILE_NAME = arg[5:]
+                if DEBUG: print(FILE_NAME)
+            # Debug .. what else :-D
             elif arg == "-debug":
                 DEBUG = True
             else:
@@ -276,8 +281,8 @@ if __name__ == "__main__":
     # try loading tap groups from file
     try:
         load_tap_groups()
-    except:
-        # if no tap_groups.txt file exist create new one
+    # if no tap_groups.txt file exist create new one
+    except FileNotFoundError:
         reset_tap_groups_txt()
 
     initialize_tap_groups()
