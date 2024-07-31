@@ -258,9 +258,15 @@ def display_menu():
             break
         else:
             invalid_input = True
-      
-if __name__ == "__main__":
 
+def check_root():
+    if os.name != 'nt' and os.geteuid() != 0:
+        raise PermissionError("This script needs to be run as root on Linux")
+
+if __name__ == "__main__":
+    # check for root on linux systems
+    check_root()
+    
     # check if start arguments are passed
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
