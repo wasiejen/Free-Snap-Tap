@@ -38,7 +38,7 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
     - Use case you ask? I have no idea right now. ;-D
     - Might be useful for people who want to have only one character written at a time independent from how long the key is pressed. Add every key each to a Tap Group and all keys will always only write one character.
 
-## Version Inforation
+## Version Information
 
 **V0.32**
 - added option to load and save tap groupings to custom files.
@@ -109,6 +109,13 @@ or
 ```bash
 python ./free_snap_tap.py
 ```
+## On Linux
+
+On Linux the script needs to be run as root due to the way pynput (uinput) interacts with the kernel to get and send key events. But I have not tested it on Linux myself.
+
+## On Feedback:
+
+Feel free to give feedback. This program is a fun project to me to get more comfortable with Github and testing out some things in Python. :-)
 
 ### Version History
 
