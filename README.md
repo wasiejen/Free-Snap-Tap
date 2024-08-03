@@ -39,6 +39,8 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
     - Might be useful for people who want to have only one character written at a time independent from how long the key is pressed. Add every key each to a Tap Group and all keys will always only write one character.
 
 ## Version Information
+**V0.35**
+- fixed bug that disabled snap tapping in V0.34
 
 **V0.34**
 - added start argument `-nocontrols` to start it without the controls `DEL` and `END` enabled
