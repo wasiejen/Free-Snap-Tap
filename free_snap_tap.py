@@ -2,7 +2,7 @@ from pynput import keyboard
 import os # to use clearing of CLI for better menu usage
 import sys # to get start arguments
 
-DEBUG = False
+DEBUG = 1 #False
 PAUSED = False
 SKIP_MENU = False
 CONTROLS_ENABLED = True
@@ -185,10 +185,10 @@ def simulate_key_event(is_press, key):
     controller.touch(keyboard.KeyCode.from_vk(key), is_press)
     simulating_key_press = False
 
-replace_key_from = {vk_codes_dict["oem_102"]: vk_codes_dict["left_control"],
-                    vk_codes_dict["left_windows"]: vk_codes_dict["left_control"]}
+#replace_key_from = {vk_codes_dict["oem_102"]: vk_codes_dict["left_control"],
+#                    vk_codes_dict["left_windows"]: vk_codes_dict["left_control"]}
 
-is_press = {WM_KEYDOWN: 1, WM_KEYUP: 0}
+#is_press = {WM_KEYDOWN: 1, WM_KEYUP: 0}
 
 def win32_event_filter(msg, data):
     """
@@ -198,28 +198,28 @@ def win32_event_filter(msg, data):
     vk_code = data.vkCode
     if DEBUG: print(vk_code)
 
-    # Replace some Buttons :-D
-    if not PAUSED:
-        if vk_code in list(replace_key_from.keys()):
-            if DEBUG: print(vk_code)
-            vk_code = replace_key_from[vk_code]
-            simulate_key_event(is_press[msg], vk_code)
-            listener.suppress_event()
+    # # Replace some Buttons :-D
+    # if not PAUSED:
+    #     if vk_code in list(replace_key_from.keys()):
+    #         if DEBUG: print(vk_code)
+    #         vk_code = replace_key_from[vk_code]
+    #         simulate_key_event(is_press[msg], vk_code)
+    #         listener.suppress_event()
 
-    if CONTROLS_ENABLED:
-        # Stop the listener if the END key is released
-        if vk_code == EXIT_KEY and msg == WM_KEYUP:
-            print('\n--- Stopping execution ---')
-            listener.stop()
+   
+    # Stop the listener if the END key is released
+    if CONTROLS_ENABLED and vk_code == EXIT_KEY and msg == WM_KEYUP:
+        print('\n--- Stopping execution ---')
+        listener.stop()
 
-        # Toggle paused/resume if the DELETE key is released
-        elif vk_code == TOGGLE_ON_OFF_KEY and msg == WM_KEYUP:
-            if PAUSED:
-                print('--- resumed ---')
-                PAUSED = False
-            else:
-                print('--- paused ---')
-                PAUSED = True
+    # Toggle paused/resume if the DELETE key is released
+    elif CONTROLS_ENABLED and vk_code == TOGGLE_ON_OFF_KEY and msg == WM_KEYUP:
+        if PAUSED:
+            print('--- resumed ---')
+            PAUSED = False
+        else:
+            print('--- paused ---')
+            PAUSED = True
 
     # Intercept key events if not PAUSED and not simulating key press
     elif not PAUSED and not simulating_key_press:
@@ -280,7 +280,7 @@ def check_root():
         raise PermissionError("This script needs to be run as root on Linux")
 
 def check_start_arguments():
-    global DEBUG, SKIP_MENU, FILE_NAME
+    global DEBUG, SKIP_MENU, FILE_NAME, CONTROLS_ENABLED
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             if DEBUG: print(arg)
