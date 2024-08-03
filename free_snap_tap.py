@@ -185,12 +185,26 @@ def simulate_key_event(is_press, key):
     controller.touch(keyboard.KeyCode.from_vk(key), is_press)
     simulating_key_press = False
 
+replace_key_from = {vk_codes_dict["oem_102"]: vk_codes_dict["left_control"],
+                    vk_codes_dict["left_windows"]: vk_codes_dict["left_control"]}
+
+is_press = {WM_KEYDOWN: 1, WM_KEYUP: 0}
+
 def win32_event_filter(msg, data):
     """
     Filter and handle keyboard events.
     """
     global PAUSED
     vk_code = data.vkCode
+    if DEBUG: print(vk_code)
+
+    # Replace some Buttons :-D
+    if not PAUSED:
+        if vk_code in list(replace_key_from.keys()):
+            if DEBUG: print(vk_code)
+            vk_code = replace_key_from[vk_code]
+            simulate_key_event(is_press[msg], vk_code)
+            listener.suppress_event()
 
     if CONTROLS_ENABLED:
         # Stop the listener if the END key is released
@@ -265,11 +279,8 @@ def check_root():
     if os.name != 'nt' and os.geteuid() != 0:
         raise PermissionError("This script needs to be run as root on Linux")
 
-if __name__ == "__main__":
-    # check for root on linux systems
-    check_root()
-    
-    # check if start arguments are passed
+def check_start_arguments():
+    global DEBUG, SKIP_MENU, FILE_NAME
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             if DEBUG: print(arg)
@@ -287,6 +298,13 @@ if __name__ == "__main__":
                 CONTROLS_ENABLED = False
             else:
                 print("unknown start argument: ", arg)
+
+if __name__ == "__main__":
+    # check for root on linux systems
+    check_root()
+    
+    # check if start arguments are passed
+    check_start_arguments()
 
     # try loading tap groups from file
     try:
