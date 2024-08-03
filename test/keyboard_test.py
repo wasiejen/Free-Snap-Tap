@@ -16,14 +16,8 @@ def on_key_event(event):
 
 
 
-
-
-
-
-
-
 # Hook the keyboard events
-keyboard.block_key('a')
+#keyboard.block_key('a')
 keyboard.hook(on_key_event)
 
 keyboard.wait('esc')
