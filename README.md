@@ -40,6 +40,9 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
 
 ## Version Information
 
+**V0.34**
+- added start argument `-nocontrols` to start it without the controls ´DEL´ and `END` enabled
+
 **V0.32**
 - added option to load and save tap groupings to custom files.
   - add `-txt=` followed with filename (e.g. -txt=starcitizen.txt) to the bat file or the link to the execution file

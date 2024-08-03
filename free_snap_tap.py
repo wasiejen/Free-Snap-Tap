@@ -283,7 +283,7 @@ if __name__ == "__main__":
             # Debug .. what else :-D
             elif arg == "-debug":
                 DEBUG = True
-            elif arg == "-nocontrols"
+            elif arg == "-nocontrols":
                 CONTROLS_ENABLED = False
             else:
                 print("unknown start argument: ", arg)
