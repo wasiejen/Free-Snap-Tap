@@ -106,13 +106,18 @@ or
 ```bash
 python ./free_snap_tap.py
 ```
-## On Linux - **Not working atm**
+## On Linux - **Not working**
 
 Will not work with the actual package pynput to use the event handling. In Linux this package only supports full supression of key events. And I only selectively supress key events and let every key not part of a tap group be. Since this is not feasable atm with this package and the implementation I used there is no linux support atm.
+
+## On MacOS - **Not working atm**
+
+Compared to linux the selective event supression is possible, but it uses another listener constructor and gets other data than the win32_event_filter which is used here. Since this conversion/switch/alternative is not implemented jet, the program will not work on MacOS. But there might be a fix for that in the future.
 
 ## On Feedback:
 
 Feel free to give feedback. This program is a fun project to me to get more comfortable with Github and testing out some things in Python. :-)
+If you have wishes or ideas what to add, just `create an issue` and mark it with the label `enhancement`.
 
 ### Version History
 
