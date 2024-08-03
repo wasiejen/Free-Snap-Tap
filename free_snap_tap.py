@@ -2,7 +2,7 @@ from pynput import keyboard
 import os # to use clearing of CLI for better menu usage
 import sys # to get start arguments
 
-DEBUG = 1 #False
+DEBUG = False
 PAUSED = False
 SKIP_MENU = False
 CONTROLS_ENABLED = True
