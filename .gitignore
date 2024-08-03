@@ -2,6 +2,7 @@
 /dist
 /build
 /old
+/test
 /__pycache__
 built.bat
 free_snap_tap.spec
