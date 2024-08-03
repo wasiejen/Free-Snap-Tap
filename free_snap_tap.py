@@ -1,7 +1,9 @@
 from pynput import keyboard
 import os # to use clearing of CLI for better menu usage
 import sys # to get start arguments
+import platform # to check for Linux
 
+IS_LINUX = False
 DEBUG = False
 PAUSED = False
 SKIP_MENU = False
@@ -11,8 +13,8 @@ CONTROLS_ENABLED = True
 FILE_NAME = 'tap_groups.txt'
 
 # Constants for key events
-WM_KEYDOWN = [256,260]
-WM_KEYUP = [257,261]
+WM_KEYDOWN = [256,260] # _PRESS_MESSAGES = (_WM_KEYDOWN, _WM_SYSKEYDOWN)
+WM_KEYUP = [257,261] # _RELEASE_MESSAGES = (_WM_KEYUP, _WM_SYSKEYUP)
 EXIT_KEY = 35  # END key vkcode 35
 TOGGLE_ON_OFF_KEY = 46  # DELETE key vkcode 46
 PRESS = True
@@ -139,6 +141,55 @@ def initialize_tap_groups():
     tap_groups_last_key_pressed = [None] * len(tap_groups)
     tap_groups_last_key_send = [None] * len(tap_groups)
 
+def win32_event_filter(msg, data):
+    """
+    Filter and handle keyboard events.
+    """
+    global PAUSED
+    vk_code = data.vkCode
+    if DEBUG: print(vk_code)
+    if DEBUG: print("msg: ", msg)
+    if DEBUG: print("data: ", data)
+
+    # # Replace some Buttons :-D
+    # if not PAUSED:
+    #     if vk_code in list(replace_key_from.keys()):
+    #         if DEBUG: print(vk_code)
+    #         vk_code = replace_key_from[vk_code]
+    #         simulate_key_event(is_press[msg], vk_code)
+    #         listener.suppress_event()
+
+   
+    # Stop the listener if the END key is released
+    if CONTROLS_ENABLED and vk_code == EXIT_KEY and msg in WM_KEYUP:
+        print('\n--- Stopping execution ---')
+        listener.stop()
+
+    # Toggle paused/resume if the DELETE key is released
+    elif CONTROLS_ENABLED and vk_code == TOGGLE_ON_OFF_KEY and msg in WM_KEYUP:
+        if PAUSED:
+            print('--- resumed ---')
+            PAUSED = False
+        else:
+            print('--- paused ---')
+            PAUSED = True
+
+    # Intercept key events if not PAUSED and not simulating key press
+    elif not PAUSED and not simulating_key_press:
+        for group_index, group in enumerate(tap_groups_states_dict):
+            if vk_code in group:
+                if msg in WM_KEYDOWN and group[vk_code] == 0:
+                    group[vk_code] = 1
+                    tap_groups_last_key_pressed[group_index] = vk_code
+                    send_keys(which_key_to_send(group_index), group_index)
+                elif msg in WM_KEYUP:
+                    group[vk_code] = 0
+                    send_keys(which_key_to_send(group_index), group_index)
+                if not IS_LINUX: listener.suppress_event()
+                # only the first instance of a key will be actualized 
+                # - no handling for a single key in multiple tap groups
+                break
+
 def which_key_to_send(group_index):
     """
     Determine which key to send based on the current state of the tap group.
@@ -167,11 +218,11 @@ def send_keys(key_to_send, group_index):
     if key_to_send != last_key_send:
         if key_to_send is None:
             if last_key_send is not None:
-                simulate_key_event(RELEASE, last_key_send)
+                if not IS_LINUX: simulate_key_event(RELEASE, last_key_send)
             tap_groups_last_key_send[group_index] = None
         else:
             if last_key_send is not None:
-                simulate_key_event(RELEASE, last_key_send)
+                if not IS_LINUX: simulate_key_event(RELEASE, last_key_send)
             simulate_key_event(PRESS, key_to_send)
             tap_groups_last_key_send[group_index] = key_to_send
 
@@ -189,55 +240,6 @@ def simulate_key_event(is_press, key):
 #                    vk_codes_dict["left_windows"]: vk_codes_dict["left_control"]}
 
 #is_press = {WM_KEYDOWN: 1, WM_KEYUP: 0}
-
-def win32_event_filter(msg, data):
-    """
-    Filter and handle keyboard events.
-    """
-    global PAUSED
-    vk_code = data.vkCode
-    if DEBUG: print(vk_code)
-    if DEBUG: print("msg: ", msg)
-    if DEBUG: print("data: ", data)
-
-    # # Replace some Buttons :-D
-    # if not PAUSED:
-    #     if vk_code in list(replace_key_from.keys()):
-    #         if DEBUG: print(vk_code)
-    #         vk_code = replace_key_from[vk_code]
-    #         simulate_key_event(is_press[msg], vk_code)
-    #         listener.suppress_event()
-
-   
-    # Stop the listener if the END key is released
-    if CONTROLS_ENABLED and vk_code == EXIT_KEY and msg == WM_KEYUP:
-        print('\n--- Stopping execution ---')
-        listener.stop()
-
-    # Toggle paused/resume if the DELETE key is released
-    elif CONTROLS_ENABLED and vk_code == TOGGLE_ON_OFF_KEY and msg == WM_KEYUP:
-        if PAUSED:
-            print('--- resumed ---')
-            PAUSED = False
-        else:
-            print('--- paused ---')
-            PAUSED = True
-
-    # Intercept key events if not PAUSED and not simulating key press
-    elif not PAUSED and not simulating_key_press:
-        for group_index, group in enumerate(tap_groups_states_dict):
-            if vk_code in group:
-                if msg in WM_KEYDOWN and group[vk_code] == 0:
-                    group[vk_code] = 1
-                    tap_groups_last_key_pressed[group_index] = vk_code
-                    send_keys(which_key_to_send(group_index), group_index)
-                elif msg in WM_KEYUP:
-                    group[vk_code] = 0
-                    send_keys(which_key_to_send(group_index), group_index)
-                listener.suppress_event()
-                # only the first instance of a key will be actualized 
-                # - no handling for a single key in multiple tap groups
-                break
 
 def display_menu():
     """
@@ -277,8 +279,15 @@ def display_menu():
         else:
             invalid_input = True
 
+def check_linux():
+    global IS_LINUX
+    if os.name != 'nt':
+        if platform.system() == 'Linux':
+            IS_LINUX = True
+    return IS_LINUX
+
 def check_root():
-    if os.name != 'nt' and os.geteuid() != 0:
+    if os.geteuid() != 0:
         raise PermissionError("This script needs to be run as root on Linux")
 
 def check_start_arguments():
@@ -303,7 +312,9 @@ def check_start_arguments():
 
 if __name__ == "__main__":
     # check for root on linux systems
-    check_root()
+
+    if check_linux():
+       check_root()
     
     # check if start arguments are passed
     check_start_arguments()
