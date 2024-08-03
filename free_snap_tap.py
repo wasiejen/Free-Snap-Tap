@@ -5,6 +5,7 @@ import sys # to get start arguments
 DEBUG = False
 PAUSED = False
 SKIP_MENU = False
+CONTROLS_ENABLED = True
 
 # Define File name for saving of Tap Groupings
 FILE_NAME = 'tap_groups.txt'
@@ -191,19 +192,20 @@ def win32_event_filter(msg, data):
     global PAUSED
     vk_code = data.vkCode
 
-    # Stop the listener if the END key is released
-    if vk_code == EXIT_KEY and msg == WM_KEYUP:
-        print('\n--- Stopping execution ---')
-        listener.stop()
+    if CONTROLS_ENABLED:
+        # Stop the listener if the END key is released
+        if vk_code == EXIT_KEY and msg == WM_KEYUP:
+            print('\n--- Stopping execution ---')
+            listener.stop()
 
-    # Toggle paused/resume if the DELETE key is released
-    elif vk_code == TOGGLE_ON_OFF_KEY and msg == WM_KEYUP:
-        if PAUSED:
-            print('--- resumed ---')
-            PAUSED = False
-        else:
-            print('--- paused ---')
-            PAUSED = True
+        # Toggle paused/resume if the DELETE key is released
+        elif vk_code == TOGGLE_ON_OFF_KEY and msg == WM_KEYUP:
+            if PAUSED:
+                print('--- resumed ---')
+                PAUSED = False
+            else:
+                print('--- paused ---')
+                PAUSED = True
 
     # Intercept key events if not PAUSED and not simulating key press
     elif not PAUSED and not simulating_key_press:
@@ -281,6 +283,8 @@ if __name__ == "__main__":
             # Debug .. what else :-D
             elif arg == "-debug":
                 DEBUG = True
+            elif arg == "-nocontrols"
+                CONTROLS_ENABLED = False
             else:
                 print("unknown start argument: ", arg)
 
