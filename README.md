@@ -112,9 +112,9 @@ or
 ```bash
 python ./free_snap_tap.py
 ```
-## On Linux
+## On Linux - **Not working atm**
 
-On Linux the script needs to be run as root due to the way pynput (uinput) interacts with the kernel to get and send key events. But I have not tested it on Linux myself.
+Will not work with the actual package pynput to use the event handling. In Linux this package only supports full supression of key events. And I only selectively supress key events and let every key not part of a tap group be. Since this is not feasable atm with this package and the implementation I used there is no linux support atm.
 
 ## On Feedback:
 
