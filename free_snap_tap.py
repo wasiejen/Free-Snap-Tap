@@ -218,11 +218,11 @@ def send_keys(key_to_send, group_index):
     if key_to_send != last_key_send:
         if key_to_send is None:
             if last_key_send is not None:
-                simulate_key_event(RELEASE, last_key_send)
+                if not IS_LINUX: simulate_key_event(RELEASE, last_key_send)
             tap_groups_last_key_send[group_index] = None
         else:
             if last_key_send is not None:
-                simulate_key_event(RELEASE, last_key_send)
+                if not IS_LINUX: simulate_key_event(RELEASE, last_key_send)
             simulate_key_event(PRESS, key_to_send)
             tap_groups_last_key_send[group_index] = key_to_send
 
@@ -313,8 +313,8 @@ def check_start_arguments():
 if __name__ == "__main__":
     # check for root on linux systems
 
-    #if check_linux():
-    #    check_root()
+    if check_linux():
+       check_root()
     
     # check if start arguments are passed
     check_start_arguments()
