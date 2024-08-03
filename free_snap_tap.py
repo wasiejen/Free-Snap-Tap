@@ -11,8 +11,8 @@ CONTROLS_ENABLED = True
 FILE_NAME = 'tap_groups.txt'
 
 # Constants for key events
-WM_KEYDOWN = 0x0100
-WM_KEYUP = 0x0101
+WM_KEYDOWN = [256,260]
+WM_KEYUP = [257,261]
 EXIT_KEY = 35  # END key vkcode 35
 TOGGLE_ON_OFF_KEY = 46  # DELETE key vkcode 46
 PRESS = True
@@ -197,6 +197,8 @@ def win32_event_filter(msg, data):
     global PAUSED
     vk_code = data.vkCode
     if DEBUG: print(vk_code)
+    if DEBUG: print("msg: ", msg)
+    if DEBUG: print("data: ", data)
 
     # # Replace some Buttons :-D
     # if not PAUSED:
@@ -225,11 +227,11 @@ def win32_event_filter(msg, data):
     elif not PAUSED and not simulating_key_press:
         for group_index, group in enumerate(tap_groups_states_dict):
             if vk_code in group:
-                if msg == WM_KEYDOWN and group[vk_code] == 0:
+                if msg in WM_KEYDOWN and group[vk_code] == 0:
                     group[vk_code] = 1
                     tap_groups_last_key_pressed[group_index] = vk_code
                     send_keys(which_key_to_send(group_index), group_index)
-                elif msg == WM_KEYUP:
+                elif msg in WM_KEYUP:
                     group[vk_code] = 0
                     send_keys(which_key_to_send(group_index), group_index)
                 listener.suppress_event()
