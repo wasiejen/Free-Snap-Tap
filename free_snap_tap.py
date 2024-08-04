@@ -11,7 +11,7 @@ CONTROLS_ENABLED = True
 
 # Define File name for saving of Tap Groupings and Key Replacements
 FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
-FILE_NAME_KEY_REPLACEMENTS = 'key_replacements_groups.txt'
+FILE_NAME_KEY_REPLACEMENTS = 'key_replacement_groups.txt'
 
 # Constants for key events
 WM_KEYDOWN = [256,260] # _PRESS_MESSAGES = (_WM_KEYDOWN, _WM_SYSKEYDOWN)
@@ -22,7 +22,7 @@ TOGGLE_ON_OFF_KEY = 46  # DELETE key vkcode 46
 # Tap groups define which keys are mutually exclusive
 tap_groups = []
 
-key_replacements = []
+key_replacement_groups = []
 
 # Initialize the Controller
 controller = keyboard.Controller()
@@ -99,7 +99,7 @@ def add_group(new_group, data_object):
     Add a new tap group.
     """
     data_object.append(new_group)
-    save_groups(FILE_NAME_TAP_GROUPS, data_object)
+    #save_groups(file_name, data_object)
 
 def delete_group(index, data_object):
     """
@@ -107,7 +107,7 @@ def delete_group(index, data_object):
     """
     if 0 <= index < len(data_object):
         del data_object[index]
-        save_groups(FILE_NAME_TAP_GROUPS, data_object)
+    #    save_groups(file_name, data_object)
 
 def reset_tap_groups_txt():
     """
@@ -117,27 +117,35 @@ def reset_tap_groups_txt():
     tap_groups = []
     add_group(['a','d'], tap_groups)
     add_group(['w','s'], tap_groups)
-
+    save_groups(FILE_NAME_TAP_GROUPS, tap_groups)
 
 def reset_key_replacement_txt():
-    global key_replacements_groups
-    key_replacements_groups = []
-    save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacements_groups)
+    """
+    Reset key_replacement_groups and initialise empty txt file
+    """
+    global key_replacement_groups
+    key_replacement_groups = []
+    add_group(['oem_102','left_shift'], key_replacement_groups)
+    add_group(['left_windows','left_control'], key_replacement_groups)
+    save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
 
 
-def replace_key_strings_with_vk_codes(data_object, data_dict_object):
-    for group in data_object:
-        group_state = {}
-        for key in group:
-            if isinstance(key, str):
-                try:
-                    key = vk_codes_dict[key]
-                except KeyError as error_msg:
-                    print("!!! Wrong string as a key used: ", error_msg)
-                    break
-            group_state[key] = 0
-        data_dict_object.append(group_state)
+def convert_to_vk_code(key):
+    if isinstance(key, str):
+        return vk_codes_dict[key]
+    else:
+        raise KeyError
 
+def initialize_key_replacement_groups():
+    global key_replacement_dict
+    key_replacement_dict = {}
+    if DEBUG: print("key groups: ", key_replacement_groups)
+    for group in key_replacement_groups:
+        key1, key2 = group
+        key1 = convert_to_vk_code(key1)
+        key2 = convert_to_vk_code(key2)
+        key_replacement_dict[key1] = key2
+    if DEBUG: print("key dict: ", key_replacement_dict)
 
 def initialize_tap_groups():
     """
@@ -145,13 +153,14 @@ def initialize_tap_groups():
     """
     global tap_groups_states_dict, tap_groups_last_key_pressed, tap_groups_last_key_send
     tap_groups_states_dict = []
-    replace_key_strings_with_vk_codes(tap_groups, tap_groups_states_dict)
-
+    for group in tap_groups:
+        group_state = {}
+        for key in group:
+            convert_to_vk_code(key)
+            group_state[key] = 0
+        tap_groups_states_dict.append(group_state)
     tap_groups_last_key_pressed = [None] * len(tap_groups)
     tap_groups_last_key_send = [None] * len(tap_groups)
-
-#replace_key_from = {vk_codes_dict["oem_102"]: vk_codes_dict["left_control"],
-#                    vk_codes_dict["left_windows"]: vk_codes_dict["left_control"]}
 
 def is_press(msg):
     if msg in WM_KEYDOWN:
@@ -165,20 +174,28 @@ def win32_event_filter(msg, data):
     """
     global PAUSED
     vk_code = data.vkCode
-    if DEBUG: print(vk_code)
-    if DEBUG: print("msg: ", msg)
-    if DEBUG: print("data: ", data)
+    if DEBUG: 
+        print(vk_code)
+        print("msg: ", msg)
+        print("data: ", data)
 
     # check for simulated keys:
     if not data.flags & 0x10:
 
-        # # Replace some Buttons :-D
-        # if not PAUSED and not IS_LINUX:
-        #     if vk_code in list(replace_key_from.keys()):
-        #         if DEBUG: print(vk_code)
-        #         key_code = keyboard.KeyCode.from_vk(replace_key_from[vk_code])
-        #         controller.touch(is_press(msg), key_code)
-        #         listener.suppress_event()
+        # Replace some Buttons :-D
+        if not PAUSED and not IS_LINUX:
+            if vk_code in list(key_replacement_dict.keys()):
+                key_code = keyboard.KeyCode.from_vk(key_replacement_dict[vk_code])
+                if DEBUG: 
+                    print("vk_code_gotten: ", vk_code)
+                    print("vk_code_replacement: ", key_replacement_dict[vk_code])
+                    print("key_code: ", key_code)
+                    print("is_press: ", is_press(msg))
+                if is_press(msg):
+                    controller.press(key_code)
+                else:
+                    controller.release(key_code)
+                listener.suppress_event()
 
         # Stop the listener if the END key is released
         if CONTROLS_ENABLED and vk_code == EXIT_KEY and msg in WM_KEYUP:
@@ -255,38 +272,93 @@ def display_menu():
     Display the menu and handle user input
     """
     invalid_input = False
+    text = ""
     while True:       
         # clear the CLI
         os.system('cls||clear')
         if invalid_input:
-            print("Invalid choice. Please try again.\n")
+            print(text)
+            print("Please try again.\n")
             invalid_input = False
+            text = ""
         print("Active Tap Groups:")
         display_groups(tap_groups)
-        print('\n --- Options ---')
+        print("\nActive Key Replacements:")
+        display_groups(key_replacement_groups)
+        print('\n --- Options Tap Groups---')
         print("1. Add Tap Group")
         print("2. Delete Tap Group")
         print("3. Reset tap_groups.txt file")
-        print("4. Start Snap Tapping :-)\n")
+        print('\n --- Options Key Replacements---')
+        print("4. Add Key Replacement Pair")
+        print("5. Delete Key Replacement Pair")
+        print("6. Reset key_replacement_groups.txt file\n")
+        print("7. Start Snap Tapping :-)\n")
 
         choice = input("Enter your choice: ")
 
         if choice == '0':
             display_groups(tap_groups)
         elif choice == '1':
-            new_group = input("Enter new tap group (keys separated by commas): ").split(',')
-            add_group(new_group, tap_groups)
-            initialize_tap_groups()
+            try:
+                new_group = input("Enter new tap group (keys separated by commas): ").replace(" ", "").split(',')
+                add_group(new_group, tap_groups)
+                initialize_tap_groups()
+                save_groups(FILE_NAME_TAP_GROUPS, tap_groups)
+            except KeyError as error_msg:
+                text = f"Error: Wrong string as a key used: {error_msg}"
+                invalid_input = True
+                delete_group(len(tap_groups) - 1, tap_groups)
         elif choice == '2':
-            index = int(input("Enter the index of the tap group to delete: "))
-            delete_group(index, tap_groups)
-            initialize_tap_groups()
+            try:
+                index = int(input("Enter the index of the tap group to delete: "))
+                if 0<= index < len(tap_groups):
+                    delete_group(index, tap_groups)
+                    initialize_tap_groups()
+                    save_groups(FILE_NAME_TAP_GROUPS, tap_groups)
+                else:
+                    text = "Error: Index outside of range of tap groups."
+                    invalid_input = True
+            except ValueError as error_msg:
+                text = "Error: Index was not a Number."
+                invalid_input = True
         elif choice == '3':
             reset_tap_groups_txt()
             initialize_tap_groups()
-        elif choice == '4' or choice == '':
+        elif choice == '4':
+            try:
+                new_group = input("Enter new key pair (2 keys separated by a comma): ").replace(" ", "").split(',')
+                if len(new_group) == 2:
+                    add_group(new_group, key_replacement_groups)
+                    initialize_key_replacement_groups()
+                    save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
+                else:
+                    text = "Error: For a pair only sets of 2 keys are valid."
+                    invalid_input = True
+            except KeyError as error_msg:
+                text = f"Error: Wrong string as a key used: {error_msg}"
+                invalid_input = True
+                delete_group(len(key_replacement_groups) - 1, key_replacement_groups)
+        elif choice == '5':
+            try:
+                index = int(input("Enter the index of the key pair to delete: "))
+                if 0<= index < len(key_replacement_groups):
+                    delete_group(index, key_replacement_groups)
+                    initialize_key_replacement_groups()
+                    save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
+                else:
+                    text = "Error: Index outside of range of key pairs."
+                    invalid_input = True
+            except ValueError as error_msg:
+                text = "Error: Index was not a Number."
+                invalid_input = True
+        elif choice == '6':
+            reset_key_replacement_txt()
+            initialize_key_replacement_groups()
+        elif choice == '7' or choice == '':
             break
         else:
+            text = "Error: Invalid input."
             invalid_input = True
 
 def check_linux():
@@ -332,14 +404,18 @@ if __name__ == "__main__":
     # try loading tap groups from file
     try:
         tap_groups = load_groups(FILE_NAME_TAP_GROUPS, tap_groups)
-        print("#1 ", tap_groups)
     # if no tap_groups.txt file exist create new one
     except FileNotFoundError:
         reset_tap_groups_txt()
-        print("#2 ", tap_groups)
-
-
     initialize_tap_groups()
+
+    # try loading key replacements from file
+    try:
+        key_replacement_groups = load_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
+    # if no tap_groups.txt file exist create new one
+    except FileNotFoundError:
+        reset_key_replacement_txt()
+    initialize_key_replacement_groups()
 
     if not SKIP_MENU:
         display_menu()
