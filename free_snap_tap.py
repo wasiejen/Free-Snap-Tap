@@ -9,22 +9,20 @@ PAUSED = False
 SKIP_MENU = False
 CONTROLS_ENABLED = True
 
-# Define File name for saving of Tap Groupings
-FILE_NAME = 'tap_groups.txt'
+# Define File name for saving of Tap Groupings and Key Replacements
+FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
+FILE_NAME_KEY_REPLACEMENTS = 'key_replacements_groups.txt'
 
 # Constants for key events
 WM_KEYDOWN = [256,260] # _PRESS_MESSAGES = (_WM_KEYDOWN, _WM_SYSKEYDOWN)
 WM_KEYUP = [257,261] # _RELEASE_MESSAGES = (_WM_KEYUP, _WM_SYSKEYUP)
 EXIT_KEY = 35  # END key vkcode 35
 TOGGLE_ON_OFF_KEY = 46  # DELETE key vkcode 46
-PRESS = True
-RELEASE = False
-
-# Flag to indicate when a key press should not be suppressed
-simulating_key_press = False
 
 # Tap groups define which keys are mutually exclusive
 tap_groups = []
+
+key_replacements = []
 
 # Initialize the Controller
 controller = keyboard.Controller()
@@ -68,48 +66,48 @@ vk_codes_dict = {
     'pa1': 253, 'oem_clear': 254
 }
 
-def load_tap_groups():
+def load_groups(file_name, data_object):
     """
     Load tap groups from a text file.
     Each line in the file represents a tap group with keys separated by commas.
     """
-    global tap_groups
-    tap_groups = []
-    with open(FILE_NAME, 'r') as file:
+    data_object = []
+    with open(file_name, 'r') as file:
         for line in file:
             group = line.strip().split(',')
-            tap_groups.append(group)
+            data_object.append(group)
+    return data_object
 
-def save_tap_groups():
+def save_groups(file_name, data_object):
     """
     Save tap groups to a text file.
     Each line in the file represents a tap group with keys separated by commas.
     """
-    with open(FILE_NAME, 'w') as file:
-        for group in tap_groups:
+    with open(file_name, 'w') as file:
+        for group in data_object:
             file.write(','.join(group) + '\n')
 
-def display_tap_groups():
+def display_groups(data_object):
     """
     Display the current tap groups.
     """
-    for index, group in enumerate(tap_groups):
+    for index, group in enumerate(data_object):
         print(f"{index}: {', '.join(group)}")
 
-def add_tap_group(new_group):
+def add_group(new_group, data_object):
     """
     Add a new tap group.
     """
-    tap_groups.append(new_group)
-    save_tap_groups()
+    data_object.append(new_group)
+    save_groups(FILE_NAME_TAP_GROUPS, data_object)
 
-def delete_tap_group(index):
+def delete_group(index, data_object):
     """
     Delete the tap group at the specified index.
     """
-    if 0 <= index < len(tap_groups):
-        del tap_groups[index]
-        save_tap_groups()
+    if 0 <= index < len(data_object):
+        del data_object[index]
+        save_groups(FILE_NAME_TAP_GROUPS, data_object)
 
 def reset_tap_groups_txt():
     """
@@ -117,16 +115,18 @@ def reset_tap_groups_txt():
     """
     global tap_groups
     tap_groups = []
-    add_tap_group(['a','d'])
-    add_tap_group(['w','s'])
+    add_group(['a','d'], tap_groups)
+    add_group(['w','s'], tap_groups)
 
-def initialize_tap_groups():
-    """
-    Initialize the state of each tap group
-    """
-    global tap_groups_states_dict, tap_groups_last_key_pressed, tap_groups_last_key_send
-    tap_groups_states_dict = []
-    for group in tap_groups:
+
+def reset_key_replacement_txt():
+    global key_replacements_groups
+    key_replacements_groups = []
+    save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacements_groups)
+
+
+def replace_key_strings_with_vk_codes(data_object, data_dict_object):
+    for group in data_object:
         group_state = {}
         for key in group:
             if isinstance(key, str):
@@ -136,10 +136,28 @@ def initialize_tap_groups():
                     print("!!! Wrong string as a key used: ", error_msg)
                     break
             group_state[key] = 0
-        tap_groups_states_dict.append(group_state)
+        data_dict_object.append(group_state)
+
+
+def initialize_tap_groups():
+    """
+    Initialize the state of each tap group
+    """
+    global tap_groups_states_dict, tap_groups_last_key_pressed, tap_groups_last_key_send
+    tap_groups_states_dict = []
+    replace_key_strings_with_vk_codes(tap_groups, tap_groups_states_dict)
 
     tap_groups_last_key_pressed = [None] * len(tap_groups)
     tap_groups_last_key_send = [None] * len(tap_groups)
+
+#replace_key_from = {vk_codes_dict["oem_102"]: vk_codes_dict["left_control"],
+#                    vk_codes_dict["left_windows"]: vk_codes_dict["left_control"]}
+
+def is_press(msg):
+    if msg in WM_KEYDOWN:
+        return True
+    if msg in WM_KEYUP:
+        return False
 
 def win32_event_filter(msg, data):
     """
@@ -151,44 +169,46 @@ def win32_event_filter(msg, data):
     if DEBUG: print("msg: ", msg)
     if DEBUG: print("data: ", data)
 
-    # # Replace some Buttons :-D
-    # if not PAUSED:
-    #     if vk_code in list(replace_key_from.keys()):
-    #         if DEBUG: print(vk_code)
-    #         vk_code = replace_key_from[vk_code]
-    #         simulate_key_event(is_press[msg], vk_code)
-    #         listener.suppress_event()
+    # check for simulated keys:
+    if not data.flags & 0x10:
 
-   
-    # Stop the listener if the END key is released
-    if CONTROLS_ENABLED and vk_code == EXIT_KEY and msg in WM_KEYUP:
-        print('\n--- Stopping execution ---')
-        listener.stop()
+        # # Replace some Buttons :-D
+        # if not PAUSED and not IS_LINUX:
+        #     if vk_code in list(replace_key_from.keys()):
+        #         if DEBUG: print(vk_code)
+        #         key_code = keyboard.KeyCode.from_vk(replace_key_from[vk_code])
+        #         controller.touch(is_press(msg), key_code)
+        #         listener.suppress_event()
 
-    # Toggle paused/resume if the DELETE key is released
-    elif CONTROLS_ENABLED and vk_code == TOGGLE_ON_OFF_KEY and msg in WM_KEYUP:
-        if PAUSED:
-            print('--- resumed ---')
-            PAUSED = False
-        else:
-            print('--- paused ---')
-            PAUSED = True
+        # Stop the listener if the END key is released
+        if CONTROLS_ENABLED and vk_code == EXIT_KEY and msg in WM_KEYUP:
+            print('\n--- Stopping execution ---')
+            listener.stop()
 
-    # Intercept key events if not PAUSED and not simulating key press
-    elif not PAUSED and not simulating_key_press:
-        for group_index, group in enumerate(tap_groups_states_dict):
-            if vk_code in group:
-                if msg in WM_KEYDOWN and group[vk_code] == 0:
-                    group[vk_code] = 1
-                    tap_groups_last_key_pressed[group_index] = vk_code
-                    send_keys(which_key_to_send(group_index), group_index)
-                elif msg in WM_KEYUP:
-                    group[vk_code] = 0
-                    send_keys(which_key_to_send(group_index), group_index)
-                if not IS_LINUX: listener.suppress_event()
-                # only the first instance of a key will be actualized 
-                # - no handling for a single key in multiple tap groups
-                break
+        # Toggle paused/resume if the DELETE key is released
+        elif CONTROLS_ENABLED and vk_code == TOGGLE_ON_OFF_KEY and msg in WM_KEYUP:
+            if PAUSED:
+                print('--- resumed ---')
+                PAUSED = False
+            else:
+                print('--- paused ---')
+                PAUSED = True
+
+        # Intercept key events if not PAUSED and not simulating key press
+        elif not PAUSED:# and not simulating_key_press:
+            for group_index, group in enumerate(tap_groups_states_dict):
+                if vk_code in group:
+                    if msg in WM_KEYDOWN and group[vk_code] == 0:
+                        group[vk_code] = 1
+                        tap_groups_last_key_pressed[group_index] = vk_code
+                        send_keys(which_key_to_send(group_index), group_index)
+                    elif msg in WM_KEYUP:
+                        group[vk_code] = 0
+                        send_keys(which_key_to_send(group_index), group_index)
+                    if not IS_LINUX: listener.suppress_event()
+                    # only the first instance of a key will be actualized 
+                    # - no handling for a single key in multiple tap groups
+                    break
 
 def which_key_to_send(group_index):
     """
@@ -215,31 +235,20 @@ def send_keys(key_to_send, group_index):
     """
     last_key_send = tap_groups_last_key_send[group_index]
 
+    key_code_to_send = keyboard.KeyCode.from_vk(key_to_send)
+    key_code_last_key_send = keyboard.KeyCode.from_vk(last_key_send)
+    if DEBUG: print("KeyCode: ", key_code_to_send)
+
     if key_to_send != last_key_send:
         if key_to_send is None:
             if last_key_send is not None:
-                if not IS_LINUX: simulate_key_event(RELEASE, last_key_send)
+                if not IS_LINUX: controller.release(key_code_last_key_send) 
             tap_groups_last_key_send[group_index] = None
         else:
             if last_key_send is not None:
-                if not IS_LINUX: simulate_key_event(RELEASE, last_key_send)
-            simulate_key_event(PRESS, key_to_send)
+                if not IS_LINUX: controller.release(key_code_last_key_send) 
+            controller.press(key_code_to_send) 
             tap_groups_last_key_send[group_index] = key_to_send
-
-def simulate_key_event(is_press, key):
-    """
-    Simulate a key press or release.
-    """
-    global simulating_key_press
-    if DEBUG: print("KeyCode: ", keyboard.KeyCode.from_vk(key))
-    simulating_key_press = True
-    controller.touch(keyboard.KeyCode.from_vk(key), is_press)
-    simulating_key_press = False
-
-#replace_key_from = {vk_codes_dict["oem_102"]: vk_codes_dict["left_control"],
-#                    vk_codes_dict["left_windows"]: vk_codes_dict["left_control"]}
-
-#is_press = {WM_KEYDOWN: 1, WM_KEYUP: 0}
 
 def display_menu():
     """
@@ -253,7 +262,7 @@ def display_menu():
             print("Invalid choice. Please try again.\n")
             invalid_input = False
         print("Active Tap Groups:")
-        display_tap_groups()
+        display_groups(tap_groups)
         print('\n --- Options ---')
         print("1. Add Tap Group")
         print("2. Delete Tap Group")
@@ -263,17 +272,18 @@ def display_menu():
         choice = input("Enter your choice: ")
 
         if choice == '0':
-            display_tap_groups()
+            display_groups(tap_groups)
         elif choice == '1':
             new_group = input("Enter new tap group (keys separated by commas): ").split(',')
-            add_tap_group(new_group)
+            add_group(new_group, tap_groups)
             initialize_tap_groups()
-        elif choice == '1':
+        elif choice == '2':
             index = int(input("Enter the index of the tap group to delete: "))
-            delete_tap_group(index)
+            delete_group(index, tap_groups)
             initialize_tap_groups()
         elif choice == '3':
             reset_tap_groups_txt()
+            initialize_tap_groups()
         elif choice == '4' or choice == '':
             break
         else:
@@ -321,10 +331,13 @@ if __name__ == "__main__":
 
     # try loading tap groups from file
     try:
-        load_tap_groups()
+        tap_groups = load_groups(FILE_NAME_TAP_GROUPS, tap_groups)
+        print("#1 ", tap_groups)
     # if no tap_groups.txt file exist create new one
     except FileNotFoundError:
         reset_tap_groups_txt()
+        print("#2 ", tap_groups)
+
 
     initialize_tap_groups()
 
@@ -337,3 +350,10 @@ if __name__ == "__main__":
 
     with keyboard.Listener(win32_event_filter=win32_event_filter) as listener:
         listener.join()
+
+
+# to distinquish between keyboard and simulated keys
+# def win32_event_filter(msg, data):
+#     if data.flags & 0x10:
+#         return False
+#     return True
