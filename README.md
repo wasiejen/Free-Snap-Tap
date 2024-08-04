@@ -90,6 +90,7 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
 -  `-nomenu` or `direct-start`: skips the menu and will be directly active
 -  `-txt="filename"` (with or without "): load and save tap groupings from a custom save file
 -  `-debug`: print out some debug info
+-  `-nocontrols`: to start it without the controls on `DEL` and `END` keys enabled
   
 Tap Groupings are a set of keys that are observed and the output of each group is separately handled. Activation of a key is mutually exclusive to all others—so there will always be only one activated key.
 You can define Tap Groupings via Command Line, via `tap_groups.txt`, or in the Python file under the # Tap Groups section.
