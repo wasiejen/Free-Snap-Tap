@@ -39,6 +39,12 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
     - Might be useful for people who want to have only one character written at a time independent from how long the key is pressed. Add every key each to a Tap Group and all keys will always only write one character.
 
 ## Version Information
+
+**V0.37**
+- bug fix where program control were not working due to changed key up and down recognition intruduced in V0.36
+- first Linux test implemention
+    - feedback needed - might not work due to still using win32_event_filter, but now without suppression of key events for Linux
+ 
 **V0.36**
 - corrected a bug where the ALT key and (ALT GR) changes the msg values for up and down keys (really weird behavior)
 
@@ -111,13 +117,15 @@ or
 ```bash
 python ./free_snap_tap.py
 ```
-## On Linux - **Not working**
+## On Linux - Linux v1 test implementation - feedback needed
 
-Will not work with the actual package pynput to use the event handling. In Linux this package only supports full supression of key events. And I only selectively supress key events and let every key not part of a tap group be. Since this is not feasable atm with this package and the implementation I used there is no linux support atm.
+V0.37 introduced an implemention attempt to make it useable on linux
+
+~~Will not work with the actual package pynput to use the event handling. In Linux this package only supports full suppression of key events. And I only selectively suppress key events and let every key not part of a tap group be. Since this is not feasable atm with this package and the implementation I used there is no linux support atm.~~
 
 ## On MacOS - **Not working atm**
 
-Compared to linux the selective event supression is possible, but it uses another listener constructor and gets other data than the win32_event_filter which is used here. Since this conversion/switch/alternative is not implemented jet, the program will not work on MacOS. But there might be a fix for that in the future.
+Compared to linux the selective event suppression is possible, but it uses another listener constructor and gets other data than the win32_event_filter which is used here. Since this conversion/switch/alternative is not implemented yet, the program will not work on MacOS. But there might be a fix for that in the future.
 
 ## On Feedback:
 
