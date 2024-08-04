@@ -268,12 +268,13 @@ def display_menu():
             new_group = input("Enter new tap group (keys separated by commas): ").split(',')
             add_tap_group(new_group)
             initialize_tap_groups()
-        elif choice == '1':
+        elif choice == '2':
             index = int(input("Enter the index of the tap group to delete: "))
             delete_tap_group(index)
             initialize_tap_groups()
         elif choice == '3':
             reset_tap_groups_txt()
+            initialize_tap_groups()
         elif choice == '4' or choice == '':
             break
         else:
