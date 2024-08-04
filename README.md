@@ -9,9 +9,11 @@ Snap Tapping ensures that the most recent key input is prioritized, even if an o
 With **Tap Groupings**, you can define your own sets of keys to be observed together and be separately handled. The key presses for each Tap Grouping are mutually exclusive — only one will be sent as input at any time. 
 As long as one key is still pressed it will be send as input - so e.g. fast tapping `D` while holding `A` (or reversed) and so rapid switching between `A` and `D` is possible.
 
-Now with CLI User Interface to manage Tap Groupings:
+**And New with the Option to manage Key Replacements**
 
-<img src="https://github.com/user-attachments/assets/044bf4e5-f433-46e0-9d19-6f3ba11b8685" width="400"/>
+With CLI User Interface to manage Tap Groupings and Key Replacements:
+
+<img width="400" alt="V0.4" src="https://github.com/user-attachments/assets/0a9c230c-8177-49c2-8aa3-f9062499fa99">
 
 Tap Groupings are now saved in a separate `tap_groups.txt` file which can be edited.
 
@@ -20,7 +22,7 @@ Each line represents one Tap Group, and each key is to be separated by a comma a
 
 String representation or vk-codes (virtual keyboard codes—list in py file) can be used.
 
-### Example Use Cases
+### Example Use Cases for Tap Groups
 
 - Movement Left/Right (Tap Group `a, d` and/or `left_arrow, right_arrow`)
 - Movement Forward/Backward (Tap Group `w, s` and/or `up_arrow, down_arrow`)
@@ -38,7 +40,19 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
     - Use case you ask? I have no idea right now. ;-D
     - Might be useful for people who want to have only one character written at a time independent from how long the key is pressed. Add every key each to a Tap Group and all keys will always only write one character.
 
+### Example Use Cases for Key Replacements
+
+- `windows_left` to `left_control` 
+- `<` to `left_shift`
+
 ## Version Information
+
+**V0.40**
+- added management of key replacements - I had the functionality to supress key, so why not replace some.
+    - managed in the same manner as the tap groupings
+- added better error handling to menu
+    - if someone still finds a way to crash the program via the menu, then congratulations :-D
+- Linux user will not see the new key replacement options - selective key suppression was not working before and is still not working  
 
 **V0.37**
 - bug fix where program control were not working due to changed key up and down recognition intruduced in V0.36
