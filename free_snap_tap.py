@@ -60,7 +60,7 @@ vk_codes_dict = {
     'semicolon': 186, 'plus': 187, 'comma': 188, 'minus': 189,
     'period': 190, 'slash': 191, 'grave_accent': 192,
     'open_bracket': 219, 'backslash': 220, 'close_bracket': 221,
-    'quote': 222, 'oem_8': 223, 'oem_102': 226,
+    'quote': 222, 'oem_8': 223, '<': 226,
     'process_key': 229, 'packet': 231, 'attn': 246, 'crsel': 247,
     'exsel': 248, 'erase_eof': 249, 'play': 250, 'zoom': 251,
     'pa1': 253, 'oem_clear': 254
@@ -125,7 +125,7 @@ def reset_key_replacement_txt():
     """
     global key_replacement_groups
     key_replacement_groups = []
-    add_group(['oem_102','left_shift'], key_replacement_groups)
+    add_group(['<','left_shift'], key_replacement_groups)
     add_group(['left_windows','left_control'], key_replacement_groups)
     save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
 
@@ -156,11 +156,15 @@ def initialize_tap_groups():
     for group in tap_groups:
         group_state = {}
         for key in group:
-            convert_to_vk_code(key)
+            key = convert_to_vk_code(key)
             group_state[key] = 0
         tap_groups_states_dict.append(group_state)
     tap_groups_last_key_pressed = [None] * len(tap_groups)
     tap_groups_last_key_send = [None] * len(tap_groups)
+    if DEBUG:
+        print(f"tap_groups_last_key_pressed: {tap_groups_last_key_pressed}")
+        print(f"tap_groups_last_key_send: {tap_groups_last_key_send}")
+
 
 def is_press(msg):
     if msg in WM_KEYDOWN:
@@ -213,14 +217,18 @@ def win32_event_filter(msg, data):
 
         # Intercept key events if not PAUSED and not simulating key press
         elif not PAUSED:# and not simulating_key_press:
+            if DEBUG: print("#0")
             for group_index, group in enumerate(tap_groups_states_dict):
+                if DEBUG: print(f"#1 {group_index, group}")
                 if vk_code in group:
                     if msg in WM_KEYDOWN and group[vk_code] == 0:
                         group[vk_code] = 1
+                        if DEBUG: print(f"#2 {vk_code}")
                         tap_groups_last_key_pressed[group_index] = vk_code
                         send_keys(which_key_to_send(group_index), group_index)
                     elif msg in WM_KEYUP:
                         group[vk_code] = 0
+                        if DEBUG: print(f"#3 {vk_code}")
                         send_keys(which_key_to_send(group_index), group_index)
                     if not IS_LINUX: listener.suppress_event()
                     # only the first instance of a key will be actualized 
@@ -251,14 +259,16 @@ def send_keys(key_to_send, group_index):
     Send the specified key and release the last key if necessary.
     """
     last_key_send = tap_groups_last_key_send[group_index]
-
+    if DEBUG: 
+        print(f"last_key_send: {last_key_send}")
+        print(f"key_to_send: {key_to_send}")
     key_code_to_send = keyboard.KeyCode.from_vk(key_to_send)
     key_code_last_key_send = keyboard.KeyCode.from_vk(last_key_send)
-    if DEBUG: print("KeyCode: ", key_code_to_send)
 
     if key_to_send != last_key_send:
         if key_to_send is None:
             if last_key_send is not None:
+
                 if not IS_LINUX: controller.release(key_code_last_key_send) 
             tap_groups_last_key_send[group_index] = None
         else:
@@ -408,6 +418,10 @@ if __name__ == "__main__":
     except FileNotFoundError:
         reset_tap_groups_txt()
     initialize_tap_groups()
+
+    if DEBUG:
+        print(f"tap_groups: {tap_groups}")
+        print(f"tap_groups_states_dict: {tap_groups_states_dict}")
 
     # try loading key replacements from file
     try:
