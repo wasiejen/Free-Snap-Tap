@@ -13,7 +13,7 @@ As long as one key is still pressed it will be send as input - so e.g. fast tapp
 
 With CLI User Interface to manage Tap Groupings and Key Replacements:
 
-<img width="400" alt="V0.4" src="https://github.com/user-attachments/assets/0a9c230c-8177-49c2-8aa3-f9062499fa99">
+<img width="400" alt="FST" src="https://github.com/user-attachments/assets/1ff42b6f-e1ce-4e6b-9ce0-8415b0c008b4">
 
 Tap Groupings are now saved in a separate `tap_groups.txt` file which can be edited.
 
@@ -48,11 +48,13 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
 ## Version Information
 
 **V0.40**
-- added management of key replacements - I had the functionality to supress key, so why not replace some.
-    - managed in the same manner as the tap groupings
-- added better error handling to menu
+- NEW: Management of key replacements
+    - I had the functionality to suppress keys, so why not replace some.
+    - Managed in the same manner as the tap groupings
+- Better or more complete error handling in the menu
     - if someone still finds a way to crash the program via the menu, then congratulations :-D
-- Linux user will not see the new key replacement options - selective key suppression was not working before and is still not working  
+- Linux user will not see the new key replacement options
+    - selective key suppression is simply not working on linux
 
 **V0.37**
 - bug fix where program control were not working due to changed key up and down recognition intruduced in V0.36
