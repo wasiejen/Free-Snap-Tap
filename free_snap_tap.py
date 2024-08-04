@@ -125,8 +125,8 @@ def reset_key_replacement_txt():
     """
     global key_replacement_groups
     key_replacement_groups = []
-    add_group(['<','left_shift'], key_replacement_groups)
-    add_group(['left_windows','left_control'], key_replacement_groups)
+    #add_group(['<','left_shift'], key_replacement_groups)
+    #add_group(['left_windows','left_control'], key_replacement_groups)
     save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
 
 
