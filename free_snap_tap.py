@@ -22,6 +22,7 @@ TOGGLE_ON_OFF_KEY = 46  # DELETE key vkcode 46
 # Tap groups define which keys are mutually exclusive
 tap_groups = []
 
+# Key Replacement Groups or Pairs define which key1 will be replaced by key2
 key_replacement_groups = []
 
 # Initialize the Controller
@@ -166,18 +167,20 @@ def initialize_tap_groups():
         print(f"tap_groups_last_key_send: {tap_groups_last_key_send}")
 
 
-def is_press(msg):
-    if msg in WM_KEYDOWN:
-        return True
-    if msg in WM_KEYUP:
-        return False
-
 def win32_event_filter(msg, data):
     """
     Filter and handle keyboard events.
     """
     global PAUSED
+
+    def is_press(msg):
+        if msg in WM_KEYDOWN:
+            return True
+        if msg in WM_KEYUP:
+            return False
+
     vk_code = data.vkCode
+
     if DEBUG: 
         print(vk_code)
         print("msg: ", msg)
@@ -293,17 +296,19 @@ def display_menu():
             text = ""
         print("Active Tap Groups:")
         display_groups(tap_groups)
-        print("\nActive Key Replacements:")
-        display_groups(key_replacement_groups)
+        if not IS_LINUX: 
+            print("\nActive Key Replacements:")
+            display_groups(key_replacement_groups)
         print('\n --- Options Tap Groups---')
         print("1. Add Tap Group")
         print("2. Delete Tap Group")
         print("3. Reset tap_groups.txt file")
-        print('\n --- Options Key Replacements---')
-        print("4. Add Key Replacement Pair")
-        print("5. Delete Key Replacement Pair")
-        print("6. Reset key_replacement_groups.txt file\n")
-        print("7. Start Snap Tapping :-)\n")
+        if not IS_LINUX: 
+            print('\n --- Options Key Replacements---')
+            print("4. Add Key Replacement Pair")
+            print("5. Delete Key Replacement Pair")
+            print("6. Reset key_replacement_groups.txt file")
+        print("\n[Enter]. Start Snap Tapping :-)\n")
 
         choice = input("Enter your choice: ")
 
@@ -335,7 +340,7 @@ def display_menu():
         elif choice == '3':
             reset_tap_groups_txt()
             initialize_tap_groups()
-        elif choice == '4':
+        elif choice == '4' and not IS_LINUX: 
             try:
                 new_group = input("Enter new key pair (2 keys separated by a comma): ").replace(" ", "").split(',')
                 if len(new_group) == 2:
@@ -349,7 +354,7 @@ def display_menu():
                 text = f"Error: Wrong string as a key used: {error_msg}"
                 invalid_input = True
                 delete_group(len(key_replacement_groups) - 1, key_replacement_groups)
-        elif choice == '5':
+        elif choice == '5' and not IS_LINUX:
             try:
                 index = int(input("Enter the index of the key pair to delete: "))
                 if 0<= index < len(key_replacement_groups):
@@ -362,7 +367,7 @@ def display_menu():
             except ValueError as error_msg:
                 text = "Error: Index was not a Number."
                 invalid_input = True
-        elif choice == '6':
+        elif choice == '6' and not IS_LINUX:
             reset_key_replacement_txt()
             initialize_key_replacement_groups()
         elif choice == '7' or choice == '':
@@ -379,7 +384,7 @@ def check_linux():
     return IS_LINUX
 
 def check_root():
-    if os.geteuid() != 0:
+    if os.name != 'nt' and os.geteuid() != 0:
         raise PermissionError("This script needs to be run as root on Linux")
 
 def check_start_arguments():
@@ -423,13 +428,14 @@ if __name__ == "__main__":
         print(f"tap_groups: {tap_groups}")
         print(f"tap_groups_states_dict: {tap_groups_states_dict}")
 
-    # try loading key replacements from file
-    try:
-        key_replacement_groups = load_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
-    # if no tap_groups.txt file exist create new one
-    except FileNotFoundError:
-        reset_key_replacement_txt()
-    initialize_key_replacement_groups()
+    if not IS_LINUX: 
+        # try loading key replacements from file
+        try:
+            key_replacement_groups = load_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
+        # if no tap_groups.txt file exist create new one
+        except FileNotFoundError:
+            reset_key_replacement_txt()
+        initialize_key_replacement_groups()
 
     if not SKIP_MENU:
         display_menu()
