@@ -6,5 +6,4 @@
 /__pycache__
 built.bat
 free_snap_tap.spec
-tap_groups.txt
 free_snap_tap.py -debug.bat
