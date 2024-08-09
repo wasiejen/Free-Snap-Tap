@@ -1,2 +1,0 @@
-<,left_shift
-left_windows,left_control
