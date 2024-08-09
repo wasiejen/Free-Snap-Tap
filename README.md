@@ -63,10 +63,13 @@ You can change the control keys in the py file under # Control keys.
 - NEW: Starting argument for custom key replacement file
   - `-keyfile=`
 - NEW: Control for returning to the menu on `PAGE_DOWN` key
+- NEW: Mouse Buttons (1: left, 2: right, 4: middle) can now be the output key of a key replacement pair
 - NEW: key replacements can now reverse there output
   - declared by just using a `-` before any or both keys in the key pair
   - (e.g. `k, -k` or `-k, -k`  would reverse the press of k to a release and vise versa)
-    - originally intented for the right mouse button (looking around) in MMO's but not working yet (vk_codes 1 and 2 for the mouse buttons do not work with win32_event_filter)
+    - originally intented for the right mouse button (looking around) in MMO's 
+      - e.g. `k, 2` / `k, mouse_right` to simulate a right mouse click with a keyboard key `k`
+      - e.g. `k, -2` then reverses to output and lets me lock the right mouse button on press
     - but can also be used for toggling auto movement on and off with another key (e.g. `left_windows, -w`)
 - removed implementation parts of the attempt to make it work on linux
   - most of the functionality was not working due to the linux limitation of not being able to supress events

@@ -1,4 +1,4 @@
-from pynput import keyboard
+from pynput import keyboard, mouse
 import os # to use clearing of CLI for better menu usage
 import msvcrt # for clearing the input buffer before starting a new input
 import sys # to get start arguments
@@ -30,9 +30,18 @@ key_replacement_groups = []
 
 # Initialize the Controller
 controller = keyboard.Controller()
+mouse_controller = mouse.Controller()
+
+controller_dict = {True: mouse_controller, False: controller}
+
+mouse_vk_codes_dict = {1: mouse.Button.left, 
+                       2: mouse.Button.right, 
+                       4: mouse.Button.middle}
+mouse_vk_codes = mouse_vk_codes_dict.keys()
 
 # Dictionary mapping strings and keys to their VK codes
 vk_codes_dict = {
+    'mouse_left': 1, 'mouse_right': 2, 'mouse_middle': 4,
     'a': 65, 'b': 66, 'c': 67, 'd': 68, 'e': 69, 'f': 70, 'g': 71,
     'h': 72, 'i': 73, 'j': 74, 'k': 75, 'l': 76, 'm': 77, 'n': 78,
     'o': 79, 'p': 80, 'q': 81, 'r': 82, 's': 83, 't': 84, 'u': 85,
@@ -207,17 +216,28 @@ def win32_event_filter(msg, data):
         if not PAUSED:
             for group_index, group in enumerate(key_replacement_dict):
                 if vk_code == group[0]:
-                    key_code = keyboard.KeyCode.from_vk(group[1])
-
+                    new_vk_code = group[1]                    
+                    
                     if DEBUG: 
                         print("vk_code_gotten: ", vk_code)
                         print("vk_code_replacement: ", group)
                         print("key_code: ", key_code)
-                        print("is_press: ", is_press(msg))
-                    if is_press(msg, key_replacement_state_reversed[group_index]):
-                        controller.press(key_code)
+                        print("is_press: ", is_press(msg))        
+
+                    is_mouse_key = new_vk_code in mouse_vk_codes
+
+                    #key_code = mouse_vk_codes_dict[new_vk_code] if is_mouse_key else keyboard.KeyCode.from_vk(new_vk_code)
+
+                    if is_mouse_key:
+                        key_code = mouse_vk_codes_dict[new_vk_code]
                     else:
-                        controller.release(key_code)
+                        key_code = keyboard.KeyCode.from_vk(new_vk_code)
+
+                    if is_press(msg, key_replacement_state_reversed[group_index]):
+                        controller_dict[is_mouse_key].press(key_code)
+                    else:
+                        controller_dict[is_mouse_key].release(key_code)
+
                     listener.suppress_event()
 
         # Stop the listener if the END key is released
