@@ -9,18 +9,20 @@ Snap Tapping ensures that the most recent key input is prioritized, even if an o
 With **Tap Groupings**, you can define your own sets of keys to be observed together and be separately handled. The key presses for each Tap Grouping are mutually exclusive — only one will be sent as input at any time. 
 As long as one key is still pressed it will be send as input - so e.g. fast tapping `D` while holding `A` (or reversed) and so rapid switching between `A` and `D` is possible.
 
-**And New with the Option to manage Key Replacements**
+Also with the Option for simple **Key Replacements**. Useful if you can't change some keys ingame or you want to use keys that normally are not available to games like the windows keys.
+
+**Only works on Windows.**
 
 With CLI User Interface to manage Tap Groupings and Key Replacements:
 
 <img width="400" alt="FST" src="https://github.com/user-attachments/assets/1ff42b6f-e1ce-4e6b-9ce0-8415b0c008b4">
 
-Tap Groupings are now saved in a separate `tap_groups.txt` file which can be edited.
+Tap Groupings are now saved in a separate `tap_groups.txt` file and key replacement pairs in `key_replacement_groups.txt` - both can be edited directly.
 
-Each line represents one Tap Group, and each key is to be separated by a comma and can have 1 or more keys in it. 
-(e.g. `1, 2, 3, 4` or `left_shift, left_control, alt` or just `v` would also be possible)
+Each line represents one Tap Group, and each key is to be separated by a comma and can have 1 or more keys in it. (e.g. `1, 2, 3, 4` or `left_shift, left_control, alt` or just `v` would also be possible)
+Key Replacement Pairs only accepts 2 keys.
 
-String representation or vk-codes (virtual keyboard codes—list in py file) can be used.
+String representation or vk-codes (virtual keyboard codes—list in py file) can also be used.
 
 ### Example Use Cases for Tap Groups
 
@@ -45,30 +47,32 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
 - `windows_left` to `left_control` 
 - `<` to `left_shift`
 
+## Controls
+
+- **Toggle Pause:** Press the `DELETE` key to pause or resume the program.
+- **Stop Execution:** Press the `END` key to stop the program.
+- **Return to Menu:** Press the `PAGE_DOWN` key to return to the menu.
+
+You can change the control keys in the py file under # Control keys.
+
 ## Version Information
 
-**V0.40**
-- NEW: Management of key replacements
-    - I had the functionality to suppress keys, so why not replace some.
-    - Managed in the same manner as the tap groupings
-- Better or more complete error handling in the menu
-    - if someone still finds a way to crash the program via the menu, then congratulations :-D
-- Linux user will not see the new key replacement options
-    - selective key suppression is simply not working on linux
-
-**V0.37**
-- bug fix where program control were not working due to changed key up and down recognition intruduced in V0.36
-- first Linux test implemention
-    - feedback needed - might not work due to still using win32_event_filter, but now without suppression of key events for Linux
- 
-**V0.36**
-- corrected a bug where the ALT key and (ALT GR) changes the msg values for up and down keys (really weird behavior)
-
-**V0.35**
-- fixed bug that disabled snap tapping in V0.34
-
-**V0.34**
-- added start argument `-nocontrols` to start it without the controls `DEL` and `END` enabled
+**V0.50**
+- fixed not working -txt= startargument; changed it to: 
+  - `-tapfile=` replaces `-txt=`
+- NEW: Starting argument for custom key replacement file
+  - `-keyfile=`
+- NEW: Control for returning to the menu on `PAGE_DOWN` key
+- NEW: Mouse Buttons (1: left, 2: right, 4: middle) can now be the output key of a key replacement pair
+- NEW: key replacements can now reverse there output
+  - declared by just using a `-` before any or both keys in the key pair
+  - (e.g. `k, -k` or `-k, -k`  would reverse the press of k to a release and vise versa)
+    - originally intented for the right mouse button (looking around) in MMO's 
+      - e.g. `k, 2` / `k, mouse_right` to simulate a right mouse click with a keyboard key `k`
+      - e.g. `k, -2` then reverses to output and lets me lock the right mouse button on press
+    - but can also be used for toggling auto movement on and off with another key (e.g. `left_windows, -w`)
+- removed implementation parts of the attempt to make it work on linux
+  - most of the functionality was not working due to the linux limitation of not being able to supress events
 
 ## How Free Snap Tap Works
 
@@ -80,25 +84,26 @@ Snap Tapping is a feature that enhances your keyboard's responsiveness by priori
 
 ## Easy Usage
 
-- Start via `free_snap_tap.exe` or the provides bat(ch) files and a Command Line Interface will open with further explanations.
-- Nothing more to do — Tap Groups can be defined via CLI. To Start from the menu hit 4+Enter or just Enter.
+- Start via `free_snap_tap.exe` or the provided bat(ch) files and a Command Line Interface will open with further explanations.
+- Nothing more to do — Tap Groups and Key Replacements can be defined via CLI. To start from the menu hit [Enter].
 - Have fun. :-)
+
+### AntiVir False Positives
+- The exe is offered to simplify the usage, it may get a false positive from some antivirus tools and be detected as a trojan. The reason for that seems to be the packaging as an executable that triggers these antivirus software and leads to false positives. See Discussion #12.
+  - Option 1: if recognised as trojan - whitelist it in your antivir.
+  - Option 2: instead use the py file - See `# Installation` for more info
 
 ## Configuration
 
 Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_tap.exe)
 -  `-nomenu` or `direct-start`: skips the menu and will be directly active
--  `-txt="filename"` (with or without "): load and save tap groupings from a custom save file
+-  `-tapfile="filename"` (with or without "): load and save tap groupings from a custom save file
+-  `-keyfile="filename"` (with or without "): load and save key groupings from a custom save file
 -  `-debug`: print out some debug info
--  `-nocontrols`: to start it without the controls on `DEL` and `END` keys enabled
+-  `-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled
   
 Tap Groupings are a set of keys that are observed and the output of each group is separately handled. Activation of a key is mutually exclusive to all others—so there will always be only one activated key.
 You can define Tap Groupings via Command Line, via `tap_groups.txt`, or in the Python file under the # Tap Groups section.
-
-## Controls
-
-- **Toggle Pause:** Press the DELETE key to pause or resume the program.
-- **Stop Execution:** Press the END key to stop the program.
 
 ## Requirements if you want to use the py file directly
 
@@ -134,7 +139,10 @@ or
 ```bash
 python ./free_snap_tap.py
 ```
-## On Linux - Linux v1 test implementation - feedback needed
+
+## On Linux - try V0.37 or V.40 - no linux functionality in V0.50+
+
+V0.50 removed implementation attempt from V0.37
 
 V0.37 introduced an implemention attempt to make it useable on linux
 
@@ -147,9 +155,32 @@ Compared to linux the selective event suppression is possible, but it uses anoth
 ## On Feedback:
 
 Feel free to give feedback. This program is a fun project to me to get more comfortable with Github and testing out some things in Python. :-)
-If you have wishes or ideas what to add, just `create an issue` and mark it with the label `enhancement`.
+If you have wishes or ideas what to add, just `create an issue` or `start a discussion`.
 
 ### Version History
+
+**V0.40**
+- NEW: Management of key replacements
+    - I had the functionality to suppress keys, so why not replace some.
+    - Managed in the same manner as the tap groupings
+- Better or more complete error handling in the menu
+    - if someone still finds a way to crash the program via the menu, then congratulations :-D
+- Linux user will not see the new key replacement options
+    - selective key suppression is simply not working on linux
+
+**V0.37**
+- bug fix where program control were not working due to changed key up and down recognition intruduced in V0.36
+- first Linux test implemention
+    - feedback needed - might not work due to still using win32_event_filter, but now without suppression of key events for Linux
+ 
+**V0.36**
+- corrected a bug where the ALT key and (ALT GR) changes the msg values for up and down keys (really weird behavior)
+
+**V0.35**
+- fixed bug that disabled snap tapping in V0.34
+
+**V0.34**
+- added start argument `-nocontrols` to start it without the controls `DEL` and `END` enabled
 
 **V0.32**
 - added option to load and save tap groupings to custom files.
