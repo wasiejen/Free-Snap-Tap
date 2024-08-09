@@ -15,7 +15,7 @@ Also with the Option for simple **Key Replacements**. Useful if you can't change
 
 With CLI User Interface to manage Tap Groupings and Key Replacements:
 
-<img width="400" alt="FST" src="https://github.com/user-attachments/assets/1ff42b6f-e1ce-4e6b-9ce0-8415b0c008b4">
+<img width="400" alt="FST" src="https://github.com/user-attachments/assets/242584cb-b199-4ab4-b6af-5859963162c6">
 
 Tap Groupings are now saved in a separate `tap_groups.txt` file and key replacement pairs in `key_replacement_groups.txt` - both can be edited directly.
 
@@ -69,7 +69,7 @@ You can change the control keys in the py file under # Control keys.
   - (e.g. `k, -k` or `-k, -k`  would reverse the press of k to a release and vise versa)
     - originally intented for the right mouse button (looking around) in MMO's 
       - e.g. `k, 2` / `k, mouse_right` to simulate a right mouse click with a keyboard key `k`
-      - e.g. `k, -2` then reverses to output and lets me lock the right mouse button on press
+      - e.g. `k, -2` then reverses to output and lets me lock the right mouse button on release of key `k`
     - but can also be used for toggling auto movement on and off with another key (e.g. `left_windows, -w`)
 - removed implementation parts of the attempt to make it work on linux
   - most of the functionality was not working due to the linux limitation of not being able to supress events
