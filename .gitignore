@@ -1,8 +1,8 @@
 /icons
 /dist
 /build
-/old
 /test
+/pictures
 /__pycache__
 free_snap_tap.spec
 free_snap_tap.py -debug.bat
