@@ -142,11 +142,15 @@ def reset_key_replacement_txt():
 
 def convert_to_vk_code(key):
     try:
-        key_int = int(key)
-        if 0 < key_int < 256:
-            return key_int
-    except ValueError:
         return vk_codes_dict[key]
+    except KeyError:
+        try:
+            key_int = int(key)
+            if 0 < key_int < 256:
+                return key_int
+        except ValueError:
+            raise KeyError
+
 
 def initialize_key_replacement_groups():
     global key_replacement_dict, key_replacement_state_reversed
