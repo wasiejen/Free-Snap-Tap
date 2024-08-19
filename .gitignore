@@ -4,9 +4,9 @@
 /test
 /pictures
 /__pycache__
-free_snap_tap.exe
 free_snap_tap.exe -nomenu start.bat
 free_snap_tap.spec
 free_snap_tap.py -debug.bat
 my_taps.txt
 my_keys.txt
+free_snap_tap.exe
