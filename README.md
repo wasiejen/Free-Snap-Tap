@@ -15,7 +15,7 @@ Also with the Option for simple **Key Replacements**. Useful if you can't change
 
 With CLI User Interface to manage Tap Groupings and Key Replacements:
 
-<img width="400" alt="FST" src="https://github.com/user-attachments/assets/242584cb-b199-4ab4-b6af-5859963162c6">
+<img width="400" alt="FST" src="https://github.com/user-attachments/assets/09efd630-c691-4d1c-8a06-aa8906bc54a7">
 
 Tap Groupings are now saved in a separate `tap_groups.txt` file and key replacement pairs in `key_replacement_groups.txt` - both can be edited directly.
 
