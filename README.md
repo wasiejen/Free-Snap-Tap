@@ -57,6 +57,17 @@ You can change the control keys in the py file under # Control keys.
 
 ## Version Information
 
+**V0.6.0**
+- NEW: key replacements will now be tracked in tap groups
+- NEW: menu option: 7. Print vk_codes to identify keys
+  - Will print out the corresponding vk_codes of a key event. Useful for finding your own vk_codes when used with different keybaord_layouts. 
+- added requirements.txt
+- removed exe from repo and put it into releases
+- some edits in README.md
+
+**V0.5.1**
+- fixed direct interpretation of `1` as a vk_code
+
 **V0.50**
 - fixed not working -txt= startargument; changed it to: 
   - `-tapfile=` replaces `-txt=`
@@ -84,6 +95,7 @@ Snap Tapping is a feature that enhances your keyboard's responsiveness by priori
 
 ## Easy Usage
 
+- Download the executable from the actual [releases](https://github.com/wasiejen/Free-Snap-Tap/releases).
 - Start via `free_snap_tap.exe` or the provided bat(ch) files and a Command Line Interface will open with further explanations.
 - Nothing more to do — Tap Groups and Key Replacements can be defined via CLI. To start from the menu hit [Enter].
 - Have fun. :-)
@@ -103,7 +115,7 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
 -  `-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled
   
 Tap Groupings are a set of keys that are observed and the output of each group is separately handled. Activation of a key is mutually exclusive to all others—so there will always be only one activated key.
-You can define Tap Groupings via Command Line, via `tap_groups.txt`, or in the Python file under the # Tap Groups section.
+You can define Tap Groupings or Key Replacements via Command Line or via editing the `tap_groups.txt` or `key_replacement_groups.txt`.
 
 ## Requirements if you want to use the py file directly
 
@@ -115,6 +127,11 @@ Install the `pynput` library using pip:
 ```bash
 pip install pynput
 ```
+or
+
+```bash
+pip install -r requirements.txt
+```
 
 ## Installation
 
@@ -124,6 +141,12 @@ pip install pynput
 ```bash
 pip install pynput
 ```
+or
+
+```bash
+pip install -r requirements.txt
+```
+
 3. **Starting the Program:**
 
     3.1 **Option A: directly:** By  clicking/executing the `free_snap_tap.bat` file.

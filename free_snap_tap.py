@@ -8,6 +8,7 @@ PAUSED = False
 STOPPED = False
 MENU_ENABLED = True
 CONTROLS_ENABLED = True
+PRINT_VK_CODES = False
 
 # Define File name for saving of Tap Groupings and Key Replacements
 FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
@@ -73,10 +74,12 @@ vk_codes_dict = {
     'semicolon': 186, 'plus': 187, 'comma': 188, 'minus': 189,
     'period': 190, 'slash': 191, 'grave_accent': 192,
     'open_bracket': 219, 'backslash': 220, 'close_bracket': 221,
-    'quote': 222, 'oem_8': 223, '<': 226,
+    'quote': 222, 'oem_8': 223, 'oem_102': 226,
     'process_key': 229, 'packet': 231, 'attn': 246, 'crsel': 247,
     'exsel': 248, 'erase_eof': 249, 'play': 250, 'zoom': 251,
-    'pa1': 253, 'oem_clear': 254
+    'pa1': 253, 'oem_clear': 254,
+    # some vk_codes for german keyboard layout
+    '<': 226, 'ä' : 222, 'ö' : 192, 'ü': 186, '´': 221, 'copilot': 134, 
 }
 
 def load_groups(file_name, data_object):
@@ -205,44 +208,33 @@ def win32_event_filter(msg, data):
     """
     global PAUSED, STOPPED
 
+    key_replaced = False
     vk_code = data.vkCode
 
+    if PRINT_VK_CODES and msg in WM_KEYDOWN:
+        print(f"vk_code: {vk_code}")
+
     if DEBUG: 
-        print(vk_code)
+        print(f"vk_code: {vk_code}")
         print("msg: ", msg)
         print("data: ", data)
 
     # check for simulated keys:
-    #if not data.flags & 0x10:
     if not is_simulated_key_event(data.flags):
 
         # Replace some Buttons :-D
         if not PAUSED:
             for group_index, group in enumerate(key_replacement_dict):
                 if vk_code == group[0]:
-                    new_vk_code = group[1]                    
-                    
+                                       
                     if DEBUG: 
                         print("vk_code_gotten: ", vk_code)
                         print("vk_code_replacement: ", group)
                         print("key_code: ", key_code)
-                        print("is_press: ", is_press(msg))        
+                        print("is_press: ", is_press(msg))
 
-                    is_mouse_key = new_vk_code in mouse_vk_codes
-
-                    #key_code = mouse_vk_codes_dict[new_vk_code] if is_mouse_key else keyboard.KeyCode.from_vk(new_vk_code)
-
-                    if is_mouse_key:
-                        key_code = mouse_vk_codes_dict[new_vk_code]
-                    else:
-                        key_code = keyboard.KeyCode.from_vk(new_vk_code)
-
-                    if is_press(msg, key_replacement_state_reversed[group_index]):
-                        controller_dict[is_mouse_key].press(key_code)
-                    else:
-                        controller_dict[is_mouse_key].release(key_code)
-
-                    listener.suppress_event()
+                    vk_code = group[1]  
+                    key_replaced = True
 
         # Stop the listener if the END key is released
         if CONTROLS_ENABLED and vk_code == MENU_KEY and msg in WM_KEYUP:
@@ -266,7 +258,7 @@ def win32_event_filter(msg, data):
                 PAUSED = True
 
         # Snap Tap Part of Evaluation
-        # Intercept key events if not PAUSED and not simulating key press
+        # Intercept key events if not PAUSED
         elif not PAUSED:
             if DEBUG: print("#0")
             for group_index, group in enumerate(tap_groups_states_dict):
@@ -285,6 +277,23 @@ def win32_event_filter(msg, data):
                     # only the first instance of a key will be actualized 
                     # - no handling for a single key in multiple tap groups
                     break
+
+        # if replaced key was not handled by tap groupings, then just send new key event
+        elif key_replaced:
+            is_mouse_key = vk_code in mouse_vk_codes
+
+            if is_mouse_key:
+                key_code = mouse_vk_codes_dict[vk_code]
+            else:
+                key_code = keyboard.KeyCode.from_vk(vk_code)
+
+            if is_press(msg, key_replacement_state_reversed[group_index]):
+                controller_dict[is_mouse_key].press(key_code)
+            else:
+                controller_dict[is_mouse_key].release(key_code)
+
+            listener.suppress_event()
+
 
 def which_key_to_send(group_index):
     """
@@ -332,6 +341,8 @@ def display_menu():
     """
     Display the menu and handle user input
     """
+    global PRINT_VK_CODES
+    PRINT_VK_CODES = False
     invalid_input = False
     text = ""
     while True:       
@@ -354,7 +365,8 @@ def display_menu():
         print("4. Add Key Replacement Pair")
         print("5. Delete Key Replacement Pair")
         print("6. Clear key_replacement_groups.txt file")
-        print("\n7. End Script")
+        print("\n7. Print vk_codes to identify keys")
+        print("8. End Script")
         #print("\n[Enter]. Start Snap Tapping :-)\n")
 
         # empty input buffer before asking for next input
@@ -422,6 +434,9 @@ def display_menu():
             reset_key_replacement_txt()
             initialize_key_replacement_groups()
         elif choice == '7':
+            PRINT_VK_CODES = True
+            break
+        elif choice == '8':
             exit()
         elif choice == '':
             break
@@ -436,7 +451,7 @@ def check_start_arguments():
         for arg in sys.argv[1:]:
             if DEBUG: print(arg)
             # start directly without showing the menu
-            if arg == "-direct_start" or arg == "-nomenu":
+            if arg == "-nomenu":
                 MENU_ENABLED = False
             # use custom tap groups file for loading and saving
             elif arg[:9] == '-tapfile=' and len(arg) > 9:
@@ -449,6 +464,7 @@ def check_start_arguments():
             # Debug .. what else :-D
             elif arg == "-debug":
                 DEBUG = True
+            # Start with controls disabled
             elif arg == "-nocontrols":
                 CONTROLS_ENABLED = False
             else:
