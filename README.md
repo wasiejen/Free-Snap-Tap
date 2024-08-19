@@ -58,15 +58,15 @@ You can change the control keys in the py file under # Control keys.
 ## Version Information
 
 **V0.6.0**
-- NEW: key replacements will now be tracked in tap groups
-- NEW: menu option: 7. Print vk_codes to identify keys
+- NEW: Key Replacements will now be tracked in tap groups
+- NEW: Menu option: 7. Print vk_codes to identify keys
   - Will print out the corresponding vk_codes of a key event. Useful for finding your own vk_codes when used with different keybaord_layouts. 
-- added requirements.txt
-- removed exe from repo and put it into releases
-- some edits in README.md
+- Added requirements.txt - see #19
+- Removed exe from repo and put it into releases: see #19
+- Some edits in README.md
 
 **V0.5.1**
-- fixed direct interpretation of `1` as a vk_code
+- Fixed direct interpretation of number strings, e.g. `1`, `2`, ... as a vk_code. Fixed by first looking up in dict if a string entry for that number exists and if not then cast it as an int an use it directly as a vk_code.
 
 **V0.50**
 - fixed not working -txt= startargument; changed it to: 
@@ -141,7 +141,8 @@ pip install -r requirements.txt
 ```bash
 pip install pynput
 ```
-or
+
+or navigate to the Free-Snap-Tap repo folder and type in:
 
 ```bash
 pip install -r requirements.txt
@@ -157,7 +158,7 @@ pip install -r requirements.txt
 ./free_snap_tap.bat
 ```
 
-or
+or navigate to the Free-Snap-Tap repo folder and type in:
 
 ```bash
 python ./free_snap_tap.py
