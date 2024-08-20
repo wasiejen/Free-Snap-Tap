@@ -325,16 +325,20 @@ def send_keys(key_to_send, group_index):
     key_code_to_send = keyboard.KeyCode.from_vk(key_to_send)
     key_code_last_key_send = keyboard.KeyCode.from_vk(last_key_send)
 
-    if key_to_send != last_key_send:
-        if key_to_send is None:
+    if key_to_send != last_key_send: # TODO: repeating input blocker
+         if key_to_send is None:
             if last_key_send is not None:
 
                 controller.release(key_code_last_key_send) 
             tap_groups_last_key_send[group_index] = None
         else:
+            # TODO: here in general could be impl a crossover: start
             if last_key_send is not None:
                 controller.release(key_code_last_key_send) 
+                # TODO: here could a delay be placed
             controller.press(key_code_to_send) 
+            # TODO: here in general could be impl a crossover: end
+
             tap_groups_last_key_send[group_index] = key_to_send
 
 def display_menu():
