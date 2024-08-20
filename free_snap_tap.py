@@ -15,7 +15,6 @@ CONTROLS_ENABLED = True
 PRINT_VK_CODES = False
 
 # AntiCheat testing (ACT)
-#ACT_REPEATING_KEYS = False
 ACT_DELAY = False
 ACT_MAX_DELAY_IN_MS = 40
 ACT_CROSSOVER = False
@@ -339,7 +338,7 @@ def send_keys(key_to_send, group_index):
     key_code_last_key_send = keyboard.KeyCode.from_vk(last_key_send)
 
     # repeat keys if activated, if not then only send keys when key changes
-    if key_to_send != last_key_send:#  or ACT_REPEATING_KEYS:
+    if key_to_send != last_key_send:#
 
         if key_to_send is None:
             if last_key_send is not None:
@@ -360,7 +359,7 @@ def send_keys(key_to_send, group_index):
                     controller.release(key_code_last_key_send) 
                 # random delay if activated
                 if ACT_DELAY: 
-                    delay = randint(5, ACT_MAX_DELAY_IN_MS)
+                    delay = randint(0, ACT_MAX_DELAY_IN_MS)
                     if DEBUG: print(f"delayed by {delay} ms")
                     sleep(delay / 1000) # in ms
 
@@ -481,7 +480,7 @@ def display_menu():
 def check_start_arguments():
     global DEBUG, MENU_ENABLED, CONTROLS_ENABLED
     global FILE_NAME_TAP_GROUPS, FILE_NAME_KEY_REPLACEMENTS
-    global ACT_REPEATING_KEYS, ACT_DELAY, ACT_CROSSOVER
+    global ACT_DELAY, ACT_CROSSOVER
     global ACT_MAX_DELAY_IN_MS, ACT_CROSSOVER_PROPABILITY_IN_PERCENT
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
@@ -503,16 +502,10 @@ def check_start_arguments():
             # Start with controls disabled
             elif arg == "-nocontrols":
                 CONTROLS_ENABLED = False
-            #elif arg == "-repeat":
-            #    ACT_REPEATING_KEYS = True
             elif arg == "-delay":
                 ACT_DELAY = True
             elif arg == "-crossover":
                 ACT_CROSSOVER = True          
-            elif arg == "-rdc":
-                #ACT_REPEATING_KEYS = True
-                ACT_DELAY = True
-                ACT_CROSSOVER = True   
             elif arg[:7] == "-delay=" and len(arg) > 7:
                 ACT_DELAY = True
                 try:
@@ -529,7 +522,7 @@ def check_start_arguments():
                     probability = int(arg[11:])
                 except:
                     print("invalid probability - needs to be a number")
-                if 0 < probability <= 100:
+                if 0 <= probability <= 100:
                     ACT_CROSSOVER_PROPABILITY_IN_PERCENT = probability
                 else:
                     print("probability not in range 0<prob<=100 %")
