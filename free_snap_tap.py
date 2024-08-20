@@ -14,15 +14,13 @@ MENU_ENABLED = True
 CONTROLS_ENABLED = True
 PRINT_VK_CODES = False
 
-# Anticheat testing (ACT)
-ACT_REPEATING_KEYS = False
+# AntiCheat testing (ACT)
+#ACT_REPEATING_KEYS = False
 ACT_DELAY = False
 ACT_MAX_DELAY_IN_MS = 40
 ACT_CROSSOVER = False
 ACT_CROSSOVER_PROPABILITY_IN_PERCENT = 50
-#ACT_CROSSOVER_RANDOM = False
-#ACT_CROSSOVER_DELAY = False
-#
+
 # Define File name for saving of Tap Groupings and Key Replacements
 FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
 FILE_NAME_KEY_REPLACEMENTS = 'key_replacement_groups.txt'
@@ -341,7 +339,7 @@ def send_keys(key_to_send, group_index):
     key_code_last_key_send = keyboard.KeyCode.from_vk(last_key_send)
 
     # repeat keys if activated, if not then only send keys when key changes
-    if key_to_send != last_key_send or ACT_REPEATING_KEYS:
+    if key_to_send != last_key_send:#  or ACT_REPEATING_KEYS:
 
         if key_to_send is None:
             if last_key_send is not None:
@@ -483,8 +481,6 @@ def display_menu():
 def check_start_arguments():
     global DEBUG, MENU_ENABLED, CONTROLS_ENABLED
     global FILE_NAME_TAP_GROUPS, FILE_NAME_KEY_REPLACEMENTS
-    global ACT_REPEATING_KEYS, ACT_DELAY, ACT_CROSSOVER, 
-    # global ACT_MAX_DELAY_IN_MS, ACT_CROSSOVER_PROPABILITY_IN_PERCENT
     global ACT_REPEATING_KEYS, ACT_DELAY, ACT_CROSSOVER
     global ACT_MAX_DELAY_IN_MS, ACT_CROSSOVER_PROPABILITY_IN_PERCENT
     if len(sys.argv) > 1:
@@ -507,18 +503,14 @@ def check_start_arguments():
             # Start with controls disabled
             elif arg == "-nocontrols":
                 CONTROLS_ENABLED = False
-            elif arg == "-repeat":
-                ACT_REPEATING_KEYS = True
+            #elif arg == "-repeat":
+            #    ACT_REPEATING_KEYS = True
             elif arg == "-delay":
                 ACT_DELAY = True
             elif arg == "-crossover":
-                ACT_CROSSOVER = True         
-            elif arg == "rdc":
-                ACT_REPEATING_KEYS = True
-                ACT_DELAY = True
-                ACT_CROSSOVER = True   
+                ACT_CROSSOVER = True          
             elif arg == "-rdc":
-                ACT_REPEATING_KEYS = True
+                #ACT_REPEATING_KEYS = True
                 ACT_DELAY = True
                 ACT_CROSSOVER = True   
             elif arg[:7] == "-delay=" and len(arg) > 7:
