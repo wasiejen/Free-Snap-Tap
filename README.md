@@ -60,13 +60,14 @@ You can change the control keys in the py file under # Control keys.
 **V0.7.0**
 - fixed a bug due which the key replacement was never send
 
-Some measures to lighten the precision of snap tap to maybe circumvent some AntiCheat
+Some measures to lighten the precision of snap tap to maybe circumvent some AntiCheat.
 - NEW: random delay for snap tap 
   - start argument `-delay=50` for max delay of 50 ms (can be set in a range of 1-500)
   - without the start argument no delay will be used
 - NEW: crossover of input for snap tap
-  - start argument `-crossover=50` for a propability of 50% (can be set in a range of 0-100)
-  - I call "crossover" the act of releasing one key before the press - but just simulated. In a way to simulate an to early release of one key before the press of the actual pressed key
+  - start argument `-crossover=50` for a probability of 50% (can be set in a range of 0-100)
+  - I call "crossover" the act of releasing one key before the press - but just simulated. In a way to simulate a too early release of one key before the press of the actual pressed key (immediate release of last key and delay of pressed key as result). 
+  - Same random delay used as defined by delay="number".
   - without the start argument no crossover will be used
 
 **V0.6.0**
@@ -125,7 +126,7 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
 -  `-keyfile="filename"` (with or without "): load and save key groupings from a custom save file
 -  `-debug`: print out some debug info
 -  `-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  `-delay="number"` for max delay of "number" ms (can be set in a range of 1-500)
--  `-crossover="number"` for a propability of "number" percent (can be set in a range of 0-100)
+-  `-crossover="number"` for a probability of "number" percent (can be set in a range of 0-100)
   
 Tap Groupings are a set of keys that are observed and the output of each group is separately handled. Activation of a key is mutually exclusive to all others—so there will always be only one activated key.
 You can define Tap Groupings or Key Replacements via Command Line or via editing the `tap_groups.txt` or `key_replacement_groups.txt`.
