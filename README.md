@@ -82,7 +82,7 @@ Some measures to lighten the precision of snap tap to maybe circumvent some Anti
 - Fixed direct interpretation of number strings, e.g. `1`, `2`, ... as a vk_code. Fixed by first looking up in dict if a string entry for that number exists and if not then cast it as an int an use it directly as a vk_code.
 
 **V0.50**
-- fixed not working -txt= startargument; changed it to: 
+- Fixed not working -txt= startargument; changed it to: 
   - `-tapfile=` replaces `-txt=`
 - NEW: Starting argument for custom key replacement file
   - `-keyfile=`
