@@ -62,13 +62,13 @@ You can change the control keys in the py file under # Control keys.
 
 Some measures to lighten the precision of snap tap to maybe circumvent some AntiCheat.
 - NEW: random delay for snap tap 
-  - start argument `-delay=50` for max delay of 50 ms (can be set in a range of 1-500)
-  - without the start argument no delay will be used
+  - Start argument `-delay=50` for max delay of 50 ms (can be set in a range of 1-500)
+  - Without the start argument no delay will be used
 - NEW: crossover of input for snap tap
-  - start argument `-crossover=50` for a probability of 50% (can be set in a range of 0-100)
+  - Start argument `-crossover=50` for a probability of 50% (can be set in a range of 0-100)
   - I call "crossover" the act of releasing one key before the press - but just simulated. In a way to simulate a too early release of one key before the press of the actual pressed key (immediate release of last key and delay of pressed key as result). 
-  - Same random delay used as defined by delay="number".
-  - without the start argument no crossover will be used
+  - Same random delay used as defined by -delay="number"
+  - Without the start argument no crossover will be used
 
 **V0.6.0**
 - NEW: Key Replacements will now be tracked in tap groups
