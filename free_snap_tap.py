@@ -264,6 +264,7 @@ def win32_event_filter(msg, data):
             for group_index, group in enumerate(tap_groups_states_dict):
                 if DEBUG: print(f"#1 {group_index, group}")
                 if vk_code in group:
+                    if key_replaced: key_replaced = False
                     if msg in WM_KEYDOWN and group[vk_code] == 0:
                         group[vk_code] = 1
                         if DEBUG: print(f"#2 {vk_code}")
@@ -279,7 +280,7 @@ def win32_event_filter(msg, data):
                     break
 
         # if replaced key was not handled by tap groupings, then just send new key event
-        elif key_replaced:
+        if key_replaced:
             is_mouse_key = vk_code in mouse_vk_codes
 
             if is_mouse_key:
