@@ -3,6 +3,10 @@ import os # to use clearing of CLI for better menu usage
 import msvcrt # for clearing the input buffer before starting a new input
 import sys # to get start arguments
 
+from random import randint # randint(3, 9)) 
+from time import sleep # sleep(0.005) = 5 ms
+
+
 DEBUG = False
 PAUSED = False
 STOPPED = False
@@ -10,6 +14,15 @@ MENU_ENABLED = True
 CONTROLS_ENABLED = True
 PRINT_VK_CODES = False
 
+# Anticheat testing (ACT)
+ACT_REPEATING_KEYS = False
+ACT_DELAY = False
+ACT_MAX_DELAY_IN_MS = 40
+ACT_CROSSOVER = False
+ACT_CROSSOVER_PROPABILITY_IN_PERCENT = 50
+#ACT_CROSSOVER_RANDOM = False
+#ACT_CROSSOVER_DELAY = False
+#
 # Define File name for saving of Tap Groupings and Key Replacements
 FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
 FILE_NAME_KEY_REPLACEMENTS = 'key_replacement_groups.txt'
@@ -214,10 +227,10 @@ def win32_event_filter(msg, data):
     if PRINT_VK_CODES and msg in WM_KEYDOWN:
         print(f"vk_code: {vk_code}")
 
-    if DEBUG: 
-        print(f"vk_code: {vk_code}")
-        print("msg: ", msg)
-        print("data: ", data)
+    # if DEBUG: 
+    #     print(f"vk_code: {vk_code}")
+    #     print("msg: ", msg)
+    #     print("data: ", data)
 
     # check for simulated keys:
     if not is_simulated_key_event(data.flags):
@@ -230,7 +243,7 @@ def win32_event_filter(msg, data):
                     if DEBUG: 
                         print("vk_code_gotten: ", vk_code)
                         print("vk_code_replacement: ", group)
-                        print("key_code: ", key_code)
+                        # print("key_code: ", key_code)
                         print("is_press: ", is_press(msg))
 
                     vk_code = group[1]  
@@ -265,7 +278,7 @@ def win32_event_filter(msg, data):
                 if DEBUG: print(f"#1 {group_index, group}")
                 if vk_code in group:
                     if key_replaced: key_replaced = False
-                    if msg in WM_KEYDOWN and group[vk_code] == 0:
+                    if msg in WM_KEYDOWN: # and group[vk_code] == 0: #TODO ACT_6 repeating keys
                         group[vk_code] = 1
                         if DEBUG: print(f"#2 {vk_code}")
                         tap_groups_last_key_pressed[group_index] = vk_code
@@ -281,6 +294,7 @@ def win32_event_filter(msg, data):
 
         # if replaced key was not handled by tap groupings, then just send new key event
         if key_replaced:
+            if DEBUG: print(f"replacement vk_code: {vk_code}")
             is_mouse_key = vk_code in mouse_vk_codes
 
             if is_mouse_key:
@@ -326,19 +340,36 @@ def send_keys(key_to_send, group_index):
     key_code_to_send = keyboard.KeyCode.from_vk(key_to_send)
     key_code_last_key_send = keyboard.KeyCode.from_vk(last_key_send)
 
-    if key_to_send != last_key_send: # TODO: repeating input blocker
-         if key_to_send is None:
-            if last_key_send is not None:
+    # repeat keys if activated, if not then only send keys when key changes
+    if key_to_send != last_key_send or ACT_REPEATING_KEYS:
 
+        if key_to_send is None:
+            if last_key_send is not None:
                 controller.release(key_code_last_key_send) 
             tap_groups_last_key_send[group_index] = None
         else:
-            # TODO: here in general could be impl a crossover: start
+            is_crossover = False
             if last_key_send is not None:
+                # only use crossover when changinging keys, or else repeating will make movement stutter
+                if key_to_send != last_key_send:
+                    # only use crossover is activated and probility is over percentage
+                    is_crossover = randint(0,100) > (100 - ACT_CROSSOVER_PROPABILITY_IN_PERCENT) and ACT_CROSSOVER # 50% possibility
+
+                if is_crossover:
+                    if DEBUG: print("crossover")
+                    controller.press(key_code_to_send)
+                else:
+                    controller.release(key_code_last_key_send) 
+                # random delay if activated
+                if ACT_DELAY: 
+                    delay = randint(5, ACT_MAX_DELAY_IN_MS)
+                    if DEBUG: print(f"delayed by {delay} ms")
+                    sleep(delay / 1000) # in ms
+
+            if is_crossover:
                 controller.release(key_code_last_key_send) 
-                # TODO: here could a delay be placed
-            controller.press(key_code_to_send) 
-            # TODO: here in general could be impl a crossover: end
+            else:
+                controller.press(key_code_to_send) 
 
             tap_groups_last_key_send[group_index] = key_to_send
 
@@ -352,7 +383,7 @@ def display_menu():
     text = ""
     while True:       
         # clear the CLI
-        os.system('cls||clear')
+        if not DEBUG: os.system('cls||clear')
         if invalid_input:
             print(text)
             print("Please try again.\n")
@@ -452,6 +483,10 @@ def display_menu():
 def check_start_arguments():
     global DEBUG, MENU_ENABLED, CONTROLS_ENABLED
     global FILE_NAME_TAP_GROUPS, FILE_NAME_KEY_REPLACEMENTS
+    global ACT_REPEATING_KEYS, ACT_DELAY, ACT_CROSSOVER, 
+    # global ACT_MAX_DELAY_IN_MS, ACT_CROSSOVER_PROPABILITY_IN_PERCENT
+    global ACT_REPEATING_KEYS, ACT_DELAY, ACT_CROSSOVER
+    global ACT_MAX_DELAY_IN_MS, ACT_CROSSOVER_PROPABILITY_IN_PERCENT
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             if DEBUG: print(arg)
@@ -472,6 +507,40 @@ def check_start_arguments():
             # Start with controls disabled
             elif arg == "-nocontrols":
                 CONTROLS_ENABLED = False
+            elif arg == "-repeat":
+                ACT_REPEATING_KEYS = True
+            elif arg == "-delay":
+                ACT_DELAY = True
+            elif arg == "-crossover":
+                ACT_CROSSOVER = True         
+            elif arg == "rdc":
+                ACT_REPEATING_KEYS = True
+                ACT_DELAY = True
+                ACT_CROSSOVER = True   
+            elif arg == "-rdc":
+                ACT_REPEATING_KEYS = True
+                ACT_DELAY = True
+                ACT_CROSSOVER = True   
+            elif arg[:7] == "-delay=" and len(arg) > 7:
+                ACT_DELAY = True
+                try:
+                    delay = int(arg[7:])
+                except:
+                    print("invalid delay - needs to be a number")
+                if 0 < delay <= 500:
+                    ACT_MAX_DELAY_IN_MS = delay
+                else:
+                    print("delay not in range 0<delay<=500 ms")
+            elif arg[:11] == "-crossover=" and len(arg) > 11:
+                ACT_CROSSOVER = True    
+                try:
+                    probability = int(arg[11:])
+                except:
+                    print("invalid probability - needs to be a number")
+                if 0 < probability <= 100:
+                    ACT_CROSSOVER_PROPABILITY_IN_PERCENT = probability
+                else:
+                    print("probability not in range 0<prob<=100 %")
             else:
                 print("unknown start argument: ", arg)
 
