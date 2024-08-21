@@ -266,6 +266,10 @@ def win32_event_filter(msg, data):
                         # key combination marked with + between keys: e.g. shift_left+u -> shift down, u down, u up, shift up
                         # key up and down marked by + and - before keys: e.g. -shift_left, n, e, w, +shift_left --> NEW
                             # have to change reverse keys for it to work with -, but is similar in function
+                        # maybe it is possible to also use + and - as modifier for the input_key,
+                            # to differentiate between key press and key release as trigger
+                            # 2 alias on one key usable then - one on press, one on release xD
+
                         # readme and description need a bigger update xD
 
                         listener.suppress_event()
