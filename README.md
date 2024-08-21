@@ -5,7 +5,7 @@
 **Only works on Windows.**
 
 A minimalistic Python-based Snap Tapping program compatible with all keyboards and supports:
-- adjustable Tap Groups (mutually exclusive keys with Snap tap functionality)
+- adjustable Tap Groups (mutually exclusive keys with Snap Tap functionality)
 - Key Replacements 
 - Aliases aka Null binds
 - Custom delay for everything that helps to be recognised as cheat because the input is not as perfect
@@ -13,7 +13,8 @@ A minimalistic Python-based Snap Tapping program compatible with all keyboards a
 
 With CLI User Interface to manage Tap_Groups and Key_Groups:
 
-<img width="400" alt="FST" src="https://github.com/user-attachments/assets/09efd630-c691-4d1c-8a06-aa8906bc54a7">
+![Free-Snap-Tap_Menu](https://github.com/user-attachments/assets/7896509d-bc2a-4927-8dd4-5bc6d4f5adf9)
+pic1: (my key_groups for testing the update V0.8.0)
 
 Tap_Groups are now saved in a separate `tap_groups.txt` file and Key_Groups in `key_groups.txt` - both can be edited directly.
 
@@ -82,6 +83,7 @@ You can change the control keys in the py file under # Control keys.
 ## Version Information
 
 ++V0.8.0**
+
 Tested on new VAC policy and working so far without being kicked for input automatization.
 Use delay of at least 5 ms, better a more to be on the save side and do not spam snap tap extremly often in 2 seconds or you will still be kicked. ;-)
 
@@ -93,6 +95,13 @@ Use delay of at least 5 ms, better a more to be on the save side and do not spam
     - crossover will also use this as delay
   - start_argument `-crossover=*probability*` will set the probability of a crossover (release will be send now and based on delay the new key press will be send later)
     - to have another way to simulate a form of imperfect snap tap to circument VAC
+   
+e.g. in bash file
+```bash
+@echo off
+python .\free_snap_tap.py -tapfile=my_taps.txt -keyfile=my_keys.txt -crossover=50 -delay=10 
+pause
+```
       
 - NEW: introducdes Aliases aka Null binds that are specifically designed with costumiazable random delays for each key event
   -  to define in Key_Groups as groups with more than 2 keys.
