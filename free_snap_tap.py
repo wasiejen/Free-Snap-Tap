@@ -263,15 +263,25 @@ def win32_event_filter(msg, data):
                             controller.release(key_code)
                             sleep(randint(ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS) / 1000)
 
+                        '''
                         # key combination marked with + between keys: e.g. shift_left+u -> shift down, u down, u up, shift up
                         # key up and down marked by + and - before keys: e.g. -shift_left, n, e, w, +shift_left --> NEW
                             # have to change reverse keys for it to work with -, but is similar in function
                         # maybe it is possible to also use + and - as modifier for the input_key,
                             # to differentiate between key press and key release as trigger
                             # 2 alias on one key usable then - one on press, one on release xD
+                        # though to the end: key groups will look like
+                        -k,-shift,h,e,l,l,o,+shift          # k down -> HELLO
+                        +k,-shift,w,o,r,l,d,+shift          # k up   -> WORLD
+                        -l,-l,mouse_right                   # l down -> l down, right mouse click
+                        h, u   # equivalent to h-,u-;h+,u+  # h will be replaced by u: h down -> u down, h up -> u up
+                            # maybe really just define h-,u-;h+,u+ and split at ; (has to be compatible with shared typ_groups )
+
+                        # include delay for a key to change the delay after that key:
+                        -h,-shift,h/10,e/5,l,l,o,+shift     # custom delay of 10 ms after h and 5 ms after e
 
                         # readme and description need a bigger update xD
-
+                        '''
                         listener.suppress_event()
 
         # Stop the listener if the END key is released
