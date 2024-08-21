@@ -346,23 +346,30 @@ def win32_event_filter(msg, data):
 
                         if should_fire_alias:
                             for i, code in enumerate(vk_codes):
-                                key_code = keyboard.KeyCode.from_vk(code)
+
+                                is_mouse_key = code in mouse_vk_codes
+                                if is_mouse_key:
+                                    key_code = mouse_vk_codes_dict[code]
+                                else:
+                                    key_code = keyboard.KeyCode.from_vk(code)
+
+                                #key_code = keyboard.KeyCode.from_vk(code)
                                 key_delays = key_groups_key_delays[group_index][i]
 
                                 if DEBUG: print(i, code)
 
                                 if new_key_press_modifiers[i] == None:
-                                    controller.press(key_code)
+                                    controller_dict[is_mouse_key].press(key_code)
                                     delay(*key_delays)
-                                    controller.release(key_code) 
+                                    controller_dict[is_mouse_key].release(key_code) 
                                 elif new_key_press_modifiers[i] == 'up':
-                                    controller.release(key_code)
+                                    controller_dict[is_mouse_key].release(key_code)
                                 elif new_key_press_modifiers[i] == 'down':
-                                    controller.press(key_code)
+                                    controller_dict[is_mouse_key].press(key_code)
                                 elif new_key_press_modifiers[i] == 'reversed': 
-                                    controller.release(key_code)
+                                    controller_dict[is_mouse_key].release(key_code)
                                     delay(*key_delays)
-                                    controller.press(key_code)
+                                    controller_dict[is_mouse_key].press(key_code)
                                 delay(*key_delays)
 
                             listener.suppress_event()   
