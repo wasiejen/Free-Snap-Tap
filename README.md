@@ -13,8 +13,10 @@ A minimalistic Python-based Snap Tapping program compatible with all keyboards a
 
 With CLI User Interface to manage Tap_Groups and Key_Groups:
 
-![Free-Snap-Tap_Menu](https://github.com/user-attachments/assets/7896509d-bc2a-4927-8dd4-5bc6d4f5adf9)
+<img width="500" alt="FST" src="https://github.com/user-attachments/assets/7896509d-bc2a-4927-8dd4-5bc6d4f5adf9">
+
 pic1: (my key_groups for testing the update V0.8.0)
+
 
 Tap_Groups are now saved in a separate `tap_groups.txt` file and Key_Groups in `key_groups.txt` - both can be edited directly.
 
