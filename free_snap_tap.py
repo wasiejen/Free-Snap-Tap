@@ -95,7 +95,9 @@ vk_codes_dict = {
     'exsel': 248, 'erase_eof': 249, 'play': 250, 'zoom': 251,
     'pa1': 253, 'oem_clear': 254,
     # some vk_codes for german keyboard layout
-    '<': 226, 'ä' : 222, 'ö' : 192, 'ü': 186, '´': 221, 'copilot': 134, 
+    '<': 226, 'ä': 222, 'ö': 192, 'ü': 186, '´': 221, 'copilot': 134, 
+    # s
+    '-': 189, '+': 187, '#': 191, ',': 188, '.':190,
 }
 
 def load_groups(file_name, data_object):
