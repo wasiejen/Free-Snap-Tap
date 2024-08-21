@@ -182,10 +182,6 @@ def initialize_key_groups():
     if DEBUG: print("key groups: ", key_groups)
     for group_index, group in enumerate(key_groups):
         for key in group:
-            if key == '':
-                break
-            #TODO: recognition of combinations or delay
-            
 
             #TODO: firstbreak up the combination into a list of keys
 
@@ -194,32 +190,32 @@ def initialize_key_groups():
             if '|' in key:
                 key, *delays = key.split('|')
                 print(f"delays for {key}: {delays}")
-                delays = [int(delay) for delay in delays]
+                # cast in int and ignore all other elements after first 2
+                delays = [int(delay) for delay in delays[:2]]
             else:
                 delays = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
             key_groups_key_delays[group_index].append(delays)
 
 
-
+            if key == '':
+                break
 
             # recognition of mofidiers +, - and #
             # only interpret it as such when more then one char is in key
-        
-
             if len(key) > 1: 
                 key_press_modifier = None
                 if key[0] == '-':
                     # down key
                     key_press_modifier = 'down'
-                    key = key.replace('-','')
+                    key = key.replace('-','',1) # only replace first occurance
                 elif key[0] == '+':
                     # up key
                     key_press_modifier = 'up'
-                    key = key.replace('+','')
+                    key = key.replace('+','',1)
                 elif key[0] == '#':
                     # up key
                     key_press_modifier = 'reversed'
-                    key = key.replace('#','')
+                    key = key.replace('#','',1)
 
             key = convert_to_vk_code(key)
             key_groups_dict[group_index].append(key)
@@ -286,19 +282,20 @@ def win32_event_filter(msg, data):
         # Replace some Buttons :-D
         if not PAUSED:
             for group_index, group in enumerate(key_groups_dict):
+                if DEBUG: print("group_index", group_index)
+                #key_press_modifier = None
+                #new_key_press_modifiers = None
+
                 if vk_code == group[0]:
 
                     key_press_modifier = key_groups_key_press_modifier[group_index][0]
-                    new_key_press_modifiers = key_groups_key_press_modifier[group_index][1:]
-
-                    
+                    new_key_press_modifiers = key_groups_key_press_modifier[group_index][1:]                
 
                     if DEBUG: 
                         print("vk_code_gotten: ", vk_code)
                         print("vk_code_replacement: ", group)
                         print("is_keydown: ", is_keydown)
                         print(f"key_pres_modifiers: {key_press_modifier} -> {new_key_press_modifiers}", )
-
 
                     # KEY REPLACEMENT handling
                     if len(group) == 2:              
@@ -332,7 +329,7 @@ def win32_event_filter(msg, data):
                         # if no up or down is set, it will be fired at press adn release of key
                         # just to be consitent with the syntax
                         if key_press_modifier == None:
-                            should_fire_alias
+                            should_fire_alias = True
                         # only fire alias with release of key, not on press
                         elif key_press_modifier == 'up':
                             if not is_keydown:
@@ -366,20 +363,7 @@ def win32_event_filter(msg, data):
                                     controller.press(key_code)
                                 delay(*key_delays)
 
-
-
-
-                        # if is_keydown: # so up key will be ignored
-                        #     for code in vk_codes:
-                        #         if DEBUG: print(f"alias press: {code}")
-                        #         key_code = keyboard.KeyCode.from_vk(code)
-                        #         controller.press(key_code)
-                        #         sleep(randint(ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS) / 1000)
-                        #         controller.release(key_code)
-                        #         sleep(randint(ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS) / 1000)
-                        #
-                        # else: # key up
-                        #     pass
+                            listener.suppress_event()   
 
                         '''
                         # key combination marked with + between keys: e.g. shift_left+u -> shift down, u down, u up, shift up
@@ -417,15 +401,11 @@ def win32_event_filter(msg, data):
                                     ### but this is d which was released
 
 
-
-                        # 
-
-
                         # readme and description need a bigger update xD
 
 
                         '''
-                        listener.suppress_event()
+                        
 
         # Stop the listener if the END key is released
         if CONTROLS_ENABLED and vk_code == MENU_KEY and msg in WM_KEYUP:
