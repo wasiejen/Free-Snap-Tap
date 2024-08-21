@@ -16,13 +16,14 @@ PRINT_VK_CODES = False
 
 # AntiCheat testing (ACT)
 ACT_DELAY = False
-ACT_MIN_DELAY_IN_MS = 0
+ACT_MIN_DELAY_IN_MS = 2
 ACT_MAX_DELAY_IN_MS = 10
 ACT_CROSSOVER = False # will also force delay
 ACT_CROSSOVER_PROPABILITY_IN_PERCENT = 50
 
 # Alias delay between presses and releases
-ALIAS_DELAY = 10 # 10 ms
+ALIAS_MIN_DELAY_IN_MS = 2 
+ALIAS_MAX_DELAY_IN_MS = 10
 
 # Define File name for saving of Tap Groupings and Key Groups
 FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
@@ -258,9 +259,9 @@ def win32_event_filter(msg, data):
                             if DEBUG: print(f"alias press: {key}")
                             key_code = keyboard.KeyCode.from_vk(key)
                             controller.press(key_code)
-                            sleep(ALIAS_DELAY / 1000)
+                            sleep(randint(ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS) / 1000)
                             controller.release(key_code)
-                            sleep(ALIAS_DELAY / 1000)
+                            sleep(randint(ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS) / 1000)
 
                         # key combination marked with + between keys: e.g. shift_left+u -> shift down, u down, u up, shift up
                         # key up and down marked by + and - before keys: e.g. -shift_left, n, e, w, +shift_left --> NEW
