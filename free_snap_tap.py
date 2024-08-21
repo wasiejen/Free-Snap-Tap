@@ -16,9 +16,13 @@ PRINT_VK_CODES = False
 
 # AntiCheat testing (ACT)
 ACT_DELAY = False
-ACT_MAX_DELAY_IN_MS = 40
-ACT_CROSSOVER = False
+ACT_MIN_DELAY_IN_MS = 0
+ACT_MAX_DELAY_IN_MS = 10
+ACT_CROSSOVER = False # will also force delay
 ACT_CROSSOVER_PROPABILITY_IN_PERCENT = 50
+
+# Alias delay between presses and releases
+ALIAS_DELAY = 10 # 10 ms
 
 # Define File name for saving of Tap Groupings and Key Replacements
 FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
@@ -100,8 +104,9 @@ def load_groups(file_name, data_object):
     data_object = []
     with open(file_name, 'r') as file:
         for line in file:
-            group = line.strip().split(',')
-            data_object.append(group)
+            if len(line) > 1:
+                group = line.strip().replace(" ","").split(',')
+                data_object.append(group)
     return data_object
 
 def save_groups(file_name, data_object):
@@ -220,8 +225,10 @@ def win32_event_filter(msg, data):
 
     key_replaced = False
     vk_code = data.vkCode
+    is_keydown = msg in WM_KEYDOWN
 
-    if PRINT_VK_CODES and msg in WM_KEYDOWN:
+
+    if PRINT_VK_CODES and is_keydown:
         print(f"vk_code: {vk_code}")
 
     # if DEBUG: 
@@ -236,15 +243,24 @@ def win32_event_filter(msg, data):
         if not PAUSED:
             for group_index, group in enumerate(key_replacement_dict):
                 if vk_code == group[0]:
-                                       
-                    if DEBUG: 
-                        print("vk_code_gotten: ", vk_code)
-                        print("vk_code_replacement: ", group)
-                        # print("key_code: ", key_code)
-                        print("is_press: ", is_press(msg))
+                    if len(group) == 2:                
+                        if DEBUG: 
+                            print("vk_code_gotten: ", vk_code)
+                            print("vk_code_replacement: ", group)
+                            print("is_press: ", is_press(msg))
 
-                    vk_code = group[1]  
-                    key_replaced = True
+                        vk_code = group[1]  
+                        key_replaced = True
+
+                    elif is_keydown: # so up key will be ignored
+                        for key in group[1:]:
+                            print(f"alias press: {key}")
+                            key_code = keyboard.KeyCode.from_vk(key)
+                            controller.press(key_code)
+                            sleep(ALIAS_DELAY / 1000)
+                            controller.release(key_code)
+                            sleep(ALIAS_DELAY / 1000)
+                        listener.suppress_event()
 
         # Stop the listener if the END key is released
         if CONTROLS_ENABLED and vk_code == MENU_KEY and msg in WM_KEYUP:
@@ -358,8 +374,8 @@ def send_keys(key_to_send, group_index):
                 else:
                     controller.release(key_code_last_key_send) 
                 # random delay if activated
-                if ACT_DELAY: 
-                    delay = randint(0, ACT_MAX_DELAY_IN_MS)
+                if ACT_DELAY or ACT_CROSSOVER: 
+                    delay = randint(ACT_MIN_DELAY_IN_MS, ACT_MAX_DELAY_IN_MS)
                     if DEBUG: print(f"delayed by {delay} ms")
                     sleep(delay / 1000) # in ms
 
