@@ -1,26 +1,22 @@
 ## Free Snap Tap: Universal Keyboard Snap Tap Program with Tap Groupings
 
-**aka Snap Tapping**
+**aka Snap Tapping** **Only works on Windows.**
 
-A minimalistic Python-based Snap Tapping program compatible with all keyboards, providing enhanced input prioritization for smoother gaming and typing experiences. Inspired by Razer Snap Tap and Wooting SOCD & Null Bind.
+A minimalistic Python-based Snap Tapping program compatible with all keyboards and supports:
+- adjustable Tap Groups (mutually exclusive keys with Snap tap functionality)
+- Key Replacements 
+- Aliases aka Null binds
+- Custom delay for everything that helps to be recognised as cheat because the input is not as perfect
+  - see ### Example Use Cases for Aliases (to show what is possible right now)
 
-Snap Tapping ensures that the most recent key input is prioritized, even if an opposing key is still pressed. This feature is particularly useful in gaming scenarios where precise control is crucial.
-
-With **Tap Groupings**, you can define your own sets of keys to be observed together and be separately handled. The key presses for each Tap Grouping are mutually exclusive — only one will be sent as input at any time. 
-As long as one key is still pressed it will be send as input - so e.g. fast tapping `D` while holding `A` (or reversed) and so rapid switching between `A` and `D` is possible.
-
-Also with the Option for simple **Key Replacements**. Useful if you can't change some keys ingame or you want to use keys that normally are not available to games like the windows keys.
-
-**Only works on Windows.**
-
-With CLI User Interface to manage Tap Groupings and Key Replacements:
+With CLI User Interface to manage Tap_Groups and Key_Groups:
 
 <img width="400" alt="FST" src="https://github.com/user-attachments/assets/09efd630-c691-4d1c-8a06-aa8906bc54a7">
 
-Tap Groupings are now saved in a separate `tap_groups.txt` file and key replacement pairs in `key_replacement_groups.txt` - both can be edited directly.
+Tap_Groups are now saved in a separate `tap_groups.txt` file and Key_Groups in `key_groups.txt` - both can be edited directly.
 
 Each line represents one Tap Group, and each key is to be separated by a comma and can have 1 or more keys in it. (e.g. `1, 2, 3, 4` or `left_shift, left_control, alt` or just `v` would also be possible)
-Key Replacement Pairs only accepts 2 keys.
+Key Replacements only accepts 2 keys. Aliases is everything with more than 2 keys as a Key_Group.
 
 String representation or vk-codes (virtual keyboard codes—list in py file) can also be used.
 
@@ -36,16 +32,40 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
   - Yaw Left/Right
   - Pitch Up/Down
   - Roll Left/Right
- 
-- Single key Tap Groups:
-  - e.g. (Tap Group `v`) would transform output while holding the key from "vvvvvvvvvvv..." to just "v". (might depend on keyboard used)
-    - Use case you ask? I have no idea right now. ;-D
-    - Might be useful for people who want to have only one character written at a time independent from how long the key is pressed. Add every key each to a Tap Group and all keys will always only write one character.
 
 ### Example Use Cases for Key Replacements
 
 - `windows_left` to `left_control` 
 - `<` to `left_shift`
+
+### Example Use Cases for Aliases (to show what is possible right now)
+
+- `-k,  p|10,  o|5,  i|15|3`   
+  - when k is pressed , send p with a max delay of 10, then o with may delay of 5, then i with min delay of 3 and max of 10 (order of delays is free - it fetches the smaller one as min and the bigger one as max.
+- `+o,r,e,v,e,r,s,e,d,-left_shift,w,o,r,l,d,+left_shift`    
+  - when o is released writes "reversedWORLD"
+- `-o,-left_shift,h,e,l,l,o,+left_shift,w,o,r,l,d`        
+  - when o is pressed writes "HELLOworld"
+- `--,-+,++,+mouse_left, +mouse_right
+  - when minus is pressed sends a + press and release, and only release of left mouse button and right mouse button
+- `+-,o,k`
+  - when minus is released writes "ok"
+
+Some explanation:
+- `` nothing in front of a key is a press and release (normal input)
+- `-` in front of a key is a press (down without up)
+- `+` in front of a key is a release (up without down)
+- `#` in front of a key is a release and a key (reversed input)
+- `|` behind a key is the the max delay for this single key (e.g. `-k|10` -> press k with a max delay of 10)
+- `|*max*|*min*` defines min and max delay (e.g. `-k|10|2` or `-k|2|10` -> press k with a max delay of 10 and min delay of 2)
+
+This is only usable in key_groups. not supported in tap_groups yet.
+
+### Delay-Settings
+- Delays for the Tap_Groups is set to 2 ms min and 10 ms max. 
+  - Can be changed in py file or the max can be set via the start argument `-delay="number"`.
+  - min not settable via start argument yet.
+- Key_Groups will use the same delay defined for Tap_Groups per default and only if given some other delay via `|` will these be overwritten.
 
 ## Controls
 
@@ -56,6 +76,9 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
 You can change the control keys in the py file under # Control keys.
 
 ## Version Information
+
+++V0.8.0**
+- see releases notes for now, will be added later
 
 **V0.7.0**
 - fixed a bug due which the key replacement was never send
@@ -125,8 +148,10 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
 -  `-tapfile="filename"` (with or without "): load and save tap groupings from a custom save file
 -  `-keyfile="filename"` (with or without "): load and save key groupings from a custom save file
 -  `-debug`: print out some debug info
--  `-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  `-delay="number"` for max delay of "number" ms (can be set in a range of 1-500)
--  `-crossover="number"` for a probability of "number" percent (can be set in a range of 0-100)
+-  `-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  
+-  `-delay="number"` sets the default max delay of "number" ms for Tap_Groups and Key_Groups (can be set in a range of 1-500)
+-  `-crossover="number"` sets the probability of "number" percent for a crossover (can be set in a range of 0-100)
+  - crossover is when the old key is released before the actual pressed key and with a delay to make it more natural
   
 Tap Groupings are a set of keys that are observed and the output of each group is separately handled. Activation of a key is mutually exclusive to all others—so there will always be only one activated key.
 You can define Tap Groupings or Key Replacements via Command Line or via editing the `tap_groups.txt` or `key_replacement_groups.txt`.
