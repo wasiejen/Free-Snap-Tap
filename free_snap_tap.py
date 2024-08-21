@@ -454,13 +454,13 @@ def display_menu():
             initialize_tap_groups()
         elif choice == '4': 
             try:
-                new_group = input("Enter new key pair (2 keys separated by a comma): ").replace(" ", "").split(',')
-                if len(new_group) == 2:
+                new_group = input("Enter keys seperated by comma (2 keys = replacement, 3+ = alias): ").replace(" ", "").split(',')
+                if len(new_group) >= 2:
                     add_group(new_group, key_replacement_groups)
                     initialize_key_replacement_groups()
                     save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
                 else:
-                    text = "Error: For a pair only sets of 2 keys are valid."
+                    text = "Error: at least 2 keys are needed."
                     invalid_input = True
             except KeyError as error_msg:
                 text = f"Error: Wrong string as a key used: {error_msg}"
