@@ -183,10 +183,10 @@ def initialize_key_groups():
     for group_index, group in enumerate(key_groups):
         for key in group:
 
-            #TODO: firstbreak up the combination into a list of keys
+            #TODO: first break up the combination into a list of keys
 
 
-            #TODO: then seperate delay info from string
+            #seperate delay info from string
             if '|' in key:
                 key, *delays = key.split('|')
                 print(f"delays for {key}: {delays}")
@@ -366,40 +366,47 @@ def win32_event_filter(msg, data):
                             listener.suppress_event()   
 
                         '''
-                        # key combination marked with + between keys: e.g. shift_left+u -> shift down, u down, u up, shift up
-                        # key up and down marked by + and - before keys: e.g. -shift_left, n, e, w, +shift_left --> NEW
-                            # have to change reverse keys for it to work with -, but is similar in function
-                        # maybe it is possible to also use + and - as modifier for the input_key,
-                            # to differentiate between key press and key release as trigger
-                            # 2 alias on one key usable then - one on press, one on release xD
-                        # though to the end: key groups will look like
-                        -k,-shift,h,e,l,l,o,+shift          # k down -> HELLO
-                        +k,-shift,w,o,r,l,d,+shift          # k up   -> WORLD
-                        -l,-l,mouse_right                   # l down -> l down, right mouse click
-                        h, u   # equivalent to h-,u-;h+,u+  # h will be replaced by u: h down -> u down, h up -> u up
-                            # maybe really just define h-,u-;h+,u+ and split at ; (has to be compatible with shared typ_groups )
+                        [o] # key combination marked with + between keys: e.g. shift_left+u -> shift down, u down, u up, shift up
+                            [x] somewhat solved by using -shift,key,+shift - even more flexible
+                        [x] # key up and down marked by + and - before keys: e.g. -shift_left, n, e, w, +shift_left --> NEW
+                            [x] # have to change reverse keys for it to work with -, but is similar in function
+                        [x] maybe it is possible to also use + and - as modifier for the input_key,
+                            [x] # to differentiate between key press and key release as trigger
+                            [x] # 2 alias on one key usable then - one on press, one on release xD
+                        [x] # though to the end: key groups will look like
+                            -k,-shift,h,e,l,l,o,+shift          # k down -> HELLO
+                            +k,-shift,w,o,r,l,d,+shift          # k up   -> WORLD
+                            -l,-l,mouse_right                   # l down -> l down, right mouse click
+                            h, u   # equivalent to h-,u-;h+,u+  # h will be replaced by u: h down -> u down, h up -> u up
+                                # maybe really just define h-,u-;h+,u+ and split at ; (has to be compatible with shared typ_groups )
 
-                        # include delay for a key to change the delay after that key:
-                        -h,-shift,h/10,e/5,l,l,o,+shift     # custom delay of 10 ms after h and 5 ms after e
+                        [x] # include delay for a key to change the delay after that key:
+                                -h,-shift,h/10,e/5,l,l,o,+shift     # custom delay of 10 ms after h and 5 ms after e
                         
-                        # global state list with 262 (0-261) elements for each key representing pressed or not
-                        # global list with lists of all combinations to be tracked
-                            # fast check by just asking if the indize of state_list[key of combination] is pressed
-                        # global state of last_key_pressed
-                        # omb_last_key_pressed for each combination
-                            # e.g. tapgroup a,d
-                            a pressed -> last_key_pressed = a
-                                state[a] = 1, looked up if in combination; set comb_last_key_pressed = a; a press send
-                            d pressed -> last_key_pressed = d
-                                state[d] = 1 and d press send
-                                key combination triggered
-                                    comb_last_key_pressed released
-                            d released
-                                state[d] = 0 and d release send
-                                check combination for num of sum greater 1
-                                    send comb_last_key_pressed
-                                    ### but this is d which was released
-
+                        # problem is that key combination can not be recognised as an input
+                            # global state list with 262 (0-261) elements for each key representing pressed or not
+                            # global list with lists of all combinations to be tracked
+                                # fast check by just asking if the indize of state_list[key of combination] is pressed
+                            # global state of last_key_pressed
+                            # comb_last_key_pressed for each combination
+                                # e.g. tapgroup a,d
+                                a pressed -> last_key_pressed = a
+                                    state[a] = 1, looked up if in combination; set comb_last_key_pressed = a; a press send
+                                d pressed -> last_key_pressed = d
+                                    state[d] = 1 and d press send
+                                    key combination triggered
+                                        comb_last_key_pressed released
+                                d released
+                                    state[d] = 0 and d release send
+                                    check combination for num of sum greater 1
+                                        send comb_last_key_pressed
+                                        ### but this is d which was released
+                        
+                        # linux compatibility:
+                            # replace win32_event_filter with generic on_press and on_release calls 
+                            # supress=True to supress everything
+                            # pipe through the script every input
+                            # logic for not sendung key when used in key groups as trigger
 
                         # readme and description need a bigger update xD
 
@@ -462,7 +469,6 @@ def win32_event_filter(msg, data):
             else:
                 key_code = keyboard.KeyCode.from_vk(vk_code)
 
-            # TODO: is this even working as intented?
             if is_keydown: # and not output_is_reversed:
                 controller_dict[is_mouse_key].press(key_code)
             else:
