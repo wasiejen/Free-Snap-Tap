@@ -24,9 +24,9 @@ ACT_CROSSOVER_PROPABILITY_IN_PERCENT = 50
 # Alias delay between presses and releases
 ALIAS_DELAY = 10 # 10 ms
 
-# Define File name for saving of Tap Groupings and Key Replacements
+# Define File name for saving of Tap Groupings and Key Groups
 FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
-FILE_NAME_KEY_REPLACEMENTS = 'key_replacement_groups.txt'
+FILE_NAME_KEY_GROUPS = 'key_groups.txt'
 
 # Constants for key events
 WM_KEYDOWN = [256,260] # _PRESS_MESSAGES = (_WM_KEYDOWN, _WM_SYSKEYDOWN)
@@ -40,8 +40,9 @@ MENU_KEY = 34 # PAGE_DOWN
 # Tap groups define which keys are mutually exclusive
 tap_groups = []
 
-# Key Replacement Groups or Pairs define which key1 will be replaced by key2
-key_replacement_groups = []
+# Key Groups define which key1 will be replaced by key2
+# if a Key Group has more than 2 keys if will be handled als alias
+key_groups = []
 
 # Initialize the Controller
 controller = keyboard.Controller()
@@ -148,15 +149,15 @@ def reset_tap_groups_txt():
     add_group(['w','s'], tap_groups)
     save_groups(FILE_NAME_TAP_GROUPS, tap_groups)
 
-def reset_key_replacement_txt():
+def reset_key_groups_txt():
     """
-    Reset key_replacement_groups and initialise empty txt file
+    Reset key_groups and initialise empty txt file
     """
-    global key_replacement_groups
-    key_replacement_groups = []
-    #add_group(['<','left_shift'], key_replacement_groups)
-    #add_group(['left_windows','left_control'], key_replacement_groups)
-    save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
+    global key_groups
+    key_groups = []
+    #add_group(['<','left_shift'], key_groups)
+    #add_group(['left_windows','left_control'], key_groups)
+    save_groups(FILE_NAME_KEY_GROUPS, key_groups)
 
 def convert_to_vk_code(key):
     try:
@@ -170,25 +171,25 @@ def convert_to_vk_code(key):
             raise KeyError
 
 
-def initialize_key_replacement_groups():
-    global key_replacement_dict, key_replacement_state_reversed
-    key_replacement_dict = [[] for n in range(len(key_replacement_groups))] 
-    key_replacement_state_reversed = [False] * len(key_replacement_groups)
+def initialize_key_groups():
+    global key_groups_dict, key_group_state_reversed
+    key_groups_dict = [[] for n in range(len(key_groups))] 
+    key_group_state_reversed = [False] * len(key_groups)
 
-    if DEBUG: print("key groups: ", key_replacement_groups)
-    for group_index, group in enumerate(key_replacement_groups):
+    if DEBUG: print("key groups: ", key_groups)
+    for group_index, group in enumerate(key_groups):
         for key in group:
             if key == '':
                 break
             if key[0] == '-':
                 # reversed true
-                key_replacement_state_reversed[group_index] = True
+                key_group_state_reversed[group_index] = True
                 key = key.replace('-','')
 
             key = convert_to_vk_code(key)
-            key_replacement_dict[group_index].append(key)
+            key_groups_dict[group_index].append(key)
 
-    if DEBUG: print("key dict: ", key_replacement_dict)
+    if DEBUG: print("key dict: ", key_groups_dict)
 
 def initialize_tap_groups():
     """
@@ -241,7 +242,7 @@ def win32_event_filter(msg, data):
 
         # Replace some Buttons :-D
         if not PAUSED:
-            for group_index, group in enumerate(key_replacement_dict):
+            for group_index, group in enumerate(key_groups_dict):
                 if vk_code == group[0]:
                     if len(group) == 2:                
                         if DEBUG: 
@@ -315,7 +316,7 @@ def win32_event_filter(msg, data):
             else:
                 key_code = keyboard.KeyCode.from_vk(vk_code)
 
-            if is_press(msg, key_replacement_state_reversed[group_index]):
+            if is_press(msg, key_group_state_reversed[group_index]):
                 controller_dict[is_mouse_key].press(key_code)
             else:
                 controller_dict[is_mouse_key].release(key_code)
@@ -404,19 +405,18 @@ def display_menu():
             text = ""
         print("Active Tap Groups:")
         display_groups(tap_groups)
-        print("\nActive Key Replacements:")
-        display_groups(key_replacement_groups)
-        print('\n------ Options Tap Groups --------------')
+        print("\nActive Key Groups:")
+        display_groups(key_groups)
+        print('\n------ Options Tap Groups -------')
         print("1. Add Tap Group")
         print("2. Delete Tap Group")
         print("3. Reset tap_groups.txt file")
-        print('\n------ Options Key Replacements --------')
-        print("4. Add Key Replacement Pair")
-        print("5. Delete Key Replacement Pair")
-        print("6. Clear key_replacement_groups.txt file")
+        print('\n------ Options Key Groups -------')
+        print("4. Add Key Group")
+        print("5. Delete Key Group")
+        print("6. Clear key_groups.txt file")
         print("\n7. Print vk_codes to identify keys")
         print("8. End Script")
-        #print("\n[Enter]. Start Snap Tapping :-)\n")
 
         # empty input buffer before asking for next input
         while msvcrt.kbhit():
@@ -456,23 +456,23 @@ def display_menu():
             try:
                 new_group = input("Enter keys seperated by comma (2 keys = replacement, 3+ = alias): ").replace(" ", "").split(',')
                 if len(new_group) >= 2:
-                    add_group(new_group, key_replacement_groups)
-                    initialize_key_replacement_groups()
-                    save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
+                    add_group(new_group, key_groups)
+                    initialize_key_groups()
+                    save_groups(FILE_NAME_KEY_GROUPS, key_groups)
                 else:
                     text = "Error: at least 2 keys are needed."
                     invalid_input = True
             except KeyError as error_msg:
                 text = f"Error: Wrong string as a key used: {error_msg}"
                 invalid_input = True
-                delete_group(len(key_replacement_groups) - 1, key_replacement_groups)
+                delete_group(len(key_groups) - 1, key_groups)
         elif choice == '5':
             try:
                 index = int(input("Enter the index of the key pair to delete: "))
-                if 0<= index < len(key_replacement_groups):
-                    delete_group(index, key_replacement_groups)
-                    initialize_key_replacement_groups()
-                    save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
+                if 0<= index < len(key_groups):
+                    delete_group(index, key_groups)
+                    initialize_key_groups()
+                    save_groups(FILE_NAME_KEY_GROUPS, key_groups)
                 else:
                     text = "Error: Index outside of range of key pairs."
                     invalid_input = True
@@ -480,8 +480,8 @@ def display_menu():
                 text = "Error: Index was not a Number."
                 invalid_input = True
         elif choice == '6':
-            reset_key_replacement_txt()
-            initialize_key_replacement_groups()
+            reset_key_groups_txt()
+            initialize_key_groups()
         elif choice == '7':
             PRINT_VK_CODES = True
             break
@@ -495,7 +495,7 @@ def display_menu():
 
 def check_start_arguments():
     global DEBUG, MENU_ENABLED, CONTROLS_ENABLED
-    global FILE_NAME_TAP_GROUPS, FILE_NAME_KEY_REPLACEMENTS
+    global FILE_NAME_TAP_GROUPS, FILE_NAME_KEY_GROUPS
     global ACT_DELAY, ACT_CROSSOVER
     global ACT_MAX_DELAY_IN_MS, ACT_CROSSOVER_PROPABILITY_IN_PERCENT
     if len(sys.argv) > 1:
@@ -510,8 +510,8 @@ def check_start_arguments():
                 if DEBUG: print(FILE_NAME_TAP_GROUPS)
             # use custom key groups file for loading and saving
             elif arg[:9] == '-keyfile=' and len(arg) > 9:
-                FILE_NAME_KEY_REPLACEMENTS = arg[9:]
-                if DEBUG: print(FILE_NAME_KEY_REPLACEMENTS)
+                FILE_NAME_KEY_GROUPS = arg[9:]
+                if DEBUG: print(FILE_NAME_KEY_GROUPS)
             # Debug .. what else :-D
             elif arg == "-debug":
                 DEBUG = True
@@ -561,13 +561,13 @@ if __name__ == "__main__":
         print(f"tap_groups: {tap_groups}")
         print(f"tap_groups_states_dict: {tap_groups_states_dict}")
 
-    # try loading key replacements from file
+    # try loading key groups from file
     try:
-        key_replacement_groups = load_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
+        key_groups = load_groups(FILE_NAME_KEY_GROUPS, key_groups)
     # if no tap_groups.txt file exist create new one
     except FileNotFoundError:
-        reset_key_replacement_txt()
-    initialize_key_replacement_groups()
+        reset_key_groups_txt()
+    initialize_key_groups()
 
     while not STOPPED:
         if MENU_ENABLED:
