@@ -255,12 +255,18 @@ def win32_event_filter(msg, data):
 
                     elif is_keydown: # so up key will be ignored
                         for key in group[1:]:
-                            print(f"alias press: {key}")
+                            if DEBUG: print(f"alias press: {key}")
                             key_code = keyboard.KeyCode.from_vk(key)
                             controller.press(key_code)
                             sleep(ALIAS_DELAY / 1000)
                             controller.release(key_code)
                             sleep(ALIAS_DELAY / 1000)
+
+                        # key combination marked with + between keys: e.g. shift_left+u -> shift down, u down, u up, shift up
+                        # key up and down marked by + and - before keys: e.g. -shift_left, n, e, w, +shift_left --> NEW
+                            # have to change reverse keys for it to work with -, but is similar in function
+                        # readme and description need a bigger update xD
+
                         listener.suppress_event()
 
         # Stop the listener if the END key is released
