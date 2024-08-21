@@ -1,4 +1,4 @@
-## Free Snap Tap: Universal Keyboard Snap Tap Program with Tap Groupings
+## Free Snap Tap: Universal Keyboard Snap Tap with Tap Groups, Key Replacement, Aliases (Null binds) and custom delay for everything.
 
 **aka Snap Tapping** **Only works on Windows.**
 
