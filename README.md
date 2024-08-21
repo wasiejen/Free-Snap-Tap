@@ -18,7 +18,8 @@ Tap_Groups are now saved in a separate `tap_groups.txt` file and Key_Groups in `
 Each line represents one Tap Group, and each key is to be separated by a comma and can have 1 or more keys in it. (e.g. `1, 2, 3, 4` or `left_shift, left_control, alt` or just `v` would also be possible)
 Key Replacements only accepts 2 keys. Aliases is everything with more than 2 keys as a Key_Group.
 
-String representation or vk-codes (virtual keyboard codes—list in py file) can also be used.
+String representation or vk-codes (virtual keyboard codes—list in py file) can also be used. 
+Usable string representations for key files can be found in the py file int the vk_code_dict under # Dictionary mapping strings and keys to their VK codes.
 
 ### Example Use Cases for Tap Groups
 
@@ -41,7 +42,8 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
 ### Example Use Cases for Aliases (to show what is possible right now)
 
 - `-k,  p|10,  o|5,  i|15|3`   
-  - when k is pressed , send p with a max delay of 10 ms, then o with may delay of 5 ms, then i with min delay of 3 ms and max of 10 ms (order of delays is free - it fetches the smaller one as min and the bigger one as max. 
+  - when `k` is pressed , send `p` with a max delay of 10 ms, then `o` with max delay of 5 ms, then `i` with min delay of 3 ms and max of 10 ms
+  - (order of delays via `|` is free - it fetches the smaller one as min and the bigger one as max. 
 - `+o,r,e,v,e,r,s,e,d,-left_shift,w,o,r,l,d,+left_shift`    
   - when o is released writes "reversedWORLD"
 - `-o,-left_shift,h,e,l,l,o,+left_shift,w,o,r,l,d`        
