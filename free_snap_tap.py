@@ -173,22 +173,59 @@ def convert_to_vk_code(key):
 
 
 def initialize_key_groups():
-    global key_groups_dict, key_group_state_reversed
+    global key_groups_dict, key_groups_key_press_modifier , key_groups_key_delays
     key_groups_dict = [[] for n in range(len(key_groups))] 
-    key_group_state_reversed = [False] * len(key_groups)
+    # saves the modifiers of the key '+'=up=False, '-'=down=True, no modifier=None
+    key_groups_key_press_modifier = [[] for n in range(len(key_groups))] 
+    key_groups_key_delays = [[] for n in range(len(key_groups))] 
 
     if DEBUG: print("key groups: ", key_groups)
     for group_index, group in enumerate(key_groups):
         for key in group:
             if key == '':
                 break
-            if key[0] == '-':
-                # reversed true
-                key_group_state_reversed[group_index] = True
-                key = key.replace('-','')
+            #TODO: recognition of combinations or delay
+            
+
+            #TODO: firstbreak up the combination into a list of keys
+
+
+            #TODO: then seperate delay info from string
+            if '|' in key:
+                key, *delays = key.split('|')
+                print(f"delays for {key}: {delays}")
+                delays = [int(delay) for delay in delays]
+            else:
+                delays = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
+            key_groups_key_delays[group_index].append(delays)
+
+
+
+
+            # recognition of mofidiers +, - and #
+            # only interpret it as such when more then one char is in key
+        
+
+            if len(key) > 1: 
+                key_press_modifier = None
+                if key[0] == '-':
+                    # down key
+                    key_press_modifier = 'down'
+                    key = key.replace('-','')
+                elif key[0] == '+':
+                    # up key
+                    key_press_modifier = 'up'
+                    key = key.replace('+','')
+                elif key[0] == '#':
+                    # up key
+                    key_press_modifier = 'reversed'
+                    key = key.replace('#','')
 
             key = convert_to_vk_code(key)
             key_groups_dict[group_index].append(key)
+            key_groups_key_press_modifier[group_index].append(key_press_modifier)
+            key_press_modifier = None
+            
 
     if DEBUG: print("key dict: ", key_groups_dict)
 
@@ -213,22 +250,27 @@ def initialize_tap_groups():
 def is_simulated_key_event(flags):
     return flags & 0x10
 
-def is_press(msg, reversed=False):
+def is_press(msg):
     if msg in WM_KEYDOWN:
-        return False if reversed else True
+        return True
     if msg in WM_KEYUP:
-        return True if reversed else False
+        return False
+
+def delay(max = ALIAS_MAX_DELAY_IN_MS, min = ALIAS_MIN_DELAY_IN_MS, ):
+    if min > max: min,max = max,min
+    sleep(randint(min, max) / 1000)
 
 def win32_event_filter(msg, data):
     """
     Filter and handle keyboard events.
     """
     global PAUSED, STOPPED
+    global key_groups_key_press_modifier
 
-    key_replaced = False
+    key_directly_replaced = False
     vk_code = data.vkCode
-    is_keydown = msg in WM_KEYDOWN
 
+    is_keydown = is_press(msg)
 
     if PRINT_VK_CODES and is_keydown:
         print(f"vk_code: {vk_code}")
@@ -245,23 +287,99 @@ def win32_event_filter(msg, data):
         if not PAUSED:
             for group_index, group in enumerate(key_groups_dict):
                 if vk_code == group[0]:
-                    if len(group) == 2:                
-                        if DEBUG: 
-                            print("vk_code_gotten: ", vk_code)
-                            print("vk_code_replacement: ", group)
-                            print("is_press: ", is_press(msg))
 
-                        vk_code = group[1]  
-                        key_replaced = True
+                    key_press_modifier = key_groups_key_press_modifier[group_index][0]
+                    new_key_press_modifiers = key_groups_key_press_modifier[group_index][1:]
 
-                    elif is_keydown: # so up key will be ignored
-                        for key in group[1:]:
-                            if DEBUG: print(f"alias press: {key}")
-                            key_code = keyboard.KeyCode.from_vk(key)
-                            controller.press(key_code)
-                            sleep(randint(ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS) / 1000)
-                            controller.release(key_code)
-                            sleep(randint(ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS) / 1000)
+                    
+
+                    if DEBUG: 
+                        print("vk_code_gotten: ", vk_code)
+                        print("vk_code_replacement: ", group)
+                        print("is_keydown: ", is_keydown)
+                        print(f"key_pres_modifiers: {key_press_modifier} -> {new_key_press_modifiers}", )
+
+
+                    # KEY REPLACEMENT handling
+                    if len(group) == 2:              
+
+                        if DEBUG: print("Key Replacement recognised: ", group)
+                        # check for key_groups_state_is_pressed
+                         
+
+                        if key_press_modifier == None:
+                            vk_code = group[1]  
+                            key_directly_replaced = True
+                            ####
+                            if new_key_press_modifiers[0] == 'reversed':
+                                is_keydown = not is_keydown # with this can be tracked in tap_groups
+
+                        elif key_press_modifier == 'up':
+                            pass
+                        elif key_press_modifier == 'down':
+                            pass
+                        elif key_press_modifier == 'reversed':
+                            pass
+
+                    # ALIAS handling
+                    else:
+                        # check for modifier
+                        if DEBUG: print("ALIAS recognised!: ", group)
+
+                        vk_codes = group[1:]
+
+                        should_fire_alias = False
+                        # if no up or down is set, it will be fired at press adn release of key
+                        # just to be consitent with the syntax
+                        if key_press_modifier == None:
+                            should_fire_alias
+                        # only fire alias with release of key, not on press
+                        elif key_press_modifier == 'up':
+                            if not is_keydown:
+                                should_fire_alias = True
+                        # only fire alias with press of key, not on release
+                        elif key_press_modifier == 'down':
+                            if is_keydown:
+                                should_fire_alias = True
+                        # I do not know yet ...
+                        elif key_press_modifier == 'reversed': #
+                            pass
+
+                        if should_fire_alias:
+                            for i, code in enumerate(vk_codes):
+                                key_code = keyboard.KeyCode.from_vk(code)
+                                key_delays = key_groups_key_delays[group_index][i]
+
+                                if DEBUG: print(i, code)
+
+                                if new_key_press_modifiers[i] == None:
+                                    controller.press(key_code)
+                                    delay(*key_delays)
+                                    controller.release(key_code) 
+                                elif new_key_press_modifiers[i] == 'up':
+                                    controller.release(key_code)
+                                elif new_key_press_modifiers[i] == 'down':
+                                    controller.press(key_code)
+                                elif new_key_press_modifiers[i] == 'reversed': 
+                                    controller.release(key_code)
+                                    delay(*key_delays)
+                                    controller.press(key_code)
+                                delay(*key_delays)
+
+
+
+
+                        # if is_keydown: # so up key will be ignored
+                        #     for code in vk_codes:
+                        #         if DEBUG: print(f"alias press: {code}")
+                        #         key_code = keyboard.KeyCode.from_vk(code)
+                        #         controller.press(key_code)
+                        #         sleep(randint(ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS) / 1000)
+                        #         controller.release(key_code)
+                        #         sleep(randint(ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS) / 1000)
+                        #
+                        # else: # key up
+                        #     pass
 
                         '''
                         # key combination marked with + between keys: e.g. shift_left+u -> shift down, u down, u up, shift up
@@ -279,8 +397,33 @@ def win32_event_filter(msg, data):
 
                         # include delay for a key to change the delay after that key:
                         -h,-shift,h/10,e/5,l,l,o,+shift     # custom delay of 10 ms after h and 5 ms after e
+                        
+                        # global state list with 262 (0-261) elements for each key representing pressed or not
+                        # global list with lists of all combinations to be tracked
+                            # fast check by just asking if the indize of state_list[key of combination] is pressed
+                        # global state of last_key_pressed
+                        # omb_last_key_pressed for each combination
+                            # e.g. tapgroup a,d
+                            a pressed -> last_key_pressed = a
+                                state[a] = 1, looked up if in combination; set comb_last_key_pressed = a; a press send
+                            d pressed -> last_key_pressed = d
+                                state[d] = 1 and d press send
+                                key combination triggered
+                                    comb_last_key_pressed released
+                            d released
+                                state[d] = 0 and d release send
+                                check combination for num of sum greater 1
+                                    send comb_last_key_pressed
+                                    ### but this is d which was released
+
+
+
+                        # 
+
 
                         # readme and description need a bigger update xD
+
+
                         '''
                         listener.suppress_event()
 
@@ -307,18 +450,18 @@ def win32_event_filter(msg, data):
 
         # Snap Tap Part of Evaluation
         # Intercept key events if not PAUSED
-        elif not PAUSED:
+        elif not PAUSED: # or not output_is_reversed:
             if DEBUG: print("#0")
             for group_index, group in enumerate(tap_groups_states_dict):
                 if DEBUG: print(f"#1 {group_index, group}")
                 if vk_code in group:
-                    if key_replaced: key_replaced = False
-                    if msg in WM_KEYDOWN: # and group[vk_code] == 0: #TODO ACT_6 repeating keys
+                    if key_directly_replaced: key_directly_replaced = False
+                    if is_keydown: # and group[vk_code] == 0: #TODO ACT_6 repeating keys
                         group[vk_code] = 1
                         if DEBUG: print(f"#2 {vk_code}")
                         tap_groups_last_key_pressed[group_index] = vk_code
                         send_keys(which_key_to_send(group_index), group_index)
-                    elif msg in WM_KEYUP:
+                    else:
                         group[vk_code] = 0
                         if DEBUG: print(f"#3 {vk_code}")
                         send_keys(which_key_to_send(group_index), group_index)
@@ -328,7 +471,9 @@ def win32_event_filter(msg, data):
                     break
 
         # if replaced key was not handled by tap groupings, then just send new key event
-        if key_replaced:
+        if key_directly_replaced:
+
+
             if DEBUG: print(f"replacement vk_code: {vk_code}")
             is_mouse_key = vk_code in mouse_vk_codes
 
@@ -337,10 +482,12 @@ def win32_event_filter(msg, data):
             else:
                 key_code = keyboard.KeyCode.from_vk(vk_code)
 
-            if is_press(msg, key_group_state_reversed[group_index]):
+            # TODO: is this even working as intented?
+            if is_keydown: # and not output_is_reversed:
                 controller_dict[is_mouse_key].press(key_code)
             else:
                 controller_dict[is_mouse_key].release(key_code)
+            #output_is_reversed = False
 
             listener.suppress_event()
 
@@ -361,6 +508,11 @@ def which_key_to_send(group_index):
                 key_to_send = key
     elif num_of_keys_pressed > 1:
         key_to_send = tap_groups_last_key_pressed[group_index]
+        # TODO: this will resent a released key if the released key was the last pressed ...
+        # we need a rolling state list?
+        # or is it good enough?
+        # should tap_groups_last_key_released also be tracked?
+            # send only last key pressed of last_key_pressed != last_key_released
 
     return key_to_send
 
