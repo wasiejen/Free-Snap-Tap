@@ -410,6 +410,10 @@ def win32_event_filter(msg, data):
                                     check combination for num of sum greater 1
                                         send comb_last_key_pressed
                                         ### but this is d which was released
+
+                        # there might be the problem with aliases and tap groups that only a press or the release will be used for input.
+                            # the other event will still be send? is that a problem?
+                            # e.g. `-o*` or `-o, *supress` for "supress o press" as a key group
                         
                         # linux compatibility:
                             # replace win32_event_filter with generic on_press and on_release calls 
