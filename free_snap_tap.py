@@ -16,13 +16,18 @@ PRINT_VK_CODES = False
 
 # AntiCheat testing (ACT)
 ACT_DELAY = False
-ACT_MAX_DELAY_IN_MS = 40
-ACT_CROSSOVER = False
+ACT_MIN_DELAY_IN_MS = 2
+ACT_MAX_DELAY_IN_MS = 10
+ACT_CROSSOVER = False # will also force delay
 ACT_CROSSOVER_PROPABILITY_IN_PERCENT = 50
 
-# Define File name for saving of Tap Groupings and Key Replacements
+# Alias delay between presses and releases
+ALIAS_MIN_DELAY_IN_MS = 2 
+ALIAS_MAX_DELAY_IN_MS = 10
+
+# Define File name for saving of Tap Groupings and Key Groups
 FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
-FILE_NAME_KEY_REPLACEMENTS = 'key_replacement_groups.txt'
+FILE_NAME_KEY_GROUPS = 'key_groups.txt'
 
 # Constants for key events
 WM_KEYDOWN = [256,260] # _PRESS_MESSAGES = (_WM_KEYDOWN, _WM_SYSKEYDOWN)
@@ -36,8 +41,9 @@ MENU_KEY = 34 # PAGE_DOWN
 # Tap groups define which keys are mutually exclusive
 tap_groups = []
 
-# Key Replacement Groups or Pairs define which key1 will be replaced by key2
-key_replacement_groups = []
+# Key Groups define which key1 will be replaced by key2
+# if a Key Group has more than 2 keys if will be handled als alias
+key_groups = []
 
 # Initialize the Controller
 controller = keyboard.Controller()
@@ -89,7 +95,9 @@ vk_codes_dict = {
     'exsel': 248, 'erase_eof': 249, 'play': 250, 'zoom': 251,
     'pa1': 253, 'oem_clear': 254,
     # some vk_codes for german keyboard layout
-    '<': 226, 'ä' : 222, 'ö' : 192, 'ü': 186, '´': 221, 'copilot': 134, 
+    '<': 226, 'ä': 222, 'ö': 192, 'ü': 186, '´': 221, 'copilot': 134, 
+    # s
+    '-': 189, '+': 187, '#': 191, ',': 188, '.':190,
 }
 
 def load_groups(file_name, data_object):
@@ -100,8 +108,9 @@ def load_groups(file_name, data_object):
     data_object = []
     with open(file_name, 'r') as file:
         for line in file:
-            group = line.strip().split(',')
-            data_object.append(group)
+            if len(line) > 1:
+                group = line.strip().replace(" ","").split(',')
+                data_object.append(group)
     return data_object
 
 def save_groups(file_name, data_object):
@@ -143,15 +152,15 @@ def reset_tap_groups_txt():
     add_group(['w','s'], tap_groups)
     save_groups(FILE_NAME_TAP_GROUPS, tap_groups)
 
-def reset_key_replacement_txt():
+def reset_key_groups_txt():
     """
-    Reset key_replacement_groups and initialise empty txt file
+    Reset key_groups and initialise empty txt file
     """
-    global key_replacement_groups
-    key_replacement_groups = []
-    #add_group(['<','left_shift'], key_replacement_groups)
-    #add_group(['left_windows','left_control'], key_replacement_groups)
-    save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
+    global key_groups
+    key_groups = []
+    #add_group(['<','left_shift'], key_groups)
+    #add_group(['left_windows','left_control'], key_groups)
+    save_groups(FILE_NAME_KEY_GROUPS, key_groups)
 
 def convert_to_vk_code(key):
     try:
@@ -165,25 +174,58 @@ def convert_to_vk_code(key):
             raise KeyError
 
 
-def initialize_key_replacement_groups():
-    global key_replacement_dict, key_replacement_state_reversed
-    key_replacement_dict = [[] for n in range(len(key_replacement_groups))] 
-    key_replacement_state_reversed = [False] * len(key_replacement_groups)
+def initialize_key_groups():
+    global key_groups_dict, key_groups_key_press_modifier , key_groups_key_delays
+    key_groups_dict = [[] for n in range(len(key_groups))] 
+    # saves the modifiers of the key '+'=up=False, '-'=down=True, no modifier=None
+    key_groups_key_press_modifier = [[] for n in range(len(key_groups))] 
+    key_groups_key_delays = [[] for n in range(len(key_groups))] 
 
-    if DEBUG: print("key groups: ", key_replacement_groups)
-    for group_index, group in enumerate(key_replacement_groups):
+    if DEBUG: print("key groups: ", key_groups)
+    for group_index, group in enumerate(key_groups):
         for key in group:
+
+            #TODO: first break up the combination into a list of keys
+
+
+            #seperate delay info from string
+            if '|' in key:
+                key, *delays = key.split('|')
+                print(f"delays for {key}: {delays}")
+                # cast in int and ignore all other elements after first 2
+                delays = [int(delay) for delay in delays[:2]]
+            else:
+                delays = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
+            key_groups_key_delays[group_index].append(delays)
+
+
             if key == '':
                 break
-            if key[0] == '-':
-                # reversed true
-                key_replacement_state_reversed[group_index] = True
-                key = key.replace('-','')
+
+            # recognition of mofidiers +, - and #
+            # only interpret it as such when more then one char is in key
+            if len(key) > 1: 
+                key_press_modifier = None
+                if key[0] == '-':
+                    # down key
+                    key_press_modifier = 'down'
+                    key = key.replace('-','',1) # only replace first occurance
+                elif key[0] == '+':
+                    # up key
+                    key_press_modifier = 'up'
+                    key = key.replace('+','',1)
+                elif key[0] == '#':
+                    # up key
+                    key_press_modifier = 'reversed'
+                    key = key.replace('#','',1)
 
             key = convert_to_vk_code(key)
-            key_replacement_dict[group_index].append(key)
+            key_groups_dict[group_index].append(key)
+            key_groups_key_press_modifier[group_index].append(key_press_modifier)
+            key_press_modifier = None
+            
 
-    if DEBUG: print("key dict: ", key_replacement_dict)
+    if DEBUG: print("key dict: ", key_groups_dict)
 
 def initialize_tap_groups():
     """
@@ -206,22 +248,29 @@ def initialize_tap_groups():
 def is_simulated_key_event(flags):
     return flags & 0x10
 
-def is_press(msg, reversed=False):
+def is_press(msg):
     if msg in WM_KEYDOWN:
-        return False if reversed else True
+        return True
     if msg in WM_KEYUP:
-        return True if reversed else False
+        return False
+
+def delay(max = ALIAS_MAX_DELAY_IN_MS, min = ALIAS_MIN_DELAY_IN_MS, ):
+    if min > max: min,max = max,min
+    sleep(randint(min, max) / 1000)
 
 def win32_event_filter(msg, data):
     """
     Filter and handle keyboard events.
     """
     global PAUSED, STOPPED
+    global key_groups_key_press_modifier
 
-    key_replaced = False
+    key_directly_replaced = False
     vk_code = data.vkCode
 
-    if PRINT_VK_CODES and msg in WM_KEYDOWN:
+    is_keydown = is_press(msg)
+
+    if PRINT_VK_CODES and is_keydown:
         print(f"vk_code: {vk_code}")
 
     # if DEBUG: 
@@ -234,17 +283,145 @@ def win32_event_filter(msg, data):
 
         # Replace some Buttons :-D
         if not PAUSED:
-            for group_index, group in enumerate(key_replacement_dict):
+            for group_index, group in enumerate(key_groups_dict):
+                if DEBUG: print("group_index", group_index)
+                #key_press_modifier = None
+                #new_key_press_modifiers = None
+
                 if vk_code == group[0]:
-                                       
+
+                    key_press_modifier = key_groups_key_press_modifier[group_index][0]
+                    new_key_press_modifiers = key_groups_key_press_modifier[group_index][1:]                
+
                     if DEBUG: 
                         print("vk_code_gotten: ", vk_code)
                         print("vk_code_replacement: ", group)
-                        # print("key_code: ", key_code)
-                        print("is_press: ", is_press(msg))
+                        print("is_keydown: ", is_keydown)
+                        print(f"key_pres_modifiers: {key_press_modifier} -> {new_key_press_modifiers}", )
 
-                    vk_code = group[1]  
-                    key_replaced = True
+                    # KEY REPLACEMENT handling
+                    if len(group) == 2:              
+
+                        if DEBUG: print("Key Replacement recognised: ", group)
+                        # check for key_groups_state_is_pressed
+                         
+
+                        if key_press_modifier == None:
+                            vk_code = group[1]  
+                            key_directly_replaced = True
+                            ####
+                            if new_key_press_modifiers[0] == 'reversed':
+                                is_keydown = not is_keydown # with this can be tracked in tap_groups
+
+                        elif key_press_modifier == 'up':
+                            pass
+                        elif key_press_modifier == 'down':
+                            pass
+                        elif key_press_modifier == 'reversed':
+                            pass
+
+                    # ALIAS handling
+                    else:
+                        # check for modifier
+                        if DEBUG: print("ALIAS recognised!: ", group)
+
+                        vk_codes = group[1:]
+
+                        should_fire_alias = False
+                        # if no up or down is set, it will be fired at press adn release of key
+                        # just to be consitent with the syntax
+                        if key_press_modifier == None:
+                            should_fire_alias = True
+                        # only fire alias with release of key, not on press
+                        elif key_press_modifier == 'up':
+                            if not is_keydown:
+                                should_fire_alias = True
+                        # only fire alias with press of key, not on release
+                        elif key_press_modifier == 'down':
+                            if is_keydown:
+                                should_fire_alias = True
+                        # I do not know yet ...
+                        elif key_press_modifier == 'reversed': #
+                            pass
+
+                        if should_fire_alias:
+                            for i, code in enumerate(vk_codes):
+
+                                is_mouse_key = code in mouse_vk_codes
+                                if is_mouse_key:
+                                    key_code = mouse_vk_codes_dict[code]
+                                else:
+                                    key_code = keyboard.KeyCode.from_vk(code)
+
+                                #key_code = keyboard.KeyCode.from_vk(code)
+                                key_delays = key_groups_key_delays[group_index][i]
+
+                                if DEBUG: print(i, code)
+
+                                if new_key_press_modifiers[i] == None:
+                                    controller_dict[is_mouse_key].press(key_code)
+                                    delay(*key_delays)
+                                    controller_dict[is_mouse_key].release(key_code) 
+                                elif new_key_press_modifiers[i] == 'up':
+                                    controller_dict[is_mouse_key].release(key_code)
+                                elif new_key_press_modifiers[i] == 'down':
+                                    controller_dict[is_mouse_key].press(key_code)
+                                elif new_key_press_modifiers[i] == 'reversed': 
+                                    controller_dict[is_mouse_key].release(key_code)
+                                    delay(*key_delays)
+                                    controller_dict[is_mouse_key].press(key_code)
+                                delay(*key_delays)
+
+                            listener.suppress_event()   
+
+                        '''
+                        [o] # key combination marked with + between keys: e.g. shift_left+u -> shift down, u down, u up, shift up
+                            [x] somewhat solved by using -shift,key,+shift - even more flexible
+                        [x] # key up and down marked by + and - before keys: e.g. -shift_left, n, e, w, +shift_left --> NEW
+                            [x] # have to change reverse keys for it to work with -, but is similar in function
+                        [x] maybe it is possible to also use + and - as modifier for the input_key,
+                            [x] # to differentiate between key press and key release as trigger
+                            [x] # 2 alias on one key usable then - one on press, one on release xD
+                        [x] # though to the end: key groups will look like
+                            -k,-shift,h,e,l,l,o,+shift          # k down -> HELLO
+                            +k,-shift,w,o,r,l,d,+shift          # k up   -> WORLD
+                            -l,-l,mouse_right                   # l down -> l down, right mouse click
+                            h, u   # equivalent to h-,u-;h+,u+  # h will be replaced by u: h down -> u down, h up -> u up
+                                # maybe really just define h-,u-;h+,u+ and split at ; (has to be compatible with shared typ_groups )
+
+                        [x] # include delay for a key to change the delay after that key:
+                                -h,-shift,h/10,e/5,l,l,o,+shift     # custom delay of 10 ms after h and 5 ms after e
+                        
+                        # problem is that key combination can not be recognised as an input
+                            # global state list with 262 (0-261) elements for each key representing pressed or not
+                            # global list with lists of all combinations to be tracked
+                                # fast check by just asking if the indize of state_list[key of combination] is pressed
+                            # global state of last_key_pressed
+                            # comb_last_key_pressed for each combination
+                                # e.g. tapgroup a,d
+                                a pressed -> last_key_pressed = a
+                                    state[a] = 1, looked up if in combination; set comb_last_key_pressed = a; a press send
+                                d pressed -> last_key_pressed = d
+                                    state[d] = 1 and d press send
+                                    key combination triggered
+                                        comb_last_key_pressed released
+                                d released
+                                    state[d] = 0 and d release send
+                                    check combination for num of sum greater 1
+                                        send comb_last_key_pressed
+                                        ### but this is d which was released
+                        
+                        # linux compatibility:
+                            # replace win32_event_filter with generic on_press and on_release calls 
+                            # supress=True to supress everything
+                            # pipe through the script every input
+                            # logic for not sendung key when used in key groups as trigger
+
+                        # readme and description need a bigger update xD
+
+
+                        '''
+                        
 
         # Stop the listener if the END key is released
         if CONTROLS_ENABLED and vk_code == MENU_KEY and msg in WM_KEYUP:
@@ -269,18 +446,18 @@ def win32_event_filter(msg, data):
 
         # Snap Tap Part of Evaluation
         # Intercept key events if not PAUSED
-        elif not PAUSED:
+        elif not PAUSED: # or not output_is_reversed:
             if DEBUG: print("#0")
             for group_index, group in enumerate(tap_groups_states_dict):
                 if DEBUG: print(f"#1 {group_index, group}")
                 if vk_code in group:
-                    if key_replaced: key_replaced = False
-                    if msg in WM_KEYDOWN: # and group[vk_code] == 0: #TODO ACT_6 repeating keys
+                    if key_directly_replaced: key_directly_replaced = False
+                    if is_keydown: # and group[vk_code] == 0: #TODO ACT_6 repeating keys
                         group[vk_code] = 1
                         if DEBUG: print(f"#2 {vk_code}")
                         tap_groups_last_key_pressed[group_index] = vk_code
                         send_keys(which_key_to_send(group_index), group_index)
-                    elif msg in WM_KEYUP:
+                    else:
                         group[vk_code] = 0
                         if DEBUG: print(f"#3 {vk_code}")
                         send_keys(which_key_to_send(group_index), group_index)
@@ -290,7 +467,9 @@ def win32_event_filter(msg, data):
                     break
 
         # if replaced key was not handled by tap groupings, then just send new key event
-        if key_replaced:
+        if key_directly_replaced:
+
+
             if DEBUG: print(f"replacement vk_code: {vk_code}")
             is_mouse_key = vk_code in mouse_vk_codes
 
@@ -299,10 +478,11 @@ def win32_event_filter(msg, data):
             else:
                 key_code = keyboard.KeyCode.from_vk(vk_code)
 
-            if is_press(msg, key_replacement_state_reversed[group_index]):
+            if is_keydown: # and not output_is_reversed:
                 controller_dict[is_mouse_key].press(key_code)
             else:
                 controller_dict[is_mouse_key].release(key_code)
+            #output_is_reversed = False
 
             listener.suppress_event()
 
@@ -323,6 +503,11 @@ def which_key_to_send(group_index):
                 key_to_send = key
     elif num_of_keys_pressed > 1:
         key_to_send = tap_groups_last_key_pressed[group_index]
+        # TODO: this will resent a released key if the released key was the last pressed ...
+        # we need a rolling state list?
+        # or is it good enough?
+        # should tap_groups_last_key_released also be tracked?
+            # send only last key pressed of last_key_pressed != last_key_released
 
     return key_to_send
 
@@ -358,8 +543,8 @@ def send_keys(key_to_send, group_index):
                 else:
                     controller.release(key_code_last_key_send) 
                 # random delay if activated
-                if ACT_DELAY: 
-                    delay = randint(0, ACT_MAX_DELAY_IN_MS)
+                if ACT_DELAY or ACT_CROSSOVER: 
+                    delay = randint(ACT_MIN_DELAY_IN_MS, ACT_MAX_DELAY_IN_MS)
                     if DEBUG: print(f"delayed by {delay} ms")
                     sleep(delay / 1000) # in ms
 
@@ -388,19 +573,18 @@ def display_menu():
             text = ""
         print("Active Tap Groups:")
         display_groups(tap_groups)
-        print("\nActive Key Replacements:")
-        display_groups(key_replacement_groups)
-        print('\n------ Options Tap Groups --------------')
+        print("\nActive Key Groups:")
+        display_groups(key_groups)
+        print('\n------ Options Tap Groups -------')
         print("1. Add Tap Group")
         print("2. Delete Tap Group")
         print("3. Reset tap_groups.txt file")
-        print('\n------ Options Key Replacements --------')
-        print("4. Add Key Replacement Pair")
-        print("5. Delete Key Replacement Pair")
-        print("6. Clear key_replacement_groups.txt file")
+        print('\n------ Options Key Groups -------')
+        print("4. Add Key Group")
+        print("5. Delete Key Group")
+        print("6. Clear key_groups.txt file")
         print("\n7. Print vk_codes to identify keys")
         print("8. End Script")
-        #print("\n[Enter]. Start Snap Tapping :-)\n")
 
         # empty input buffer before asking for next input
         while msvcrt.kbhit():
@@ -438,25 +622,25 @@ def display_menu():
             initialize_tap_groups()
         elif choice == '4': 
             try:
-                new_group = input("Enter new key pair (2 keys separated by a comma): ").replace(" ", "").split(',')
-                if len(new_group) == 2:
-                    add_group(new_group, key_replacement_groups)
-                    initialize_key_replacement_groups()
-                    save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
+                new_group = input("Enter keys seperated by comma (2 keys = replacement, 3+ = alias): ").replace(" ", "").split(',')
+                if len(new_group) >= 2:
+                    add_group(new_group, key_groups)
+                    initialize_key_groups()
+                    save_groups(FILE_NAME_KEY_GROUPS, key_groups)
                 else:
-                    text = "Error: For a pair only sets of 2 keys are valid."
+                    text = "Error: at least 2 keys are needed."
                     invalid_input = True
             except KeyError as error_msg:
                 text = f"Error: Wrong string as a key used: {error_msg}"
                 invalid_input = True
-                delete_group(len(key_replacement_groups) - 1, key_replacement_groups)
+                delete_group(len(key_groups) - 1, key_groups)
         elif choice == '5':
             try:
                 index = int(input("Enter the index of the key pair to delete: "))
-                if 0<= index < len(key_replacement_groups):
-                    delete_group(index, key_replacement_groups)
-                    initialize_key_replacement_groups()
-                    save_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
+                if 0<= index < len(key_groups):
+                    delete_group(index, key_groups)
+                    initialize_key_groups()
+                    save_groups(FILE_NAME_KEY_GROUPS, key_groups)
                 else:
                     text = "Error: Index outside of range of key pairs."
                     invalid_input = True
@@ -464,8 +648,8 @@ def display_menu():
                 text = "Error: Index was not a Number."
                 invalid_input = True
         elif choice == '6':
-            reset_key_replacement_txt()
-            initialize_key_replacement_groups()
+            reset_key_groups_txt()
+            initialize_key_groups()
         elif choice == '7':
             PRINT_VK_CODES = True
             break
@@ -479,7 +663,7 @@ def display_menu():
 
 def check_start_arguments():
     global DEBUG, MENU_ENABLED, CONTROLS_ENABLED
-    global FILE_NAME_TAP_GROUPS, FILE_NAME_KEY_REPLACEMENTS
+    global FILE_NAME_TAP_GROUPS, FILE_NAME_KEY_GROUPS
     global ACT_DELAY, ACT_CROSSOVER
     global ACT_MAX_DELAY_IN_MS, ACT_CROSSOVER_PROPABILITY_IN_PERCENT
     if len(sys.argv) > 1:
@@ -494,8 +678,8 @@ def check_start_arguments():
                 if DEBUG: print(FILE_NAME_TAP_GROUPS)
             # use custom key groups file for loading and saving
             elif arg[:9] == '-keyfile=' and len(arg) > 9:
-                FILE_NAME_KEY_REPLACEMENTS = arg[9:]
-                if DEBUG: print(FILE_NAME_KEY_REPLACEMENTS)
+                FILE_NAME_KEY_GROUPS = arg[9:]
+                if DEBUG: print(FILE_NAME_KEY_GROUPS)
             # Debug .. what else :-D
             elif arg == "-debug":
                 DEBUG = True
@@ -545,13 +729,13 @@ if __name__ == "__main__":
         print(f"tap_groups: {tap_groups}")
         print(f"tap_groups_states_dict: {tap_groups_states_dict}")
 
-    # try loading key replacements from file
+    # try loading key groups from file
     try:
-        key_replacement_groups = load_groups(FILE_NAME_KEY_REPLACEMENTS, key_replacement_groups)
+        key_groups = load_groups(FILE_NAME_KEY_GROUPS, key_groups)
     # if no tap_groups.txt file exist create new one
     except FileNotFoundError:
-        reset_key_replacement_txt()
-    initialize_key_replacement_groups()
+        reset_key_groups_txt()
+    initialize_key_groups()
 
     while not STOPPED:
         if MENU_ENABLED:
