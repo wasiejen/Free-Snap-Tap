@@ -41,7 +41,7 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
 ### Example Use Cases for Aliases (to show what is possible right now)
 
 - `-k,  p|10,  o|5,  i|15|3`   
-  - when k is pressed , send p with a max delay of 10, then o with may delay of 5, then i with min delay of 3 and max of 10 (order of delays is free - it fetches the smaller one as min and the bigger one as max.
+  - when k is pressed , send p with a max delay of 10 ms, then o with may delay of 5 ms, then i with min delay of 3 ms and max of 10 ms (order of delays is free - it fetches the smaller one as min and the bigger one as max. 
 - `+o,r,e,v,e,r,s,e,d,-left_shift,w,o,r,l,d,+left_shift`    
   - when o is released writes "reversedWORLD"
 - `-o,-left_shift,h,e,l,l,o,+left_shift,w,o,r,l,d`        
@@ -52,20 +52,20 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
   - when minus is released writes "ok"
 
 Some explanation:
-- `` nothing in front of a key is a press and release (normal input)
+- `` nothing in front of a key is synchronious input (press is a press, release is a release)
 - `-` in front of a key is a press (down without up)
 - `+` in front of a key is a release (up without down)
-- `#` in front of a key is a release and a key (reversed input)
+- `#` in front of a key is a release and a key (reversed synchronious input)
 - `|` behind a key is the the max delay for this single key (e.g. `-k|10` -> press k with a max delay of 10)
 - `|*max*|*min*` defines min and max delay (e.g. `-k|10|2` or `-k|2|10` -> press k with a max delay of 10 and min delay of 2)
 
 This is only usable in key_groups. not supported in tap_groups yet.
 
 ### Delay-Settings
-- Delays for the Tap_Groups is set to 2 ms min and 10 ms max. 
+- Delays for the Tap_Groups is set to 2 ms min and 10 ms max as default.
   - Can be changed in py file or the max can be set via the start argument `-delay="number"`.
   - min not settable via start argument yet.
-- Key_Groups will use the same delay defined for Tap_Groups per default and only if given some other delay via `|` will these be overwritten.
+- Key_Groups will use the same delay defined for Tap_Groups per default and only if given some other delay via `|` will these be overwritten for this specific key event (not this key in general).
 
 ## Controls
 
