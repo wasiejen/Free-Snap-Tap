@@ -15,15 +15,15 @@ CONTROLS_ENABLED = True
 PRINT_VK_CODES = False
 
 # AntiCheat testing (ACT)
-ACT_DELAY = False
+ACT_DELAY = True
 ACT_MIN_DELAY_IN_MS = 2
 ACT_MAX_DELAY_IN_MS = 10
 ACT_CROSSOVER = False # will also force delay
 ACT_CROSSOVER_PROPABILITY_IN_PERCENT = 50
 
 # Alias delay between presses and releases
-ALIAS_MIN_DELAY_IN_MS = 2 
-ALIAS_MAX_DELAY_IN_MS = 10
+ALIAS_MIN_DELAY_IN_MS = ACT_MIN_DELAY_IN_MS 
+ALIAS_MAX_DELAY_IN_MS = ACT_MAX_DELAY_IN_MS
 
 # Define File name for saving of Tap Groupings and Key Groups
 FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
@@ -371,6 +371,7 @@ def win32_event_filter(msg, data):
                         vk_codes = group[1:]
 
                         if should_activate(key_modifier) == True:
+
                             for i, code in enumerate(vk_codes):
 
                                 is_mouse_key = check_for_mouse_vk_code(code)
@@ -382,7 +383,7 @@ def win32_event_filter(msg, data):
 
                                 if new_key_modifiers[i] == None:
                                     controller_dict[is_mouse_key].press(key_code)
-                                    delay(*key_delays)
+                                    if ACT_DELAY: delay(*key_delays)
                                     controller_dict[is_mouse_key].release(key_code) 
                                 elif new_key_modifiers[i] == 'up':
                                     controller_dict[is_mouse_key].release(key_code)
@@ -390,9 +391,9 @@ def win32_event_filter(msg, data):
                                     controller_dict[is_mouse_key].press(key_code)
                                 elif new_key_modifiers[i] == 'reversed': 
                                     controller_dict[is_mouse_key].release(key_code)
-                                    delay(*key_delays)
+                                    if ACT_DELAY: delay(*key_delays)
                                     controller_dict[is_mouse_key].press(key_code)
-                                delay(*key_delays)
+                                if ACT_DELAY: delay(*key_delays)
 
                             listener.suppress_event()   
                     #
@@ -638,7 +639,7 @@ def display_menu():
             initialize_tap_groups()
         elif choice == '4': 
             try:
-                new_group = input("Enter keys seperated by comma (2 keys = replacement, 3+ = alias): ").replace(" ", "").split(',')
+                new_group = input("Enter keys seperated by comma (2 keys = replacement, 3+ = alias): ").split(',')
                 if len(new_group) >= 2:
                     add_group(new_group, key_groups)
                     initialize_key_groups()
@@ -680,13 +681,17 @@ def display_menu():
 def check_start_arguments():
     global DEBUG, MENU_ENABLED, CONTROLS_ENABLED
     global FILE_NAME_TAP_GROUPS, FILE_NAME_KEY_GROUPS
-    global ACT_DELAY, ACT_CROSSOVER
-    global ACT_MAX_DELAY_IN_MS, ACT_CROSSOVER_PROPABILITY_IN_PERCENT
+    global ACT_DELAY, ACT_CROSSOVER, ACT_CROSSOVER_PROPABILITY_IN_PERCENT
+    global ACT_MAX_DELAY_IN_MS, ACT_MIN_DELAY_IN_MS
+    global ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             if DEBUG: print(arg)
+            # enable debug print outs
+            if arg == "-debug":
+                DEBUG = True
             # start directly without showing the menu
-            if arg == "-nomenu":
+            elif arg == "-nomenu":
                 MENU_ENABLED = False
             # use custom tap groups file for loading and saving
             elif arg[:9] == '-tapfile=' and len(arg) > 9:
@@ -696,9 +701,6 @@ def check_start_arguments():
             elif arg[:9] == '-keyfile=' and len(arg) > 9:
                 FILE_NAME_KEY_GROUPS = arg[9:]
                 if DEBUG: print(FILE_NAME_KEY_GROUPS)
-            # Debug .. what else :-D
-            elif arg == "-debug":
-                DEBUG = True
             # Start with controls disabled
             elif arg == "-nocontrols":
                 CONTROLS_ENABLED = False
@@ -709,13 +711,22 @@ def check_start_arguments():
             elif arg[:7] == "-delay=" and len(arg) > 7:
                 ACT_DELAY = True
                 try:
-                    delay = int(arg[7:])
+                    delays = [int(delay) for delay in arg[7:].replace(' ','').split(',')]
                 except:
-                    print("invalid delay - needs to be a number")
-                if 0 < delay <= 500:
-                    ACT_MAX_DELAY_IN_MS = delay
-                else:
-                    print("delay not in range 0<delay<=500 ms")
+                    print("invalid delay - needs to be a number(s), seperated by comma")
+                if len(delays) > 2:
+                    delays = delays[:2] # keep only first 2 numbers
+                valid_delays = []
+                for delay in delays:
+                    if 0 < delay <= 1000:
+                        valid_delays.append(delay)
+                    else:
+                        print("delay not in range 0<delay<=1000 ms")
+                ACT_MIN_DELAY_IN_MS, ACT_MAX_DELAY_IN_MS = sorted(valid_delays)
+                ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS = sorted(valid_delays)
+
+                print(f"delays set to: min:{ACT_MIN_DELAY_IN_MS}, max:{ACT_MAX_DELAY_IN_MS}")
+
             elif arg[:11] == "-crossover=" and len(arg) > 11:
                 ACT_CROSSOVER = True    
                 try:
@@ -726,6 +737,10 @@ def check_start_arguments():
                     ACT_CROSSOVER_PROPABILITY_IN_PERCENT = probability
                 else:
                     print("probability not in range 0<prob<=100 %")
+            elif arg == "-nodelay":
+                ACT_DELAY = False
+                ACT_CROSSOVER = False
+                print("delay+crossover deactivated")
             else:
                 print("unknown start argument: ", arg)
 
