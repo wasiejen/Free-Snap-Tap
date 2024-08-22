@@ -98,18 +98,19 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
 Tap Groupings are a set of keys that are observed and the output of each group is separately handled. Activation of a key is mutually exclusive to all others—so there will always be only one activated key.
 You can define Tap Groupings or Key Replacements via Command Line or via editing the `tap_groups.txt` or `key_replacement_groups.txt`.
 
-e.g. example batch file
+### Example batch file for CMD, for PowerShell replace '^' with '`' for multiline start arguments
+
 ```bash
 @echo off
 python .\free_snap_tap.py ^
-#-debug ^
-#-tapfile=my_taps.txt ^
-#-keyfile=my_keys.txt ^
+::-debug ^
+::-tapfile=my_taps.txt ^
+::-keyfile=my_keys.txt ^
 -crossover=50 ^
 -delay=10,2 ^
-#-nomenu ^
-#-nocontrols ^
-#-nodelay ^
+::-nomenu ^
+::-nocontrols ^
+::-nodelay ^
 
 pause
 ```
