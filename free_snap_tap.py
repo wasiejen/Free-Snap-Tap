@@ -96,8 +96,11 @@ vk_codes_dict = {
     'pa1': 253, 'oem_clear': 254,
     # some vk_codes for german keyboard layout
     '<': 226, 'ä': 222, 'ö': 192, 'ü': 186, '´': 221, 'copilot': 134, 
-    # s
+    # some symbols
     '-': 189, '+': 187, '#': 191, ',': 188, '.':190,
+    # supress keys with binding to:
+    'suppress': 0,
+
 }
 
 def load_groups(file_name, data_object):
@@ -110,7 +113,11 @@ def load_groups(file_name, data_object):
         for line in file:
             if len(line) > 1:
                 group = line.strip().replace(" ","").split(',')
-                data_object.append(group)
+                # ignore line if first char is a #
+                if group[0][0] == '#':
+                    pass
+                else:
+                    data_object.append(group)
     return data_object
 
 def save_groups(file_name, data_object):
@@ -175,10 +182,10 @@ def convert_to_vk_code(key):
 
 
 def initialize_key_groups():
-    global key_groups_dict, key_groups_key_press_modifier , key_groups_key_delays
+    global key_groups_dict, key_groups_key_modifier , key_groups_key_delays
     key_groups_dict = [[] for n in range(len(key_groups))] 
     # saves the modifiers of the key '+'=up=False, '-'=down=True, no modifier=None
-    key_groups_key_press_modifier = [[] for n in range(len(key_groups))] 
+    key_groups_key_modifier = [[] for n in range(len(key_groups))] 
     key_groups_key_delays = [[] for n in range(len(key_groups))] 
 
     if DEBUG: print("key groups: ", key_groups)
@@ -191,7 +198,7 @@ def initialize_key_groups():
             #seperate delay info from string
             if '|' in key:
                 key, *delays = key.split('|')
-                print(f"delays for {key}: {delays}")
+                if DEBUG: print(f"delays for {key}: {delays}")
                 # cast in int and ignore all other elements after first 2
                 delays = [int(delay) for delay in delays[:2]]
             else:
@@ -204,26 +211,24 @@ def initialize_key_groups():
 
             # recognition of mofidiers +, - and #
             # only interpret it as such when more then one char is in key
+            key_modifier = None
             if len(key) > 1: 
-                key_press_modifier = None
                 if key[0] == '-':
                     # down key
-                    key_press_modifier = 'down'
+                    key_modifier = 'down'
                     key = key.replace('-','',1) # only replace first occurance
                 elif key[0] == '+':
                     # up key
-                    key_press_modifier = 'up'
+                    key_modifier = 'up'
                     key = key.replace('+','',1)
                 elif key[0] == '#':
                     # up key
-                    key_press_modifier = 'reversed'
+                    key_modifier = 'reversed'
                     key = key.replace('#','',1)
 
             key = convert_to_vk_code(key)
             key_groups_dict[group_index].append(key)
-            key_groups_key_press_modifier[group_index].append(key_press_modifier)
-            key_press_modifier = None
-            
+            key_groups_key_modifier[group_index].append(key_modifier)            
 
     if DEBUG: print("key dict: ", key_groups_dict)
 
@@ -263,11 +268,41 @@ def win32_event_filter(msg, data):
     Filter and handle keyboard events.
     """
     global PAUSED, STOPPED
-    global key_groups_key_press_modifier
+    global key_groups_key_modifier
+
+    def check_for_mouse_vk_code(vk_code):
+        is_mouse_key = vk_code in mouse_vk_codes
+        return is_mouse_key
+
+    def get_key_code(is_mouse_key, vk_code):
+        if is_mouse_key:
+            key_code = mouse_vk_codes_dict[vk_code]
+        else:
+            key_code = keyboard.KeyCode.from_vk(vk_code)
+        return key_code
+
+    def should_activate(key_modifier):
+
+        activate = False
+        # if no up or down is set, it will be fired at press and release of key
+        # just to be consitent with the syntax
+        if key_modifier == None:
+            activate = True
+        # only fire alias with release of key, not on press
+        elif key_modifier == 'up':
+            if not is_keydown:
+                activate = True
+        # only fire alias with press of key, not on release
+        elif key_modifier == 'down':
+            if is_keydown:
+                activate = True
+        # I do not know yet ...
+        elif key_modifier == 'reversed': #
+            pass
+        return activate
 
     key_directly_replaced = False
     vk_code = data.vkCode
-
     is_keydown = is_press(msg)
 
     if PRINT_VK_CODES and is_keydown:
@@ -284,41 +319,37 @@ def win32_event_filter(msg, data):
         # Replace some Buttons :-D
         if not PAUSED:
             for group_index, group in enumerate(key_groups_dict):
-                if DEBUG: print("group_index", group_index)
-                #key_press_modifier = None
-                #new_key_press_modifiers = None
+                # if DEBUG: print("group_index", group_index)
 
                 if vk_code == group[0]:
 
-                    key_press_modifier = key_groups_key_press_modifier[group_index][0]
-                    new_key_press_modifiers = key_groups_key_press_modifier[group_index][1:]                
+                    key_modifier = key_groups_key_modifier[group_index][0]
+                    new_key_modifiers = key_groups_key_modifier[group_index][1:]                
 
                     if DEBUG: 
                         print("vk_code_gotten: ", vk_code)
                         print("vk_code_replacement: ", group)
                         print("is_keydown: ", is_keydown)
-                        print(f"key_pres_modifiers: {key_press_modifier} -> {new_key_press_modifiers}", )
+                        print(f"key_modifiers: {key_modifier} -> {new_key_modifiers}", )
 
                     # KEY REPLACEMENT handling
                     if len(group) == 2:              
 
                         if DEBUG: print("Key Replacement recognised: ", group)
                         # check for key_groups_state_is_pressed
-                         
-
-                        if key_press_modifier == None:
+                        
+                        if should_activate(key_modifier) == True:
                             vk_code = group[1]  
                             key_directly_replaced = True
-                            ####
-                            if new_key_press_modifiers[0] == 'reversed':
-                                is_keydown = not is_keydown # with this can be tracked in tap_groups
 
-                        elif key_press_modifier == 'up':
-                            pass
-                        elif key_press_modifier == 'down':
-                            pass
-                        elif key_press_modifier == 'reversed':
-                            pass
+                        if new_key_modifiers[0] == 'reversed':
+                            is_keydown = not is_keydown # with this can be tracked in tap_groups
+
+                        # look for "suppress" as defined in vk_code_dict
+                        # suppress event when found
+                        if vk_code == 0:
+                            if DEBUG: print("key suppressed: vk_code: ", group)
+                            listener.suppress_event()   
 
                     # ALIAS handling
                     else:
@@ -327,52 +358,33 @@ def win32_event_filter(msg, data):
 
                         vk_codes = group[1:]
 
-                        should_fire_alias = False
-                        # if no up or down is set, it will be fired at press adn release of key
-                        # just to be consitent with the syntax
-                        if key_press_modifier == None:
-                            should_fire_alias = True
-                        # only fire alias with release of key, not on press
-                        elif key_press_modifier == 'up':
-                            if not is_keydown:
-                                should_fire_alias = True
-                        # only fire alias with press of key, not on release
-                        elif key_press_modifier == 'down':
-                            if is_keydown:
-                                should_fire_alias = True
-                        # I do not know yet ...
-                        elif key_press_modifier == 'reversed': #
-                            pass
-
-                        if should_fire_alias:
+                        if should_activate(key_modifier) == True:
                             for i, code in enumerate(vk_codes):
 
-                                is_mouse_key = code in mouse_vk_codes
-                                if is_mouse_key:
-                                    key_code = mouse_vk_codes_dict[code]
-                                else:
-                                    key_code = keyboard.KeyCode.from_vk(code)
+                                is_mouse_key = check_for_mouse_vk_code(code)
+                                key_code = get_key_code(is_mouse_key, code)
 
-                                #key_code = keyboard.KeyCode.from_vk(code)
                                 key_delays = key_groups_key_delays[group_index][i]
 
                                 if DEBUG: print(i, code)
 
-                                if new_key_press_modifiers[i] == None:
+                                if new_key_modifiers[i] == None:
                                     controller_dict[is_mouse_key].press(key_code)
                                     delay(*key_delays)
                                     controller_dict[is_mouse_key].release(key_code) 
-                                elif new_key_press_modifiers[i] == 'up':
+                                elif new_key_modifiers[i] == 'up':
                                     controller_dict[is_mouse_key].release(key_code)
-                                elif new_key_press_modifiers[i] == 'down':
+                                elif new_key_modifiers[i] == 'down':
                                     controller_dict[is_mouse_key].press(key_code)
-                                elif new_key_press_modifiers[i] == 'reversed': 
+                                elif new_key_modifiers[i] == 'reversed': 
                                     controller_dict[is_mouse_key].release(key_code)
                                     delay(*key_delays)
                                     controller_dict[is_mouse_key].press(key_code)
                                 delay(*key_delays)
 
                             listener.suppress_event()   
+                    #
+
 
                         '''
                         [o] # key combination marked with + between keys: e.g. shift_left+u -> shift down, u down, u up, shift up
@@ -424,8 +436,7 @@ def win32_event_filter(msg, data):
                         # readme and description need a bigger update xD
 
 
-                        '''
-                        
+                        '''         
 
         # Stop the listener if the END key is released
         if CONTROLS_ENABLED and vk_code == MENU_KEY and msg in WM_KEYUP:
@@ -471,25 +482,17 @@ def win32_event_filter(msg, data):
                     break
 
         # if replaced key was not handled by tap groupings, then just send new key event
-        if key_directly_replaced:
+        # if key_directly_replaced:
+        #     if DEBUG: print(f"replacement vk_code: {vk_code}")
 
+        #     is_mouse_key = check_for_mouse_vk_code(vk_code)
+        #     key_code = get_key_code(is_mouse_key, vk_code)
 
-            if DEBUG: print(f"replacement vk_code: {vk_code}")
-            is_mouse_key = vk_code in mouse_vk_codes
-
-            if is_mouse_key:
-                key_code = mouse_vk_codes_dict[vk_code]
-            else:
-                key_code = keyboard.KeyCode.from_vk(vk_code)
-
-            if is_keydown: # and not output_is_reversed:
-                controller_dict[is_mouse_key].press(key_code)
-            else:
-                controller_dict[is_mouse_key].release(key_code)
-            #output_is_reversed = False
-
-            listener.suppress_event()
-
+        #     if is_keydown: # and not output_is_reversed:
+        #         controller_dict[is_mouse_key].press(key_code)
+        #     else:
+        #         controller_dict[is_mouse_key].release(key_code)
+        #     listener.suppress_event()
 
 def which_key_to_send(group_index):
     """
@@ -508,7 +511,7 @@ def which_key_to_send(group_index):
     elif num_of_keys_pressed > 1:
         key_to_send = tap_groups_last_key_pressed[group_index]
         # TODO: this will resent a released key if the released key was the last pressed ...
-        # we need a rolling state list?
+        # do we need a rolling state list?
         # or is it good enough?
         # should tap_groups_last_key_released also be tracked?
             # send only last key pressed of last_key_pressed != last_key_released
