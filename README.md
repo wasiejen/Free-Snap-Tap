@@ -5,10 +5,10 @@
 **Only works on Windows.**
 
 A minimalistic Python-based Snap Tapping program compatible with all keyboards and supports:
-- adjustable Tap Groups (mutually exclusive keys with Snap Tap functionality)
+- Adjustable Tap Groups (mutually exclusive keys with Snap Tap functionality)
 - Key Replacements - change keys which can also be evaluated by Tap Groups
 - Aliases aka Null binds
-- Custom delay for everything that helps to be recognised as cheat because the input is not as perfect
+- Custom delay for every key event that helps to NOT be recognised as input automation because the input is not as perfect
   - see [### Example Use Cases for Aliases (to show what is possible right now)](https://github.com/wasiejen/Free-Snap-Tap?tab=readme-ov-file#examplesfor-aliases-to-show-what-is-possible-right-now)
 - With CLI User Interface to manage Tap_Groups and Key_Groups
 
@@ -46,20 +46,14 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
 
 ## Examplesfor Aliases (to show what is possible right now)
 
-- `-k,  p|10,  o|5,  i|15|3`   
-  - when `k` is pressed , send `p` with a max delay of 10 ms, then `o` with max delay of 5 ms, then `i` with min delay of 3 ms and max of 10 ms
-  - (order of delays via `|` is free - it fetches the smaller one as min and the bigger one as max. 
-- `+o,r,e,v,e,r,s,e,d,-left_shift,w,o,r,l,d,+left_shift`    
-  - when o is released writes "reversedWORLD"
-- `-o,-left_shift,h,e,l,l,o,+left_shift,w,o,r,l,d`        
-  - when o is pressed writes "HELLOworld"
-- `--,-+,++,+mouse_left, +mouse_right`
-  - when minus is pressed sends a + press and release, and only release of left mouse button and right mouse button
-- `+-,o,k # inline comments work also`
-  - when minus is released writes "ok"
-- `h, h, e, #l, l, o # here key commented out`
-  - when h is pressed -> helo, but also when h is released -> helo (2 for h tap -> helohelo)
+- `-k,  p|10,  o|5,  i|15|3`: when `k` is pressed , send `p` with a max delay of 10 ms, then `o` with max delay of 5 ms, then `i` with min delay of 3 ms and max of 10 ms (order of delays via `|` is free - it fetches the smaller one as min and the bigger one as max)
+- `+o,r,e,v,e,r,s,e,d,-left_shift,w,o,r,l,d,+left_shift`: when `o` is released -> "reversedWORLD"
+- `-o,-left_shift,h,e,l,l,o,+left_shift,w,o,r,l,d`: when `o` is pressed -> "HELLOworld"
+- `--,-+,++,+mouse_left, +mouse_right`: when `-` is pressed sends a `+` press and release, and only sends the release of `mouse_left` button and `mouse_right` button
+- `+-,o,k # inline comments work also`: when `-` is released -> "ok"
+- `h, h, e, #l, l, o # here key commented out`: when `h` is pressed -> "helo", but also when h is released -> "helo" (2 for h tap -> "helohelo")
 - `# h, h, e, #l, l, o # whole line commented out`
+- `-n, suppress`: n press will be suppressed, n release still be send
 
 ### Key Modifier explanation:
 - `` nothing in front of a key is synchronious input (press is a press, release is a release)
@@ -78,7 +72,7 @@ This is only usable in key_groups. not supported in tap_groups yet.
   - Can be changed in py file or the min and max can be set via the start argument `-delay="number, number"`.
 - Delays are used after each key event (press and release), so a keypress has 2 delays
 - Aliases use the same delay as Tap_Groups per default
-  - only if the keys are given some other delay via `*key*|*number*|*number*` will these be overwritten for this specific key event (not this key in general).
+  - Only if the keys are given some other delay via `*key*|*number*|*number*` will these be overwritten for this specific key event (not this key in general).
 
 ## Controls
 
@@ -98,11 +92,27 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
 -  `-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  
 -  `-delay="number ,number"`: sets the default min and max delay of "number,number" ms for Tap_Groups and Key_Groups (can be set in a range of 1-1000)
 -  `-crossover="number"`: sets the probability of "number" percent for a crossover (can be set in a range of 0-100)
-  - crossover is when the old key is released before the actual pressed key and with a delay to make it more natural
+  - A crossover is key event reversal with delay - press and release are overlapping the time of delay
 -  `-nodelay`: deactivates delay and crossover
   
 Tap Groupings are a set of keys that are observed and the output of each group is separately handled. Activation of a key is mutually exclusive to all others—so there will always be only one activated key.
 You can define Tap Groupings or Key Replacements via Command Line or via editing the `tap_groups.txt` or `key_replacement_groups.txt`.
+
+e.g. example batch file
+```bash
+@echo off
+python .\Free-Snap-Tap\free_snap_tap.py ^
+#-debug ^
+#-tapfile=my_taps.txt ^
+#-keyfile=my_keys.txt ^
+-crossover=50 ^
+-delay=10,2 ^
+#-nomenu ^
+#-nocontrols ^
+#-nodelay ^
+
+pause
+```
 
 ## Actual Version Information
 
@@ -121,21 +131,6 @@ You can define Tap Groupings or Key Replacements via Command Line or via editing
 - option to supress key events via key group (with 2 keys only)
   - `-n, suppress` -> n press will be suppressed, n release still be send
 
-e.g. a batch file
-```bash
-@echo off
-python .\Free-Snap-Tap\free_snap_tap.py ^
-#-debug ^
-#-tapfile=my_taps.txt ^
-#-keyfile=my_keys.txt ^
--crossover=50 ^
--delay=10,2 ^
-#-nomenu ^
-#-nocontrols ^
-#-nodelay ^
-
-pause
-```
 
 **V0.8.0**
 
