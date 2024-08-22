@@ -61,7 +61,7 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
   - when h is pressed -> helo, but also when h is released -> helo (2 for h tap -> helohelo)
 - `# h, h, e, #l, l, o # whole line commented out`
 
-### Some explanation:
+### Key Modifier explanation:
 - `` nothing in front of a key is synchronious input (press is a press, release is a release)
 - `-` in front of a key is a press (down without up)
 - `+` in front of a key is a release (up without down)
