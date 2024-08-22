@@ -97,7 +97,7 @@ vk_codes_dict = {
     # some vk_codes for german keyboard layout
     '<': 226, 'ä': 222, 'ö': 192, 'ü': 186, '´': 221, 'copilot': 134, 
     # some symbols
-    '-': 189, '+': 187, '#': 191, ',': 188, '.':190,
+    '-': 189, '+': 187, 'hash': 191, ',': 188, '.':190,
     # supress keys with binding to:
     'suppress': 0,
 
@@ -117,7 +117,16 @@ def load_groups(file_name, data_object):
                 if group[0][0] == '#':
                     pass
                 else:
-                    data_object.append(group)
+                    # remove commented out keys
+                    cleaned_group = []
+                    for key in group:
+                        # ignore commented out keys
+                        if key[0] != '#': 
+                            # ignore comments after keys
+                            cleaned_group.append(key.split('#')[0])
+
+                        
+                    data_object.append(cleaned_group)
     return data_object
 
 def save_groups(file_name, data_object):
@@ -221,10 +230,10 @@ def initialize_key_groups():
                     # up key
                     key_modifier = 'up'
                     key = key.replace('+','',1)
-                elif key[0] == '#':
+                elif key[0] == '!':
                     # up key
                     key_modifier = 'reversed'
-                    key = key.replace('#','',1)
+                    key = key.replace('!','',1)
 
             key = convert_to_vk_code(key)
             key_groups_dict[group_index].append(key)
@@ -297,11 +306,11 @@ def win32_event_filter(msg, data):
             if is_keydown:
                 activate = True
         # I do not know yet ...
-        elif key_modifier == 'reversed': #
+        elif key_modifier == 'reversed': 
             pass
         return activate
 
-    key_directly_replaced = False
+    key_replaced = False
     vk_code = data.vkCode
     is_keydown = is_press(msg)
 
@@ -333,14 +342,14 @@ def win32_event_filter(msg, data):
                         print(f"key_modifiers: {key_modifier} -> {new_key_modifiers}", )
 
                     # KEY REPLACEMENT handling
-                    if len(group) == 2:              
+                    if len(group) == 2 and not key_replaced:              
 
                         if DEBUG: print("Key Replacement recognised: ", group)
                         # check for key_groups_state_is_pressed
                         
                         if should_activate(key_modifier) == True:
                             vk_code = group[1]  
-                            key_directly_replaced = True
+                            key_replaced = True
 
                         if new_key_modifiers[0] == 'reversed':
                             is_keydown = not is_keydown # with this can be tracked in tap_groups
@@ -349,7 +358,10 @@ def win32_event_filter(msg, data):
                         # suppress event when found
                         if vk_code == 0:
                             if DEBUG: print("key suppressed: vk_code: ", group)
-                            listener.suppress_event()   
+                            listener.suppress_event() 
+
+                        # deactive after replacement to not trigger any aliases
+                        # break
 
                     # ALIAS handling
                     else:
@@ -466,7 +478,7 @@ def win32_event_filter(msg, data):
             for group_index, group in enumerate(tap_groups_states_dict):
                 if DEBUG: print(f"#1 {group_index, group}")
                 if vk_code in group:
-                    if key_directly_replaced: key_directly_replaced = False
+                    if key_replaced == True: key_replaced = False
                     if is_keydown: # and group[vk_code] == 0: #TODO ACT_6 repeating keys
                         group[vk_code] = 1
                         if DEBUG: print(f"#2 {vk_code}")
@@ -481,18 +493,15 @@ def win32_event_filter(msg, data):
                     # - no handling for a single key in multiple tap groups
                     break
 
-        # if replaced key was not handled by tap groupings, then just send new key event
-        # if key_directly_replaced:
-        #     if DEBUG: print(f"replacement vk_code: {vk_code}")
+        if key_replaced == True:
+            is_mouse_key = check_for_mouse_vk_code(vk_code)
+            key_code = get_key_code(is_mouse_key, vk_code)
 
-        #     is_mouse_key = check_for_mouse_vk_code(vk_code)
-        #     key_code = get_key_code(is_mouse_key, vk_code)
-
-        #     if is_keydown: # and not output_is_reversed:
-        #         controller_dict[is_mouse_key].press(key_code)
-        #     else:
-        #         controller_dict[is_mouse_key].release(key_code)
-        #     listener.suppress_event()
+            if is_keydown: # and not output_is_reversed:
+                controller_dict[is_mouse_key].press(key_code)
+            else:
+                controller_dict[is_mouse_key].release(key_code)
+            listener.suppress_event()
 
 def which_key_to_send(group_index):
     """
