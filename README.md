@@ -101,7 +101,7 @@ You can define Tap Groupings or Key Replacements via Command Line or via editing
 e.g. example batch file
 ```bash
 @echo off
-python .\Free-Snap-Tap\free_snap_tap.py ^
+python .\free_snap_tap.py ^
 #-debug ^
 #-tapfile=my_taps.txt ^
 #-keyfile=my_keys.txt ^
