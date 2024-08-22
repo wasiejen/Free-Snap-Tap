@@ -1,4 +1,4 @@
-## Free Snap Tap: Universal Keyboard Snap Tap with Tap Groups, Key Replacement, Aliases (Null binds) and custom delay for everything.
+# Free Snap Tap: Universal Keyboard Snap Tap with Tap Groups, Key Replacement, Aliases (Null binds) and custom delay for everything.
 
 **Works as of V0.8.0 without triggering Valve Anti Cheat (if delays are not set too short :-) )**
 
@@ -6,10 +6,10 @@
 
 A minimalistic Python-based Snap Tapping program compatible with all keyboards and supports:
 - adjustable Tap Groups (mutually exclusive keys with Snap Tap functionality)
-- Key Replacements 
+- Key Replacements - change keys which can also be evaluated by Tap Groups
 - Aliases aka Null binds
 - Custom delay for everything that helps to be recognised as cheat because the input is not as perfect
-  - see ### Example Use Cases for Aliases (to show what is possible right now)
+  - see [### Example Use Cases for Aliases (to show what is possible right now)](https://github.com/wasiejen/Free-Snap-Tap?tab=readme-ov-file#examplesfor-aliases-to-show-what-is-possible-right-now)
 - With CLI User Interface to manage Tap_Groups and Key_Groups
 
 <img width="500" alt="FST" src="https://github.com/user-attachments/assets/7896509d-bc2a-4927-8dd4-5bc6d4f5adf9">
@@ -25,7 +25,7 @@ Tap_Groups are saved in a separate `tap_groups.txt` file and Key_Groups in `key_
 - Comments work with `#` for line comment, single key commenting out, comment after key sequence.
 String representation or vk-codes (virtual keyboard codes—list in py file) can also be used. 
 
-### Examples for Tap Groups
+## Examples for Tap Groups
 
 - Movement Left/Right (Tap Group `a, d` and/or `left_arrow, right_arrow`)
 - Movement Forward/Backward (Tap Group `w, s` and/or `up_arrow, down_arrow`)
@@ -38,13 +38,13 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
   - Pitch Up/Down
   - Roll Left/Right
 
-### Examples for Key Replacements
+## Examples for Key Replacements
 
 - `windows_left, left_control` 
 - `<, left_shift`
 - `-t, +t` , `+t, -t` - key press/release reversal
 
-### Examplesfor Aliases (to show what is possible right now)
+## Examplesfor Aliases (to show what is possible right now)
 
 - `-k,  p|10,  o|5,  i|15|3`   
   - when `k` is pressed , send `p` with a max delay of 10 ms, then `o` with max delay of 5 ms, then `i` with min delay of 3 ms and max of 10 ms
@@ -61,7 +61,7 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
   - when h is pressed -> helo, but also when h is released -> helo (2 for h tap -> helohelo)
 - `# h, h, e, #l, l, o # whole line commented out`
 
-Some explanation:
+### Some explanation:
 - `` nothing in front of a key is synchronious input (press is a press, release is a release)
 - `-` in front of a key is a press (down without up)
 - `+` in front of a key is a release (up without down)
@@ -72,7 +72,7 @@ Some explanation:
 
 This is only usable in key_groups. not supported in tap_groups yet.
 
-### Delay-Settings
+## Delay-Settings
 - Delays are random between a min and a max time in ms
 - Default delays for the Tap_Groups is set to 2 ms for min and 10 ms for max (py file)
   - Can be changed in py file or the min and max can be set via the start argument `-delay="number, number"`.
@@ -88,7 +88,23 @@ This is only usable in key_groups. not supported in tap_groups yet.
 
 You can change the control keys in the py file under # Control keys.
 
-## Version Information
+## Configuration
+
+Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_tap.exe)
+-  `-nomenu` or `direct-start`: skips the menu and will be directly active
+-  `-tapfile="filename"`: (with or without "): load and save tap groupings from a custom save file
+-  `-keyfile="filename"`: (with or without "): load and save key groupings from a custom save file
+-  `-debug`: print out some debug info
+-  `-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  
+-  `-delay="number ,number"`: sets the default min and max delay of "number,number" ms for Tap_Groups and Key_Groups (can be set in a range of 1-1000)
+-  `-crossover="number"`: sets the probability of "number" percent for a crossover (can be set in a range of 0-100)
+  - crossover is when the old key is released before the actual pressed key and with a delay to make it more natural
+-  `-nodelay`: deactivates delay and crossover
+  
+Tap Groupings are a set of keys that are observed and the output of each group is separately handled. Activation of a key is mutually exclusive to all others—so there will always be only one activated key.
+You can define Tap Groupings or Key Replacements via Command Line or via editing the `tap_groups.txt` or `key_replacement_groups.txt`.
+
+## Actual Version Information
 
 **V0.8.1**
 
@@ -175,22 +191,6 @@ Snap Tapping is a feature that enhances your keyboard's responsiveness by priori
 - The exe is offered to simplify the usage, it may get a false positive from some antivirus tools and be detected as a trojan. The reason for that seems to be the packaging as an executable that triggers these antivirus software and leads to false positives. See Discussion #12.
   - Option 1: if recognised as trojan - whitelist it in your antivir.
   - Option 2: instead use the py file - See `# Installation` for more info
-
-## Configuration
-
-Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_tap.exe)
--  `-nomenu` or `direct-start`: skips the menu and will be directly active
--  `-tapfile="filename"`: (with or without "): load and save tap groupings from a custom save file
--  `-keyfile="filename"`: (with or without "): load and save key groupings from a custom save file
--  `-debug`: print out some debug info
--  `-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  
--  `-delay="number ,number"`: sets the default min and max delay of "number,number" ms for Tap_Groups and Key_Groups (can be set in a range of 1-1000)
--  `-crossover="number"`: sets the probability of "number" percent for a crossover (can be set in a range of 0-100)
-  - crossover is when the old key is released before the actual pressed key and with a delay to make it more natural
--  `-nodelay`: deactivates delay and crossover
-  
-Tap Groupings are a set of keys that are observed and the output of each group is separately handled. Activation of a key is mutually exclusive to all others—so there will always be only one activated key.
-You can define Tap Groupings or Key Replacements via Command Line or via editing the `tap_groups.txt` or `key_replacement_groups.txt`.
 
 ## Installation
 
