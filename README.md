@@ -18,12 +18,11 @@ pic1: (my key_groups for testing the update V0.8.0)
 
 
 Tap_Groups are saved in a separate `tap_groups.txt` file and Key_Groups in `key_groups.txt`. Both can be edited directly.
-
-Each line represents one Tap Group, and each key is to be separated by a comma and can have 1 or more keys in it. (e.g. `1, 2, 3, 4` or `left_shift, left_control, alt` or just `v` would also be possible)
-Each line in the Key Groups can be Key Replacements (2 keys) or Aliases (more than 2 keys).
-- Key Replacments will also be evaluated by Tap groups and have no delay. Output is syncronious to input. 
-- Aliases will be played immediately with Trigger and have costumisable delay.
-Comments work with `#` for line comment, single key commenting out, comment after key sequence.
+- Each line represents one Tap Group, and each key is to be separated by a comma and can have 1 or more keys in it. (e.g. `1, 2, 3, 4` or `left_shift, left_control, alt` or just `v` would also be possible)
+- Each line in the Key Groups can be Key Replacements (2 keys) or Aliases (more than 2 keys).
+  - Key Replacments will also be evaluated by Tap groups and have no delay. Output is syncronious to input. 
+  - Aliases will be played immediately with Trigger and have costumisable delay.
+- Comments work with `#` for line comment, single key commenting out, comment after key sequence.
 String representation or vk-codes (virtual keyboard codes—list in py file) can also be used. 
 
 ### Examples for Tap Groups
@@ -43,7 +42,7 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
 
 - `windows_left, left_control` 
 - `<, left_shift`
-- `-t, +t` , `+t, -t` - key press/release reversabl
+- `-t, +t` , `+t, -t` - key press/release reversal
 
 ### Examplesfor Aliases (to show what is possible right now)
 
@@ -56,8 +55,11 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
   - when o is pressed writes "HELLOworld"
 - `--,-+,++,+mouse_left, +mouse_right`
   - when minus is pressed sends a + press and release, and only release of left mouse button and right mouse button
-- `+-,o,k`
+- `+-,o,k # inline comments work also`
   - when minus is released writes "ok"
+- `h, h, e, #l, l, o # here key commented out`
+  - when h is pressed -> helo, but also when h is released -> helo (2 for h tap -> helohelo)
+- `# h, h, e, #l, l, o # whole line commented out`
 
 Some explanation:
 - `` nothing in front of a key is synchronious input (press is a press, release is a release)
@@ -66,13 +68,17 @@ Some explanation:
 - `!` in front of a key is a release and a key (reversed synchronious input)
 - `|` behind a key is the the max delay for this single key (e.g. `-k|10` -> press k with a max delay of 10)
 - `|*max*|*min*` defines min and max delay (e.g. `-k|10|2` or `-k|2|10` -> press k with a max delay of 10 and min delay of 2)
+- `#` in front of a key, comments that key out and will not be used
 
 This is only usable in key_groups. not supported in tap_groups yet.
 
 ### Delay-Settings
-- Delays for the Tap_Groups is set to 2 ms min and 10 ms max as default.
+- Delays are random between a min and a max time in ms
+- Default delays for the Tap_Groups is set to 2 ms for min and 10 ms for max (py file)
   - Can be changed in py file or the min and max can be set via the start argument `-delay="number, number"`.
-- Key_Groups will use the same delay defined for Tap_Groups per default and only if the keys are given some other delay via `*key*|*number*|*number*` will these be overwritten for this specific key event (not this key in general).
+- Delays are used after each key event (press and release), so a keypress has 2 delays
+- Aliases use the same delay as Tap_Groups per default
+  - only if the keys are given some other delay via `*key*|*number*|*number*` will these be overwritten for this specific key event (not this key in general).
 
 ## Controls
 
