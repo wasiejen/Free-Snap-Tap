@@ -6,8 +6,8 @@
 
 A minimalistic Python-based Snap Tapping program compatible with all keyboards and supports:
 - Adjustable Tap Groups (mutually exclusive keys with Snap Tap functionality)
-- Key Replacements - change keys which can also be evaluated by Tap Groups
-- Aliases aka Null binds
+- Key Rebinds/Replacements - change keys which can also be evaluated by Tap Groups
+- Macros (Aliases, Null binds)
 - Custom delay for every key event that helps to NOT be recognised as input automation because the input is not as perfect
   - see [### Example Use Cases for Aliases (to show what is possible right now)](https://github.com/wasiejen/Free-Snap-Tap?tab=readme-ov-file#examplesfor-aliases-to-show-what-is-possible-right-now)
 - With CLI User Interface to manage Tap_Groups and Key_Groups
@@ -44,7 +44,7 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
 - `<, left_shift`
 - `-t, +t` , `+t, -t` - key press/release reversal
 
-## Examplesfor Aliases (to show what is possible right now)
+## Examples for Aliases (to show what is possible right now)
 
 - `-k,  p|10,  o|5,  i|15|3`: when `k` is pressed , send `p` with a max delay of 10 ms, then `o` with max delay of 5 ms, then `i` with min delay of 3 ms and max of 10 ms (order of delays via `|` is free - it fetches the smaller one as min and the bigger one as max)
 - `+o,r,e,v,e,r,s,e,d,-left_shift,w,o,r,l,d,+left_shift`: when `o` is released -> "reversedWORLD"
@@ -77,6 +77,7 @@ This is only usable in key_groups. not supported in tap_groups yet.
 ## Controls
 
 - **Toggle Pause:** Press the `DELETE` key to pause or resume the program.
+  - resuming will reload key and tap groups from files
 - **Stop Execution:** Press the `END` key to stop the program.
 - **Return to Menu:** Press the `PAGE_DOWN` key to return to the menu.
 
@@ -96,9 +97,11 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
 -  `-nodelay`: deactivates delay and crossover
   
 Tap Groupings are a set of keys that are observed and the output of each group is separately handled. Activation of a key is mutually exclusive to all others—so there will always be only one activated key.
-You can define Tap Groupings or Key Replacements via Command Line or via editing the `tap_groups.txt` or `key_replacement_groups.txt`.
+You can define Tap Groupings or Key Groups (Rebinds and Aliases) via Command Line or via editing the `tap_groups.txt` or `key_groups.txt`.
 
-### Example batch file for CMD, for PowerShell replace '^' with '`' for multiline start arguments
+### Example batch file
+Example is for use with CMD, for PowerShell replace '^' with '`' for multiline start arguments.
+To Use the exe replace line `python .\free_snap_tap.py ^` with `.\free_snap_tap.exe ^`.
 
 ```bash
 @echo off
@@ -116,6 +119,16 @@ pause
 ```
 
 ## Actual Version Information
+
+**V0.8.2**
+
+- delays were applied one key later - should now work correctly
+- removed my notes from py file :-)
+- vk_codes.py now contains key codes
+- vk_code print (menu option 7) is now much more verbose and helpful :-D
+- when using controls:
+  - resume will now reload tap and key files 
+  - (so tap out of game, change groups, save and resume in game will reload groups)
 
 **V0.8.1**
 
@@ -179,7 +192,7 @@ Snap Tapping is a feature that enhances your keyboard's responsiveness by priori
 ## Easy Usage
 
 - Download the executable from the actual [releases](https://github.com/wasiejen/Free-Snap-Tap/releases).
-- Start via `free_snap_tap.exe` or the provided bat(ch) files and a Command Line Interface will open with further explanations.
+- Start via `free_snap_tap.exe` or the provided bat(ch) file and a Command Line Interface will open with further explanations.
 - Nothing more to do — Tap Groups and Key Replacements can be defined via CLI. To start from the menu hit [Enter].
 - Have fun. :-)
 
@@ -205,12 +218,12 @@ pip install -r requirements.txt
 
 3. **Starting the Program:**
 
-    3.1 **Option A: directly:** By  clicking/executing the `free_snap_tap.bat` file.
+    3.1 **Option A: directly:** By  clicking/executing the `example_batch_file.bat` file.
 
     3.2 **Option B: via Command Line:** Start a Command Line/Terminal, navigate to the folder containing the .py file and use one of the follwing commands:
 
 ```bash
-./free_snap_tap.bat
+./example_batch_file.bat
 ```
 
 or navigate to the Free-Snap-Tap repo folder and type in:
