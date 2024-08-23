@@ -1,5 +1,5 @@
 @echo off
-python .\free_snap_tap.py ^
+.\free_snap_tap.exe ^
 ::-debug ^
 ::-tapfile=my_taps.txt ^
 ::-keyfile=my_keys.txt ^

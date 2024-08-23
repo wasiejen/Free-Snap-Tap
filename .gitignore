@@ -1,7 +1,7 @@
 /icons
 /dist
 /build
-/test
+/testing
 /pictures
 /__pycache__
 free_snap_tap.exe -nomenu start.bat
