@@ -3,6 +3,10 @@ from threading import Thread, Lock # to play aliases without interfering with ke
 import os # to use clearing of CLI for better menu usage
 import sys # to get start arguments
 
+#testing on this branch
+import pyautogui
+import pydirectinput
+
 from vk_codes import vk_codes_dict
 
 from random import randint # randint(3, 9)) 
@@ -51,12 +55,31 @@ key_groups = []
 controller = keyboard.Controller()
 mouse_controller = mouse.Controller()
 
-controller_dict = {True: mouse_controller, False: controller}
+
+class Wrapper_Pyinput():
+    def press(self, key_code):
+        if key_code == mouse.Button.left:
+            pydirectinput.mouseDown()
+        else: 
+            mouse_controller.press(key_code)
+    def release(self, key_code):
+        if key_code == mouse.Button.left:
+            pydirectinput.mouseUp()
+        else: 
+            mouse_controller.release(key_code)
+
+wrapper = Wrapper_Pyinput()
+
+controller_dict = {True: wrapper, False: controller}
 
 mouse_vk_codes_dict = {1: mouse.Button.left, 
                        2: mouse.Button.right, 
                        4: mouse.Button.middle}
 mouse_vk_codes = mouse_vk_codes_dict.keys()
+
+print(mouse.Button.left) 
+print(mouse.Button.right)
+print(mouse.Button.middle)
 
 def load_groups(file_name, data_object):
     """
