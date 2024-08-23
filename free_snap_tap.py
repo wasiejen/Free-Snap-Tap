@@ -7,14 +7,21 @@ from vk_codes import vk_codes_dict
 
 from random import randint # randint(3, 9)) 
 from time import sleep # sleep(0.005) = 5 ms
+import pygetwindow as gw
 
 # global variables
 DEBUG = False
 PAUSED = False
+MANUAL_PAUSED = False
 STOPPED = False
 MENU_ENABLED = True
 CONTROLS_ENABLED = True
 PRINT_VK_CODES = False
+
+# for focus setting
+paused_lock = Lock()
+FOCUS_APP_NAME = None
+FOCUS_THREAD_PAUSED = True
 
 # AntiCheat testing (ACT)
 ACT_DELAY = True
@@ -287,7 +294,7 @@ def win32_event_filter(msg, data):
     """
     Filter and handle keyboard events.
     """
-    global PAUSED, STOPPED, MENU_ENABLED
+    global PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
     global key_groups_key_modifier
 
     def should_activate(key_modifier):
@@ -400,11 +407,19 @@ def win32_event_filter(msg, data):
                 reload_tap_groups()
                 reload_key_groups()
                 print("tap and key groups reloaded")
-                print('--- resumed ---')
-                PAUSED = False
+                print('--- manuelly resumed ---')
+                with paused_lock:
+                    PAUSED = False
+                    MANUAL_PAUSED = False
+                # pause focus thread to allow manual overwrite and use without auto focus
+                if FOCUS_APP_NAME != None: focus_thread.pause()
             else:
-                print('--- paused ---')
-                PAUSED = True
+                print('--- manually paused ---')
+                with paused_lock:
+                    PAUSED = True
+                    MANUAL_PAUSED = True
+                # restart focus thread when manual overwrite is over
+                if FOCUS_APP_NAME != None: focus_thread.restart()
 
         # Snap Tap Part of Evaluation
         # Intercept key events if not PAUSED
@@ -608,12 +623,14 @@ def display_menu():
             text = "Error: Invalid input."
             invalid_input = True
 
+
 def check_start_arguments():
     global DEBUG, MENU_ENABLED, CONTROLS_ENABLED
     global FILE_NAME_TAP_GROUPS, FILE_NAME_KEY_GROUPS
     global ACT_DELAY, ACT_CROSSOVER, ACT_CROSSOVER_PROPABILITY_IN_PERCENT
     global ACT_MAX_DELAY_IN_MS, ACT_MIN_DELAY_IN_MS
     global ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS
+    global FOCUS_APP_NAME
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             if DEBUG: print(arg)
@@ -671,8 +688,61 @@ def check_start_arguments():
                 ACT_DELAY = False
                 ACT_CROSSOVER = False
                 print("delay+crossover deactivated")
+            elif arg[:10] == "-focusapp="  and len(arg) > 10:
+                FOCUS_APP_NAME = arg[10:]
+                print(FOCUS_APP_NAME)
             else:
                 print("unknown start argument: ", arg)
+
+class Focus_Thread(Thread):
+    '''
+    Thread for observing the active window and pause toggle the evaluation of key events
+    can be manually overwritten by Controls on DEL
+    reloads key and tap files on resume
+    '''
+
+    def __init__(self, focus_app_name):
+        Thread.__init__(self)
+        self.stop = False
+        self.daemon = True
+        self.focus_app_name = focus_app_name
+
+    def run(self):
+        global PAUSED, MANUAL_PAUSED, paused_lock, FOCUS_THREAD_PAUSED
+        while self.stop == False:
+            if FOCUS_THREAD_PAUSED == False and MANUAL_PAUSED == False:
+                if gw.getActiveWindow().title.find(self.focus_app_name) >= 0:
+                    if PAUSED == True:
+                        try:
+                            reload_tap_groups()
+                            reload_key_groups()
+                            print("--- tap and key groups successful reloaded ---")
+                            print('--- auto focus resumed ---')
+                            with paused_lock:
+                                PAUSED = False
+                        except:
+                            print('--- reloading of groups files failed - not resumed, still paused ---')
+                else:
+                    if PAUSED == False:
+                        with paused_lock:
+                            PAUSED = True
+                        print('--- auto focus paused ---')
+            sleep(1)
+
+    def pause(self):
+        global FOCUS_THREAD_PAUSED
+        with paused_lock:
+            FOCUS_THREAD_PAUSED = True
+
+    def restart(self):
+        global FOCUS_THREAD_PAUSED, MANUAL_PAUSED
+        if FOCUS_THREAD_PAUSED == True:
+            with paused_lock:
+                FOCUS_THREAD_PAUSED = False
+                MANUAL_PAUSED = False
+
+    def end(self):
+        self.stop = True
 
 if __name__ == "__main__":
     # check if start arguments are passed
@@ -688,14 +758,23 @@ if __name__ == "__main__":
     # try loading key groups from file
     reload_key_groups()
 
+    if FOCUS_APP_NAME != None:
+        focus_thread = Focus_Thread(FOCUS_APP_NAME)
+        focus_thread.start()
+
     while not STOPPED:
         if MENU_ENABLED:
+            if FOCUS_APP_NAME != None: focus_thread.pause()
             display_menu()
 
         print('\n--- Free Snap Tap started ---')
         print('--- toggle PAUSED with DELETE key ---')
         print('--- STOP execution with END key ---')
         print('--- enter MENU again with PAGE_DOWN key ---')
+        if FOCUS_APP_NAME != None: focus_thread.restart()
 
         with keyboard.Listener(win32_event_filter=win32_event_filter) as listener:
             listener.join()
+
+    if FOCUS_APP_NAME != None: focus_thread.end()
+    sys.exit(1)
