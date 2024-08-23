@@ -380,7 +380,7 @@ def win32_event_filter(msg, data):
                         # so simluted keys no longer block real input
                         # and if the delay was to long, supression of the event did not work anymore
 
-                        thread = Thread(target=alias_thread, args=(group_index, group, key_groups_key_delays, new_key_modifiers))
+                        thread = Thread(target=alias_thread, daemon = True, args=(group_index, group, key_groups_key_delays, new_key_modifiers))
                         thread.start()
 
                         listener.suppress_event()   
