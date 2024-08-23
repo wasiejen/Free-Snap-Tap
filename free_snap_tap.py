@@ -1,4 +1,5 @@
 from pynput import keyboard, mouse
+from threading import Thread, Lock # to play aliases without interfering with keyboard listener
 import os # to use clearing of CLI for better menu usage
 import sys # to get start arguments
 
@@ -7,7 +8,7 @@ from vk_codes import vk_codes_dict
 from random import randint # randint(3, 9)) 
 from time import sleep # sleep(0.005) = 5 ms
 
-
+# global variables
 DEBUG = False
 PAUSED = False
 STOPPED = False
@@ -246,6 +247,42 @@ def delay(max = ALIAS_MAX_DELAY_IN_MS, min = ALIAS_MIN_DELAY_IN_MS, ):
     if min > max: min,max = max,min
     sleep(randint(min, max) / 1000)
 
+def check_for_mouse_vk_code(vk_code):
+    is_mouse_key = vk_code in mouse_vk_codes
+    return is_mouse_key
+
+def get_key_code(is_mouse_key, vk_code):
+    if is_mouse_key:
+        key_code = mouse_vk_codes_dict[vk_code]
+    else:
+        key_code = keyboard.KeyCode.from_vk(vk_code)
+    return key_code
+
+def alias_thread(group_index, group, key_groups_key_delays, new_key_modifiers):
+    vk_codes = group[1:] 
+
+    for index, code in enumerate(vk_codes):
+        is_mouse_key = check_for_mouse_vk_code(code)
+        key_code = get_key_code(is_mouse_key, code)
+
+        key_delays = key_groups_key_delays[group_index][index + 1] #+1 to exclude first element
+
+        if DEBUG: print(index, code)
+
+        if new_key_modifiers[index] == None:
+            controller_dict[is_mouse_key].press(key_code)
+            if ACT_DELAY: delay(*key_delays)
+            controller_dict[is_mouse_key].release(key_code) 
+        elif new_key_modifiers[index] == 'up':
+            controller_dict[is_mouse_key].release(key_code)
+        elif new_key_modifiers[index] == 'down':
+            controller_dict[is_mouse_key].press(key_code)
+        elif new_key_modifiers[index] == 'reversed': 
+            controller_dict[is_mouse_key].release(key_code)
+            if ACT_DELAY: delay(*key_delays)
+            controller_dict[is_mouse_key].press(key_code)
+        if ACT_DELAY: delay(*key_delays)
+
 def win32_event_filter(msg, data):
     """
     Filter and handle keyboard events.
@@ -253,19 +290,7 @@ def win32_event_filter(msg, data):
     global PAUSED, STOPPED, MENU_ENABLED
     global key_groups_key_modifier
 
-    def check_for_mouse_vk_code(vk_code):
-        is_mouse_key = vk_code in mouse_vk_codes
-        return is_mouse_key
-
-    def get_key_code(is_mouse_key, vk_code):
-        if is_mouse_key:
-            key_code = mouse_vk_codes_dict[vk_code]
-        else:
-            key_code = keyboard.KeyCode.from_vk(vk_code)
-        return key_code
-
     def should_activate(key_modifier):
-
         activate = False
         # if no up or down is set, it will be fired at press and release of key
         # just to be consitent with the syntax
@@ -346,31 +371,12 @@ def win32_event_filter(msg, data):
                         # check for modifier
                         if DEBUG: print("ALIAS recognised!: ", group)
 
-                        vk_codes = group[1:]
+                        # ---- thread start
+                        # so simluted keys no longer block real input
+                        # and if the delay was to long, supression of the event did not work anymore
 
-                        #if should_activate(trigger_key_modifier) == True:
-
-                        for index, code in enumerate(vk_codes):
-                            is_mouse_key = check_for_mouse_vk_code(code)
-                            key_code = get_key_code(is_mouse_key, code)
-
-                            key_delays = key_groups_key_delays[group_index][index + 1] #+1 to exclude first element
-
-                            if DEBUG: print(index, code)
-
-                            if new_key_modifiers[index] == None:
-                                controller_dict[is_mouse_key].press(key_code)
-                                if ACT_DELAY: delay(*key_delays)
-                                controller_dict[is_mouse_key].release(key_code) 
-                            elif new_key_modifiers[index] == 'up':
-                                controller_dict[is_mouse_key].release(key_code)
-                            elif new_key_modifiers[index] == 'down':
-                                controller_dict[is_mouse_key].press(key_code)
-                            elif new_key_modifiers[index] == 'reversed': 
-                                controller_dict[is_mouse_key].release(key_code)
-                                if ACT_DELAY: delay(*key_delays)
-                                controller_dict[is_mouse_key].press(key_code)
-                            if ACT_DELAY: delay(*key_delays)
+                        thread = Thread(target=alias_thread, daemon = True, args=(group_index, group, key_groups_key_delays, new_key_modifiers))
+                        thread.start()
 
                         listener.suppress_event()   
                     #      
