@@ -1,6 +1,5 @@
 from pynput import keyboard, mouse
 import os # to use clearing of CLI for better menu usage
-import msvcrt # for clearing the input buffer before starting a new input
 import sys # to get start arguments
 
 from vk_codes import vk_codes_dict
@@ -531,10 +530,6 @@ def display_menu():
         print("6. Clear key_groups.txt file")
         print("\n7. Print vk_codes to identify keys")
         print("8. End Script", flush=True)
-
-        # empty input buffer before asking for next input
-        # while msvcrt.kbhit():
-        #     msvcrt.getch()
 
         choice = input("\nHit [Enter] to start or enter your choice: " )
 
