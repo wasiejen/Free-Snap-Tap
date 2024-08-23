@@ -3,6 +3,8 @@ import os # to use clearing of CLI for better menu usage
 import msvcrt # for clearing the input buffer before starting a new input
 import sys # to get start arguments
 
+from vk_codes import vk_codes_dict
+
 from random import randint # randint(3, 9)) 
 from time import sleep # sleep(0.005) = 5 ms
 
@@ -55,53 +57,6 @@ mouse_vk_codes_dict = {1: mouse.Button.left,
                        2: mouse.Button.right, 
                        4: mouse.Button.middle}
 mouse_vk_codes = mouse_vk_codes_dict.keys()
-
-# Dictionary mapping strings and keys to their VK codes
-vk_codes_dict = {
-    'mouse_left': 1, 'mouse_right': 2, 'mouse_middle': 4,
-    'a': 65, 'b': 66, 'c': 67, 'd': 68, 'e': 69, 'f': 70, 'g': 71,
-    'h': 72, 'i': 73, 'j': 74, 'k': 75, 'l': 76, 'm': 77, 'n': 78,
-    'o': 79, 'p': 80, 'q': 81, 'r': 82, 's': 83, 't': 84, 'u': 85,
-    'v': 86, 'w': 87, 'x': 88, 'y': 89, 'z': 90,
-    '0': 48, '1': 49, '2': 50, '3': 51, '4': 52, '5': 53, '6': 54,
-    '7': 55, '8': 56, '9': 57,
-    'F1': 112, 'F2': 113, 'F3': 114, 'F4': 115, 'F5': 116, 'F6': 117,
-    'F7': 118, 'F8': 119, 'F9': 120, 'F10': 121, 'F11': 122, 'F12': 123,
-    'num0': 96, 'num1': 97, 'num2': 98, 'num3': 99, 'num4': 100,
-    'num5': 101, 'num6': 102, 'num7': 103, 'num8': 104, 'num9': 105,
-    'multiply': 106, 'add': 107, 'separator': 108, 'subtract': 109,
-    'decimal': 110, 'divide': 111,
-    'backspace': 8, 'tab': 9, 'enter': 13, 'shift': 16, 'ctrl': 17,
-    'alt': 18, 'PAUSED': 19, 'caps_lock': 20, 'esc': 27, 'space': 32,
-    'page_up': 33, 'page_down': 34, 'end': 35, 'home': 36,
-    'left_arrow': 37, 'up_arrow': 38, 'right_arrow': 39, 'down_arrow': 40,
-    'select': 41, 'print': 42, 'execute': 43, 'print_screen': 44,
-    'insert': 45, 'delete': 46, 'help': 47,
-    'left_windows': 91, 'right_windows': 92, 'applications': 93,
-    'sleep': 95, 'num_lock': 144, 'scroll_lock': 145,
-    'left_shift': 160, 'right_shift': 161, 'left_control': 162,
-    'right_control': 163, 'left_menu': 164, 'right_menu': 165,
-    'browser_back': 166, 'browser_forward': 167, 'browser_refresh': 168,
-    'browser_stop': 169, 'browser_search': 170, 'browser_favorites': 171,
-    'browser_home': 172, 'volume_mute': 173, 'volume_down': 174,
-    'volume_up': 175, 'media_next_track': 176, 'media_prev_track': 177,
-    'media_stop': 178, 'media_play_PAUSED': 179, 'launch_mail': 180,
-    'launch_media_select': 181, 'launch_app1': 182, 'launch_app2': 183,
-    'semicolon': 186, 'plus': 187, 'comma': 188, 'minus': 189,
-    'period': 190, 'slash': 191, 'grave_accent': 192,
-    'open_bracket': 219, 'backslash': 220, 'close_bracket': 221,
-    'quote': 222, 'oem_8': 223, 'oem_102': 226,
-    'process_key': 229, 'packet': 231, 'attn': 246, 'crsel': 247,
-    'exsel': 248, 'erase_eof': 249, 'play': 250, 'zoom': 251,
-    'pa1': 253, 'oem_clear': 254,
-    # some vk_codes for german keyboard layout
-    '<': 226, 'ä': 222, 'ö': 192, 'ü': 186, '´': 221, 'copilot': 134, 
-    # some symbols
-    '-': 189, '+': 187, 'hash': 191, ',': 188, '.':190,
-    # supress keys with binding to:
-    'suppress': 0,
-
-}
 
 def load_groups(file_name, data_object):
     """
@@ -333,9 +288,10 @@ def win32_event_filter(msg, data):
     key_replaced = False
     vk_code = data.vkCode
     is_keydown = is_press(msg)
+    is_simulated = is_simulated_key_event(data.flags)
 
-    if PRINT_VK_CODES and is_keydown:
-        print(f"vk_code: {vk_code}")
+    if (PRINT_VK_CODES and is_keydown) or DEBUG:
+        print(f"time: {data.time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
 
     # if DEBUG: 
     #     print(f"vk_code: {vk_code}")
@@ -343,7 +299,7 @@ def win32_event_filter(msg, data):
     #     print("data: ", data)
 
     # check for simulated keys:
-    if not is_simulated_key_event(data.flags):
+    if not is_simulated: # is_simulated_key_event(data.flags):
 
         # Replace some Buttons :-D
         if not PAUSED and not PRINT_VK_CODES:
@@ -395,84 +351,30 @@ def win32_event_filter(msg, data):
 
                         #if should_activate(trigger_key_modifier) == True:
 
-                        for i, code in enumerate(vk_codes):
-
+                        for index, code in enumerate(vk_codes):
                             is_mouse_key = check_for_mouse_vk_code(code)
                             key_code = get_key_code(is_mouse_key, code)
 
-                            key_delays = key_groups_key_delays[group_index][i]
+                            key_delays = key_groups_key_delays[group_index][index + 1] #+1 to exclude first element
 
-                            if DEBUG: print(i, code)
+                            if DEBUG: print(index, code)
 
-                            if new_key_modifiers[i] == None:
+                            if new_key_modifiers[index] == None:
                                 controller_dict[is_mouse_key].press(key_code)
                                 if ACT_DELAY: delay(*key_delays)
                                 controller_dict[is_mouse_key].release(key_code) 
-                            elif new_key_modifiers[i] == 'up':
+                            elif new_key_modifiers[index] == 'up':
                                 controller_dict[is_mouse_key].release(key_code)
-                            elif new_key_modifiers[i] == 'down':
+                            elif new_key_modifiers[index] == 'down':
                                 controller_dict[is_mouse_key].press(key_code)
-                            elif new_key_modifiers[i] == 'reversed': 
+                            elif new_key_modifiers[index] == 'reversed': 
                                 controller_dict[is_mouse_key].release(key_code)
                                 if ACT_DELAY: delay(*key_delays)
                                 controller_dict[is_mouse_key].press(key_code)
                             if ACT_DELAY: delay(*key_delays)
 
                         listener.suppress_event()   
-                    #
-
-
-                        '''
-                        [o] # key combination marked with + between keys: e.g. shift_left+u -> shift down, u down, u up, shift up
-                            [x] somewhat solved by using -shift,key,+shift - even more flexible
-                        [x] # key up and down marked by + and - before keys: e.g. -shift_left, n, e, w, +shift_left --> NEW
-                            [x] # have to change reverse keys for it to work with -, but is similar in function
-                        [x] maybe it is possible to also use + and - as modifier for the input_key,
-                            [x] # to differentiate between key press and key release as trigger
-                            [x] # 2 alias on one key usable then - one on press, one on release xD
-                        [x] # though to the end: key groups will look like
-                            -k,-shift,h,e,l,l,o,+shift          # k down -> HELLO
-                            +k,-shift,w,o,r,l,d,+shift          # k up   -> WORLD
-                            -l,-l,mouse_right                   # l down -> l down, right mouse click
-                            h, u   # equivalent to h-,u-;h+,u+  # h will be replaced by u: h down -> u down, h up -> u up
-                                # maybe really just define h-,u-;h+,u+ and split at ; (has to be compatible with shared typ_groups )
-
-                        [x] # include delay for a key to change the delay after that key:
-                                -h,-shift,h/10,e/5,l,l,o,+shift     # custom delay of 10 ms after h and 5 ms after e
-                        
-                        # problem is that key combination can not be recognised as an input
-                            # global state list with 262 (0-261) elements for each key representing pressed or not
-                            # global list with lists of all combinations to be tracked
-                                # fast check by just asking if the indize of state_list[key of combination] is pressed
-                            # global state of last_key_pressed
-                            # comb_last_key_pressed for each combination
-                                # e.g. tapgroup a,d
-                                a pressed -> last_key_pressed = a
-                                    state[a] = 1, looked up if in combination; set comb_last_key_pressed = a; a press send
-                                d pressed -> last_key_pressed = d
-                                    state[d] = 1 and d press send
-                                    key combination triggered
-                                        comb_last_key_pressed released
-                                d released
-                                    state[d] = 0 and d release send
-                                    check combination for num of sum greater 1
-                                        send comb_last_key_pressed
-                                        ### but this is d which was released
-
-                        # there might be the problem with aliases and tap groups that only a press or the release will be used for input.
-                            # the other event will still be send? is that a problem?
-                            # e.g. `-o*` or `-o, *supress` for "supress o press" as a key group
-                        
-                        # linux compatibility:
-                            # replace win32_event_filter with generic on_press and on_release calls 
-                            # supress=True to supress everything
-                            # pipe through the script every input
-                            # logic for not sendung key when used in key groups as trigger
-
-                        # readme and description need a bigger update xD
-
-
-                        '''         
+                    #      
 
         # Stop the listener if the MENU key is released
         if CONTROLS_ENABLED and vk_code == MENU_KEY and not is_keydown:
@@ -628,13 +530,13 @@ def display_menu():
         print("5. Delete Key Group")
         print("6. Clear key_groups.txt file")
         print("\n7. Print vk_codes to identify keys")
-        print("8. End Script")
+        print("8. End Script", flush=True)
 
         # empty input buffer before asking for next input
-        while msvcrt.kbhit():
-            msvcrt.getch()
+        # while msvcrt.kbhit():
+        #     msvcrt.getch()
 
-        choice = input("\nHit [Enter] to start or enter your choice: ")
+        choice = input("\nHit [Enter] to start or enter your choice: " )
 
         if choice == '0':
             display_groups(tap_groups)
