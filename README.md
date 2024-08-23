@@ -96,7 +96,7 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
    - A crossover is key event reversal with delay - press and release are overlapping the time of delay
 -  `-nodelay`: deactivates delay and crossover
 -  `-focusapp="part of the app name"`: Script only activate evaluaten of key events if the defined window with the given name is in focus.
-   - e.g. for Counterstrike, `-focusapp=Count` is enough to recognize it
+   - e.g. for Counterstrike, `-focusapp=count` is enough to recognize it (not case sensitive)
    - can be manually overwritten by Control on DEL key (to activate outside and deactivate inside focus app)
   
 Tap Groupings are a set of keys that are observed and the output of each group is separately handled. Activation of a key is mutually exclusive to all others—so there will always be only one activated key.

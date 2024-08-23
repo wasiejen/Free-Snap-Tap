@@ -705,13 +705,13 @@ class Focus_Thread(Thread):
         Thread.__init__(self)
         self.stop = False
         self.daemon = True
-        self.focus_app_name = focus_app_name
+        self.focus_app_name = focus_app_name.lower()
 
     def run(self):
         global PAUSED, MANUAL_PAUSED, paused_lock, FOCUS_THREAD_PAUSED
         while self.stop == False:
             if FOCUS_THREAD_PAUSED == False and MANUAL_PAUSED == False:
-                if gw.getActiveWindow().title.find(self.focus_app_name) >= 0:
+                if gw.getActiveWindow().title.lower().find(self.focus_app_name) >= 0:
                     if PAUSED == True:
                         try:
                             reload_tap_groups()
