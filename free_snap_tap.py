@@ -259,6 +259,26 @@ def initialize_tap_groups():
         print(f"tap_groups_last_key_pressed: {tap_groups_last_key_pressed}")
         print(f"tap_groups_last_key_send: {tap_groups_last_key_send}")
 
+def reload_key_groups():
+    # try loading tap groups from file
+    global FILE_NAME_KEY_GROUPS, key_groups
+    try:
+        key_groups = load_groups(FILE_NAME_KEY_GROUPS, key_groups)
+    # if no tap_groups.txt file exist create new one
+    except FileNotFoundError:
+        reset_key_groups_txt()
+    initialize_key_groups()
+
+def reload_tap_groups():
+    global FILE_NAME_TAP_GROUPS, tap_groups
+    # try loading tap groups from file
+    try:
+        tap_groups = load_groups(FILE_NAME_TAP_GROUPS, tap_groups)
+    # if no tap_groups.txt file exist create new one
+    except FileNotFoundError:
+        reset_tap_groups_txt()
+    initialize_tap_groups()
+
 def is_simulated_key_event(flags):
     return flags & 0x10
 
@@ -276,7 +296,7 @@ def win32_event_filter(msg, data):
     """
     Filter and handle keyboard events.
     """
-    global PAUSED, STOPPED
+    global PAUSED, STOPPED, MENU_ENABLED
     global key_groups_key_modifier
 
     def check_for_mouse_vk_code(vk_code):
@@ -326,20 +346,23 @@ def win32_event_filter(msg, data):
     if not is_simulated_key_event(data.flags):
 
         # Replace some Buttons :-D
-        if not PAUSED:
+        if not PAUSED and not PRINT_VK_CODES:
             for group_index, group in enumerate(key_groups_dict):
                 # if DEBUG: print("group_index", group_index)
 
-                if vk_code == group[0]:
+                #group_key_modifiers = 
+                trigger_key_modifier, *new_key_modifiers = key_groups_key_modifier[group_index]
 
-                    key_modifier = key_groups_key_modifier[group_index][0]
-                    new_key_modifiers = key_groups_key_modifier[group_index][1:]                
+                if vk_code == group[0] and should_activate(trigger_key_modifier):
+
+                    #key_modifier = key_groups_key_modifier[group_index][0]
+                    #new_key_modifiers = key_groups_key_modifier[group_index][1:]                
 
                     if DEBUG: 
                         print("vk_code_gotten: ", vk_code)
                         print("vk_code_replacement: ", group)
                         print("is_keydown: ", is_keydown)
-                        print(f"key_modifiers: {key_modifier} -> {new_key_modifiers}", )
+                        print(f"key_modifiers: {trigger_key_modifier} -> {new_key_modifiers}", )
 
                     # KEY REPLACEMENT handling
                     if len(group) == 2 and not key_replaced:              
@@ -347,9 +370,9 @@ def win32_event_filter(msg, data):
                         if DEBUG: print("Key Replacement recognised: ", group)
                         # check for key_groups_state_is_pressed
                         
-                        if should_activate(key_modifier) == True:
-                            vk_code = group[1]  
-                            key_replaced = True
+                        #if should_activate(trigger_key_modifier) == True:
+                        vk_code = group[1]  
+                        key_replaced = True
 
                         if new_key_modifiers[0] == 'reversed':
                             is_keydown = not is_keydown # with this can be tracked in tap_groups
@@ -370,32 +393,32 @@ def win32_event_filter(msg, data):
 
                         vk_codes = group[1:]
 
-                        if should_activate(key_modifier) == True:
+                        #if should_activate(trigger_key_modifier) == True:
 
-                            for i, code in enumerate(vk_codes):
+                        for i, code in enumerate(vk_codes):
 
-                                is_mouse_key = check_for_mouse_vk_code(code)
-                                key_code = get_key_code(is_mouse_key, code)
+                            is_mouse_key = check_for_mouse_vk_code(code)
+                            key_code = get_key_code(is_mouse_key, code)
 
-                                key_delays = key_groups_key_delays[group_index][i]
+                            key_delays = key_groups_key_delays[group_index][i]
 
-                                if DEBUG: print(i, code)
+                            if DEBUG: print(i, code)
 
-                                if new_key_modifiers[i] == None:
-                                    controller_dict[is_mouse_key].press(key_code)
-                                    if ACT_DELAY: delay(*key_delays)
-                                    controller_dict[is_mouse_key].release(key_code) 
-                                elif new_key_modifiers[i] == 'up':
-                                    controller_dict[is_mouse_key].release(key_code)
-                                elif new_key_modifiers[i] == 'down':
-                                    controller_dict[is_mouse_key].press(key_code)
-                                elif new_key_modifiers[i] == 'reversed': 
-                                    controller_dict[is_mouse_key].release(key_code)
-                                    if ACT_DELAY: delay(*key_delays)
-                                    controller_dict[is_mouse_key].press(key_code)
+                            if new_key_modifiers[i] == None:
+                                controller_dict[is_mouse_key].press(key_code)
                                 if ACT_DELAY: delay(*key_delays)
+                                controller_dict[is_mouse_key].release(key_code) 
+                            elif new_key_modifiers[i] == 'up':
+                                controller_dict[is_mouse_key].release(key_code)
+                            elif new_key_modifiers[i] == 'down':
+                                controller_dict[is_mouse_key].press(key_code)
+                            elif new_key_modifiers[i] == 'reversed': 
+                                controller_dict[is_mouse_key].release(key_code)
+                                if ACT_DELAY: delay(*key_delays)
+                                controller_dict[is_mouse_key].press(key_code)
+                            if ACT_DELAY: delay(*key_delays)
 
-                            listener.suppress_event()   
+                        listener.suppress_event()   
                     #
 
 
@@ -451,21 +474,25 @@ def win32_event_filter(msg, data):
 
                         '''         
 
-        # Stop the listener if the END key is released
-        if CONTROLS_ENABLED and vk_code == MENU_KEY and msg in WM_KEYUP:
+        # Stop the listener if the MENU key is released
+        if CONTROLS_ENABLED and vk_code == MENU_KEY and not is_keydown:
+            MENU_ENABLED = True
             print('\n--- Stopping execution ---')
             listener.stop()
 
         # Stop the listener if the END key is released
-        elif CONTROLS_ENABLED and vk_code == EXIT_KEY and msg in WM_KEYUP:
+        elif CONTROLS_ENABLED and vk_code == EXIT_KEY and not is_keydown:
             print('\n--- Stopping execution ---')
             listener.stop()
             STOPPED = True
             exit()
 
         # Toggle paused/resume if the DELETE key is released
-        elif CONTROLS_ENABLED and vk_code == TOGGLE_ON_OFF_KEY and msg in WM_KEYUP:
+        elif CONTROLS_ENABLED and vk_code == TOGGLE_ON_OFF_KEY and not is_keydown:
             if PAUSED:
+                reload_tap_groups()
+                reload_key_groups()
+                print("tap and key groups reloaded")
                 print('--- resumed ---')
                 PAUSED = False
             else:
@@ -474,7 +501,7 @@ def win32_event_filter(msg, data):
 
         # Snap Tap Part of Evaluation
         # Intercept key events if not PAUSED
-        elif not PAUSED: # or not output_is_reversed:
+        elif not PAUSED and not PRINT_VK_CODES:
             if DEBUG: print("#0")
             for group_index, group in enumerate(tap_groups_states_dict):
                 if DEBUG: print(f"#1 {group_index, group}")
@@ -749,24 +776,14 @@ if __name__ == "__main__":
     check_start_arguments()
 
     # try loading tap groups from file
-    try:
-        tap_groups = load_groups(FILE_NAME_TAP_GROUPS, tap_groups)
-    # if no tap_groups.txt file exist create new one
-    except FileNotFoundError:
-        reset_tap_groups_txt()
-    initialize_tap_groups()
+    reload_tap_groups()
 
     if DEBUG:
         print(f"tap_groups: {tap_groups}")
         print(f"tap_groups_states_dict: {tap_groups_states_dict}")
 
     # try loading key groups from file
-    try:
-        key_groups = load_groups(FILE_NAME_KEY_GROUPS, key_groups)
-    # if no tap_groups.txt file exist create new one
-    except FileNotFoundError:
-        reset_key_groups_txt()
-    initialize_key_groups()
+    reload_key_groups()
 
     while not STOPPED:
         if MENU_ENABLED:
