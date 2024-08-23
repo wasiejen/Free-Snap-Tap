@@ -4,8 +4,8 @@ import os # to use clearing of CLI for better menu usage
 import sys # to get start arguments
 
 #testing on this branch
-import pyautogui
-import pydirectinput
+# import pyautogui
+# import pydirectinput
 
 from vk_codes import vk_codes_dict
 
@@ -53,24 +53,69 @@ key_groups = []
 
 # Initialize the Controller
 controller = keyboard.Controller()
-mouse_controller = mouse.Controller()
+#mouse_controller = mouse.Controller()
 
+import ctypes
 
-class Wrapper_Pyinput():
-    def press(self, key_code):
-        if key_code == mouse.Button.left:
-            pydirectinput.mouseDown()
-        else: 
-            mouse_controller.press(key_code)
-    def release(self, key_code):
-        if key_code == mouse.Button.left:
-            pydirectinput.mouseUp()
-        else: 
-            mouse_controller.release(key_code)
+class Mouse_windll():
+    """It simulates the mouse"""
+    MOUSEEVENTF_MOVE = 0x0001 # mouse move 
+    MOUSEEVENTF_LEFTDOWN = 0x0002 # left button down 
+    MOUSEEVENTF_LEFTUP = 0x0004 # left button up 
+    MOUSEEVENTF_RIGHTDOWN = 0x0008 # right button down 
+    MOUSEEVENTF_RIGHTUP = 0x0010 # right button up 
+    MOUSEEVENTF_MIDDLEDOWN = 0x0020 # middle button down 
+    MOUSEEVENTF_MIDDLEUP = 0x0040 # middle button up 
 
-wrapper = Wrapper_Pyinput()
+    def _do_event(self, flags):
+        """generate a mouse event"""
+        return ctypes.windll.user32.mouse_event(flags, 0, 0, 0, 0)
 
-controller_dict = {True: wrapper, False: controller}
+    def press(self, vk_code):
+        """Click at the specified placed"""
+        if vk_code == mouse.Button.left:
+            key_code = self.MOUSEEVENTF_LEFTDOWN
+        elif vk_code == mouse.Button.right:
+            key_code = self.MOUSEEVENTF_RIGHTDOWN
+        elif vk_code == mouse.Button.middle:
+            key_code = self.MOUSEEVENTF_MIDDLEDOWN
+        self._do_event(key_code)
+
+    def release(self, vk_code):
+        """Click at the specified placed"""
+        key_code = 0
+        if vk_code == mouse.Button.left:
+            key_code = self.MOUSEEVENTF_LEFTUP
+        elif vk_code == mouse.Button.right:
+            key_code = self.MOUSEEVENTF_RIGHTUP
+        elif vk_code == mouse.Button.middle:
+            key_code = self.MOUSEEVENTF_MIDDLEUP
+        self._do_event(key_code)
+
+mouse_windll_controller = Mouse_windll()
+
+# class Wrapper_windll():
+#     def press(self, key_code):
+#         mouse_windll.press(key_code)
+#     def release(self, key_code):
+#         mouse_windll.release(key_code)
+
+# class Wrapper_Pyinput():
+#     def press(self, key_code):
+#         if key_code == mouse.Button.left:
+#             pydirectinput.mouseDown()
+#         else: 
+#             mouse_controller.press(key_code)
+#     def release(self, key_code):
+#         if key_code == mouse.Button.left:
+#             pydirectinput.mouseUp()
+#         else: 
+#             mouse_controller.release(key_code)
+
+#wrapper = Wrapper_Pyinput()
+#wrapper = Wrapper_windll()
+
+controller_dict = {True: mouse_windll_controller, False: controller}
 
 mouse_vk_codes_dict = {1: mouse.Button.left, 
                        2: mouse.Button.right, 
