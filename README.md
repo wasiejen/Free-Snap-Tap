@@ -86,21 +86,24 @@ You can change the control keys in the py file under # Control keys.
 ## Configuration
 
 Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_tap.exe)
--  `-nomenu` or `direct-start`: skips the menu and will be directly active
+-  `-nomenu` skips the menu and will be directly active
 -  `-tapfile="filename"`: (with or without "): load and save tap groupings from a custom save file
 -  `-keyfile="filename"`: (with or without "): load and save key groupings from a custom save file
 -  `-debug`: print out some debug info
 -  `-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  
 -  `-delay="number ,number"`: sets the default min and max delay of "number,number" ms for Tap_Groups and Key_Groups (can be set in a range of 1-1000)
 -  `-crossover="number"`: sets the probability of "number" percent for a crossover (can be set in a range of 0-100)
-  - A crossover is key event reversal with delay - press and release are overlapping the time of delay
+   - A crossover is key event reversal with delay - press and release are overlapping the time of delay
 -  `-nodelay`: deactivates delay and crossover
+-  `-focusapp="part of the app name"`: Script only activate evaluaten of key events if the defined window with the given name is in focus.
+   - e.g. for Counterstrike, `-focusapp=Count` is enough to recognize it
+   - can be manually overwritten by Control on DEL key (to activate outside and deactivate inside focus app)
   
 Tap Groupings are a set of keys that are observed and the output of each group is separately handled. Activation of a key is mutually exclusive to all others—so there will always be only one activated key.
 You can define Tap Groupings or Key Groups (Rebinds and Aliases) via Command Line or via editing the `tap_groups.txt` or `key_groups.txt`.
 
 ### Example batch file
-Example is for use with CMD, for PowerShell replace '^' with '`' for multiline start arguments.
+Example is for use with CMD, for PowerShell replace ^ with \` for multiline start arguments.
 To Use the exe replace line `python .\free_snap_tap.py ^` with `.\free_snap_tap.exe ^`.
 
 ```bash
@@ -114,11 +117,27 @@ python .\free_snap_tap.py ^
 ::-nomenu ^
 ::-nocontrols ^
 ::-nodelay ^
+::-focusapp=Count
 
 pause
 ```
 
 ## Actual Version Information
+
+**V0.8.4**
+- NEW: Auto Focus on a active Window specified by part of the name of the app/game/program
+  - script will only evaluate keyboard input when a window with this name is in focus
+  - `-focusapp=*part of the app name*` - e.g. for Counterstrike, only Count is enough to recognize it
+  - control on Del now also pauses Auto focus, so evaluation can be activated outside of app or deactivated in app.
+  - auto focus will restart with restarting script from menu again
+  - when resumed the tap and key group files will be reloaded and so changes in them applied
+  - only active when this startargument is used
+ 
+**V0.8.3**
+- NEW: threading for Alias execution
+  - prevents original key to be send because of long delay before actual suppression takes place
+  - prevents interfering with real input
+- not much else :-D
 
 **V0.8.2**
 
