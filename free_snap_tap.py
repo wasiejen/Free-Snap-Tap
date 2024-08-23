@@ -31,11 +31,6 @@ ALIAS_MAX_DELAY_IN_MS = ACT_MAX_DELAY_IN_MS
 FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
 FILE_NAME_KEY_GROUPS = 'key_groups.txt'
 
-# threading target test
-shared_data = {'count': 0}
-data_lock = Lock()
-
-
 # Constants for key events
 WM_KEYDOWN = [256,260] # _PRESS_MESSAGES = (_WM_KEYDOWN, _WM_SYSKEYDOWN)
 WM_KEYUP = [257,261] # _RELEASE_MESSAGES = (_WM_KEYUP, _WM_SYSKEYUP)
