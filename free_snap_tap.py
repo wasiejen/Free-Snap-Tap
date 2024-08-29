@@ -2,12 +2,12 @@ from pynput import keyboard, mouse
 from threading import Thread, Lock # to play aliases without interfering with keyboard listener
 import os # to use clearing of CLI for better menu usage
 import sys # to get start arguments
-
-from vk_codes import vk_codes_dict
-
 from random import randint # randint(3, 9)) 
 from time import sleep # sleep(0.005) = 5 ms
-import pygetwindow as gw
+import pygetwindow as gw # to get name of actual window for focusapp function
+
+from vk_codes import vk_codes_dict
+from tap_keyboard import Tap_Group, Key_Event, Key_Group, Key
 
 # global variables
 DEBUG = False
@@ -47,8 +47,13 @@ EXIT_KEY = 35  # END key vkcode 35
 TOGGLE_ON_OFF_KEY = 46  # DELETE key vkcode 46
 MENU_KEY = 34 # PAGE_DOWN
 
+# collect all active keys here for key combination 
+current_keys = set()
+# triggers = [] # not used yet
+
 # Tap groups define which keys are mutually exclusive
-tap_groups = []
+tap_groups_hr = []   # hr = human readable form - just a remainder of old implementation
+tap_groups = []  # [:Tap_Group]
 
 # Key Groups define which key1 will be replaced by key2
 # if a Key Group has more than 2 keys if will be handled als alias
@@ -85,9 +90,7 @@ def load_groups(file_name, data_object):
                         # ignore commented out keys
                         if key[0] != '#': 
                             # ignore comments after keys
-                            cleaned_group.append(key.split('#')[0])
-
-                        
+                            cleaned_group.append(key.split('#')[0])  
                     data_object.append(cleaned_group)
     return data_object
 
@@ -124,11 +127,11 @@ def reset_tap_groups_txt():
     """
     Reset Tap Groups and save new tap_group.txt with a+d and w+s tap groups
     """
-    global tap_groups
-    tap_groups = []
-    add_group(['a','d'], tap_groups)
-    add_group(['w','s'], tap_groups)
-    save_groups(FILE_NAME_TAP_GROUPS, tap_groups)
+    global tap_groups_hr
+    tap_groups_hr = []
+    add_group(['a','d'], tap_groups_hr)
+    add_group(['w','s'], tap_groups_hr)
+    save_groups(FILE_NAME_TAP_GROUPS, tap_groups_hr)
 
 def reset_key_groups_txt():
     """
@@ -202,7 +205,6 @@ def initialize_key_groups():
             key = convert_to_vk_code(key)
             key_groups_dict[group_index].append(key)
             key_groups_key_modifier[group_index].append(key_modifier)            
-
     if DEBUG: 
         print("key dict: ", key_groups_dict)
 
@@ -210,20 +212,15 @@ def initialize_tap_groups():
     """
     Initialize the state of each tap group
     """
-    global tap_groups_states_dict, tap_groups_last_key_pressed, tap_groups_last_key_send
-    tap_groups_states_dict = []
-    for group in tap_groups:
-        group_state = {}
-        for key in group:
-            key = convert_to_vk_code(key)
-            group_state[key] = 0
-        tap_groups_states_dict.append(group_state)
-    tap_groups_last_key_pressed = [None] * len(tap_groups)
-    tap_groups_last_key_send = [None] * len(tap_groups)
-    if DEBUG:
-        print(f"tap_groups_last_key_pressed: {tap_groups_last_key_pressed}")
-        print(f"tap_groups_last_key_send: {tap_groups_last_key_send}")
-
+    global tap_groups
+    tap_groups = []
+    for group in tap_groups_hr:
+        keys = []
+        for key_string in group:
+            key = Key(key_string, convert_to_vk_code(key_string))
+            keys.append(key)
+        tap_groups.append(Tap_Group(keys))      
+        
 def reload_key_groups():
     # try loading tap groups from file
     global FILE_NAME_KEY_GROUPS, key_groups
@@ -235,10 +232,10 @@ def reload_key_groups():
     initialize_key_groups()
 
 def reload_tap_groups():
-    global FILE_NAME_TAP_GROUPS, tap_groups
+    global FILE_NAME_TAP_GROUPS, tap_groups_hr
     # try loading tap groups from file
     try:
-        tap_groups = load_groups(FILE_NAME_TAP_GROUPS, tap_groups)
+        tap_groups_hr = load_groups(FILE_NAME_TAP_GROUPS, tap_groups_hr)
     # if no tap_groups.txt file exist create new one
     except FileNotFoundError:
         reset_tap_groups_txt()
@@ -325,6 +322,7 @@ def win32_event_filter(msg, data):
         return activate
 
     key_replaced = False
+    alias_fired = False
     vk_code = data.vkCode
     is_keydown = is_press(msg)
     is_simulated = is_simulated_key_event(data.flags)
@@ -340,23 +338,24 @@ def win32_event_filter(msg, data):
 
     # check for simulated keys:
     if not is_simulated: # is_simulated_key_event(data.flags):
-
+        
+        ### collect input into active keys set
+        if is_keydown:
+            current_keys.add(vk_code)
+        else:
+            try:
+                current_keys.remove(vk_code)
+            except KeyError as error:
+                print(f"Key not found to remove in current:, {error}")
+                
         # Replace some Buttons :-D
         if not PAUSED and not PRINT_VK_CODES:
+           
             for group_index, group in enumerate(key_groups_dict):
-                # if DEBUG: 
-                # print("group_index", group_index)
 
-                #group_key_modifiers = 
                 trigger_key_modifier, *new_key_modifiers = key_groups_key_modifier[group_index]
-
                 if vk_code == group[0] and should_activate(trigger_key_modifier):
-
-                    #key_modifier = key_groups_key_modifier[group_index][0]
-                    #new_key_modifiers = key_groups_key_modifier[group_index][1:]                
-
                     if DEBUG: 
-
                         print("vk_code_gotten: ", vk_code)
                         print("vk_code_replacement: ", group)
                         print("is_keydown: ", is_keydown)
@@ -364,17 +363,14 @@ def win32_event_filter(msg, data):
 
                     # KEY REPLACEMENT handling
                     if len(group) == 2 and not key_replaced:              
-
                         if DEBUG: 
                             print("Key Replacement recognised: ", group)
                         # check for key_groups_state_is_pressed
-                        
                         #if should_activate(trigger_key_modifier) == True:
                         vk_code = group[1]  
                         key_replaced = True
-
                         if new_key_modifiers[0] == 'reversed':
-                            is_keydown = not is_keydown # with this can be tracked in tap_groups
+                            is_keydown = not is_keydown # with this can be tracked in groups
 
                         # look for "suppress" as defined in vk_code_dict
                         # suppress event when found
@@ -388,19 +384,12 @@ def win32_event_filter(msg, data):
 
                     # ALIAS handling
                     else:
-                        # check for modifier
+                        alias_fired = True
                         if DEBUG: 
                             print("ALIAS recognised!: ", group)
-
-                        # ---- thread start
-                        # so simluted keys no longer block real input
-                        # and if the delay was to long, supression of the event did not work anymore
-
+                        # thread for better delay handler and to prevent dropping of key supression if delay to long
                         thread = Thread(target=alias_thread, daemon = True, args=(group_index, group, key_groups_key_delays, new_key_modifiers))
                         thread.start()
-
-                        listener.suppress_event()   
-                    #      
 
         # Stop the listener if the MENU key is released
         if CONTROLS_ENABLED and vk_code == MENU_KEY and not is_keydown:
@@ -442,81 +431,72 @@ def win32_event_filter(msg, data):
         elif not PAUSED and not PRINT_VK_CODES:
             if DEBUG: 
                 print("#0")
-            for group_index, group in enumerate(tap_groups_states_dict):
-                if DEBUG: 
-                    print(f"#1 {group_index, group}")
-                if vk_code in group:
-                    if key_replaced is True: 
+                print(tap_groups)               
+            for tap_group in tap_groups:
+                if vk_code in tap_group.get_vk_codes():
+                    if DEBUG: 
+                        print(f"#2 {vk_code}")
+                    if key_replaced is True:
                         key_replaced = False
-                    if is_keydown: # and group[vk_code] == 0: #TODO ACT_6 repeating keys
-                        group[vk_code] = 1
-                        if DEBUG: 
-                            print(f"#2 {vk_code}")
-                        tap_groups_last_key_pressed[group_index] = vk_code
-                        send_keys(which_key_to_send(group_index), group_index)
-                    else:
-                        group[vk_code] = 0
-                        if DEBUG: 
-                            print(f"#3 {vk_code}")
-                        send_keys(which_key_to_send(group_index), group_index)
+                    tap_group.update_tap_states(vk_code, is_keydown)            
+                    # send keys
+                    send_keys(tap_group)
                     listener.suppress_event()
-                    # only the first instance of a key will be actualized 
-                    # - no handling for a single key in multiple tap groups
                     break
-
+                               
         if key_replaced is True:
             is_mouse_key = check_for_mouse_vk_code(vk_code)
             key_code = get_key_code(is_mouse_key, vk_code)
-
             if is_keydown: # and not output_is_reversed:
                 controller_dict[is_mouse_key].press(key_code)
             else:
                 controller_dict[is_mouse_key].release(key_code)
             listener.suppress_event()
+        
+        if alias_fired is True:
+            listener.suppress_event()
+            
+    # here arrive all key_events that will be send - last place to intercept
+    # here the interception of interference of alias with tap groups is realized
+    if is_simulated:
+        for tap_group in tap_groups:
+            vk_codes = tap_group.get_vk_codes()
+            if vk_code in vk_codes:
+                active_key = tap_group.get_active_key()
+                # if None all simulated keys are allowed - so no supression
+                if active_key is None:
+                    pass
+                else:
+                    if active_key == vk_code:
+                        # is active key -> only press allowed
+                        if not is_keydown:
+                            listener.suppress_event()
+                    # not the active key -> only release allowed
+                    else: 
+                        if is_keydown:
+                            listener.suppress_event()
 
-def which_key_to_send(group_index):
-    """
-    Determine which key to send based on the current state of the tap group.
-    - If no keys are pressed, no key is sent.
-    - If one key is pressed, that key is sent.
-    - If more than one key is pressed, the last pressed key is sent.
-    """
-    num_of_keys_pressed = sum(tap_groups_states_dict[group_index].values())
-    key_to_send = None
-
-    if num_of_keys_pressed == 1:
-        for key, state in tap_groups_states_dict[group_index].items():
-            if state == 1:
-                key_to_send = key
-    elif num_of_keys_pressed > 1:
-        key_to_send = tap_groups_last_key_pressed[group_index]
-        # TODO: this will resent a released key if the released key was the last pressed ...
-        # do we need a rolling state list?
-        # or is it good enough?
-        # should tap_groups_last_key_released also be tracked?
-            # send only last key pressed of last_key_pressed != last_key_released
-
-    return key_to_send
-
-def send_keys(key_to_send, group_index):
+def send_keys(tap_group):
     """
     Send the specified key and release the last key if necessary.
     """
-    last_key_send = tap_groups_last_key_send[group_index]
+    
+    key_to_send = tap_group.get_active_key()
+    last_key_send = tap_group.get_last_key_send()
+    
     if DEBUG: 
-
         print(f"last_key_send: {last_key_send}")
         print(f"key_to_send: {key_to_send}")
+        
     key_code_to_send = keyboard.KeyCode.from_vk(key_to_send)
     key_code_last_key_send = keyboard.KeyCode.from_vk(last_key_send)
-
-    # repeat keys if activated, if not then only send keys when key changes
-    if key_to_send != last_key_send:#
-
+    
+    # only send if key to send is not the same as last key send
+    if key_to_send != last_key_send:
         if key_to_send is None:
             if last_key_send is not None:
                 controller.release(key_code_last_key_send) 
-            tap_groups_last_key_send[group_index] = None
+            tap_group.set_last_key_send(None)            
         else:
             is_crossover = False
             if last_key_send is not None:
@@ -524,7 +504,6 @@ def send_keys(key_to_send, group_index):
                 if key_to_send != last_key_send:
                     # only use crossover is activated and probility is over percentage
                     is_crossover = randint(0,100) > (100 - ACT_CROSSOVER_PROPABILITY_IN_PERCENT) and ACT_CROSSOVER # 50% possibility
-
                 if is_crossover:
                     if DEBUG: 
                         print("crossover")
@@ -537,14 +516,12 @@ def send_keys(key_to_send, group_index):
                     if DEBUG: 
                         print(f"delayed by {delay} ms")
                     sleep(delay / 1000) # in ms
-
             if is_crossover:
                 controller.release(key_code_last_key_send) 
             else:
                 controller.press(key_code_to_send) 
-
-            tap_groups_last_key_send[group_index] = key_to_send
-
+            tap_group.set_last_key_send(key_to_send)
+            
 def display_menu():
     """
     Display the menu and handle user input
@@ -563,7 +540,7 @@ def display_menu():
             invalid_input = False
             text = ""
         print("Active Tap Groups:")
-        display_groups(tap_groups)
+        display_groups(tap_groups_hr)
         print("\nActive Key Groups:")
         display_groups(key_groups)
         print('\n------ Options Tap Groups -------')
@@ -580,24 +557,24 @@ def display_menu():
         choice = input("\nHit [Enter] to start or enter your choice: " )
 
         if choice == '0':
-            display_groups(tap_groups)
+            display_groups(tap_groups_hr)
         elif choice == '1':
             try:
                 new_group = input("Enter new tap group (keys separated by commas): ").replace(" ", "").split(',')
-                add_group(new_group, tap_groups)
+                add_group(new_group, tap_groups_hr)
                 initialize_tap_groups()
-                save_groups(FILE_NAME_TAP_GROUPS, tap_groups)
+                save_groups(FILE_NAME_TAP_GROUPS, tap_groups_hr)
             except KeyError as error_msg:
                 text = f"Error: Wrong string as a key used: {error_msg}"
                 invalid_input = True
-                delete_group(len(tap_groups) - 1, tap_groups)
+                delete_group(len(tap_groups_hr) - 1, tap_groups_hr)
         elif choice == '2':
             try:
                 index = int(input("Enter the index of the tap group to delete: "))
-                if 0 <= index < len(tap_groups):
-                    delete_group(index, tap_groups)
+                if 0 <= index < len(tap_groups_hr):
+                    delete_group(index, tap_groups_hr)
                     initialize_tap_groups()
-                    save_groups(FILE_NAME_TAP_GROUPS, tap_groups)
+                    save_groups(FILE_NAME_TAP_GROUPS, tap_groups_hr)
                 else:
                     text = "Error: Index outside of range of tap groups."
                     invalid_input = True
@@ -790,8 +767,8 @@ def main():
     reload_tap_groups()
 
     if DEBUG:
+        print(f"tap_groups_hr: {tap_groups_hr}")
         print(f"tap_groups: {tap_groups}")
-        print(f"tap_groups_states_dict: {tap_groups_states_dict}")
 
     # try loading key groups from file
     reload_key_groups()
