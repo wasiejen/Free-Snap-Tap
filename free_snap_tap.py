@@ -51,13 +51,19 @@ MENU_KEY = 34 # PAGE_DOWN
 current_keys = set()
 # triggers = [] # not used yet
 
-# Tap groups define which keys are mutually exclusive
-tap_groups_hr = []   # hr = human readable form - just a remainder of old implementation
-tap_groups = []  # [:Tap_Group]
 
+
+# Tap groups define which keys are mutually exclusive
+tap_groups_hr = []   # hr = human readable form - just a remainder of old implementation #legacy
 # Key Groups define which key1 will be replaced by key2
 # if a Key Group has more than 2 keys if will be handled als alias
-key_groups = []
+key_groups_hr = [] #legacy
+
+
+tap_groups = []     # [Tap_Groups]
+rebinds = []        # Key_Event : Key_Event
+key_groups = []     # [Key_Groups]
+macros = []         # [Key_Group : Key_Group]  # triggers are the Keys to the Item Makro
 
 # Initialize the Controller
 controller = keyboard.Controller()
@@ -137,11 +143,11 @@ def reset_key_groups_txt():
     """
     Reset key_groups and initialise empty txt file
     """
-    global key_groups
-    key_groups = []
+    global key_groups_hr
+    key_groups_hr = []
     #add_group(['<','left_shift'], key_groups)
     #add_group(['left_windows','left_control'], key_groups)
-    save_groups(FILE_NAME_KEY_GROUPS, key_groups)
+    save_groups(FILE_NAME_KEY_GROUPS, key_groups_hr)
 
 def convert_to_vk_code(key):
     try:
@@ -156,18 +162,32 @@ def convert_to_vk_code(key):
 
 
 def initialize_key_groups():
-    global key_groups_dict, key_groups_key_modifier , key_groups_key_delays
-    key_groups_dict = [[] for n in range(len(key_groups))] 
-    # saves the modifiers of the key '+'=up=False, '-'=down=True, no modifier=None
-    key_groups_key_modifier = [[] for n in range(len(key_groups))] 
-    key_groups_key_delays = [[] for n in range(len(key_groups))] 
+    
+    # in new form there are rebinds and macros
+    # rebind are key_event -> key_event
+    # key_group are a list of key_event
+    # macros are key_group/trigger_group : key_groups
+    
+    global key_groups
+    global rebinds
+    global macros
+    
+    
+    # global key_groups_dict, key_groups_key_modifier , key_groups_key_delays
+    # key_groups_dict = [[] for n in range(len(key_groups_hr))] 
+    # # saves the modifiers of the key '+'=up=False, '-'=down=True, no modifier=None
+    # key_groups_key_modifier = [[] for n in range(len(key_groups_hr))] 
+    # key_groups_key_delays = [[] for n in range(len(key_groups_hr))] 
 
-    if DEBUG: 
-        print("key groups: ", key_groups)
-    for group_index, group in enumerate(key_groups):
+    # if DEBUG: 
+    #     print("key groups: ", key_groups_hr)
+        
+    for group_index, group in enumerate(key_groups_hr):
+        new_key_group = Key_Group()
         for key in group:
-
+            #key_event = Key_Event
             #TODO: first break up the combination into a list of keys
+
 
 
             #seperate delay info from string
@@ -179,12 +199,11 @@ def initialize_key_groups():
                 delays = [int(delay) for delay in delays[:2]]
             else:
                 delays = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
-            key_groups_key_delays[group_index].append(delays)
-
-
+                
+            # if string empty, stop
             if key == '':
                 break
-
+      
             # recognition of mofidiers +, - and #
             # only interpret it as such when more then one char is in key
             key_modifier = None
@@ -198,15 +217,22 @@ def initialize_key_groups():
                     key_modifier = 'up'
                     key = key.replace('+','',1)
                 elif key[0] == '!':
-                    # up key
+                    # revers 
                     key_modifier = 'reversed'
                     key = key.replace('!','',1)
 
-            key = convert_to_vk_code(key)
-            key_groups_dict[group_index].append(key)
-            key_groups_key_modifier[group_index].append(key_modifier)            
-    if DEBUG: 
-        print("key dict: ", key_groups_dict)
+            # convert string to actual vk_code
+            vk_code = convert_to_vk_code(key)
+            
+            if key_modifier is None:
+                new_key_group.append(Key(key,vk_code))
+            elif key_modifier == 'down':
+                new_key_group.append(Key_Event(vk_code, True, delays))
+            elif key_modifier == 'up':
+                new_key_group.append(Key_Event(vk_code, False, delays))
+            elif key_modifier == 'reversed':
+                new_key_group.append(Key(key,vk_code,reversed=True))
+                    
 
 def initialize_tap_groups():
     """
@@ -223,9 +249,9 @@ def initialize_tap_groups():
         
 def reload_key_groups():
     # try loading tap groups from file
-    global FILE_NAME_KEY_GROUPS, key_groups
+    global FILE_NAME_KEY_GROUPS, key_groups_hr
     try:
-        key_groups = load_groups(FILE_NAME_KEY_GROUPS, key_groups)
+        key_groups_hr = load_groups(FILE_NAME_KEY_GROUPS, key_groups_hr)
     # if no tap_groups.txt file exist create new one
     except FileNotFoundError:
         reset_key_groups_txt()
@@ -326,6 +352,12 @@ def win32_event_filter(msg, data):
     vk_code = data.vkCode
     is_keydown = is_press(msg)
     is_simulated = is_simulated_key_event(data.flags)
+    
+    current_ke = Key_Event(vk_code, is_keydown)
+    
+    
+    
+       
 
     if (PRINT_VK_CODES and is_keydown) or DEBUG:
         print(f"time: {data.time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
@@ -360,28 +392,22 @@ def win32_event_filter(msg, data):
                         print("vk_code_replacement: ", group)
                         print("is_keydown: ", is_keydown)
                         print(f"key_modifiers: {trigger_key_modifier} -> {new_key_modifiers}", )
-
                     # KEY REPLACEMENT handling
                     if len(group) == 2 and not key_replaced:              
                         if DEBUG: 
                             print("Key Replacement recognised: ", group)
                         # check for key_groups_state_is_pressed
-                        #if should_activate(trigger_key_modifier) == True:
                         vk_code = group[1]  
                         key_replaced = True
                         if new_key_modifiers[0] == 'reversed':
                             is_keydown = not is_keydown # with this can be tracked in groups
-
-                        # look for "suppress" as defined in vk_code_dict
                         # suppress event when found
                         if vk_code == 0:
                             if DEBUG: 
                                 print("key suppressed: vk_code: ", group)
                             listener.suppress_event() 
-
                         # deactive after replacement to not trigger any aliases
                         # break
-
                     # ALIAS handling
                     else:
                         alias_fired = True
@@ -453,6 +479,7 @@ def win32_event_filter(msg, data):
                 controller_dict[is_mouse_key].release(key_code)
             listener.suppress_event()
         
+        # supress event that triggered an alias - done here because it should also update tap groups before
         if alias_fired is True:
             listener.suppress_event()
             
@@ -480,7 +507,7 @@ def send_keys(tap_group):
     """
     Send the specified key and release the last key if necessary.
     """
-    
+    # TODO remove delay from here, because it stops listener for the time of delay also ...
     key_to_send = tap_group.get_active_key()
     last_key_send = tap_group.get_last_key_send()
     
@@ -542,7 +569,7 @@ def display_menu():
         print("Active Tap Groups:")
         display_groups(tap_groups_hr)
         print("\nActive Key Groups:")
-        display_groups(key_groups)
+        display_groups(key_groups_hr)
         print('\n------ Options Tap Groups -------')
         print("1. Add Tap Group")
         print("2. Delete Tap Group")
@@ -588,23 +615,23 @@ def display_menu():
             try:
                 new_group = input("Enter keys seperated by comma (2 keys = replacement, 3+ = alias): ").split(',')
                 if len(new_group) >= 2:
-                    add_group(new_group, key_groups)
+                    add_group(new_group, key_groups_hr)
                     initialize_key_groups()
-                    save_groups(FILE_NAME_KEY_GROUPS, key_groups)
+                    save_groups(FILE_NAME_KEY_GROUPS, key_groups_hr)
                 else:
                     text = "Error: at least 2 keys are needed."
                     invalid_input = True
             except KeyError as error_msg:
                 text = f"Error: Wrong string as a key used: {error_msg}"
                 invalid_input = True
-                delete_group(len(key_groups) - 1, key_groups)
+                delete_group(len(key_groups_hr) - 1, key_groups_hr)
         elif choice == '5':
             try:
                 index = int(input("Enter the index of the key pair to delete: "))
-                if 0<= index < len(key_groups):
-                    delete_group(index, key_groups)
+                if 0<= index < len(key_groups_hr):
+                    delete_group(index, key_groups_hr)
                     initialize_key_groups()
-                    save_groups(FILE_NAME_KEY_GROUPS, key_groups)
+                    save_groups(FILE_NAME_KEY_GROUPS, key_groups_hr)
                 else:
                     text = "Error: Index outside of range of key pairs."
                     invalid_input = True
