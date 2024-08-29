@@ -159,7 +159,8 @@ def initialize_key_groups():
     key_groups_key_modifier = [[] for n in range(len(key_groups))] 
     key_groups_key_delays = [[] for n in range(len(key_groups))] 
 
-    if DEBUG: print("key groups: ", key_groups)
+    if DEBUG: 
+        print("key groups: ", key_groups)
     for group_index, group in enumerate(key_groups):
         for key in group:
 
@@ -169,7 +170,8 @@ def initialize_key_groups():
             #seperate delay info from string
             if '|' in key:
                 key, *delays = key.split('|')
-                if DEBUG: print(f"delays for {key}: {delays}")
+                if DEBUG: 
+                    print(f"delays for {key}: {delays}")
                 # cast in int and ignore all other elements after first 2
                 delays = [int(delay) for delay in delays[:2]]
             else:
@@ -201,7 +203,8 @@ def initialize_key_groups():
             key_groups_dict[group_index].append(key)
             key_groups_key_modifier[group_index].append(key_modifier)            
 
-    if DEBUG: print("key dict: ", key_groups_dict)
+    if DEBUG: 
+        print("key dict: ", key_groups_dict)
 
 def initialize_tap_groups():
     """
@@ -251,7 +254,8 @@ def is_press(msg):
         return False
 
 def delay(max = ALIAS_MAX_DELAY_IN_MS, min = ALIAS_MIN_DELAY_IN_MS, ):
-    if min > max: min,max = max,min
+    if min > max: 
+        min,max = max,min
     sleep(randint(min, max) / 1000)
 
 def check_for_mouse_vk_code(vk_code):
@@ -274,11 +278,13 @@ def alias_thread(group_index, group, key_groups_key_delays, new_key_modifiers):
 
         key_delays = key_groups_key_delays[group_index][index + 1] #+1 to exclude first element
 
-        if DEBUG: print(index, code)
+        if DEBUG: 
+            print(index, code)
 
-        if new_key_modifiers[index] == None:
+        if new_key_modifiers[index] is None:
             controller_dict[is_mouse_key].press(key_code)
-            if ACT_DELAY: delay(*key_delays)
+            if ACT_DELAY: 
+                delay(*key_delays)
             controller_dict[is_mouse_key].release(key_code) 
         elif new_key_modifiers[index] == 'up':
             controller_dict[is_mouse_key].release(key_code)
@@ -286,9 +292,11 @@ def alias_thread(group_index, group, key_groups_key_delays, new_key_modifiers):
             controller_dict[is_mouse_key].press(key_code)
         elif new_key_modifiers[index] == 'reversed': 
             controller_dict[is_mouse_key].release(key_code)
-            if ACT_DELAY: delay(*key_delays)
+            if ACT_DELAY: 
+                delay(*key_delays)
             controller_dict[is_mouse_key].press(key_code)
-        if ACT_DELAY: delay(*key_delays)
+        if ACT_DELAY: 
+            delay(*key_delays)
 
 def win32_event_filter(msg, data):
     """
@@ -301,7 +309,7 @@ def win32_event_filter(msg, data):
         activate = False
         # if no up or down is set, it will be fired at press and release of key
         # just to be consitent with the syntax
-        if key_modifier == None:
+        if key_modifier is None:
             activate = True
         # only fire alias with release of key, not on press
         elif key_modifier == 'up':
@@ -325,6 +333,7 @@ def win32_event_filter(msg, data):
         print(f"time: {data.time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
 
     # if DEBUG: 
+
     #     print(f"vk_code: {vk_code}")
     #     print("msg: ", msg)
     #     print("data: ", data)
@@ -335,7 +344,8 @@ def win32_event_filter(msg, data):
         # Replace some Buttons :-D
         if not PAUSED and not PRINT_VK_CODES:
             for group_index, group in enumerate(key_groups_dict):
-                # if DEBUG: print("group_index", group_index)
+                # if DEBUG: 
+                # print("group_index", group_index)
 
                 #group_key_modifiers = 
                 trigger_key_modifier, *new_key_modifiers = key_groups_key_modifier[group_index]
@@ -346,6 +356,7 @@ def win32_event_filter(msg, data):
                     #new_key_modifiers = key_groups_key_modifier[group_index][1:]                
 
                     if DEBUG: 
+
                         print("vk_code_gotten: ", vk_code)
                         print("vk_code_replacement: ", group)
                         print("is_keydown: ", is_keydown)
@@ -354,7 +365,8 @@ def win32_event_filter(msg, data):
                     # KEY REPLACEMENT handling
                     if len(group) == 2 and not key_replaced:              
 
-                        if DEBUG: print("Key Replacement recognised: ", group)
+                        if DEBUG: 
+                            print("Key Replacement recognised: ", group)
                         # check for key_groups_state_is_pressed
                         
                         #if should_activate(trigger_key_modifier) == True:
@@ -367,7 +379,8 @@ def win32_event_filter(msg, data):
                         # look for "suppress" as defined in vk_code_dict
                         # suppress event when found
                         if vk_code == 0:
-                            if DEBUG: print("key suppressed: vk_code: ", group)
+                            if DEBUG: 
+                                print("key suppressed: vk_code: ", group)
                             listener.suppress_event() 
 
                         # deactive after replacement to not trigger any aliases
@@ -376,7 +389,8 @@ def win32_event_filter(msg, data):
                     # ALIAS handling
                     else:
                         # check for modifier
-                        if DEBUG: print("ALIAS recognised!: ", group)
+                        if DEBUG: 
+                            print("ALIAS recognised!: ", group)
 
                         # ---- thread start
                         # so simluted keys no longer block real input
@@ -412,38 +426,45 @@ def win32_event_filter(msg, data):
                     PAUSED = False
                     MANUAL_PAUSED = False
                 # pause focus thread to allow manual overwrite and use without auto focus
-                if FOCUS_APP_NAME != None: focus_thread.pause()
+                if FOCUS_APP_NAME is not None: 
+                    focus_thread.pause()
             else:
                 print('--- manually paused ---')
                 with paused_lock:
                     PAUSED = True
                     MANUAL_PAUSED = True
                 # restart focus thread when manual overwrite is over
-                if FOCUS_APP_NAME != None: focus_thread.restart()
+                if FOCUS_APP_NAME is not None: 
+                    focus_thread.restart()
 
         # Snap Tap Part of Evaluation
         # Intercept key events if not PAUSED
         elif not PAUSED and not PRINT_VK_CODES:
-            if DEBUG: print("#0")
+            if DEBUG: 
+                print("#0")
             for group_index, group in enumerate(tap_groups_states_dict):
-                if DEBUG: print(f"#1 {group_index, group}")
+                if DEBUG: 
+                    print(f"#1 {group_index, group}")
                 if vk_code in group:
-                    if key_replaced == True: key_replaced = False
+                    if key_replaced is True: 
+                        key_replaced = False
                     if is_keydown: # and group[vk_code] == 0: #TODO ACT_6 repeating keys
                         group[vk_code] = 1
-                        if DEBUG: print(f"#2 {vk_code}")
+                        if DEBUG: 
+                            print(f"#2 {vk_code}")
                         tap_groups_last_key_pressed[group_index] = vk_code
                         send_keys(which_key_to_send(group_index), group_index)
                     else:
                         group[vk_code] = 0
-                        if DEBUG: print(f"#3 {vk_code}")
+                        if DEBUG: 
+                            print(f"#3 {vk_code}")
                         send_keys(which_key_to_send(group_index), group_index)
                     listener.suppress_event()
                     # only the first instance of a key will be actualized 
                     # - no handling for a single key in multiple tap groups
                     break
 
-        if key_replaced == True:
+        if key_replaced is True:
             is_mouse_key = check_for_mouse_vk_code(vk_code)
             key_code = get_key_code(is_mouse_key, vk_code)
 
@@ -483,6 +504,7 @@ def send_keys(key_to_send, group_index):
     """
     last_key_send = tap_groups_last_key_send[group_index]
     if DEBUG: 
+
         print(f"last_key_send: {last_key_send}")
         print(f"key_to_send: {key_to_send}")
     key_code_to_send = keyboard.KeyCode.from_vk(key_to_send)
@@ -504,14 +526,16 @@ def send_keys(key_to_send, group_index):
                     is_crossover = randint(0,100) > (100 - ACT_CROSSOVER_PROPABILITY_IN_PERCENT) and ACT_CROSSOVER # 50% possibility
 
                 if is_crossover:
-                    if DEBUG: print("crossover")
+                    if DEBUG: 
+                        print("crossover")
                     controller.press(key_code_to_send)
                 else:
                     controller.release(key_code_last_key_send) 
                 # random delay if activated
                 if ACT_DELAY or ACT_CROSSOVER: 
                     delay = randint(ACT_MIN_DELAY_IN_MS, ACT_MAX_DELAY_IN_MS)
-                    if DEBUG: print(f"delayed by {delay} ms")
+                    if DEBUG: 
+                        print(f"delayed by {delay} ms")
                     sleep(delay / 1000) # in ms
 
             if is_crossover:
@@ -531,7 +555,8 @@ def display_menu():
     text = ""
     while True:       
         # clear the CLI
-        if not DEBUG: os.system('cls||clear')
+        if not DEBUG:
+            os.system('cls||clear')
         if invalid_input:
             print(text)
             print("Please try again.\n")
@@ -577,7 +602,7 @@ def display_menu():
                     text = "Error: Index outside of range of tap groups."
                     invalid_input = True
             except ValueError as error_msg:
-                text = "Error: Index was not a Number."
+                text = f"Error: Index was not a Number: {error_msg}"
                 invalid_input = True
         elif choice == '3':
             reset_tap_groups_txt()
@@ -607,7 +632,7 @@ def display_menu():
                     text = "Error: Index outside of range of key pairs."
                     invalid_input = True
             except ValueError as error_msg:
-                text = "Error: Index was not a Number."
+                text = f"Error: Index was not a Number: {error_msg}"
                 invalid_input = True
         elif choice == '6':
             reset_key_groups_txt()
@@ -633,7 +658,8 @@ def check_start_arguments():
     global FOCUS_APP_NAME
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
-            if DEBUG: print(arg)
+            if DEBUG: 
+                print(arg)
             # enable debug print outs
             if arg == "-debug":
                 DEBUG = True
@@ -643,11 +669,13 @@ def check_start_arguments():
             # use custom tap groups file for loading and saving
             elif arg[:9] == '-tapfile=' and len(arg) > 9:
                 FILE_NAME_TAP_GROUPS = arg[9:]
-                if DEBUG: print(FILE_NAME_TAP_GROUPS)
+                if DEBUG: 
+                    print(FILE_NAME_TAP_GROUPS)
             # use custom key groups file for loading and saving
             elif arg[:9] == '-keyfile=' and len(arg) > 9:
                 FILE_NAME_KEY_GROUPS = arg[9:]
-                if DEBUG: print(FILE_NAME_KEY_GROUPS)
+                if DEBUG: 
+                    print(FILE_NAME_KEY_GROUPS)
             # Start with controls disabled
             elif arg == "-nocontrols":
                 CONTROLS_ENABLED = False
@@ -659,7 +687,7 @@ def check_start_arguments():
                 ACT_DELAY = True
                 try:
                     delays = [int(delay) for delay in arg[7:].replace(' ','').split(',')]
-                except:
+                except Exception:
                     print("invalid delay - needs to be a number(s), seperated by comma")
                 if len(delays) > 2:
                     delays = delays[:2] # keep only first 2 numbers
@@ -678,7 +706,7 @@ def check_start_arguments():
                 ACT_CROSSOVER = True    
                 try:
                     probability = int(arg[11:])
-                except:
+                except Exception:
                     print("invalid probability - needs to be a number")
                 if 0 <= probability <= 100:
                     ACT_CROSSOVER_PROPABILITY_IN_PERCENT = probability
@@ -709,10 +737,12 @@ class Focus_Thread(Thread):
 
     def run(self):
         global PAUSED, MANUAL_PAUSED, paused_lock, FOCUS_THREAD_PAUSED
-        while self.stop == False:
-            if FOCUS_THREAD_PAUSED == False and MANUAL_PAUSED == False:
-                if gw.getActiveWindow().title.lower().find(self.focus_app_name) >= 0:
-                    if PAUSED == True:
+        last_active_window = ''
+        while not self.stop:
+            active_window = gw.getActiveWindow().title
+            if FOCUS_THREAD_PAUSED is False and MANUAL_PAUSED is False:
+                if active_window.lower().find(self.focus_app_name) >= 0:
+                    if PAUSED:
                         try:
                             reload_tap_groups()
                             reload_key_groups()
@@ -720,13 +750,19 @@ class Focus_Thread(Thread):
                             print('--- auto focus resumed ---')
                             with paused_lock:
                                 PAUSED = False
-                        except:
+                        except Exception:
                             print('--- reloading of groups files failed - not resumed, still paused ---')
                 else:
-                    if PAUSED == False:
+                    if not PAUSED:
                         with paused_lock:
                             PAUSED = True
                         print('--- auto focus paused ---')
+                    # print out active window when paused and it changes
+                    # to help find the name :-D
+                    else:
+                        if last_active_window != active_window:
+                            print(f"> Active Window: {active_window}")
+                            last_active_window = active_window
             sleep(1)
 
     def pause(self):
@@ -736,7 +772,7 @@ class Focus_Thread(Thread):
 
     def restart(self):
         global FOCUS_THREAD_PAUSED, MANUAL_PAUSED
-        if FOCUS_THREAD_PAUSED == True:
+        if FOCUS_THREAD_PAUSED:
             with paused_lock:
                 FOCUS_THREAD_PAUSED = False
                 MANUAL_PAUSED = False
@@ -744,8 +780,10 @@ class Focus_Thread(Thread):
     def end(self):
         self.stop = True
 
-if __name__ == "__main__":
-    # check if start arguments are passed
+def main():
+    global listener
+    global focus_thread
+     # check if start arguments are passed
     check_start_arguments()
 
     # try loading tap groups from file
@@ -758,23 +796,29 @@ if __name__ == "__main__":
     # try loading key groups from file
     reload_key_groups()
 
-    if FOCUS_APP_NAME != None:
+    if FOCUS_APP_NAME is not None:
         focus_thread = Focus_Thread(FOCUS_APP_NAME)
         focus_thread.start()
 
     while not STOPPED:
         if MENU_ENABLED:
-            if FOCUS_APP_NAME != None: focus_thread.pause()
+            if FOCUS_APP_NAME is not None:
+                focus_thread.pause()
             display_menu()
 
         print('\n--- Free Snap Tap started ---')
         print('--- toggle PAUSED with DELETE key ---')
         print('--- STOP execution with END key ---')
         print('--- enter MENU again with PAGE_DOWN key ---')
-        if FOCUS_APP_NAME != None: focus_thread.restart()
+        if FOCUS_APP_NAME is not None:
+            focus_thread.restart()
 
         with keyboard.Listener(win32_event_filter=win32_event_filter) as listener:
             listener.join()
 
-    if FOCUS_APP_NAME != None: focus_thread.end()
+    if FOCUS_APP_NAME is not None:
+        focus_thread.end()
     sys.exit(1)
+    
+if __name__ == "__main__":
+   main()
