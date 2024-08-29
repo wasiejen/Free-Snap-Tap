@@ -111,58 +111,75 @@ def load_groups(file_name):
                         key_group = groups[1].split(',')
                         # rebind
                         if len(trigger_group) == 1 and len(key_group) == 1:
-                            rebinds_hr.append([trigger_group, key_group])
+                            rebinds_hr.append([trigger_group[0], key_group[0]])
                         # macro
                         else:
                             macros_hr.append([trigger_group, key_group])
                         
 
-# def save_groups(file_name):
+def save_groups(file_name):
+    """
+    Save tap groups to a text file.
+    Each line in the file represents a tap group with keys separated by commas.
+    """
+    global tap_groups_hr, rebinds_hr, macros_hr
+    
+    with open(file_name, 'w') as file:
+        # tapgroups
+        file.write("# Tap Groups\n")
+        for tap_group in tap_groups_hr:
+            # file.write(f"{tap_group}\n")
+            file.write(', '.join(tap_group)+'\n')         
+        # rebinds
+        file.write("# Rebinds\n")
+        for rebind in rebinds_hr:
+            file.write(' : '.join([', '.join(rebind[0]),', '.join(rebind[1])]))
+        # macros
+        file.write("# Macros\n")
+        for macro in macros_hr:
+            file.write(' : '.join([', '.join(macro[0]),', '.join(macro[1])]))
+
+
+# def display_groups2():
 #     """
-#     Save tap groups to a text file.
-#     Each line in the file represents a tap group with keys separated by commas.
+#     Display the current tap groups.
 #     """
 #     global tap_groups_hr, rebinds_hr, macros_hr
-    
-#     with open(file_name, 'w') as file:
-#         # tapgroups
-#         file.write("# Tap Groups\n")
-#         for tap_group in tap_groups_hr:
-#             # file.write(f"{tap_group}\n")
-#             file.write(', '.join(tap_group)+'\n')         
-#         # rebinds
-#         file.write("# Rebinds\n")
-#         for rebind in rebinds_hr:
-#             file.write(' : '.join([', '.join(rebind[0]),', '.join(rebind[1])]))
-#         # macros
-#         file.write("# Macros\n")
-#         for macro in macros_hr:
-#             file.write(' : '.join([', '.join(macro[0]),', '.join(macro[1])]))
-
-
+#     print("# Tap Groups")
+#     for index, tap_group in enumerate(tap_groups_hr):
+#         # print(f"{tap_group}\n")
+#         print(f"[{index}] " + ', '.join(tap_group)+'')         
+#     # rebinds
+#     print("\n# Rebinds")
+#     for index, rebind in enumerate(rebinds_hr):
+#         print(f"[{index}] " + ' : '.join([', '.join(rebind[0]),', '.join(rebind[1])]))
+#     # macros
+#     print("\n# Macros")
+#     for index, macro in enumerate(macros_hr):
+#         print(f"[{index}] " + ' : '.join([', '.join(macro[0]),', '.join(macro[1])]))
+        
 def display_groups():
     """
     Display the current tap groups.
     """
     global tap_groups_hr, rebinds_hr, macros_hr
     print("# Tap Groups")
-    for index, tap_group in enumerate(tap_groups_hr):
-        # print(f"{tap_group}\n")
-        print(f"[{index}] " + ', '.join(tap_group)+'')         
+    for index, tap_group in enumerate(tap_groups):
+        print(f"[{index}] {tap_group}")      
     # rebinds
     print("\n# Rebinds")
-    for index, rebind in enumerate(rebinds_hr):
-        print(f"[{index}] " + ' : '.join([', '.join(rebind[0]),', '.join(rebind[1])]))
+    for index, rebind in enumerate(rebinds):
+        print(f"[{index}] {rebind}")  
     # macros
     print("\n# Macros")
-    for index, macro in enumerate(macros_hr):
-        print(f"[{index}] " + ' : '.join([', '.join(macro[0]),', '.join(macro[1])]))
+    for index, macro in enumerate(macros):
+        print(f"[{index}] {macro}")  
 
-# def add_group(new_group, data_object):
-#     """
-#     Add a new tap group.
-#     """
-#     data_object.append(new_group)
+def add_group(new_group, data_object):
+    """
+    Add a new tap group.
+    """
+    data_object.append(new_group)
 
 # def delete_group(index, data_object):
 #     """
@@ -171,15 +188,15 @@ def display_groups():
 #     if 0 <= index < len(data_object):
 #         del data_object[index]
 
-# def reset_tap_groups_txt():
-#     """
-#     Reset Tap Groups and save new tap_group.txt with a+d and w+s tap groups
-#     """
-#     global tap_groups_hr
-#     tap_groups_hr = []
-#     add_group(['a','d'], tap_groups_hr)
-#     add_group(['w','s'], tap_groups_hr)
-#     save_groups(FILE_NAME_ALL)
+def reset_tap_groups_txt():
+    """
+    Reset Tap Groups and save new tap_group.txt with a+d and w+s tap groups
+    """
+    global tap_groups_hr
+    tap_groups_hr = []
+    add_group(['a','d'], tap_groups_hr)
+    add_group(['w','s'], tap_groups_hr)
+    save_groups(FILE_NAME_ALL)
 
 # def reset_key_groups_txt():
 #     """
@@ -203,7 +220,6 @@ def convert_to_vk_code(key):
         except ValueError:
             raise KeyError
 
-
 def initialize_groups():
     
     # in new form there are rebinds and macros
@@ -211,15 +227,14 @@ def initialize_groups():
     # key_group are a list of key_event
     # macros are key_group/trigger_group : key_groups
     
-    global tap_groups   
-    global rebinds
-    global macros
+    global tap_groups, rebinds, macros, triggers
     
     tap_groups = []
     rebinds = []
     macros = []
+    triggers = []
     
-    def extract(key):
+    def extract_data_from_key(key):
         #seperate delay info from string
         if '|' in key:
             key, *delays = key.split('|')
@@ -253,62 +268,47 @@ def initialize_groups():
 
         # convert string to actual vk_code
         vk_code = convert_to_vk_code(key)
-        return key, vk_code, key_modifier, delays
+            
+        if key_modifier is None:
+            new_element = (Key(key, vk_code, delays=delays))
+        elif key_modifier == 'down':
+            new_element = (Key_Event(vk_code, True, delays, key_string=key))
+        elif key_modifier == 'up':
+            new_element = (Key_Event(vk_code, False, delays, key_string=key))
+        elif key_modifier == 'reversed':
+            new_element = (Key(key, vk_code, delays=delays, reversed=True))
+        #return key, vk_code, key_modifier, delays
+        return new_element
     
+    # extract tap groups
     for group in tap_groups_hr:
         keys = []
         for key_string in group:
             key = Key(key_string, convert_to_vk_code(key_string))
             keys.append(key)
         tap_groups.append(Tap_Group(keys))  
-    
+    # extract rebinds
     for rebind in rebinds_hr:
         new_rebind = []
-        print(rebind)
-        for key in rebind:
-            print(key)
-            data = extract(key[0])
-            if data is not False:
-                key, vk_code, key_modifier, delays = data
-                
-                if key_modifier is None:
-                    new_rebind.append(Key(key, vk_code, delays=delays))
-                elif key_modifier == 'down':
-                    new_rebind.append(Key_Event(vk_code, True, delays, key_string=key))
-                elif key_modifier == 'up':
-                    new_rebind.append(Key_Event(vk_code, False, delays, key_string=key))
-                elif key_modifier == 'reversed':
-                    new_rebind.append(Key(key, vk_code, delays=delays, reversed=True))
+        for key in rebind:            
+            new_element = extract_data_from_key(key)   
+            if new_element is not False:
+                new_rebind.append(new_element)
         rebinds.append(Rebind(new_rebind[0], new_rebind[1]))
-                 
+    # extract macros         
     for macro in macros_hr:
-        new_macro = [[],[]]
+        new_macro = []
         # trigger j = 0, key_group j = 1
-        for j, key_group in enumerate(macro):
-
+        for key_group in macro:
             new_key_group = Key_Group([])
-            if DEBUG: 
-                print(j, key_group)
             for key in key_group:
-                data = extract(key)
-                if data is not False:
-                    key, vk_code, key_modifier, delays = data
-                
-                    if key_modifier is None:
-                        new_key_group.append(Key(key,vk_code))
-                    elif key_modifier == 'down':
-                        new_key_group.append(Key_Event(vk_code, True, delays, key_string=key))
-                    elif key_modifier == 'up':
-                        new_key_group.append(Key_Event(vk_code, False, delays, key_string=key))
-                    elif key_modifier == 'reversed':
-                        new_key_group.append(Key(key,vk_code,reversed=True))
-
-            new_macro[j] = new_key_group    
+                new_element = extract_data_from_key(key)            
+                if new_element is not False:
+                    new_key_group.append(new_element)
+            new_macro.append(new_key_group)
         macros.append(Macro(trigger=new_macro[0], key_events_to_play=new_macro[1]))
+        triggers.append(new_macro[0])
                       
-
-    
-
 def reload_all_groups():
     global FILE_NAME_TAP_GROUPS, tap_groups_hr
     # try loading tap groups from file
@@ -432,22 +432,25 @@ def win32_event_filter(msg, data):
             except KeyError as error:
                 print(f"Key not found to remove in current:, {error}")
                 
-                
-        #         --------------
-                
-                
-        # # Replace some Buttons :-D
-        # if not PAUSED and not PRINT_VK_CODES:
+        # Replace some Buttons :-D
+        if not PAUSED and not PRINT_VK_CODES:
             
-        #     for rebind in rebinds:
-        #         if current_ke == rebind[0]:
-        #             current_ke = rebind[1]
-        #         # geht nicht weil beides Keys sind und nicht key events
-           
-           
-           
-        #    ----------------
-           
+            for rebind in rebinds:
+                key_events = rebind[0].get_key_events()
+                if current_ke in key_events:
+                    #check if it is only one key_event
+                    if len(key_events) == 1:
+                        current_ke = rebind[1]
+                    # if it is a key it has 2 key_events
+                    else:
+                        new_key_events = rebind[1].get_key_events()
+                        if current_ke == key_events[0]:
+                            current_ke = new_key_events[0]
+                        else:
+                            current_ke = new_key_events[1]
+                            
+
+            
            
            
            
@@ -840,10 +843,10 @@ def main2():
 def main():
     #reset_tap_groups_txt()
     reload_all_groups()
-    print(tap_groups)
-    print(rebinds)
-    print(macros)
+    # print(tap_groups)
+    # print(rebinds)
+    # print(macros)
     display_groups()
     
 if __name__ == "__main__":
-   main2()
+   main()

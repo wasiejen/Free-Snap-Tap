@@ -41,8 +41,8 @@ class Tap_Keyboard(object):
             #     self._send_key_event(key_event)
                 
         # only update if changed
-        if self._real_key_states[key_event.vk_code()] is not key_event.is_press():
-            self._real_key_states[key_event.vk_code()] = key_event.is_press()
+        if self._real_key_states[key_event.get_vk_code()] is not key_event.get_is_press():
+            self._real_key_states[key_event.get_vk_code()] = key_event.get_is_press()
             
             self._update_tap_groups(key_event)
             self._update_trigger_status()
@@ -51,8 +51,8 @@ class Tap_Keyboard(object):
     def _update_virtual_key_states(self, vk_code, is_press):
         key_event = Key_Event(vk_code, is_press)
         # only update if changed
-        if self._virtual_key_states[key_event.vk_code()] is not key_event.is_press():
-            self._virtual_key_states[key_event.vk_code()] = key_event.is_press()
+        if self._virtual_key_states[key_event.get_vk_code()] is not key_event.get_is_press():
+            self._virtual_key_states[key_event.get_vk_code()] = key_event.get_is_press()
             # TODO:2 not needed if only real keys can trigger triggers :-)
             # self._update_status()
             
@@ -200,27 +200,35 @@ class Alias_Thread(Thread):
 class Key(object):
     
     def __init__(self, key_string, vk_code = None, reversed = False, delays=[0,0]) -> None:
-        self.key_string = key_string
-        self.delays = delays
+        self._key_string = key_string
+        self._delays = delays
+        self._reversed = reversed
         if vk_code is None:
             raise NotImplementedError
             #vk_code = convert_to_vk_code(key_string)
         else:
-            self.vk_code = vk_code
-        self.key_events = [Key_Event(self.vk_code, True, delays=delays, key_string=key_string), 
-                           Key_Event(self.vk_code, False, delays=delays, key_string=key_string)]
+            self._vk_code = vk_code
+        self._key_events = [Key_Event(self._vk_code, True, delays=delays, key_string=key_string), 
+                           Key_Event(self._vk_code, False, delays=delays, key_string=key_string)]
+        if self._reversed:
+            self._key_events[0], self._key_events[1] = self._key_events[1], self._key_events[0]
         
     def get_vk_code(self):
-        return self.vk_code
+        return self._vk_code
     
     def get_key_string(self):
-        return self.key_string
+        return self._key_string
     
     def get_key_events(self):
-        return self.key_events
+        return self._key_events
     
     def __repr__(self):
-        return f"{self.key_string}"
+        delay = f"|{self._delays[0]}|{self._delays[1]}"
+        delay = ''
+        if self._reversed:
+            return f"!{self._key_string}{delay}"
+        else:
+            return f"{self._key_string}{delay}"
               
                        
 class Key_Event(object):
@@ -228,35 +236,49 @@ class Key_Event(object):
     def __init__(self, vk_code, is_press=True, delays=[0,0], key_string = None):
         self._key_string = key_string
         self._vk_code = vk_code
-        self._state_pressed = is_press
+        self._is_press = is_press
         self._delays = delays
+
         
     def get_all(self):
-        return self._vk_code, self._state_pressed, self._delays
+        return self._vk_code, self._is_press, self._delays
 
-    def vk_code(self):
+    def get_vk_code(self):
         return self._vk_code
 
-    def is_press(self):
-        return self._state_pressed
+    def get_is_press(self):
+        return self._is_press
 
-    def delays(self):
+    def get_delays(self):
         return self._delays
     def __hash__(self):
         # return hash((self._vk_code, self._state_pressed))
         return hash(self.__repr__())
     
-    def __eq__(self, other) -> bool:
-        return (self.vk_code() == other.vk_code()) and (self.is_press() is other.is_press())
+    def get_key_events(self):
+        return [self]
     
-    def __repr__(self):
-        if self._key_string is None:
-            return f"{'-' if self._state_pressed else '+'}{self._vk_code}"
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, Key_Event):
+            return False
         else:
-            return f"{'-' if self._state_pressed else '+'}{self._key_string}"
+            return (self.get_vk_code() == other.get_vk_code()) and (self.get_is_press() is other.get_is_press())
+    
+    def __str__(self):
+        if self._key_string is None:
+            return f"Key_Event({self._vk_code}, {self._is_press}, {self._delays})"
+        else:
+            return f"Key_Event({self._key_string}, {self._is_press}, {self._delays})"
+        
+    def __repr__(self):
+        delay = f"|{self._delays[0]}|{self._delays[1]}"#
+        delay = ''
+        if self._key_string is None:
+            return f"{'-' if self._is_press else '+'}{self._vk_code}{delay}"
+        else:
+            return f"{'-' if self._is_press else '+'}{self._key_string}{delay}"
    
-    # def __str__(self):
-    #     return f"Key_Event({self._vk_code}, {self._state_pressed}, {self._delays})"
+        
         
         
         
@@ -316,7 +338,7 @@ class Rebind(object):
         key_strings = []
         for key in [self.trigger, self.replacement]:
             key_strings.append(repr(key))
-        return "Rebind(" + ','.join(key_strings) + ")"
+        return "Rebind(" + ' : '.join(key_strings) + ")"
     
     # def 
       
@@ -342,8 +364,12 @@ class Macro(object):
         self.key_group.add_key_event(key_event)
         
     def __repr__(self):
-        text = f"Macro({repr(self.trigger)}: {self.key_group})"               
+        text = f"Macro({repr(self.trigger)} : {self.key_group})"               
         return text
+    
+    # def __str__(self):
+    #     text = f"({repr(self.trigger)} : {self.key_group})"               
+    #     return text
     
     
 class Tap_Group(object):
