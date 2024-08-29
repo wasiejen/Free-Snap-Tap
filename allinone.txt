@@ -1,0 +1,14 @@
+# Tap Groups
+a,d
+w,s
+
+# Rebinds
+n:j
+o:p
+-u:+u
++u:-u
+z:!z
+
+# Macros
+k,l: -left_shift,h,e,l,l,o,+left_shift
+k:h,i
