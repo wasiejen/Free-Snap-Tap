@@ -122,7 +122,18 @@ python .\free_snap_tap.py ^
 pause
 ```
 
-## Actual Version Information
+## Current Version Information
+
+**V0.8.5**
+- NEW: Tap Groups have always priority before Alias execution
+  - Alias will be played as normal but only key events that are not interfering with the actual state of the tap group will be send
+  - following example does now work without interfering with actual real input and the function of the tap group
+```bash
++w, +w|5|2, -s|25|15, +s|0|0   #stop_forward
++s, +s|5|2, -w|25|15, +w|0|0   #stop_back
++a, +a|5|2, -d|25|15, +d|0|0   #stop_left
++d, +d|5|2, -a|25|15, +a|0|0   #stop_right
+```
 
 **V0.8.4**
 - NEW: Auto Focus on a active Window specified by part of the name of the app/game/program
@@ -163,7 +174,6 @@ pause
 - reverse now marked with `!` instead of `#` (used now for commenting)
 - option to supress key events via key group (with 2 keys only)
   - `-n, suppress` -> n press will be suppressed, n release still be send
-
 
 **V0.8.0**
 
