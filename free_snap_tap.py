@@ -721,7 +721,10 @@ class Focus_Thread(Thread):
         global PAUSED, MANUAL_PAUSED, paused_lock, FOCUS_THREAD_PAUSED
         last_active_window = ''
         while not self.stop:
-            active_window = gw.getActiveWindow().title
+            try:
+                active_window = gw.getActiveWindow().title
+            except AttributeError:
+                pass
             if FOCUS_THREAD_PAUSED is False and MANUAL_PAUSED is False:
                 if active_window.lower().find(self.focus_app_name) >= 0:
                     if PAUSED:
