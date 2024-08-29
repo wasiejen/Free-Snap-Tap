@@ -633,6 +633,22 @@ def check_start_arguments():
     global ACT_MAX_DELAY_IN_MS, ACT_MIN_DELAY_IN_MS
     global ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS
     global FOCUS_APP_NAME
+    
+    def extract_delays(arg):
+        try:
+            delays = [int(delay) for delay in arg.replace(' ','').split(',')]
+        except Exception:
+            print("invalid delay - needs to be a number(s), seperated by comma")
+        if len(delays) > 2:
+            delays = delays[:2] # keep only first 2 numbers
+        valid_delays = []
+        for delay in delays:
+            if 0 < delay <= 1000:
+                valid_delays.append(delay)
+            else:
+                print("delay not in range 0<delay<=1000 ms")
+        return sorted(valid_delays)
+    
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
             if DEBUG: 
@@ -658,27 +674,16 @@ def check_start_arguments():
                 CONTROLS_ENABLED = False
             elif arg == "-delay":
                 ACT_DELAY = True
+            elif arg[:10] == "-tapdelay=" and len(arg) > 10:
+                ACT_DELAY = True
+                ACT_MIN_DELAY_IN_MS, ACT_MAX_DELAY_IN_MS = extract_delays(arg[10:])
+                print(f"Tap delays set to: min:{ACT_MIN_DELAY_IN_MS}, max:{ACT_MAX_DELAY_IN_MS}")
+            elif arg[:12] == "-aliasdelay=" and len(arg) > 12:
+                ACT_DELAY = True
+                ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS = extract_delays(arg[12:])
+                print(f"Alias delays set to: min:{ALIAS_MIN_DELAY_IN_MS}, max:{ALIAS_MAX_DELAY_IN_MS}")
             elif arg == "-crossover":
                 ACT_CROSSOVER = True          
-            elif arg[:7] == "-delay=" and len(arg) > 7:
-                ACT_DELAY = True
-                try:
-                    delays = [int(delay) for delay in arg[7:].replace(' ','').split(',')]
-                except Exception:
-                    print("invalid delay - needs to be a number(s), seperated by comma")
-                if len(delays) > 2:
-                    delays = delays[:2] # keep only first 2 numbers
-                valid_delays = []
-                for delay in delays:
-                    if 0 < delay <= 1000:
-                        valid_delays.append(delay)
-                    else:
-                        print("delay not in range 0<delay<=1000 ms")
-                ACT_MIN_DELAY_IN_MS, ACT_MAX_DELAY_IN_MS = sorted(valid_delays)
-                ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS = sorted(valid_delays)
-
-                print(f"delays set to: min:{ACT_MIN_DELAY_IN_MS}, max:{ACT_MAX_DELAY_IN_MS}")
-
             elif arg[:11] == "-crossover=" and len(arg) > 11:
                 ACT_CROSSOVER = True    
                 try:
