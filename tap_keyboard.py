@@ -199,14 +199,16 @@ class Alias_Thread(Thread):
            
 class Key(object):
     
-    def __init__(self, key_string, vk_code = None) -> None:
+    def __init__(self, key_string, vk_code = None, reversed = False, delays=[0,0]) -> None:
         self.key_string = key_string
+        self.delays = delays
         if vk_code is None:
             raise NotImplementedError
             #vk_code = convert_to_vk_code(key_string)
         else:
             self.vk_code = vk_code
-        self.key_events = [Key_Event(self.vk_code, True), Key_Event(self.vk_code, False)]
+        self.key_events = [Key_Event(self.vk_code, True, delays=delays, key_string=key_string), 
+                           Key_Event(self.vk_code, False, delays=delays, key_string=key_string)]
         
     def get_vk_code(self):
         return self.vk_code
@@ -214,13 +216,17 @@ class Key(object):
     def get_key_string(self):
         return self.key_string
     
+    def get_key_events(self):
+        return self.key_events
+    
     def __repr__(self):
         return f"{self.key_string}"
               
                        
 class Key_Event(object):
     
-    def __init__(self, vk_code, is_press=True, delays=[0,0]):
+    def __init__(self, vk_code, is_press=True, delays=[0,0], key_string = None):
+        self._key_string = key_string
         self._vk_code = vk_code
         self._state_pressed = is_press
         self._delays = delays
@@ -244,16 +250,19 @@ class Key_Event(object):
         return (self.vk_code() == other.vk_code()) and (self.is_press() is other.is_press())
     
     def __repr__(self):
-        return f"{'-' if self._state_pressed else '+'}{self._vk_code}"
+        if self._key_string is None:
+            return f"{'-' if self._state_pressed else '+'}{self._vk_code}"
+        else:
+            return f"{'-' if self._state_pressed else '+'}{self._key_string}"
    
-    def __str__(self):
-        return f"Key_Event({self._vk_code}, {self._state_pressed}, {self._delays})"
+    # def __str__(self):
+    #     return f"Key_Event({self._vk_code}, {self._state_pressed}, {self._delays})"
         
         
         
 class Key_Group(object):
     
-    def __init__(self, key_events):
+    def __init__(self, key_events=[]):
         if isinstance(key_events, Key_Event):
             key_events = [key_events]
         self.key_group = key_events
@@ -262,6 +271,9 @@ class Key_Group(object):
         return self.key_group
     
     def add_key_event(self, key_event):
+        self.key_group.append(key_event)
+        
+    def append(self, key_event):
         self.key_group.append(key_event)
     
     def __hash__(self):
@@ -274,15 +286,41 @@ class Key_Group(object):
         return equal
     
     def __repr__(self):
-        text = 'Key_Group('
+        key_strings = []
         for key_event in self.key_group:
-            text += f"{repr(key_event)},"
-        text += ')'
-        return text
+            key_strings.append(repr(key_event))
+        return "Key_Group(" + ', '.join(key_strings) + ")"
+    
+    def __len__(self):
+        return len(self.key_group)
       
+class Rebind(object):
+    
+    def __init__(self, trigger, replacement):
+        # if isinstance(trigger, Key_Event):
+        self.trigger = trigger
+        # if isinstance(replacement, Key_Event):
+        self.replacement = replacement
+   
+ 
+    def get_trigger(self):
+        if isinstance(self.trigger, Key):
+            return self.trigger.get_key_events()
+        else:
+            return [self.trigger]
+    
+    def get_replacment(self):
+        return self.replacement
+    
+    def __repr__(self):
+        key_strings = []
+        for key in [self.trigger, self.replacement]:
+            key_strings.append(repr(key))
+        return "Rebind(" + ','.join(key_strings) + ")"
+    
+    # def 
       
-      
-class Makro(object):
+class Macro(object):
     
     def __init__(self, trigger= Key_Group([]), key_events_to_play= Key_Group([])):
         if isinstance(trigger, Key_Event):
@@ -304,7 +342,7 @@ class Makro(object):
         self.key_group.add_key_event(key_event)
         
     def __repr__(self):
-        text = f"Makro({repr(self.trigger)}: {self.key_group})"               
+        text = f"Macro({repr(self.trigger)}: {self.key_group})"               
         return text
     
     
@@ -362,15 +400,17 @@ class Tap_Group(object):
     def set_last_key_send(self, last_key_send):
         self.last_key_send = last_key_send
         
-    def __str__(self):
-        return f""
+    # def __str__(self):
+    #     key_strings = []
+    #     for key in self.keys:
+    #         key_strings.append(repr(key))
+    #     return "Tap_Group(" + ','.join(key_strings) + ")"
      
     def __repr__(self):
-        text = 'Tap_Group('
+        key_strings = []
         for key in self.keys:
-            text += f"{repr(key)}, "
-        text += ')'
-        return text
+            key_strings.append(repr(key))
+        return "Tap_Group(" + ','.join(key_strings) + ")"
      
      
     
@@ -380,7 +420,7 @@ if __name__ == '__main__':
     starttime = time()
     
     trigger = Key_Group([Key_Event(160, True), Key_Event(65, True)])
-    newmakro = Makro(trigger)
+    newmakro = Macro(trigger)
     newmakro.add_key_event(Key_Event(162,True))
     newmakro.add_key_event(Key_Event(66,True,[1000,1000]))
     newmakro.add_key_event(Key_Event(66,False))

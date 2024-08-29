@@ -7,7 +7,7 @@ from time import sleep # sleep(0.005) = 5 ms
 import pygetwindow as gw # to get name of actual window for focusapp function
 
 from vk_codes import vk_codes_dict
-from tap_keyboard import Tap_Group, Key_Event, Key_Group, Key
+from tap_keyboard import Tap_Group, Key_Event, Key_Group, Key, Macro, Rebind
 
 # global variables
 DEBUG = False
@@ -35,8 +35,9 @@ ALIAS_MIN_DELAY_IN_MS = ACT_MIN_DELAY_IN_MS
 ALIAS_MAX_DELAY_IN_MS = ACT_MAX_DELAY_IN_MS
 
 # Define File name for saving of Tap Groupings and Key Groups
-FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
-FILE_NAME_KEY_GROUPS = 'key_groups.txt'
+# FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
+# FILE_NAME_KEY_GROUPS = 'key_groups.txt'
+FILE_NAME_ALL = 'allinone.txt'
 
 # Constants for key events
 WM_KEYDOWN = [256,260] # _PRESS_MESSAGES = (_WM_KEYDOWN, _WM_SYSKEYDOWN)
@@ -49,21 +50,20 @@ MENU_KEY = 34 # PAGE_DOWN
 
 # collect all active keys here for key combination 
 current_keys = set()
-# triggers = [] # not used yet
-
-
+triggers = [] # not used yet
 
 # Tap groups define which keys are mutually exclusive
 tap_groups_hr = []   # hr = human readable form - just a remainder of old implementation #legacy
 # Key Groups define which key1 will be replaced by key2
 # if a Key Group has more than 2 keys if will be handled als alias
-key_groups_hr = [] #legacy
-
+rebinds_hr = [] #legacy
+macros_hr = []
 
 tap_groups = []     # [Tap_Groups]
 rebinds = []        # Key_Event : Key_Event
-key_groups = []     # [Key_Groups]
 macros = []         # [Key_Group : Key_Group]  # triggers are the Keys to the Item Makro
+
+#key_groups = []     # [Key_Groups]
 
 # Initialize the Controller
 controller = keyboard.Controller()
@@ -76,15 +76,17 @@ mouse_vk_codes_dict = {1: mouse.Button.left,
                        4: mouse.Button.middle}
 mouse_vk_codes = mouse_vk_codes_dict.keys()
 
-def load_groups(file_name, data_object):
-    """
-    Load tap groups from a text file.
-    Each line in the file represents a tap group with keys separated by commas.
-    """
-    data_object = []
+def load_groups(file_name):
+    global tap_groups_hr, rebinds_hr, macros_hr
+    
+    tap_groups_hr = []
+    rebinds_hr = []
+    macros_hr = []
+    
     with open(file_name, 'r') as file:
         for line in file:
             if len(line) > 1:
+                # strip all comments from line
                 group = line.strip().replace(" ","").split(',')
                 # ignore line if first char is a #
                 if group[0][0] == '#':
@@ -96,58 +98,99 @@ def load_groups(file_name, data_object):
                         # ignore commented out keys
                         if key[0] != '#': 
                             # ignore comments after keys
-                            cleaned_group.append(key.split('#')[0])  
-                    data_object.append(cleaned_group)
-    return data_object
+                            cleaned_group.append(key.split('#')[0]) 
+                    cleaned_line = ','.join(cleaned_group)
 
-def save_groups(file_name, data_object):
-    """
-    Save tap groups to a text file.
-    Each line in the file represents a tap group with keys separated by commas.
-    """
-    with open(file_name, 'w') as file:
-        for group in data_object:
-            file.write(','.join(group) + '\n')
+                    groups = cleaned_line.split(':')
+                    # tap group
+                    if len(groups) == 1: 
+                        tap_groups_hr.append(groups[0].split(','))
+                    # rebinds and macros
+                    elif len(groups) == 2:
+                        trigger_group = groups[0].split(',')
+                        key_group = groups[1].split(',')
+                        # rebind
+                        if len(trigger_group) == 1 and len(key_group) == 1:
+                            rebinds_hr.append([trigger_group, key_group])
+                        # macro
+                        else:
+                            macros_hr.append([trigger_group, key_group])
+                        
 
-def display_groups(data_object):
+# def save_groups(file_name):
+#     """
+#     Save tap groups to a text file.
+#     Each line in the file represents a tap group with keys separated by commas.
+#     """
+#     global tap_groups_hr, rebinds_hr, macros_hr
+    
+#     with open(file_name, 'w') as file:
+#         # tapgroups
+#         file.write("# Tap Groups\n")
+#         for tap_group in tap_groups_hr:
+#             # file.write(f"{tap_group}\n")
+#             file.write(', '.join(tap_group)+'\n')         
+#         # rebinds
+#         file.write("# Rebinds\n")
+#         for rebind in rebinds_hr:
+#             file.write(' : '.join([', '.join(rebind[0]),', '.join(rebind[1])]))
+#         # macros
+#         file.write("# Macros\n")
+#         for macro in macros_hr:
+#             file.write(' : '.join([', '.join(macro[0]),', '.join(macro[1])]))
+
+
+def display_groups():
     """
     Display the current tap groups.
     """
-    for index, group in enumerate(data_object):
-        print(f"{index}: {', '.join(group)}")
+    global tap_groups_hr, rebinds_hr, macros_hr
+    print("# Tap Groups")
+    for index, tap_group in enumerate(tap_groups_hr):
+        # print(f"{tap_group}\n")
+        print(f"[{index}] " + ', '.join(tap_group)+'')         
+    # rebinds
+    print("\n# Rebinds")
+    for index, rebind in enumerate(rebinds_hr):
+        print(f"[{index}] " + ' : '.join([', '.join(rebind[0]),', '.join(rebind[1])]))
+    # macros
+    print("\n# Macros")
+    for index, macro in enumerate(macros_hr):
+        print(f"[{index}] " + ' : '.join([', '.join(macro[0]),', '.join(macro[1])]))
 
-def add_group(new_group, data_object):
-    """
-    Add a new tap group.
-    """
-    data_object.append(new_group)
+# def add_group(new_group, data_object):
+#     """
+#     Add a new tap group.
+#     """
+#     data_object.append(new_group)
 
-def delete_group(index, data_object):
-    """
-    Delete the tap group at the specified index.
-    """
-    if 0 <= index < len(data_object):
-        del data_object[index]
+# def delete_group(index, data_object):
+#     """
+#     Delete the tap group at the specified index.
+#     """
+#     if 0 <= index < len(data_object):
+#         del data_object[index]
 
-def reset_tap_groups_txt():
-    """
-    Reset Tap Groups and save new tap_group.txt with a+d and w+s tap groups
-    """
-    global tap_groups_hr
-    tap_groups_hr = []
-    add_group(['a','d'], tap_groups_hr)
-    add_group(['w','s'], tap_groups_hr)
-    save_groups(FILE_NAME_TAP_GROUPS, tap_groups_hr)
+# def reset_tap_groups_txt():
+#     """
+#     Reset Tap Groups and save new tap_group.txt with a+d and w+s tap groups
+#     """
+#     global tap_groups_hr
+#     tap_groups_hr = []
+#     add_group(['a','d'], tap_groups_hr)
+#     add_group(['w','s'], tap_groups_hr)
+#     save_groups(FILE_NAME_ALL)
 
-def reset_key_groups_txt():
-    """
-    Reset key_groups and initialise empty txt file
-    """
-    global key_groups_hr
-    key_groups_hr = []
-    #add_group(['<','left_shift'], key_groups)
-    #add_group(['left_windows','left_control'], key_groups)
-    save_groups(FILE_NAME_KEY_GROUPS, key_groups_hr)
+# def reset_key_groups_txt():
+#     """
+#     Reset key_groups and initialise empty txt file
+#     """
+#     global key_groups_hr, macros_hr
+#     key_groups_hr = []
+#     macros_hr = []
+#     #add_group(['<','left_shift'], key_groups)
+#     #add_group(['left_windows','left_control'], key_groups)
+#     save_groups(FILE_NAME_ALL)
 
 def convert_to_vk_code(key):
     try:
@@ -161,111 +204,120 @@ def convert_to_vk_code(key):
             raise KeyError
 
 
-def initialize_key_groups():
+def initialize_groups():
     
     # in new form there are rebinds and macros
     # rebind are key_event -> key_event
     # key_group are a list of key_event
     # macros are key_group/trigger_group : key_groups
     
-    global key_groups
+    global tap_groups   
     global rebinds
     global macros
     
-    
-    # global key_groups_dict, key_groups_key_modifier , key_groups_key_delays
-    # key_groups_dict = [[] for n in range(len(key_groups_hr))] 
-    # # saves the modifiers of the key '+'=up=False, '-'=down=True, no modifier=None
-    # key_groups_key_modifier = [[] for n in range(len(key_groups_hr))] 
-    # key_groups_key_delays = [[] for n in range(len(key_groups_hr))] 
-
-    # if DEBUG: 
-    #     print("key groups: ", key_groups_hr)
-        
-    for group_index, group in enumerate(key_groups_hr):
-        new_key_group = Key_Group()
-        for key in group:
-            #key_event = Key_Event
-            #TODO: first break up the combination into a list of keys
-
-
-
-            #seperate delay info from string
-            if '|' in key:
-                key, *delays = key.split('|')
-                if DEBUG: 
-                    print(f"delays for {key}: {delays}")
-                # cast in int and ignore all other elements after first 2
-                delays = [int(delay) for delay in delays[:2]]
-            else:
-                delays = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
-                
-            # if string empty, stop
-            if key == '':
-                break
-      
-            # recognition of mofidiers +, - and #
-            # only interpret it as such when more then one char is in key
-            key_modifier = None
-            if len(key) > 1: 
-                if key[0] == '-':
-                    # down key
-                    key_modifier = 'down'
-                    key = key.replace('-','',1) # only replace first occurance
-                elif key[0] == '+':
-                    # up key
-                    key_modifier = 'up'
-                    key = key.replace('+','',1)
-                elif key[0] == '!':
-                    # revers 
-                    key_modifier = 'reversed'
-                    key = key.replace('!','',1)
-
-            # convert string to actual vk_code
-            vk_code = convert_to_vk_code(key)
-            
-            if key_modifier is None:
-                new_key_group.append(Key(key,vk_code))
-            elif key_modifier == 'down':
-                new_key_group.append(Key_Event(vk_code, True, delays))
-            elif key_modifier == 'up':
-                new_key_group.append(Key_Event(vk_code, False, delays))
-            elif key_modifier == 'reversed':
-                new_key_group.append(Key(key,vk_code,reversed=True))
-                    
-
-def initialize_tap_groups():
-    """
-    Initialize the state of each tap group
-    """
-    global tap_groups
     tap_groups = []
+    rebinds = []
+    macros = []
+    
+    def extract(key):
+        #seperate delay info from string
+        if '|' in key:
+            key, *delays = key.split('|')
+            if DEBUG: 
+                print(f"delays for {key}: {delays}")
+            # cast in int and ignore all other elements after first 2
+            delays = [int(delay) for delay in delays[:2]]
+        else:
+            delays = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
+            
+        # if string empty, stop
+        if key == '':
+            return False
+    
+        # recognition of mofidiers +, - and #
+        # only interpret it as such when more then one char is in key
+        key_modifier = None
+        if len(key) > 1: 
+            if key[0] == '-':
+                # down key
+                key_modifier = 'down'
+                key = key.replace('-','',1) # only replace first occurance
+            elif key[0] == '+':
+                # up key
+                key_modifier = 'up'
+                key = key.replace('+','',1)
+            elif key[0] == '!':
+                # revers 
+                key_modifier = 'reversed'
+                key = key.replace('!','',1)
+
+        # convert string to actual vk_code
+        vk_code = convert_to_vk_code(key)
+        return key, vk_code, key_modifier, delays
+    
     for group in tap_groups_hr:
         keys = []
         for key_string in group:
             key = Key(key_string, convert_to_vk_code(key_string))
             keys.append(key)
-        tap_groups.append(Tap_Group(keys))      
-        
-def reload_key_groups():
-    # try loading tap groups from file
-    global FILE_NAME_KEY_GROUPS, key_groups_hr
-    try:
-        key_groups_hr = load_groups(FILE_NAME_KEY_GROUPS, key_groups_hr)
-    # if no tap_groups.txt file exist create new one
-    except FileNotFoundError:
-        reset_key_groups_txt()
-    initialize_key_groups()
+        tap_groups.append(Tap_Group(keys))  
+    
+    for rebind in rebinds_hr:
+        new_rebind = []
+        print(rebind)
+        for key in rebind:
+            print(key)
+            data = extract(key[0])
+            if data is not False:
+                key, vk_code, key_modifier, delays = data
+                
+                if key_modifier is None:
+                    new_rebind.append(Key(key, vk_code, delays=delays))
+                elif key_modifier == 'down':
+                    new_rebind.append(Key_Event(vk_code, True, delays, key_string=key))
+                elif key_modifier == 'up':
+                    new_rebind.append(Key_Event(vk_code, False, delays, key_string=key))
+                elif key_modifier == 'reversed':
+                    new_rebind.append(Key(key, vk_code, delays=delays, reversed=True))
+        rebinds.append(Rebind(new_rebind[0], new_rebind[1]))
+                 
+    for macro in macros_hr:
+        new_macro = [[],[]]
+        # trigger j = 0, key_group j = 1
+        for j, key_group in enumerate(macro):
 
-def reload_tap_groups():
+            new_key_group = Key_Group([])
+            if DEBUG: 
+                print(j, key_group)
+            for key in key_group:
+                data = extract(key)
+                if data is not False:
+                    key, vk_code, key_modifier, delays = data
+                
+                    if key_modifier is None:
+                        new_key_group.append(Key(key,vk_code))
+                    elif key_modifier == 'down':
+                        new_key_group.append(Key_Event(vk_code, True, delays, key_string=key))
+                    elif key_modifier == 'up':
+                        new_key_group.append(Key_Event(vk_code, False, delays, key_string=key))
+                    elif key_modifier == 'reversed':
+                        new_key_group.append(Key(key,vk_code,reversed=True))
+
+            new_macro[j] = new_key_group    
+        macros.append(Macro(trigger=new_macro[0], key_events_to_play=new_macro[1]))
+                      
+
+    
+
+def reload_all_groups():
     global FILE_NAME_TAP_GROUPS, tap_groups_hr
     # try loading tap groups from file
     try:
-        tap_groups_hr = load_groups(FILE_NAME_TAP_GROUPS, tap_groups_hr)
+        load_groups(FILE_NAME_ALL)
     # if no tap_groups.txt file exist create new one
     except FileNotFoundError:
         reset_tap_groups_txt()
-    initialize_tap_groups()
+    initialize_groups()
 
 def is_simulated_key_event(flags):
     return flags & 0x10
@@ -328,24 +380,24 @@ def win32_event_filter(msg, data):
     global PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
     global key_groups_key_modifier
 
-    def should_activate(key_modifier):
-        activate = False
-        # if no up or down is set, it will be fired at press and release of key
-        # just to be consitent with the syntax
-        if key_modifier is None:
-            activate = True
-        # only fire alias with release of key, not on press
-        elif key_modifier == 'up':
-            if not is_keydown:
-                activate = True
-        # only fire alias with press of key, not on release
-        elif key_modifier == 'down':
-            if is_keydown:
-                activate = True
-        # I do not know yet ...
-        elif key_modifier == 'reversed': 
-            pass
-        return activate
+    # def should_activate(key_modifier):
+    #     activate = False
+    #     # if no up or down is set, it will be fired at press and release of key
+    #     # just to be consitent with the syntax
+    #     if key_modifier is None:
+    #         activate = True
+    #     # only fire alias with release of key, not on press
+    #     elif key_modifier == 'up':
+    #         if not is_keydown:
+    #             activate = True
+    #     # only fire alias with press of key, not on release
+    #     elif key_modifier == 'down':
+    #         if is_keydown:
+    #             activate = True
+    #     # I do not know yet ...
+    #     elif key_modifier == 'reversed': 
+    #         pass
+    #     return activate
 
     key_replaced = False
     alias_fired = False
@@ -380,8 +432,25 @@ def win32_event_filter(msg, data):
             except KeyError as error:
                 print(f"Key not found to remove in current:, {error}")
                 
-        # Replace some Buttons :-D
-        if not PAUSED and not PRINT_VK_CODES:
+                
+        #         --------------
+                
+                
+        # # Replace some Buttons :-D
+        # if not PAUSED and not PRINT_VK_CODES:
+            
+        #     for rebind in rebinds:
+        #         if current_ke == rebind[0]:
+        #             current_ke = rebind[1]
+        #         # geht nicht weil beides Keys sind und nicht key events
+           
+           
+           
+        #    ----------------
+           
+           
+           
+           
            
             for group_index, group in enumerate(key_groups_dict):
 
@@ -433,9 +502,8 @@ def win32_event_filter(msg, data):
         # Toggle paused/resume if the DELETE key is released
         elif CONTROLS_ENABLED and vk_code == TOGGLE_ON_OFF_KEY and not is_keydown:
             if PAUSED:
-                reload_tap_groups()
-                reload_key_groups()
-                print("tap and key groups reloaded")
+                reload_all_groups()
+                print("--- tap and key groups reloaded ---")
                 print('--- manuelly resumed ---')
                 with paused_lock:
                     PAUSED = False
@@ -553,7 +621,7 @@ def display_menu():
     """
     Display the menu and handle user input
     """
-    global PRINT_VK_CODES
+    global PRINT_VK_CODES, DEBUG
     PRINT_VK_CODES = False
     invalid_input = False
     text = ""
@@ -566,92 +634,32 @@ def display_menu():
             print("Please try again.\n")
             invalid_input = False
             text = ""
-        print("Active Tap Groups:")
-        display_groups(tap_groups_hr)
-        print("\nActive Key Groups:")
-        display_groups(key_groups_hr)
-        print('\n------ Options Tap Groups -------')
-        print("1. Add Tap Group")
-        print("2. Delete Tap Group")
-        print("3. Reset tap_groups.txt file")
-        print('\n------ Options Key Groups -------')
-        print("4. Add Key Group")
-        print("5. Delete Key Group")
-        print("6. Clear key_groups.txt file")
-        print("\n7. Print vk_codes to identify keys")
-        print("8. End Script", flush=True)
+        display_groups()
+        print('\n------ Options -------')
+        print(f"1. Open file:'{FILE_NAME_ALL}' in your default editor.")
+        print("2. Reload everything from file.")
+        
+        print("\n3. Print virtuell key codes to identify keys.")
+        print("4. End the program/script.", flush=True)
 
         choice = input("\nHit [Enter] to start or enter your choice: " )
 
         if choice == '0':
-            display_groups(tap_groups_hr)
+            DEBUG = not DEBUG
         elif choice == '1':
-            try:
-                new_group = input("Enter new tap group (keys separated by commas): ").replace(" ", "").split(',')
-                add_group(new_group, tap_groups_hr)
-                initialize_tap_groups()
-                save_groups(FILE_NAME_TAP_GROUPS, tap_groups_hr)
-            except KeyError as error_msg:
-                text = f"Error: Wrong string as a key used: {error_msg}"
-                invalid_input = True
-                delete_group(len(tap_groups_hr) - 1, tap_groups_hr)
+            os.startfile(FILE_NAME_ALL)
         elif choice == '2':
-            try:
-                index = int(input("Enter the index of the tap group to delete: "))
-                if 0 <= index < len(tap_groups_hr):
-                    delete_group(index, tap_groups_hr)
-                    initialize_tap_groups()
-                    save_groups(FILE_NAME_TAP_GROUPS, tap_groups_hr)
-                else:
-                    text = "Error: Index outside of range of tap groups."
-                    invalid_input = True
-            except ValueError as error_msg:
-                text = f"Error: Index was not a Number: {error_msg}"
-                invalid_input = True
+            reload_all_groups()   
         elif choice == '3':
-            reset_tap_groups_txt()
-            initialize_tap_groups()
-        elif choice == '4': 
-            try:
-                new_group = input("Enter keys seperated by comma (2 keys = replacement, 3+ = alias): ").split(',')
-                if len(new_group) >= 2:
-                    add_group(new_group, key_groups_hr)
-                    initialize_key_groups()
-                    save_groups(FILE_NAME_KEY_GROUPS, key_groups_hr)
-                else:
-                    text = "Error: at least 2 keys are needed."
-                    invalid_input = True
-            except KeyError as error_msg:
-                text = f"Error: Wrong string as a key used: {error_msg}"
-                invalid_input = True
-                delete_group(len(key_groups_hr) - 1, key_groups_hr)
-        elif choice == '5':
-            try:
-                index = int(input("Enter the index of the key pair to delete: "))
-                if 0<= index < len(key_groups_hr):
-                    delete_group(index, key_groups_hr)
-                    initialize_key_groups()
-                    save_groups(FILE_NAME_KEY_GROUPS, key_groups_hr)
-                else:
-                    text = "Error: Index outside of range of key pairs."
-                    invalid_input = True
-            except ValueError as error_msg:
-                text = f"Error: Index was not a Number: {error_msg}"
-                invalid_input = True
-        elif choice == '6':
-            reset_key_groups_txt()
-            initialize_key_groups()
-        elif choice == '7':
             PRINT_VK_CODES = True
             break
-        elif choice == '8':
+        elif choice == '4':
             exit()
         elif choice == '':
             break
         else:
             text = "Error: Invalid input."
             invalid_input = True
-
 
 def check_start_arguments():
     global DEBUG, MENU_ENABLED, CONTROLS_ENABLED
@@ -727,7 +735,7 @@ def check_start_arguments():
                 print("delay+crossover deactivated")
             elif arg[:10] == "-focusapp="  and len(arg) > 10:
                 FOCUS_APP_NAME = arg[10:]
-                print(FOCUS_APP_NAME)
+                print(f"> Set app focus to: {FOCUS_APP_NAME}")
             else:
                 print("unknown start argument: ", arg)
 
@@ -756,8 +764,7 @@ class Focus_Thread(Thread):
                 if active_window.lower().find(self.focus_app_name) >= 0:
                     if PAUSED:
                         try:
-                            reload_tap_groups()
-                            reload_key_groups()
+                            reload_all_groups()
                             print("--- tap and key groups successful reloaded ---")
                             print('--- auto focus resumed ---')
                             with paused_lock:
@@ -792,21 +799,19 @@ class Focus_Thread(Thread):
     def end(self):
         self.stop = True
 
-def main():
+def main2():
     global listener
     global focus_thread
      # check if start arguments are passed
     check_start_arguments()
 
     # try loading tap groups from file
-    reload_tap_groups()
+    reload_all_groups()
 
     if DEBUG:
         print(f"tap_groups_hr: {tap_groups_hr}")
         print(f"tap_groups: {tap_groups}")
 
-    # try loading key groups from file
-    reload_key_groups()
 
     if FOCUS_APP_NAME is not None:
         focus_thread = Focus_Thread(FOCUS_APP_NAME)
@@ -832,5 +837,13 @@ def main():
         focus_thread.end()
     sys.exit(1)
     
+def main():
+    #reset_tap_groups_txt()
+    reload_all_groups()
+    print(tap_groups)
+    print(rebinds)
+    print(macros)
+    display_groups()
+    
 if __name__ == "__main__":
-   main()
+   main2()
