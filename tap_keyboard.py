@@ -1,20 +1,9 @@
-from pynput import keyboard, mouse    
+#from pynput import keyboard, mouse    
 from random import randint
 from time import sleep, time
 #import time
 from threading import Thread, Lock
  
-# Initialize the Controller
-controller = keyboard.Controller()
-mouse_controller = mouse.Controller()
-
-controller_dict = {True: mouse_controller, False: controller}
-
-mouse_vk_codes_dict = {1: mouse.Button.left, 
-                       2: mouse.Button.right, 
-                       4: mouse.Button.middle}
-mouse_vk_codes = mouse_vk_codes_dict.keys()    
-
 class Tap_Keyboard(object):
     
     def __init__(self):
@@ -192,11 +181,11 @@ class Alias_Thread(Thread):
         Thread.__init__(self)
         self.stop = False
         self.daemon = True
-        self.key_events = makro.get_key_events()
+        self.key_group = makro.get_key_events()
         
     def run(self):     
         try:   
-            for key_event in self.key_events:
+            for key_event in self.key_group:
                 alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event}")
                 vk_code, is_press, delays = key_event.get_all()
                 # kb._update_virtual_key_states(vk_code, is_press)
@@ -208,8 +197,27 @@ class Alias_Thread(Thread):
             alias_thread_logging.append(error)
         pass
            
+class Key(object):
+    
+    def __init__(self, key_string, vk_code = None) -> None:
+        self.key_string = key_string
+        if vk_code is None:
+            raise NotImplementedError
+            #vk_code = convert_to_vk_code(key_string)
+        else:
+            self.vk_code = vk_code
+        self.key_events = [Key_Event(self.vk_code, True), Key_Event(self.vk_code, False)]
+        
+    def get_vk_code(self):
+        return self.vk_code
+    
+    def get_key_string(self):
+        return self.key_string
+    
+    def __repr__(self):
+        return f"{self.key_string}"
               
-                
+                       
 class Key_Event(object):
     
     def __init__(self, vk_code, is_press=True, delays=[0,0]):
@@ -282,34 +290,34 @@ class Makro(object):
         else:
             self.trigger = trigger
         if isinstance(key_events_to_play, Key_Event):
-            self.key_events = Key_Group(key_events_to_play)
+            self.key_group = Key_Group(key_events_to_play)
         else:
-            self.key_events = key_events_to_play
+            self.key_group = key_events_to_play
       
     def get_trigger(self):
         return self.trigger
     
     def get_key_events(self):
-        return self.key_events.get_key_events()
+        return self.key_group.get_key_events()
     
     def add_key_event(self, key_event):
-        self.key_events.add_key_event(key_event)
+        self.key_group.add_key_event(key_event)
         
     def __repr__(self):
-        text = f"Makro({repr(self.trigger)}: {self.key_events})"               
+        text = f"Makro({repr(self.trigger)}: {self.key_group})"               
         return text
     
     
 class Tap_Group(object):
      
-    def __init__(self, vk_codes) -> None:
-         self.vk_codes = vk_codes
+    def __init__(self, keys = []) -> None:
+         self.keys = keys
          self.states = {}
-         for code in self.vk_codes:
+         self.active_key = None
+         for code in self.keys:
              self.states[code] = 0
          self.last_key_pressed = None
-         # how to save the states without duplicating what is in kb?
-         pass
+         self.last_key_send = None
      
     def update_tap_states(self, vk_code, is_press):
         if is_press:
@@ -317,9 +325,10 @@ class Tap_Group(object):
             self.last_key_pressed = vk_code
         else:
             self.states[vk_code] = 0
+        self.active_key = self.get_key_to_send()
     
     def get_vk_codes(self):
-        return self.vk_codes
+        return [key.get_vk_code() for key in self.keys]
     
     def get_states(self):
         return self.states
@@ -343,8 +352,25 @@ class Tap_Group(object):
         elif num_of_keys_pressed > 1:
             key_to_send = self.last_key_pressed
         return key_to_send
+
+    def get_active_key(self):
+        return self.active_key
+    
+    def get_last_key_send(self):
+        return self.last_key_send
+    
+    def set_last_key_send(self, last_key_send):
+        self.last_key_send = last_key_send
         
+    def __str__(self):
+        return f""
      
+    def __repr__(self):
+        text = 'Tap_Group('
+        for key in self.keys:
+            text += f"{repr(key)}, "
+        text += ')'
+        return text
      
      
     
@@ -379,7 +405,7 @@ if __name__ == '__main__':
     kb.release(160)
     kb.release(65)
     
-    sleep(2)
+    sleep(4)
     for line in alias_thread_logging:
         print(line)
       
