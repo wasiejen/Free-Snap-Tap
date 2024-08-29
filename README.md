@@ -134,6 +134,10 @@ pause
 +a, +a|5|2, -d|25|15, +d|0|0   #stop_left
 +d, +d|5|2, -a|25|15, +a|0|0   #stop_right
 ```
+- Tap delay and Alias delay can now be adjusted separately via the 2 start arguments:
+  - `-tapdelay=8,2`  and `-aliasdelay=8,2` (min delay 2ms and max delay 8 ms)
+  - replaces `-delay=`
+- To easier find the name name for `-focusapp`: if focusapp (with any name) is activated and the evaluation of key events is auto paused then the active windows name will be printed into the command line and updated with every change of the active window. 
 
 **V0.8.4**
 - NEW: Auto Focus on a active Window specified by part of the name of the app/game/program
