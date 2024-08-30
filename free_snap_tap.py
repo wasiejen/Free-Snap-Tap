@@ -328,7 +328,7 @@ def win32_event_filter(msg, data):
     is_simulated = is_simulated_key_event(data.flags)
 
     if (PRINT_VK_CODES and is_keydown) or DEBUG:
-        print(f"time: {data.time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
+        print(f"time: {data.time}, vk_code: {vk_code} - {'press  ' if is_keydown else 'release'} - {'simulated' if is_simulated else 'real'}")
 
     # if DEBUG: 
 
@@ -340,13 +340,14 @@ def win32_event_filter(msg, data):
     if not is_simulated: # is_simulated_key_event(data.flags):
         
         ### collect input into active keys set
-        if is_keydown:
-            current_keys.add(vk_code)
-        else:
-            try:
-                current_keys.remove(vk_code)
-            except KeyError as error:
-                print(f"Key not found to remove in current:, {error}")
+        # if is_keydown:
+        #     current_keys.add(vk_code)
+        # else:
+        #     try:
+        #         current_keys.remove(vk_code)
+        #     except KeyError as error:
+        #         if DEBUG: 
+        #             print(f"Key not found to remove in current:, {error}")
                 
         # Replace some Buttons :-D
         if not PAUSED and not PRINT_VK_CODES:
@@ -552,12 +553,15 @@ def display_menu():
         print("5. Delete Key Group")
         print("6. Clear key_groups.txt file")
         print("\n7. Print vk_codes to identify keys")
-        print("8. End Script", flush=True)
+        print("8. Open Files in your default txt editor")
+        print("9. End Script", flush=True)
 
         choice = input("\nHit [Enter] to start or enter your choice: " )
 
-        if choice == '0':
-            display_groups(tap_groups_hr)
+        if choice == '8':
+            os.startfile(FILE_NAME_TAP_GROUPS)
+            os.startfile(FILE_NAME_KEY_GROUPS)
+            #display_groups(tap_groups_hr)
         elif choice == '1':
             try:
                 new_group = input("Enter new tap group (keys separated by commas): ").replace(" ", "").split(',')
@@ -617,7 +621,7 @@ def display_menu():
         elif choice == '7':
             PRINT_VK_CODES = True
             break
-        elif choice == '8':
+        elif choice == '9':
             exit()
         elif choice == '':
             break
@@ -700,7 +704,7 @@ def check_start_arguments():
                 print("delay+crossover deactivated")
             elif arg[:10] == "-focusapp="  and len(arg) > 10:
                 FOCUS_APP_NAME = arg[10:]
-                print(FOCUS_APP_NAME)
+                print(f"focusapp active: looking for: {FOCUS_APP_NAME}")
             else:
                 print("unknown start argument: ", arg)
 
