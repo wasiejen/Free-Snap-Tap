@@ -328,7 +328,7 @@ def win32_event_filter(msg, data):
     is_simulated = is_simulated_key_event(data.flags)
 
     if (PRINT_VK_CODES and is_keydown) or DEBUG:
-        print(f"time: {data.time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
+        print(f"time: {data.time}, vk_code: {vk_code} - {'press' if is_keydown else 'release'} - {'simulated' if is_simulated else 'real'}")
 
     # if DEBUG: 
 
