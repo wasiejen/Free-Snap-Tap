@@ -3,7 +3,7 @@ from threading import Thread, Lock # to play aliases without interfering with ke
 import os # to use clearing of CLI for better menu usage
 import sys # to get start arguments
 from random import randint # randint(3, 9)) 
-from time import sleep # sleep(0.005) = 5 ms
+from time import time, sleep # sleep(0.005) = 5 ms
 import pygetwindow as gw # to get name of actual window for focusapp function
 
 from vk_codes import vk_codes_dict
@@ -344,61 +344,46 @@ def get_key_code(is_mouse_key, vk_code):
         key_code = keyboard.KeyCode.from_vk(vk_code)
     return key_code
 
-def alias_thread(group_index, group, key_groups_key_delays, new_key_modifiers):
-    vk_codes = group[1:] 
+alias_thread_logging = []
 
-    for index, code in enumerate(vk_codes):
-        is_mouse_key = check_for_mouse_vk_code(code)
-        key_code = get_key_code(is_mouse_key, code)
+class Alias_Thread(Thread):
+    '''
+    
+    '''
 
-        key_delays = key_groups_key_delays[group_index][index + 1] #+1 to exclude first element
-
-        if DEBUG: 
-            print(index, code)
-
-        if new_key_modifiers[index] is None:
-            controller_dict[is_mouse_key].press(key_code)
-            if ACT_DELAY: 
-                delay(*key_delays)
-            controller_dict[is_mouse_key].release(key_code) 
-        elif new_key_modifiers[index] == 'up':
-            controller_dict[is_mouse_key].release(key_code)
-        elif new_key_modifiers[index] == 'down':
-            controller_dict[is_mouse_key].press(key_code)
-        elif new_key_modifiers[index] == 'reversed': 
-            controller_dict[is_mouse_key].release(key_code)
-            if ACT_DELAY: 
-                delay(*key_delays)
-            controller_dict[is_mouse_key].press(key_code)
-        if ACT_DELAY: 
-            delay(*key_delays)
-
+    def __init__(self, macro):
+        Thread.__init__(self)
+        self.daemon = True
+        self.key_group = macro.get_all_key_events()
+        
+    def run(self):     
+        try:   
+            # Key_events ans Keys here ...
+            for key_event in self.key_group:
+                
+                alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.get_key_string()}")
+                vk_code, is_press, delays = key_event.get_all()
+                is_mouse_key = check_for_mouse_vk_code(vk_code)
+                key_code = get_key_code(is_mouse_key, vk_code)
+                if is_press:
+                    controller_dict[is_mouse_key].press(key_code)
+                else:
+                    controller_dict[is_mouse_key].release(key_code)
+                
+                if ACT_DELAY: 
+                    delay(*delays)
+        except Exception as error:
+            alias_thread_logging.append(error)
+        pass
+    
+    
 def win32_event_filter(msg, data):
     """
     Filter and handle keyboard events.
     """
     global PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
     global key_groups_key_modifier
-
-    # def should_activate(key_modifier):
-    #     activate = False
-    #     # if no up or down is set, it will be fired at press and release of key
-    #     # just to be consitent with the syntax
-    #     if key_modifier is None:
-    #         activate = True
-    #     # only fire alias with release of key, not on press
-    #     elif key_modifier == 'up':
-    #         if not is_keydown:
-    #             activate = True
-    #     # only fire alias with press of key, not on release
-    #     elif key_modifier == 'down':
-    #         if is_keydown:
-    #             activate = True
-    #     # I do not know yet ...
-    #     elif key_modifier == 'reversed': 
-    #         pass
-    #     return activate
-
+    
     key_replaced = False
     alias_fired = False
     vk_code = data.vkCode
@@ -406,11 +391,10 @@ def win32_event_filter(msg, data):
     is_simulated = is_simulated_key_event(data.flags)
     
     current_ke = Key_Event(vk_code, is_keydown)
+    _activated_macros: []
+    _played_macros = []
     
     
-    
-       
-
     if (PRINT_VK_CODES and is_keydown) or DEBUG:
         print(f"time: {data.time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
 
@@ -430,124 +414,143 @@ def win32_event_filter(msg, data):
             try:
                 current_keys.remove(vk_code)
             except KeyError as error:
-                print(f"Key not found to remove in current:, {error}")
+                pass
+                # print(f"Key not found to remove in current:, {error}")
                 
         # Replace some Buttons :-D
         if not PAUSED and not PRINT_VK_CODES:
             
+            
+            # viel zu komplex geworden durch OO
+            # Key class sollte ich nicht benutzen?
+            # rebind sollte wieder ein {} sein zum directen abbilden von key events
+            
+            
+            
+            
+            
+            
+            
+            # check for rebinds and replace current key event with replacement
             for rebind in rebinds:
-                key_events = rebind[0].get_key_events()
+                key_events = rebind.get_trigger()[0].get_key_events()
+                print(key_events)
                 if current_ke in key_events:
+                    old_ke = current_ke
                     #check if it is only one key_event
                     if len(key_events) == 1:
-                        current_ke = rebind[1]
+                        current_ke = rebind.get_replacement()
                     # if it is a key it has 2 key_events
                     else:
-                        new_key_events = rebind[1].get_key_events()
+                        new_key_events = rebind.get_replacement().get_key_events()
+                        print(new_key_events)
+                        
                         if current_ke == key_events[0]:
                             current_ke = new_key_events[0]
                         else:
                             current_ke = new_key_events[1]
                             
-
-            
-           
-           
-           
-           
-            for group_index, group in enumerate(key_groups_dict):
-
-                trigger_key_modifier, *new_key_modifiers = key_groups_key_modifier[group_index]
-                if vk_code == group[0] and should_activate(trigger_key_modifier):
-                    if DEBUG: 
-                        print("vk_code_gotten: ", vk_code)
-                        print("vk_code_replacement: ", group)
-                        print("is_keydown: ", is_keydown)
-                        print(f"key_modifiers: {trigger_key_modifier} -> {new_key_modifiers}", )
-                    # KEY REPLACEMENT handling
-                    if len(group) == 2 and not key_replaced:              
-                        if DEBUG: 
-                            print("Key Replacement recognised: ", group)
-                        # check for key_groups_state_is_pressed
-                        vk_code = group[1]  
-                        key_replaced = True
-                        if new_key_modifiers[0] == 'reversed':
-                            is_keydown = not is_keydown # with this can be tracked in groups
-                        # suppress event when found
-                        if vk_code == 0:
+                        if current_ke.get_vk_code() == 0:
                             if DEBUG: 
-                                print("key suppressed: vk_code: ", group)
+                                print("key suppressed: vk_code: ", current_ke)
                             listener.suppress_event() 
-                        # deactive after replacement to not trigger any aliases
-                        # break
-                    # ALIAS handling
-                    else:
-                        alias_fired = True
-                        if DEBUG: 
-                            print("ALIAS recognised!: ", group)
-                        # thread for better delay handler and to prevent dropping of key supression if delay to long
-                        thread = Thread(target=alias_thread, daemon = True, args=(group_index, group, key_groups_key_delays, new_key_modifiers))
-                        thread.start()
+                    current_keys.remove(old_ke.get_vk_codes())
+                    current_keys.add(current_ke.get_vk_codes())
+                    print(f"key replaced: {old_ke} -> {type(current_ke)}")
+                            
+            # # check for macro trigger 
+            # _activated_macros = []
+            # for macro in macros:
+            #     # is_triggered = False
+            #     macro_trigger = macro.get_trigger()
+                
+            #     # no key combination
+            #     print(macro_trigger)
+            #     if len(macro_trigger.get_key_events()) == 1:
+            #         if macro_trigger.get_key_events()[0] == current_ke:
+            #             # is_triggered = True
+            #             _activated_macros.append(macro)
+                
+            #     # key combination
+            #     else:
+            #         if all(key in current_keys for key in macro_trigger.get_vk_codes()):   #arcane magic if that works xD
+            #             # is_triggered = True
+            #             _activated_macros.append(macro)
+            
+            # # remove triggers from played that are not activated any more
+            # cleaned_macros = []         
+            # for macro in _played_macros:
+            #     if macro in _activated_macros:
+            #         cleaned_macros.append(macro)
+            # _played_macros = cleaned_macros
+            
+            # # play macro if not already played
+            # for macro in _activated_macros:
+            #     if macro not in _played_macros:
+            #         _played_macros.append(macro)
+            #         print(f"added trigger to played triggers: {_played_macros}")
+            #         # as help to later supress startin event AFTER it goes through the tap_groups
+            #         alias_fired = True
 
-        # Stop the listener if the MENU key is released
-        if CONTROLS_ENABLED and vk_code == MENU_KEY and not is_keydown:
-            MENU_ENABLED = True
-            print('\n--- Stopping execution ---')
-            listener.stop()
+            #         thread = Alias_Thread(macro)
+            #         print("> playing makro:", macro)
+            #         thread.start()
+                          
+        
 
-        # Stop the listener if the END key is released
-        elif CONTROLS_ENABLED and vk_code == EXIT_KEY and not is_keydown:
-            print('\n--- Stopping execution ---')
-            listener.stop()
-            STOPPED = True
-            exit()
+        # # Stop the listener if the MENU key is released
+        # if CONTROLS_ENABLED and vk_code == MENU_KEY and not is_keydown:
+        #     MENU_ENABLED = True
+        #     print('\n--- Stopping execution ---')
+        #     listener.stop()
 
-        # Toggle paused/resume if the DELETE key is released
-        elif CONTROLS_ENABLED and vk_code == TOGGLE_ON_OFF_KEY and not is_keydown:
-            if PAUSED:
-                reload_all_groups()
-                print("--- tap and key groups reloaded ---")
-                print('--- manuelly resumed ---')
-                with paused_lock:
-                    PAUSED = False
-                    MANUAL_PAUSED = False
-                # pause focus thread to allow manual overwrite and use without auto focus
-                if FOCUS_APP_NAME is not None: 
-                    focus_thread.pause()
-            else:
-                print('--- manually paused ---')
-                with paused_lock:
-                    PAUSED = True
-                    MANUAL_PAUSED = True
-                # restart focus thread when manual overwrite is over
-                if FOCUS_APP_NAME is not None: 
-                    focus_thread.restart()
+        # # Stop the listener if the END key is released
+        # elif CONTROLS_ENABLED and vk_code == EXIT_KEY and not is_keydown:
+        #     print('\n--- Stopping execution ---')
+        #     listener.stop()
+        #     STOPPED = True
+        #     exit()
 
-        # Snap Tap Part of Evaluation
-        # Intercept key events if not PAUSED
-        elif not PAUSED and not PRINT_VK_CODES:
-            if DEBUG: 
-                print("#0")
-                print(tap_groups)               
-            for tap_group in tap_groups:
-                if vk_code in tap_group.get_vk_codes():
-                    if DEBUG: 
-                        print(f"#2 {vk_code}")
-                    if key_replaced is True:
-                        key_replaced = False
-                    tap_group.update_tap_states(vk_code, is_keydown)            
-                    # send keys
-                    send_keys(tap_group)
-                    listener.suppress_event()
-                    break
+        # # Toggle paused/resume if the DELETE key is released
+        # elif CONTROLS_ENABLED and vk_code == TOGGLE_ON_OFF_KEY and not is_keydown:
+        #     if PAUSED:
+        #         reload_all_groups()
+        #         print("--- tap and key groups reloaded ---")
+        #         print('--- manuelly resumed ---')
+        #         with paused_lock:
+        #             PAUSED = False
+        #             MANUAL_PAUSED = False
+        #         # pause focus thread to allow manual overwrite and use without auto focus
+        #         if FOCUS_APP_NAME is not None: 
+        #             focus_thread.pause()
+        #     else:
+        #         print('--- manually paused ---')
+        #         with paused_lock:
+        #             PAUSED = True
+        #             MANUAL_PAUSED = True
+        #         # restart focus thread when manual overwrite is over
+        #         if FOCUS_APP_NAME is not None: 
+        #             focus_thread.restart()
+
+        # # Snap Tap Part of Evaluation
+        # # Intercept key events if not PAUSED
+        # elif not PAUSED and not PRINT_VK_CODES:
+        #     if DEBUG: 
+        #         print("#0")
+        #         print(tap_groups)               
+        #     for tap_group in tap_groups:
+        #         if vk_code in tap_group.get_vk_codes():
+        #             if DEBUG: 
+        #                 print(f"#2 {vk_code}")
+        #             if key_replaced is True:
+        #                 key_replaced = False
+        #             tap_group.update_tap_states(vk_code, is_keydown)            
+        #             # send keys
+        #             send_keys(tap_group)
+        #             listener.suppress_event()
+        #             break
                                
         if key_replaced is True:
-            is_mouse_key = check_for_mouse_vk_code(vk_code)
-            key_code = get_key_code(is_mouse_key, vk_code)
-            if is_keydown: # and not output_is_reversed:
-                controller_dict[is_mouse_key].press(key_code)
-            else:
-                controller_dict[is_mouse_key].release(key_code)
             listener.suppress_event()
         
         # supress event that triggered an alias - done here because it should also update tap groups before
@@ -805,6 +808,7 @@ class Focus_Thread(Thread):
 def main2():
     global listener
     global focus_thread
+    global current_keys
      # check if start arguments are passed
     check_start_arguments()
 
@@ -821,6 +825,7 @@ def main2():
         focus_thread.start()
 
     while not STOPPED:
+        current_keys = set()
         if MENU_ENABLED:
             if FOCUS_APP_NAME is not None:
                 focus_thread.pause()
@@ -835,6 +840,8 @@ def main2():
 
         with keyboard.Listener(win32_event_filter=win32_event_filter) as listener:
             listener.join()
+            
+        sleep(5)
 
     if FOCUS_APP_NAME is not None:
         focus_thread.end()
@@ -849,4 +856,5 @@ def main():
     display_groups()
     
 if __name__ == "__main__":
-   main()
+    starttime = time()
+    main2()
