@@ -41,8 +41,8 @@ class Tap_Keyboard(object):
             #     self._send_key_event(key_event)
                 
         # only update if changed
-        if self._real_key_states[key_event.get_vk_code()] is not key_event.get_is_press():
-            self._real_key_states[key_event.get_vk_code()] = key_event.get_is_press()
+        if self._real_key_states[key_event.get_vk_codes()] is not key_event.get_is_press():
+            self._real_key_states[key_event.get_vk_codes()] = key_event.get_is_press()
             
             self._update_tap_groups(key_event)
             self._update_trigger_status()
@@ -51,8 +51,8 @@ class Tap_Keyboard(object):
     def _update_virtual_key_states(self, vk_code, is_press):
         key_event = Key_Event(vk_code, is_press)
         # only update if changed
-        if self._virtual_key_states[key_event.get_vk_code()] is not key_event.get_is_press():
-            self._virtual_key_states[key_event.get_vk_code()] = key_event.get_is_press()
+        if self._virtual_key_states[key_event.get_vk_codes()] is not key_event.get_is_press():
+            self._virtual_key_states[key_event.get_vk_codes()] = key_event.get_is_press()
             # TODO:2 not needed if only real keys can trigger triggers :-)
             # self._update_status()
             
@@ -199,21 +199,17 @@ class Alias_Thread(Thread):
            
 class Key(object):
     
-    def __init__(self, key_string, vk_code = None, reversed = False, delays=[0,0]) -> None:
+    def __init__(self, key_string, vk_code, reversed = False, delays=[0,0]) -> None:
         self._key_string = key_string
         self._delays = delays
         self._reversed = reversed
-        if vk_code is None:
-            raise NotImplementedError
-            #vk_code = convert_to_vk_code(key_string)
-        else:
-            self._vk_code = vk_code
+        self._vk_code = vk_code
         self._key_events = [Key_Event(self._vk_code, True, delays=delays, key_string=key_string), 
                            Key_Event(self._vk_code, False, delays=delays, key_string=key_string)]
         if self._reversed:
             self._key_events[0], self._key_events[1] = self._key_events[1], self._key_events[0]
         
-    def get_vk_code(self):
+    def get_vk_codes(self):
         return self._vk_code
     
     def get_key_string(self):
@@ -243,7 +239,7 @@ class Key_Event(object):
     def get_all(self):
         return self._vk_code, self._is_press, self._delays
 
-    def get_vk_code(self):
+    def get_vk_codes(self):
         return self._vk_code
 
     def get_is_press(self):
@@ -258,11 +254,14 @@ class Key_Event(object):
     def get_key_events(self):
         return [self]
     
+    def get_key_string(self):
+        return self._key_string
+    
     def __eq__(self, other) -> bool:
         if not isinstance(other, Key_Event):
             return False
         else:
-            return (self.get_vk_code() == other.get_vk_code()) and (self.get_is_press() is other.get_is_press())
+            return (self.get_vk_codes() == other.get_vk_codes()) and (self.get_is_press() is other.get_is_press())
     
     def __str__(self):
         if self._key_string is None:
@@ -291,6 +290,9 @@ class Key_Group(object):
       
     def get_key_events(self):
         return self.key_group
+    
+    def get_vk_codes(self):
+        return [key.get_vk_codes() for key in self.key_group]
     
     def add_key_event(self, key_event):
         self.key_group.append(key_event)
@@ -331,7 +333,7 @@ class Rebind(object):
         else:
             return [self.trigger]
     
-    def get_replacment(self):
+    def get_replacement(self):
         return self.replacement
     
     def __repr__(self):
@@ -360,12 +362,32 @@ class Macro(object):
     def get_key_events(self):
         return self.key_group.get_key_events()
     
+    def get_all_key_events(self):
+        all_key_events = []
+        for key in self.key_group:
+            if isinstance(key, Key):
+                for ke in key.get_key_events():
+                    all_key_events.append(ke)
+            else:
+                all_key_events.append(key)
+        return all_key_events
+    
+    # def get_vk_codes(self):
+    #     return [key.get_vk_codes() for key in self.key_group]
+    
     def add_key_event(self, key_event):
         self.key_group.add_key_event(key_event)
         
     def __repr__(self):
         text = f"Macro({repr(self.trigger)} : {self.key_group})"               
         return text
+    
+    def __hash__(self):
+        return hash(self.__repr__())
+    
+    def __eq__(self, other):
+        return repr(self) == repr(other)
+        
     
     # def __str__(self):
     #     text = f"({repr(self.trigger)} : {self.key_group})"               
