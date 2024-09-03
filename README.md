@@ -62,7 +62,6 @@ String representation or vk-codes (virtual keyboard codes — list in py file) c
 #### New with 9.0: key combinations and prohibited keys (e.g. !ctrl)
 - `-space, !ctrl: -space|125|125, -ctrl|325|325, +ctrl|0|0, +space|0|0`: when space is pressed and **control is not pressed** (e.g. crouched) will jump, delay 125ms, crouch for 325 ms and releases both (for counterstrike with default bindings)
 - `+d, !ctrl, !space: +d|15|5, -a|100|100, +a|0|0`: when d is released and **control and space are not pressed** then release d, wait 5-15ms, make counter strafe by pressing a for 100 ms and then releasing without further delay after
-  - the fun part is now you could define `+d, !ctrl: +d|15|5, -a|150|150, +a|0|0` which will only be applied if you jump and release the movement key
 
 ## Key Modifier explanation:
 #### **for rebinds and macros**
@@ -133,6 +132,7 @@ pause
 ## Current Version Information
 
 **V0.9.0**
+
 - NEW: Key combinations for Macros/Aliases
 - NEW: Key prohibtion via `! notation` for trigger key combination of a macro
   - see example down below
@@ -153,8 +153,6 @@ pause
   #### Example
 
   - `+d, !ctrl, !space: +d|15|5, -a|100|100, +a|0|0`: when d is released and **control and space are not pressed** then release d, wait 5-15ms, make counter strafe by pressing a for 100 ms and then releasing without further delay after
-    - the fun part is now you could define `+d, !ctrl: +d|15|5, -a|150|150, +a|0|0` with differnt counter strafe duration which will only be applied if you jump and release the movement key
-
 
 ## How Free Snap Tap Works 
 
