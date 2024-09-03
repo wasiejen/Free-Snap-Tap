@@ -197,43 +197,17 @@ class Alias_Thread(Thread):
             alias_thread_logging.append(error)
         pass
            
-class Key(object):
-    
-    def __init__(self, key_string, vk_code, reversed = False, delays=[0,0]) -> None:
-        self._key_string = key_string
-        self._delays = delays
-        self._reversed = reversed
-        self._vk_code = vk_code
-        self._key_events = [Key_Event(self._vk_code, True, delays=delays, key_string=key_string), 
-                           Key_Event(self._vk_code, False, delays=delays, key_string=key_string)]
-        if self._reversed:
-            self._key_events[0], self._key_events[1] = self._key_events[1], self._key_events[0]
-        
-    def get_vk_code(self):
-        return self._vk_code
-    
-    def get_key_string(self):
-        return self._key_string
-    
-    def get_key_events(self):
-        return self._key_events
-    
-    def __repr__(self):
-        delay = f"|{self._delays[0]}|{self._delays[1]}"
-        delay = ''
-        if self._reversed:
-            return f"!{self._key_string}{delay}"
-        else:
-            return f"{self._key_string}{delay}"
+
               
                        
 class Key_Event(object):
     
-    def __init__(self, vk_code, is_press=True, delays=[0,0], key_string = None):
+    def __init__(self, vk_code, is_press=True, delays=[0,0], key_string = None, prohibited = False):
         self._key_string = key_string
         self._vk_code = vk_code
         self._is_press = is_press
         self._delays = delays
+        self._prohibited = prohibited
 
         
     def get_all(self):
@@ -250,7 +224,7 @@ class Key_Event(object):
     
     def __hash__(self):
         # return hash((self._vk_code, self._state_pressed))
-        return hash(f"{'-' if self._is_press else '+'}{self._vk_code}")
+        return hash(f"{self._get_sign()}{self._vk_code}")
     
     # to be able to use complimentory to the Key class and return 2 Key_events
     def get_key_events(self):
@@ -261,6 +235,15 @@ class Key_Event(object):
     
     def get_opposite_key_event(self):
         return Key_Event(self._vk_code, not self._is_press, self._delays, self._key_string)
+    
+    def is_prohibited(self):
+        return self._prohibited
+    
+    def _get_sign(self):
+        if self._prohibited:
+            return '!'
+        else:
+            return '-' if self._is_press else '+'
     
     def __eq__(self, other) -> bool:
         return (self.get_vk_code() == other.get_vk_code()) and (self.get_is_press() is other.get_is_press())
@@ -275,11 +258,40 @@ class Key_Event(object):
         delay = f"|{self._delays[0]}|{self._delays[1]}"#
         delay = ''
         if self._key_string is None:
-            return f"{'-' if self._is_press else '+'}{self._vk_code}{delay}"
+            return f"{self._get_sign()}{self._vk_code}{delay}"
         else:
-            return f"{'-' if self._is_press else '+'}{self._key_string}{delay}"
+            return f"{self._get_sign()}{self._vk_code}{delay}"
+            # return f"{self._get_sign()}{self._key_string}{delay}"
    
+class Key(object):
+    
+    def __init__(self, key_string, vk_code, reversed = False, delays=[0,0]) -> None:
+        self._key_string = key_string
+        self._delays = delays
+        self._reversed = reversed
+        self._vk_code = vk_code
+        key_event = Key_Event(self._vk_code, True, delays=delays, key_string=key_string)
+        if not self._reversed:
+            self._key_events = [key_event, key_event.get_opposite_key_event()]
+        else:        
+            self._key_events = [key_event.get_opposite_key_event(), key_event]
         
+    def get_vk_code(self):
+        return self._vk_code
+    
+    def get_key_string(self):
+        return self._key_string
+    
+    def get_key_events(self):
+        return self._key_events
+    
+    def __repr__(self):
+        delay = f"|{self._delays[0]}|{self._delays[1]}"
+        delay = ''
+        if self._reversed:
+            return f"!{self._key_string}{delay}"
+        else:
+            return f"{self._key_string}{delay}"        
         
         
         
