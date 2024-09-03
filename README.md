@@ -7,9 +7,10 @@
 A minimalistic Python-based Snap Tapping program compatible with all keyboards and supports:
 - Adjustable Tap Groups (mutually exclusive keys with Snap Tap functionality)
 - Key Rebinds/Replacements - replaced keys which can also be evaluated by Tap Groups/Macros
-- Macros (Aliases, Null binds) - no interference with Tap Group Keys
+- Macros (Aliases, Null binds) - supports key combinations, key prohibition and played keys have no interference with Tap Group Keys
 - Custom delay for every key event that helps to NOT be recognised as input automation because the input is not as perfect
   - see [### Example Use Cases for Aliases (to show what is possible right now)](https://github.com/wasiejen/Free-Snap-Tap?tab=readme-ov-file#examplesfor-aliases-to-show-what-is-possible-right-now)
+- With Autofocus option: to only be active if a certain active window is in focus (see # Configuration)
 - With simple Command Line Interface (CLI)
 
 <img width="900" alt="FST" src="https://github.com/user-attachments/assets/6160fa32-e598-448f-bd67-7ef0cd02b081">
