@@ -7,9 +7,10 @@
 A minimalistic Python-based Snap Tapping program compatible with all keyboards and supports:
 - Adjustable Tap Groups (mutually exclusive keys with Snap Tap functionality)
 - Key Rebinds/Replacements - replaced keys which can also be evaluated by Tap Groups/Macros
-- Macros (Aliases, Null binds) - no interference with Tap Group Keys
+- Macros (Aliases, Null binds) - supports key combinations, key prohibition and played keys have no interference with Tap Group Keys
 - Custom delay for every key event that helps to NOT be recognised as input automation because the input is not as perfect
   - see [### Example Use Cases for Aliases (to show what is possible right now)](https://github.com/wasiejen/Free-Snap-Tap?tab=readme-ov-file#examplesfor-aliases-to-show-what-is-possible-right-now)
+- With Autofocus option: to only be active if a certain active window is in focus (see # Configuration)
 - With simple Command Line Interface (CLI)
 
 <img width="900" alt="FST" src="https://github.com/user-attachments/assets/6160fa32-e598-448f-bd67-7ef0cd02b081">
@@ -19,12 +20,15 @@ _pic1: CLI Menu_
 All Tap Groups, Rebinds and Macros/Aliases are saved in an external file (default `FSTconfig.txt`) and can be edited directly.
 
 **Tap Groups** 
-- multiple Keys seperated by commas - `w,s`,`a,d` or `1,2,3,4`. Each key without modifiers.
+- Mutually exclusive keys - the most recent key press will always be priotized; constantly pressed keys will be repressed if others keys are released again (snap tap).
+- Multiple Keys seperated by commas - `w,s`,`a,d` or `1,2,3,4`. Each key without modifiers.
 
 **Rebinds** 
+- Directly replaces one key with another and supress the original key. Windows keys, caps_lock and other keys can be remapped. Helpful for games that do not or only partly support rebinding ingame.
 - 2 keys seperates by `:`. `c : ctrl`, `+p : +mouse_right`. Replacement key will be evaluated in Tap Groups and Macros. Source Key will be supressed and not evaluated.
 
 **Macros/Aliases** 
+- A trigger will play a sequence of key_events (presses, releases) with custom delay for each key. Supports key prohibition - key not allowed to be pressed to trigger the trigger combination.
 - 2 Key Groups (Keys seperated by comma) seperated by `:`. 
 - First group will be the trigger combination (one key or more), second group is the key sequence to be played. 
 
@@ -102,13 +106,14 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
 -  `-file="filename"`: (with or without "): custom save file
 -  `-debug`: print out some debug info
 -  `-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  
--  `-delay="number ,number"`: sets the default min and max delay of "number,number" ms for Tap_Groups and Key_Groups (can be set in a range of 1-1000)
+-  `-tapdelay="number, number"`: sets the default min and max delay of "number,number" ms for Tap_Groups
+-  `-aliasdelay="number, number"`: sets the default min and max delay of "number,number" ms for Macros/Aliases
 -  `-crossover="number"`: sets the probability of "number" percent for a crossover (can be set in a range of 0-100)
    - A crossover is key event reversal with delay - press and release are overlapping the time of delay
 -  `-nodelay`: deactivates delay and crossover
 -  `-focusapp="part of the app name"`: Script only activate evaluaten of key events if the defined window with the given name is in focus.
    - e.g. for Counterstrike, `-focusapp=count` is enough to recognize it (not case sensitive)
-   - can be manually overwritten by Control on DEL key (to activate outside and deactivate inside focus app)
+   - can be manually overwritten by Control on ALT+DEL key combination (to activate outside and deactivate inside focus app)
   
 ### Example batch file
 Example is for use with CMD, for PowerShell replace ^ with \` for multiline start arguments.
