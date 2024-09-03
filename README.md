@@ -1,4 +1,4 @@
-# Free Snap Tap: Universal Keyboard Snap Tap with Tap Groups, Rebinds (Key Replacements), Macros (Aliases) and custom delay on a per key basis.
+# Free Snap Tap: Universal Keyboard Snap Tap with Tap Groups, Rebinds (Key Replacements), Macros (Aliases) and custom adjustable delay for each key.
 
 **Works as of V0.8.0 without triggering Valve Anti Cheat (if delays are not set too short :-) )**
 
@@ -74,7 +74,7 @@ String representation or vk-codes (virtual keyboard codes — list in py file) c
 #### **only for macros**
 - `|` behind a key is the the max delay for this single key (e.g. `-k|10` -> press k with a max delay of 10)
 - `|*max*|*min*` defines min and max delay (e.g. `-k|10|2` or `-k|2|10` -> press k with a max delay of 10 and min delay of 2)
-- `!` before a key in the first key group means (trigger group) will be seen as `probited key` - if that key is pressed, the trigger will not trigger ^^
+- `!` before a key in the first key group means (trigger group) will be seen as `prohibited key` - if that key is pressed, the trigger will not trigger ^^
 
 
 This is only usable in key_groups. not supported in tap_groups yet.
@@ -134,7 +134,7 @@ pause
 
 **V0.9.0**
 - NEW: Key combinations for Macros/Aliases
-- NEW: Key prohibtion in key combinations 
+- NEW: Key prohibtion via `! notation` for trigger key combination of a macro
   - see example down below
 - NEW: simplified CLI Menu 
   - now with option to directly open the config file in your default txt editor
