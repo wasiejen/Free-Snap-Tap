@@ -20,12 +20,15 @@ _pic1: CLI Menu_
 All Tap Groups, Rebinds and Macros/Aliases are saved in an external file (default `FSTconfig.txt`) and can be edited directly.
 
 **Tap Groups** 
-- multiple Keys seperated by commas - `w,s`,`a,d` or `1,2,3,4`. Each key without modifiers.
+- Mutually exclusive keys - the most recent key press will always be priotized; constantly pressed keys will be repressed if others keys are released again (snap tap).
+- Multiple Keys seperated by commas - `w,s`,`a,d` or `1,2,3,4`. Each key without modifiers.
 
 **Rebinds** 
+- Directly replaces one key with another and supress the original key. Windows keys, caps_lock and other keys can be remapped. Helpful for games that do not or only partly support rebinding ingame.
 - 2 keys seperates by `:`. `c : ctrl`, `+p : +mouse_right`. Replacement key will be evaluated in Tap Groups and Macros. Source Key will be supressed and not evaluated.
 
 **Macros/Aliases** 
+- A trigger will play a sequence of key_events (presses, releases) with custom delay for each key. Supports key prohibition - key not allowed to be pressed to trigger the trigger combination.
 - 2 Key Groups (Keys seperated by comma) seperated by `:`. 
 - First group will be the trigger combination (one key or more), second group is the key sequence to be played. 
 
