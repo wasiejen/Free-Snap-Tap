@@ -1,4 +1,4 @@
-# Free Snap Tap: Universal Keyboard Snap Tap with Tap Groups, Rebinds (Key Replacemen, Macros (Aliases) and custom delay on a per key basis.
+# Free Snap Tap: Universal Keyboard Snap Tap with Tap Groups, Rebinds (Key Replacements), Macros (Aliases) and custom delay on a per key basis.
 
 **Works as of V0.8.0 without triggering Valve Anti Cheat (if delays are not set too short :-) )**
 
