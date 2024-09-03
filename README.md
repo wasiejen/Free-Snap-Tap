@@ -102,13 +102,14 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
 -  `-file="filename"`: (with or without "): custom save file
 -  `-debug`: print out some debug info
 -  `-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  
--  `-delay="number ,number"`: sets the default min and max delay of "number,number" ms for Tap_Groups and Key_Groups (can be set in a range of 1-1000)
+-  `-tapdelay="number, number"`: sets the default min and max delay of "number,number" ms for Tap_Groups
+-  `-aliasdelay="number, number"`: sets the default min and max delay of "number,number" ms for Macros/Aliases
 -  `-crossover="number"`: sets the probability of "number" percent for a crossover (can be set in a range of 0-100)
    - A crossover is key event reversal with delay - press and release are overlapping the time of delay
 -  `-nodelay`: deactivates delay and crossover
 -  `-focusapp="part of the app name"`: Script only activate evaluaten of key events if the defined window with the given name is in focus.
    - e.g. for Counterstrike, `-focusapp=count` is enough to recognize it (not case sensitive)
-   - can be manually overwritten by Control on DEL key (to activate outside and deactivate inside focus app)
+   - can be manually overwritten by Control on ALT+DEL key combination (to activate outside and deactivate inside focus app)
   
 ### Example batch file
 Example is for use with CMD, for PowerShell replace ^ with \` for multiline start arguments.
