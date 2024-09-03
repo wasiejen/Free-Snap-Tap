@@ -443,16 +443,20 @@ def win32_event_filter(msg, data):
     # check for simulated keys:
     if not is_simulated: # is_simulated_key_event(data.flags):
         
-        manage_key_states_by_event(current_ke)
+        # stop repeating keys from being evaluated
+        if last_real_ke == current_ke:
+            listener.suppress_event() 
+        last_real_ke = current_ke
+        
+        key_released = False        
+        if current_ke not in rebinds.keys():
+            manage_key_states_by_event(current_ke)
+            if DEBUG:
+                print(f"pressed key: {pressed_keys}, released keys: {released_keys}")
 
         # Replace some Buttons :-D
         if not PAUSED and not PRINT_VK_CODES:
                       
-            # stop repeating keys from being evaluated
-            if last_real_ke == current_ke:
-                listener.suppress_event() 
-            last_real_ke = current_ke
-
             # check for rebinds and replace current key event with replacement key event
             try:
                 # old_ke = current_ke
@@ -516,12 +520,13 @@ def win32_event_filter(msg, data):
                     thread = Alias_Thread(macros[trigger])
                     if DEBUG:
                         print("> playing makro:", trigger)
-                    thread.start()   
+                    thread.start()  
                     
             # to remove the key from released_keys after evaluation of triggers
             # so can only trigger once
             if not is_keydown:
-                remove_key_release_state(current_ke.get_vk_code())                       
+                remove_key_release_state(current_ke.get_vk_code())  
+                key_released = True          
         
         def check_for_combination(vk_codes):                 
             all_active = True
@@ -594,6 +599,11 @@ def win32_event_filter(msg, data):
         # supress event that triggered an alias - done here because it should also update tap groups before
         if alias_fired is True:
             listener.suppress_event()
+            
+        # to remove the key from released_keys after evaluation of triggers
+        # so can only trigger once
+        if not is_keydown and not key_released:
+            remove_key_release_state(current_ke.get_vk_code()) 
      
     # here arrive all key_events that will be send - last place to intercept
     # here the interception of interference of alias with tap groups is realized
@@ -808,6 +818,7 @@ class Focus_Thread(Thread):
                 if active_window.lower().find(self.focus_app_name) >= 0:
                     if PAUSED:
                         try:
+                            #reset_key_states()
                             reload_all_groups()
                             print("--- reloaded ---")
                             print('--- auto focus resumed ---')
