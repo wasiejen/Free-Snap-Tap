@@ -6,24 +6,28 @@
 
 A minimalistic Python-based Snap Tapping program compatible with all keyboards and supports:
 - Adjustable Tap Groups (mutually exclusive keys with Snap Tap functionality)
-- Key Rebinds/Replacements - change keys which can also be evaluated by Tap Groups
-- Macros (Aliases, Null binds)
+- Key Rebinds/Replacements - replaced keys which can also be evaluated by Tap Groups/Macros
+- Macros (Aliases, Null binds) - no interference with Tap Group Keys
 - Custom delay for every key event that helps to NOT be recognised as input automation because the input is not as perfect
   - see [### Example Use Cases for Aliases (to show what is possible right now)](https://github.com/wasiejen/Free-Snap-Tap?tab=readme-ov-file#examplesfor-aliases-to-show-what-is-possible-right-now)
-- With CLI User Interface to manage Tap_Groups and Key_Groups
+- With simple Command Line Interface (CLI)
 
 <img width="500" alt="FST" src="https://github.com/user-attachments/assets/7896509d-bc2a-4927-8dd4-5bc6d4f5adf9">
+<img width="500" alt="FST" src="https://github.com//wasiejen/Free-Snap-Tap/picture/CLI_Menu.png">
 
-pic1: (my key_groups for testing the update V0.8.0)
+_pic1: CLI Menu_
 
+All Tap Groups, Rebinds and Macros/Aliases are saved in an external file (default `FSTconfig.txt`) and can be edited directly.
 
-Tap_Groups are saved in a separate `tap_groups.txt` file and Key_Groups in `key_groups.txt`. Both can be edited directly.
-- Each line represents one Tap Group, and each key is to be separated by a comma and can have 1 or more keys in it. (e.g. `1, 2, 3, 4` or `left_shift, left_control, alt` or just `v` would also be possible)
-- Each line in the Key Groups can be Key Replacements (2 keys) or Aliases (more than 2 keys).
-  - Key Replacments will also be evaluated by Tap groups and have no delay. Output is syncronious to input. 
-  - Aliases will be played immediately with Trigger and have costumisable delay.
-- Comments work with `#` for line comment, single key commenting out, comment after key sequence.
-String representation or vk-codes (virtual keyboard codes—list in py file) can also be used. 
+**Tap Group** - multiple Keys seperated by commas - `w,s`,`a,d` or `1,2,3,4`. Each key without modifiers.
+
+**Rebind** - 2 keys seperates by `:`. `c : ctrl`, `+p : +mouse_right`. Replacement key will be evaluated in Tap Groups and Macros. Source Key will be supressed and not evaluated.
+
+**Macros/Aliases** - 2 Key Groups (Keys seperated by comma) seperated by `:`. 
+First group will be the trigger combination (one key or more), second group is the key sequence to be played. 
+
+Comments work with `#` for line comment, single key commenting out and comment after key sequence.
+String representation or vk-codes (virtual keyboard codes — list in py file) can also be used. 
 
 ## Examples for Tap Groups
 
@@ -40,29 +44,36 @@ String representation or vk-codes (virtual keyboard codes—list in py file) can
 
 ## Examples for Key Replacements
 
-- `windows_left, left_control` 
-- `<, left_shift`
-- `-t, +t` , `+t, -t` - key press/release reversal
+- `windows_left : left_control` 
+- `< : left_shift`
+- `-t : +t` , `+t : -t` - press t will be rebind to release t and release t to press t (input reversal) same as `t : !t`
 
 ## Examples for Aliases (to show what is possible right now)
 
-- `-k,  p|10,  o|5,  i|15|3`: when `k` is pressed , send `p` with a max delay of 10 ms, then `o` with max delay of 5 ms, then `i` with min delay of 3 ms and max of 10 ms (order of delays via `|` is free - it fetches the smaller one as min and the bigger one as max)
-- `+o,r,e,v,e,r,s,e,d,-left_shift,w,o,r,l,d,+left_shift`: when `o` is released -> "reversedWORLD"
-- `-o,-left_shift,h,e,l,l,o,+left_shift,w,o,r,l,d`: when `o` is pressed -> "HELLOworld"
-- `--,-+,++,+mouse_left, +mouse_right`: when `-` is pressed sends a `+` press and release, and only sends the release of `mouse_left` button and `mouse_right` button
-- `+-,o,k # inline comments work also`: when `-` is released -> "ok"
-- `h, h, e, #l, l, o # here key commented out`: when `h` is pressed -> "helo", but also when h is released -> "helo" (2 for h tap -> "helohelo")
-- `# h, h, e, #l, l, o # whole line commented out`
-- `-n, suppress`: n press will be suppressed, n release still be send
+- `-k :  p|10,  o|5,  i|15|3`: when `k` is pressed , send `p` with a max delay of 10 ms, then `o` with max delay of 5 ms, then `i` with min delay of 3 ms and max of 10 ms (order of delays via `|` is free - it fetches the smaller one as min and the bigger one as max)
+- `+o :r,e,v,e,r,s,e,d,-left_shift,w,o,r,l,d,+left_shift`: when `o` is released -> "reversedWORLD"
+- `-- :-+,++,+mouse_left, +mouse_right`: when `-` is pressed sends a `+` press and release, and only sends the release of `mouse_left` button and `mouse_right` button
+- `+- :o,k # inline comments work also`: when `-` is released -> "ok"
+- `h : h, e, #l, l, o # here key commented out`: when `h` is pressed -> "helo", but also when h is released -> "helo" (2 for h tap -> "helohelo")
+- `-n : suppress`: n press will be suppressed, n release still be send
 
-### Key Modifier explanation:
+#### New with 9.0: key combinations and prohibited keys (e.g. !ctrl)
+- `-space, !ctrl: -space|125|125, -ctrl|325|325, +ctrl|0|0, +space|0|0`: when space is pressed and **control is not pressed** (e.g. crouched) will jump, delay 125ms, crouch for 325 ms and releases both (for counterstrike with default bindings)
+- `+d, !ctrl, !space: +d|15|5, -a|100|100, +a|0|0`: when d is released and **control and space are not pressed** then release d, wait 5-15ms, make counter strafe by pressing a for 100 ms and then releasing without further delay after
+  - the fun part is now you could define `+d, !ctrl: +d|15|5, -a|150|150, +a|0|0` which will only be applied if you jump and release the movement key
+
+## Key Modifier explanation:
+#### **for rebinds and macros**
 - `` nothing in front of a key is synchronious input (press is a press, release is a release)
 - `-` in front of a key is a press (down without up)
 - `+` in front of a key is a release (up without down)
-- `!` in front of a key is a release and a key (reversed synchronious input)
+- `!` in front of a key is a release and a key (reversed synchronious input) (only rebind!)
+- `#` in front of a key, comments that key out and will not be used
+#### **only for macros**
 - `|` behind a key is the the max delay for this single key (e.g. `-k|10` -> press k with a max delay of 10)
 - `|*max*|*min*` defines min and max delay (e.g. `-k|10|2` or `-k|2|10` -> press k with a max delay of 10 and min delay of 2)
-- `#` in front of a key, comments that key out and will not be used
+- `!` before a key in the first key group means (trigger group) will be seen as `probited key` - if that key is pressed, the trigger will not trigger ^^
+
 
 This is only usable in key_groups. not supported in tap_groups yet.
 
@@ -76,19 +87,18 @@ This is only usable in key_groups. not supported in tap_groups yet.
 
 ## Controls
 
-- **Toggle Pause:** Press the `DELETE` key to pause or resume the program.
+- **Toggle Pause:** Press the `ALT + DELETE` key to pause or resume the program.
   - resuming will reload key and tap groups from files
-- **Stop Execution:** Press the `END` key to stop the program.
-- **Return to Menu:** Press the `PAGE_DOWN` key to return to the menu.
+- **Stop Execution:** Press the `ALT + END` key to stop the program.
+- **Return to Menu:** Press the `ALT + PAGE_DOWN` key to return to the menu.
 
-You can change the control keys in the py file under # Control keys.
+You can change the control key combinations in the py file under # Control key combination.
 
 ## Configuration
 
 Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_tap.exe)
 -  `-nomenu` skips the menu and will be directly active
--  `-tapfile="filename"`: (with or without "): load and save tap groupings from a custom save file
--  `-keyfile="filename"`: (with or without "): load and save key groupings from a custom save file
+-  `-file="filename"`: (with or without "): custom save file
 -  `-debug`: print out some debug info
 -  `-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  
 -  `-delay="number ,number"`: sets the default min and max delay of "number,number" ms for Tap_Groups and Key_Groups (can be set in a range of 1-1000)
@@ -99,9 +109,6 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
    - e.g. for Counterstrike, `-focusapp=count` is enough to recognize it (not case sensitive)
    - can be manually overwritten by Control on DEL key (to activate outside and deactivate inside focus app)
   
-Tap Groupings are a set of keys that are observed and the output of each group is separately handled. Activation of a key is mutually exclusive to all others—so there will always be only one activated key.
-You can define Tap Groupings or Key Groups (Rebinds and Aliases) via Command Line or via editing the `tap_groups.txt` or `key_groups.txt`.
-
 ### Example batch file
 Example is for use with CMD, for PowerShell replace ^ with \` for multiline start arguments.
 To Use the exe replace line `python .\free_snap_tap.py ^` with `.\free_snap_tap.exe ^`.
@@ -110,22 +117,109 @@ To Use the exe replace line `python .\free_snap_tap.py ^` with `.\free_snap_tap.
 @echo off
 .\free_snap_tap.exe ^
 ::-debug ^
-::-tapfile=my_taps.txt ^
-::-keyfile=my_keys.txt ^
--crossover=20 ^
--tapdelay=5,2 ^
--aliasdelay=5,2 ^
+::-file=my_taps.txt ^
+-crossover=50 ^
+-delay=10,2 ^
 ::-nomenu ^
 ::-nocontrols ^
 ::-nodelay ^
-::-focusapp=count ^
-::
-pause
+::-focusapp=count
 
 pause
 ```
 
 ## Current Version Information
+
+**V0.9.0**
+- NEW: Key combinations for Macros/Aliases
+- NEW: Key prohibtion in key combinations 
+  - see example down below
+- NEW: simplified CLI Menu 
+  - now with option to directly open the config file in your default txt editor
+  - (didn't want to further support that cumbersome edit option) :-)
+- NEW: One file now for all settings
+  - NEW: start agrument `-file=*filename*`
+  - start argument `-tapfile=` and -`keyfile=` removed
+- NEW: Changed formatting of rebinds and macros
+  - now uses `:` to differentiate between key groups
+    - for Rebinds: `left_windows : ctrl`
+    - for Macros: `+w, !left_control : +w|15|5, -s|100|100, +s|0|0 `
+- NEW: Controls are now default activated per `ALT+Control key` combination
+- NEW: nearly completely rewritten :-)
+- probably some more things I have just forgotten to mention ^^
+
+  #### Example
+
+  - `+d, !ctrl, !space: +d|15|5, -a|100|100, +a|0|0`: when d is released and **control and space are not pressed** then release d, wait 5-15ms, make counter strafe by pressing a for 100 ms and then releasing without further delay after
+    - the fun part is now you could define `+d, !ctrl: +d|15|5, -a|150|150, +a|0|0` with differnt counter strafe duration which will only be applied if you jump and release the movement key
+
+
+## How Free Snap Tap Works 
+
+Snap Tapping is a feature that enhances your keyboard's responsiveness by prioritizing the most recent key input when multiple keys are pressed simultaneously. Here’s how it operates:
+
+1. **Intercepting Keyboard Input:** The program monitors the keys defined in the Tap Groupings. When you press any of these keys, the program intercepts the input.
+2. **Suppressing Original Input:** Instead of allowing the original key press to be sent directly to your computer, the program suppresses it. This means the original input is not immediately processed by your system or application.
+3. **Sending Idealized Input:** The program then determines the ideal input based on the most recent key press. For example, if you press `A` and then `D` without releasing `A`, the program will prioritize `D` and if you release `D`, `A` will be pressed again as long it is pressed. This idealized input is then sent to your system, ensuring that the most recent direction is registered.
+
+## Easy Usage
+
+- Download the executable from the actual [releases](https://github.com/wasiejen/Free-Snap-Tap/releases).
+- Start via `free_snap_tap.exe` or the provided bat(ch) file and a Command Line Interface will open with further explanations.
+- to costumize the start with many options see `# Comfiguration`. Example batch file can also be found there.
+- To start from the menu hit [Enter].
+- Have fun. :-)
+
+### AntiVir False Positives
+- The exe is offered to simplify the usage, it may get a false positive from some antivirus tools and be detected as a trojan. The reason for that seems to be the packaging as an executable that triggers these antivirus software and leads to false positives. See Discussion #12.
+  - Option 1: if recognised as trojan - whitelist it in your antivir.
+  - Option 2: instead use the py file - See `# Installation` for more info
+
+## Installation
+
+1. **Install Python:** Ensure Python 3.6 or higher is installed on your system. You can download it from [python.org](https://www.python.org/).
+2. **Install `pynput` Package:** Open your terminal or command prompt and run:
+
+```bash
+pip install pynput
+```
+
+or navigate to the Free-Snap-Tap repo folder and type in:
+
+```bash
+pip install -r requirements.txt
+```
+
+3. **Starting the Program:**
+
+    3.1 **Option A: directly:** By  clicking/executing the `example_batch_file.bat` file.
+
+    3.2 **Option B: via Command Line:** Start a Command Line/Terminal, navigate to the folder containing the .py file and use one of the follwing commands:
+
+```bash
+./example_batch_file.bat
+```
+
+or navigate to the Free-Snap-Tap repo folder and type in:
+
+```bash
+python ./free_snap_tap.py
+```
+
+## On Linux 
+
+Not working due to no support of selective key supression in Linux OS.
+
+## On MacOS - **Not supported atm**
+
+Compared to linux the selective event suppression is possible, but it uses another listener constructor and gets other data than the win32_event_filter which is used here. Since this conversion/switch/alternative is not implemented yet, the program will not work on MacOS. But there might be a fix for that in the future.
+
+## On Feedback:
+
+Feel free to give feedback. This program is a fun project to me to get more comfortable with Github and testing out some things in Python. :-)
+If you have wishes or ideas what to add, just `create a issue` or `start a discussion` with a description and use cases of the feature.
+
+### Version History
 
 **V0.8.5**
 - NEW: Tap Groups have always priority before Alias execution
@@ -216,72 +310,6 @@ See [### Example Use Cases for Aliases (to show what is possible right now)](htt
   - `#` in front a the key - does nothing to first key, as second key send a release when key pressed and a press when key released
  
 - activation of crossover now forces delay to be active (with default settings 2ms and 10 ms in py file)
-
-## How Free Snap Tap Works
-
-Snap Tapping is a feature that enhances your keyboard's responsiveness by prioritizing the most recent key input when multiple keys are pressed simultaneously. Here’s how it operates:
-
-1. **Intercepting Keyboard Input:** The program monitors the keys defined in the Tap Groupings. When you press any of these keys, the program intercepts the input.
-2. **Suppressing Original Input:** Instead of allowing the original key press to be sent directly to your computer, the program suppresses it. This means the original input is not immediately processed by your system or application.
-3. **Sending Idealized Input:** The program then determines the ideal input based on the most recent key press. For example, if you press `A` and then `D` without releasing `A`, the program will prioritize `D` and if you release `D`, `A` will be pressed again as long it is pressed. This idealized input is then sent to your system, ensuring that the most recent direction is registered.
-
-## Easy Usage
-
-- Download the executable from the actual [releases](https://github.com/wasiejen/Free-Snap-Tap/releases).
-- Start via `free_snap_tap.exe` or the provided bat(ch) file and a Command Line Interface will open with further explanations.
-- Nothing more to do — Tap Groups and Key Replacements can be defined via CLI. To start from the menu hit [Enter].
-- Have fun. :-)
-
-### AntiVir False Positives
-- The exe is offered to simplify the usage, it may get a false positive from some antivirus tools and be detected as a trojan. The reason for that seems to be the packaging as an executable that triggers these antivirus software and leads to false positives. See Discussion #12.
-  - Option 1: if recognised as trojan - whitelist it in your antivir.
-  - Option 2: instead use the py file - See `# Installation` for more info
-
-## Installation
-
-1. **Install Python:** Ensure Python 3.6 or higher is installed on your system. You can download it from [python.org](https://www.python.org/).
-2. **Install `pynput` Package:** Open your terminal or command prompt and run:
-
-```bash
-pip install pynput
-```
-
-or navigate to the Free-Snap-Tap repo folder and type in:
-
-```bash
-pip install -r requirements.txt
-```
-
-3. **Starting the Program:**
-
-    3.1 **Option A: directly:** By  clicking/executing the `example_batch_file.bat` file.
-
-    3.2 **Option B: via Command Line:** Start a Command Line/Terminal, navigate to the folder containing the .py file and use one of the follwing commands:
-
-```bash
-./example_batch_file.bat
-```
-
-or navigate to the Free-Snap-Tap repo folder and type in:
-
-```bash
-python ./free_snap_tap.py
-```
-
-## On Linux 
-
-Not working due to no support of selective key supression in Linux OS.
-
-## On MacOS - **Not supported atm**
-
-Compared to linux the selective event suppression is possible, but it uses another listener constructor and gets other data than the win32_event_filter which is used here. Since this conversion/switch/alternative is not implemented yet, the program will not work on MacOS. But there might be a fix for that in the future.
-
-## On Feedback:
-
-Feel free to give feedback. This program is a fun project to me to get more comfortable with Github and testing out some things in Python. :-)
-If you have wishes or ideas what to add, just `create a issue` or `start a discussion` with a description and use cases of the feature.
-
-### Version History
 
 **V0.7.0**
 - fixed a bug due which the key replacement was never send
