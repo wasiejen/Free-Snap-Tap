@@ -10,5 +10,5 @@ o:p
 z:!z
 
 # Macros
-k,l: -left_shift,h,e,l,l,o,+left_shift
+-k,-l: -left_shift,h,e,l,l,o,+left_shift
 k:h,i

@@ -209,7 +209,7 @@ class Key(object):
         if self._reversed:
             self._key_events[0], self._key_events[1] = self._key_events[1], self._key_events[0]
         
-    def get_vk_codes(self):
+    def get_vk_code(self):
         return self._vk_code
     
     def get_key_string(self):
@@ -239,7 +239,7 @@ class Key_Event(object):
     def get_all(self):
         return self._vk_code, self._is_press, self._delays
 
-    def get_vk_codes(self):
+    def get_vk_code(self):
         return self._vk_code
 
     def get_is_press(self):
@@ -247,27 +247,29 @@ class Key_Event(object):
 
     def get_delays(self):
         return self._delays
+    
     def __hash__(self):
         # return hash((self._vk_code, self._state_pressed))
-        return hash(self.__repr__())
+        return hash(f"{'-' if self._is_press else '+'}{self._vk_code}")
     
+    # to be able to use complimentory to the Key class and return 2 Key_events
     def get_key_events(self):
-        return [self]
+        return [self, self]
     
     def get_key_string(self):
         return self._key_string
     
-    def __eq__(self, other) -> bool:
-        if not isinstance(other, Key_Event):
-            return False
-        else:
-            return (self.get_vk_codes() == other.get_vk_codes()) and (self.get_is_press() is other.get_is_press())
+    def get_opposite_key_event(self):
+        return Key_Event(self._vk_code, not self._is_press, self._delays, self._key_string)
     
-    def __str__(self):
-        if self._key_string is None:
-            return f"Key_Event({self._vk_code}, {self._is_press}, {self._delays})"
-        else:
-            return f"Key_Event({self._key_string}, {self._is_press}, {self._delays})"
+    def __eq__(self, other) -> bool:
+        return (self.get_vk_code() == other.get_vk_code()) and (self.get_is_press() is other.get_is_press())
+    
+    # def __str__(self):
+    #     if self._key_string is None:
+    #         return f"Key_Event({self._vk_code}, {self._is_press}, {self._delays})"
+    #     else:
+    #         return f"Key_Event({self._key_string}, {self._is_press}, {self._delays})"
         
     def __repr__(self):
         delay = f"|{self._delays[0]}|{self._delays[1]}"#
