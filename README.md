@@ -115,7 +115,7 @@ To Use the exe replace line `python .\free_snap_tap.py ^` with `.\free_snap_tap.
 
 ```bash
 @echo off
-python .\free_snap_tap.py ^
+.\free_snap_tap.exe ^
 ::-debug ^
 ::-file=my_taps.txt ^
 -crossover=50 ^

@@ -434,6 +434,7 @@ def win32_event_filter(msg, data):
     if PRINT_VK_CODES or DEBUG:
         print(f"time: {data.time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
 
+
     # if DEBUG: 
     #     print(f"vk_code: {vk_code}")
     #     print("msg: ", msg)
@@ -443,7 +444,7 @@ def win32_event_filter(msg, data):
     if not is_simulated: # is_simulated_key_event(data.flags):
         
         manage_key_states_by_event(current_ke)
-        
+
         # Replace some Buttons :-D
         if not PAUSED and not PRINT_VK_CODES:
                       
@@ -778,7 +779,7 @@ def check_start_arguments():
                 print("delay+crossover deactivated")
             elif arg[:10] == "-focusapp="  and len(arg) > 10:
                 FOCUS_APP_NAME = arg[10:]
-                print(f"> Set app focus to: {FOCUS_APP_NAME}")
+                print(f"focusapp active: looking for: {FOCUS_APP_NAME}")
             else:
                 print("unknown start argument: ", arg)
 
