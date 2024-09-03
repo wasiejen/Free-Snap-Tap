@@ -35,10 +35,9 @@ ACT_CROSSOVER_PROPABILITY_IN_PERCENT = 50
 ALIAS_MIN_DELAY_IN_MS = ACT_MIN_DELAY_IN_MS 
 ALIAS_MAX_DELAY_IN_MS = ACT_MAX_DELAY_IN_MS
 
-# Define File name for saving of Tap Groupings and Key Groups
-# FILE_NAME_TAP_GROUPS = 'tap_groups.txt'
-# FILE_NAME_KEY_GROUPS = 'key_groups.txt'
-FILE_NAME_ALL = 'allinone.txt'
+# Define File name for saving of everything, can be any filetype
+# But .txt or .cfg recommended for easier editing
+FILE_NAME_ALL = 'FSTconfig.txt'
 
 # Constants for key events
 WM_KEYDOWN = [256,260] # _PRESS_MESSAGES = (_WM_KEYDOWN, _WM_SYSKEYDOWN)
@@ -429,7 +428,7 @@ def win32_event_filter(msg, data):
     is_simulated = is_simulated_key_event(data.flags)
     
     current_ke = Key_Event(vk_code, is_keydown)
-    _activated_triggers: []
+    _activated_triggers = []
     _played_triggers = []
       
     if PRINT_VK_CODES or DEBUG:
@@ -594,9 +593,7 @@ def win32_event_filter(msg, data):
         # supress event that triggered an alias - done here because it should also update tap groups before
         if alias_fired is True:
             listener.suppress_event()
-        
-
-            
+     
     # here arrive all key_events that will be send - last place to intercept
     # here the interception of interference of alias with tap groups is realized
     if is_simulated:
@@ -684,7 +681,7 @@ def display_menu():
         print('\n------ Options -------')
         print(f"1. Open file:'{FILE_NAME_ALL}' in your default editor.")
         print("2. Reload everything from file.")
-        print("3. Print virtuell key codes to identify keys.")
+        print("3. Print virtual key codes to identify keys.")
         print("4. End the program/script.", flush=True)
         
         sys.stdout.flush()
@@ -828,7 +825,7 @@ class Focus_Thread(Thread):
                         if last_active_window != active_window:
                             print(f"> Active Window: {active_window}")
                             last_active_window = active_window
-            sleep(1)
+            sleep(0.5)
 
     def pause(self):
         global FOCUS_THREAD_PAUSED

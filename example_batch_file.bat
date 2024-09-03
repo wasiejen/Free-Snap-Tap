@@ -8,6 +8,6 @@
 ::-nomenu ^
 ::-nocontrols ^
 ::-nodelay ^
-::-focusapp=count ^
-::
+::-focusapp=count 
+
 pause
