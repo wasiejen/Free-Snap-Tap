@@ -12,19 +12,21 @@ A minimalistic Python-based Snap Tapping program compatible with all keyboards a
   - see [### Example Use Cases for Aliases (to show what is possible right now)](https://github.com/wasiejen/Free-Snap-Tap?tab=readme-ov-file#examplesfor-aliases-to-show-what-is-possible-right-now)
 - With simple Command Line Interface (CLI)
 
-<img width="500" alt="FST" src="https://github.com/user-attachments/assets/7896509d-bc2a-4927-8dd4-5bc6d4f5adf9">
-<img width="500" alt="FST" src="https://github.com//wasiejen/Free-Snap-Tap/picture/CLI_Menu.png">
+<img width="900" alt="FST" src="https://github.com/user-attachments/assets/6160fa32-e598-448f-bd67-7ef0cd02b081">
 
 _pic1: CLI Menu_
 
 All Tap Groups, Rebinds and Macros/Aliases are saved in an external file (default `FSTconfig.txt`) and can be edited directly.
 
-**Tap Group** - multiple Keys seperated by commas - `w,s`,`a,d` or `1,2,3,4`. Each key without modifiers.
+**Tap Groups** 
+- multiple Keys seperated by commas - `w,s`,`a,d` or `1,2,3,4`. Each key without modifiers.
 
-**Rebind** - 2 keys seperates by `:`. `c : ctrl`, `+p : +mouse_right`. Replacement key will be evaluated in Tap Groups and Macros. Source Key will be supressed and not evaluated.
+**Rebinds** 
+- 2 keys seperates by `:`. `c : ctrl`, `+p : +mouse_right`. Replacement key will be evaluated in Tap Groups and Macros. Source Key will be supressed and not evaluated.
 
-**Macros/Aliases** - 2 Key Groups (Keys seperated by comma) seperated by `:`. 
-First group will be the trigger combination (one key or more), second group is the key sequence to be played. 
+**Macros/Aliases** 
+- 2 Key Groups (Keys seperated by comma) seperated by `:`. 
+- First group will be the trigger combination (one key or more), second group is the key sequence to be played. 
 
 Comments work with `#` for line comment, single key commenting out and comment after key sequence.
 String representation or vk-codes (virtual keyboard codes — list in py file) can also be used. 
