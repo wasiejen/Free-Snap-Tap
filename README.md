@@ -25,7 +25,7 @@ All Tap Groups, Rebinds and Macros/Aliases are saved in an external file (defaul
 
 **Rebinds** 
 - Directly replaces one key with another and supress the original key. Windows keys, caps_lock and other keys can be remapped. Helpful for games that do not or only partly support rebinding ingame.
-- 2 keys seperates by `:`. `c : ctrl`, `+p : +mouse_right`. Replacement key will be evaluated in Tap Groups and Macros. Source Key will be supressed and not evaluated.
+- 2 keys seperates by `:`. `c : ctrl`, `+p : +mouse_right`. Replacement key will be evaluated in Tap Groups and in Triggers for Macros. Source/Trigger Key will be supressed and not evaluated.
 
 **Macros/Aliases** 
 - A trigger will play a sequence of key_events (presses, releases) with custom delay for each key. Supports key prohibition - key not allowed to be pressed to trigger the trigger combination.
@@ -57,10 +57,10 @@ String representation or vk-codes (virtual keyboard codes — list in py file) c
 ## Examples for Aliases (to show what is possible right now)
 
 - `-k :  p|10,  o|5,  i|15|3`: when `k` is pressed , send `p` with a max delay of 10 ms, then `o` with max delay of 5 ms, then `i` with min delay of 3 ms and max of 10 ms (order of delays via `|` is free - it fetches the smaller one as min and the bigger one as max)
-- `+o :r,e,v,e,r,s,e,d,-left_shift,w,o,r,l,d,+left_shift`: when `o` is released -> "reversedWORLD"
+- `+o :r,e,v,e,r,s,e,d,-left_shift,w,o,r,l,d,+left_shift`: when `o` is released -> writes/sends "reversedWORLD"
 - `-- :-+,++,+mouse_left, +mouse_right`: when `-` is pressed sends a `+` press and release, and only sends the release of `mouse_left` button and `mouse_right` button
-- `+- :o,k # inline comments work also`: when `-` is released -> "ok"
-- `h : h, e, #l, l, o # here key commented out`: when `h` is pressed -> "helo", but also when h is released -> "helo" (2 for h tap -> "helohelo")
+- `+- :o,k # inline comments work also`: when `-` is released -> writes/sends "ok"
+- `h : h, e, #l, l, o # here key commented out`: when `h` is pressed -> writes/sends "helo"
 - `-n : suppress`: n press will be suppressed, n release still be send
 
 #### New with 9.0: key combinations and prohibited keys (e.g. !ctrl)
@@ -79,8 +79,7 @@ String representation or vk-codes (virtual keyboard codes — list in py file) c
 - `|*max*|*min*` defines min and max delay (e.g. `-k|10|2` or `-k|2|10` -> press k with a max delay of 10 and min delay of 2)
 - `!` before a key in the first key group means (trigger group) will be seen as `prohibited key` - if that key is pressed, the trigger will not trigger ^^
 
-
-This is only usable in key_groups. not supported in tap_groups yet.
+Key Modifiers do not work in Tap groups and will be ignored.
 
 ## Delay-Settings
 - Delays are random between a min and a max time in ms
@@ -118,23 +117,28 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
 ### Example batch file
 Example is for use with CMD, for PowerShell replace ^ with \` for multiline start arguments.
 To Use the exe replace line `python .\free_snap_tap.py ^` with `.\free_snap_tap.exe ^`.
+Uncomment lines by removing `::` in front of the start arguments.
 
 ```bash
 @echo off
 .\free_snap_tap.exe ^
 ::-debug ^
-::-file=my_taps.txt ^
--crossover=50 ^
--delay=10,2 ^
+::-file=FSTconfig.txt ^
+-crossover=20 ^
+-tapdelay=5,2 ^
+-aliasdelay=5,2 ^
 ::-nomenu ^
 ::-nocontrols ^
 ::-nodelay ^
-::-focusapp=count
+::-focusapp=count 
 
 pause
 ```
 
 ## Current Version Information
+
+**V0.9.1**
+- Bugfix: Tracked released keys were not removed from states list and every key event could trigger macros that used key releases as triggers.
 
 **V0.9.0**
 
