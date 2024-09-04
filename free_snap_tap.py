@@ -12,6 +12,7 @@ from tap_keyboard import Key_Event, Key_Group, Key, Tap_Group
 
 # global variables
 DEBUG = False
+DEBUG2 = False
 PAUSED = False
 MANUAL_PAUSED = False
 STOPPED = False
@@ -62,6 +63,34 @@ tap_groups_hr = []
 rebinds_hr = [] 
 macros_hr = []
 
+# logging
+alias_thread_logging = []
+
+# collect all active keys here for recognition of key combinations
+pressed_keys = set()
+released_keys = set()
+
+# toggle state tracker
+toggle_state = {}
+alias_toggle_lock = Lock()
+
+# save point for times of key presses and releases for real, simulated and combined (all) key events
+time_real_last_pressed = {}
+time_real_last_released = {}
+time_real_released = {}
+time_real_pressed = {}
+time_real = [time_real_last_pressed, time_real_last_released, time_real_released, time_real_pressed]
+time_simulated_last_pressed = {}
+time_simulated_last_released = {}
+time_simulated_released = {}
+time_simulated_pressed = {}
+time_simulated = [time_simulated_last_pressed, time_simulated_last_released, time_simulated_released, time_simulated_pressed]
+time_all_last_pressed = {}
+time_all_last_released = {}
+time_all_released = {}
+time_all_pressed = {}
+time_all = [time_all_last_pressed, time_all_last_released, time_all_released, time_all_pressed]
+
 # Initialize the Controller
 controller = keyboard.Controller()
 mouse_controller = mouse.Controller()
@@ -73,9 +102,10 @@ mouse_vk_codes_dict = {1: mouse.Button.left,
                        4: mouse.Button.middle}
 mouse_vk_codes = mouse_vk_codes_dict.keys()
 
-# collect all active keys here for recognition of key combinations
-pressed_keys = set()
-released_keys = set()
+# save point to recognise repeating real key input and stop evaluating it
+last_real_ke = Key_Event(0,True)
+# last_virtual_ke = Key_Event(0,True)
+
 
 def add_key_press_state(vk_code):    
     pressed_keys.add(vk_code)    
@@ -102,7 +132,7 @@ def remove_key_release_state(vk_code):
         if DEBUG:
             print(f"release state error: {error}")
 
-
+# file handling and hr display of groups
 def load_groups(file_name):
     '''
     reads in the file and removes the commented out lines, keys and inline comments
@@ -210,6 +240,7 @@ def reset_tap_groups_txt():
     add_group(['w','s'], tap_groups_hr)
     save_groups(FILE_NAME_ALL)
 
+# initializing and convenience functions
 def convert_to_vk_code(key):
     '''
     try to convert string input of a key into a vk_code based on vk_code_dict
@@ -246,7 +277,15 @@ def initialize_groups():
             if DEBUG: 
                 print(f"delays for {key}: {delays}")
             # cast in int and ignore all other elements after first 2
-            delays = [int(delay) for delay in delays[:2]]
+            
+            # check for eval in ()
+            # if first char of element in delays is a bracket and at more than 2 chars long -> (something)
+            if delays[0][0] == '(' and len(delays[0]) > 2:
+                ##1
+                delays = delays[0][1:-1] # strip brackets
+                
+            else:      
+                delays = [int(delay) for delay in delays][:2]
         else:
             delays = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
             
@@ -266,6 +305,10 @@ def initialize_groups():
                 # up key
                 key_modifier = 'up'
                 key = key.replace('+','',1)
+            elif key[0] == '^':
+                # up key
+                key_modifier = 'toggle'
+                key = key.replace('^','',1)
             elif key[0] == '!':
                 # revers 
                 if index == 0: # is not trigger
@@ -284,6 +327,8 @@ def initialize_groups():
             new_element = (Key_Event(vk_code, True, delays, key_string=key))
         elif key_modifier == 'up':
             new_element = (Key_Event(vk_code, False, delays, key_string=key))
+        elif key_modifier == 'toggle':
+            new_element = (Key_Event(vk_code, None, delays, key_string=key, toggle=True))
         elif key_modifier == 'reversed':
             new_element = (Key(key, vk_code, delays=delays, reversed=True))
         elif key_modifier == 'prohibited':
@@ -355,23 +400,10 @@ def reload_all_groups():
         print(f"rebinds: {rebinds}")
         print(f"macros: {macros}")
 
-def is_simulated_key_event(flags):
-    return flags & 0x10
-
-def is_press(msg):
-    if msg in WM_KEYDOWN:
-        return True
-    if msg in WM_KEYUP:
-        return False
-
 def delay(max = ALIAS_MAX_DELAY_IN_MS, min = ALIAS_MIN_DELAY_IN_MS, ):
     if min > max: 
         min,max = max,min
     sleep(randint(min, max) / 1000)
-
-def check_for_mouse_vk_code(vk_code):
-    is_mouse_key = vk_code in mouse_vk_codes
-    return is_mouse_key
 
 def get_key_code(is_mouse_key, vk_code):
     if is_mouse_key:
@@ -381,6 +413,11 @@ def get_key_code(is_mouse_key, vk_code):
     return key_code
 
 def send_key_event(key_event, with_delay=False):
+    
+    def check_for_mouse_vk_code(vk_code):
+        is_mouse_key = vk_code in mouse_vk_codes
+        return is_mouse_key
+    
     vk_code, is_press, delays = key_event.get_all()
     is_mouse_key = check_for_mouse_vk_code(vk_code)
     key_code = get_key_code(is_mouse_key, vk_code)
@@ -390,242 +427,134 @@ def send_key_event(key_event, with_delay=False):
         controller_dict[is_mouse_key].release(key_code)
     
     if ACT_DELAY and with_delay: 
-        delay(*delays)
-                
-alias_thread_logging = []
-
-class Alias_Thread(Thread):
-    '''
-    execute macros/alias in its own threads so the delay is not interfering with key evaluation
-    '''
-    def __init__(self, macro):
-        Thread.__init__(self)
-        self.daemon = True
-        self.key_group = macro.get_key_events()
-        
-    def run(self):     
-        try:   
-            # Key_events ans Keys here ...
-            for key_event in self.key_group:
-                alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.get_key_string()}")
-                send_key_event(key_event, with_delay=True)
-        except Exception as error:
-            alias_thread_logging.append(error)
-
-last_real_ke = Key_Event(0,True)
-
-def win32_event_filter(msg, data):
-    """
-    Filter and handle keyboard events.
-    """
-    global PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
-    global key_groups_key_modifier, last_real_ke
-    
-    key_replaced = False
-    alias_fired = False
-    vk_code = data.vkCode
-    is_keydown = is_press(msg)
-    is_simulated = is_simulated_key_event(data.flags)
-    
-    current_ke = Key_Event(vk_code, is_keydown)
-    _activated_triggers = []
-    _played_triggers = []
-      
-    if PRINT_VK_CODES or DEBUG:
-        print(f"time: {data.time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
-
-
-    # if DEBUG: 
-    #     print(f"vk_code: {vk_code}")
-    #     print("msg: ", msg)
-    #     print("data: ", data)
-
-    # check for simulated keys:
-    if not is_simulated: # is_simulated_key_event(data.flags):
-        
-        # stop repeating keys from being evaluated
-        if last_real_ke == current_ke:
-            listener.suppress_event() 
-        last_real_ke = current_ke
-        
-        key_released = False        
-        if current_ke not in rebinds.keys():
-            manage_key_states_by_event(current_ke)
+        if isinstance(delays, str):
+            delay_eval = delay_evaluation(delays)
             if DEBUG:
-                print(f"pressed key: {pressed_keys}, released keys: {released_keys}")
-
-        # Replace some Buttons :-D
-        if not PAUSED and not PRINT_VK_CODES:
-                      
-            # check for rebinds and replace current key event with replacement key event
+                print(f"delay eval value: {delay_eval}")
+            delay(delay_eval, delay_eval)
+        else:
+            delay(*delays)
+        
+def delay_evaluation(delay_eval):
+    
+    # first get vk_code and is_press
+    def get_vk_code_and_press_from_keystring(key_string):
+        vk_code, is_press = None, None
+        # without modifier it will be interpreted as a release
+        if key_string[0] not in ['-', '+']:
+            is_press = False
+        elif key_string[0] == '-':
+            is_press = True
+            key_string = key_string[1:]
+        else:
+            is_press = False  
+            key_string = key_string[1:]
+        vk_code = convert_to_vk_code(key_string)
+        return vk_code, is_press
+    
+    def get_key_time_template(key_string, time_released, time_pressed):
+        '''
+        template for all press and release time functions -> time in ms
+        '''
+        vk_code, is_press = get_vk_code_and_press_from_keystring(key_string)
+        key_time = 0
+        if is_press:
             try:
-                # old_ke = current_ke
-                current_ke = rebinds[current_ke]
-                key_replaced = True
-                vk_code, is_keydown, _ = current_ke.get_all() 
-                # if key is supressed
-                if vk_code == 0:
-                    listener.suppress_event()  
+                key_time = time_released[vk_code]
+                if DEBUG2:
+                    print(f"vk_code: {vk_code} time released: {key_time}")
             except KeyError as error:
-                if DEBUG:
-                    print(f"rebind not found: {error}")
-                    print(rebinds)
-                    
-            ### collect active keys
-            if key_replaced:
-                manage_key_states_by_event(current_ke)
-                if DEBUG:
-                    print(f"replaced a key: pressed key: {pressed_keys}, released keys: {released_keys}")
+                pass
+                #print(f"no key yet for: {error}")     
+        else:
+            try:
+                key_time = time_pressed[vk_code]
+                if DEBUG2:
+                    print(f"vk_code: {vk_code} time pressed: {key_time}")
+            except KeyError as error:
+                pass
+                #print(f"no key yet for vk_code: {error}")
+        return key_time
+    
+    def tr(key_string):
+        '''
+        real press and release time function -> time in ms
+        '''
+        return get_key_time_template(key_string, time_real_released, time_real_pressed)
+    
+    def ts(key_string):
+        '''
+        simulated press and release time function -> time in ms
+        '''
+        return get_key_time_template(key_string, time_simulated_released, time_simulated_pressed)
+    
+    def ta(key_string):
+        '''
+        all combined (real and simulated) press and release time function -> time in ms
+        '''
+        return get_key_time_template(key_string, time_all_released, time_all_pressed)
+    
+    # hardcoded counterstrafe with a polynomial function to destribe acceleration
+    def cs(key_string):
+        x = tr(key_string)
+        if x > 500:
+            velocity = 250
+        else:
+            a = -0.001
+            b = 0.97
+            c = 12
+            velocity = a*pow(x,2) + b*x + c
+        # 100 ms at velo of 250 units/sec breaktime
+        # just a guess for now
+        breaktime = velocity * 100 / 250
+        return round(breaktime)
+        
+    # hardcoded counterstrafe linear
+    def csl(key_string):
+        x = tr(key_string)
+        if x > 500:
+            breaktime = 100
+        else:
+            breaktime = x / (500/100)
+        return round(breaktime)
+
+    result = eval(delay_eval)
+    if DEBUG2:
+        print(f"evaluated {delay_eval} to: {result}")
+    return 0 if result < 0 else result
+
+def set_key_times(key_event_time, vk_code, is_keydown, time_list):
+    time_last_pressed, time_last_released, time_released, time_pressed = time_list
+    if is_keydown:
+        time_last_pressed[vk_code] = key_event_time
+        try:
+            time_released[vk_code] = time_last_pressed[vk_code] - time_last_released[vk_code]
+            #print(f"time released: {time_released[vk_code]}")
+        except KeyError as error:
+            pass
+            #print(f"no key yet for: {error}")     
+    else:
+        time_last_released[vk_code] = key_event_time
+        try:
+            time_pressed[vk_code] = time_last_released[vk_code] - time_last_pressed[vk_code]
+            #print(f"time pressed: {time_pressed[vk_code]}")
+        except KeyError as error:
+            pass
+            #print(f"no key yet for vk_code: {error}")
             
-            # check for macro triggers     
-            _activated_triggers = []     
-            for trigger_group in triggers:
-                keys = trigger_group.get_key_events()
-                if len(keys) == 1:
-                    key = keys[0]
-                    if vk_code == key.get_vk_code() and is_keydown == key.get_is_press():
-                        _activated_triggers.append(trigger_group)  
-                else:
-                    activated = True
-                    for key in keys:
-                        # check if key is pressed
-                        if key.is_prohibited():
-                            # activated = activated and key.get_vk_code() in all_inactive_keys
-                            activated = activated and key.get_vk_code() not in pressed_keys
-                        elif key.get_is_press():
-                            activated = activated and key.get_vk_code() in pressed_keys
-                        else:
-                            activated = activated and key.get_vk_code() in released_keys
-                                                           
-                    if activated:
-                        _activated_triggers.append(trigger_group)  
-                        if DEBUG:
-                            print(f"trigger group {trigger_group} activated")
-           
-            # remove triggers from played that are not activated any more
-            cleaned_triggers = []         
-            for trigger in _played_triggers:
-                if trigger in _activated_triggers:
-                    cleaned_triggers.append(trigger)
-            _played_triggers = cleaned_triggers    
-           
-            # play trigger if not already played
-            for trigger in _activated_triggers:
-                if trigger not in _played_triggers:
-                    _played_triggers.append(trigger)
-                    if DEBUG:
-                        print(f"added trigger to played triggers: {_played_triggers}")
-                    # as help to later supress startin event AFTER it goes through the tap_groups
-                    alias_fired = True
-                    thread = Alias_Thread(macros[trigger])
-                    if DEBUG:
-                        print("> playing makro:", trigger)
-                    thread.start()  
-                    
-            # to remove the key from released_keys after evaluation of triggers
-            # so can only trigger once
-            if not is_keydown:
-                remove_key_release_state(current_ke.get_vk_code())  
-                key_released = True          
-        
-        def check_for_combination(vk_codes):                 
-            all_active = True
-            for vk_code in vk_codes:
-                if isinstance(vk_code, str):
-                    vk_code = convert_to_vk_code(vk_code)
-                all_active = all_active and vk_code in pressed_keys
-            return all_active
-        
-        if CONTROLS_ENABLED:                  
-            # # Stop the listener if the MENU combination is pressed
-            if check_for_combination(MENU_Combination):
-                MENU_ENABLED = True
-                print('\n--- Stopping - Return to menu ---')
-                listener.stop()
+def get_toggle_state_key_event(key_event):
+    global toggle_state
+    vk_code, _, delays = key_event.get_all()
+    with alias_toggle_lock:
+        try:
+            toggle_state[vk_code] = not toggle_state[vk_code]
+        except KeyError:
+            toggle_state[vk_code] = True
+                            #replace it so it can be evaluated
+        toggle_ke = Key_Event(vk_code, toggle_state[vk_code], delays)
+    return toggle_ke
 
-            # # Stop the listener if the END combination is pressed
-            elif check_for_combination(EXIT_Combination):
-                print('\n--- Stopping execution ---')
-                listener.stop()
-                STOPPED = True
-                exit()
-
-            # Toggle paused/resume if the DELETE combination is pressed
-            elif check_for_combination(TOGGLE_ON_OFF_Combination):
-                if PAUSED:
-                    reload_all_groups()
-                    print("--- reloaded ---")
-                    print('--- manuelly resumed ---')
-                    with paused_lock:
-                        PAUSED = False
-                        MANUAL_PAUSED = False
-                    # pause focus thread to allow manual overwrite and use without auto focus
-                    if FOCUS_APP_NAME is not None: 
-                        focus_thread.pause()
-                    #reset_key_states()
-                else:
-                    print('--- manually paused ---')
-                    with paused_lock:
-                        PAUSED = True
-                        MANUAL_PAUSED = True
-                    # restart focus thread when manual overwrite is over
-                    if FOCUS_APP_NAME is not None: 
-                        focus_thread.restart()
-                    #reset_key_states()
-
-        # Snap Tap Part of Evaluation
-        # Intercept key events if not PAUSED
-        if not PAUSED and not PRINT_VK_CODES:
-            if DEBUG: 
-                print("#0")
-                print(tap_groups)               
-            for tap_group in tap_groups:
-                if vk_code in tap_group.get_vk_codes():
-                    if DEBUG: 
-                        print(f"#2 {vk_code}")
-                    if key_replaced is True:
-                        key_replaced = False
-                    tap_group.update_tap_states(vk_code, is_keydown)            
-                    # send keys
-                    send_keys(tap_group)
-                    listener.suppress_event()
-                    break
-        
-        # if replacement happened suppress source key event   
-        if key_replaced is True:
-            send_key_event(current_ke)
-            listener.suppress_event()
-        
-        # supress event that triggered an alias - done here because it should also update tap groups before
-        if alias_fired is True:
-            listener.suppress_event()
-            
-        # to remove the key from released_keys after evaluation of triggers
-        # so can only trigger once
-        if not is_keydown and not key_released:
-            remove_key_release_state(current_ke.get_vk_code()) 
-     
-    # here arrive all key_events that will be send - last place to intercept
-    # here the interception of interference of alias with tap groups is realized
-    if is_simulated:
-        for tap_group in tap_groups:
-            vk_codes = tap_group.get_vk_codes()
-            if vk_code in vk_codes:
-                active_key = tap_group.get_active_key()
-                # if None all simulated keys are allowed - so no supression
-                if active_key is None:
-                    pass
-                else:
-                    if active_key == vk_code:
-                        # is active key -> only press allowed
-                        if not is_keydown:
-                            listener.suppress_event()
-                    # not the active key -> only release allowed
-                    else: 
-                        if is_keydown:
-                            listener.suppress_event()
-
-def send_keys(tap_group):
+def send_keys_for_tap_group(tap_group):
     """
     Send the specified key and release the last key if necessary.
     """
@@ -670,12 +599,288 @@ def send_keys(tap_group):
             else:
                 controller.press(key_code_to_send) 
             tap_group.set_last_key_send(key_to_send)
+
+# Theading 
+class Alias_Thread(Thread):
+    '''
+    execute macros/alias in its own threads so the delay is not interfering with key evaluation
+    '''
+    def __init__(self, key_sequence):
+        Thread.__init__(self)
+        self.daemon = True
+        self.key_events = key_sequence
+        
+    def run(self):     
+        try:   
+            # Key_events ans Keys here ...
+            for key_event in self.key_events:
+                if key_event.is_toggle():
+                    key_event = get_toggle_state_key_event(key_event)
+                alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.get_key_string()}")
+                send_key_event(key_event, with_delay=True)
+        except Exception as error:
+            alias_thread_logging.append(error)
+
+# event evaluation
+def win32_event_filter(msg, data):
+    """
+    Filter and handle keyboard events.
+    """
+    global PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
+    global last_real_ke, last_virtual_ke, toggle_state
+    #global time_real_last_pressed, time_real_last_released
+    global time_real, time_simulated, time_all
+    
+    def is_simulated_key_event(flags):
+        return flags & 0x10
+
+    def is_press(msg):
+        if msg in WM_KEYDOWN:
+            return True
+        if msg in WM_KEYUP:
+            return False
+
+    def check_for_combination(vk_codes):                 
+        all_active = True
+        for vk_code in vk_codes:
+            if isinstance(vk_code, str):
+                vk_code = convert_to_vk_code(vk_code)
+            all_active = all_active and vk_code in pressed_keys
+        return all_active
+    
+    key_replaced = False
+    alias_fired = False
+    real_key_repeated = False
+    vk_code = data.vkCode
+    key_event_time = data.time
+    is_keydown = is_press(msg)
+    is_simulated = is_simulated_key_event(data.flags)
+    
+    current_ke = Key_Event(vk_code, is_keydown)
+    _activated_triggers = []
+    _played_triggers = []
+    
+    ##1
+    if PRINT_VK_CODES or DEBUG:
+    # if True:
+        print(f"time: {data.time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
+
+    # check for simulated keys:
+    if not is_simulated: # is_simulated_key_event(data.flags):
+        
+        # stop repeating keys from being evaluated
+        if last_real_ke == current_ke:
+            # listener.suppress_event() 
+            real_key_repeated = True
+        last_real_ke = current_ke
+        
+        # here best place to start tracking the timings of presses and releases
+        if not real_key_repeated:
+            set_key_times(key_event_time, vk_code, is_keydown, time_real)
+            set_key_times(key_event_time, vk_code, is_keydown, time_all)       
+        
+        key_release_removed = False        
+        if current_ke not in rebinds.keys():
+            manage_key_states_by_event(current_ke)
+            if DEBUG:
+                print(f"pressed key: {pressed_keys}, released keys: {released_keys}")
+
+        # Replace some Buttons :-D
+        if not PAUSED and not PRINT_VK_CODES:
+                      
+            # check for rebinds and replace current key event with replacement key event
+            try:
+                old_ke = current_ke
+                current_ke = rebinds[current_ke]
+                key_replaced = True
+
+                # if key is supressed
+                if current_ke.get_vk_code() == 0:
+                    listener.suppress_event()  
+                    
+                # if key is to be toggled
+                if current_ke.is_toggle():
+                    if old_ke.get_is_press():
+                        current_ke = get_toggle_state_key_event(current_ke)
+                    else:
+                        # key up needs to be supressed or else it will be evaluated 2 times each tap
+                        listener.suppress_event()  
+
+            except KeyError as error:
+                if DEBUG:
+                    print(f"rebind not found: {error}")
+                    print(rebinds)
+                    
+            # prevent evaluation of repeated key events
+            # not earliert to keep rebinds and supression intact - toggling can be a bit fast if key is pressed a long time
+            if not real_key_repeated:
+                ### collect active keys
+                if key_replaced:
+                    manage_key_states_by_event(current_ke)
+                    if DEBUG:
+                        print(f"replaced a key: pressed key: {pressed_keys}, released keys: {released_keys}")
+                
+                # check for macro triggers     
+                _activated_triggers = []     
+                for trigger_group in triggers:
+                    keys = trigger_group.get_key_events()
+                    activated = True
+                    for key in keys:
+                        # check if key is pressed
+                        if key.is_prohibited():
+                            activated = activated and key.get_vk_code() not in pressed_keys
+                        elif key.get_is_press():
+                            activated = activated and key.get_vk_code() in pressed_keys
+                        else:
+                            activated = activated and key.get_vk_code() in released_keys
+                        # check if time contraint is fulfilled only after the key check
+                        if activated and isinstance(key.get_delays(), str):
+                            time_constraint = delay_evaluation(key.get_delays())
+                            if DEBUG:
+                                print(f"key.get_delays(): {key.get_delays()}")
+                            activated = activated and time_constraint                          
+                    if activated:
+                        _activated_triggers.append(trigger_group)  
+                        if DEBUG:
+                            print(f"trigger group {trigger_group} activated")
+            
+                # remove triggers from played that are not activated any more
+                cleaned_triggers = []         
+                for trigger in _played_triggers:
+                    if trigger in _activated_triggers:
+                        cleaned_triggers.append(trigger)
+                _played_triggers = cleaned_triggers    
+            
+                # play trigger if not already played
+                for trigger in _activated_triggers:
+                    if trigger not in _played_triggers:
+                        _played_triggers.append(trigger)
+                        if DEBUG:
+                            print(f"added trigger to played triggers: {_played_triggers}")
+                        # as help to later supress startin event AFTER it goes through the tap_groups
+                        alias_fired = True
+                        key_sequence = macros[trigger].get_key_events()
+                        # only spawn a thread for execution if more than one key event in to be played key sequence
+                        if len(key_sequence) > 1:
+                            thread = Alias_Thread(key_sequence)
+                            thread.start() 
+                        else:
+                            key_event = key_sequence[0]
+                            if key_event.is_toggle():
+                                key_event = get_toggle_state_key_event(key_event)
+                            send_key_event(key_event)
+                        if DEBUG:
+                            print("> playing makro:", trigger)
+                                
+                # to remove the key from released_keys after evaluation of triggers
+                # so can only trigger once
+                if not is_keydown:
+                    remove_key_release_state(current_ke.get_vk_code())  
+                    key_release_removed = True          
+
+        if CONTROLS_ENABLED:                  
+            # # Stop the listener if the MENU combination is pressed
+            if check_for_combination(MENU_Combination):
+                MENU_ENABLED = True
+                print('\n--- Stopping - Return to menu ---')
+                listener.stop()
+
+            # # Stop the listener if the END combination is pressed
+            elif check_for_combination(EXIT_Combination):
+                print('\n--- Stopping execution ---')
+                listener.stop()
+                STOPPED = True
+                exit()
+
+            # Toggle paused/resume if the DELETE combination is pressed
+            elif check_for_combination(TOGGLE_ON_OFF_Combination):
+                if PAUSED:
+                    reload_all_groups()
+                    print("--- reloaded ---")
+                    print('--- manuelly resumed ---')
+                    with paused_lock:
+                        PAUSED = False
+                        MANUAL_PAUSED = False
+                    # pause focus thread to allow manual overwrite and use without auto focus
+                    if FOCUS_APP_NAME is not None: 
+                        focus_thread.pause()
+                    #reset_key_states()
+                else:
+                    print('--- manually paused ---')
+                    with paused_lock:
+                        PAUSED = True
+                        MANUAL_PAUSED = True
+                    # restart focus thread when manual overwrite is over
+                    if FOCUS_APP_NAME is not None: 
+                        focus_thread.restart()
+                    #reset_key_states()
+
+        # Snap Tap Part of Evaluation
+        # Intercept key events if not PAUSED
+        if not PAUSED and not PRINT_VK_CODES:
+            if DEBUG: 
+                print("#0")
+                print(tap_groups)               
+            for tap_group in tap_groups:
+                if current_ke.get_vk_code() in tap_group.get_vk_codes():
+                    if DEBUG: 
+                        print(f"#2 {vk_code}")
+                    if key_replaced is True:
+                        key_replaced = False
+                    tap_group.update_tap_states(vk_code, is_keydown)            
+                    # send keys
+                    send_keys_for_tap_group(tap_group)
+                    listener.suppress_event()
+                    break
+        
+        # if replacement happened suppress source key event   
+        if key_replaced is True:
+            send_key_event(current_ke)
+            listener.suppress_event()
+        
+        # supress event that triggered an alias - done here because it should also update tap groups before
+        if alias_fired is True:
+            listener.suppress_event()
+            
+        # to remove the key from released_keys after evaluation of triggers
+        # so can only trigger once
+        if not is_keydown and not key_release_removed:
+            remove_key_release_state(current_ke.get_vk_code()) 
+    
+    # here arrive all key_events that will be send - last place to intercept
+    # here the interception of interference of alias with tap groups is realized
+    if is_simulated:
+        
+        # TODO:
+        # should simulated keys also be rebound according to rebinds?
+        
+        for tap_group in tap_groups:
+            vk_codes = tap_group.get_vk_codes()
+            if vk_code in vk_codes:
+                active_key = tap_group.get_active_key()
+                # if None all simulated keys are allowed - so no supression
+                if active_key is None:
+                    pass
+                else:
+                    if active_key == vk_code:
+                        # is active key -> only press allowed
+                        if not is_keydown:
+                            listener.suppress_event()
+                    # not the active key -> only release allowed
+                    else: 
+                        if is_keydown:
+                            listener.suppress_event()
+                            
+        # save time of simulated and send keys
+        set_key_times(key_event_time, vk_code, is_keydown, time_simulated)
+        set_key_times(key_event_time, vk_code, is_keydown, time_all)
+    
             
 def display_menu():
     """
     Display the menu and handle user input
     """
-    global PRINT_VK_CODES, DEBUG
+    global PRINT_VK_CODES, DEBUG, DEBUG2
     PRINT_VK_CODES = False
     invalid_input = False
     text = ""
@@ -690,6 +895,7 @@ def display_menu():
             text = ""
         display_groups()
         print('\n------ Options -------')
+        print("0. Toggle debugging output for V0.9.3 formula evaluation.")
         print(f"1. Open file:'{FILE_NAME_ALL}' in your default editor.")
         print("2. Reload everything from file.")
         print("3. Print virtual key codes to identify keys.")
@@ -704,7 +910,7 @@ def display_menu():
         choice = input("\nHit [Enter] to start or enter your choice: " )
 
         if choice == '0':
-            DEBUG = not DEBUG
+            DEBUG2 = not DEBUG2
         elif choice == '1':
             startfile(FILE_NAME_ALL)
         elif choice == '2':
@@ -904,13 +1110,9 @@ def reset_key_states():
     pressed_keys = set()
     released_keys = set()
     
-def main2():
-    reload_all_groups()
-    print(tap_groups)
-    print(rebinds)
-    print(macros)
-    display_groups()
-    
 if __name__ == "__main__":
-    starttime = time()
+    starttime = time()   # for alias thread event logging
     main()
+    
+    
+# **** ... this is a long file xD
