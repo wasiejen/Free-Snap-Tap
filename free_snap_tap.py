@@ -62,9 +62,20 @@ tap_groups_hr = []
 rebinds_hr = [] 
 macros_hr = []
 
+# logging
+alias_thread_logging = []
+
+# collect all active keys here for recognition of key combinations
+pressed_keys = set()
+released_keys = set()
+
 # toggle state tracker
 toggle_state = {}
 alias_toggle_lock = Lock()
+
+# save point for time of key pressed and releases
+time_key_pressed = {}
+time_key_released = {}
 
 # Initialize the Controller
 controller = keyboard.Controller()
@@ -77,9 +88,6 @@ mouse_vk_codes_dict = {1: mouse.Button.left,
                        4: mouse.Button.middle}
 mouse_vk_codes = mouse_vk_codes_dict.keys()
 
-# collect all active keys here for recognition of key combinations
-pressed_keys = set()
-released_keys = set()
 
 def add_key_press_state(vk_code):    
     pressed_keys.add(vk_code)    
@@ -106,7 +114,7 @@ def remove_key_release_state(vk_code):
         if DEBUG:
             print(f"release state error: {error}")
 
-
+# file handling and hr display of groups
 def load_groups(file_name):
     '''
     reads in the file and removes the commented out lines, keys and inline comments
@@ -214,6 +222,7 @@ def reset_tap_groups_txt():
     add_group(['w','s'], tap_groups_hr)
     save_groups(FILE_NAME_ALL)
 
+# initializing and convenience functions
 def convert_to_vk_code(key):
     '''
     try to convert string input of a key into a vk_code based on vk_code_dict
@@ -293,7 +302,7 @@ def initialize_groups():
         elif key_modifier == 'up':
             new_element = (Key_Event(vk_code, False, delays, key_string=key))
         elif key_modifier == 'toggle':
-            new_element = (Key_Event(vk_code, True, delays, key_string=key, toggle=True))
+            new_element = (Key_Event(vk_code, None, delays, key_string=key, toggle=True))
         elif key_modifier == 'reversed':
             new_element = (Key(key, vk_code, delays=delays, reversed=True))
         elif key_modifier == 'prohibited':
@@ -401,9 +410,66 @@ def send_key_event(key_event, with_delay=False):
     
     if ACT_DELAY and with_delay: 
         delay(*delays)
-                
-alias_thread_logging = []
 
+def get_toggle_state_key_event(key_event):
+    global toggle_state
+    vk_code, _, delays = key_event.get_all()
+    with alias_toggle_lock:
+        try:
+            toggle_state[vk_code] = not toggle_state[vk_code]
+        except KeyError:
+            toggle_state[vk_code] = True
+                            #replace it so it can be evaluated
+        toggle_ke = Key_Event(vk_code, toggle_state[vk_code], delays)
+    return toggle_ke
+
+def send_keys_for_tap_group(tap_group):
+    """
+    Send the specified key and release the last key if necessary.
+    """
+    # TODO remove delay from here, because it stops listener for the time of delay also ...
+    key_to_send = tap_group.get_active_key()
+    last_key_send = tap_group.get_last_key_send()
+    
+    if DEBUG: 
+        print(f"last_key_send: {last_key_send}")
+        print(f"key_to_send: {key_to_send}")
+        
+    key_code_to_send = keyboard.KeyCode.from_vk(key_to_send)
+    key_code_last_key_send = keyboard.KeyCode.from_vk(last_key_send)
+    
+    # only send if key to send is not the same as last key send
+    if key_to_send != last_key_send:
+        if key_to_send is None:
+            if last_key_send is not None:
+                controller.release(key_code_last_key_send) 
+            tap_group.set_last_key_send(None)            
+        else:
+            is_crossover = False
+            if last_key_send is not None:
+                # only use crossover when changinging keys, or else repeating will make movement stutter
+                if key_to_send != last_key_send:
+                    # only use crossover is activated and probility is over percentage
+                    is_crossover = randint(0,100) > (100 - ACT_CROSSOVER_PROPABILITY_IN_PERCENT) and ACT_CROSSOVER # 50% possibility
+                if is_crossover:
+                    if DEBUG: 
+                        print("crossover")
+                    controller.press(key_code_to_send)
+                else:
+                    controller.release(key_code_last_key_send) 
+                # random delay if activated
+                if ACT_DELAY or ACT_CROSSOVER: 
+                    delay = randint(ACT_MIN_DELAY_IN_MS, ACT_MAX_DELAY_IN_MS)
+                    if DEBUG: 
+                        print(f"delayed by {delay} ms")
+                    sleep(delay / 1000) # in ms
+            if is_crossover:
+                controller.release(key_code_last_key_send) 
+            else:
+                controller.press(key_code_to_send) 
+            tap_group.set_last_key_send(key_to_send)
+
+# Theading 
 class Alias_Thread(Thread):
     '''
     execute macros/alias in its own threads so the delay is not interfering with key evaluation
@@ -425,18 +491,22 @@ class Alias_Thread(Thread):
             alias_thread_logging.append(error)
 
 last_real_ke = Key_Event(0,True)
+last_virtual_ke = Key_Event(0,True)
 
+# event evaluation
 def win32_event_filter(msg, data):
     """
     Filter and handle keyboard events.
     """
     global PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
-    global key_groups_key_modifier, last_real_ke
+    global last_real_ke, last_virtual_ke
     global toggle_state
     
     key_replaced = False
     alias_fired = False
+    real_key_repeated = False
     vk_code = data.vkCode
+    key_event_time = data.time
     is_keydown = is_press(msg)
     is_simulated = is_simulated_key_event(data.flags)
     
@@ -447,18 +517,13 @@ def win32_event_filter(msg, data):
     if PRINT_VK_CODES or DEBUG:
         print(f"time: {data.time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
 
-
-    # if DEBUG: 
-    #     print(f"vk_code: {vk_code}")
-    #     print("msg: ", msg)
-    #     print("data: ", data)
-
     # check for simulated keys:
     if not is_simulated: # is_simulated_key_event(data.flags):
         
         # stop repeating keys from being evaluated
         if last_real_ke == current_ke:
-            listener.suppress_event() 
+            # listener.suppress_event() 
+            real_key_repeated = True
         last_real_ke = current_ke
         
         key_release_removed = False        
@@ -468,28 +533,26 @@ def win32_event_filter(msg, data):
                 print(f"pressed key: {pressed_keys}, released keys: {released_keys}")
 
         # Replace some Buttons :-D
-        if not PAUSED and not PRINT_VK_CODES:
+        if not PAUSED and not PRINT_VK_CODES and not real_key_repeated:
                       
             # check for rebinds and replace current key event with replacement key event
             try:
-                #old_ke = current_ke
+                old_ke = current_ke
                 current_ke = rebinds[current_ke]
                 key_replaced = True
-                #vk_code, is_keydown, _ = current_ke.get_all() 
 
                 # if key is supressed
-                if vk_code == 0:
+                if current_ke.get_vk_code() == 0:
                     listener.suppress_event()  
                     
                 # if key is to be toggled
                 if current_ke.is_toggle():
-                    if is_keydown:
+                    if old_ke.get_is_press():
                         current_ke = get_toggle_state_key_event(current_ke)
                     else:
-                        # needs to be supressed or else it will be evaluated 2 times each tap
+                        # key up needs to be supressed or else it will be evaluated 2 times each tap
                         listener.suppress_event()  
 
-                        
             except KeyError as error:
                 if DEBUG:
                     print(f"rebind not found: {error}")
@@ -637,10 +700,19 @@ def win32_event_filter(msg, data):
         # so can only trigger once
         if not is_keydown and not key_release_removed:
             remove_key_release_state(current_ke.get_vk_code()) 
-     
+    
+    else:
+        # removes repeated virtual keys
+        if last_virtual_ke == current_ke:
+            print(f"simulated key repeated {current_ke} - this should not happen")
+            listener.suppress_event() 
+        last_virtual_ke = current_ke
+    
+    
     # here arrive all key_events that will be send - last place to intercept
     # here the interception of interference of alias with tap groups is realized
     if is_simulated:
+        
         for tap_group in tap_groups:
             vk_codes = tap_group.get_vk_codes()
             if vk_code in vk_codes:
@@ -658,63 +730,8 @@ def win32_event_filter(msg, data):
                         if is_keydown:
                             listener.suppress_event()
 
-def get_toggle_state_key_event(key_event):
-    global toggle_state
-    vk_code, _, delays = key_event.get_all()
-    with alias_toggle_lock:
-        try:
-            toggle_state[vk_code] = not toggle_state[vk_code]
-        except KeyError:
-            toggle_state[vk_code] = True
-                            #replace it so it can be evaluated
-        toggle_ke = Key_Event(vk_code, toggle_state[vk_code], delays)
-    return toggle_ke
 
-def send_keys_for_tap_group(tap_group):
-    """
-    Send the specified key and release the last key if necessary.
-    """
-    # TODO remove delay from here, because it stops listener for the time of delay also ...
-    key_to_send = tap_group.get_active_key()
-    last_key_send = tap_group.get_last_key_send()
-    
-    if DEBUG: 
-        print(f"last_key_send: {last_key_send}")
-        print(f"key_to_send: {key_to_send}")
-        
-    key_code_to_send = keyboard.KeyCode.from_vk(key_to_send)
-    key_code_last_key_send = keyboard.KeyCode.from_vk(last_key_send)
-    
-    # only send if key to send is not the same as last key send
-    if key_to_send != last_key_send:
-        if key_to_send is None:
-            if last_key_send is not None:
-                controller.release(key_code_last_key_send) 
-            tap_group.set_last_key_send(None)            
-        else:
-            is_crossover = False
-            if last_key_send is not None:
-                # only use crossover when changinging keys, or else repeating will make movement stutter
-                if key_to_send != last_key_send:
-                    # only use crossover is activated and probility is over percentage
-                    is_crossover = randint(0,100) > (100 - ACT_CROSSOVER_PROPABILITY_IN_PERCENT) and ACT_CROSSOVER # 50% possibility
-                if is_crossover:
-                    if DEBUG: 
-                        print("crossover")
-                    controller.press(key_code_to_send)
-                else:
-                    controller.release(key_code_last_key_send) 
-                # random delay if activated
-                if ACT_DELAY or ACT_CROSSOVER: 
-                    delay = randint(ACT_MIN_DELAY_IN_MS, ACT_MAX_DELAY_IN_MS)
-                    if DEBUG: 
-                        print(f"delayed by {delay} ms")
-                    sleep(delay / 1000) # in ms
-            if is_crossover:
-                controller.release(key_code_last_key_send) 
-            else:
-                controller.press(key_code_to_send) 
-            tap_group.set_last_key_send(key_to_send)
+
             
 def display_menu():
     """
