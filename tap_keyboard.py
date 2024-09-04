@@ -172,12 +172,13 @@
                        
 class Key_Event(object):
     
-    def __init__(self, vk_code, is_press=True, delays=[0,0], key_string = None, prohibited = False):
+    def __init__(self, vk_code, is_press=True, delays=[0,0], key_string = None, prohibited = False, toggle = False):
         self._key_string = key_string
         self._vk_code = vk_code
         self._is_press = is_press
         self._delays = delays
         self._prohibited = prohibited
+        self._toggle = toggle
         
     def get_all(self):
         return self._vk_code, self._is_press, self._delays
@@ -207,6 +208,9 @@ class Key_Event(object):
     
     def is_prohibited(self):
         return self._prohibited
+    
+    def is_toggle(self):
+        return self._toggle
     
     def _get_sign(self):
         if self._prohibited:

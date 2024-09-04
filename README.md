@@ -68,17 +68,26 @@ String representation or vk-codes (virtual keyboard codes — list in py file) c
   - useful to then add the single key tap groups `ctrl` and `space` - macros will not interfere with tap groups if the keys they play contradicts the state of a tap group 
 - `+d, !ctrl, !space: +d|15|5, -a|100|100, +a|0|0`: when d is released and **control and space are not pressed** then release d, wait 5-15ms, make counter strafe by pressing a for 100 ms and then releasing without further delay after
 
+#### New with 9.2: toggle option (^ modifier) in rebinds and macros
+- Rebind: `left_shift: ^left_shift` - each press of shift will on one press toggle shift to pressed state and with another press to released state
+- Macro: `r, !left_shift: ^right_mouse` - r will toggle the right mouse between pressed and released with each tap (press and release) - will not be triggered if shift is pressed
+  - if macro only has one element as sequence there will be no delay used even if given
+  - can also be used in key sequences `r, !left_shift: ^ctrl|50|50, ^left_mouse|50|50, ...` 
+    - but if that is useful is an entire different question ;-)
+
 ## Key Modifier explanation:
 #### **for rebinds and macros**
 - `` nothing in front of a key is synchronious input (press is a press, release is a release)
 - `-` in front of a key is a press (down without up)
 - `+` in front of a key is a release (up without down)
-- `!` in front of a key is a release and a key (reversed synchronious input) (only rebind!)
 - `#` in front of a key, comments that key out and will not be used
+- `^` in front of a key, will toggle the key state between pressed and released on key_down (rebind) or on trigger activation (macro)
+#### **only for rebinds**
+- `!` in front of a key is a release and a key (reversed synchronious input)
 #### **only for macros**
-- `|` behind a key is the the max delay for this single key (e.g. `-k|10` -> press k with a max delay of 10)
-- `|*max*|*min*` defines min and max delay (e.g. `-k|10|2` or `-k|2|10` -> press k with a max delay of 10 and min delay of 2)
-- `!` before a key in the first key group means (trigger group) will be seen as `prohibited key` - if that key is pressed, the trigger will not trigger ^^
+- `!` in front of a key in the first key group means (trigger group) will be seen as `prohibited key` - if that key is pressed, the trigger will not trigger ^^
+- `|` after a key is the the max delay for this single key (e.g. `-k|10` -> press k with a max delay of 10)
+- `|*max*|*min*` after a key defines min and max delay (e.g. `-k|10|2` or `-k|2|10` -> press k with a max delay of 10 and min delay of 2)
 
 Key Modifiers do not work in Tap groups and will be ignored.
 

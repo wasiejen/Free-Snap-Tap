@@ -62,6 +62,10 @@ tap_groups_hr = []
 rebinds_hr = [] 
 macros_hr = []
 
+# toggle state tracker
+toggle_state = {}
+alias_toggle_lock = Lock()
+
 # Initialize the Controller
 controller = keyboard.Controller()
 mouse_controller = mouse.Controller()
@@ -266,6 +270,10 @@ def initialize_groups():
                 # up key
                 key_modifier = 'up'
                 key = key.replace('+','',1)
+            elif key[0] == '^':
+                # up key
+                key_modifier = 'toggle'
+                key = key.replace('^','',1)
             elif key[0] == '!':
                 # revers 
                 if index == 0: # is not trigger
@@ -284,6 +292,8 @@ def initialize_groups():
             new_element = (Key_Event(vk_code, True, delays, key_string=key))
         elif key_modifier == 'up':
             new_element = (Key_Event(vk_code, False, delays, key_string=key))
+        elif key_modifier == 'toggle':
+            new_element = (Key_Event(vk_code, True, delays, key_string=key, toggle=True))
         elif key_modifier == 'reversed':
             new_element = (Key(key, vk_code, delays=delays, reversed=True))
         elif key_modifier == 'prohibited':
@@ -398,15 +408,17 @@ class Alias_Thread(Thread):
     '''
     execute macros/alias in its own threads so the delay is not interfering with key evaluation
     '''
-    def __init__(self, macro):
+    def __init__(self, key_sequence):
         Thread.__init__(self)
         self.daemon = True
-        self.key_group = macro.get_key_events()
+        self.key_events = key_sequence
         
     def run(self):     
         try:   
             # Key_events ans Keys here ...
-            for key_event in self.key_group:
+            for key_event in self.key_events:
+                if key_event.is_toggle():
+                    key_event = get_toggle_state_key_event(key_event)
                 alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.get_key_string()}")
                 send_key_event(key_event, with_delay=True)
         except Exception as error:
@@ -420,6 +432,7 @@ def win32_event_filter(msg, data):
     """
     global PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
     global key_groups_key_modifier, last_real_ke
+    global toggle_state
     
     key_replaced = False
     alias_fired = False
@@ -448,7 +461,7 @@ def win32_event_filter(msg, data):
             listener.suppress_event() 
         last_real_ke = current_ke
         
-        key_released = False        
+        key_release_removed = False        
         if current_ke not in rebinds.keys():
             manage_key_states_by_event(current_ke)
             if DEBUG:
@@ -459,13 +472,24 @@ def win32_event_filter(msg, data):
                       
             # check for rebinds and replace current key event with replacement key event
             try:
-                # old_ke = current_ke
+                #old_ke = current_ke
                 current_ke = rebinds[current_ke]
                 key_replaced = True
-                vk_code, is_keydown, _ = current_ke.get_all() 
+                #vk_code, is_keydown, _ = current_ke.get_all() 
+
                 # if key is supressed
                 if vk_code == 0:
                     listener.suppress_event()  
+                    
+                # if key is to be toggled
+                if current_ke.is_toggle():
+                    if is_keydown:
+                        current_ke = get_toggle_state_key_event(current_ke)
+                    else:
+                        # needs to be supressed or else it will be evaluated 2 times each tap
+                        listener.suppress_event()  
+
+                        
             except KeyError as error:
                 if DEBUG:
                     print(f"rebind not found: {error}")
@@ -483,7 +507,7 @@ def win32_event_filter(msg, data):
                 keys = trigger_group.get_key_events()
                 if len(keys) == 1:
                     key = keys[0]
-                    if vk_code == key.get_vk_code() and is_keydown == key.get_is_press():
+                    if current_ke.get_vk_code() == key.get_vk_code() and is_keydown == key.get_is_press():
                         _activated_triggers.append(trigger_group)  
                 else:
                     activated = True
@@ -517,16 +541,25 @@ def win32_event_filter(msg, data):
                         print(f"added trigger to played triggers: {_played_triggers}")
                     # as help to later supress startin event AFTER it goes through the tap_groups
                     alias_fired = True
-                    thread = Alias_Thread(macros[trigger])
+                    key_sequence = macros[trigger].get_key_events()
+                    # only spawn a thread for execution if more than one key event in to be played key sequence
+                    if len(key_sequence) > 1:
+                        thread = Alias_Thread(key_sequence)
+                        thread.start() 
+                    else:
+                        key_event = key_sequence[0]
+                        if key_event.is_toggle():
+                            key_event = get_toggle_state_key_event(key_event)
+                        send_key_event(key_event)
                     if DEBUG:
                         print("> playing makro:", trigger)
-                    thread.start()  
+                     
                     
             # to remove the key from released_keys after evaluation of triggers
             # so can only trigger once
             if not is_keydown:
                 remove_key_release_state(current_ke.get_vk_code())  
-                key_released = True          
+                key_release_removed = True          
         
         def check_for_combination(vk_codes):                 
             all_active = True
@@ -580,14 +613,14 @@ def win32_event_filter(msg, data):
                 print("#0")
                 print(tap_groups)               
             for tap_group in tap_groups:
-                if vk_code in tap_group.get_vk_codes():
+                if current_ke.get_vk_code() in tap_group.get_vk_codes():
                     if DEBUG: 
                         print(f"#2 {vk_code}")
                     if key_replaced is True:
                         key_replaced = False
                     tap_group.update_tap_states(vk_code, is_keydown)            
                     # send keys
-                    send_keys(tap_group)
+                    send_keys_for_tap_group(tap_group)
                     listener.suppress_event()
                     break
         
@@ -602,7 +635,7 @@ def win32_event_filter(msg, data):
             
         # to remove the key from released_keys after evaluation of triggers
         # so can only trigger once
-        if not is_keydown and not key_released:
+        if not is_keydown and not key_release_removed:
             remove_key_release_state(current_ke.get_vk_code()) 
      
     # here arrive all key_events that will be send - last place to intercept
@@ -625,7 +658,19 @@ def win32_event_filter(msg, data):
                         if is_keydown:
                             listener.suppress_event()
 
-def send_keys(tap_group):
+def get_toggle_state_key_event(key_event):
+    global toggle_state
+    vk_code, _, delays = key_event.get_all()
+    with alias_toggle_lock:
+        try:
+            toggle_state[vk_code] = not toggle_state[vk_code]
+        except KeyError:
+            toggle_state[vk_code] = True
+                            #replace it so it can be evaluated
+        toggle_ke = Key_Event(vk_code, toggle_state[vk_code], delays)
+    return toggle_ke
+
+def send_keys_for_tap_group(tap_group):
     """
     Send the specified key and release the last key if necessary.
     """
@@ -903,6 +948,7 @@ def reset_key_states():
     global pressed_keys, released_keys
     pressed_keys = set()
     released_keys = set()
+
     
 def main2():
     reload_all_groups()
