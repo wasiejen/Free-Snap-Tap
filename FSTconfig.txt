@@ -1,5 +1,17 @@
 # Tap Groups
-a, d
-w, s
+a,d
+w,s
+
 # Rebinds
+n:j
+o:p
+-u:+u
++u:-u
+z:!z
+left_shift: ^left_shift
+
+
 # Macros
+-k,-l: -left_shift,h,e,l,l,o,+left_shift
+k:h,i
+r, !left_shift: ^right_mouse

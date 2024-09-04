@@ -43,5 +43,7 @@ vk_codes_dict = {
     '-': 189, '+': 187, 'hash': 191, ',': 188, '.':190,
     # supress keys with binding to:
     'suppress': 0,
+    # toggle keys with binding to:
+    'toggle' : -1
 
 }
