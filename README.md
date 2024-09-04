@@ -11,6 +11,7 @@ A minimalistic Python-based Snap Tapping program compatible with all keyboards a
 - Custom delay for every key event that helps to NOT be recognised as input automation because the input is not as perfect
   - see [### Example Use Cases for Aliases (to show what is possible right now)](https://github.com/wasiejen/Free-Snap-Tap?tab=readme-ov-file#examplesfor-aliases-to-show-what-is-possible-right-now)
 - With Autofocus option: to only be active if a certain active window is in focus (see # Configuration)
+- programmable delays and time constraints for macros
 - With simple Command Line Interface (CLI)
 
 <img width="900" alt="FST" src="https://github.com/user-attachments/assets/6160fa32-e598-448f-bd67-7ef0cd02b081">
@@ -75,6 +76,60 @@ String representation or vk-codes (virtual keyboard codes — list in py file) c
   - can also be used in key sequences `r, !left_shift: ^ctrl|50|50, ^left_mouse|50|50, ...` 
     - but if that is useful is an entire different question ;-)
 
+#### New with 9.3: dynamic evaluation of delays - programmable delays dependent on key press and release times
+
+```bash
+# Tap Groups
+a,d
+w,s
+
+# Rebinds
+left_windows,left_control
+<,left_shift
+caps_lock : shift
+c: left_control
+v: suppress
+
+# Macros
+# automatic counter strafing when w key released
+# will not trigger if crouched (!ctrl), jumping (!space) or opposite key is pressed
+# (tr("+w")>100): will only trigger if movement key was pressed for at least 100 ms
+# (cs("+w")): counterstrafe will be dynamically adjusted based on time of pressed movement key 
+# cs() is a hardcoded function that uses a polynomial function to approximate the acceleration ingame and calculate the needed length for a counterstrafe to come to a stop
++w|(tr("+w")>100), !s, !ctrl, !space  :  +w|15|5, -s|(cs("+w")), +s|0|0
++s|(tr("+s")>100), !w, !ctrl, !space  :  +s|15|5, -w|(cs("+s")), +w|0|0
++a|(tr("+a")>100), !d, !ctrl, !space  :  +a|15|5, -d|(cs("+a")), +d|0|0
++d|(tr("+d")>100), !a, !ctrl, !space  :  +d|15|5, -a|(cs("+d")), +a|0|0
+
+
+# jump with crouch: will not trigger if ctrl is pressed (!ctrl)
+# will only trigger if space press was 125-400 ms long and the crouch will go at most to 600 ms after the initial space press
++space|(125<tr("+space")<400), !ctrl : +space, -ctrl|(600-tr("+space")), +ctrl|0|0 
+
+# automatic application of healing syringe and switch back to last weapon
+# (125<tr("+x")<900): will not be triggered if tapped really quickly or hold over 900 ms
+# the longest it will be waiting to release x is 900ms after x was pressed (900-tr("+x")) to make sure it is eqiupped fully
++x|(125<tr("+x")<900) : +x|(900-tr("+x")), -left_mouse|600|600, +left_mouse|0|0, q
+```
+- Dynamic evaluation is instead used of set delays behind the `|` of a key. e.g. `+w|(tr("+w")>100)`
+- Evaluation defined by a formula in brackets `()`
+  - **As a part of the trigger combination will check if the condition in the evaluation is True**
+    - Will be handled seperatly from attached key and both checked seperately
+  - **As part of the played key sequence it has to return a number that will be used as delay in ms** 
+    - If result is negativ will return 0
+  - **`""` or `''` are needed**  -> `tr("+w")` will give out the length of the last key press for key w, and `tr("-w")` will give out the length of time between a release and a press - so length of release/ time since it was last activated
+- Time functions 
+  - `tr()` - Callable for last **real key** press and release time with `tr("+/-key")`. 
+    - also rebinds are here - only the replaced keys without the trigger/source key
+  - `ts()` - Only observes **simulated keys** (keys send by macros) 
+    - (tap groups in real and simulated due to there handling in the program)
+  - `ta()` - Combines **both real and simulated** input to generate an combined times for **"all"** key events
+- Other function:
+  - `cs()` - Counterstrafe based on a polynomial function - everything over 500 ms is handled as max velocity and returns 100 ms as delay for the counterstafe.
+  - `csl()` - Counterstrafe based on a linear function (polynomial works better in my opinion)
+- All normal python code is evaluable:
+  - so keep in mind: all Trigger functions must evaluate to bool (True or False) and all played keys must result in a number
+
 ## Key Modifier explanation:
 #### **for rebinds and macros**
 - `` nothing in front of a key is synchronious input (press is a press, release is a release)
@@ -88,6 +143,12 @@ String representation or vk-codes (virtual keyboard codes — list in py file) c
 - `!` in front of a key in the first key group means (trigger group) will be seen as `prohibited key` - if that key is pressed, the trigger will not trigger ^^
 - `|` after a key is the the max delay for this single key (e.g. `-k|10` -> press k with a max delay of 10)
 - `|*max*|*min*` after a key defines min and max delay (e.g. `-k|10|2` or `-k|2|10` -> press k with a max delay of 10 and min delay of 2)
+- `|(formula)` after a key: 
+  - as part of a trigger group must result in True or False and forms a time constraint that needs to be fulfilled before activating
+  - as part of a played key sequence (macro) it has to return a number that will be used as a set delay
+  - time functions usable: `tr()`, `ts()`, `ta()`
+  - e.g. as trigger:  `+w|(tr("+w")>100)` - evaluated to: (tr("+w")=(length of pressed time for w key) must be > 100 ms to be activated
+  - e.g. as played key: `-ctrl|(600-tr("+space"))` - control will be pressed and then the delay will wait for 600-tr("+space")=(length of time space was pressed) ms
 
 Key Modifiers do not work in Tap groups and will be ignored.
 
@@ -146,6 +207,12 @@ pause
 ```
 
 ## Current Version Information
+
+**V0.9.3**
+- See: #### New with 9.3: dynamic evaluation of delays - programmable delays dependent on key press and release times
+
+**V0.9.2**
+- See: #### New with 9.2: toggle option (^ modifier) in rebinds and macros
 
 **V0.9.1**
 - Bugfix: Tracked released keys were not removed from states list and every key event could trigger macros that used key releases as triggers.
