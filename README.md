@@ -8,7 +8,7 @@ A minimalistic Python-based Snap Tapping program compatible with all keyboards a
 - Adjustable Tap Groups (mutually exclusive keys with Snap Tap functionality)
 - Key Rebinds/Replacements - replaced keys which can also be evaluated by Tap Groups/Macros
 - Macros (Aliases, Null binds) - supports key combinations, key prohibition and played keys have no interference with Tap Group Keys
-- Custom delay for every key event that helps to NOT be recognised as input automation because the input is not as perfect
+- Custom delay for every key event that helps to NOT be recognized as input automation because the input is not as perfect
   - see [### Example Use Cases for Aliases (to show what is possible right now)](https://github.com/wasiejen/Free-Snap-Tap?tab=readme-ov-file#examplesfor-aliases-to-show-what-is-possible-right-now)
 - With Autofocus option: to only be active if a certain active window is in focus (see # Configuration)
 - programmable delays and time constraints for macros
@@ -21,20 +21,20 @@ _pic1: CLI Menu_
 All Tap Groups, Rebinds and Macros/Aliases are saved in an external file (default `FSTconfig.txt`) and can be edited directly.
 
 **Tap Groups** 
-- Mutually exclusive keys - the most recent key press will always be priotized; constantly pressed keys will be repressed if others keys are released again (snap tap).
-- Multiple Keys seperated by commas - `w,s`,`a,d` or `1,2,3,4`. Each key without modifiers.
+- Mutually exclusive keys - the most recent key press will always be prioritized; constantly pressed keys will be repressed if others keys are released again (snap tap).
+- Multiple Keys separated by commas - `w,s`,`a,d` or `1,2,3,4`. Each key without modifiers.
 
 **Rebinds** 
-- Directly replaces one key with another and supress the original key. Windows keys, caps_lock and other keys can be remapped. Helpful for games that do not or only partly support rebinding ingame.
-- 2 keys seperates by `:`. `c : ctrl`, `+p : +mouse_right`. Replacement key will be evaluated in Tap Groups and in Triggers for Macros. Source/Trigger Key will be supressed and not evaluated.
+- Directly replaces one key with another and suppress the original key. Windows keys, caps_lock and other keys can be remapped. Helpful for games that do not or only partly support rebinding ingame.
+- 2 keys separates by `:`. `c : ctrl`, `+p : +mouse_right`. Replacement key will be evaluated in Tap Groups and in Triggers for Macros. Source/Trigger Key will be suppressed and not evaluated.
 
 **Macros/Aliases** 
 - A trigger will play a sequence of key_events (presses, releases) with custom delay for each key. Supports key prohibition - key not allowed to be pressed to trigger the trigger combination.
-- 2 Key Groups (Keys seperated by comma) seperated by `:`. 
+- 2 Key Groups (Keys separated by comma) separated by `:`. 
 - First group will be the trigger combination (one key or more), second group is the key sequence to be played. 
 
 Comments work with `#` for line comment, single key commenting out and comment after key sequence.
-String representation or vk-codes (virtual keyboard codes — list in py file) can also be used. 
+String representation or vk-codes (virtual keyboard codes — list in vk_codes.py file) can also be used. 
 
 ## Examples for Tap Groups
 
@@ -79,28 +79,28 @@ String representation or vk-codes (virtual keyboard codes — list in py file) c
 #### New with 9.3: dynamic evaluation of delays - programmable delays dependent on key press and release times
 
 ```bash
+# Example Config file: for testing remove most of the explaining comments - something the program is not liking xD
 # Tap Groups
 a,d
 w,s
 
 # Rebinds
-left_windows,left_control
-<,left_shift
+left_windows : left_control
+< : left_shift
 caps_lock : shift
-c: left_control
-v: suppress
+c : ^left_control     # toggle for left control on c
+v : suppress  
 
 # Macros
 # automatic counter strafing when w key released
 # will not trigger if crouched (!ctrl), jumping (!space) or opposite key is pressed
 # (tr("+w")>100): will only trigger if movement key was pressed for at least 100 ms
 # (cs("+w")): counterstrafe will be dynamically adjusted based on time of pressed movement key 
-# cs() is a hardcoded function that uses a polynomial function to approximate the acceleration ingame and calculate the needed length for a counterstrafe to come to a stop
+# cs() is a hard coded function that uses a polynomial function to approximate the acceleration ingame and calculate the needed length for a counterstrafe to come to a stop
 +w|(tr("+w")>100), !s, !ctrl, !space  :  +w|15|5, -s|(cs("+w")), +s|0|0
 +s|(tr("+s")>100), !w, !ctrl, !space  :  +s|15|5, -w|(cs("+s")), +w|0|0
 +a|(tr("+a")>100), !d, !ctrl, !space  :  +a|15|5, -d|(cs("+a")), +d|0|0
 +d|(tr("+d")>100), !a, !ctrl, !space  :  +d|15|5, -a|(cs("+d")), +a|0|0
-
 
 # jump with crouch: will not trigger if ctrl is pressed (!ctrl)
 # will only trigger if space press was 125-400 ms long and the crouch will go at most to 600 ms after the initial space press
@@ -108,37 +108,38 @@ v: suppress
 
 # automatic application of healing syringe and switch back to last weapon
 # (125<tr("+x")<900): will not be triggered if tapped really quickly or hold over 900 ms
-# the longest it will be waiting to release x is 900ms after x was pressed (900-tr("+x")) to make sure it is eqiupped fully
+# the longest it will be waiting to release x is 900ms after x was pressed (900-tr("+x")) to make sure it is equipped fully
 +x|(125<tr("+x")<900) : +x|(900-tr("+x")), -left_mouse|600|600, +left_mouse|0|0, q
 ```
+
 - Dynamic evaluation is instead used of set delays behind the `|` of a key. e.g. `+w|(tr("+w")>100)`
 - Evaluation defined by a formula in brackets `()`
   - **As a part of the trigger combination will check if the condition in the evaluation is True**
-    - Will be handled seperatly from attached key and both checked seperately
+    - Will be handled separately from attached key and both checked separately
   - **As part of the played key sequence it has to return a number that will be used as delay in ms** 
-    - If result is negativ will return 0
+    - If result is negative will return 0
   - **`""` or `''` are needed**  -> `tr("+w")` will give out the length of the last key press for key w, and `tr("-w")` will give out the length of time between a release and a press - so length of release/ time since it was last activated
 - Time functions 
   - `tr()` - Callable for last **real key** press and release time with `tr("+/-key")`. 
     - also rebinds are here - only the replaced keys without the trigger/source key
   - `ts()` - Only observes **simulated keys** (keys send by macros) 
     - (tap groups in real and simulated due to there handling in the program)
-  - `ta()` - Combines **both real and simulated** input to generate an combined times for **"all"** key events
+  - `ta()` - Combines **both real and simulated** input to generate a combined times for **"all"** key events
 - Other function:
   - `cs()` - Counterstrafe based on a polynomial function - everything over 500 ms is handled as max velocity and returns 100 ms as delay for the counterstafe.
   - `csl()` - Counterstrafe based on a linear function (polynomial works better in my opinion)
-- All normal python code is evaluable:
+- All normal python code is able to be evaluated:
   - so keep in mind: all Trigger functions must evaluate to bool (True or False) and all played keys must result in a number
 
 ## Key Modifier explanation:
 #### **for rebinds and macros**
-- `` nothing in front of a key is synchronious input (press is a press, release is a release)
+- `` nothing in front of a key is synchronous input (press is a press, release is a release)
 - `-` in front of a key is a press (down without up)
 - `+` in front of a key is a release (up without down)
 - `#` in front of a key, comments that key out and will not be used
 - `^` in front of a key, will toggle the key state between pressed and released on key_down (rebind) or on trigger activation (macro)
 #### **only for rebinds**
-- `!` in front of a key is a release and a key (reversed synchronious input)
+- `!` in front of a key is a release and a key (reversed synchronous input)
 #### **only for macros**
 - `!` in front of a key in the first key group means (trigger group) will be seen as `prohibited key` - if that key is pressed, the trigger will not trigger ^^
 - `|` after a key is the the max delay for this single key (e.g. `-k|10` -> press k with a max delay of 10)
@@ -156,7 +157,7 @@ Key Modifiers do not work in Tap groups and will be ignored.
 - Delays are random between a min and a max time in ms
 - Default delays for the Tap_Groups is set to 2 ms for min and 10 ms for max (py file)
   - Can be changed in py file or the min and max can be set via the start argument `-delay="number, number"`.
-- Delays are used after each key event (press and release), so a keypress has 2 delays
+- Delays are used after each key event (press and release), so a key press has 2 delays
 - Aliases use the same delay as Tap_Groups per default
   - Only if the keys are given some other delay via `*key*|*number*|*number*` will these be overwritten for this specific key event (not this key in general).
 
@@ -181,12 +182,12 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
 -  `-crossover="number"`: sets the probability of "number" percent for a crossover (can be set in a range of 0-100)
    - A crossover is key event reversal with delay - press and release are overlapping the time of delay
 -  `-nodelay`: deactivates delay and crossover
--  `-focusapp="part of the app name"`: Script only activate evaluaten of key events if the defined window with the given name is in focus.
+-  `-focusapp="part of the app name"`: Script only activate evaluation of key events if the defined window with the given name is in focus.
    - e.g. for Counterstrike, `-focusapp=count` is enough to recognize it (not case sensitive)
    - can be manually overwritten by Control on ALT+DEL key combination (to activate outside and deactivate inside focus app)
   
 ### Example batch file
-Example is for use with CMD, for PowerShell replace ^ with \` for multiline start arguments.
+Example is for use with CMD, for PowerShell replace ^ with \` for multi line start arguments.
 To Use the exe replace line `python .\free_snap_tap.py ^` with `.\free_snap_tap.exe ^`.
 Uncomment lines by removing `::` in front of the start arguments.
 
@@ -220,13 +221,13 @@ pause
 **V0.9.0**
 
 - NEW: Key combinations for Macros/Aliases
-- NEW: Key prohibtion via `! notation` for trigger key combination of a macro
+- NEW: Key prohibition via `! notation` for trigger key combination of a macro
     - see example down below
 - NEW: simplified CLI Menu 
     - now with option to directly open the config file in your default txt editor
     - (didn't want to further support that cumbersome edit option) :-)
 - NEW: One file now for all settings
-    - NEW: start agrument `-file=*filename*`
+    - NEW: start argument `-file=*filename*`
     - start argument `-tapfile=` and -`keyfile=` removed
 - NEW: Changed formatting of rebinds and macros
     - now uses `:` to differentiate between key groups
@@ -239,7 +240,7 @@ pause
   #### Example
 
   - `+d, !ctrl, !space: +d|15|5, -a|100|100, +a|0|0`: when d is released and **control and space are not pressed** then release d, wait 5-15ms, make counter strafe by pressing a for 100 ms and then releasing without further delay after
-      - the fun part is now you could define `+d, -space, !ctrl: +d|15|5, -a|150|150, +a|0|0` with differnt counter strafe duration which will only be applied if you jump and release the movement key
+      - the fun part is now you could define `+d, -space, !ctrl: +d|15|5, -a|150|150, +a|0|0` with different counter strafe duration which will only be applied if you jump and release the movement key
 
 ## How Free Snap Tap Works 
 
@@ -253,13 +254,13 @@ Snap Tapping is a feature that enhances your keyboard's responsiveness by priori
 
 - Download the executable from the actual [releases](https://github.com/wasiejen/Free-Snap-Tap/releases).
 - Start via `free_snap_tap.exe` or the provided bat(ch) file and a Command Line Interface will open with further explanations.
-- to costumize the start with many options see `# Comfiguration`. Example batch file can also be found there.
+- to customize the start with many options see `# Configuration`. Example batch file can also be found there.
 - To start from the menu hit [Enter].
 - Have fun. :-)
 
 ### AntiVir False Positives
-- The exe is offered to simplify the usage, it may get a false positive from some antivirus tools and be detected as a trojan. The reason for that seems to be the packaging as an executable that triggers these antivirus software and leads to false positives. See Discussion #12.
-  - Option 1: if recognised as trojan - whitelist it in your antivir.
+- The exe is offered to simplify the usage, it may get a false positive from some antivirus tools and be detected as a Trojan. The reason for that seems to be the packaging as an executable that triggers these antivirus software and leads to false positives. See Discussion #12.
+  - Option 1: if recognized as Trojan - whitelist it in your antivir.
   - Option 2: instead use the py file - See `# Installation` for more info
 
 ## Installation
@@ -281,7 +282,7 @@ pip install -r requirements.txt
 
     3.1 **Option A: directly:** By  clicking/executing the `example_batch_file.bat` file.
 
-    3.2 **Option B: via Command Line:** Start a Command Line/Terminal, navigate to the folder containing the .py file and use one of the follwing commands:
+    3.2 **Option B: via Command Line:** Start a Command Line/Terminal, navigate to the folder containing the .py file and use one of the following commands:
 
 ```bash
 ./example_batch_file.bat
@@ -295,15 +296,15 @@ python ./free_snap_tap.py
 
 ## On Linux 
 
-Not working due to no support of selective key supression in Linux OS.
+Not working due to no support of selective key suppression in Linux OS.
 
 ## On MacOS - **Not supported atm**
 
-Compared to linux the selective event suppression is possible, but it uses another listener constructor and gets other data than the win32_event_filter which is used here. Since this conversion/switch/alternative is not implemented yet, the program will not work on MacOS. But there might be a fix for that in the future.
+Compared to Linux the selective event suppression is possible, but it uses another listener constructor and gets other data than the win32_event_filter which is used here. Since this conversion/switch/alternative is not implemented yet, the program will not work on MacOS. But there might be a fix for that in the future.
 
 ## On Feedback:
 
-Feel free to give feedback. This program is a fun project to me to get more comfortable with Github and testing out some things in Python. :-)
+Feel free to give feedback. This program is a fun project to me to get more comfortable with GitHub and testing out some things in Python. :-)
 If you have wishes or ideas what to add, just `create a issue` or `start a discussion` with a description and use cases of the feature.
 
 ### Version History
@@ -330,7 +331,7 @@ If you have wishes or ideas what to add, just `create a issue` or `start a discu
   - control on Del now also pauses Auto focus, so evaluation can be activated outside of app or deactivated in app.
   - auto focus will restart with restarting script from menu again
   - when resumed the tap and key group files will be reloaded and so changes in them applied
-  - only active when this startargument is used
+  - only active when this start argument is used
  
 **V0.8.3**
 - NEW: threading for Alias execution
@@ -351,7 +352,7 @@ If you have wishes or ideas what to add, just `create a issue` or `start a discu
 **V0.8.1**
 
 - delay is now active as default
-  - `-nodelay` start argument can be used to disbale delay and crossover
+  - `-nodelay` start argument can be used to disable delay and crossover
 - min max delay per start argument settable
   - `-delay=20,10`
 - comments now work in the group files
@@ -360,13 +361,13 @@ If you have wishes or ideas what to add, just `create a issue` or `start a discu
   - comment out some keys `..., h , #e, l, #l, o,... -> hlo`
   - comment after key sequence `a,d # sidestepping tap group`
 - reverse now marked with `!` instead of `#` (used now for commenting)
-- option to supress key events via key group (with 2 keys only)
+- option to suppress key events via key group (with 2 keys only)
   - `-n, suppress` -> n press will be suppressed, n release still be send
 
 **V0.8.0**
 
-Tested on new VAC policy and working so far without being kicked for input automatization.
-Use delay of at least 5 ms, better a more to be on the save side and do not spam snap tap extremly often in 2 seconds or you will still be kicked. ;-)
+Tested on new VAC policy and working so far without being kicked for input automation.
+Use delay of at least 5 ms, better a more to be on the save side and do not spam snap tap extremely often in 2 seconds or you will still be kicked. ;-)
 
 - NEW: updated random delay and crossover to tap_groups to simulate a more natural (or harder to detect) way to use snap tap
   - works with the new policy of Valve Anti Cheat (VAC)
@@ -375,21 +376,21 @@ Use delay of at least 5 ms, better a more to be on the save side and do not spam
     - min delay value of 2 ms can be changed in py file if needed
     - crossover will also use this as delay
   - start_argument `-crossover=*probability*` will set the probability of a crossover (release will be send now and based on delay the new key press will be send later)
-    - to have another way to simulate a form of imperfect snap tap to circument VAC
+    - to have another way to simulate a form of imperfect snap tap to circumvent VAC
       
-- NEW: introducdes Aliases aka Null binds that are specifically designed with costumiazable random delays for each key event
+- NEW: introduces Aliases aka Null binds that are specifically designed with customizable random delays for each key event
   -  to define in Key_Groups as groups with more than 2 keys.
   -  mouse output for mouse_left, mouse_right, mouse_middle works
-  -  NEW: key event modifiers that changes howw the key will be evaluated
+  -  NEW: key event modifiers that changes how the key will be evaluated
     - `-` in front a the key - as first key, following keys will only executed when key pressed, else only send key press (no key release send)
     - `+` in front a the key - as first key, following keys will  only executed when key released, else only send key release (no key press send)
     - `-` in front a the key - as first key, following keys will  only executed when key pressed, else only send key press (no key release)
     - ` ` (nothing/empty/space) in front a the key - as first key, following keys will be `executed on key press and release!!`, else send a key press and release
   - NEW: delay per key (not for first key = trigger)
     - random delay will default to 2 ms min and 10 ms max (in py file changeable) and uses the same delay as defined by start_argument `-delay=*time_in_ms*`
-    - `+l, -left_shift|20|10, h|10,e|5,l|50,l,o, +left_shift` will print HELLO when l is released with variing delay for key events: left_shift, h, e and l
+    - `+l, -left_shift|20|10, h|10,e|5,l|50,l,o, +left_shift` will print HELLO when l is released with varying delay for key events: left_shift, h, e and l
       - `*modifier**key*|*delay_in_ms*` marks the delay that will be set as max delay
-      - `*modifier**key*|*delay1_in_ms*|*delay1_in_ms*` marks the delay that will be set as max and min delay (order is free - uses the bigger one as max and smaller als min)
+      - `*modifier**key*|*delay1_in_ms*|*delay1_in_ms*` marks the delay that will be set as max and min delay (order is free - uses the bigger one as max and smaller as min)
  
 See [### Example Use Cases for Aliases (to show what is possible right now)](https://github.com/wasiejen/Free-Snap-Tap?tab=readme-ov-file#example-use-cases-for-aliases-to-show-what-is-possible-right-now) for how it might look like
  
@@ -401,7 +402,7 @@ See [### Example Use Cases for Aliases (to show what is possible right now)](htt
 **V0.7.0**
 - fixed a bug due which the key replacement was never send
 
-Some measures to lighten the precision of snap tap to maybe circumvent some AntiCheat.
+Some measures to lighten the precision of snap tap to maybe circumvent some Anti Cheat.
 - NEW: random delay for snap tap 
   - Start argument `-delay=50` for max delay of 50 ms (can be set in a range of 1-500)
   - Without the start argument no delay will be used
@@ -414,7 +415,7 @@ Some measures to lighten the precision of snap tap to maybe circumvent some Anti
 **V0.6.0**
 - NEW: Key Replacements will now be tracked in tap groups
 - NEW: Menu option: 7. Print vk_codes to identify keys
-  - Will print out the corresponding vk_codes of a key event. Useful for finding your own vk_codes when used with different keybaord_layouts. 
+  - Will print out the corresponding vk_codes of a key event. Useful for finding your own vk_codes when used with different keyboard_layouts. 
 - Added requirements.txt - see #19
 - Removed exe from repo and put it into releases: see #19
 - Some edits in README.md
@@ -423,7 +424,7 @@ Some measures to lighten the precision of snap tap to maybe circumvent some Anti
 - Fixed direct interpretation of number strings, e.g. `1`, `2`, ... as a vk_code. Fixed by first looking up in dict if a string entry for that number exists and if not then cast it as an int an use it directly as a vk_code.
 
 **V0.50**
-- Fixed not working -txt= startargument; changed it to: 
+- Fixed not working -txt= start argument; changed it to: 
   - `-tapfile=` replaces `-txt=`
 - NEW: Starting argument for custom key replacement file
   - `-keyfile=`
@@ -432,12 +433,12 @@ Some measures to lighten the precision of snap tap to maybe circumvent some Anti
 - NEW: key replacements can now reverse there output
   - declared by just using a `-` before any or both keys in the key pair
   - (e.g. `k, -k` or `-k, -k`  would reverse the press of k to a release and vise versa)
-    - originally intented for the right mouse button (looking around) in MMO's 
+    - originally intended for the right mouse button (looking around) in MMO's 
       - e.g. `k, 2` / `k, mouse_right` to simulate a right mouse click with a keyboard key `k`
       - e.g. `k, -2` then reverses to output and lets me lock the right mouse button on release of key `k`
     - but can also be used for toggling auto movement on and off with another key (e.g. `left_windows, -w`)
-- removed implementation parts of the attempt to make it work on linux
-  - most of the functionality was not working due to the linux limitation of not being able to supress events
+- removed implementation parts of the attempt to make it work on Linux
+  - most of the functionality was not working due to the Linux limitation of not being able to suppress events
 
 **V0.40**
 - NEW: Management of key replacements
@@ -446,11 +447,11 @@ Some measures to lighten the precision of snap tap to maybe circumvent some Anti
 - Better or more complete error handling in the menu
     - if someone still finds a way to crash the program via the menu, then congratulations :-D
 - Linux user will not see the new key replacement options
-    - selective key suppression is simply not working on linux
+    - selective key suppression is simply not working on Linux
 
 **V0.37**
-- bug fix where program control were not working due to changed key up and down recognition intruduced in V0.36
-- first Linux test implemention
+- bug fix where program control were not working due to changed key up and down recognition introduced in V0.36
+- first Linux test implementation
     - feedback needed - might not work due to still using win32_event_filter, but now without suppression of key events for Linux
  
 **V0.36**
