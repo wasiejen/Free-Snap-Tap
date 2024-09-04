@@ -10,5 +10,4 @@
 ::-nodelay ^
 ::-focusapp=count 
 
-
 pause
