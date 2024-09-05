@@ -75,21 +75,24 @@ toggle_state = {}
 alias_toggle_lock = Lock()
 
 # save point for times of key presses and releases for real, simulated and combined (all) key events
-time_real_last_pressed = {}
-time_real_last_released = {}
-time_real_released = {}
-time_real_pressed = {}
-time_real = [time_real_last_pressed, time_real_last_released, time_real_released, time_real_pressed]
-time_simulated_last_pressed = {}
-time_simulated_last_released = {}
-time_simulated_released = {}
-time_simulated_pressed = {}
-time_simulated = [time_simulated_last_pressed, time_simulated_last_released, time_simulated_released, time_simulated_pressed]
-time_all_last_pressed = {}
-time_all_last_released = {}
-time_all_released = {}
-time_all_pressed = {}
-time_all = [time_all_last_pressed, time_all_last_released, time_all_released, time_all_pressed]
+# time_real_last_pressed = {}
+# time_real_last_released = {}
+# time_real_released = {}
+# time_real_pressed = {}
+# time_real = [time_real_last_pressed, time_real_last_released, time_real_released, time_real_pressed]
+time_real = [{}, {}, {}, {}]
+# time_simulated_last_pressed = {}
+# time_simulated_last_released = {}
+# time_simulated_released = {}
+# time_simulated_pressed = {}
+# time_simulated = [time_simulated_last_pressed, time_simulated_last_released, time_simulated_released, time_simulated_pressed]
+time_simulated = [{}, {}, {}, {}]
+# time_all_last_pressed = {}
+# time_all_last_released = {}
+# time_all_released = {}
+# time_all_pressed = {}
+# time_all = [time_all_last_pressed, time_all_last_released, time_all_released, time_all_pressed]
+time_all = [{}, {}, {}, {}]
 
 # Initialize the Controller
 controller = keyboard.Controller()
@@ -271,21 +274,34 @@ def initialize_groups():
     triggers = []
     
     def extract_data_from_key(key, index):
-        #seperate delay info from string
+        #separate delay info from string
         if '|' in key:
             key, *delays = key.split('|')
             if DEBUG: 
                 print(f"delays for {key}: {delays}")
-            # cast in int and ignore all other elements after first 2
+            temp_delays = []
+            # constraints = []
+            for delay in delays:
+                if delay.startswith('('):
+                    # clean the brackets
+                    delay = delay[1:-1]
+                    # IDEA ##1
+                    # could look for tr(, ts( or ta( in it to determine if it is a delay or constraint
+                    temp_delays.append(delay)
+                else:
+                    temp_delays.append(int(delay))
+            delays = temp_delays
             
-            # check for eval in ()
-            # if first char of element in delays is a bracket and at more than 2 chars long -> (something)
-            if delays[0][0] == '(' and len(delays[0]) > 2:
-                ##1
-                delays = delays[0][1:-1] # strip brackets
+            
+            # # check for eval in ()
+            # # if first char of element in delays is a bracket and at more than 2 chars long -> (something)
+            # if delays[0][0] == '(' and len(delays[0]) > 2:
+            #     ##1
+            #     delays = delays[0][1:-1] # strip brackets
                 
-            else:      
-                delays = [int(delay) for delay in delays][:2]
+            # else:    
+            #     # cast in int and ignore all other elements after first 2  
+            #     delays = [int(delay) for delay in delays][:2]
         else:
             delays = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
             
@@ -322,7 +338,7 @@ def initialize_groups():
         vk_code = convert_to_vk_code(key)
             
         if key_modifier is None:
-            new_element = (Key(key, vk_code, delays=delays))
+            new_element = (Key(vk_code, delays=delays, key_string=key))
         elif key_modifier == 'down':
             new_element = (Key_Event(vk_code, True, delays, key_string=key))
         elif key_modifier == 'up':
@@ -330,7 +346,7 @@ def initialize_groups():
         elif key_modifier == 'toggle':
             new_element = (Key_Event(vk_code, None, delays, key_string=key, toggle=True))
         elif key_modifier == 'reversed':
-            new_element = (Key(key, vk_code, delays=delays, reversed=True))
+            new_element = (Key(vk_code, delays=delays, key_string=key, reversed=True))
         elif key_modifier == 'prohibited':
             new_element = (Key_Event(vk_code, False, delays, key_string=key, prohibited=True))
         #return key, vk_code, key_modifier, delays
@@ -341,7 +357,7 @@ def initialize_groups():
         keys = []
         for key_string in group:
             key = convert_to_vk_code(key_string)
-            keys.append(Key(key_string, key))
+            keys.append(Key(key, key_string=key_string))
         tap_groups.append(Tap_Group(keys))  
          
     # extract rebinds
@@ -419,22 +435,51 @@ def send_key_event(key_event, with_delay=False):
         return is_mouse_key
     
     vk_code, is_press, delays = key_event.get_all()
-    is_mouse_key = check_for_mouse_vk_code(vk_code)
-    key_code = get_key_code(is_mouse_key, vk_code)
-    if is_press:
-        controller_dict[is_mouse_key].press(key_code)
-    else:
-        controller_dict[is_mouse_key].release(key_code)
     
-    if ACT_DELAY and with_delay: 
-        if isinstance(delays, str):
-            delay_eval = delay_evaluation(delays)
-            if DEBUG:
-                print(f"delay eval value: {delay_eval}")
-            delay(delay_eval, delay_eval)
+    # replace delays with evaluated delay
+    constraint_fulfilled, delays = check_constraint_fulfillment(key_event, get_also_delays=True)
+    
+    if constraint_fulfilled:
+        if len(delays) == 0:
+            delays = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
+        elif len(delays) == 1:
+            delays = delays*2
+        elif len(delays) == 2:
+            pass
         else:
-            delay(*delays)
+            delays = delays[:2]
         
+        is_mouse_key = check_for_mouse_vk_code(vk_code)
+        key_code = get_key_code(is_mouse_key, vk_code)
+        if is_press:
+            controller_dict[is_mouse_key].press(key_code)
+        else:
+            controller_dict[is_mouse_key].release(key_code)
+
+        if ACT_DELAY and with_delay: 
+            delay(*delays)
+
+def check_constraint_fulfillment(key_event, get_also_delays=False):
+    fullfilled = True
+    temp_delays = []
+    delays = key_event.get_delays()
+    for delay in delays:
+        if isinstance(delay, int):
+            temp_delays.append(delay)
+        elif isinstance(delay, str):
+            result = delay_evaluation(delay)
+            if isinstance(result, bool):
+                fullfilled = fullfilled and result
+            if isinstance(result, int):
+                temp_delays.append(result)
+            else:
+                print(f"! Constraint {delay} is not valid.")
+                
+    if get_also_delays:
+        return fullfilled, temp_delays
+    else:
+        return fullfilled
+            
 def delay_evaluation(delay_eval):
     
     # first get vk_code and is_press
@@ -452,10 +497,11 @@ def delay_evaluation(delay_eval):
         vk_code = convert_to_vk_code(key_string)
         return vk_code, is_press
     
-    def get_key_time_template(key_string, time_released, time_pressed):
+    def get_key_time_template(key_string, time_list):
         '''
         template for all press and release time functions -> time in ms
         '''
+        _, _, time_released, time_pressed = time_list
         vk_code, is_press = get_vk_code_and_press_from_keystring(key_string)
         key_time = 0
         if is_press:
@@ -464,35 +510,35 @@ def delay_evaluation(delay_eval):
                 if DEBUG2:
                     print(f"vk_code: {vk_code} time released: {key_time}")
             except KeyError as error:
-                pass
-                #print(f"no key yet for: {error}")     
+                print(f"time_release: no value yet for vk_code: {error}")     
+                return 0
         else:
             try:
                 key_time = time_pressed[vk_code]
                 if DEBUG2:
                     print(f"vk_code: {vk_code} time pressed: {key_time}")
             except KeyError as error:
-                pass
-                #print(f"no key yet for vk_code: {error}")
+                print(f"time_press: no value yet for vk_code: {error}")
+                return 0
         return key_time
     
     def tr(key_string):
         '''
         real press and release time function -> time in ms
         '''
-        return get_key_time_template(key_string, time_real_released, time_real_pressed)
+        return get_key_time_template(key_string, time_real)
     
     def ts(key_string):
         '''
         simulated press and release time function -> time in ms
         '''
-        return get_key_time_template(key_string, time_simulated_released, time_simulated_pressed)
+        return get_key_time_template(key_string, time_simulated)
     
     def ta(key_string):
         '''
         all combined (real and simulated) press and release time function -> time in ms
         '''
-        return get_key_time_template(key_string, time_all_released, time_all_pressed)
+        return get_key_time_template(key_string, time_all)
     
     # hardcoded counterstrafe with a polynomial function to destribe acceleration
     def cs(key_string):
@@ -517,11 +563,25 @@ def delay_evaluation(delay_eval):
         else:
             breaktime = x / (500/100)
         return round(breaktime)
-
+    
+    def p(key_string):
+        vk_code, _ = get_vk_code_and_press_from_keystring(key_string)
+        return vk_code in pressed_keys
+    
+    def r(key_string):
+        return not p(key_string)   
+            
     result = eval(delay_eval)
     if DEBUG2:
         print(f"evaluated {delay_eval} to: {result}")
-    return 0 if result < 0 else result
+    # if it is a number and if negativ change it to 0
+    if isinstance(result, float):
+        result = int(result)
+    if isinstance(result, int):
+        if result < 0:
+            result = 0     
+
+    return result
 
 def set_key_times(key_event_time, vk_code, is_keydown, time_list):
     time_last_pressed, time_last_released, time_released, time_pressed = time_list
@@ -542,7 +602,7 @@ def set_key_times(key_event_time, vk_code, is_keydown, time_list):
             pass
             #print(f"no key yet for vk_code: {error}")
             
-def get_toggle_state_key_event(key_event):
+def get_next_toggle_state_key_event(key_event):
     global toggle_state
     vk_code, _, delays = key_event.get_all()
     with alias_toggle_lock:
@@ -553,6 +613,17 @@ def get_toggle_state_key_event(key_event):
                             #replace it so it can be evaluated
         toggle_ke = Key_Event(vk_code, toggle_state[vk_code], delays)
     return toggle_ke
+
+def set_toggle_state_to_curr_ke(key_event):
+    vk_code, is_keydown, _ =  key_event.get_all()
+    for key in toggle_state.keys():
+        if key == vk_code:
+            toggle_state[vk_code] = is_keydown
+            
+def release_all_toggles():
+    for vk_code in toggle_state.keys():
+        send_key_event(Key_Event(vk_code, False))
+        toggle_state[vk_code] = False
 
 def send_keys_for_tap_group(tap_group):
     """
@@ -600,26 +671,6 @@ def send_keys_for_tap_group(tap_group):
                 controller.press(key_code_to_send) 
             tap_group.set_last_key_send(key_to_send)
 
-# Theading 
-class Alias_Thread(Thread):
-    '''
-    execute macros/alias in its own threads so the delay is not interfering with key evaluation
-    '''
-    def __init__(self, key_sequence):
-        Thread.__init__(self)
-        self.daemon = True
-        self.key_events = key_sequence
-        
-    def run(self):     
-        try:   
-            # Key_events ans Keys here ...
-            for key_event in self.key_events:
-                if key_event.is_toggle():
-                    key_event = get_toggle_state_key_event(key_event)
-                alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.get_key_string()}")
-                send_key_event(key_event, with_delay=True)
-        except Exception as error:
-            alias_thread_logging.append(error)
 
 # event evaluation
 def win32_event_filter(msg, data):
@@ -690,26 +741,35 @@ def win32_event_filter(msg, data):
                       
             # check for rebinds and replace current key event with replacement key event
             try:
-                old_ke = current_ke
-                current_ke = rebinds[current_ke]
+                new_ke = rebinds[current_ke]
                 key_replaced = True
-
-                # if key is supressed
-                if current_ke.get_vk_code() == 0:
-                    listener.suppress_event()  
-                    
-                # if key is to be toggled
-                if current_ke.is_toggle():
-                    if old_ke.get_is_press():
-                        current_ke = get_toggle_state_key_event(current_ke)
-                    else:
-                        # key up needs to be supressed or else it will be evaluated 2 times each tap
+                
+                # check if constraints is/are met
+                ##1
+                key_replaced = key_replaced and check_constraint_fulfillment(new_ke)
+                
+                if key_replaced:
+                    old_ke = current_ke
+                    current_ke = new_ke
+                    # if key is supressed
+                    if current_ke.get_vk_code() == 0:
                         listener.suppress_event()  
+                        
+                    # if key is to be toggled
+                    if current_ke.is_toggle():
+                        if old_ke.get_is_press():
+                            current_ke = get_next_toggle_state_key_event(current_ke)
+                        else:
+                            # key up needs to be supressed or else it will be evaluated 2 times each tap
+                            listener.suppress_event()  
 
             except KeyError as error:
                 if DEBUG:
                     print(f"rebind not found: {error}")
                     print(rebinds)
+                    
+            # reset toggle state of key manually released - so toggle will start anew by pressing the key
+            set_toggle_state_to_curr_ke(current_ke)
                     
             # prevent evaluation of repeated key events
             # not earliert to keep rebinds and supression intact - toggling can be a bit fast if key is pressed a long time
@@ -724,25 +784,33 @@ def win32_event_filter(msg, data):
                 _activated_triggers = []     
                 for trigger_group in triggers:
                     keys = trigger_group.get_key_events()
+                    current_ke_in_trigger = False
                     activated = True
                     for key in keys:
-                        # check if key is pressed
+                        if not activated:
+                            break
+                        if key == current_ke:
+                            current_ke_in_trigger =  True
+                        
+                        # check of key trigger
                         if key.is_prohibited():
                             activated = activated and key.get_vk_code() not in pressed_keys
                         elif key.get_is_press():
                             activated = activated and key.get_vk_code() in pressed_keys
                         else:
                             activated = activated and key.get_vk_code() in released_keys
-                        # check if time contraint is fulfilled only after the key check
-                        if activated and isinstance(key.get_delays(), str):
-                            time_constraint = delay_evaluation(key.get_delays())
+                    
+                    # first check every other given trigger before evaluating constraints    
+                    if activated and current_ke_in_trigger:
+                        for key in keys:
+                            if not activated:
+                                break
+                            activated = activated and check_constraint_fulfillment(key)
+        
+                        if activated:                         
+                            _activated_triggers.append(trigger_group)  
                             if DEBUG:
-                                print(f"key.get_delays(): {key.get_delays()}")
-                            activated = activated and time_constraint                          
-                    if activated:
-                        _activated_triggers.append(trigger_group)  
-                        if DEBUG:
-                            print(f"trigger group {trigger_group} activated")
+                                print(f"trigger group {trigger_group} activated")
             
                 # remove triggers from played that are not activated any more
                 cleaned_triggers = []         
@@ -767,7 +835,7 @@ def win32_event_filter(msg, data):
                         else:
                             key_event = key_sequence[0]
                             if key_event.is_toggle():
-                                key_event = get_toggle_state_key_event(key_event)
+                                key_event = get_next_toggle_state_key_event(key_event)
                             send_key_event(key_event)
                         if DEBUG:
                             print("> playing makro:", trigger)
@@ -810,6 +878,7 @@ def win32_event_filter(msg, data):
                     with paused_lock:
                         PAUSED = True
                         MANUAL_PAUSED = True
+                        release_all_toggles()
                     # restart focus thread when manual overwrite is over
                     if FOCUS_APP_NAME is not None: 
                         focus_thread.restart()
@@ -818,16 +887,19 @@ def win32_event_filter(msg, data):
         # Snap Tap Part of Evaluation
         # Intercept key events if not PAUSED
         if not PAUSED and not PRINT_VK_CODES:
+            vk_code, is_keydown, _ = current_ke.get_all()
             if DEBUG: 
                 print("#0")
                 print(tap_groups)               
+                print(vk_code, is_keydown)               
             for tap_group in tap_groups:
-                if current_ke.get_vk_code() in tap_group.get_vk_codes():
+                if vk_code in tap_group.get_vk_codes():
                     if DEBUG: 
                         print(f"#2 {vk_code}")
                     if key_replaced is True:
                         key_replaced = False
-                    tap_group.update_tap_states(vk_code, is_keydown)            
+                    tap_group.update_tap_states(vk_code, is_keydown) 
+
                     # send keys
                     send_keys_for_tap_group(tap_group)
                     listener.suppress_event()
@@ -874,7 +946,6 @@ def win32_event_filter(msg, data):
         # save time of simulated and send keys
         set_key_times(key_event_time, vk_code, is_keydown, time_simulated)
         set_key_times(key_event_time, vk_code, is_keydown, time_all)
-    
             
 def display_menu():
     """
@@ -951,6 +1022,9 @@ def check_start_arguments():
     
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
+            # if commented out do nothing
+            if arg[0] == ':' or '#':
+                pass
             if DEBUG: 
                 print(arg)
             # enable debug print outs
@@ -998,7 +1072,30 @@ def check_start_arguments():
                 print(f"focusapp active: looking for: {FOCUS_APP_NAME}")
             else:
                 print("unknown start argument: ", arg)
-
+                
+# Theading 
+class Alias_Thread(Thread):
+    '''
+    execute macros/alias in its own threads so the delay is not interfering with key evaluation
+    '''
+    def __init__(self, key_sequence):
+        Thread.__init__(self)
+        self.daemon = True
+        self.key_events = key_sequence
+        
+    def run(self):     
+        try:   
+            # Key_events ans Keys here ...
+            for key_event in self.key_events:
+                alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.get_key_string()}")
+                
+                if key_event.is_toggle():
+                    key_event = get_next_toggle_state_key_event(key_event)
+                    
+                send_key_event(key_event, with_delay=True)
+        except Exception as error:
+            alias_thread_logging.append(error)
+            
 class Focus_Thread(Thread):
     '''
     Thread for observing the active window and pause toggle the evaluation of key events
@@ -1036,6 +1133,7 @@ class Focus_Thread(Thread):
                     if not PAUSED:
                         with paused_lock:
                             PAUSED = True
+                            release_all_toggles()
                         print('--- auto focus paused ---')
                     # print out active window when paused and it changes
                     # to help find the name :-D
@@ -1081,6 +1179,7 @@ def main():
 
     while not STOPPED:
         reset_key_states()
+        release_all_toggles()
                
         if MENU_ENABLED:
             if FOCUS_APP_NAME is not None:
