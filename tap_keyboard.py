@@ -215,6 +215,8 @@ class Key_Event(object):
     def _get_sign(self):
         if self._prohibited:
             return '!'
+        elif self._toggle:
+            return '^'
         else:
             return '-' if self._is_press else '+'
     
@@ -228,17 +230,16 @@ class Key_Event(object):
     #         return f"Key_Event({self._key_string}, {self._is_press}, {self._delays})"
         
     def __repr__(self):
-        delay = f"|{self._delays[0]}|{self._delays[1]}"#
         delay = ''
         if self._key_string is None:
             return f"{self._get_sign()}{self._vk_code}{delay}"
         else:
-            return f"{self._get_sign()}{self._vk_code}{delay}"
+            return f"{self._get_sign()}{self._key_string}{delay}"
             # return f"{self._get_sign()}{self._key_string}{delay}"
    
 class Key(object):
     
-    def __init__(self, key_string, vk_code, reversed = False, delays=[0,0]) -> None:
+    def __init__(self, vk_code, key_string='', reversed = False, delays=[0,0]) -> None:
         self._key_string = key_string
         self._delays = delays
         self._reversed = reversed

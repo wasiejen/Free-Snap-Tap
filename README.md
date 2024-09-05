@@ -109,7 +109,7 @@ v : suppress
 # automatic application of healing syringe and switch back to last weapon
 # (125<tr("+x")<900): will not be triggered if tapped really quickly or hold over 900 ms
 # the longest it will be waiting to release x is 900ms after x was pressed (900-tr("+x")) to make sure it is equipped fully
-+x|(125<tr("+x")<900) : +x|(900-tr("+x")), -left_mouse|600|600, +left_mouse|0|0, q
++x|(125<tr("+x")<800) : +x|(1000-tr("+x")), -left_mouse|700|700, +left_mouse|0|0, q
 ```
 
 - Dynamic evaluation is instead used of set delays behind the `|` of a key. e.g. `+w|(tr("+w")>100)`
@@ -208,6 +208,32 @@ pause
 ```
 
 ## Current Version Information
+
+**V0.9.4**
+
+- NEW:
+  - formula evaluation now extended to rebind trigger
+    - `c|(p("0")) : ctrl` - only rebind c to ctrl if 0 is pressed
+      - in combination with toggle function `0 : ^0` the 0 key can be toggled and the rebinds for a set of keys then change with just one key press or while just holding the key. (that is a functionality I always wanted to have in MMOs :-) - rebind everthing with a button press)
+  - 2 new evaluation functions to be usable
+    - `p("key")` - checks if the key is **P**ressed (current real key press)
+    - `r("key")` - checks if the key is **R**eleased - literally `not p()`
+  - multiple formula can now be added to any key and will be evaluated
+    - `+w|(not p("s"))|(tr("+w")>100)` - only trigger on +w if +s is not pressed and w was pressed for at least 100 ms
+  - False/True Evaluation now also usable in played keys of macro
+    - `+s|(not p("s"))|100|100` - only release s if s is not pressed (current real key press) and if played will delay for 100 ms (100ms max and 100 ms min)
+      - delays can still be added as numbers but only the first 2 will be used for min and max random delay
+    - `-s|(r("w"))|(cs("+w"))` - only press s if w is released (current real key state) and then use custom delay defined by the function cs("+w")
+
+- Bugfixes:
+  - Macros triggered with every key event when trigger was fulfilled even if key event was not part of the trigger - bug introduced in V0.9.3 by fixing non evaluation of formula if there was only one key in trigger group
+  - If time of a key in a formula was not pressed before could lead to an undefined state - will now return 0/False if no valid value for time pressed or time released exist yet
+
+- QOL:
+  - removed '"unknown start argument: ", arg' outputs if start arguments were commented out in batch file. Now ':' or '#' will be seen as commenting out and the argument that is still received will not be printed out any more
+  - toggle modifier '^' was not shown in display of rebinds
+  - toggle state will now be overwritten by actual manual input of the same key - behavior is now no longer independent of real key press/release state as before
+  - toggle states will be reseted and toggled keys released if manual paused or focusapp paused
 
 **V0.9.3**
 - See: #### New with 9.3: dynamic evaluation of delays - programmable delays dependent on key press and release times
