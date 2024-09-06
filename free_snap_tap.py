@@ -784,33 +784,31 @@ def win32_event_filter(msg, data):
                 _activated_triggers = []     
                 for trigger_group in triggers:
                     keys = trigger_group.get_key_events()
-                    current_ke_in_trigger = False
-                    activated = True
-                    for key in keys:
-                        if not activated:
-                            break
-                        if key == current_ke:
-                            current_ke_in_trigger =  True
-                        
-                        # check of key trigger
-                        if key.is_prohibited():
-                            activated = activated and key.get_vk_code() not in pressed_keys
-                        elif key.get_is_press():
-                            activated = activated and key.get_vk_code() in pressed_keys
-                        else:
-                            activated = activated and key.get_vk_code() in released_keys
-                    
-                    # first check every other given trigger before evaluating constraints    
-                    if activated and current_ke_in_trigger:
+                    # only trigger on the first key_event in trigger group
+                    # so only if that key is pressed the trigger can be activated
+                    if current_ke == keys[0]:                   
+                        activated = True
                         for key in keys:
                             if not activated:
-                                break
-                            activated = activated and check_constraint_fulfillment(key)
-        
-                        if activated:                         
-                            _activated_triggers.append(trigger_group)  
-                            if DEBUG:
-                                print(f"trigger group {trigger_group} activated")
+                                break                            
+                            # check of key trigger
+                            # if key.is_prohibited():
+                            #     activated = activated and key.get_vk_code() not in pressed_keys
+                            if key.get_is_press():
+                                activated = activated and key.get_vk_code() in pressed_keys
+                            else:
+                                activated = activated and key.get_vk_code() not in pressed_keys
+                        # first check every other given trigger before evaluating constraints    
+                        if activated:
+                            for key in keys:
+                                if not activated:
+                                    break
+                                activated = activated and check_constraint_fulfillment(key)
+            
+                            if activated:                         
+                                _activated_triggers.append(trigger_group)  
+                                if DEBUG:
+                                    print(f"trigger group {trigger_group} activated")
             
                 # remove triggers from played that are not activated any more
                 cleaned_triggers = []         
