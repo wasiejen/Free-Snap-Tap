@@ -20,6 +20,8 @@ MENU_ENABLED = True
 CONTROLS_ENABLED = True
 PRINT_VK_CODES = False
 
+EXEC_ONLY_ONE_TRIGGERED_MACRO = False
+
 # for focus setting
 FOCUS_APP_NAME = None
 FOCUS_THREAD_PAUSED = True
@@ -54,8 +56,9 @@ MENU_Combination = [34, 164] # PAGE_DOWN
 # if a Key Group has more than 2 keys if will be handled als alias
 tap_groups = []    # [Tap_Groups]
 rebinds = {}       # Key_Event : Key_Event
+rebind_triggers = []
 macros = {}        # [Key_Group : Key_Group]  # triggers are the Keys to the Item Makro
-triggers = [] 
+macro_triggers = [] 
 
 # hr = human readable form - saves the lines cleaned of comments and presorted
 # these will be shown in menu, because internally they look a bit different (esp rebinds)
@@ -74,23 +77,10 @@ released_keys = set()
 toggle_state = {}
 alias_toggle_lock = Lock()
 
-# save point for times of key presses and releases for real, simulated and combined (all) key events
-# time_real_last_pressed = {}
-# time_real_last_released = {}
-# time_real_released = {}
-# time_real_pressed = {}
 # time_real = [time_real_last_pressed, time_real_last_released, time_real_released, time_real_pressed]
 time_real = [{}, {}, {}, {}]
-# time_simulated_last_pressed = {}
-# time_simulated_last_released = {}
-# time_simulated_released = {}
-# time_simulated_pressed = {}
 # time_simulated = [time_simulated_last_pressed, time_simulated_last_released, time_simulated_released, time_simulated_pressed]
 time_simulated = [{}, {}, {}, {}]
-# time_all_last_pressed = {}
-# time_all_last_released = {}
-# time_all_released = {}
-# time_all_pressed = {}
 # time_all = [time_all_last_pressed, time_all_last_released, time_all_released, time_all_pressed]
 time_all = [{}, {}, {}, {}]
 
@@ -181,8 +171,9 @@ def load_groups(file_name):
                         trigger_group = groups[0].split(',')
                         key_group = groups[1].split(',')
                         # rebind
-                        if len(trigger_group) == 1 and len(key_group) == 1:
-                            rebinds_hr.append([trigger_group[0], key_group[0]])
+                        # if len(trigger_group) == 1 and len(key_group) == 1:
+                        if len(key_group) == 1:
+                            rebinds_hr.append([trigger_group, key_group[0]])
                         # macro
                         else:
                             macros_hr.append([trigger_group, key_group])
@@ -221,7 +212,8 @@ def display_groups():
     # rebinds
     print("\n# Rebinds")
     for index, rebind in enumerate(rebinds_hr):
-        print(f"[{index}] " + ' : '.join([rebind[0], rebind[1]]))
+        # print(f"[{index}] " + ' : '.join([rebind[0], rebind[1]]))
+        print(f"[{index}] " + ' : '.join([', '.join(rebind[0]), rebind[1]]))
     # macros
     print("\n# Macros")
     for index, macro in enumerate(macros_hr):
@@ -262,18 +254,19 @@ def convert_to_vk_code(key):
 def initialize_groups():
     '''
     in new form there are rebinds and macros
-    rebind are key_event -> key_event
-    key_group are a list of key_event
-    macros are key_group/trigger_group : key_groups
+    rebind are Key_Group -> Key_Event
+    key_group are a list of Key_Event, Keys
+    macros are Key_Group : key_Groups
     '''
-    global tap_groups, rebinds, macros, triggers
+    global tap_groups, rebinds, rebind_triggers, macros, macro_triggers
     
     tap_groups = []
     rebinds = {}
+    rebind_triggers = []
     macros = {}
-    triggers = []
+    macro_triggers = []
     
-    def extract_data_from_key(key, index):
+    def extract_data_from_key(key):
         #separate delay info from string
         if '|' in key:
             key, *delays = key.split('|')
@@ -292,16 +285,6 @@ def initialize_groups():
                     temp_delays.append(int(delay))
             delays = temp_delays
             
-            
-            # # check for eval in ()
-            # # if first char of element in delays is a bracket and at more than 2 chars long -> (something)
-            # if delays[0][0] == '(' and len(delays[0]) > 2:
-            #     ##1
-            #     delays = delays[0][1:-1] # strip brackets
-                
-            # else:    
-            #     # cast in int and ignore all other elements after first 2  
-            #     delays = [int(delay) for delay in delays][:2]
         else:
             delays = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
             
@@ -321,18 +304,14 @@ def initialize_groups():
                 # up key
                 key_modifier = 'up'
                 key = key.replace('+','',1)
+            elif key[0] == '!':
+                # up key
+                key_modifier = 'up'
+                key = key.replace('!','',1)
             elif key[0] == '^':
                 # up key
                 key_modifier = 'toggle'
                 key = key.replace('^','',1)
-            elif key[0] == '!':
-                # revers 
-                if index == 0: # is not trigger
-                    key_modifier = 'prohibited'
-                # prohibited key
-                else:                    
-                    key_modifier = 'reversed'
-                key = key.replace('!','',1)
 
         # convert string to actual vk_code
         vk_code = convert_to_vk_code(key)
@@ -345,11 +324,6 @@ def initialize_groups():
             new_element = (Key_Event(vk_code, False, delays, key_string=key))
         elif key_modifier == 'toggle':
             new_element = (Key_Event(vk_code, None, delays, key_string=key, toggle=True))
-        elif key_modifier == 'reversed':
-            new_element = (Key(vk_code, delays=delays, key_string=key, reversed=True))
-        elif key_modifier == 'prohibited':
-            new_element = (Key_Event(vk_code, False, delays, key_string=key, prohibited=True))
-        #return key, vk_code, key_modifier, delays
         return new_element
     
     # extract tap groups
@@ -362,24 +336,49 @@ def initialize_groups():
          
     # extract rebinds
     for rebind in rebinds_hr:
-        new_rebind = []
-        is_single_key_event = True
-        for index, key in enumerate(rebind):            
-            new_element = extract_data_from_key(key, index)   
+        trigger_group, replacement_key = rebind
+        
+        # evaluate the given key strings
+        new_trigger_group = []
+        for key in trigger_group:
+            new_element = extract_data_from_key(key)            
             if new_element is not False:
-                new_rebind.append(new_element)
-                if isinstance(new_element, Key):
-                    is_single_key_event = False
+                new_trigger_group.append(new_element)
+        replacement_key = extract_data_from_key(replacement_key)
         
-        if is_single_key_event:
-            trigger, replacement = new_rebind[0], new_rebind[1]   
-            rebinds[trigger] = replacement
+        # check if any given key is a Key Instance - has to be treated differently just to 
+        # be able to use v:8 instead of -v:-8 and +v:+8
+        both_are_Keys = False
+        if isinstance(new_trigger_group[0], Key) or isinstance(replacement_key, Key):
+            # if one is Key Instance but the other Key_Event -> convert Key_Event into Key
+            if not isinstance(new_trigger_group[0], Key):
+                temp = new_trigger_group[0]
+                new_trigger_group[0] = Key(temp.get_vk_code(), key_string=temp.get_key_string())    
+            if not isinstance(replacement_key, Key):
+                # TODO:
+                # here toggle is lost in conversion
+                if replacement_key.is_toggle():
+                    pass # Key_Event.get_key_events() returns [ke, ke] - that should handle it
+                else:
+                    temp = replacement_key
+                    replacement_key = Key(temp.get_vk_code(), key_string=temp.get_key_string())
+            both_are_Keys = True
+        
+        trigger_key, *trigger_rest = new_trigger_group
+        
+        if not both_are_Keys:
+            trigger_group = Key_Group(new_trigger_group)
+            rebind_triggers.append(trigger_group)
+            rebinds[trigger_group] = replacement_key
+        
         else:
-            trigger_events = new_rebind[0].get_key_events()
-            replacement_events = new_rebind[1].get_key_events()
-            rebinds[trigger_events[0]] = replacement_events[0]
-            rebinds[trigger_events[1]] = replacement_events[1]
-        
+            trigger_events = trigger_key.get_key_events()
+            replacement_events = replacement_key.get_key_events()
+            for index in [0,1]:
+                trigger_group = Key_Group([trigger_events[index]] + trigger_rest)
+                rebind_triggers.append(trigger_group)
+                rebinds[trigger_group] = replacement_events[index]
+                  
     # extract macros         
     for macro in macros_hr:
         new_macro = []
@@ -387,7 +386,7 @@ def initialize_groups():
         for index, key_group in enumerate(macro):
             new_key_group = Key_Group([])
             for key in key_group:
-                new_element = extract_data_from_key(key, index)            
+                new_element = extract_data_from_key(key)            
                 if new_element is not False:
                     if isinstance(new_element, Key_Event):
                         new_key_group.append(new_element)
@@ -398,7 +397,7 @@ def initialize_groups():
                         if index == 1: 
                             new_key_group.append(key_events[1])
             new_macro.append(new_key_group)
-        triggers.append(new_macro[0])
+        macro_triggers.append(new_macro[0])
         # trigger is the key to the to be played keygroup
         macros[new_macro[0]] = new_macro[1]
                       
@@ -699,6 +698,29 @@ def win32_event_filter(msg, data):
             all_active = all_active and vk_code in pressed_keys
         return all_active
     
+    def is_trigger_activated(current_ke, trigger_group):
+        keys = trigger_group.get_key_events()
+        # only trigger on the first key_event in trigger group
+        # so only if that key is pressed the trigger can be activated
+        if current_ke != keys[0]:    
+            return False      
+                 
+        activated = True
+        for key in keys:                         
+            if key.get_is_press():
+                activated = activated and key.get_vk_code() in pressed_keys
+            else:
+                activated = activated and key.get_vk_code() not in pressed_keys
+                
+        # first check every other given trigger before evaluating constraints    
+        if activated:
+            for key in keys:
+                if not activated:
+                    return False
+                activated = activated and check_constraint_fulfillment(key)
+        return activated
+        
+    
     key_replaced = False
     alias_fired = False
     real_key_repeated = False
@@ -738,39 +760,40 @@ def win32_event_filter(msg, data):
 
         # Replace some Buttons :-D
         if not PAUSED and not PRINT_VK_CODES:
-                      
+            
+            '''REBINDS HERE'''
             # check for rebinds and replace current key event with replacement key event
-            try:
-                new_ke = rebinds[current_ke]
-                key_replaced = True
+            for trigger_group in rebind_triggers:
                 
-                # check if constraints is/are met
-                ##1
-                key_replaced = key_replaced and check_constraint_fulfillment(new_ke)
-                
-                if key_replaced:
-                    old_ke = current_ke
-                    current_ke = new_ke
-                    # if key is supressed
-                    if current_ke.get_vk_code() == 0:
-                        listener.suppress_event()  
-                        
-                    # if key is to be toggled
-                    if current_ke.is_toggle():
-                        if old_ke.get_is_press():
-                            current_ke = get_next_toggle_state_key_event(current_ke)
-                        else:
-                            # key up needs to be supressed or else it will be evaluated 2 times each tap
+                if is_trigger_activated(current_ke, trigger_group):
+                    try:
+                        replacement_ke = rebinds[trigger_group]
+                        old_ke = current_ke
+                        current_ke = replacement_ke
+                        key_replaced = True
+                    except KeyError as error:
+                        if DEBUG:
+                            print(f"rebind not found: {error}")
+                            print(rebinds)
+                            
+                    if key_replaced:
+                        # if key is supressed
+                        if current_ke.get_vk_code() == 0:
                             listener.suppress_event()  
-
-            except KeyError as error:
-                if DEBUG:
-                    print(f"rebind not found: {error}")
-                    print(rebinds)
-                    
+                            
+                        # if key is to be toggled
+                        if current_ke.is_toggle():
+                            if old_ke.get_is_press():
+                                current_ke = get_next_toggle_state_key_event(current_ke)
+                            else:
+                                # key up needs to be supressed or else it will be evaluated 2 times each tap
+                                listener.suppress_event()  
+                                
+            '''TOGGLE STATE'''
             # reset toggle state of key manually released - so toggle will start anew by pressing the key
             set_toggle_state_to_curr_ke(current_ke)
-                    
+            
+            '''STOP REPEATED KEYS HERE'''        
             # prevent evaluation of repeated key events
             # not earliert to keep rebinds and supression intact - toggling can be a bit fast if key is pressed a long time
             if not real_key_repeated:
@@ -780,64 +803,48 @@ def win32_event_filter(msg, data):
                     if DEBUG:
                         print(f"replaced a key: pressed key: {pressed_keys}, released keys: {released_keys}")
                 
+                '''MACROS HERE'''
                 # check for macro triggers     
                 _activated_triggers = []     
-                for trigger_group in triggers:
-                    keys = trigger_group.get_key_events()
-                    # only trigger on the first key_event in trigger group
-                    # so only if that key is pressed the trigger can be activated
-                    if current_ke == keys[0]:                   
-                        activated = True
-                        for key in keys:
-                            if not activated:
-                                break                            
-                            # check of key trigger
-                            # if key.is_prohibited():
-                            #     activated = activated and key.get_vk_code() not in pressed_keys
-                            if key.get_is_press():
-                                activated = activated and key.get_vk_code() in pressed_keys
-                            else:
-                                activated = activated and key.get_vk_code() not in pressed_keys
-                        # first check every other given trigger before evaluating constraints    
-                        if activated:
-                            for key in keys:
-                                if not activated:
-                                    break
-                                activated = activated and check_constraint_fulfillment(key)
-            
-                            if activated:                         
-                                _activated_triggers.append(trigger_group)  
-                                if DEBUG:
-                                    print(f"trigger group {trigger_group} activated")
+                for trigger_group in macro_triggers:
+                    if is_trigger_activated(current_ke, trigger_group):                         
+                        _activated_triggers.append(trigger_group)  
+                        if DEBUG:
+                            print(f"trigger group {trigger_group} activated")
             
                 # remove triggers from played that are not activated any more
-                cleaned_triggers = []         
-                for trigger in _played_triggers:
-                    if trigger in _activated_triggers:
-                        cleaned_triggers.append(trigger)
-                _played_triggers = cleaned_triggers    
+                # cleaned_triggers = []         
+                # for trigger in _played_triggers:
+                #     if trigger in _activated_triggers:
+                #         cleaned_triggers.append(trigger)
+                # _played_triggers = cleaned_triggers    
             
                 # play trigger if not already played
                 for trigger in _activated_triggers:
-                    if trigger not in _played_triggers:
-                        _played_triggers.append(trigger)
-                        if DEBUG:
-                            print(f"added trigger to played triggers: {_played_triggers}")
+                    # if trigger not in _played_triggers:
+                    #     _played_triggers.append(trigger)
+                    #     if DEBUG:
+                    #         print(f"added trigger to played triggers: {_played_triggers}")
                         # as help to later supress startin event AFTER it goes through the tap_groups
-                        alias_fired = True
-                        key_sequence = macros[trigger].get_key_events()
-                        # only spawn a thread for execution if more than one key event in to be played key sequence
-                        if len(key_sequence) > 1:
-                            thread = Alias_Thread(key_sequence)
-                            thread.start() 
-                        else:
-                            key_event = key_sequence[0]
-                            if key_event.is_toggle():
-                                key_event = get_next_toggle_state_key_event(key_event)
-                            send_key_event(key_event)
-                        if DEBUG:
-                            print("> playing makro:", trigger)
-                                
+                    alias_fired = True
+                    key_sequence = macros[trigger].get_key_events()
+                    # only spawn a thread for execution if more than one key event in to be played key sequence
+                    if len(key_sequence) > 1:
+                        thread = Alias_Thread(key_sequence)
+                        thread.start() 
+                    else:
+                        key_event = key_sequence[0]
+                        if key_event.is_toggle():
+                            key_event = get_next_toggle_state_key_event(key_event)
+                        send_key_event(key_event)
+                    if DEBUG:
+                        print("> playing makro:", trigger)
+                        
+                    if EXEC_ONLY_ONE_TRIGGERED_MACRO:
+                        break
+                
+                
+                '''PREVENT NEXT KEY EVENT FROM TRIGGERING OLD EVENTS'''               
                 # to remove the key from released_keys after evaluation of triggers
                 # so can only trigger once
                 if not is_keydown:
@@ -882,6 +889,7 @@ def win32_event_filter(msg, data):
                         focus_thread.restart()
                     #reset_key_states()
 
+        '''TAP GROUP EVALUATION HERE'''
         # Snap Tap Part of Evaluation
         # Intercept key events if not PAUSED
         if not PAUSED and not PRINT_VK_CODES:
@@ -1001,7 +1009,7 @@ def check_start_arguments():
     global ACT_DELAY, ACT_CROSSOVER, ACT_CROSSOVER_PROPABILITY_IN_PERCENT
     global ACT_MAX_DELAY_IN_MS, ACT_MIN_DELAY_IN_MS
     global ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS
-    global FOCUS_APP_NAME
+    global FOCUS_APP_NAME, EXEC_ONLY_ONE_TRIGGERED_MACRO
     
     def extract_delays(arg):
         try:
@@ -1068,6 +1076,8 @@ def check_start_arguments():
             elif arg[:10] == "-focusapp="  and len(arg) > 10:
                 FOCUS_APP_NAME = arg[10:]
                 print(f"focusapp active: looking for: {FOCUS_APP_NAME}")
+            elif arg == "-exec_one_macro":
+                EXEC_ONLY_ONE_TRIGGERED_MACRO = True
             else:
                 print("unknown start argument: ", arg)
                 

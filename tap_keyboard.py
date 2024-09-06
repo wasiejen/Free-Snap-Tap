@@ -172,12 +172,11 @@
                        
 class Key_Event(object):
     
-    def __init__(self, vk_code, is_press=True, delays=[0,0], key_string = None, prohibited = False, toggle = False):
+    def __init__(self, vk_code, is_press=True, delays=[0,0], key_string = None, toggle = False):
         self._key_string = key_string
         self._vk_code = vk_code
         self._is_press = is_press
         self._delays = delays
-        self._prohibited = prohibited
         self._toggle = toggle
         
     def get_all(self):
@@ -213,9 +212,7 @@ class Key_Event(object):
         return self._toggle
     
     def _get_sign(self):
-        if self._prohibited:
-            return '!'
-        elif self._toggle:
+        if self._toggle:
             return '^'
         else:
             return '-' if self._is_press else '+'
@@ -239,16 +236,13 @@ class Key_Event(object):
    
 class Key(object):
     
-    def __init__(self, vk_code, key_string='', reversed = False, delays=[0,0]) -> None:
+    def __init__(self, vk_code, key_string='', delays=[0,0]) -> None:
         self._key_string = key_string
         self._delays = delays
-        self._reversed = reversed
         self._vk_code = vk_code
         key_event = Key_Event(self._vk_code, True, delays=delays, key_string=key_string)
-        if not self._reversed:
-            self._key_events = [key_event, key_event.get_opposite_key_event()]
-        else:        
-            self._key_events = [key_event.get_opposite_key_event(), key_event]
+        self._key_events = [key_event, key_event.get_opposite_key_event()]
+
         
     def get_vk_code(self):
         return self._vk_code
@@ -290,11 +284,14 @@ class Key_Group(object):
         return hash(self.__repr__())
       
     def __eq__(self, other) -> bool:
-        equal = True
-        for my_key_event, other_key_event in zip(self.key_group, other.get_key_events()):
-            equal = equal and my_key_event == other_key_event
-        return equal
-    
+        if len(self.key_group) == len(other.get_key_events()):
+            equal = True
+            for my_key_event, other_key_event in zip(self.key_group, other.get_key_events()):
+                equal = equal and my_key_event == other_key_event
+            return equal
+        else:
+            False
+
     def __repr__(self):
         key_strings = []
         for key_event in self.key_group:
