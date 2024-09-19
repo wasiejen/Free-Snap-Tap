@@ -11,6 +11,7 @@ o, -i :l
 left_shift: ^left_shift
 c:left_shift
 v:suppress
+minus:left_mouse
 
 
 # Macros
