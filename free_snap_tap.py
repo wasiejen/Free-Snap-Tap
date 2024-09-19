@@ -113,6 +113,10 @@ last_real_ke = Key_Event(0,True)
 macro_thread_dict = {}
 macros_sequence_counter_dict = {}
 
+TIME_DIFF = None
+
+def time_in_millisec():
+    return int(time() * 1000)
 
 def add_key_press_state(vk_code):    
     pressed_keys.add(vk_code)    
@@ -560,7 +564,7 @@ def check_constraint_fulfillment(key_event, get_also_delays=False):
         if isinstance(delay, int):
             temp_delays.append(delay)
         elif isinstance(delay, str):
-            result = delay_evaluation(delay)
+            result = delay_evaluation(delay, key_event)
             if isinstance(result, bool):
                 fullfilled = fullfilled and result
             if isinstance(result, int):
@@ -573,7 +577,7 @@ def check_constraint_fulfillment(key_event, get_also_delays=False):
     else:
         return fullfilled
             
-def delay_evaluation(delay_eval):
+def delay_evaluation(delay_eval, current_ke):
     
     # first get vk_code and is_press
     def get_vk_code_and_press_from_keystring(key_string):
@@ -663,6 +667,33 @@ def delay_evaluation(delay_eval):
     
     def r(key_string):
         return not p(key_string)   
+
+    # give out time since last key press/release
+    def last(key_string, time_list = time_real):
+        time_last_pressed, time_last_released, _, _ = time_list
+        vk_code, is_press = get_vk_code_and_press_from_keystring(key_string)
+        try:
+            if DEBUG:
+                print(time_in_millisec() - TIME_DIFF)
+                print(time_last_pressed[vk_code])
+            current_time = time_in_millisec() - TIME_DIFF
+            return current_time - time_last_pressed[vk_code] if is_press else current_time - time_last_released[vk_code]
+        except KeyError:
+            return 0
+        
+    # double click - gets the time since the last click  
+    def dc(time_list = time_real):
+        _, _, time_released, time_pressed = time_list
+        # use current key event that activated trigger to get reliable double click
+        vk_code = current_ke.get_vk_code()
+        try:
+            if DEBUG:
+                print(time_released[vk_code] + time_pressed[vk_code])
+            return time_released[vk_code] + time_pressed[vk_code]
+        except KeyError:
+            ##2
+            return 9999
+            
             
     result = eval(delay_eval)
     if DEBUG2:
@@ -867,7 +898,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     global PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
     global last_real_ke, last_virtual_ke, toggle_state_dict
     #global time_real_last_pressed, time_real_last_released
-    global time_real, time_simulated, time_all
+    global time_real, time_simulated, time_all, TIME_DIFF
     global macro_thread_dict, macros_sequence_counter_dict
     
     # def is_simulated_key_event(flags):
@@ -920,9 +951,11 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     
     current_ke = Key_Event(vk_code, is_keydown)
     _activated_triggers = []
-    _played_triggers = []
     
-    ##1
+    # get the time difference from system time to the key_event_time
+    if TIME_DIFF is None:
+        TIME_DIFF = time_in_millisec() - key_event_time
+    
     if PRINT_VK_CODES or DEBUG:
     # if True:
         print(f"time: {key_event_time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
