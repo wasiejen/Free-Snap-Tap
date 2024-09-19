@@ -43,6 +43,42 @@ vk_codes_dict = {
     # some symbols
     '-': 189, '+': 187, 'hash': 191, ',': 188, '.':190,
     # supress keys with binding to:
-    'suppress': 0,
+    'suppress': -999,
+    
+    # reset macro sequences
+    'reset' : -255, # always resets the active macro
+    'reset_all': -256,
+    'reset_0': 0,
+    'reset_1': -1,
+    'reset_2': -2,
+    'reset_3': -3,
+    'reset_4': -4,
+    'reset_5': -5,
+    'reset_6': -6,
+    'reset_7': -7,
+    'reset_8': -8,
+    'reset_9': -9,
+    'reset_10': -10,
+    'reset_11': -11,
+    'reset_12': -12,
+    'reset_13': -13,
+    'reset_14': -14,
+    'reset_15': -15,
+    'reset_16': -16,
+    'reset_17': -17,
+    'reset_18': -18,
+    'reset_19': -19,
+    'reset_20': -20,
+    'reset_21': -21,
+    'reset_22': -22,
+    'reset_23': -23,
+    'reset_24': -24,
+    'reset_25': -25,
+    'reset_26': -26,
+    'reset_27': -27,
+    'reset_28': -28,
+    'reset_29': -29,
+    'reset_30': -30,
+    
 
 }
