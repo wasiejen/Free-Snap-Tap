@@ -111,6 +111,7 @@ last_real_ke = Key_Event(0,True)
 # last_virtual_ke = Key_Event(0,True)
 
 macro_thread_dict = {}
+macros_sequence_counter = {}
 
 
 def add_key_press_state(vk_code):    
@@ -193,8 +194,14 @@ def load_groups(file_name):
                         # macro
                     elif len(groups) > 2 and len(groups[1]) == 0:
                         trigger_group = groups[0].split(',')
-                        key_group = groups[2].split(',')
-                        macros_hr.append([trigger_group, key_group])
+                        if len(groups) > 3:
+                            # for group in groups[2:]:
+                            #     trigger_group.append(group.split(','))
+                            key_groups = [group.split(',') for group in groups[2:]]
+                            macros_hr.append([trigger_group] + key_groups)
+                        else:
+                            key_group = groups[2].split(',')
+                            macros_hr.append([trigger_group, key_group])
                             
                     # groups = cleaned_line.split(':')
                     
@@ -229,12 +236,13 @@ def save_groups(file_name):
             file.write(', '.join(tap_group)+'\n')         
         # rebinds
         file.write("# Rebinds\n")
-        for rebind in rebinds_hr:
-            file.write(' : '.join([', '.join(rebind[0]),', '.join(rebind[1])]))
+        # for rebind in rebinds_hr:
+        #     file.write(' : '.join([', '.join(rebind[0]),', '.join(rebind[1])]))
         # macros
         file.write("# Macros\n")
-        for macro in macros_hr:
-            file.write(' : '.join([', '.join(macro[0]),', '.join(macro[1])]))
+        # for macro in macros_hr:
+        #     # TODO: to adapt to save key sequences - necessary - mainly used to create new file if none found
+        #     file.write(' :: '.join([', '.join(macro[0]),', '.join(macro[1])]))
 
 def display_groups():
     """
@@ -252,8 +260,14 @@ def display_groups():
         print(f"[{index}] " + ' : '.join([', '.join(rebind[0]), rebind[1]]))
     # macros
     print("\n# Macros")
-    for index, macro in enumerate(macros_hr):
-        print(f"[{index}] " + ' :: '.join([', '.join(macro[0]),', '.join(macro[1])]))
+    for index, *group in enumerate(macros_hr):
+        group = group[0]
+        first_line = f"[{index}] " + ' :: '.join([', '.join(group[0]),', '.join(group[1])])
+        position = first_line.find('::')
+        print(first_line)
+        if len(group) > 2:
+            for gr in group[2:]:
+                print(" " * (position+1) + ": " + ', '.join(gr))
 
 def add_group(new_group, data_object):
     """
@@ -294,7 +308,8 @@ def initialize_groups():
     key_group are a list of Key_Event, Keys
     macros are Key_Group : key_Groups
     '''
-    global tap_groups, rebinds, rebind_triggers, macros, macro_triggers
+    global tap_groups, rebinds, rebind_triggers
+    global macros, macro_triggers, macros_sequence_counter
     
     tap_groups = []
     rebinds = {}
@@ -430,12 +445,13 @@ def initialize_groups():
                         key_events = new_element.get_key_events()
                         new_key_group.append(key_events[0])
                         # if not in trigger group - so Key Instances as triggers are handled correctly
-                        if index == 1: 
+                        if index >= 1: 
                             new_key_group.append(key_events[1])
             new_macro.append(new_key_group)
         macro_triggers.append(new_macro[0])
         # trigger is the key to the to be played keygroup
-        macros[new_macro[0]] = new_macro[1]
+        macros[new_macro[0]] = new_macro[1:]
+        macros_sequence_counter[new_macro[0]] = 0
                       
 def reload_all_groups():
     global FILE_NAME_TAP_GROUPS, tap_groups_hr
@@ -492,18 +508,17 @@ def send_key_event(key_event, with_delay=False, stop_event=None):
             controller_dict[is_mouse_key].release(key_code)
         
         if ACT_DELAY and with_delay:
-            print(*delays)
             delay_time = get_random_delay(*delays)
-
+            # if not in a thread just play sleep for the delay
             if stop_event is None:
                 sleep(delay_time / 1000)
+            # if in thread, sleep in increments and break if stop_event is set
             else:
-                
-                #delay_time = 503
                 sleep_increment = 5 # 5 ms
                 num_sleep_increments = (delay_time // sleep_increment )
                 num_sleep_rest = (delay_time % sleep_increment)
-                print(f"delay: {delay_time}, num_sleep_increments {num_sleep_increments}, num_sleep_rest {num_sleep_rest}")
+                if DEBUG: 
+                    print(f"incremental delay: {delay_time}, num_sleep_increments {num_sleep_increments}, num_sleep_rest {num_sleep_rest}")
                 sleep(num_sleep_rest / 1000)
                 for i in range(num_sleep_increments):
                     if not stop_event.is_set():
@@ -830,7 +845,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     global last_real_ke, last_virtual_ke, toggle_state
     #global time_real_last_pressed, time_real_last_released
     global time_real, time_simulated, time_all
-    global macro_thread_dict
+    global macro_thread_dict, macros_sequence_counter
     
     # def is_simulated_key_event(flags):
     #     return flags & 0x10
@@ -911,8 +926,8 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
 
         # Replace some Buttons :-D
         if not PAUSED and not PRINT_VK_CODES:
-            
-            '''REBINDS HERE'''
+        
+            'REBINDS HERE'
             # check for rebinds and replace current key event with replacement key event
             for trigger_group in rebind_triggers:
                 
@@ -932,7 +947,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                         if current_ke.get_vk_code() == 0:
                             listener.suppress_event()  
                                            
-            '''STOP REPEATED KEYS HERE'''        
+            'STOP REPEATED KEYS HERE'        
             # prevent evaluation of repeated key events
             # not earliert to keep rebinds and supression intact - toggling can be a bit fast if key is pressed a long time
             if real_key_repeated:
@@ -952,12 +967,12 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                     if DEBUG:
                         print(f"replaced a key: pressed key: {pressed_keys}, released keys: {released_keys}")
                 
-                '''TOGGLE STATE'''
+                'TOGGLE STATE'
                 # reset toggle state of key manually released - so toggle will start anew by pressing the key
                 set_toggle_state_to_curr_ke(current_ke)
                 
                 
-                '''MACROS HERE'''
+                'MACROS HERE'
                 # check for macro triggers     
                 _activated_triggers = []     
                 for trigger_group in macro_triggers:
@@ -965,25 +980,38 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                         _activated_triggers.append(trigger_group)  
                         if DEBUG:
                             print(f"trigger group {trigger_group} activated")
-            
-                # remove triggers from played that are not activated any more
-                # cleaned_triggers = []         
-                # for trigger in _played_triggers:
-                #     if trigger in _activated_triggers:
-                #         cleaned_triggers.append(trigger)
-                # _played_triggers = cleaned_triggers    
-            
-                # play trigger if not already played
+                       
+                # play triggered macros
                 for trigger in _activated_triggers:
-                    # if trigger not in _played_triggers:
-                    #     _played_triggers.append(trigger)
-                    #     if DEBUG:
-                    #         print(f"added trigger to played triggers: {_played_triggers}")
-                        # as help to later supress startin event AFTER it goes through the tap_groups
                     alias_fired = True
-                    key_sequence = macros[trigger].get_key_events()
+                    
+                    'MACRO SEQUENCES'
+                    macro_groups = macros[trigger]
+                    if len(macro_groups) == 1:
+                        key_sequence = macro_groups[0].get_key_events()
+                    else:
+                        if macros_sequence_counter[trigger] >= len(macro_groups):
+                            macros_sequence_counter[trigger] = 0
+                        # try:
+                        key_sequence = macro_groups[macros_sequence_counter[trigger]].get_key_events()
+                        macros_sequence_counter[trigger] += 1
+                        # except KeyError:
+                        #     key_sequence = macro_groups[0].get_key_events()
+                        #     macros_sequence_counter[trigger] = 1
+                        
+                    'MACRO playback'
                     # only spawn a thread for execution if more than one key event in to be played key sequence
-                    if len(key_sequence) > 1:
+                    print(f"key_sequence: {key_sequence}")
+                    # if there is an empty key group ... just ignore it and do not supress the triggerkey
+                    if len(key_sequence) == 0:
+                        pass
+                    # if there is only one key in the sequence, play it as a rebind?
+                    # elif len(key_sequence) == 1:
+                    #     key_event = key_sequence[0]
+                    #     if key_event.is_toggle():
+                    #         key_event = get_next_toggle_state_key_event(key_event)
+                    #     send_key_event(key_event)
+                    elif len(key_sequence) > 0:
                         
                         ## interruptable threads
                         # if thread.is_alive()
@@ -1002,22 +1030,17 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                         stop_event = Event()
 
                         macro_thread = Alias_Thread(key_sequence, stop_event)
-                        # save thread and stop event to find it again for possible interuption
+                        # save thread and stop event to find it again for possible interruption
                         macro_thread_dict[trigger] = [macro_thread, stop_event]
                         
                         macro_thread.start() 
-                    else:
-                        key_event = key_sequence[0]
-                        if key_event.is_toggle():
-                            key_event = get_next_toggle_state_key_event(key_event)
-                        send_key_event(key_event)
                     if DEBUG:
                         print("> playing makro:", trigger)
                         
                     if EXEC_ONLY_ONE_TRIGGERED_MACRO:
                         break
                 
-                '''PREVENT NEXT KEY EVENT FROM TRIGGERING OLD EVENTS'''               
+                'PREVENT NEXT KEY EVENT FROM TRIGGERING OLD EVENTS'               
                 # to remove the key from released_keys after evaluation of triggers
                 # so can only trigger once
                 if not is_keydown:
@@ -1066,7 +1089,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                         focus_thread.restart()
                     #reset_key_states()
 
-        '''TAP GROUP EVALUATION HERE'''
+        'TAP GROUP EVALUATION HERE'
         # Snap Tap Part of Evaluation
         # Intercept key events if not PAUSED
         if not PAUSED and not PRINT_VK_CODES:
