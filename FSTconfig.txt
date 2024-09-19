@@ -12,16 +12,18 @@ left_shift: ^left_shift
 c:left_shift
 v:suppress
 minus:left_mouse
+right_mouse: suppress
+
 
 
 # Macros
-k:h,-i|(tr("+w")+500),+i,h,o
--k,-l: -left_shift,h|100|100,e|100|100,l|(tr("+w")+1000),l|100|100,o|100|100,+left_shift
-#r, !left_shift: ^right_mouse
+k::h,-i|(tr("+w")+500),+i,h,o
+-k,-l:: -left_shift,h|100|100,e|100|100,l|(tr("+w")+1000),l|100|100,o|100|100,+left_shift
+#r, !left_shift:: ^right_mouse
 
-+w|(tr("+w")>100), !s, !ctrl, !space  :  +w|15|5, -s|(cs("+w")), +s|0|0
-+s|(tr("+s")>100), !w, !ctrl, !space  :  +s|15|5, -w|(cs("+s")), +w|0|0
-+a|(tr("+a")>100), !d, !ctrl, !space  :  +a|15|5, -d|(cs("+a")), +d|0|0
-+d|(tr("+d")>100), !a, !ctrl, !space  :  +d|15|5, -a|(cs("+d")), +a|0|0
++w|(tr("+w")>100), !s, !ctrl, !space  ::  +w|15|5, -s|(cs("+w")), +s|0|0
++s|(tr("+s")>100), !w, !ctrl, !space  ::  +s|15|5, -w|(cs("+s")), +w|0|0
++a|(tr("+a")>100), !d, !ctrl, !space  ::  +a|15|5, -d|(cs("+a")), +d|0|0
++d|(tr("+d")>100), !a, !ctrl, !space  ::  +d|15|5, -a|(cs("+d")), +a|0|0
 
-+space|(150<tr("+space")<500), !ctrl : +space, -ctrl|(550-tr("+space")), +ctrl|0|0
++space|(150<tr("+space")<500), !ctrl :: +space, -ctrl|(550-tr("+space")), +ctrl|0|0

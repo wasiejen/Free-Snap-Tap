@@ -46,6 +46,14 @@ FILE_NAME_ALL = 'FSTconfig.txt'
 WM_KEYDOWN = [256,260] # _PRESS_MESSAGES = (_WM_KEYDOWN, _WM_SYSKEYDOWN)
 WM_KEYUP = [257,261] # _RELEASE_MESSAGES = (_WM_KEYUP, _WM_SYSKEYUP)
 
+# Constants for mouse events
+MSG_MOUSE_DOWN = [513,516,519,523]
+MSG_MOUSE_UP = [514,517,520,524]
+
+MSG_MOUSE_MOVE = 512
+MSG_MOUSE_SCROLL_VERTICAL = 522
+MSG_MOUSE_SCROLL_HORIZONTAL = 526
+
 # Control key combinations
 EXIT_Combination = [35, 164]#35  # END key vkcode 35, ALT 164
 TOGGLE_ON_OFF_Combination = [46, 164]  # DELETE key vkcode 46
@@ -92,7 +100,10 @@ controller_dict = {True: mouse_controller, False: controller}
 
 mouse_vk_codes_dict = {1: mouse.Button.left, 
                        2: mouse.Button.right, 
-                       4: mouse.Button.middle}
+                       3: mouse.Button.middle,
+                       4: mouse.Button.x1,
+                       5: mouse.Button.x2,
+                       }
 mouse_vk_codes = mouse_vk_codes_dict.keys()
 
 # save point to recognise repeating real key input and stop evaluating it
@@ -174,9 +185,32 @@ def load_groups(file_name):
                         # if len(trigger_group) == 1 and len(key_group) == 1:
                         if len(key_group) == 1:
                             rebinds_hr.append([trigger_group, key_group[0]])
-                        # macro
                         else:
-                            macros_hr.append([trigger_group, key_group])
+                            print(f"{key_group} is not a valid rebind (only one key_event/key allowed") 
+                            print("   use :: instead of : to declare it as a macro")
+                        # macro
+                    elif len(groups) > 2 and len(groups[1]) == 0:
+                        trigger_group = groups[0].split(',')
+                        key_group = groups[2].split(',')
+                        macros_hr.append([trigger_group, key_group])
+                            
+                    # groups = cleaned_line.split(':')
+                    
+                    # #sort cleaned groups into categories
+                    # # tap groups
+                    # if len(groups) == 1: 
+                    #     tap_groups_hr.append(groups[0].split(','))
+                    # # rebinds and macros
+                    # elif len(groups) == 2:
+                    #     trigger_group = groups[0].split(',')
+                    #     key_group = groups[1].split(',')
+                    #     # rebind
+                    #     # if len(trigger_group) == 1 and len(key_group) == 1:
+                    #     if len(key_group) == 1:
+                    #         rebinds_hr.append([trigger_group, key_group[0]])
+                    #     # macro
+                    #     else:
+                    #         macros_hr.append([trigger_group, key_group])
                         
 def save_groups(file_name):
     """
@@ -217,7 +251,7 @@ def display_groups():
     # macros
     print("\n# Macros")
     for index, macro in enumerate(macros_hr):
-        print(f"[{index}] " + ' : '.join([', '.join(macro[0]),', '.join(macro[1])]))
+        print(f"[{index}] " + ' :: '.join([', '.join(macro[0]),', '.join(macro[1])]))
 
 def add_group(new_group, data_object):
     """
@@ -670,17 +704,84 @@ def send_keys_for_tap_group(tap_group):
                 controller.press(key_code_to_send) 
             tap_group.set_last_key_send(key_to_send)
 
-
-# event evaluation
-def win32_event_filter(msg, data):
-    """
-    Filter and handle keyboard events.
-    """
-    global PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
-    global last_real_ke, last_virtual_ke, toggle_state
-    #global time_real_last_pressed, time_real_last_released
-    global time_real, time_simulated, time_all
+def mouse_win32_event_filter(msg, data):#
+    '''
+    data:
+    typedef struct tagMSLLHOOKSTRUCT {
+    POINT     pt;
+    DWORD     mouseData;
+    DWORD     flags;
+    DWORD     time;
+    ULONG_PTR dwExtraInfo;
+    '''
+    # no mousedata for left, right, middle
+    # mousedata for x1: 65536: 2^16
+    # mousedata for x2: 131072: 2x2^16
+    # mousedata for scroll up/left: 7864320 : 120*2^16
+    # mousedata for scroll down/right: 4287102976 : 65416*2^16: 8177 *2^19
     
+    # buttons received:
+    # Button.right
+    # Button.left
+    # Button.x1
+    # Button.x2
+    # Button.middle
+    
+    def is_simulated_key_event(flags):
+        return flags == 1
+    
+    def is_press(msg):
+        if msg in MSG_MOUSE_DOWN:
+            return True
+        if msg in MSG_MOUSE_UP:
+            return False
+        
+    def get_mouse_vk_code():
+        # mouse left
+        if msg in [513, 514]:
+            return 1
+        if msg in [516, 517]:
+            return 2
+        if msg in [519, 520]:
+            return 3
+        if msg in [523, 524]:
+            if data.mouseData == 65536:
+                return 4
+            if data.mouseData == 131072:
+                return 5
+    
+    # if DEBUG
+    #print(f"pt: {data.pt}")
+    #print(f"mouseData: {data.mouseData}")
+    #print(f"flags: {data.flags}")
+    #print(f"time: {data.time}")
+    #print(f"dwExtraInfo: {data.dwExtraInfo}")
+    
+    skip_event = False
+    
+    # mouse movement
+    if msg == MSG_MOUSE_MOVE:
+        skip_event = True
+    # veritcal scoll
+    if msg == MSG_MOUSE_SCROLL_VERTICAL:
+        skip_event = True
+    # horizontal scroll
+    if msg == MSG_MOUSE_SCROLL_HORIZONTAL:
+        skip_event = True
+
+    if not skip_event:
+        
+        vk_code = get_mouse_vk_code()
+        key_event_time = data.time
+        is_keydown = is_press(msg)
+        is_simulated = is_simulated_key_event(data.flags)
+        print(f"vk_coe: {vk_code}, simulated: {is_simulated}, msg: {msg}")       
+        
+        # let us test just with right click for the moment
+           
+        win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event=True)
+        
+def keyboard_win32_event_filter(msg, data):
     def is_simulated_key_event(flags):
         return flags & 0x10
 
@@ -689,6 +790,32 @@ def win32_event_filter(msg, data):
             return True
         if msg in WM_KEYUP:
             return False
+    
+    vk_code = data.vkCode
+    key_event_time = data.time
+    is_keydown = is_press(msg)
+    is_simulated = is_simulated_key_event(data.flags)
+    win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated)
+
+# event evaluation
+# def win32_event_filter(msg, data):
+def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event=False):
+    """
+    Filter and handle keyboard events.
+    """
+    global PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
+    global last_real_ke, last_virtual_ke, toggle_state
+    #global time_real_last_pressed, time_real_last_released
+    global time_real, time_simulated, time_all
+    
+    # def is_simulated_key_event(flags):
+    #     return flags & 0x10
+
+    # def is_press(msg):
+    #     if msg in WM_KEYDOWN:
+    #         return True
+    #     if msg in WM_KEYUP:
+    #         return False
 
     def check_for_combination(vk_codes):                 
         all_active = True
@@ -724,10 +851,10 @@ def win32_event_filter(msg, data):
     key_replaced = False
     alias_fired = False
     real_key_repeated = False
-    vk_code = data.vkCode
-    key_event_time = data.time
-    is_keydown = is_press(msg)
-    is_simulated = is_simulated_key_event(data.flags)
+    # vk_code = data.vkCode
+    # key_event_time = data.time
+    # is_keydown = is_press(msg)
+    # is_simulated = is_simulated_key_event(data.flags)
     
     current_ke = Key_Event(vk_code, is_keydown)
     _activated_triggers = []
@@ -736,7 +863,7 @@ def win32_event_filter(msg, data):
     ##1
     if PRINT_VK_CODES or DEBUG:
     # if True:
-        print(f"time: {data.time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
+        print(f"time: {key_event_time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
 
     # check for simulated keys:
     if not is_simulated: # is_simulated_key_event(data.flags):
@@ -780,28 +907,31 @@ def win32_event_filter(msg, data):
                         # if key is supressed
                         if current_ke.get_vk_code() == 0:
                             listener.suppress_event()  
-                            
-                        # if key is to be toggled
-                        if current_ke.is_toggle():
-                            if old_ke.get_is_press():
-                                current_ke = get_next_toggle_state_key_event(current_ke)
-                            else:
-                                # key up needs to be supressed or else it will be evaluated 2 times each tap
-                                listener.suppress_event()  
-                                
-            '''TOGGLE STATE'''
-            # reset toggle state of key manually released - so toggle will start anew by pressing the key
-            set_toggle_state_to_curr_ke(current_ke)
-            
+                                           
             '''STOP REPEATED KEYS HERE'''        
             # prevent evaluation of repeated key events
             # not earliert to keep rebinds and supression intact - toggling can be a bit fast if key is pressed a long time
-            if not real_key_repeated:
+            if real_key_repeated:
+                listener.suppress_event()
+            else:
                 ### collect active keys
                 if key_replaced:
+                    # if key is to be toggled
+                    if current_ke.is_toggle():
+                        if old_ke.get_is_press():
+                            current_ke = get_next_toggle_state_key_event(current_ke)
+                        else:
+                            # key up needs to be supressed or else it will be evaluated 2 times each tap
+                            listener.suppress_event()  
+                            
                     manage_key_states_by_event(current_ke)
                     if DEBUG:
                         print(f"replaced a key: pressed key: {pressed_keys}, released keys: {released_keys}")
+                
+                '''TOGGLE STATE'''
+                # reset toggle state of key manually released - so toggle will start anew by pressing the key
+                set_toggle_state_to_curr_ke(current_ke)
+                
                 
                 '''MACROS HERE'''
                 # check for macro triggers     
@@ -843,25 +973,28 @@ def win32_event_filter(msg, data):
                     if EXEC_ONLY_ONE_TRIGGERED_MACRO:
                         break
                 
-                
                 '''PREVENT NEXT KEY EVENT FROM TRIGGERING OLD EVENTS'''               
                 # to remove the key from released_keys after evaluation of triggers
                 # so can only trigger once
                 if not is_keydown:
                     remove_key_release_state(current_ke.get_vk_code())  
-                    key_release_removed = True          
+                    key_release_removed = True  
 
         if CONTROLS_ENABLED:                  
             # # Stop the listener if the MENU combination is pressed
             if check_for_combination(MENU_Combination):
                 MENU_ENABLED = True
                 print('\n--- Stopping - Return to menu ---')
+                release_all_toggles()
                 listener.stop()
+                mouse_listener.stop()
 
             # # Stop the listener if the END combination is pressed
             elif check_for_combination(EXIT_Combination):
                 print('\n--- Stopping execution ---')
+                release_all_toggles()
                 listener.stop()
+                mouse_listener.stop()
                 STOPPED = True
                 exit()
 
@@ -928,10 +1061,7 @@ def win32_event_filter(msg, data):
     # here arrive all key_events that will be send - last place to intercept
     # here the interception of interference of alias with tap groups is realized
     if is_simulated:
-        
-        # TODO:
-        # should simulated keys also be rebound according to rebinds?
-        
+                
         for tap_group in tap_groups:
             vk_codes = tap_group.get_vk_codes()
             if vk_code in vk_codes:
@@ -1166,9 +1296,12 @@ class Focus_Thread(Thread):
     def end(self):
         self.stop = True
          
+         
+         
+         
 
 def main():
-    global listener
+    global listener, mouse_listener
     global focus_thread
      # check if start arguments are passed
     check_start_arguments()
@@ -1202,9 +1335,14 @@ def main():
         print('--- enter MENU again with ALT+PAGE_DOWN key ---')
         if FOCUS_APP_NAME is not None:
             focus_thread.restart()
+            
+        mouse_listener = mouse.Listener(win32_event_filter=mouse_win32_event_filter)
+        mouse_listener.start()
         
-        with keyboard.Listener(win32_event_filter=win32_event_filter) as listener:
+        with keyboard.Listener(win32_event_filter=keyboard_win32_event_filter) as listener:
             listener.join()
+            
+        mouse_listener.stop()
             
         sleep(1)
 
