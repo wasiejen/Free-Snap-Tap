@@ -63,9 +63,9 @@ MENU_Combination = [34, 164] # PAGE_DOWN
 # Key Groups define which key1 will be replaced by key2
 # if a Key Group has more than 2 keys if will be handled als alias
 tap_groups = []    # [Tap_Groups]
-rebinds = {}       # Key_Event : Key_Event
+rebinds_dict = {}       # Key_Event : Key_Event
 rebind_triggers = []
-macros = {}        # [Key_Group : Key_Group]  # triggers are the Keys to the Item Makro
+macros_dict = {}        # [Key_Group : Key_Group]  # triggers are the Keys to the Item Makro
 macro_triggers = [] 
 
 # hr = human readable form - saves the lines cleaned of comments and presorted
@@ -82,7 +82,7 @@ pressed_keys = set()
 released_keys = set()
 
 # toggle state tracker
-toggle_state = {}
+toggle_state_dict = {}
 alias_toggle_lock = Lock()
 
 # time_real = [time_real_last_pressed, time_real_last_released, time_real_released, time_real_pressed]
@@ -111,7 +111,7 @@ last_real_ke = Key_Event(0,True)
 # last_virtual_ke = Key_Event(0,True)
 
 macro_thread_dict = {}
-macros_sequence_counter = {}
+macros_sequence_counter_dict = {}
 
 
 def add_key_press_state(vk_code):    
@@ -308,13 +308,13 @@ def initialize_groups():
     key_group are a list of Key_Event, Keys
     macros are Key_Group : key_Groups
     '''
-    global tap_groups, rebinds, rebind_triggers
-    global macros, macro_triggers, macros_sequence_counter
+    global tap_groups, rebinds_dict, rebind_triggers
+    global macros_dict, macro_triggers, macros_sequence_counter_dict
     
     tap_groups = []
-    rebinds = {}
+    rebinds_dict = {}
     rebind_triggers = []
-    macros = {}
+    macros_dict = {}
     macro_triggers = []
     
     def extract_data_from_key(key):
@@ -420,7 +420,7 @@ def initialize_groups():
         if not both_are_Keys:
             trigger_group = Key_Group(new_trigger_group)
             rebind_triggers.append(trigger_group)
-            rebinds[trigger_group] = replacement_key
+            rebinds_dict[trigger_group] = replacement_key
         
         else:
             trigger_events = trigger_key.get_key_events()
@@ -428,7 +428,7 @@ def initialize_groups():
             for index in [0,1]:
                 trigger_group = Key_Group([trigger_events[index]] + trigger_rest)
                 rebind_triggers.append(trigger_group)
-                rebinds[trigger_group] = replacement_events[index]
+                rebinds_dict[trigger_group] = replacement_events[index]
                   
     # extract macros         
     for macro in macros_hr:
@@ -450,8 +450,8 @@ def initialize_groups():
             new_macro.append(new_key_group)
         macro_triggers.append(new_macro[0])
         # trigger is the key to the to be played keygroup
-        macros[new_macro[0]] = new_macro[1:]
-        macros_sequence_counter[new_macro[0]] = 0
+        macros_dict[new_macro[0]] = new_macro[1:]
+        macros_sequence_counter_dict[new_macro[0]] = 0
                       
 def reload_all_groups():
     global FILE_NAME_TAP_GROUPS, tap_groups_hr
@@ -464,8 +464,8 @@ def reload_all_groups():
     initialize_groups()
     if DEBUG:
         print(f"tap_groups: {tap_groups}")
-        print(f"rebinds: {rebinds}")
-        print(f"macros: {macros}")
+        print(f"rebinds: {rebinds_dict}")
+        print(f"macros: {macros_dict}")
 
 def get_random_delay(max = ALIAS_MAX_DELAY_IN_MS, min = ALIAS_MIN_DELAY_IN_MS, ):
     if min > max: 
@@ -479,11 +479,11 @@ def get_key_code(is_mouse_key, vk_code):
         key_code = keyboard.KeyCode.from_vk(vk_code)
     return key_code
 
-def send_key_event(key_event, with_delay=False, stop_event=None):
+def execute_key_event(key_event, with_delay=False, stop_event=None):
+    global macros_sequence_counter_dict, macro_triggers
     
     def check_for_mouse_vk_code(vk_code):
-        is_mouse_key = vk_code in mouse_vk_codes
-        return is_mouse_key
+        return vk_code in mouse_vk_codes
     
     vk_code, is_press, delays = key_event.get_all()
     
@@ -491,44 +491,66 @@ def send_key_event(key_event, with_delay=False, stop_event=None):
     constraint_fulfilled, delays = check_constraint_fulfillment(key_event, get_also_delays=True)
     
     if constraint_fulfilled:
-        if len(delays) == 0:
-            delays = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
-        elif len(delays) == 1:
-            delays = delays*2
-        elif len(delays) == 2:
-            pass
-        else:
-            delays = delays[:2]
         
-        is_mouse_key = check_for_mouse_vk_code(vk_code)
-        key_code = get_key_code(is_mouse_key, vk_code)
-        if is_press:
-            controller_dict[is_mouse_key].press(key_code)
-        else:
-            controller_dict[is_mouse_key].release(key_code)
-        
-        if ACT_DELAY and with_delay:
-            delay_time = get_random_delay(*delays)
-            # if not in a thread just play sleep for the delay
-            if stop_event is None:
-                sleep(delay_time / 1000)
-            # if in thread, sleep in increments and break if stop_event is set
+        # reset macro sequence
+        if vk_code <= 0:
+            reset_code = - vk_code
+            # reset current trigger of this event - return this code to alias tread
+            if reset_code == 255:
+                return reset_code
+            # reset every sequence counter
+            elif reset_code == 256:
+                for index in len(macro_triggers):
+                    macros_sequence_counter_dict[macro_triggers[index]] = 0
+                    _, stop_event = macro_thread_dict[macro_triggers[index]]
+                    stop_event.set()
+            # reset a specific macro according to index  
             else:
-                sleep_increment = 5 # 5 ms
-                num_sleep_increments = (delay_time // sleep_increment )
-                num_sleep_rest = (delay_time % sleep_increment)
-                if DEBUG: 
-                    print(f"incremental delay: {delay_time}, num_sleep_increments {num_sleep_increments}, num_sleep_rest {num_sleep_rest}")
-                sleep(num_sleep_rest / 1000)
-                for i in range(num_sleep_increments):
-                    if not stop_event.is_set():
-                        sleep(sleep_increment / 1000)
-                    else:
-                        print("stop event recognised")
-                        break
-                    
-                
-                
+                try:
+                    macros_sequence_counter_dict[macro_triggers[reset_code]] = 0
+                    _, stop_event = macro_thread_dict[macro_triggers[reset_code]]
+                    stop_event.set()
+                except IndexError:
+                    print(f"wrong index for reset - no macro with index: {reset_code}")
+        else:
+            
+            if len(delays) == 0:
+                delays = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
+            elif len(delays) == 1:
+                delays = delays*2
+            elif len(delays) == 2:
+                pass
+            else:
+                delays = delays[:2]
+            
+            is_mouse_key = check_for_mouse_vk_code(vk_code)
+            key_code = get_key_code(is_mouse_key, vk_code)
+            if is_press:
+                controller_dict[is_mouse_key].press(key_code)
+            else:
+                controller_dict[is_mouse_key].release(key_code)
+            
+            if ACT_DELAY and with_delay:
+                delay_time = get_random_delay(*delays)
+                # if not in a thread just play sleep for the delay
+                if stop_event is None:
+                    sleep(delay_time / 1000)
+                # if in thread, sleep in increments and break if stop_event is set
+                else:
+                    sleep_increment = 5 # 5 ms
+                    num_sleep_increments = (delay_time // sleep_increment )
+                    num_sleep_rest = (delay_time % sleep_increment)
+                    if DEBUG: 
+                        print(f"incremental delay: {delay_time}, num_sleep_increments {num_sleep_increments}, num_sleep_rest {num_sleep_rest}")
+                    sleep(num_sleep_rest / 1000)
+                    for i in range(num_sleep_increments):
+                        if not stop_event.is_set():
+                            sleep(sleep_increment / 1000)
+                        else:
+                            if DEBUG:
+                                print("stop event recognised")
+                            break
+           
 
 def check_constraint_fulfillment(key_event, get_also_delays=False):
     fullfilled = True
@@ -674,27 +696,27 @@ def set_key_times(key_event_time, vk_code, is_keydown, time_list):
             #print(f"no key yet for vk_code: {error}")
             
 def get_next_toggle_state_key_event(key_event):
-    global toggle_state
+    global toggle_state_dict
     vk_code, _, delays = key_event.get_all()
     with alias_toggle_lock:
         try:
-            toggle_state[vk_code] = not toggle_state[vk_code]
+            toggle_state_dict[vk_code] = not toggle_state_dict[vk_code]
         except KeyError:
-            toggle_state[vk_code] = True
+            toggle_state_dict[vk_code] = True
                             #replace it so it can be evaluated
-        toggle_ke = Key_Event(vk_code, toggle_state[vk_code], delays)
+        toggle_ke = Key_Event(vk_code, toggle_state_dict[vk_code], delays)
     return toggle_ke
 
 def set_toggle_state_to_curr_ke(key_event):
     vk_code, is_keydown, _ =  key_event.get_all()
-    for key in toggle_state.keys():
+    for key in toggle_state_dict.keys():
         if key == vk_code:
-            toggle_state[vk_code] = is_keydown
+            toggle_state_dict[vk_code] = is_keydown
             
 def release_all_toggles():
-    for vk_code in toggle_state.keys():
-        send_key_event(Key_Event(vk_code, False))
-        toggle_state[vk_code] = False
+    for vk_code in toggle_state_dict.keys():
+        execute_key_event(Key_Event(vk_code, False))
+        toggle_state_dict[vk_code] = False
 
 def send_keys_for_tap_group(tap_group):
     """
@@ -813,7 +835,8 @@ def mouse_win32_event_filter(msg, data):#
         key_event_time = data.time
         is_keydown = is_press(msg)
         is_simulated = is_simulated_key_event(data.flags)
-        print(f"vk_coe: {vk_code}, simulated: {is_simulated}, msg: {msg}")       
+        if DEBUG:
+            print(f"vk_coe: {vk_code}, simulated: {is_simulated}, msg: {msg}")       
         
         # let us test just with right click for the moment
            
@@ -842,10 +865,10 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     Filter and handle keyboard events.
     """
     global PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
-    global last_real_ke, last_virtual_ke, toggle_state
+    global last_real_ke, last_virtual_ke, toggle_state_dict
     #global time_real_last_pressed, time_real_last_released
     global time_real, time_simulated, time_all
-    global macro_thread_dict, macros_sequence_counter
+    global macro_thread_dict, macros_sequence_counter_dict
     
     # def is_simulated_key_event(flags):
     #     return flags & 0x10
@@ -919,7 +942,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
             set_key_times(key_event_time, vk_code, is_keydown, time_all)       
         
         key_release_removed = False        
-        if current_ke not in rebinds.keys():
+        if current_ke not in rebinds_dict.keys():
             manage_key_states_by_event(current_ke)
             if DEBUG:
                 print(f"pressed key: {pressed_keys}, released keys: {released_keys}")
@@ -933,18 +956,18 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                 
                 if is_trigger_activated(current_ke, trigger_group):
                     try:
-                        replacement_ke = rebinds[trigger_group]
+                        replacement_ke = rebinds_dict[trigger_group]
                         old_ke = current_ke
                         current_ke = replacement_ke
                         key_replaced = True
                     except KeyError as error:
                         if DEBUG:
                             print(f"rebind not found: {error}")
-                            print(rebinds)
+                            print(rebinds_dict)
                             
                     if key_replaced:
                         # if key is supressed
-                        if current_ke.get_vk_code() == 0:
+                        if current_ke.get_vk_code() == -999:
                             listener.suppress_event()  
                                            
             'STOP REPEATED KEYS HERE'        
@@ -986,22 +1009,23 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                     alias_fired = True
                     
                     'MACRO SEQUENCES'
-                    macro_groups = macros[trigger]
+                    macro_groups = macros_dict[trigger]
                     if len(macro_groups) == 1:
                         key_sequence = macro_groups[0].get_key_events()
                     else:
-                        if macros_sequence_counter[trigger] >= len(macro_groups):
-                            macros_sequence_counter[trigger] = 0
+                        if macros_sequence_counter_dict[trigger] >= len(macro_groups):
+                            macros_sequence_counter_dict[trigger] = 0
                         # try:
-                        key_sequence = macro_groups[macros_sequence_counter[trigger]].get_key_events()
-                        macros_sequence_counter[trigger] += 1
+                        key_sequence = macro_groups[macros_sequence_counter_dict[trigger]].get_key_events()
+                        macros_sequence_counter_dict[trigger] += 1
                         # except KeyError:
                         #     key_sequence = macro_groups[0].get_key_events()
                         #     macros_sequence_counter[trigger] = 1
                         
                     'MACRO playback'
                     # only spawn a thread for execution if more than one key event in to be played key sequence
-                    print(f"key_sequence: {key_sequence}")
+                    if DEBUG:
+                        print(f"key_sequence: {key_sequence}")
                     # if there is an empty key group ... just ignore it and do not supress the triggerkey
                     if len(key_sequence) == 0:
                         pass
@@ -1020,20 +1044,22 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                         try:
                             macro_thread, stop_event = macro_thread_dict[trigger]
                             if macro_thread.is_alive():
-                                print("still alive - try to stop")
+                                if DEBUG:
+                                    print(f"{trigger}-macro: still alive - try to stop")
                                 stop_event.set()
                                 macro_thread.join()
                         except KeyError:
+                            # this thread was not started before
                             pass
                         
                         # reset stop event
                         stop_event = Event()
 
-                        macro_thread = Alias_Thread(key_sequence, stop_event)
+                        macro_thread = Alias_Thread(key_sequence, stop_event, trigger)
                         # save thread and stop event to find it again for possible interruption
                         macro_thread_dict[trigger] = [macro_thread, stop_event]
-                        
                         macro_thread.start() 
+                        
                     if DEBUG:
                         print("> playing makro:", trigger)
                         
@@ -1047,6 +1073,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                     remove_key_release_state(current_ke.get_vk_code())  
                     key_release_removed = True  
 
+        'CONTROLS HERE'
         if CONTROLS_ENABLED:                  
             # # Stop the listener if the MENU combination is pressed
             if check_for_combination(MENU_Combination):
@@ -1113,7 +1140,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
         
         # if replacement happened suppress source key event   
         if key_replaced is True:
-            send_key_event(current_ke)
+            execute_key_event(current_ke)
             listener.suppress_event()
         
         # supress event that triggered an alias - done here because it should also update tap groups before
@@ -1128,7 +1155,9 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     # here arrive all key_events that will be send - last place to intercept
     # here the interception of interference of alias with tap groups is realized
     if is_simulated:
-                
+        # fecthing current vk and press - not needed atm but as precaution if I put it somewhere else xD
+        vk_code, is_keydown, _ = current_ke.get_all()
+        
         for tap_group in tap_groups:
             vk_codes = tap_group.get_vk_codes()
             if vk_code in vk_codes:
@@ -1283,13 +1312,15 @@ class Alias_Thread(Thread):
     '''
     execute macros/alias in its own threads so the delay is not interfering with key evaluation
     '''
-    def __init__(self, key_sequence, stop_event):
+    def __init__(self, key_sequence, stop_event, trigger):
         Thread.__init__(self)
         self.daemon = True
         self.key_events = key_sequence
         self.stop_event = stop_event
+        self.trigger = trigger
         
-    def run(self):     
+    def run(self): 
+        global macros_sequence_counter_dict
         try:   
             # Key_events ans Keys here ...
             for key_event in self.key_events:
@@ -1299,8 +1330,16 @@ class Alias_Thread(Thread):
                 else:
                     if key_event.is_toggle():
                         key_event = get_next_toggle_state_key_event(key_event)
-                        
-                    send_key_event(key_event, with_delay=True, stop_event=self.stop_event)
+                    
+                    # send key event and handles interruption of delay
+                    # retun vk_code if negativ as a reset function for macro sequences
+                    # -255 is self reset - every other negative number correspond to -vk_code index of macro_triggers
+                    reset_code = execute_key_event(key_event, with_delay=True, stop_event=self.stop_event)
+                    if reset_code is not None:
+                        if reset_code == -255:
+                            macros_sequence_counter_dict[self.trigger] = 0
+                            break
+                       
         except Exception as error:
             print(error)
             alias_thread_logging.append(error)
