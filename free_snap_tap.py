@@ -1,5 +1,5 @@
 from pynput import keyboard, mouse
-from threading import Thread, Lock # to play aliases without interfering with keyboard listener
+from threading import Thread, Lock, Event # to play aliases without interfering with keyboard listener
 from os import system, startfile # to use clearing of CLI for better menu usage and opening config file
 import sys # to get start arguments
 import msvcrt # to flush input stream
@@ -109,6 +109,8 @@ mouse_vk_codes = mouse_vk_codes_dict.keys()
 # save point to recognise repeating real key input and stop evaluating it
 last_real_ke = Key_Event(0,True)
 # last_virtual_ke = Key_Event(0,True)
+
+macro_thread_dict = {}
 
 
 def add_key_press_state(vk_code):    
@@ -449,10 +451,10 @@ def reload_all_groups():
         print(f"rebinds: {rebinds}")
         print(f"macros: {macros}")
 
-def delay(max = ALIAS_MAX_DELAY_IN_MS, min = ALIAS_MIN_DELAY_IN_MS, ):
+def get_random_delay(max = ALIAS_MAX_DELAY_IN_MS, min = ALIAS_MIN_DELAY_IN_MS, ):
     if min > max: 
         min,max = max,min
-    sleep(randint(min, max) / 1000)
+    return randint(min, max)
 
 def get_key_code(is_mouse_key, vk_code):
     if is_mouse_key:
@@ -461,7 +463,7 @@ def get_key_code(is_mouse_key, vk_code):
         key_code = keyboard.KeyCode.from_vk(vk_code)
     return key_code
 
-def send_key_event(key_event, with_delay=False):
+def send_key_event(key_event, with_delay=False, stop_event=None):
     
     def check_for_mouse_vk_code(vk_code):
         is_mouse_key = vk_code in mouse_vk_codes
@@ -488,9 +490,30 @@ def send_key_event(key_event, with_delay=False):
             controller_dict[is_mouse_key].press(key_code)
         else:
             controller_dict[is_mouse_key].release(key_code)
+        
+        if ACT_DELAY and with_delay:
+            print(*delays)
+            delay_time = get_random_delay(*delays)
 
-        if ACT_DELAY and with_delay: 
-            delay(*delays)
+            if stop_event is None:
+                sleep(delay_time / 1000)
+            else:
+                
+                #delay_time = 503
+                sleep_increment = 5 # 5 ms
+                num_sleep_increments = (delay_time // sleep_increment )
+                num_sleep_rest = (delay_time % sleep_increment)
+                print(f"delay: {delay_time}, num_sleep_increments {num_sleep_increments}, num_sleep_rest {num_sleep_rest}")
+                sleep(num_sleep_rest / 1000)
+                for i in range(num_sleep_increments):
+                    if not stop_event.is_set():
+                        sleep(sleep_increment / 1000)
+                    else:
+                        print("stop event recognised")
+                        break
+                    
+                
+                
 
 def check_constraint_fulfillment(key_event, get_also_delays=False):
     fullfilled = True
@@ -807,6 +830,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     global last_real_ke, last_virtual_ke, toggle_state
     #global time_real_last_pressed, time_real_last_released
     global time_real, time_simulated, time_all
+    global macro_thread_dict
     
     # def is_simulated_key_event(flags):
     #     return flags & 0x10
@@ -960,8 +984,28 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                     key_sequence = macros[trigger].get_key_events()
                     # only spawn a thread for execution if more than one key event in to be played key sequence
                     if len(key_sequence) > 1:
-                        thread = Alias_Thread(key_sequence)
-                        thread.start() 
+                        
+                        ## interruptable threads
+                        # if thread.is_alive()
+                        #   set stop event
+                        #   thread join
+                        try:
+                            macro_thread, stop_event = macro_thread_dict[trigger]
+                            if macro_thread.is_alive():
+                                print("still alive - try to stop")
+                                stop_event.set()
+                                macro_thread.join()
+                        except KeyError:
+                            pass
+                        
+                        # reset stop event
+                        stop_event = Event()
+
+                        macro_thread = Alias_Thread(key_sequence, stop_event)
+                        # save thread and stop event to find it again for possible interuption
+                        macro_thread_dict[trigger] = [macro_thread, stop_event]
+                        
+                        macro_thread.start() 
                     else:
                         key_event = key_sequence[0]
                         if key_event.is_toggle():
@@ -1216,22 +1260,26 @@ class Alias_Thread(Thread):
     '''
     execute macros/alias in its own threads so the delay is not interfering with key evaluation
     '''
-    def __init__(self, key_sequence):
+    def __init__(self, key_sequence, stop_event):
         Thread.__init__(self)
         self.daemon = True
         self.key_events = key_sequence
+        self.stop_event = stop_event
         
     def run(self):     
         try:   
             # Key_events ans Keys here ...
             for key_event in self.key_events:
-                alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.get_key_string()}")
-                
-                if key_event.is_toggle():
-                    key_event = get_next_toggle_state_key_event(key_event)
-                    
-                send_key_event(key_event, with_delay=True)
+                #alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.get_key_string()}")
+                if self.stop_event.is_set():
+                    break
+                else:
+                    if key_event.is_toggle():
+                        key_event = get_next_toggle_state_key_event(key_event)
+                        
+                    send_key_event(key_event, with_delay=True, stop_event=self.stop_event)
         except Exception as error:
+            print(error)
             alias_thread_logging.append(error)
             
 class Focus_Thread(Thread):
@@ -1295,10 +1343,7 @@ class Focus_Thread(Thread):
 
     def end(self):
         self.stop = True
-         
-         
-         
-         
+              
 
 def main():
     global listener, mouse_listener
