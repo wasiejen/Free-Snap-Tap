@@ -1436,7 +1436,8 @@ class Repeat_Thread(Thread):
     def __init__(self, key_event, stop_event, time, time_increment=500):
         Thread.__init__(self)
         self.daemon = True
-        self.key_event = key_event
+        vk_code, is_press, delays = key_event.get_all()
+        self.key_event = Key_Event(vk_code, is_press, delays=delays[1:])
         self.stop_event = stop_event
         self.time = time
         self.time_increment = time_increment
@@ -1445,7 +1446,8 @@ class Repeat_Thread(Thread):
     def run(self): 
         while not self.stop_event.is_set():
             # for key_event in self.key_event:
-            send_key_event(self.key_event)
+            execute_key_event(self.key_event)
+            # send_key_event(self.key_event)
             for index in range(self.number_of_increments):
                 if not self.stop_event.is_set():
                     sleep(self.time_increment / 1000)
