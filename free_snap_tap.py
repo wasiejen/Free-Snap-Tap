@@ -491,9 +491,12 @@ def execute_key_event(key_event, with_delay=False, stop_event=None):
             # reset every sequence counter
             elif reset_code == 256:
                 for index in len(macro_triggers):
-                    macros_sequence_counter_dict[macro_triggers[index]] = 0
-                    _, stop_event = macro_thread_dict[macro_triggers[index]]
-                    stop_event.set()
+                    try:
+                        macros_sequence_counter_dict[macro_triggers[index]] = 0
+                        _, stop_event = macro_thread_dict[macro_triggers[index]]
+                        stop_event.set()
+                    except KeyError as error:
+                        print(f"reset_all: macro thread for trigger {error} not found")
             # reset a specific macro according to index  
             else:
                 try:
@@ -502,7 +505,7 @@ def execute_key_event(key_event, with_delay=False, stop_event=None):
                         _, stop_event = macro_thread_dict[macro_triggers[reset_code]]
                         stop_event.set()
                     except KeyError as error:
-                        print(f"reset for {error} unsuccessful")
+                        print(f"reset_{reset_code}: interrupt for macro with trigger {error} unsuccessful")
                 except IndexError:
                     print(f"wrong index for reset - no macro with index: {reset_code}")
         else:
@@ -709,18 +712,18 @@ def delay_evaluation(delay_eval, current_ke):
         repeat_thread.start() 
         return False
     
-    # def stop_repeat():
-    #     try:
-    #         repeat_thread, stop_event = repeat_thread_dict[current_ke]
-    #         if repeat_thread.is_alive():
-    #             if DEBUG:
-    #                 print(f"{current_ke}-repeat: still alive - try to stop")
-    #             stop_event.set()
-    #             #repeat_thread.join()
-    #     except KeyError:
-    #         # this thread was not started before
-    #         pass
-    #     return False
+    def stop_repeat():
+        try:
+            repeat_thread, stop_event = repeat_thread_dict[current_ke]
+            if repeat_thread.is_alive():
+                if DEBUG:
+                    print(f"{current_ke}-repeat: still alive - try to stop")
+                stop_event.set()
+                #repeat_thread.join()
+        except KeyError:
+            # this thread was not started before
+            pass
+        return False
     
     def toggle_repeat(key_string):
         try:
@@ -1509,7 +1512,7 @@ class Focus_Thread(Thread):
                             #reset_key_states()
                             reload_all_groups()
                             print("--- reloaded ---")
-                            print(f'--- auto focus resumed --- found: {active_window}')
+                            print(f'>>> FOCUS APP FOUND: resuming with app: {active_window}')
                             with paused_lock:
                                 PAUSED = False
                         except Exception:
