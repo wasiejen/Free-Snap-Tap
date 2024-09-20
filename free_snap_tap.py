@@ -478,7 +478,7 @@ def execute_key_event(key_event, with_delay=False, stop_event=None):
     vk_code, is_press, delays = key_event.get_all()
     
     # replace delays with evaluated delay
-    constraint_fulfilled, delays = check_constraint_fulfillment(key_event, get_also_delays=True)
+    constraint_fulfilled, delay_times = check_constraint_fulfillment(key_event, get_also_delays=True)
     
     if constraint_fulfilled:
         
@@ -507,14 +507,14 @@ def execute_key_event(key_event, with_delay=False, stop_event=None):
                     print(f"wrong index for reset - no macro with index: {reset_code}")
         else:
             
-            if len(delays) == 0:
-                delays = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
-            elif len(delays) == 1:
-                delays = delays*2
-            elif len(delays) == 2:
+            if len(delay_times) == 0:
+                delay_times = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
+            elif len(delay_times) == 1:
+                delay_times = delay_times*2
+            elif len(delay_times) == 2:
                 pass
             else:
-                delays = delays[:2]
+                delay_times = delay_times[:2]
             
             send_key_event(key_event)
             # is_mouse_key = check_for_mouse_vk_code(vk_code)
@@ -525,7 +525,7 @@ def execute_key_event(key_event, with_delay=False, stop_event=None):
             #     controller_dict[is_mouse_key].release(key_code)
             
             if ACT_DELAY and with_delay:
-                delay_time = get_random_delay(*delays)
+                delay_time = get_random_delay(*delay_times)
                 # if not in a thread just play sleep for the delay
                 if stop_event is None:
                     sleep(delay_time / 1000)
@@ -737,6 +737,16 @@ def delay_evaluation(delay_eval, current_ke):
             print(f"{current_ke} starting repeat for first time")
             repeat(key_string)
         return False
+    
+    def reset_timer():
+        try:
+            repeat_thread, stop_event = repeat_thread_dict[current_ke]
+            if repeat_thread.is_alive():
+                repeat_thread.reset_timer()
+        except KeyError:
+            pass
+        return True
+        
     
    
     easy_eval_succeeded = False
@@ -1116,7 +1126,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                     #     key_event = key_sequence[0]
                     #     if key_event.is_toggle():
                     #         key_event = get_next_toggle_state_key_event(key_event)
-                    #     send_key_event(key_event)
+                    #     execute_key_event(key_event)
                     elif len(key_sequence) > 0:
                         
                         ## interruptable threads
@@ -1442,17 +1452,24 @@ class Repeat_Thread(Thread):
         self.time = time
         self.time_increment = time_increment
         self.number_of_increments = time // time_increment
+        self.reset = False
         
     def run(self): 
+
         while not self.stop_event.is_set():
-            # for key_event in self.key_event:
-            execute_key_event(self.key_event)
-            # send_key_event(self.key_event)
+            if self.reset:
+                self.reset = False
+            else:
+                execute_key_event(self.key_event)
+                
             for index in range(self.number_of_increments):
-                if not self.stop_event.is_set():
+                if not self.stop_event.is_set() and not self.reset:
                     sleep(self.time_increment / 1000)
                 else:
                     break
+                
+    def reset_timer(self):
+        self.reset = True
             
 class Focus_Thread(Thread):
     '''
