@@ -113,6 +113,9 @@ last_real_ke = Key_Event(0,True)
 macro_thread_dict = {}
 macros_sequence_counter_dict = {}
 
+repeat_thread_dict = {}
+# macros_sequence_counter_dict = {}
+
 TIME_DIFF = None
 
 def time_in_millisec():
@@ -467,9 +470,10 @@ def get_key_code(is_mouse_key, vk_code):
 
 def execute_key_event(key_event, with_delay=False, stop_event=None):
     global macros_sequence_counter_dict, macro_triggers
+    global repeat_thread_dict
     
-    def check_for_mouse_vk_code(vk_code):
-        return vk_code in mouse_vk_codes
+    # def check_for_mouse_vk_code(vk_code):
+    #     return vk_code in mouse_vk_codes
     
     vk_code, is_press, delays = key_event.get_all()
     
@@ -494,8 +498,11 @@ def execute_key_event(key_event, with_delay=False, stop_event=None):
             else:
                 try:
                     macros_sequence_counter_dict[macro_triggers[reset_code]] = 0
-                    _, stop_event = macro_thread_dict[macro_triggers[reset_code]]
-                    stop_event.set()
+                    try:
+                        _, stop_event = macro_thread_dict[macro_triggers[reset_code]]
+                        stop_event.set()
+                    except KeyError as error:
+                        print(f"reset for {error} unsuccessful")
                 except IndexError:
                     print(f"wrong index for reset - no macro with index: {reset_code}")
         else:
@@ -509,12 +516,13 @@ def execute_key_event(key_event, with_delay=False, stop_event=None):
             else:
                 delays = delays[:2]
             
-            is_mouse_key = check_for_mouse_vk_code(vk_code)
-            key_code = get_key_code(is_mouse_key, vk_code)
-            if is_press:
-                controller_dict[is_mouse_key].press(key_code)
-            else:
-                controller_dict[is_mouse_key].release(key_code)
+            send_key_event(key_event)
+            # is_mouse_key = check_for_mouse_vk_code(vk_code)
+            # key_code = get_key_code(is_mouse_key, vk_code)
+            # if is_press:
+            #     controller_dict[is_mouse_key].press(key_code)
+            # else:
+            #     controller_dict[is_mouse_key].release(key_code)
             
             if ACT_DELAY and with_delay:
                 delay_time = get_random_delay(*delays)
@@ -536,7 +544,19 @@ def execute_key_event(key_event, with_delay=False, stop_event=None):
                             if DEBUG:
                                 print("stop event recognised")
                             break
-           
+
+def send_key_event(key_event):
+    
+    def check_for_mouse_vk_code(vk_code):
+        return vk_code in mouse_vk_codes
+    vk_code, is_press, delays = key_event.get_all()
+    
+    is_mouse_key = check_for_mouse_vk_code(vk_code)
+    key_code = get_key_code(is_mouse_key, vk_code)
+    if is_press:
+        controller_dict[is_mouse_key].press(key_code)
+    else:
+        controller_dict[is_mouse_key].release(key_code)          
 
 def check_constraint_fulfillment(key_event, get_also_delays=False):
     fullfilled = True
@@ -560,6 +580,7 @@ def check_constraint_fulfillment(key_event, get_also_delays=False):
         return fullfilled
             
 def delay_evaluation(delay_eval, current_ke):
+    global repeat_thread_dict
     
     # first get vk_code and is_press
     def get_vk_code_and_press_from_keystring(key_string):
@@ -575,16 +596,6 @@ def delay_evaluation(delay_eval, current_ke):
             is_press = False  
         vk_code = convert_to_vk_code(key_string.strip('"').strip("'"))
         return vk_code, is_press
-        # if key_string[0] not in ['-', '+']:
-        #     is_press = False
-        # elif key_string[0] == '-':
-        #     is_press = True
-        #     key_string = key_string[1:]
-        # else:
-        #     is_press = False  
-        #     key_string = key_string[1:]
-        # vk_code = convert_to_vk_code(key_string)
-        # return vk_code, is_press
     
     def get_key_time_template(key_string, time_list):
         '''
@@ -686,9 +697,48 @@ def delay_evaluation(delay_eval, current_ke):
             ##2
             return 9999
         
-    def repeat(time_string):
-        pass
-            
+    def repeat(key_string):
+        repeat_time = int(key_string)
+                
+        # reset stop event
+        stop_event = Event()
+
+        repeat_thread = Repeat_Thread(current_ke, stop_event, repeat_time, time_increment=500)
+        # save thread and stop event to find it again for possible interruption
+        repeat_thread_dict[current_ke] = [repeat_thread, stop_event]
+        repeat_thread.start() 
+        return False
+    
+    # def stop_repeat():
+    #     try:
+    #         repeat_thread, stop_event = repeat_thread_dict[current_ke]
+    #         if repeat_thread.is_alive():
+    #             if DEBUG:
+    #                 print(f"{current_ke}-repeat: still alive - try to stop")
+    #             stop_event.set()
+    #             #repeat_thread.join()
+    #     except KeyError:
+    #         # this thread was not started before
+    #         pass
+    #     return False
+    
+    def toggle_repeat(key_string):
+        try:
+            repeat_thread, stop_event = repeat_thread_dict[current_ke]
+            if repeat_thread.is_alive():
+                print(f"{current_ke} stopping repeat")
+                stop_event.set()
+                repeat_thread.join()
+            else:
+                print(f"{current_ke} restarting repeat")
+                repeat(key_string)
+        except KeyError:
+            # this thread was not started before
+            print(f"{current_ke} starting repeat for first time")
+            repeat(key_string)
+        return False
+    
+   
     easy_eval_succeeded = False
     first_char = delay_eval[0]
     if first_char in ['!', '+', '-']:
@@ -714,6 +764,14 @@ def delay_evaluation(delay_eval, current_ke):
                 result = 0     
 
         return result
+    
+def stop_all_repeating_keys():
+    global repeat_thread_dict
+    for key_event in repeat_thread_dict.keys():
+        repeat_thread, stop_event = repeat_thread_dict[key_event]
+        if repeat_thread.is_alive():
+            stop_event.set()
+            repeat_thread.join()
 
 def set_key_times(key_event_time, vk_code, is_keydown, time_list):
     time_last_pressed, time_last_released, time_released, time_pressed = time_list
@@ -1104,6 +1162,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                 MENU_ENABLED = True
                 print('\n--- Stopping - Return to menu ---')
                 release_all_toggles()
+                stop_all_repeating_keys()
                 listener.stop()
                 mouse_listener.stop()
 
@@ -1111,6 +1170,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
             elif check_for_combination(EXIT_Combination):
                 print('\n--- Stopping execution ---')
                 release_all_toggles()
+                stop_all_repeating_keys()
                 listener.stop()
                 mouse_listener.stop()
                 STOPPED = True
@@ -1135,6 +1195,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                         PAUSED = True
                         MANUAL_PAUSED = True
                         release_all_toggles()
+                        stop_all_repeating_keys()
                     # restart focus thread when manual overwrite is over
                     if FOCUS_APP_NAME is not None: 
                         focus_thread.restart()
@@ -1367,6 +1428,29 @@ class Alias_Thread(Thread):
         except Exception as error:
             print(error)
             alias_thread_logging.append(error)
+
+class Repeat_Thread(Thread):
+    '''
+    repeatatly execute a key event based on a timer
+    '''
+    def __init__(self, key_event, stop_event, time, time_increment=500):
+        Thread.__init__(self)
+        self.daemon = True
+        self.key_event = key_event
+        self.stop_event = stop_event
+        self.time = time
+        self.time_increment = time_increment
+        self.number_of_increments = time // time_increment
+        
+    def run(self): 
+        while not self.stop_event.is_set():
+            # for key_event in self.key_event:
+            send_key_event(self.key_event)
+            for index in range(self.number_of_increments):
+                if not self.stop_event.is_set():
+                    sleep(self.time_increment / 1000)
+                else:
+                    break
             
 class Focus_Thread(Thread):
     '''
@@ -1396,7 +1480,7 @@ class Focus_Thread(Thread):
                             #reset_key_states()
                             reload_all_groups()
                             print("--- reloaded ---")
-                            print('--- auto focus resumed ---')
+                            print(f'--- auto focus resumed --- found: {active_window}')
                             with paused_lock:
                                 PAUSED = False
                         except Exception:
@@ -1404,6 +1488,7 @@ class Focus_Thread(Thread):
                 else:
                     if not PAUSED:
                         release_all_toggles()
+                        stop_all_repeating_keys()
                         with paused_lock:
                             PAUSED = True
                         print('--- auto focus paused ---')

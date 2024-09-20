@@ -14,6 +14,8 @@ v:suppress
 minus:left_mouse
 right_mouse: suppress
 plus:reset_0
+z: v|(toggle_repeat(1000))
+#+z:: +v|(toggle_repeat(1000))
 
 
 
