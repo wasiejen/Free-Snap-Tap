@@ -206,24 +206,6 @@ def load_groups(file_name):
                         else:
                             key_group = groups[2].split(',')
                             macros_hr.append([trigger_group, key_group])
-                            
-                    # groups = cleaned_line.split(':')
-                    
-                    # #sort cleaned groups into categories
-                    # # tap groups
-                    # if len(groups) == 1: 
-                    #     tap_groups_hr.append(groups[0].split(','))
-                    # # rebinds and macros
-                    # elif len(groups) == 2:
-                    #     trigger_group = groups[0].split(',')
-                    #     key_group = groups[1].split(',')
-                    #     # rebind
-                    #     # if len(trigger_group) == 1 and len(key_group) == 1:
-                    #     if len(key_group) == 1:
-                    #         rebinds_hr.append([trigger_group, key_group[0]])
-                    #     # macro
-                    #     else:
-                    #         macros_hr.append([trigger_group, key_group])
                         
 def save_groups(file_name):
     """
@@ -583,16 +565,26 @@ def delay_evaluation(delay_eval, current_ke):
     def get_vk_code_and_press_from_keystring(key_string):
         vk_code, is_press = None, None
         # without modifier it will be interpreted as a release
-        if key_string[0] not in ['-', '+']:
+        if key_string[0] in ['+', '!']:
             is_press = False
+            key_string = key_string[1:]
         elif key_string[0] == '-':
             is_press = True
             key_string = key_string[1:]
         else:
             is_press = False  
-            key_string = key_string[1:]
-        vk_code = convert_to_vk_code(key_string)
+        vk_code = convert_to_vk_code(key_string.strip('"').strip("'"))
         return vk_code, is_press
+        # if key_string[0] not in ['-', '+']:
+        #     is_press = False
+        # elif key_string[0] == '-':
+        #     is_press = True
+        #     key_string = key_string[1:]
+        # else:
+        #     is_press = False  
+        #     key_string = key_string[1:]
+        # vk_code = convert_to_vk_code(key_string)
+        # return vk_code, is_press
     
     def get_key_time_template(key_string, time_list):
         '''
@@ -693,19 +685,35 @@ def delay_evaluation(delay_eval, current_ke):
         except KeyError:
             ##2
             return 9999
+        
+    def repeat(time_string):
+        pass
             
-            
-    result = eval(delay_eval)
-    if DEBUG2:
-        print(f"evaluated {delay_eval} to: {result}")
-    # if it is a number and if negativ change it to 0
-    if isinstance(result, float):
-        result = int(result)
-    if isinstance(result, int):
-        if result < 0:
-            result = 0     
+    easy_eval_succeeded = False
+    first_char = delay_eval[0]
+    if first_char in ['!', '+', '-']:
+        try:
+            vk_code, is_press = get_vk_code_and_press_from_keystring(delay_eval)
+            easy_eval_succeeded = True
+            if is_press:
+                return vk_code in pressed_keys
+            else:
+                return vk_code not in pressed_keys
+        except Exception as error:
+            print(error)
+    
+    if not easy_eval_succeeded:
+        result = eval(delay_eval)
+        if DEBUG2:
+            print(f"evaluated {delay_eval} to: {result}")
+        # if it is a number and if negativ change it to 0
+        if isinstance(result, float):
+            result = int(result)
+        if isinstance(result, int):
+            if result < 0:
+                result = 0     
 
-    return result
+        return result
 
 def set_key_times(key_event_time, vk_code, is_keydown, time_list):
     time_last_pressed, time_last_released, time_released, time_pressed = time_list
@@ -868,9 +876,7 @@ def mouse_win32_event_filter(msg, data):#
         is_simulated = is_simulated_key_event(data.flags)
         if DEBUG:
             print(f"vk_coe: {vk_code}, simulated: {is_simulated}, msg: {msg}")       
-        
-        # let us test just with right click for the moment
-           
+                   
         win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event=True)
         
 def keyboard_win32_event_filter(msg, data):
@@ -897,18 +903,8 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     """
     global PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
     global last_real_ke, last_virtual_ke, toggle_state_dict
-    #global time_real_last_pressed, time_real_last_released
     global time_real, time_simulated, time_all, TIME_DIFF
     global macro_thread_dict, macros_sequence_counter_dict
-    
-    # def is_simulated_key_event(flags):
-    #     return flags & 0x10
-
-    # def is_press(msg):
-    #     if msg in WM_KEYDOWN:
-    #         return True
-    #     if msg in WM_KEYUP:
-    #         return False
 
     def check_for_combination(vk_codes):                 
         all_active = True
@@ -938,16 +934,11 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                 if not activated:
                     return False
                 activated = activated and check_constraint_fulfillment(key)
-        return activated
-        
+        return activated    
     
     key_replaced = False
     alias_fired = False
     real_key_repeated = False
-    # vk_code = data.vkCode
-    # key_event_time = data.time
-    # is_keydown = is_press(msg)
-    # is_simulated = is_simulated_key_event(data.flags)
     
     current_ke = Key_Event(vk_code, is_keydown)
     _activated_triggers = []
@@ -1412,9 +1403,9 @@ class Focus_Thread(Thread):
                             print('--- reloading of groups files failed - not resumed, still paused ---')
                 else:
                     if not PAUSED:
+                        release_all_toggles()
                         with paused_lock:
                             PAUSED = True
-                            release_all_toggles()
                         print('--- auto focus paused ---')
                     # print out active window when paused and it changes
                     # to help find the name :-D
