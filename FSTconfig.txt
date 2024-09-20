@@ -22,6 +22,7 @@ plus:reset_0
 k::h,-i|(tr("+w")+500),+i,h,o : t,e,s,t : : reset|(False) : 1,2,3 : 4,5,6
 -k,-l:: -left_shift,h|100|100,e|100|100,l|(tr("+w")+1000),l|100|100,o|100|100,+left_shift
 #r, !left_shift:: ^right_mouse
+m|(!b) :: c,o,o,l
 
 +w|(tr("+w")>100), !s, !ctrl, !space  ::  +w|15|5, -s|(cs("+w")), +s|0|0
 +s|(tr("+s")>100), !w, !ctrl, !space  ::  +s|15|5, -w|(cs("+s")), +w|0|0
