@@ -3,7 +3,7 @@ a,d
 w,s
 
 # Rebinds
-n:j
+
 o, +i :p
 o, -i :l
 -u:+u
@@ -17,6 +17,14 @@ plus:reset_0
 z: v|(toggle_repeat(5000))
 v: v|(reset_timer())
 #+z:: +v|(toggle_repeat(1000))
++mouse_x1 : -v
+-mouse_x1 : -suppress
++mouse_x2 : -b
+-mouse_x2 : -suppress
+
+b : mouse_x1
+n : mouse_x2
+
 
 
 
@@ -33,3 +41,8 @@ m|(!b) :: c,o,o,l
 +d|(tr("+d")>100), !a, !ctrl, !space  ::  +d|15|5, -a|(cs("+d")), +a|0|0
 
 +space|(150<tr("+space")<500), !ctrl :: +space, -ctrl|(550-tr("+space")), +ctrl|0|0
+
+
+
+# initialize dict of key times with starting time: key presses and key releases
+# x1 and x2 not working as expected

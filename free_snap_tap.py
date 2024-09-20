@@ -726,15 +726,15 @@ def delay_evaluation(delay_eval, current_ke):
         try:
             repeat_thread, stop_event = repeat_thread_dict[current_ke]
             if repeat_thread.is_alive():
-                print(f"{current_ke} stopping repeat")
+                print(f"stopping repeat for {current_ke}")
                 stop_event.set()
                 repeat_thread.join()
             else:
-                print(f"{current_ke} restarting repeat")
+                #print(f"{current_ke} restarting repeat")
                 repeat(key_string)
         except KeyError:
             # this thread was not started before
-            print(f"{current_ke} starting repeat for first time")
+            #print(f"{current_ke} starting repeat for first time")
             repeat(key_string)
         return False
     
@@ -782,6 +782,13 @@ def stop_all_repeating_keys():
         if repeat_thread.is_alive():
             stop_event.set()
             repeat_thread.join()
+            
+def init_all_key_times_to_starting_time(key_event_time):
+    for time_set in [time_real, time_simulated, time_all]:
+        time_last_pressed, time_last_released, *_ = time_set
+        for vk_code in range(256):
+            time_last_pressed[vk_code] = key_event_time
+            time_last_released[vk_code] = key_event_time
 
 def set_key_times(key_event_time, vk_code, is_keydown, time_list):
     time_last_pressed, time_last_released, time_released, time_pressed = time_list
@@ -1014,6 +1021,8 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     # get the time difference from system time to the key_event_time
     if TIME_DIFF is None:
         TIME_DIFF = time_in_millisec() - key_event_time
+        # set all key_times to starting time
+        init_all_key_times_to_starting_time(key_event_time)
     
     if PRINT_VK_CODES or DEBUG:
     # if True:
@@ -1447,7 +1456,7 @@ class Repeat_Thread(Thread):
         Thread.__init__(self)
         self.daemon = True
         vk_code, is_press, delays = key_event.get_all()
-        self.key_event = Key_Event(vk_code, is_press, delays=delays[1:])
+        self.key_event = Key_Event(vk_code, is_press, delays=delays[1:], key_string=key_event.get_key_string())
         self.stop_event = stop_event
         self.time = time
         self.time_increment = time_increment
@@ -1455,6 +1464,7 @@ class Repeat_Thread(Thread):
         self.reset = False
         
     def run(self): 
+        print(f"now repeating: {self.key_event} at interval of {self.time} ms")
 
         while not self.stop_event.is_set():
             if self.reset:
