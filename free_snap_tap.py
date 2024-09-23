@@ -152,11 +152,11 @@ def load_from_file(file_name):
     default_start_arguments = []
     default_group_lines = []
     for line in cleaned_lines:
-        if line.startswith('<focus>'):
-            focus_name = line.replace('<focus>', '').lower()
+        if line.startswith('<focus='):
+            focus_name = line.replace('<focus=', '').replace('>', '').replace('\n', '')
             multi_focus_dict[focus_name] = [[], []]
-        elif line.startswith('<arg>'):
-            line = line.replace('<arg>', '')
+        elif line.startswith('<arg='):
+            line = line.replace('<arg=', '').replace('>', '').replace('\n', '').lower()
             if focus_name is None:
                 default_start_arguments.append(line)
             else:
@@ -196,27 +196,31 @@ def write_out_new_file(file_name):
 def clean_lines(lines):
     comments_cleaned_lines = []
     for line in lines:
-        line = line.strip().replace(" ","")
         if len(line) > 1:
-            # strip all comments from line
-            group = line.split(',')
-            # ignore line if first char is a #
-            if group[0][0] == '#':
-                pass
+            if line.startswith('<focus='):
+                comments_cleaned_lines.append(line.lower())
             else:
-                # remove commented out keys
-                cleaned_group = []
-                for key in group:
-                    # ignore commented out keys
-                    if key[0] != '#': 
-                        # ignore comments after keys
-                        cleaned_group.append(key.split('#')[0]) 
-                    # if commented out key before :, add :
-                    elif key.find(':') >= 0:
-                        cleaned_group.append(':')
-                        
-                cleaned_line = ','.join(cleaned_group)
-                comments_cleaned_lines.append(cleaned_line)
+                line = line.strip().replace(" ","")
+                if len(line) > 1:
+                    # strip all comments from line
+                    group = line.split(',')
+                    # ignore line if first char is a #
+                    if group[0][0] == '#':
+                        pass
+                    else:
+                        # remove commented out keys
+                        cleaned_group = []
+                        for key in group:
+                            # ignore commented out keys
+                            if key[0] != '#': 
+                                # ignore comments after keys
+                                cleaned_group.append(key.split('#')[0]) 
+                            # if commented out key before :, add :
+                            elif key.find(':') >= 0:
+                                cleaned_group.append(':')
+                                
+                        cleaned_line = ','.join(cleaned_group)
+                        comments_cleaned_lines.append(cleaned_line)
     
     # clean multiline macro seauences and joins them together
     multiline_cleaned_lines = []
@@ -1728,6 +1732,7 @@ def main():
         print('\n--- Free Snap Tap started ---')
         if CONTROLS_ENABLED:
             display_control_text()
+            print(multi_focus_dict_keys)
         if focus_active:
             focus_thread.restart()
             
