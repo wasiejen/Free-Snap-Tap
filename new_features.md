@@ -4,7 +4,7 @@
   - all start arguments supported via `<arg=*startargument*>`
   - multi focus apps with own groups via `<focus=*name of focus app*>`  
     - all start arguments and groups before first `<focus=...>` will be interpreted as default and applied to all focus app settings
-    - every group until the next <focus=> will be added to the current focus name
+    - every start argument and groups until the next <focus=> will be added to the current focus name and applied AFTER the default start arguments and groups
     - e.g. tap group `a, d` before first <focus=> will be applied to all focus groups
 - adapted output of groups to always show to currently active groups
 - if a ke/key had more then one suffix, following suffixes of a ke or a trigger_group were not checked/executed as soon as one suffix evaluated to False (was a measure to prevent unnecessary checks) - fixed, now all will be checked
