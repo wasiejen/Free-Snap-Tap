@@ -1490,8 +1490,10 @@ def apply_start_arguments(argv):
             ACT_CROSSOVER = False
             print("delay+crossover deactivated")
         elif arg[:10] == "-focusapp="  and len(arg) > 10:
-            FOCUS_APP_NAME = arg[10:]
-            print(f"focusapp active: looking for: {FOCUS_APP_NAME}")
+            #FOCUS_APP_NAME = arg[10:]
+            #print(f"focusapp active: looking for: {FOCUS_APP_NAME}")
+            print(f"Do not use the -focusapp start argument with V1.0.0+, use instead <focus>*name* directly in config!")
+            sys.exit(1)
         elif arg == "-exec_one_macro":
             EXEC_ONLY_ONE_TRIGGERED_MACRO = True
         else:
