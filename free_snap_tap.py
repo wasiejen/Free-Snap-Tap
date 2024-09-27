@@ -168,8 +168,7 @@ def load_from_file(file_name):
                 multi_focus_dict[focus_name][1].append(line)
     
     multi_focus_dict_keys = multi_focus_dict.keys()
-                   
-                        
+                                    
 def write_out_new_file(file_name):
     """
     Create a new file if config file was not found with minimal tap groups
@@ -1257,6 +1256,8 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                 stop_all_repeating_keys()
                 listener.stop()
                 mouse_listener.stop()
+                
+                ##3 red
 
             # # Stop the listener if the END combination is pressed
             elif check_for_combination(EXIT_Combination):
@@ -1285,7 +1286,8 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                     # pause focus thread to allow manual overwrite and use without auto focus
                     if FOCUS_APP_NAME is not None: 
                         focus_thread.pause()
-                    #reset_key_states()
+                        
+                    ##3 green
                 else:
                     print('--- manually paused ---')
                     with paused_lock:
@@ -1296,7 +1298,8 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                     # restart focus thread when manual overwrite is over
                     if FOCUS_APP_NAME is not None: 
                         focus_thread.restart()
-                    #reset_key_states()
+                        
+                    ##3 red
 
         'TAP GROUP EVALUATION HERE'
         # Snap Tap Part of Evaluation
@@ -1592,10 +1595,11 @@ class Focus_Thread(Thread):
     reloads key and tap files on resume
     '''
 
-    def __init__(self):
+    def __init__(self, indicator=None):
         Thread.__init__(self)
         self.stop = False
         self.daemon = True
+        self.indicator = indicator
 
     def run(self):
         global WIN32_FILTER_PAUSED, MANUAL_PAUSED, paused_lock, FOCUS_THREAD_PAUSED
@@ -1607,6 +1611,7 @@ class Focus_Thread(Thread):
                 active_window = gw.getActiveWindow().title
             except AttributeError:
                 pass
+            
             if FOCUS_THREAD_PAUSED is False and MANUAL_PAUSED is False:
                 
                 if active_window != last_active_window:
@@ -1663,6 +1668,13 @@ class Focus_Thread(Thread):
                                 WIN32_FILTER_PAUSED = True
                             print('--- auto focus paused ---')
                     app_changed = False
+            
+            if STATUS_INDICATOR:
+                if FOCUS_THREAD_PAUSED or MANUAL_PAUSED or WIN32_FILTER_PAUSED:
+                    self.indicator.set_active(False)
+                else:
+                    self.indicator.set_active(True)
+            
             sleep(0.5)
 
     def pause(self):
@@ -1679,6 +1691,36 @@ class Focus_Thread(Thread):
 
     def end(self):
         self.stop = True
+        
+import tkinter as tk
+STATUS_INDICATOR = True
+
+class Status_Indicator:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Status Indicator")
+        self.canvas = tk.Canvas(root, width=50, height=50)
+        self.canvas.pack()
+        self.active = False
+        self.indicator = self.canvas.create_oval(10, 10, 40, 40, fill="red")
+        self.stop = False
+        self.last_state = False
+
+    def update_indicator(self):
+        while not self.stop:
+            if self.last_state != self.active:
+                color = "green" if self.active else "red"
+                self.canvas.itemconfig(self.indicator, fill=color)
+            sleep(1)  # Update every second
+
+    def set_active(self, active):
+        self.active = active
+        # color = "green" if self.active else "red"
+        # self.canvas.itemconfig(self.indicator, fill=color)
+        
+    def end(self):
+        self.stop = True
+
               
 def apply_args_and_groups(focus_name = None):
     global multi_focus_dict, sys_start_args, default_start_arguments, default_group_lines
@@ -1692,8 +1734,6 @@ def apply_args_and_groups(focus_name = None):
     apply_start_arguments(default_start_arguments + focus_start_arguments)
     presort_lines(default_group_lines + focus_group_lines)
     initialize_groups()
-    
-    pass
 
 def reload_from_file():
     # try loading  from file
@@ -1706,7 +1746,7 @@ def reload_from_file():
 def main():
     global default_start_arguments, default_group_lines, sys_start_args
     global listener, mouse_listener
-    global focus_thread
+    global focus_thread, indicator
        
     focus_active = False
 
@@ -1723,9 +1763,17 @@ def main():
     if len(multi_focus_dict_keys) > 0:
         focus_active = True
         
+    if STATUS_INDICATOR:
+        root = tk.Tk()
+        indicator = Status_Indicator(root)
+        indicator_thread = Thread(target=indicator.update_indicator)
+        indicator_thread.daemon = True  # Daemonize thread
+        indicator_thread.start() 
+        
     if focus_active:
-        focus_thread = Focus_Thread()
+        focus_thread = Focus_Thread(indicator)
         focus_thread.start()
+        
 
     while not STOPPED:
         reset_key_states()
@@ -1757,6 +1805,10 @@ def main():
 
     if focus_active:
         focus_thread.end()
+        focus_thread.join()
+    if STATUS_INDICATOR:
+        indicator.end()
+        indicator.join()
         
     sys.exit(1)
 
