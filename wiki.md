@@ -1,4 +1,19 @@
-NEW:
+### NEW V1.0.1: 
+- all settings in one file (except start arg: `-file=...` to define from which file to load at start)
+  - all start arguments supported via `<arg>*startargument*`
+  - multi focus apps with own groups via `<focus>*name of focus app*`  
+    - all start arguments and groups before first `<focus>...` will be interpreted as default and applied to all focus app settings
+    - every start argument and groups until the next \<focus> will be added to the current focus name and applied AFTER the default start arguments and groups
+    - e.g. tap group `a, d` before first \<focus> will be applied to all focus groups
+- adapted cli output of groups to always show the currently active groups
+- if a ke/key had more then one suffix, following suffixes of a ke or a trigger_group were not checked/executed as soon as one suffix evaluated to False (was a measure to prevent unnecessary checks) - fixed, now all will be checked
+- starting times for keys was set to start time - now will be set 1000 seconds in the past, to guarantee first time execution of macros/rebinds with boolean time evaluations 
+  - my cause problems in delay times if the key was not pressed before a time evaluation for a delay of this key
+- reset_repeat() and repeat_stop() now evaluates to True
+- file now supports multi line macro sequences, when new lines starts with `:` it will be added to the line above
+
+
+### NEW V1.0.0:
 - macro playback interruption and replaying by retriggering the same macro
 - macro sequences and reset functionality
 - macro notation now with `::` instead of `:`
@@ -12,10 +27,10 @@ NEW:
  - added evaluations:
    - last(): returns time since last press or release
    - dc(): "double click": on press returns time since last press, on release returns time since last release 
-
 - many other smaller improvements :-)
   
-# Function documentation (Version 1):
+
+# Function documentation (Version 1.0.1):
 
 ## General overview
 
@@ -44,6 +59,7 @@ It interpretes the real input (of keyboard and mouse) and according to defined r
   - **suffix/evaluations** `ke|(evaluation)` can result in a constraint if evaluated to True/False or as delay when evaluated to a number
   - **suffix/function invocation** `ke1 :: ke2|(repeat_toggle(10000))` a function that will always evaluate to False and so supresses the actual ke, but will start the function defined in it
     - in this example: trigger `ke1` will start a repeated sending of the `ke2` every 10 seconds until ```ke1` is pressed again and stop it
+  - **focus app name** is a part or the full name of the active window the program will be looking for to activate or change tap groups, rebinds and macros
 
 ## General (very short) overview of functionalities
 
@@ -61,6 +77,8 @@ It interpretes the real input (of keyboard and mouse) and according to defined r
     - can be reseted by itself via `reset` key_event or by other macros or rebinds with the use of `reset_*number of macro*` key_event 
       - IDEA: or the function invocation (reset(*number of macro*)) TODO: implemented it
 5. [Delays] supported for Tap_Groups in general and in Macros in general and on a per key basis with option to be random in min, max limits
+6. [Focus App] activates and deactivates the functionality based on set focus app names. Multiple focus app defineable with different settings and Tap Groups, Rebinds and Macros for each focus app
+7. [Configuration] everything can be configurated in a single text file
 
 
 ## More in depth functionality
@@ -177,7 +195,7 @@ Every key event supports prefixes **prefix/modifier**
         - for tr("+ke") returns the length of time from last key press to actual key release
     - `|(ts("ke"))` timing of length of time for presses and releases of **Simulated** key events (also includes Tap Groups due to handling of them internally)
     - `|(ta("ke"))` timing of length of time for presses and releases of **All** key events
-    - `ke1|(last("ke2"))` timing of length since last `-ke` press or `+ke` release (especially useful for other keys than the suffixed ke1)
+    - `ke1|(last("ke2"))` timing of length since last `-ke` press or `+ke` release (especially useful to check on other keys than the suffixed key)
     - `|(dc("ke"))` dc short for double click: return time on press since the last press, or time of release since the last release
     - `|(cs("key"))`: counterstrafing especially for CounterStrike: returns a time of length a key must pressed based on the pressed key to return the optimal time of length for a counterstrafe to come to a stop. Uses an internal function to approximate the acceleration time of the counter movement key.
     - `|(csl("ke"))`: some as above only uses a linear function to estimate the counter strafing time
@@ -193,7 +211,7 @@ Every key event supports prefixes **prefix/modifier**
 - supports function invocation as suffix in replacement key of rebinds or played key groups of macros
 - !ATTENTION: when function invocation is used on trigger and/or constraints of a trigger_group
   - the trigger and all constraints must check for True BEFORE their evaluations/trigger invocations will be checked
-  - invocations will always result in False, so if used in a trigger_group, the following rebind or macro will NEVER be activated
+  - some invocations will result in False, so if used in a trigger_group, the following rebind or macro will likely never be activated
 - ke/Keys that are suffixed with an invocation will never be played directly but instead will be played at the start of the repetition. So if you trigger a repeat and nothing is happening, then most likely the repeat did not start correctly or some other evaluations of the repeated ke/Key prevented the immediate execution 
 - repeated ke's/Keys are not able to trigger other macros/rebinds even when started on a replacement of a rebind
 
@@ -203,10 +221,11 @@ Every key event supports prefixes **prefix/modifier**
   - each invocation only applies to the Key or ke of it is suffixed to
 
 function invocations right now:
-  - (toggle_repeat(*time in ms*))   evaluates always to False, so ke/Key will not be played
-    - one press will start a repeat of ke/Key it is suffixed to
-  - (stop_repeat())                 evaluates always to False, so ke/Key will not be played
-  - (reset_repeat())                evaluates always to False, so ke/Key will not be played
+  - `(toggle_repeat(*time in ms*))`   **evaluates always to False, so ke/Key will not be played**
+    - one press+release will start a repeat of ke/Key it is suffixed to and the second will stop the repeat
+    - length of delay between press and release will be dependent on your press and release timing; the press will start the repeating of press and release will start it for release
+  - `(stop_repeat())`                evaluates always to **True**, so ke/Key will be played if all other constraints are also True
+  - `(reset_repeat())`               evaluates always to **True**, so ke/Key will be played if all other constraints are also True
     - resets the interval of the ke/Key and starts the interval anew
 
 Example:
@@ -226,3 +245,51 @@ Example:
   - the repeated ke/Key inherits the suffixes following AFTER the invocation of (toggle_repeat())
     - e.g. `u : v|(toggle_repeat(6500))|(last("-v")>5000)` will create a repeated Key (-ke, +ke) with interval 6,5 seconds and will only send it when the time last press of the real v key is bigger than 5 seconds.
     - normal suffix constraints or other evaluation are usable
+
+
+## [Configuration]
+
+- text file can be changed from default "FSTconfig.txt" to any file you want to, with the help of the startargument `-file=*file_name*`
+- all startarguments can be used either with a .bat file, by adding them to the link to the .exe or .py file, or by including them in the config file with `<arg>*start_argument*`, e.g. `<arg>-nomenu`
+- focus app names can be defined in the config file via `<focus>*name of the app*`
+  - everything BEFORE the first \<focus> will be seen as default start arguments and groupings and applied in general (evene outsite of focus apps) and to all following focus app groupings
+  - everything following this \<focus> definition up until the next \<focus> will be applied when the focus app name given is found in the current active window
+
+```bash
+#----------------------------------------
+### Counter Strike focus group
+<focus>Counter
+
+#<arg>-debug
+#<arg>-crossover=40
+<arg>-tapdelay=6,4
+<arg>-aliasdelay=6,4
+#<arg>-nomenu
+#<arg>-nocontrols
+#<arg>-nodelay
+
+# Tap Groups
+a,d
+w,s
+
+# Rebinds
+...
+```
+
+### [Start Arguments]
+
+Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_tap.exe)
+-  `-nomenu` skips the menu and will be directly active
+-  `-file="filename"`: (with or without "): custom save file
+-  `-debug`: print out some debug info
+-  `-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  
+-  `-tapdelay="number, number"`: sets the default min and max delay of "number,number" ms for Tap_Groups
+-  `-aliasdelay="number, number"`: sets the default min and max delay of "number,number" ms for Macros/Aliases
+-  `-crossover="number"`: sets the probability of "number" percent for a crossover (can be set in a range of 0-100)
+   - A crossover is key event reversal with delay - press and release are overlapping the time of delay
+-  `-nodelay`: deactivates delay and crossover
+-  `-focusapp="part of the app name"`: Script only activate evaluation of key events if the defined window with the given name is in focus.
+   - e.g. for Counterstrike, `-focusapp=count` is enough to recognize it (not case sensitive)
+   - can be manually overwritten by Control on ALT+DEL key combination (to activate outside and deactivate inside focus app)
+
+'''
