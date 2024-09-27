@@ -1650,6 +1650,15 @@ class Focus_Thread(Thread):
                         else:
                             release_all_toggles()
                             stop_all_repeating_keys()
+                            #reset_key_states()
+                            reset_global_variable_changes()
+                            apply_args_and_groups()
+                            system('cls||clear')
+                            display_groups()
+                            print("\n--- reloaded sucessfully ---")
+                            print(f'>>> NO FOCUS APP FOUND')
+                            if CONTROLS_ENABLED:
+                                display_control_text()
                             with paused_lock:
                                 WIN32_FILTER_PAUSED = True
                             print('--- auto focus paused ---')
