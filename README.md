@@ -37,13 +37,14 @@ A minimalistic Python-based Snap Tapping program compatible with all keyboards a
 #<arg>-nocontrols
 <arg>-nodelay
 
-#Tap Groupd
+#Tap Groups
 a, d
 w, s
 
 
 #----------------------------------------
-### Counter Strike focus group - everything following <focus> will activate when an active window matches the name or has the part of the name in itself that is given after <focus>
+# Counter Strike focus group - everything following <focus> will activate when an active
+# window matches the name or has the part of the name in itself that is given after <focus>
 <focus>Counter
 
 #<arg>-debug
@@ -71,7 +72,8 @@ v : suppress
 # will not trigger if crouched (!ctrl), jumping (!space) or opposite key is pressed
 # (tr("+w")>100): will only trigger if movement key was pressed for at least 100 ms
 # (cs("+w")): counterstrafe will be dynamically adjusted based on time of pressed movement key 
-# cs() is a hard coded function that uses a polynomial function to approximate the acceleration ingame and calculate the needed length for a counterstrafe to come to a stop
+# cs() is a hard coded function that uses a polynomial function to approximate the acceleration
+#    ingame and calculate the needed length for a counterstrafe to come to a stop
 +w|(tr("+w")>100), !s, !ctrl, !space  :  +w|15|5, -s|(cs("+w")), +s|0|0
 +s|(tr("+s")>100), !w, !ctrl, !space  :  +s|15|5, -w|(cs("+s")), +w|0|0
 +a|(tr("+a")>100), !d, !ctrl, !space  :  +a|15|5, -d|(cs("+a")), +d|0|0
@@ -88,11 +90,37 @@ v : suppress
 
 
 #----------------------------------------
-#Horizon - Forbidden West
+#Horizon - Forbidden West (with some examples I use)
 <focus> Horizon
 
-# focus groups for Horizon Forbidden West
+<arg>-tapdelay=6,4
+<arg>-aliasdelay=50,50        # horizon does not like it when 2 key events are to close - so set to constant 50 ms delay
 
+# focus groups for Horizon Forbidden West
++shift|(dc()<900) : +suppress            # supress shift release on double tap shift by supressing the release of shift
+alt: ^alt                                # toggle alt on alt press (I use alt for concentration mode ingame)
+u : v|(toggle_repeat(6500))|(last("-v")>5000)    # automatic scanning every 6.5 seconds
+v : v|(reset_timer())                            # when v is hit manually for a scan, reset timer of the repeated keys
+
+# Macros
+-left_mouse, -right_mouse :: -left_mouse|900, -alt|(p("right_mouse"))
+
+-c :: -c|50, +shift|50                           # macro sequence [0] for crouching and stop running when crouched  
+    : -c|50, -shift|50                           # run again if crouch endet
+-shift :: -shift, -reset_1                       # shift resets the crouch sequence
+i :: -f|50, space|50, +f                         # automatic usage of special ability with only hitting one key instead of 2
+
+-mouse_x2 :: -mouse_x2|50, +shift|50, -shift|50, +mouse_x2         # when evade, toggle running on
++mouse_x2 : +suppress
+
+-mouse_x1 :: -mouse_x1|50, +shift|50, -shift|50, +mouse_x1         # when melee attacking, toggle running on
++mouse_x1 : +suppress
+
+# mod macro sequence [0]
++left_mouse, -right_mouse :: +left_mouse, +alt, reset_0        # reset the macro [0] when left mouse button released
++right_mouse, -left_mouse :: +right_mouse, +alt, reset_0       # reset the macro [0] when right mouse button released
+
++v|(tr("+v")>500) : v|(stop_repeat())        # stop v repetition if v is long pressed and scan mode activated
 
 #----------------------------------------
 # Space Marine 2 :-D
@@ -350,9 +378,6 @@ Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_
 -  `-crossover="number"`: sets the probability of "number" percent for a crossover (can be set in a range of 0-100)
    - A crossover is key event reversal with delay - press and release are overlapping the time of delay
 -  `-nodelay`: deactivates delay and crossover
--  `-focusapp="part of the app name"`: Script only activate evaluation of key events if the defined window with the given name is in focus.
-   - e.g. for Counterstrike, `-focusapp=count` is enough to recognize it (not case sensitive)
-   - can be manually overwritten by Control on ALT+DEL key combination (to activate outside and deactivate inside focus app)
 
 '''
 
