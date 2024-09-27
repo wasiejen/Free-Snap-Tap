@@ -1363,6 +1363,12 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
         # save time of simulated and send keys
         set_key_times(key_event_time, vk_code, is_keydown, time_simulated)
         set_key_times(key_event_time, vk_code, is_keydown, time_all)
+        
+    # if STATUS_INDICATOR:
+    #     if FOCUS_THREAD_PAUSED or MANUAL_PAUSED or WIN32_FILTER_PAUSED:
+    #         indicator.set_active(False)
+    #     else:
+    #         indicator.set_active(True)
     
            
 'menu display' 
@@ -1598,7 +1604,7 @@ class Focus_Thread(Thread):
     def __init__(self, indicator=None):
         Thread.__init__(self)
         self.stop = False
-        self.daemon = True
+        #self.daemon = True
         self.indicator = indicator
 
     def run(self):
@@ -1669,11 +1675,11 @@ class Focus_Thread(Thread):
                             print('--- auto focus paused ---')
                     app_changed = False
             
-            if STATUS_INDICATOR:
-                if FOCUS_THREAD_PAUSED or MANUAL_PAUSED or WIN32_FILTER_PAUSED:
-                    self.indicator.set_active(False)
-                else:
-                    self.indicator.set_active(True)
+            # if STATUS_INDICATOR:
+            #     if FOCUS_THREAD_PAUSED or MANUAL_PAUSED or WIN32_FILTER_PAUSED:
+            #         self.indicator.set_active(False)
+            #     else:
+            #         self.indicator.set_active(True)
             
             sleep(0.5)
 
@@ -1699,27 +1705,27 @@ class Status_Indicator:
     def __init__(self, root):
         self.root = root
         self.root.title("Status Indicator")
-        self.canvas = tk.Canvas(root, width=50, height=50)
+        self.canvas = tk.Canvas(self.root, width=50, height=50)
         self.canvas.pack()
         self.active = False
         self.indicator = self.canvas.create_oval(10, 10, 40, 40, fill="red")
         self.stop = False
         self.last_state = False
 
-    def update_indicator(self):
-        while not self.stop:
-            if self.last_state != self.active:
-                color = "green" if self.active else "red"
-                self.canvas.itemconfig(self.indicator, fill=color)
-            sleep(1)  # Update every second
+    # def update_indicator(self):
+    #     while not self.stop:
+    #         if self.last_state != self.active:
+    #             color = "green" if self.active else "red"
+    #             self.canvas.itemconfig(self.indicator, fill=color)
+    #         sleep(1)  # Update every second
 
     def set_active(self, active):
         self.active = active
-        # color = "green" if self.active else "red"
-        # self.canvas.itemconfig(self.indicator, fill=color)
+        color = "green" if self.active else "red"
+        self.canvas.itemconfig(self.indicator, fill=color)
         
-    def end(self):
-        self.stop = True
+    # def end(self):
+    #     self.stop = True
 
               
 def apply_args_and_groups(focus_name = None):
@@ -1743,6 +1749,31 @@ def reload_from_file():
     except FileNotFoundError:
         create_new_group_file()   
 
+def main_gui():
+    global indicator
+    if True:
+        root = tk.Tk()
+        canvas = tk.Canvas(root, width=50, height=50)
+        canvas.pack()
+        indicator = canvas.create_oval(10, 10, 40, 40, fill="red")
+        #indicator = Status_Indicator(root)
+        # indicator_thread = Thread(target=indicator.update_indicator)
+        # indicator_thread.daemon = True  # Daemonize thread
+        # indicator_thread.start() 
+    
+    # main_thread = Thread(target=main)
+    # main_thread.start()
+    
+    while True:
+        if STATUS_INDICATOR:
+            if FOCUS_THREAD_PAUSED or MANUAL_PAUSED or WIN32_FILTER_PAUSED:
+
+                canvas.itemconfig(indicator, fill="green")
+            else:
+                canvas.itemconfig(indicator, fill="red")
+        sleep(0.5)
+        
+
 def main():
     global default_start_arguments, default_group_lines, sys_start_args
     global listener, mouse_listener
@@ -1763,12 +1794,7 @@ def main():
     if len(multi_focus_dict_keys) > 0:
         focus_active = True
         
-    if STATUS_INDICATOR:
-        root = tk.Tk()
-        indicator = Status_Indicator(root)
-        indicator_thread = Thread(target=indicator.update_indicator)
-        indicator_thread.daemon = True  # Daemonize thread
-        indicator_thread.start() 
+
         
     if focus_active:
         focus_thread = Focus_Thread(indicator)
@@ -1814,7 +1840,8 @@ def main():
 
 if __name__ == "__main__":
     starttime = time()   # for alias thread event logging
-    main()
+    # main()
+    main_gui()
     
     
 # **** ... this is a long file xD

@@ -28,20 +28,28 @@ def start_indicator(indicator):
 def main():
     root = tk.Tk()
     indicator = StatusIndicator(root)
-    start_indicator(indicator)
+    # start_indicator(indicator)
 
-    # Example of changing status from another thread
-    def toggle_status():
-        while True:
-            time.sleep(5)  # Toggle every 5 seconds
-            new_status = "active" if indicator.status == "inactive" else "inactive"
-            indicator.set_status(new_status)
+    # # Example of changing status from another thread
+    # def toggle_status():
+    #     while True:
+    #         time.sleep(5)  # Toggle every 5 seconds
+    #         new_status = "active" if indicator.status == "inactive" else "inactive"
+    #         indicator.set_status(new_status)
 
-    toggle_thread = threading.Thread(target=toggle_status)
-    toggle_thread.daemon = True
-    toggle_thread.start()
+    # toggle_thread = threading.Thread(target=toggle_status)
+    # toggle_thread.daemon = True
+    # toggle_thread.start()
 
     root.mainloop()
 
 if __name__ == "__main__":
-    main()
+    # main()
+    root = tk.Tk()
+    root.title("Status Indicator")
+    canvas = tk.Canvas(root, width=50, height=50)
+    canvas.pack()
+    indicator = canvas.create_oval(10, 10, 40, 40, fill="red")
+    
+    time.sleep(5)
+    
