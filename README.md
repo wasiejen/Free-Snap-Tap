@@ -27,7 +27,8 @@ A minimalistic Python-based Snap Tapping program compatible with all keyboards a
 
 
 ```bash
-# default groups are defined before he first <focus> and will always be active and also applied if a focus app is recognised
+# default groups are defined before he first <focus> and will always be 
+# active and also applied if a focus app is recognised
 
 #<arg>-debug
 #<arg>-crossover=40
@@ -74,19 +75,19 @@ v : suppress
 # (cs("+w")): counterstrafe will be dynamically adjusted based on time of pressed movement key 
 # cs() is a hard coded function that uses a polynomial function to approximate the acceleration
 #    ingame and calculate the needed length for a counterstrafe to come to a stop
-+w|(tr("+w")>100), !s, !ctrl, !space  :  +w|15|5, -s|(cs("+w")), +s|0|0
-+s|(tr("+s")>100), !w, !ctrl, !space  :  +s|15|5, -w|(cs("+s")), +w|0|0
-+a|(tr("+a")>100), !d, !ctrl, !space  :  +a|15|5, -d|(cs("+a")), +d|0|0
-+d|(tr("+d")>100), !a, !ctrl, !space  :  +d|15|5, -a|(cs("+d")), +a|0|0
++w|(tr("+w")>100), !s, !ctrl, !space  ::  +w|15|5, -s|(cs("+w")), +s|0|0
++s|(tr("+s")>100), !w, !ctrl, !space  ::  +s|15|5, -w|(cs("+s")), +w|0|0
++a|(tr("+a")>100), !d, !ctrl, !space  ::  +a|15|5, -d|(cs("+a")), +d|0|0
++d|(tr("+d")>100), !a, !ctrl, !space  ::  +d|15|5, -a|(cs("+d")), +a|0|0
 
 # jump with crouch: will not trigger if ctrl is pressed (!ctrl)
 # will only trigger if space press was 125-400 ms long and the crouch will go at most to 600 ms after the initial space press
-+space|(125<tr("+space")<400), !ctrl : +space, -ctrl|(600-tr("+space")), +ctrl|0|0 
++space|(125<tr("+space")<400), !ctrl :: +space, -ctrl|(600-tr("+space")), +ctrl|0|0 
 
 # automatic application of healing syringe and switch back to last weapon
 # (125<tr("+x")<900): will not be triggered if tapped really quickly or hold over 900 ms
 # the longest it will be waiting to release x is 900ms after x was pressed (900-tr("+x")) to make sure it is equipped fully
-+x|(125<tr("+x")<800) : +x|(1000-tr("+x")), -left_mouse|700|700, +left_mouse|0|0, q
++x|(125<tr("+x")<800) :: +x|(1000-tr("+x")), -left_mouse|700|700, +left_mouse|0|0, q
 
 
 #----------------------------------------
