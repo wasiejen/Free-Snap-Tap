@@ -1,12 +1,12 @@
 
-<arg=-crossover=50>
+<arg>-crossover=50
 
 
 # Tap Groups
 a,d
 w,s
 
-<focus=visual studio>
+<focus>visual studio
 
 # Rebinds
 
@@ -29,7 +29,7 @@ v: v|(reset_timer())
 -mouse_x2 : -suppress
 
 
-<focus=sublime>
+<focus>sublime
 
 b : mouse_x1
 n : mouse_x2

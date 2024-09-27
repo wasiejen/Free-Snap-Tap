@@ -152,11 +152,11 @@ def load_from_file(file_name):
     default_start_arguments = []
     default_group_lines = []
     for line in cleaned_lines:
-        if line.startswith('<focus='):
-            focus_name = line.replace('<focus=', '').replace('>', '').replace('\n', '')
+        if line.startswith('<focus>'):
+            focus_name = line.replace('<focus>', '').replace('\n', '').lower()
             multi_focus_dict[focus_name] = [[], []]
-        elif line.startswith('<arg='):
-            line = line.replace('<arg=', '').replace('>', '').replace('\n', '').lower()
+        elif line.startswith('<arg>'):
+            line = line.replace('<arg>', '').replace('\n', '').lower()
             if focus_name is None:
                 default_start_arguments.append(line)
             else:
@@ -197,8 +197,8 @@ def clean_lines(lines):
     comments_cleaned_lines = []
     for line in lines:
         if len(line) > 1:
-            if line.startswith('<focus='):
-                comments_cleaned_lines.append(line.lower())
+            if line.startswith('<focus>'):
+                comments_cleaned_lines.append(line)
             else:
                 line = line.strip().replace(" ","")
                 if len(line) > 1:
@@ -823,7 +823,7 @@ def delay_evaluation(delay_eval, current_ke):
         # save thread and stop event to find it again for possible interruption
         repeat_thread_dict[current_ke] = [repeat_thread, stop_event]
         repeat_thread.start() 
-        return False
+        return None
     
     def stop_repeat():
         try:
@@ -837,7 +837,7 @@ def delay_evaluation(delay_eval, current_ke):
         except KeyError:
             # this thread was not started before
             pass
-        return False
+        return True
     
     def toggle_repeat(key_string):
         try:
@@ -1417,7 +1417,7 @@ def display_menu():
 def display_control_text():
     print('--- toggle PAUSED with ALT+DELETE key ---')
     print('--- STOP execution with ALT+END key ---')
-    print('--- enter MENU again with ALT+PAGE_DOWN key ---')
+    print('--- enter MENU again with ALT+PAGE_DOWN key ---\n')
 
 def apply_start_arguments(argv):
     global DEBUG, MENU_ENABLED, CONTROLS_ENABLED
@@ -1732,7 +1732,7 @@ def main():
         print('\n--- Free Snap Tap started ---')
         if CONTROLS_ENABLED:
             display_control_text()
-            print(multi_focus_dict_keys)
+            print(f">>> focus looks for: {', '.join(multi_focus_dict_keys)}")
         if focus_active:
             focus_thread.restart()
             
