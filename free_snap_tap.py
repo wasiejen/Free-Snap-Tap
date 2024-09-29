@@ -10,6 +10,11 @@ import pygetwindow as gw # to get name of actual window for focusapp function
 from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_dict.py
 from tap_keyboard import Key_Event, Key_Group, Key, Tap_Group
 
+import tkinter as tk
+
+STATUS_INDICATOR = False
+STATUS_INDICATOR_SIZE = 100
+
 # global variables
 DEBUG = False
 DEBUG2 = False
@@ -1362,14 +1367,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                             
         # save time of simulated and send keys
         set_key_times(key_event_time, vk_code, is_keydown, time_simulated)
-        set_key_times(key_event_time, vk_code, is_keydown, time_all)
-        
-    # if STATUS_INDICATOR:
-    #     if FOCUS_THREAD_PAUSED or MANUAL_PAUSED or WIN32_FILTER_PAUSED:
-    #         indicator.set_active(False)
-    #     else:
-    #         indicator.set_active(True)
-    
+        set_key_times(key_event_time, vk_code, is_keydown, time_all)  
            
 'menu display' 
 def display_menu():
@@ -1435,6 +1433,7 @@ def apply_start_arguments(argv):
     global ACT_MAX_DELAY_IN_MS, ACT_MIN_DELAY_IN_MS
     global ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS
     global FOCUS_APP_NAME, EXEC_ONLY_ONE_TRIGGERED_MACRO
+    global STATUS_INDICATOR, STATUS_INDICATOR_SIZE
     
     def extract_delays(arg):
         try:
@@ -1503,6 +1502,13 @@ def apply_start_arguments(argv):
             print(f"focusapp active: looking for: {FOCUS_APP_NAME}")
         elif arg == "-exec_one_macro":
             EXEC_ONLY_ONE_TRIGGERED_MACRO = True
+        elif arg == "-status_indicator":
+            STATUS_INDICATOR = True
+            print(f"set indicator to: {STATUS_INDICATOR}")
+        elif arg[:18] == "-status_indicator="  and len(arg) > 18:
+            STATUS_INDICATOR = True
+            STATUS_INDICATOR_SIZE = int(arg[18:])
+            print(f"set indicator size to: {STATUS_INDICATOR_SIZE}")
         else:
             print("unknown start argument: ", arg)
 
@@ -1696,36 +1702,6 @@ class Focus_Thread(Thread):
 
     def end(self):
         self.stop = True
-        
-import tkinter as tk
-STATUS_INDICATOR = True
-
-class Status_Indicator:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Status Indicator")
-        self.canvas = tk.Canvas(self.root, width=50, height=50)
-        self.canvas.pack()
-        self.active = False
-        self.indicator = self.canvas.create_oval(10, 10, 40, 40, fill="red")
-        self.stop = False
-        self.last_state = False
-
-    # def update_indicator(self):
-    #     while not self.stop:
-    #         if self.last_state != self.active:
-    #             color = "green" if self.active else "red"
-    #             self.canvas.itemconfig(self.indicator, fill=color)
-    #         sleep(1)  # Update every second
-
-    def set_active(self, active):
-        self.active = active
-        color = "green" if self.active else "red"
-        self.canvas.itemconfig(self.indicator, fill=color)
-        
-    # def end(self):
-    #     self.stop = True
-
               
 def apply_args_and_groups(focus_name = None):
     global multi_focus_dict, sys_start_args, default_start_arguments, default_group_lines
@@ -1748,16 +1724,59 @@ def reload_from_file():
     except FileNotFoundError:
         create_new_group_file()   
 
-class StatusIndicator:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Status Indicator")
-        self.canvas = tk.Canvas(root, width=100, height=100)
+class Status_Indicator:
+    
+    def __init__(self):
+        self.root = tk.Tk()
+        self.root.overrideredirect(True)  # Remove window decorations
+        self.root.geometry("100x100")
+        self.root.attributes("-alpha", 0.8)  # Set transparency level
+        self.root.wm_attributes("-topmost", 1)  # Keep the window on top
+        self.root.wm_attributes("-transparentcolor", "yellow")
+
+        # Create a canvas for the indicator
+        self.canvas = tk.Canvas(self.root, width=100+STATUS_INDICATOR_SIZE, height=100+STATUS_INDICATOR_SIZE, bg='yellow', highlightthickness=0)
         self.canvas.pack()
-        self.status = False
-        self.indicator = self.canvas.create_oval(20, 20, 80, 80, fill="red")
+
+        # Draw the indicator
+        self.indicator = self.canvas.create_oval(20, 20, 20+STATUS_INDICATOR_SIZE, 20+STATUS_INDICATOR_SIZE, fill="green")
+
+        # Bind mouse events to make the window draggable
+        self.root.bind("<ButtonPress-1>", self.on_start)
+        self.root.bind("<B1-Motion>", self.on_drag)
+
+        # Create a right-click context menu
+        self.context_menu = tk.Menu(self.root, tearoff=0)
+        self.context_menu.add_command(label="Close", command=self.close_window)
+
+        # Bind right-click to show the context menu
+        self.canvas.bind("<Button-3>", self.show_context_menu)
+        
         self.stop = False
 
+    def on_start(self, event):
+        # Record the starting position of the mouse
+        self._drag_data = {"x": event.x_root, "y": event.y_root}
+
+    def on_drag(self, event):
+        # Calculate the new position of the window
+        dx = event.x_root - self._drag_data["x"]
+        dy = event.y_root - self._drag_data["y"]
+        x = self.root.winfo_x() + dx
+        y = self.root.winfo_y() + dy
+
+        # Update the starting position of the mouse
+        self._drag_data["x"] = event.x_root
+        self._drag_data["y"] = event.y_root
+
+        # Move the window to the new position
+        self.root.geometry(f"+{x}+{y}")
+
+    def show_context_menu(self, event):
+        self.context_menu.tk_popup(event.x_root, event.y_root)
+
+    def run(self):
+        self.root.mainloop()
 
     def update_indicator(self):
         while not self.stop:
@@ -1768,48 +1787,41 @@ class StatusIndicator:
                     self.status = True
             color = "green" if self.status else "red"
             self.canvas.itemconfig(self.indicator, fill=color)
-            print(self.status)
+            
+            if not main_thread.is_alive():
+                self.close_window()
+            
+            #print(self.status)
             sleep(0.5)  # Update every second
-
-    def set_status(self, status):
-        self.status = status
-        
+    
     def end(self):
         self.stop = True
+        # self.root.destroy()
         
-
-    
-def main_gui():
-    global indicator, indicator_thread
-    
-    # def start_indicator(indicator):
+    def close_window(self):
+        self.end()
+        #indicator_thread.join()
+        # Properly close the Tkinter window and stop the main loop
+        self.root.destroy()
         
-    root = tk.Tk()
-    indicator = StatusIndicator(root)
-    # start_indicator(indicator)
+    
+def main_with_indicator():
+    global indicator, indicator_thread, main_thread
+    
+    indicator = Status_Indicator()
     indicator_thread = Thread(target=indicator.update_indicator)
     indicator_thread.daemon = True  # Daemonize thread
     indicator_thread.start()
-   
-    main_thread = Thread(target=main)
-    main_thread.start()
+    indicator.run()
 
-    root.mainloop()
     
-        
 
 def main():
     global default_start_arguments, default_group_lines, sys_start_args
-    global listener, mouse_listener
+    global listener, mouse_listener, keyboard_listener
     global focus_thread, indicator
        
     focus_active = False
-
-     # check if start arguments are passed
-    if len(sys.argv) > 1:
-        sys_start_args = sys.argv[1:]
-
-    apply_args_and_groups()
     
     if DEBUG:
         print(f"tap_groups_hr: {tap_groups_hr}")
@@ -1844,28 +1856,58 @@ def main():
             
         mouse_listener = mouse.Listener(win32_event_filter=mouse_win32_event_filter)
         mouse_listener.start()
-        
+        # listener = keyboard.Listener(win32_event_filter=keyboard_win32_event_filter)
+        # listener.start()
+    
         with keyboard.Listener(win32_event_filter=keyboard_win32_event_filter) as listener:
             listener.join()
             
         mouse_listener.stop()
+        mouse_listener.join()
+        # listener.stop()
             
         sleep(1)
 
     if focus_active:
         focus_thread.end()
         focus_thread.join()
-    if STATUS_INDICATOR:
-        indicator.end()
-        indicator_thread.join()
-        
+    
     sys.exit(1)
 
 if __name__ == "__main__":
     starttime = time()   # for alias thread event logging
     
+    # check if start arguments are passed
+    if len(sys.argv) > 1:
+        sys_start_args = sys.argv[1:]
+
+    apply_args_and_groups()
+    
     if STATUS_INDICATOR:
-        main_gui()
+        main_thread = Thread(target=main)
+        main_thread.start()
+        try:            
+            main_with_indicator()
+        except RuntimeError:
+            pass
+        # print("trying cleanup")
+        # if indicator_thread.is_alive():
+        #     indicator.end()
+        #     indicator_thread.join()
+        # #     indicator.close_window()
+        # if mouse_listener.is_alive():
+        #     mouse_listener.stop()
+        #     mouse_listener.join()
+        # if focus_thread.is_alive():
+        #     focus_thread.end()
+        #     focus_thread.join()
+        # if listener.is_alive():
+        #     listener.stop()
+        #     listener.join()
+        # if main_thread.is_alive():
+        #     STOPPED = True
+        #     main_thread.join()
+        sys.exit(1)
     else:
         main()
     
