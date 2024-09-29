@@ -1601,11 +1601,10 @@ class Focus_Thread(Thread):
     reloads key and tap files on resume
     '''
 
-    def __init__(self, indicator=None):
+    def __init__(self):
         Thread.__init__(self)
         self.stop = False
-        #self.daemon = True
-        self.indicator = indicator
+        self.daemon = True
 
     def run(self):
         global WIN32_FILTER_PAUSED, MANUAL_PAUSED, paused_lock, FOCUS_THREAD_PAUSED
@@ -1749,29 +1748,54 @@ def reload_from_file():
     except FileNotFoundError:
         create_new_group_file()   
 
-def main_gui():
-    global indicator
-    if True:
-        root = tk.Tk()
-        canvas = tk.Canvas(root, width=50, height=50)
-        canvas.pack()
-        indicator = canvas.create_oval(10, 10, 40, 40, fill="red")
-        #indicator = Status_Indicator(root)
-        # indicator_thread = Thread(target=indicator.update_indicator)
-        # indicator_thread.daemon = True  # Daemonize thread
-        # indicator_thread.start() 
-    
-    # main_thread = Thread(target=main)
-    # main_thread.start()
-    
-    while True:
-        if STATUS_INDICATOR:
-            if FOCUS_THREAD_PAUSED or MANUAL_PAUSED or WIN32_FILTER_PAUSED:
+class StatusIndicator:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Status Indicator")
+        self.canvas = tk.Canvas(root, width=100, height=100)
+        self.canvas.pack()
+        self.status = False
+        self.indicator = self.canvas.create_oval(20, 20, 80, 80, fill="red")
+        self.stop = False
 
-                canvas.itemconfig(indicator, fill="green")
-            else:
-                canvas.itemconfig(indicator, fill="red")
-        sleep(0.5)
+
+    def update_indicator(self):
+        while not self.stop:
+            if STATUS_INDICATOR:
+                if FOCUS_THREAD_PAUSED or MANUAL_PAUSED or WIN32_FILTER_PAUSED:
+                    self.status = False
+                else:
+                    self.status = True
+            color = "green" if self.status else "red"
+            self.canvas.itemconfig(self.indicator, fill=color)
+            print(self.status)
+            sleep(0.5)  # Update every second
+
+    def set_status(self, status):
+        self.status = status
+        
+    def end(self):
+        self.stop = True
+        
+
+    
+def main_gui():
+    global indicator, indicator_thread
+    
+    # def start_indicator(indicator):
+        
+    root = tk.Tk()
+    indicator = StatusIndicator(root)
+    # start_indicator(indicator)
+    indicator_thread = Thread(target=indicator.update_indicator)
+    indicator_thread.daemon = True  # Daemonize thread
+    indicator_thread.start()
+   
+    main_thread = Thread(target=main)
+    main_thread.start()
+
+    root.mainloop()
+    
         
 
 def main():
@@ -1794,10 +1818,9 @@ def main():
     if len(multi_focus_dict_keys) > 0:
         focus_active = True
         
-
-        
+   
     if focus_active:
-        focus_thread = Focus_Thread(indicator)
+        focus_thread = Focus_Thread()
         focus_thread.start()
         
 
@@ -1834,14 +1857,17 @@ def main():
         focus_thread.join()
     if STATUS_INDICATOR:
         indicator.end()
-        indicator.join()
+        indicator_thread.join()
         
     sys.exit(1)
 
 if __name__ == "__main__":
     starttime = time()   # for alias thread event logging
-    # main()
-    main_gui()
+    
+    if STATUS_INDICATOR:
+        main_gui()
+    else:
+        main()
     
     
 # **** ... this is a long file xD
