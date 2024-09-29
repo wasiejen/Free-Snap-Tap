@@ -1,48 +1,48 @@
 import tkinter as tk
-import threading
-import queue
-import time
 
-class StatusIndicator:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Status Indicator")
-        self.canvas = tk.Canvas(root, width=100, height=100)
-        self.canvas.pack()
-        self.indicator = self.canvas.create_oval(20, 20, 80, 80, fill="red")
-        self.queue = queue.Queue()
-        self.root.after(100, self.process_queue)
+def on_start(event):
+    # Record the starting position of the mouse
+    root._drag_data = {"x": event.x_root, "y": event.y_root}
 
-    def process_queue(self):
-        try:
-            while True:
-                status = self.queue.get_nowait()
-                color = "green" if status == "active" else "red"
-                self.canvas.itemconfig(self.indicator, fill=color)
-        except queue.Empty:
-            pass
-        finally:
-            self.root.after(100, self.process_queue)
+def on_drag(event):
+    # Calculate the new position of the window
+    dx = event.x_root - root._drag_data["x"]
+    dy = event.y_root - root._drag_data["y"]
+    x = root.winfo_x() + dx
+    y = root.winfo_y() + dy
 
-    def set_status(self, status):
-        self.queue.put(status)
+    # Update the starting position of the mouse
+    root._drag_data["x"] = event.x_root
+    root._drag_data["y"] = event.y_root
 
-def start_indicator(indicator):
-    def toggle_status():
-        while True:
-            time.sleep(5)  # Toggle every 5 seconds
-            new_status = "active" if indicator.queue.empty() else "inactive"
-            indicator.set_status(new_status)
+    # Move the window to the new position
+    root.geometry(f"+{x}+{y}")
 
-    toggle_thread = threading.Thread(target=toggle_status)
-    toggle_thread.daemon = True
-    toggle_thread.start()
+def show_context_menu(event):
+    context_menu.tk_popup(event.x_root, event.y_root)
 
-def main():
-    root = tk.Tk()
-    indicator = StatusIndicator(root)
-    start_indicator(indicator)
-    root.mainloop()
+root = tk.Tk()
+root.overrideredirect(True)  # Remove window decorations
+root.geometry("100x100")
+root.attributes("-alpha", 1)  # Set transparency level
+root.wm_attributes("-transparentcolor", "yellow")
 
-if __name__ == "__main__":
-    main()
+# Create a canvas for the indicator
+canvas = tk.Canvas(root, width=100, height=100, bg="yellow", highlightthickness=0)
+canvas.pack()
+
+# Draw the indicator
+indicator = canvas.create_oval(20, 20, 80, 80, fill="green")
+
+# Bind mouse events to make the window draggable
+root.bind("<ButtonPress-1>", on_start)
+root.bind("<B1-Motion>", on_drag)
+
+# Create a right-click context menu
+context_menu = tk.Menu(root, tearoff=0)
+context_menu.add_command(label="Close", command=root.quit)
+
+# Bind right-click to show the context menu
+canvas.bind("<Button-3>", show_context_menu)
+
+root.mainloop()
