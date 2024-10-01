@@ -1,6 +1,5 @@
 <arg>-status_indicator=20
 
-<focus> sublime
 # Tap Groups
 a, d
 w, s
