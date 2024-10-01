@@ -1291,7 +1291,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                     # send keys
                     send_keys_for_tap_group(tap_group)
                     # to allow repeated keys from hold, key_to_send is a vk_code
-                    if tap_group.get_active_key() != vk_code:
+                    if tap_group.get_active_key() != vk_code or not real_key_repeated:
                         listener.suppress_event()
                     break
         
@@ -1632,8 +1632,9 @@ class Focus_Thread(Thread):
         while not self.stop:
             try:
                 active_window = gw.getActiveWindow().title
+
                 # shorten the active window name
-                if len(active_window) >= 35:
+                if len(active_window) >= 25:
                     reverse = active_window[::-1]
                     del1 = reverse.find('–')
                     del2 = reverse.find('-')
@@ -1874,7 +1875,6 @@ def main():
             print(f">>> focus looks for: {', '.join(multi_focus_dict_keys)}")
         if focus_thread.is_alive():
             focus_thread.restart()
-            
 
         listener.join()
     
