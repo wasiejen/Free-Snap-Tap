@@ -1336,6 +1336,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
         set_key_times(key_event_time, vk_code, is_keydown, time_simulated)
         set_key_times(key_event_time, vk_code, is_keydown, time_all) 
 
+'control helper functions'
 def control_return_to_menu():
     global MENU_ENABLED, listener, mouse_listener
     MENU_ENABLED = True
@@ -1353,7 +1354,7 @@ def control_exit_program():
     listener.stop()
     mouse_listener.stop()
     STOPPED = True
-    exit()
+    #exit()
 
 def control_toggle_pause():
     global WIN32_FILTER_PAUSED, MANUAL_PAUSED, paused_lock, CONTROLS_ENABLED
@@ -1614,8 +1615,7 @@ class Repeat_Thread(Thread):
 class Focus_Thread(Thread):
     '''
     Thread for observing the active window and pause toggle the evaluation of key events
-    can be manually overwritten by Controls on DEL
-    reloads key and tap files on resume
+    can be manually overwritten by Controls on ALT+DEL
     '''
 
     def __init__(self):
@@ -1632,14 +1632,21 @@ class Focus_Thread(Thread):
         while not self.stop:
             try:
                 active_window = gw.getActiveWindow().title
+                # shorten the active window name
                 if len(active_window) >= 35:
-                    if '–' in active_window:
-                        while active_window.find('–') != -1:
-                            active_window = active_window[active_window.find('–') + 2 : ]
-                    elif '-' in active_window:
-                        while active_window.find('-') != -1:
-                            active_window = active_window[active_window.find('-') + 2 : ]
-                
+                    reverse = active_window[::-1]
+                    del1 = reverse.find('–')
+                    del2 = reverse.find('-')
+                    del3 = reverse.find('/')
+                    del4 = reverse.find('\\')
+                    del_min = 100
+                    for deliminator in [del1, del2, del3, del4]:
+                        if deliminator != -1 and deliminator < del_min:
+                            del_min = deliminator 
+                    reverse_shortened = reverse[:del_min]
+                    active_window = reverse_shortened[::-1]
+                    if active_window[0] == ' ':
+                        active_window = active_window[1:]    
                 
             except AttributeError:
                 pass
@@ -1742,6 +1749,7 @@ class Status_Indicator:
     
     def __init__(self):
         self.root = tk.Tk()
+        self.root.title("FST Status Indicator")
         self.root.overrideredirect(True)  # Remove window decorations
         self.root.geometry("100x100")
         self.root.attributes("-alpha", 1)  # Set transparency level
@@ -1847,7 +1855,12 @@ def main():
     while not STOPPED:
         reset_key_states()
         release_all_toggles()
-               
+        
+        mouse_listener = mouse.Listener(win32_event_filter=mouse_win32_event_filter)
+        mouse_listener.start()
+        listener = keyboard.Listener(win32_event_filter=keyboard_win32_event_filter)
+        listener.start()
+        
         if MENU_ENABLED:
             if focus_thread.is_alive():
                 focus_thread.pause()
@@ -1862,13 +1875,11 @@ def main():
         if focus_thread.is_alive():
             focus_thread.restart()
             
-        mouse_listener = mouse.Listener(win32_event_filter=mouse_win32_event_filter)
-        mouse_listener.start()
-        # listener = keyboard.Listener(win32_event_filter=keyboard_win32_event_filter)
-        # listener.start()
+
+        listener.join()
     
-        with keyboard.Listener(win32_event_filter=keyboard_win32_event_filter) as listener:
-            listener.join()
+        # with keyboard.Listener(win32_event_filter=keyboard_win32_event_filter) as listener:
+        #     listener.join()
             
         mouse_listener.stop()
         mouse_listener.join()
