@@ -3,3 +3,8 @@ a, d
 w, s
 # Rebinds
 # Macros
+
+<focus>sublime
+v::h,i,h,o
+<focus>visual
+v::b,u,r,b
