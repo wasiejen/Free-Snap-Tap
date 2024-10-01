@@ -82,6 +82,8 @@ alias_thread_logging = []
 # collect all active keys here for recognition of key combinations
 pressed_keys = set()
 released_keys = set()
+# collect active key press/release states to prevent refiring macros while holding a key
+real_key_press_states = {}
 
 # toggle state tracker
 toggle_state_dict = {}
@@ -1086,7 +1088,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     
     key_replaced = False
     alias_fired = False
-    real_key_repeated = False
+    #real_key_repeated = False
     
     current_ke = Key_Event(vk_code, is_keydown)
     _activated_triggers = []
@@ -1105,10 +1107,17 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     if not is_simulated: # is_simulated_key_event(data.flags):
         
         # stop repeating keys from being evaluated
-        if last_real_ke == current_ke:
-            # listener.suppress_event() 
+        try:
+            press_state = real_key_press_states[current_ke.get_vk_code()]
+        except KeyError:
+            press_state = None
+            
+        if press_state == current_ke.get_is_press():
             real_key_repeated = True
-        last_real_ke = current_ke
+        else:
+            # if not the same -> changed -> evaluate normally for macros
+            real_key_repeated = False
+            real_key_press_states[current_ke.get_vk_code()] = current_ke.get_is_press()
         
         # here best place to start tracking the timings of presses and releases
         if not real_key_repeated:
@@ -1143,13 +1152,11 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                         # if key is supressed
                         if current_ke.get_vk_code() == SUPPRESS_CODE:
                             listener.suppress_event()  
-                                           
+                                                                                                     
             'STOP REPEATED KEYS HERE'        
             # prevent evaluation of repeated key events
-            # not earliert to keep rebinds and supression intact - toggling can be a bit fast if key is pressed a long time
-            if real_key_repeated:
-                listener.suppress_event()
-            else:
+            # not earliert to keep rebinds and supression intact - toggling can be a bit fast if key is pressed a long time               
+            if not real_key_repeated:
                 ### collect active keys
                 if key_replaced:
                     # if key is to be toggled
