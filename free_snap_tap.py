@@ -1224,13 +1224,9 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                     #         key_event = get_next_toggle_state_key_event(key_event)
                     #     execute_key_event(key_event)
                     elif len(key_sequence) > 0:
-                        
-                        ## interruptable threads
-                        # if thread.is_alive()
-                        #   set stop event
-                        #   thread join
                         try:
                             macro_thread, stop_event = macro_thread_dict[trigger]
+                            ## interruptable threads
                             if macro_thread.is_alive():
                                 if DEBUG:
                                     print(f"{trigger}-macro: still alive - try to stop")
@@ -1265,52 +1261,15 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
         if CONTROLS_ENABLED:                  
             # # Stop the listener if the MENU combination is pressed
             if check_for_combination(MENU_Combination):
-                MENU_ENABLED = True
-                print('--- Stopping - Return to menu ---')
-                release_all_toggles()
-                stop_all_repeating_keys()
-                listener.stop()
-                mouse_listener.stop()
+                control_return_to_menu()
                 
             # # Stop the listener if the END combination is pressed
             elif check_for_combination(EXIT_Combination):
-                print('--- Stopping execution ---')
-                release_all_toggles()
-                stop_all_repeating_keys()
-                listener.stop()
-                mouse_listener.stop()
-                STOPPED = True
-                exit()
+                control_exit_program()
 
             # Toggle paused/resume if the DELETE combination is pressed
             elif check_for_combination(TOGGLE_ON_OFF_Combination):
-                if WIN32_FILTER_PAUSED:
-                    reset_global_variable_changes()
-                    apply_args_and_groups(FOCUS_APP_NAME)
-                    system('cls||clear')
-                    display_groups()
-                    print("\n--- reloaded sucessfully ---")
-                    print('--- manuelly resumed ---\n')
-                    if CONTROLS_ENABLED:
-                        display_control_text()
-                    with paused_lock:
-                        WIN32_FILTER_PAUSED = False
-                        MANUAL_PAUSED = False
-                    # pause focus thread to allow manual overwrite and use without auto focus
-                    # if focus_thread.is_alive(): 
-                    #     focus_thread.pause()
-                    #reset_key_states()
-                else:
-                    print('--- manually paused ---')
-                    with paused_lock:
-                        WIN32_FILTER_PAUSED = True
-                        MANUAL_PAUSED = True
-                    release_all_toggles()
-                    stop_all_repeating_keys()
-                    # restart focus thread when manual overwrite is over
-                    # if focus_thread.is_alive(): 
-                    #     focus_thread.restart()
-                    #reset_key_states()
+                control_toggle_pause()
 
         'TAP GROUP EVALUATION HERE'
         # Snap Tap Part of Evaluation
@@ -1375,7 +1334,49 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                             
         # save time of simulated and send keys
         set_key_times(key_event_time, vk_code, is_keydown, time_simulated)
-        set_key_times(key_event_time, vk_code, is_keydown, time_all)  
+        set_key_times(key_event_time, vk_code, is_keydown, time_all) 
+
+def control_return_to_menu():
+    global MENU_ENABLED, listener, mouse_listener
+    MENU_ENABLED = True
+    print('--- Stopping - Return to menu ---')
+    release_all_toggles()
+    stop_all_repeating_keys()
+    listener.stop()
+    mouse_listener.stop()
+
+def control_exit_program():
+    global STOPPED, listener, mouse_listener
+    print('--- Stopping execution ---')
+    release_all_toggles()
+    stop_all_repeating_keys()
+    listener.stop()
+    mouse_listener.stop()
+    STOPPED = True
+    exit()
+
+def control_toggle_pause():
+    global WIN32_FILTER_PAUSED, MANUAL_PAUSED, paused_lock, CONTROLS_ENABLED
+    if WIN32_FILTER_PAUSED:
+        reset_global_variable_changes()
+        apply_args_and_groups(FOCUS_APP_NAME)
+        system('cls||clear')
+        display_groups()
+        print("\n--- reloaded sucessfully ---")
+        print('--- manuelly resumed ---\n')
+        if CONTROLS_ENABLED:
+            display_control_text()
+        with paused_lock:
+            WIN32_FILTER_PAUSED = False
+            MANUAL_PAUSED = False
+
+    else:
+        print('--- manually paused ---')
+        with paused_lock:
+            WIN32_FILTER_PAUSED = True
+            MANUAL_PAUSED = True
+        release_all_toggles()
+        stop_all_repeating_keys() 
            
 'menu display' 
 def display_menu():
@@ -1760,7 +1761,10 @@ class Status_Indicator:
 
         # Create a right-click context menu
         self.context_menu = tk.Menu(self.root, tearoff=0)
-        self.context_menu.add_command(label="Close", command=self.close_window)
+        self.context_menu.add_command(label="Toggle Pause", command=control_toggle_pause)
+        self.context_menu.add_command(label="Return to Menu", command=control_return_to_menu)
+        self.context_menu.add_command(label="Exit Program", command=control_exit_program)
+        self.context_menu.add_command(label="Close Indicator", command=self.close_window)
 
         # Bind right-click to show the context menu
         self.canvas.bind("<Button-3>", self.show_context_menu)
@@ -1795,7 +1799,7 @@ class Status_Indicator:
         global STOPPED
         while not self.stop:
             if STATUS_INDICATOR:
-                if FOCUS_THREAD_PAUSED or MANUAL_PAUSED or WIN32_FILTER_PAUSED:
+                if MANUAL_PAUSED or WIN32_FILTER_PAUSED:
                     self.status = False
                 else:
                     self.status = True
