@@ -60,9 +60,9 @@ MSG_MOUSE_SCROLL_VERTICAL = 522
 MSG_MOUSE_SCROLL_HORIZONTAL = 526
 
 # Control key combinations
-EXIT_Combination = [35, 164]#35  # END key vkcode 35, ALT 164
-TOGGLE_ON_OFF_Combination = [46, 164]  # DELETE key vkcode 46
-MENU_Combination = [34, 164] # PAGE_DOWN
+EXIT_Combination = ["alt", "end"] # END key vkcode 35, ALT 164
+TOGGLE_ON_OFF_Combination = ["alt", "delete"]  # DELETE key vkcode 46
+MENU_Combination = ["alt", "page_down"] # PAGE_DOWN
 
 SUPPRESS_CODE = -999
 
@@ -1266,7 +1266,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
             # # Stop the listener if the MENU combination is pressed
             if check_for_combination(MENU_Combination):
                 MENU_ENABLED = True
-                print('\n--- Stopping - Return to menu ---')
+                print('--- Stopping - Return to menu ---')
                 release_all_toggles()
                 stop_all_repeating_keys()
                 listener.stop()
@@ -1274,7 +1274,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                 
             # # Stop the listener if the END combination is pressed
             elif check_for_combination(EXIT_Combination):
-                print('\n--- Stopping execution ---')
+                print('--- Stopping execution ---')
                 release_all_toggles()
                 stop_all_repeating_keys()
                 listener.stop()
@@ -1430,9 +1430,9 @@ def display_menu():
             invalid_input = True
 
 def display_control_text():
-    print('--- toggle PAUSED with ALT+DELETE key ---')
-    print('--- STOP execution with ALT+END key ---')
-    print('--- enter MENU again with ALT+PAGE_DOWN key ---\n')
+    print('--- toggle PAUSED with ALT + DELETE ---')
+    print('--- STOP execution with ALT + END ---')
+    print('--- enter MENU again with ALT + PAGE_DOWN ---\n')
 
 def apply_start_arguments(argv):
     global DEBUG, MENU_ENABLED, CONTROLS_ENABLED
@@ -1631,6 +1631,15 @@ class Focus_Thread(Thread):
         while not self.stop:
             try:
                 active_window = gw.getActiveWindow().title
+                if len(active_window) >= 35:
+                    if '–' in active_window:
+                        while active_window.find('–') != -1:
+                            active_window = active_window[active_window.find('–') + 2 : ]
+                    elif '-' in active_window:
+                        while active_window.find('-') != -1:
+                            active_window = active_window[active_window.find('-') + 2 : ]
+                
+                
             except AttributeError:
                 pass
               
@@ -1686,13 +1695,14 @@ class Focus_Thread(Thread):
                             system('cls||clear')
                             display_groups()
                             print("\n--- reloaded sucessfully ---")
-                            print(f'>>> NO FOCUS APP FOUND: looking for: {', '.join(multi_focus_dict_keys)}')
+                            print(f'>>> NO FOCUS APP FOUND: looking for: {', '.join(multi_focus_dict_keys)}\n')
                             if CONTROLS_ENABLED:
                                 display_control_text()
                             with paused_lock:
                                 WIN32_FILTER_PAUSED = True
-
-                            print('--- auto focus paused ---')           
+                                
+                            print(f"> Active Window: {active_window}")
+                                     
                     
             else:
                 manually_paused = True
@@ -1727,22 +1737,13 @@ def apply_args_and_groups(focus_name = None):
     presort_lines(default_group_lines + focus_group_lines)
     initialize_groups()
 
-
-def reload_from_file():
-    # try loading  from file
-    try:
-        load_from_file(FILE_NAME)
-    # if no file exist create new one
-    except FileNotFoundError:
-        create_new_group_file()   
-
 class Status_Indicator:
     
     def __init__(self):
         self.root = tk.Tk()
         self.root.overrideredirect(True)  # Remove window decorations
         self.root.geometry("100x100")
-        self.root.attributes("-alpha", 0.8)  # Set transparency level
+        self.root.attributes("-alpha", 1)  # Set transparency level
         self.root.wm_attributes("-topmost", 1)  # Keep the window on top
         self.root.wm_attributes("-transparentcolor", "yellow")
 
@@ -1869,12 +1870,12 @@ def main():
         mouse_listener.join()
         # listener.stop()
             
-        sleep(1)
-
     if focus_thread.is_alive():
         focus_thread.end()
         focus_thread.join()
     
+        sleep(1)
+
     sys.exit(1)
 
 if __name__ == "__main__":
