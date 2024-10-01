@@ -87,6 +87,8 @@ alias_thread_logging = []
 # collect all active keys here for recognition of key combinations
 pressed_keys = set()
 released_keys = set()
+# collect active key press/release states to prevent refiring macros while holding a key
+real_key_press_states = {}
 
 # toggle state tracker
 toggle_state_dict = {}
@@ -173,7 +175,15 @@ def load_from_file(file_name):
                 multi_focus_dict[focus_name][1].append(line)
     
     multi_focus_dict_keys = multi_focus_dict.keys()
-                                    
+
+def reload_from_file():
+    # try loading  from file
+    try:
+        load_from_file(FILE_NAME)
+    # if no file exist create new one
+    except FileNotFoundError:
+        create_new_group_file()             
+
 def write_out_new_file(file_name):
     """
     Create a new file if config file was not found with minimal tap groups
@@ -1090,7 +1100,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     
     key_replaced = False
     alias_fired = False
-    real_key_repeated = False
+    #real_key_repeated = False
     
     current_ke = Key_Event(vk_code, is_keydown)
     _activated_triggers = []
@@ -1109,10 +1119,17 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     if not is_simulated: # is_simulated_key_event(data.flags):
         
         # stop repeating keys from being evaluated
-        if last_real_ke == current_ke:
-            # listener.suppress_event() 
+        try:
+            press_state = real_key_press_states[current_ke.get_vk_code()]
+        except KeyError:
+            press_state = None
+            
+        if press_state == current_ke.get_is_press():
             real_key_repeated = True
-        last_real_ke = current_ke
+        else:
+            # if not the same -> changed -> evaluate normally for macros
+            real_key_repeated = False
+            real_key_press_states[current_ke.get_vk_code()] = current_ke.get_is_press()
         
         # here best place to start tracking the timings of presses and releases
         if not real_key_repeated:
@@ -1147,13 +1164,11 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                         # if key is supressed
                         if current_ke.get_vk_code() == SUPPRESS_CODE:
                             listener.suppress_event()  
-                                           
-            'STOP REPEATED KEYS HERE'        
+                                                                                                     
+            'STOP REPEATED KEYS FROM HERE'        
             # prevent evaluation of repeated key events
-            # not earliert to keep rebinds and supression intact - toggling can be a bit fast if key is pressed a long time
-            if real_key_repeated:
-                listener.suppress_event()
-            else:
+            # not earliert to keep rebinds and supression intact - toggling can be a bit fast if key is pressed a long time               
+            if not real_key_repeated:
                 ### collect active keys
                 if key_replaced:
                     # if key is to be toggled
@@ -1172,7 +1187,6 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                 # reset toggle state of key manually released - so toggle will start anew by pressing the key
                 set_toggle_state_to_curr_ke(current_ke)
                 
-                
                 'MACROS HERE'
                 # check for macro triggers     
                 _activated_triggers = []     
@@ -1186,19 +1200,15 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                 for trigger in _activated_triggers:
                     alias_fired = True
                     
-                    'MACRO SEQUENCES'
+                    'MACRO SEQUENCES COUNTER HANDLING'
                     macro_groups = macros_dict[trigger]
                     if len(macro_groups) == 1:
                         key_sequence = macro_groups[0].get_key_events()
                     else:
                         if macros_sequence_counter_dict[trigger] >= len(macro_groups):
                             macros_sequence_counter_dict[trigger] = 0
-                        # try:
                         key_sequence = macro_groups[macros_sequence_counter_dict[trigger]].get_key_events()
                         macros_sequence_counter_dict[trigger] += 1
-                        # except KeyError:
-                        #     key_sequence = macro_groups[0].get_key_events()
-                        #     macros_sequence_counter[trigger] = 1
                         
                     'MACRO playback'
                     # only spawn a thread for execution if more than one key event in to be played key sequence
@@ -1287,19 +1297,21 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                         WIN32_FILTER_PAUSED = False
                         MANUAL_PAUSED = False
                     # pause focus thread to allow manual overwrite and use without auto focus
-                    if FOCUS_APP_NAME is not None: 
-                        focus_thread.pause()
-                        
+                    # if focus_thread.is_alive(): 
+                    #     focus_thread.pause()
+                    #reset_key_states()
+                else:
                     print('--- manually paused ---')
                     with paused_lock:
                         WIN32_FILTER_PAUSED = True
                         MANUAL_PAUSED = True
-                        release_all_toggles()
-                        stop_all_repeating_keys()
+                    release_all_toggles()
+                    stop_all_repeating_keys()
                     # restart focus thread when manual overwrite is over
-                    if FOCUS_APP_NAME is not None: 
-                        focus_thread.restart()
-                        
+                    # if focus_thread.is_alive(): 
+                    #     focus_thread.restart()
+                    #reset_key_states()
+
         'TAP GROUP EVALUATION HERE'
         # Snap Tap Part of Evaluation
         # Intercept key events if not PAUSED
@@ -1319,7 +1331,9 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
 
                     # send keys
                     send_keys_for_tap_group(tap_group)
-                    listener.suppress_event()
+                    # to allow repeated keys from hold, key_to_send is a vk_code
+                    if tap_group.get_active_key() != vk_code:
+                        listener.suppress_event()
                     break
         
         # if replacement happened suppress source key event   
@@ -1613,17 +1627,21 @@ class Focus_Thread(Thread):
         global multi_focus_dict, multi_focus_dict_keys, FOCUS_APP_NAME
         last_active_window = ''
         found_new_focus_app = False
+        manually_paused = False
         while not self.stop:
             try:
                 active_window = gw.getActiveWindow().title
             except AttributeError:
                 pass
-            
-            if FOCUS_THREAD_PAUSED is False and MANUAL_PAUSED is False:
-                
-                if active_window != last_active_window:
-                    last_active_window = active_window
-                    app_changed = True
+              
+            if not FOCUS_THREAD_PAUSED and not MANUAL_PAUSED:
+    
+                if active_window != last_active_window or manually_paused:
+                    if active_window != last_active_window:
+                        last_active_window = active_window
+                    # to make sure it activates ne focus setting even if manually paused in other app than resumed
+                    if manually_paused:
+                        manually_paused = False
                     
                     found_new_focus_app = False
                         
@@ -1635,22 +1653,22 @@ class Focus_Thread(Thread):
                                     
                     if found_new_focus_app:
                         # if WIN32_FILTER_PAUSED or not initialized_at_start:
-                        if WIN32_FILTER_PAUSED or app_changed:
-                            try:
-                                #reset_key_states()
-                                reset_global_variable_changes()
-                                apply_args_and_groups(focus_name)
-                                system('cls||clear')
-                                display_groups()
-                                print("\n--- reloaded sucessfully ---")
-                                print(f'>>> FOCUS APP FOUND: resuming with app: \n    {active_window}\n')
-                                if CONTROLS_ENABLED:
-                                    display_control_text()
-                                with paused_lock:
-                                    WIN32_FILTER_PAUSED = False
+                        #if WIN32_FILTER_PAUSED or app_changed:
+                        try:
+                            #reset_key_states()
+                            reset_global_variable_changes()
+                            apply_args_and_groups(focus_name)
+                            system('cls||clear')
+                            display_groups()
+                            print("\n--- reloaded sucessfully ---")
+                            print(f'>>> FOCUS APP FOUND: resuming with app: \n    {active_window}\n')
+                            if CONTROLS_ENABLED:
+                                display_control_text()
+                            with paused_lock:
+                                WIN32_FILTER_PAUSED = False
 
-                            except Exception:
-                                print('--- reloading of groups files failed - not resumed, still paused ---')
+                        except Exception:
+                            print('--- reloading of groups files failed - not resumed, still paused ---')
                     
                     else:
                         FOCUS_APP_NAME = None
@@ -1668,14 +1686,17 @@ class Focus_Thread(Thread):
                             system('cls||clear')
                             display_groups()
                             print("\n--- reloaded sucessfully ---")
-                            print(f'>>> NO FOCUS APP FOUND')
+                            print(f'>>> NO FOCUS APP FOUND: looking for: {', '.join(multi_focus_dict_keys)}')
                             if CONTROLS_ENABLED:
                                 display_control_text()
                             with paused_lock:
                                 WIN32_FILTER_PAUSED = True
-                            print('--- auto focus paused ---')
-                    app_changed = False
-                        
+
+                            print('--- auto focus paused ---')           
+                    
+            else:
+                manually_paused = True
+                      
             sleep(0.5)
 
     def pause(self):
@@ -1705,6 +1726,7 @@ def apply_args_and_groups(focus_name = None):
     apply_start_arguments(default_start_arguments + focus_start_arguments)
     presort_lines(default_group_lines + focus_group_lines)
     initialize_groups()
+
 
 def reload_from_file():
     # try loading  from file
@@ -1822,7 +1844,7 @@ def main():
         release_all_toggles()
                
         if MENU_ENABLED:
-            if focus_active:
+            if focus_thread.is_alive():
                 focus_thread.pause()
             display_menu()
         else:
@@ -1832,7 +1854,7 @@ def main():
         if CONTROLS_ENABLED:
             display_control_text()
             print(f">>> focus looks for: {', '.join(multi_focus_dict_keys)}")
-        if focus_active:
+        if focus_thread.is_alive():
             focus_thread.restart()
             
         mouse_listener = mouse.Listener(win32_event_filter=mouse_win32_event_filter)
@@ -1849,7 +1871,7 @@ def main():
             
         sleep(1)
 
-    if focus_active:
+    if focus_thread.is_alive():
         focus_thread.end()
         focus_thread.join()
     
