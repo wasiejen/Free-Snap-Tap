@@ -18,7 +18,7 @@ STATUS_INDICATOR_SIZE = 100
 # global variables
 DEBUG = False
 DEBUG2 = False
-WIN32_FILTER_PAUSED = False
+WIN32_FILTER_PAUSED = True
 MANUAL_PAUSED = False
 STOPPED = False
 MENU_ENABLED = True
@@ -52,12 +52,13 @@ WM_KEYDOWN = [256,260] # _PRESS_MESSAGES = (_WM_KEYDOWN, _WM_SYSKEYDOWN)
 WM_KEYUP = [257,261] # _RELEASE_MESSAGES = (_WM_KEYUP, _WM_SYSKEYUP)
 
 # Constants for mouse events
-MSG_MOUSE_DOWN = [513,516,519,523]
-MSG_MOUSE_UP = [514,517,520,524]
-
 MSG_MOUSE_MOVE = 512
 MSG_MOUSE_SCROLL_VERTICAL = 522
-MSG_MOUSE_SCROLL_HORIZONTAL = 526
+MSG_MOUSE_SCROLL_HORIZONTAL = 526   
+
+MSG_MOUSE_DOWN = [513,516,519,523]
+MSG_MOUSE_UP = [514,517,520,524]
+MSG_MOUSE_SCROLL = [MSG_MOUSE_SCROLL_VERTICAL, MSG_MOUSE_SCROLL_HORIZONTAL]
 
 # Control key combinations
 EXIT_Combination = ["alt", "end"] # END key vkcode 35, ALT 164
@@ -908,6 +909,7 @@ def send_key_event(key_event):
     
     def check_for_mouse_vk_code(vk_code):
         return vk_code in mouse_vk_codes
+    
     vk_code, is_press, delays = key_event.get_all()
     
     is_mouse_key = check_for_mouse_vk_code(vk_code)
@@ -989,6 +991,8 @@ def mouse_win32_event_filter(msg, data):#
     # Button.x2
     # Button.middle
     
+
+    
     def is_simulated_key_event(flags):
         return flags == 1
     
@@ -997,6 +1001,11 @@ def mouse_win32_event_filter(msg, data):#
             return True
         if msg in MSG_MOUSE_UP:
             return False
+        if msg in MSG_MOUSE_SCROLL:
+            if data.mouseData == 7864320: # up
+                return False
+            if data.mouseData == 4287102976: # down
+                return True
         
     def get_mouse_vk_code():
         # mouse left
@@ -1011,6 +1020,12 @@ def mouse_win32_event_filter(msg, data):#
                 return 4
             if data.mouseData == 131072:
                 return 5
+        if msg == MSG_MOUSE_SCROLL_VERTICAL:
+            return 6
+        if msg == MSG_MOUSE_SCROLL_HORIZONTAL:
+            return 7
+        return None
+
     
     # if DEBUG
     #print(f"pt: {data.pt}")
@@ -1019,19 +1034,19 @@ def mouse_win32_event_filter(msg, data):#
     #print(f"time: {data.time}")
     #print(f"dwExtraInfo: {data.dwExtraInfo}")
     
-    skip_event = False
     
-    # mouse movement
-    if msg == MSG_MOUSE_MOVE:
-        skip_event = True
+    # skip_event = False
+    # # mouse movement
+    # if msg == MSG_MOUSE_MOVE:
+    #     skip_event = True
     # veritcal scoll
-    if msg == MSG_MOUSE_SCROLL_VERTICAL:
-        skip_event = True
-    # horizontal scroll
-    if msg == MSG_MOUSE_SCROLL_HORIZONTAL:
-        skip_event = True
+    # if msg == MSG_MOUSE_SCROLL_VERTICAL:
+    #     skip_event = True
+    # # horizontal scroll
+    # if msg == MSG_MOUSE_SCROLL_HORIZONTAL:
+    #     skip_event = True
 
-    if not skip_event:
+    if not msg == MSG_MOUSE_MOVE:
         
         vk_code = get_mouse_vk_code()
         key_event_time = data.time
@@ -1039,8 +1054,11 @@ def mouse_win32_event_filter(msg, data):#
         is_simulated = is_simulated_key_event(data.flags)
         if DEBUG:
             print(f"vk_coe: {vk_code}, simulated: {is_simulated}, msg: {msg}")       
-                   
-        win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event=True)
+        if vk_code is not None:      
+            win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event=True)
+        else:
+            listener.suppress()
+
         
 def keyboard_win32_event_filter(msg, data):
     def is_simulated_key_event(flags):
@@ -1119,17 +1137,22 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     if not is_simulated: # is_simulated_key_event(data.flags):
         
         # stop repeating keys from being evaluated
-        try:
-            press_state = real_key_press_states[current_ke.get_vk_code()]
-        except KeyError:
-            press_state = None
-            
-        if press_state == current_ke.get_is_press():
-            real_key_repeated = True
+        vk_code = current_ke.get_vk_code()
+        # exclude mouse events from this
+        if vk_code >= 8:
+            try:
+                press_state = real_key_press_states[vk_code]
+            except KeyError:
+                press_state = None
+                
+            if press_state == current_ke.get_is_press():
+                real_key_repeated = True
+            else:
+                # if not the same -> changed -> evaluate normally for macros
+                real_key_repeated = False
+                real_key_press_states[vk_code] = current_ke.get_is_press()
         else:
-            # if not the same -> changed -> evaluate normally for macros
             real_key_repeated = False
-            real_key_press_states[current_ke.get_vk_code()] = current_ke.get_is_press()
         
         # here best place to start tracking the timings of presses and releases
         if not real_key_repeated:
