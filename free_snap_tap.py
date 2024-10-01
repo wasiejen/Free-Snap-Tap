@@ -1262,8 +1262,6 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                 listener.stop()
                 mouse_listener.stop()
                 
-                ##3 red
-
             # # Stop the listener if the END combination is pressed
             elif check_for_combination(EXIT_Combination):
                 print('\n--- Stopping execution ---')
@@ -1292,8 +1290,6 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                     if FOCUS_APP_NAME is not None: 
                         focus_thread.pause()
                         
-                    ##3 green
-                else:
                     print('--- manually paused ---')
                     with paused_lock:
                         WIN32_FILTER_PAUSED = True
@@ -1304,8 +1300,6 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                     if FOCUS_APP_NAME is not None: 
                         focus_thread.restart()
                         
-                    ##3 red
-
         'TAP GROUP EVALUATION HERE'
         # Snap Tap Part of Evaluation
         # Intercept key events if not PAUSED
@@ -1679,13 +1673,7 @@ class Focus_Thread(Thread):
                                 WIN32_FILTER_PAUSED = True
                             print('--- auto focus paused ---')
                     app_changed = False
-            
-            # if STATUS_INDICATOR:
-            #     if FOCUS_THREAD_PAUSED or MANUAL_PAUSED or WIN32_FILTER_PAUSED:
-            #         self.indicator.set_active(False)
-            #     else:
-            #         self.indicator.set_active(True)
-            
+                        
             sleep(0.5)
 
     def pause(self):
@@ -1779,6 +1767,7 @@ class Status_Indicator:
         self.root.mainloop()
 
     def update_indicator(self):
+        global STOPPED
         while not self.stop:
             if STATUS_INDICATOR:
                 if FOCUS_THREAD_PAUSED or MANUAL_PAUSED or WIN32_FILTER_PAUSED:
@@ -1786,40 +1775,32 @@ class Status_Indicator:
                 else:
                     self.status = True
             color = "green" if self.status else "red"
-            self.canvas.itemconfig(self.indicator, fill=color)
-            
+            self.canvas.itemconfig(self.indicator, fill=color)    
             if not main_thread.is_alive():
                 self.close_window()
-            
-            #print(self.status)
-            sleep(0.5)  # Update every second
+            sleep(0.5)
     
     def end(self):
         self.stop = True
-        # self.root.destroy()
         
     def close_window(self):
         self.end()
-        #indicator_thread.join()
         # Properly close the Tkinter window and stop the main loop
         self.root.destroy()
         
-    
-def main_with_indicator():
-    global indicator, indicator_thread, main_thread
+def start_indicator_gui():
+    global indicator, indicator_thread
     
     indicator = Status_Indicator()
     indicator_thread = Thread(target=indicator.update_indicator)
     indicator_thread.daemon = True  # Daemonize thread
     indicator_thread.start()
     indicator.run()
-
     
-
 def main():
     global default_start_arguments, default_group_lines, sys_start_args
     global listener, mouse_listener, keyboard_listener
-    global focus_thread, indicator
+    global focus_thread, main_thread
        
     focus_active = False
     
@@ -1829,12 +1810,10 @@ def main():
 
     if len(multi_focus_dict_keys) > 0:
         focus_active = True
-        
    
     if focus_active:
         focus_thread = Focus_Thread()
         focus_thread.start()
-        
 
     while not STOPPED:
         reset_key_states()
@@ -1887,26 +1866,9 @@ if __name__ == "__main__":
         main_thread = Thread(target=main)
         main_thread.start()
         try:            
-            main_with_indicator()
+            start_indicator_gui()
         except RuntimeError:
             pass
-        # print("trying cleanup")
-        # if indicator_thread.is_alive():
-        #     indicator.end()
-        #     indicator_thread.join()
-        # #     indicator.close_window()
-        # if mouse_listener.is_alive():
-        #     mouse_listener.stop()
-        #     mouse_listener.join()
-        # if focus_thread.is_alive():
-        #     focus_thread.end()
-        #     focus_thread.join()
-        # if listener.is_alive():
-        #     listener.stop()
-        #     listener.join()
-        # if main_thread.is_alive():
-        #     STOPPED = True
-        #     main_thread.join()
         sys.exit(1)
     else:
         main()
