@@ -4,6 +4,10 @@
 a, d
 w, s
 # Rebinds
++vert_scroll   :: t|0
+-vert_scroll   :: g|0
++hori_scroll   :: f|0
+-hori_scroll   :: h|0
 # Macros
 
 <focus>sublime

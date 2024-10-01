@@ -3,6 +3,9 @@ vk_codes_dict = {
     'mouse_left': 1, 'mouse_right': 2, 'mouse_middle': 3,
     'left_mouse': 1, 'right_mouse': 2, 'middle_mouse': 3,
     'mouse_x1': 4, 'mouse_x2': 5,
+    'scroll_vertical' : 6, 'scroll_vert' : 6, 'vert_scroll' : 6,
+    'scroll_horizontal' : 7, 'scroll_hori' : 7, 'hori_scroll' : 7,
+    
     'a': 65, 'b': 66, 'c': 67, 'd': 68, 'e': 69, 'f': 70, 'g': 71,
     'h': 72, 'i': 73, 'j': 74, 'k': 75, 'l': 76, 'm': 77, 'n': 78,
     'o': 79, 'p': 80, 'q': 81, 'r': 82, 's': 83, 't': 84, 'u': 85,
