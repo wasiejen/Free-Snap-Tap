@@ -14,6 +14,7 @@ import tkinter as tk
 
 STATUS_INDICATOR = False
 STATUS_INDICATOR_SIZE = 100
+CROSSHAIR_ENABLED = False
 
 # global variables
 DEBUG = False
@@ -1466,7 +1467,7 @@ def apply_start_arguments(argv):
     global ACT_MAX_DELAY_IN_MS, ACT_MIN_DELAY_IN_MS
     global ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS
     global FOCUS_APP_NAME, EXEC_ONLY_ONE_TRIGGERED_MACRO
-    global STATUS_INDICATOR, STATUS_INDICATOR_SIZE
+    global STATUS_INDICATOR, STATUS_INDICATOR_SIZE, CROSSHAIR_ENABLED
     
     def extract_delays(arg):
         try:
@@ -1544,6 +1545,9 @@ def apply_start_arguments(argv):
             STATUS_INDICATOR = True
             STATUS_INDICATOR_SIZE = int(arg[18:])
             print(f"set indicator size to: {STATUS_INDICATOR_SIZE}")
+        elif arg == "-crosshair":
+            CROSSHAIR_ENABLED = True
+            print(f"set indicator to: {STATUS_INDICATOR}")
         else:
             print("unknown start argument: ", arg)
 
@@ -1551,7 +1555,8 @@ def reset_global_variable_changes():
     global DEBUG, MENU_ENABLED, FILE_NAME, CONTROLS_ENABLED, ACT_DELAY
     global ACT_MAX_DELAY_IN_MS, ACT_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS
     global ACT_CROSSOVER, ACT_CROSSOVER_PROPABILITY_IN_PERCENT, FOCUS_APP_NAME, EXEC_ONLY_ONE_TRIGGERED_MACRO
-
+    global CROSSHAIR_ENABLED
+    
     DEBUG = False
     MENU_ENABLED = True
     CONTROLS_ENABLED = True
@@ -1563,6 +1568,7 @@ def reset_global_variable_changes():
     ALIAS_MIN_DELAY_IN_MS = ACT_MIN_DELAY_IN_MS 
     ALIAS_MAX_DELAY_IN_MS = ACT_MAX_DELAY_IN_MS   
     EXEC_ONLY_ONE_TRIGGERED_MACRO = False
+    CROSSHAIR_ENABLED = False
 
     
 'Theading'
@@ -1771,11 +1777,24 @@ def apply_args_and_groups(focus_name = None):
 
 class Status_Indicator:
     
-    def __init__(self):
-        self.root = tk.Tk()
+    def __init__(self, root):
+        self.root = root
         self.root.title("FST Status Indicator")
         self.root.overrideredirect(True)  # Remove window decorations
-        self.root.geometry("100x100")
+        
+                # Get the screen width and height
+        self.screen_width = self.root.winfo_screenwidth()
+        self.screen_height = self.root.winfo_screenheight()
+        
+        # Calculate the position to center the window
+        self.x_position = (self.screen_width) - 60
+        self.y_position = 20
+        
+        # Set the window geometry to 2x2 pixels centered on the screen
+        self.root.geometry(f'100x100+{self.x_position}+{self.y_position}')
+        
+        
+        #self.root.geometry("100x100")
         self.root.attributes("-alpha", 1)  # Set transparency level
         self.root.wm_attributes("-topmost", 1)  # Keep the window on top
         self.root.wm_attributes("-transparentcolor", "yellow")
@@ -1793,15 +1812,40 @@ class Status_Indicator:
 
         # Create a right-click context menu
         self.context_menu = tk.Menu(self.root, tearoff=0)
+        
         self.context_menu.add_command(label="Toggle Pause", command=control_toggle_pause)
         self.context_menu.add_command(label="Return to Menu", command=control_return_to_menu)
         self.context_menu.add_command(label="Exit Program", command=control_exit_program)
+        self.context_menu.add_separator()
         self.context_menu.add_command(label="Close Indicator", command=self.close_window)
+        self.context_menu.add_command(label="Toggle Crosshair", command=self.toggle_crosshair)
+        self.crosshair_enabled = False
+        self.crosshair = None
 
         # Bind right-click to show the context menu
         self.canvas.bind("<Button-3>", self.show_context_menu)
         
         self.stop = False
+        
+    def toggle_crosshair(self):
+        global CROSSHAIR_ENABLED
+        if not CROSSHAIR_ENABLED:#self.crosshair_enabled:
+            CROSSHAIR_ENABLED = True
+            self.crosshair_activate()
+        else:
+            CROSSHAIR_ENABLED = False
+            self.crosshair_deactivate()
+        
+    def crosshair_activate(self):
+        if self.crosshair is not None:
+            self.crosshair_deactivate()
+        self.crosshair = Crosshair(tk.Toplevel())
+        self.crosshair_enabled = True
+        
+    def crosshair_deactivate(self):
+        self.crosshair.destroy()
+        self.crosshair = None
+        self.crosshair_enabled = False
 
     def on_start(self, event):
         # Record the starting position of the mouse
@@ -1839,6 +1883,14 @@ class Status_Indicator:
             self.canvas.itemconfig(self.indicator, fill=color)    
             if not main_thread.is_alive():
                 self.close_window()
+                
+            # activate and deactive crosshair from tk.mainloop
+            if CROSSHAIR_ENABLED:
+                if not self.crosshair_enabled:
+                    self.crosshair_activate()
+            else:
+                if self.crosshair_enabled:
+                    self.crosshair_deactivate()
             sleep(0.5)
     
     def end(self):
@@ -1848,15 +1900,88 @@ class Status_Indicator:
         self.end()
         # Properly close the Tkinter window and stop the main loop
         self.root.destroy()
+
+class Crosshair():
+    
+    def __init__(self, root):
         
-def start_indicator_gui():
+        def rgbtohex(r,g,b):
+            return f'#{r:02x}{g:02x}{b:02x}'
+
+        # Create a new Tkinter window
+        self.root = root
+        
+        # Remove window decorations
+        self.root.overrideredirect(True)
+        
+        # Set the window to be transparent
+        self.root.attributes('-alpha', 1)
+        
+        # Get the screen width and height
+        self.screen_width = self.root.winfo_screenwidth()
+        self.screen_height = self.root.winfo_screenheight()
+        
+        # Calculate the position to center the window
+        self.x_position = (self.screen_width // 2) - 50
+        self.y_position = (self.screen_height // 2) - 50
+        
+        # Set the window geometry to 2x2 pixels centered on the screen
+        self.root.geometry(f'100x100+{self.x_position}+{self.y_position}')
+        
+        # Create a canvas to draw the crosshair
+        self.canvas = tk.Canvas(self.root, width=100, height=100, bg='white', highlightthickness=0)
+        self.canvas.pack()
+        x = -0
+        y = -0
+        # Draw the crosshair lines
+        color = rgbtohex(255, 0, 255)
+        self.canvas.create_line(50+x, 60+y, 50+x, 75+y, fill=color, width=1)    # Vertical line
+        self.canvas.create_line(51+x, 60+y, 51+x, 75+y, fill=color, width=1)    # Vertical line
+        self.canvas.create_line(49+x, 60+y, 49+x, 75+y, fill="black", width=1)  # Vertical line
+        
+        self.canvas.create_line(60+x, 50+y, 75+x, 50+y, fill=color, width=1)    # Horizontal line right
+        self.canvas.create_line(60+x, 51+y, 75+x, 51+y, fill=color, width=1)    # Horizontal line right
+        self.canvas.create_line(60+x, 52+y, 75+x, 52+y, fill="black", width=1)  # Horizontal line right
+        
+        self.canvas.create_line(25+x, 50+y, 40+x, 50+y, fill=color, width=1)    # Horizontal line left
+        self.canvas.create_line(25+x, 51+y, 40+x, 51+y, fill=color, width=1)    # tHorizontal line left
+        self.canvas.create_line(25+x, 52+y, 40+x, 52+y, fill="black", width=1)  # Horizontal line left
+        
+    
+        self.canvas.create_line(49+x, 50+y, 49+x, 52+y, fill=color, width=1)    # Dot
+        self.canvas.create_line(52+x, 50+y, 52+x, 53+y, fill=color, width=1)    # Dot
+        self.canvas.create_line(49+x, 52+y, 52+x, 52+y, fill=color, width=1)    # Dot
+        self.canvas.create_line(49+x, 53+y, 53+x, 53+y, fill="black", width=1)  # Dot
+        self.canvas.create_line(48+x, 50+y, 48+x, 53+y, fill="black", width=1)  # Dot
+        
+        # Set the window to be always on top and transparent again for drawing
+        self.root.attributes('-topmost', True)
+        self.root.attributes('-transparentcolor', 'white')
+
+    def run(self):
+        # Start the Tkinter main loop
+        self.root.mainloop()
+        
+    def destroy(self):
+        self.root.destroy()
+
+def start_indicator_gui(root):
     global indicator, indicator_thread
     
-    indicator = Status_Indicator()
+    indicator = Status_Indicator(root)
     indicator_thread = Thread(target=indicator.update_indicator)
     indicator_thread.daemon = True  # Daemonize thread
     indicator_thread.start()
     indicator.run()
+    
+def start_crosshair_gui(root):
+    global crosshair, crosshair_thread
+    
+    crosshair = Crosshair(root)
+    crosshair_thread = Thread(target=indicator.update_indicator)
+    crosshair_thread.daemon = True  # Daemonize thread
+    crosshair_thread.start()
+    crosshair.run()
     
 def main():
     global default_start_arguments, default_group_lines, sys_start_args
@@ -1900,19 +2025,15 @@ def main():
             focus_thread.restart()
 
         listener.join()
-    
-        # with keyboard.Listener(win32_event_filter=keyboard_win32_event_filter) as listener:
-        #     listener.join()
             
         mouse_listener.stop()
         mouse_listener.join()
-        # listener.stop()
             
     if focus_thread.is_alive():
         focus_thread.end()
         focus_thread.join()
     
-        sleep(1)
+        sleep(0.5)
 
     sys.exit(1)
 
@@ -1928,8 +2049,9 @@ if __name__ == "__main__":
     if STATUS_INDICATOR:
         main_thread = Thread(target=main)
         main_thread.start()
-        try:            
-            start_indicator_gui()
+        try:
+            root = tk.Tk()
+            start_indicator_gui(root)
         except RuntimeError:
             pass
         sys.exit(1)
