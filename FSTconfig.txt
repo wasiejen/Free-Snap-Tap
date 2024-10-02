@@ -11,6 +11,8 @@ w, s
 # Macros
 
 <focus>sublime
+<arg>-crosshair
+
 v::h,i,h,o
 <focus>visual
 v::b,u,r,b
