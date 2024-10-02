@@ -279,6 +279,9 @@ class Key_Group(object):
         
     def append(self, key_event):
         self.key_group.append(key_event)
+        
+    def get_trigger(self):
+        return self.key_group[0]
     
     def __hash__(self):
         return hash(self.__repr__())
