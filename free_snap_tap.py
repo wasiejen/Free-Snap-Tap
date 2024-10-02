@@ -1984,16 +1984,7 @@ def start_indicator_gui(root):
     indicator_thread.daemon = True  # Daemonize thread
     indicator_thread.start()
     indicator.run()
-    
-def start_crosshair_gui(root):
-    global crosshair, crosshair_thread
-    
-    crosshair = Crosshair(root)
-    crosshair_thread = Thread(target=indicator.update_indicator)
-    crosshair_thread.daemon = True  # Daemonize thread
-    crosshair_thread.start()
-    crosshair.run()
-    
+        
 def main():
     global default_start_arguments, default_group_lines, sys_start_args
     global listener, mouse_listener, keyboard_listener
