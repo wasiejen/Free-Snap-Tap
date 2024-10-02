@@ -189,7 +189,7 @@ vk_codes_dict = {
     'ü': 186, 
     '´': 221, 
     'ß': 219,
-    'copilot': 134, # actually a key combination with 134 as somewhat unique vk_code id
+    'copilot': 134, # actually a 3 key combination with 134 as somewhat unique vk_code id
     
     
     # -----------------only for internal usage --------------------

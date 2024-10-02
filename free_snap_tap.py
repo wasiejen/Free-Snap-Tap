@@ -15,6 +15,8 @@ import tkinter as tk
 STATUS_INDICATOR = False
 STATUS_INDICATOR_SIZE = 100
 CROSSHAIR_ENABLED = False
+CROSSHAIR_DELTA_X = 0
+CROSSHAIR_DELTA_Y = 0
 
 # global variables
 DEBUG = False
@@ -510,7 +512,6 @@ def initialize_groups():
         all_trigger_events.append(trigger_group.get_trigger())
 
                       
-
 'managing key press and release states'
 def add_key_press_state(vk_code):    
     pressed_keys.add(vk_code)    
@@ -1371,6 +1372,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
         set_key_times(key_event_time, vk_code, is_keydown, time_simulated)
         set_key_times(key_event_time, vk_code, is_keydown, time_all) 
 
+
 'control helper functions'
 def control_return_to_menu():
     global MENU_ENABLED, listener, mouse_listener
@@ -1413,6 +1415,7 @@ def control_toggle_pause():
             MANUAL_PAUSED = True
         release_all_toggles()
         stop_all_repeating_keys() 
+           
            
 'menu display' 
 def display_menu():
@@ -1471,6 +1474,8 @@ def display_control_text():
     print('--- STOP execution with ALT + END ---')
     print('--- enter MENU again with ALT + PAGE_DOWN ---\n')
 
+
+'start argument handling'
 def apply_start_arguments(argv):
     global DEBUG, MENU_ENABLED, CONTROLS_ENABLED
     global FILE_NAME
@@ -1478,7 +1483,8 @@ def apply_start_arguments(argv):
     global ACT_MAX_DELAY_IN_MS, ACT_MIN_DELAY_IN_MS
     global ALIAS_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS
     global FOCUS_APP_NAME, EXEC_ONLY_ONE_TRIGGERED_MACRO
-    global STATUS_INDICATOR, STATUS_INDICATOR_SIZE, CROSSHAIR_ENABLED
+    global STATUS_INDICATOR, STATUS_INDICATOR_SIZE
+    global CROSSHAIR_ENABLED, CROSSHAIR_DELTA_X, CROSSHAIR_DELTA_Y
     
     def extract_delays(arg):
         try:
@@ -1558,7 +1564,12 @@ def apply_start_arguments(argv):
             print(f"set indicator size to: {STATUS_INDICATOR_SIZE}")
         elif arg == "-crosshair":
             CROSSHAIR_ENABLED = True
-            print(f"set indicator to: {STATUS_INDICATOR}")
+            print(f"set crosshair to: {CROSSHAIR_ENABLED}")
+        elif arg[:11] == "-crosshair="  and len(arg) > 11:
+            CROSSHAIR_ENABLED = True
+            x, y = arg[11:].strip().replace(' ', '').split(',')
+            CROSSHAIR_DELTA_X, CROSSHAIR_DELTA_Y = int(x), int(y)
+            print(f"set crosshair delta is set to: {CROSSHAIR_DELTA_X}, {CROSSHAIR_DELTA_Y}")
         else:
             print("unknown start argument: ", arg)
 
@@ -1566,7 +1577,7 @@ def reset_global_variable_changes():
     global DEBUG, MENU_ENABLED, FILE_NAME, CONTROLS_ENABLED, ACT_DELAY
     global ACT_MAX_DELAY_IN_MS, ACT_MIN_DELAY_IN_MS, ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS
     global ACT_CROSSOVER, ACT_CROSSOVER_PROPABILITY_IN_PERCENT, FOCUS_APP_NAME, EXEC_ONLY_ONE_TRIGGERED_MACRO
-    global CROSSHAIR_ENABLED
+    global CROSSHAIR_ENABLED, CROSSHAIR_DELTA_X, CROSSHAIR_DELTA_Y
     
     DEBUG = False
     MENU_ENABLED = True
@@ -1580,7 +1591,21 @@ def reset_global_variable_changes():
     ALIAS_MAX_DELAY_IN_MS = ACT_MAX_DELAY_IN_MS   
     EXEC_ONLY_ONE_TRIGGERED_MACRO = False
     CROSSHAIR_ENABLED = False
+    CROSSHAIR_DELTA_X = 0
+    CROSSHAIR_DELTA_Y = 0
 
+def apply_args_and_groups(focus_name = None):
+    global multi_focus_dict, sys_start_args, default_start_arguments, default_group_lines
+    if focus_name is not None:
+        focus_start_arguments, focus_group_lines = multi_focus_dict[focus_name]
+    else:
+        focus_start_arguments, focus_group_lines = [],[]
+    
+    apply_start_arguments(sys_start_args)
+    reload_from_file()
+    apply_start_arguments(default_start_arguments + focus_start_arguments)
+    presort_lines(default_group_lines + focus_group_lines)
+    initialize_groups()
     
 'Theading'
 class Alias_Thread(Thread):
@@ -1773,19 +1798,8 @@ class Focus_Thread(Thread):
     def end(self):
         self.stop = True
               
-def apply_args_and_groups(focus_name = None):
-    global multi_focus_dict, sys_start_args, default_start_arguments, default_group_lines
-    if focus_name is not None:
-        focus_start_arguments, focus_group_lines = multi_focus_dict[focus_name]
-    else:
-        focus_start_arguments, focus_group_lines = [],[]
-    
-    apply_start_arguments(sys_start_args)
-    reload_from_file()
-    apply_start_arguments(default_start_arguments + focus_start_arguments)
-    presort_lines(default_group_lines + focus_group_lines)
-    initialize_groups()
-
+              
+'GUI elements'
 class Status_Indicator:
     
     def __init__(self, root):
@@ -1892,8 +1906,6 @@ class Status_Indicator:
                     self.status = True
             color = "green" if self.status else "red"
             self.canvas.itemconfig(self.indicator, fill=color)    
-            if not main_thread.is_alive():
-                self.close_window()
                 
             # activate and deactive crosshair from tk.mainloop
             if CROSSHAIR_ENABLED:
@@ -1902,6 +1914,12 @@ class Status_Indicator:
             else:
                 if self.crosshair_enabled:
                     self.crosshair_deactivate()
+                    
+            # if mainthread is inactive already than end indicator
+            if not main_thread.is_alive():
+                if self.crosshair_enabled:
+                    self.crosshair_deactivate()
+                self.close_window()
             sleep(0.5)
     
     def end(self):
@@ -1928,50 +1946,71 @@ class Crosshair():
         # Set the window to be transparent
         self.root.attributes('-alpha', 1)
         
+        # delta x,y for the midpoint of the crosshair
+        x = CROSSHAIR_DELTA_X - 1  # for me this is the center of the screen
+        y = CROSSHAIR_DELTA_Y - 1
+        
+        # base size has to be at least double the max of |x| or |y|
+        min_canvas_size = 2 * max(abs(x), abs(y)) + 25   # add a bit of buffer (25)
+        print(min_canvas_size)
+        
+        # adapt canvas size to be big enough for the delta values
+        if min_canvas_size < 100:
+            self.size = 100 
+        else: 
+            # make it a multiplicative of 100
+            self.size = (min_canvas_size // 100 + 1) * 100
+        
+        # middle point distance from coordinate system of he canvas
+        mid = self.size // 2
+        
         # Get the screen width and height
         self.screen_width = self.root.winfo_screenwidth()
         self.screen_height = self.root.winfo_screenheight()
         
         # Calculate the position to center the window
-        self.x_position = (self.screen_width // 2) - 50
-        self.y_position = (self.screen_height // 2) - 50
+        self.x_position = (self.screen_width // 2) - mid
+        self.y_position = (self.screen_height // 2) - mid
         
         # Set the window geometry to 2x2 pixels centered on the screen
-        self.root.geometry(f'100x100+{self.x_position}+{self.y_position}')
+        self.root.geometry(f'{self.size}x{self.size}+{self.x_position}+{self.y_position}')
         
         # Create a canvas to draw the crosshair
-        self.canvas = tk.Canvas(self.root, width=100, height=100, bg='white', highlightthickness=0)
+        self.canvas = tk.Canvas(self.root, width=self.size, height=self.size, bg='white', highlightthickness=0)
         self.canvas.pack()
-        x = -0
-        y = -0
-        # Draw the crosshair lines
+
+        # set color to glowing pink - that should be usable in most games :-D
+        # would be interesting if it would be possible to make it the complementory color of 
+        # the window below
         color = rgbtohex(255, 0, 255)
-        self.canvas.create_line(50+x, 60+y, 50+x, 75+y, fill=color, width=1)    # Vertical line
-        self.canvas.create_line(51+x, 60+y, 51+x, 75+y, fill=color, width=1)    # Vertical line
-        self.canvas.create_line(49+x, 60+y, 49+x, 75+y, fill="black", width=1)  # Vertical line
         
-        self.canvas.create_line(60+x, 50+y, 75+x, 50+y, fill=color, width=1)    # Horizontal line right
-        self.canvas.create_line(60+x, 51+y, 75+x, 51+y, fill=color, width=1)    # Horizontal line right
-        self.canvas.create_line(60+x, 52+y, 75+x, 52+y, fill="black", width=1)  # Horizontal line right
+        # Draw the crosshair lines
+        self.canvas.create_line(mid+0+x, mid+10+y, mid+0+x, mid+25+y, fill=color)    # Vertical line
+        self.canvas.create_line(mid+1+x, mid+10+y, mid+1+x, mid+25+y, fill=color)    # Vertical line
+        self.canvas.create_line(mid-1+x, mid+10+y, mid-1+x, mid+25+y, fill="black")  # Vertical line
         
-        self.canvas.create_line(25+x, 50+y, 40+x, 50+y, fill=color, width=1)    # Horizontal line left
-        self.canvas.create_line(25+x, 51+y, 40+x, 51+y, fill=color, width=1)    # tHorizontal line left
-        self.canvas.create_line(25+x, 52+y, 40+x, 52+y, fill="black", width=1)  # Horizontal line left
+        self.canvas.create_line(mid+10+x, mid+0+y, mid+25+x, mid+0+y, fill=color)    # Horizontal line right
+        self.canvas.create_line(mid+10+x, mid+1+y, mid+25+x, mid+1+y, fill=color)    # Horizontal line right
+        self.canvas.create_line(mid+10+x, mid+2+y, mid+25+x, mid+2+y, fill="black")  # Horizontal line right
+        
+        self.canvas.create_line(mid-25+x, mid+0+y, mid-10+x, mid+0+y, fill=color)    # Horizontal line left
+        self.canvas.create_line(mid-25+x, mid+1+y, mid-10+x, mid+1+y, fill=color)    # tHorizontal line left
+        self.canvas.create_line(mid-25+x, mid+2+y, mid-10+x, mid+2+y, fill="black")  # Horizontal line left
         
     
-        self.canvas.create_line(49+x, 50+y, 49+x, 52+y, fill=color, width=1)    # Dot
-        self.canvas.create_line(52+x, 50+y, 52+x, 53+y, fill=color, width=1)    # Dot
-        self.canvas.create_line(49+x, 52+y, 52+x, 52+y, fill=color, width=1)    # Dot
-        self.canvas.create_line(49+x, 53+y, 53+x, 53+y, fill="black", width=1)  # Dot
-        self.canvas.create_line(48+x, 50+y, 48+x, 53+y, fill="black", width=1)  # Dot
+        self.canvas.create_line(mid-1+x, mid+0+y, mid-1+x, mid+2+y, fill=color)      # Dot
+        self.canvas.create_line(mid+2+x, mid+0+y, mid+2+x, mid+3+y, fill=color)      # Dot
+        self.canvas.create_line(mid-1+x, mid+2+y, mid+2+x, mid+2+y, fill=color)      # Dot
+        self.canvas.create_line(mid-1+x, mid+3+y, mid+3+x, mid+3+y, fill="black")    # Dot
+        self.canvas.create_line(mid-2+x, mid+0+y, mid-2+x, mid+3+y, fill="black")    # Dot
         
         # Set the window to be always on top and transparent again for drawing
         self.root.attributes('-topmost', True)
         self.root.attributes('-transparentcolor', 'white')
 
-    def run(self):
-        # Start the Tkinter main loop
-        self.root.mainloop()
+    # def run(self):
+    #     # Start the Tkinter main loop
+    #     self.root.mainloop()
         
     def destroy(self):
         self.root.destroy()
@@ -1984,7 +2023,9 @@ def start_indicator_gui(root):
     indicator_thread.daemon = True  # Daemonize thread
     indicator_thread.start()
     indicator.run()
-        
+
+
+'Main'   
 def main():
     global default_start_arguments, default_group_lines, sys_start_args
     global listener, mouse_listener, keyboard_listener
