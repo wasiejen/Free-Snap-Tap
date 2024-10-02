@@ -76,6 +76,7 @@ rebinds_dict = {}       # Key_Event : Key_Event
 rebind_triggers = []
 macros_dict = {}        # [Key_Group : Key_Group]  # triggers are the Keys to the Item Makro
 macro_triggers = [] 
+all_trigger_events = []
 
 # hr = human readable form - saves the lines cleaned of comments and presorted
 # these will be shown in menu, because internally they look a bit different (esp rebinds)
@@ -356,12 +357,14 @@ def initialize_groups():
     '''
     global tap_groups, rebinds_dict, rebind_triggers
     global macros_dict, macro_triggers, macros_sequence_counter_dict
+    global all_trigger_events
     
     tap_groups = []
     rebinds_dict = {}
     rebind_triggers = []
     macros_dict = {}
     macro_triggers = []
+    all_trigger_events = []
     
     def extract_data_from_key(key):
         #separate delay info from string
@@ -467,7 +470,7 @@ def initialize_groups():
             trigger_group = Key_Group(new_trigger_group)
             rebind_triggers.append(trigger_group)
             rebinds_dict[trigger_group] = replacement_key
-        
+                    
         else:
             trigger_events = trigger_key.get_key_events()
             
@@ -476,6 +479,7 @@ def initialize_groups():
                 trigger_group = Key_Group([trigger_events[index]] + trigger_rest)
                 rebind_triggers.append(trigger_group)
                 rebinds_dict[trigger_group] = replacement_events[index]
+                
                   
     # extract macros         
     for macro in macros_hr:
@@ -499,6 +503,12 @@ def initialize_groups():
         # trigger is the key to the to be played keygroup
         macros_dict[new_macro[0]] = new_macro[1:]
         macros_sequence_counter_dict[new_macro[0]] = 0
+        
+    # extract all triggers for suppression of repeated keys: test V1.0.2.1 Bugfix
+    all_triggers = rebind_triggers + macro_triggers
+    for trigger_group in all_triggers:
+        all_trigger_events.append(trigger_group.get_trigger())
+
                       
 
 'managing key press and release states'
@@ -1059,8 +1069,7 @@ def mouse_win32_event_filter(msg, data):#
             win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event=True)
         else:
             listener.suppress()
-
-        
+       
 def keyboard_win32_event_filter(msg, data):
     def is_simulated_key_event(flags):
         return flags & 0x10
@@ -1147,6 +1156,8 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                 press_state = None
                 
             if press_state == current_ke.get_is_press():
+                if current_ke in all_trigger_events:
+                    listener.suppress_event()  
                 real_key_repeated = True
             else:
                 # if not the same -> changed -> evaluate normally for macros
