@@ -1716,71 +1716,73 @@ class Focus_Thread(Thread):
                 
             except AttributeError:
                 pass
-              
-            if not FOCUS_THREAD_PAUSED and not MANUAL_PAUSED:
-    
-                if active_window != last_active_window or manually_paused:
-                    if active_window != last_active_window:
-                        last_active_window = active_window
-                    # to make sure it activates ne focus setting even if manually paused in other app than resumed
-                    if manually_paused:
-                        manually_paused = False
-                    
-                    found_new_focus_app = False
+            
+            if active_window not in ["FST Status Indicator", "FST Crosshair"]:
+                if not FOCUS_THREAD_PAUSED and not MANUAL_PAUSED:
+        
+                    if active_window != last_active_window or manually_paused:
+                        if active_window != last_active_window:
+                            last_active_window = active_window
+                        # to make sure it activates ne focus setting even if manually paused in other app than resumed
+
+                        if manually_paused:
+                            manually_paused = False
                         
-                    for focus_name in multi_focus_dict_keys:
-                        if active_window.lower().find(focus_name) >= 0:
-                            found_new_focus_app = True
-                            FOCUS_APP_NAME = focus_name
-                            break
-                                    
-                    if found_new_focus_app:
-                        # if WIN32_FILTER_PAUSED or not initialized_at_start:
-                        #if WIN32_FILTER_PAUSED or app_changed:
-                        try:
-                            #reset_key_states()
-                            reset_global_variable_changes()
-                            apply_args_and_groups(focus_name)
-                            system('cls||clear')
-                            display_groups()
-                            print("\n--- reloaded sucessfully ---")
-                            print(f'>>> FOCUS APP FOUND: resuming with app: \n    {active_window}\n')
-                            if CONTROLS_ENABLED:
-                                display_control_text()
-                            with paused_lock:
-                                WIN32_FILTER_PAUSED = False
+                        found_new_focus_app = False
+                            
+                        for focus_name in multi_focus_dict_keys:
+                            if active_window.lower().find(focus_name) >= 0:
+                                found_new_focus_app = True
+                                FOCUS_APP_NAME = focus_name
+                                break
+                                        
+                        if found_new_focus_app:
+                            # if WIN32_FILTER_PAUSED or not initialized_at_start:
+                            #if WIN32_FILTER_PAUSED or app_changed:
+                            try:
+                                #reset_key_states()
+                                reset_global_variable_changes()
+                                apply_args_and_groups(focus_name)
+                                system('cls||clear')
+                                display_groups()
+                                print("\n--- reloaded sucessfully ---")
+                                print(f'>>> FOCUS APP FOUND: resuming with app: \n    {active_window}\n')
+                                if CONTROLS_ENABLED:
+                                    display_control_text()
+                                with paused_lock:
+                                    WIN32_FILTER_PAUSED = False
 
-                        except Exception:
-                            print('--- reloading of groups files failed - not resumed, still paused ---')
-                    
-                    else:
-                        FOCUS_APP_NAME = None
-                        if WIN32_FILTER_PAUSED:
-                            # print out active window when paused and it changes
-                            # to help find the name :-D
-                            print(f"> Active Window: {active_window}")
-
+                            except Exception:
+                                print('--- reloading of groups files failed - not resumed, still paused ---')
+                        
                         else:
-                            release_all_toggles()
-                            stop_all_repeating_keys()
-                            #reset_key_states()
-                            reset_global_variable_changes()
-                            apply_args_and_groups()
-                            system('cls||clear')
-                            display_groups()
-                            print("\n--- reloaded sucessfully ---")
-                            print(f'>>> NO FOCUS APP FOUND: looking for: {', '.join(multi_focus_dict_keys)}\n')
-                            if CONTROLS_ENABLED:
-                                display_control_text()
-                            with paused_lock:
-                                WIN32_FILTER_PAUSED = True
-                                
-                            print(f"> Active Window: {active_window}")
-                                     
-                    
-            else:
-                manually_paused = True
-                      
+                            FOCUS_APP_NAME = None
+                            if WIN32_FILTER_PAUSED:
+                                # print out active window when paused and it changes
+                                # to help find the name :-D
+                                print(f"> Active Window: {active_window}")
+
+                            else:
+                                release_all_toggles()
+                                stop_all_repeating_keys()
+                                #reset_key_states()
+                                reset_global_variable_changes()
+                                apply_args_and_groups()
+                                system('cls||clear')
+                                display_groups()
+                                print("\n--- reloaded sucessfully ---")
+                                print(f'>>> NO FOCUS APP FOUND: looking for: {', '.join(multi_focus_dict_keys)}\n')
+                                if CONTROLS_ENABLED:
+                                    display_control_text()
+                                with paused_lock:
+                                    WIN32_FILTER_PAUSED = True
+                                    
+                                print(f"> Active Window: {active_window}")
+                                        
+                        
+                else:
+                    manually_paused = True
+                        
             sleep(0.5)
 
     def pause(self):
@@ -1813,13 +1815,10 @@ class Status_Indicator:
         
         # Calculate the position to center the window
         self.x_position = (self.screen_width) - 60
-        self.y_position = 20
+        self.y_position = 0
         
         # Set the window geometry to 2x2 pixels centered on the screen
         self.root.geometry(f'100x100+{self.x_position}+{self.y_position}')
-        
-        
-        #self.root.geometry("100x100")
         self.root.attributes("-alpha", 1)  # Set transparency level
         self.root.wm_attributes("-topmost", 1)  # Keep the window on top
         self.root.wm_attributes("-transparentcolor", "yellow")
@@ -1838,6 +1837,8 @@ class Status_Indicator:
         # Create a right-click context menu
         self.context_menu = tk.Menu(self.root, tearoff=0)
         
+        self.context_menu.add_command(label="Open config file", command=self.open_config_file)
+        self.context_menu.add_separator()
         self.context_menu.add_command(label="Toggle Pause", command=control_toggle_pause)
         self.context_menu.add_command(label="Return to Menu", command=control_return_to_menu)
         self.context_menu.add_command(label="Exit Program", command=control_exit_program)
@@ -1851,6 +1852,8 @@ class Status_Indicator:
         self.canvas.bind("<Button-3>", self.show_context_menu)
         
         self.stop = False
+    def open_config_file(self):
+        startfile(FILE_NAME)
         
     def toggle_crosshair(self):
         global CROSSHAIR_ENABLED
@@ -1920,7 +1923,7 @@ class Status_Indicator:
                 if self.crosshair_enabled:
                     self.crosshair_deactivate()
                 self.close_window()
-            sleep(0.5)
+            sleep(1)
     
     def end(self):
         self.stop = True
@@ -1940,6 +1943,9 @@ class Crosshair():
         # Create a new Tkinter window
         self.root = root
         
+        # Set title to recognise it in focus window
+        self.root.title("FST Crosshair")
+        
         # Remove window decorations
         self.root.overrideredirect(True)
         
@@ -1947,19 +1953,21 @@ class Crosshair():
         self.root.attributes('-alpha', 1)
         
         # delta x,y for the midpoint of the crosshair
-        x = CROSSHAIR_DELTA_X - 1  # for me this is the center of the screen
-        y = CROSSHAIR_DELTA_Y - 1
+        delta_x = CROSSHAIR_DELTA_X - 1  # for me this is the center of the screen
+        delta_y = CROSSHAIR_DELTA_Y - 1
         
         # base size has to be at least double the max of |x| or |y|
-        min_canvas_size = 2 * max(abs(x), abs(y)) + 25   # add a bit of buffer (25)
-        print(min_canvas_size)
+        # min_canvas_size = 2 * max(abs(delta_x), abs(delta_y)) + 25   # add a bit of buffer (25)
+        # print(min_canvas_size)
         
-        # adapt canvas size to be big enough for the delta values
-        if min_canvas_size < 100:
-            self.size = 100 
-        else: 
-            # make it a multiplicative of 100
-            self.size = (min_canvas_size // 100 + 1) * 100
+        # # adapt canvas size to be big enough for the delta values
+        # if min_canvas_size < 100:
+        #     self.size = 100 
+        # else: 
+        #     # make it a multiplicative of 100
+        #     self.size = (min_canvas_size // 100 + 1) * 100
+        
+        self.size = 100 
         
         # middle point distance from coordinate system of he canvas
         mid = self.size // 2
@@ -1969,8 +1977,8 @@ class Crosshair():
         self.screen_height = self.root.winfo_screenheight()
         
         # Calculate the position to center the window
-        self.x_position = (self.screen_width // 2) - mid
-        self.y_position = (self.screen_height // 2) - mid
+        self.x_position = (self.screen_width // 2) - mid + delta_x
+        self.y_position = (self.screen_height // 2) - mid + delta_y
         
         # Set the window geometry to 2x2 pixels centered on the screen
         self.root.geometry(f'{self.size}x{self.size}+{self.x_position}+{self.y_position}')
@@ -1985,24 +1993,23 @@ class Crosshair():
         color = rgbtohex(255, 0, 255)
         
         # Draw the crosshair lines
-        self.canvas.create_line(mid+0+x, mid+10+y, mid+0+x, mid+25+y, fill=color)    # Vertical line
-        self.canvas.create_line(mid+1+x, mid+10+y, mid+1+x, mid+25+y, fill=color)    # Vertical line
-        self.canvas.create_line(mid-1+x, mid+10+y, mid-1+x, mid+25+y, fill="black")  # Vertical line
+        self.canvas.create_line(mid+0, mid+10, mid+0, mid+25, fill=color)    # Vertical line
+        self.canvas.create_line(mid+1, mid+10, mid+1, mid+25, fill=color)    # Vertical line
+        self.canvas.create_line(mid-1, mid+10, mid-1, mid+25, fill="black")  # Vertical line
         
-        self.canvas.create_line(mid+10+x, mid+0+y, mid+25+x, mid+0+y, fill=color)    # Horizontal line right
-        self.canvas.create_line(mid+10+x, mid+1+y, mid+25+x, mid+1+y, fill=color)    # Horizontal line right
-        self.canvas.create_line(mid+10+x, mid+2+y, mid+25+x, mid+2+y, fill="black")  # Horizontal line right
+        self.canvas.create_line(mid+11, mid+0, mid+26, mid+0, fill=color)    # Horizontal line right
+        self.canvas.create_line(mid+11, mid+1, mid+26, mid+1, fill=color)    # Horizontal line right
+        self.canvas.create_line(mid+11, mid+2, mid+26, mid+2, fill="black")  # Horizontal line right
         
-        self.canvas.create_line(mid-25+x, mid+0+y, mid-10+x, mid+0+y, fill=color)    # Horizontal line left
-        self.canvas.create_line(mid-25+x, mid+1+y, mid-10+x, mid+1+y, fill=color)    # tHorizontal line left
-        self.canvas.create_line(mid-25+x, mid+2+y, mid-10+x, mid+2+y, fill="black")  # Horizontal line left
+        self.canvas.create_line(mid-25, mid+0, mid-10, mid+0, fill=color)    # Horizontal line left
+        self.canvas.create_line(mid-25, mid+1, mid-10, mid+1, fill=color)    # tHorizontal line left
+        self.canvas.create_line(mid-25, mid+2, mid-10, mid+2, fill="black")  # Horizontal line left
         
-    
-        self.canvas.create_line(mid-1+x, mid+0+y, mid-1+x, mid+2+y, fill=color)      # Dot
-        self.canvas.create_line(mid+2+x, mid+0+y, mid+2+x, mid+3+y, fill=color)      # Dot
-        self.canvas.create_line(mid-1+x, mid+2+y, mid+2+x, mid+2+y, fill=color)      # Dot
-        self.canvas.create_line(mid-1+x, mid+3+y, mid+3+x, mid+3+y, fill="black")    # Dot
-        self.canvas.create_line(mid-2+x, mid+0+y, mid-2+x, mid+3+y, fill="black")    # Dot
+        self.canvas.create_line(mid-1, mid+0, mid-1, mid+2, fill=color)      # Dot
+        self.canvas.create_line(mid+2, mid+0, mid+2, mid+3, fill=color)      # Dot
+        self.canvas.create_line(mid-1, mid+2, mid+2, mid+2, fill=color)      # Dot
+        self.canvas.create_line(mid-1, mid+3, mid+3, mid+3, fill="black")    # Dot
+        self.canvas.create_line(mid-2, mid+0, mid-2, mid+3, fill="black")    # Dot
         
         # Set the window to be always on top and transparent again for drawing
         self.root.attributes('-topmost', True)
