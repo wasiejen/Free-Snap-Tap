@@ -120,15 +120,11 @@ mouse_vk_codes_dict = {1: mouse.Button.left,
                        }
 mouse_vk_codes = mouse_vk_codes_dict.keys()
 
-# save point to recognise repeating real key input and stop evaluating it
-last_real_ke = Key_Event(0,True)
-# last_virtual_ke = Key_Event(0,True)
 
 macro_thread_dict = {}
 macros_sequence_counter_dict = {}
 
 repeat_thread_dict = {}
-# macros_sequence_counter_dict = {}
 
 TIME_DIFF = None
 
@@ -428,82 +424,93 @@ def initialize_groups():
         return new_element
     
     # extract tap groups
-    for group in tap_groups_hr:
-        keys = []
-        for key_string in group:
-            key = convert_to_vk_code(key_string)
-            keys.append(Key(key, key_string=key_string))
-        tap_groups.append(Tap_Group(keys))  
+    try:
+        for group in tap_groups_hr:
+            keys = []
+            for key_string in group:
+                key = convert_to_vk_code(key_string)
+                keys.append(Key(key, key_string=key_string))
+            tap_groups.append(Tap_Group(keys))
+    except Exception as error:
+        print(f"ERROR: {error} \n -> in Tap Group: {group}")
+        raise Exception(error)
          
     # extract rebinds
-    for rebind in rebinds_hr:
-        trigger_group, replacement_key = rebind
-        
-        # evaluate the given key strings
-        new_trigger_group = []
-        for key in trigger_group:
-            new_element = extract_data_from_key(key)            
-            if new_element is not False:
-                new_trigger_group.append(new_element)
-        replacement_key = extract_data_from_key(replacement_key)
-        
-        # check if any given key is a Key Instance - has to be treated differently just to 
-        # be able to use v:8 instead of -v:-8 and +v:+8
-        both_are_Keys = False
-        if isinstance(new_trigger_group[0], Key) or isinstance(replacement_key, Key):
-            # if one is Key Instance but the other Key_Event -> convert Key_Event into Key
-            if not isinstance(new_trigger_group[0], Key):
-                temp = new_trigger_group[0]
-                new_trigger_group[0] = Key(temp.get_vk_code(), key_string=temp.get_key_string())    
-            if not isinstance(replacement_key, Key):
-                # TODO:
-                # here toggle is lost in conversion
-                if replacement_key.is_toggle():
-                    pass # Key_Event.get_key_events() returns [ke, ke] - that should handle it
-                else:
-                    temp = replacement_key
-                    replacement_key = Key(temp.get_vk_code(), key_string=temp.get_key_string())
-            both_are_Keys = True
-        
-        trigger_key, *trigger_rest = new_trigger_group
-        
-        if not both_are_Keys:
-            trigger_group = Key_Group(new_trigger_group)
-            rebind_triggers.append(trigger_group)
-            rebinds_dict[trigger_group] = replacement_key
-                    
-        else:
-            trigger_events = trigger_key.get_key_events()
+    try:
+        for rebind in rebinds_hr:
+            trigger_group, replacement_key = rebind
             
-            replacement_events = replacement_key.get_key_events()
-            for index in [0,1]:
-                trigger_group = Key_Group([trigger_events[index]] + trigger_rest)
-                rebind_triggers.append(trigger_group)
-                rebinds_dict[trigger_group] = replacement_events[index]
-                
-                  
-    # extract macros         
-    for macro in macros_hr:
-        new_macro = []
-        # trigger j = 0, key_group j = 1
-        for index, key_group in enumerate(macro):
-            new_key_group = Key_Group([])
-            for key in key_group:
+            # evaluate the given key strings
+            new_trigger_group = []
+            for key in trigger_group:
                 new_element = extract_data_from_key(key)            
                 if new_element is not False:
-                    if isinstance(new_element, Key_Event):
-                        new_key_group.append(new_element)
-                    elif isinstance(new_element, Key):
-                        key_events = new_element.get_key_events()
-                        new_key_group.append(key_events[0])
-                        # if not in trigger group - so Key Instances as triggers are handled correctly
-                        if index >= 1: 
-                            new_key_group.append(key_events[1])
-            new_macro.append(new_key_group)
-        macro_triggers.append(new_macro[0])
-        # trigger is the key to the to be played keygroup
-        macros_dict[new_macro[0]] = new_macro[1:]
-        macros_sequence_counter_dict[new_macro[0]] = 0
+                    new_trigger_group.append(new_element)
+            replacement_key = extract_data_from_key(replacement_key)
+            
+            # check if any given key is a Key Instance - has to be treated differently just to 
+            # be able to use v:8 instead of -v:-8 and +v:+8
+            both_are_Keys = False
+            if isinstance(new_trigger_group[0], Key) or isinstance(replacement_key, Key):
+                # if one is Key Instance but the other Key_Event -> convert Key_Event into Key
+                if not isinstance(new_trigger_group[0], Key):
+                    temp = new_trigger_group[0]
+                    new_trigger_group[0] = Key(temp.get_vk_code(), key_string=temp.get_key_string())    
+                if not isinstance(replacement_key, Key):
+                    # TODO:
+                    # here toggle is lost in conversion
+                    if replacement_key.is_toggle():
+                        pass # Key_Event.get_key_events() returns [ke, ke] - that should handle it
+                    else:
+                        temp = replacement_key
+                        replacement_key = Key(temp.get_vk_code(), key_string=temp.get_key_string())
+                both_are_Keys = True
+            
+            trigger_key, *trigger_rest = new_trigger_group
+            
+            if not both_are_Keys:
+                trigger_group = Key_Group(new_trigger_group)
+                rebind_triggers.append(trigger_group)
+                rebinds_dict[trigger_group] = replacement_key
+                        
+            else:
+                trigger_events = trigger_key.get_key_events()
+                
+                replacement_events = replacement_key.get_key_events()
+                for index in [0,1]:
+                    trigger_group = Key_Group([trigger_events[index]] + trigger_rest)
+                    rebind_triggers.append(trigger_group)
+                    rebinds_dict[trigger_group] = replacement_events[index]
+    except Exception as error:
+        print(f"ERROR: {error} \n -> in Rebind: {rebind}")
+        raise Exception(error)
+                  
+    # extract macros   
+    try:      
+        for macro in macros_hr:
+            new_macro = []
+            # trigger j = 0, key_group j = 1
+            for index, key_group in enumerate(macro):
+                new_key_group = Key_Group([])
+                for key in key_group:
+                    new_element = extract_data_from_key(key)            
+                    if new_element is not False:
+                        if isinstance(new_element, Key_Event):
+                            new_key_group.append(new_element)
+                        elif isinstance(new_element, Key):
+                            key_events = new_element.get_key_events()
+                            new_key_group.append(key_events[0])
+                            # if not in trigger group - so Key Instances as triggers are handled correctly
+                            if index >= 1: 
+                                new_key_group.append(key_events[1])
+                new_macro.append(new_key_group)
+            macro_triggers.append(new_macro[0])
+            # trigger is the key to the to be played keygroup
+            macros_dict[new_macro[0]] = new_macro[1:]
+            macros_sequence_counter_dict[new_macro[0]] = 0
+    except Exception as error:
+        print(f"ERROR: {error} \n -> in Macro: {macro}")
+        raise Exception(error)
         
     # extract all triggers for suppression of repeated keys: test V1.0.2.1 Bugfix
     all_triggers = rebind_triggers + macro_triggers
@@ -658,6 +665,7 @@ def execute_key_event(key_event, with_delay=False, stop_event=None):
         # reset macro sequence
         if vk_code <= 0:
             reset_code = - vk_code
+            print(reset_code)
             # reset current trigger of this event - return this code to alias tread
             if reset_code == 255:
                 return reset_code
@@ -1086,7 +1094,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     Filter and handle keyboard events.
     """
     global WIN32_FILTER_PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
-    global last_real_ke, last_virtual_ke, toggle_state_dict
+    global toggle_state_dict
     global time_real, time_simulated, time_all, TIME_DIFF
     global macro_thread_dict, macros_sequence_counter_dict
 
@@ -1743,8 +1751,9 @@ class Focus_Thread(Thread):
                                 with paused_lock:
                                     WIN32_FILTER_PAUSED = False
 
-                            except Exception:
+                            except Exception as error:
                                 print('--- reloading of groups files failed - not resumed, still paused ---')
+                                print(f" -> aborted reloading due to: {error}")
                         
                         else:
                             FOCUS_APP_NAME = None
