@@ -120,15 +120,11 @@ mouse_vk_codes_dict = {1: mouse.Button.left,
                        }
 mouse_vk_codes = mouse_vk_codes_dict.keys()
 
-# save point to recognise repeating real key input and stop evaluating it
-last_real_ke = Key_Event(0,True)
-# last_virtual_ke = Key_Event(0,True)
 
 macro_thread_dict = {}
 macros_sequence_counter_dict = {}
 
 repeat_thread_dict = {}
-# macros_sequence_counter_dict = {}
 
 TIME_DIFF = None
 
@@ -146,14 +142,53 @@ def load_from_file(file_name):
     reads in the file and removes the commented out lines, keys and inline comments;
     joins multiline macro sequences; 
     '''    
+
+    def clean_lines(lines):
+        comments_cleaned_lines = []
+        for line in lines:
+            if len(line) > 1:
+                if line.startswith('<focus>'):
+                    comments_cleaned_lines.append(line)
+                else:
+                    line = line.strip().replace(" ","")
+                    if len(line) > 1:
+                        # strip all comments from line
+                        group = line.split(',')
+                        # ignore line if first char is a #
+                        if group[0][0] == '#':
+                            pass
+                        else:
+                            # remove commented out keys
+                            cleaned_group = []
+                            for key in group:
+                                # ignore commented out keys
+                                if key[0] != '#': 
+                                    # ignore comments after keys
+                                    cleaned_group.append(key.split('#')[0]) 
+                                # if commented out key before :, add :
+                                elif key.find(':') >= 0:
+                                    cleaned_group.append(':')
+                                    
+                            cleaned_line = ','.join(cleaned_group)
+                            comments_cleaned_lines.append(cleaned_line)
+        
+        # clean multiline macro seauences and joins them together
+        multiline_cleaned_lines = []
+        for line in comments_cleaned_lines:
+            if len(line) > 1 and line[0] == ':':
+                # add multiline to last multiline sequence
+                multiline_cleaned_lines[-1] += line
+            else:
+                multiline_cleaned_lines.append(line)
+                
+        return multiline_cleaned_lines
+
     temp_file = []
     with open(file_name, 'r') as file:
         for line in file:
             temp_file.append(line) 
 
-    cleaned_lines = clean_lines(temp_file)   #
-    
-    
+    cleaned_lines = clean_lines(temp_file) 
     
     global multi_focus_dict, multi_focus_dict_keys
     global default_start_arguments, default_group_lines
@@ -211,46 +246,6 @@ def write_out_new_file(file_name):
         # for macro in macros_hr:
         #     # TODO: to adapt to save key sequences - necessary - mainly used to create new file if none found
         #     file.write(' :: '.join([', '.join(macro[0]),', '.join(macro[1])]))
-
-def clean_lines(lines):
-    comments_cleaned_lines = []
-    for line in lines:
-        if len(line) > 1:
-            if line.startswith('<focus>'):
-                comments_cleaned_lines.append(line)
-            else:
-                line = line.strip().replace(" ","")
-                if len(line) > 1:
-                    # strip all comments from line
-                    group = line.split(',')
-                    # ignore line if first char is a #
-                    if group[0][0] == '#':
-                        pass
-                    else:
-                        # remove commented out keys
-                        cleaned_group = []
-                        for key in group:
-                            # ignore commented out keys
-                            if key[0] != '#': 
-                                # ignore comments after keys
-                                cleaned_group.append(key.split('#')[0]) 
-                            # if commented out key before :, add :
-                            elif key.find(':') >= 0:
-                                cleaned_group.append(':')
-                                
-                        cleaned_line = ','.join(cleaned_group)
-                        comments_cleaned_lines.append(cleaned_line)
-    
-    # clean multiline macro seauences and joins them together
-    multiline_cleaned_lines = []
-    for line in comments_cleaned_lines:
-        if len(line) > 1 and line[0] == ':':
-            # add multiline to last multiline sequence
-            multiline_cleaned_lines[-1] += line
-        else:
-            multiline_cleaned_lines.append(line)
-            
-    return multiline_cleaned_lines
     
 def presort_lines(lines):
     '''
@@ -429,82 +424,93 @@ def initialize_groups():
         return new_element
     
     # extract tap groups
-    for group in tap_groups_hr:
-        keys = []
-        for key_string in group:
-            key = convert_to_vk_code(key_string)
-            keys.append(Key(key, key_string=key_string))
-        tap_groups.append(Tap_Group(keys))  
+    try:
+        for group in tap_groups_hr:
+            keys = []
+            for key_string in group:
+                key = convert_to_vk_code(key_string)
+                keys.append(Key(key, key_string=key_string))
+            tap_groups.append(Tap_Group(keys))
+    except Exception as error:
+        print(f"ERROR: {error} \n -> in Tap Group: {group}")
+        raise Exception(error)
          
     # extract rebinds
-    for rebind in rebinds_hr:
-        trigger_group, replacement_key = rebind
-        
-        # evaluate the given key strings
-        new_trigger_group = []
-        for key in trigger_group:
-            new_element = extract_data_from_key(key)            
-            if new_element is not False:
-                new_trigger_group.append(new_element)
-        replacement_key = extract_data_from_key(replacement_key)
-        
-        # check if any given key is a Key Instance - has to be treated differently just to 
-        # be able to use v:8 instead of -v:-8 and +v:+8
-        both_are_Keys = False
-        if isinstance(new_trigger_group[0], Key) or isinstance(replacement_key, Key):
-            # if one is Key Instance but the other Key_Event -> convert Key_Event into Key
-            if not isinstance(new_trigger_group[0], Key):
-                temp = new_trigger_group[0]
-                new_trigger_group[0] = Key(temp.get_vk_code(), key_string=temp.get_key_string())    
-            if not isinstance(replacement_key, Key):
-                # TODO:
-                # here toggle is lost in conversion
-                if replacement_key.is_toggle():
-                    pass # Key_Event.get_key_events() returns [ke, ke] - that should handle it
-                else:
-                    temp = replacement_key
-                    replacement_key = Key(temp.get_vk_code(), key_string=temp.get_key_string())
-            both_are_Keys = True
-        
-        trigger_key, *trigger_rest = new_trigger_group
-        
-        if not both_are_Keys:
-            trigger_group = Key_Group(new_trigger_group)
-            rebind_triggers.append(trigger_group)
-            rebinds_dict[trigger_group] = replacement_key
-                    
-        else:
-            trigger_events = trigger_key.get_key_events()
+    try:
+        for rebind in rebinds_hr:
+            trigger_group, replacement_key = rebind
             
-            replacement_events = replacement_key.get_key_events()
-            for index in [0,1]:
-                trigger_group = Key_Group([trigger_events[index]] + trigger_rest)
-                rebind_triggers.append(trigger_group)
-                rebinds_dict[trigger_group] = replacement_events[index]
-                
-                  
-    # extract macros         
-    for macro in macros_hr:
-        new_macro = []
-        # trigger j = 0, key_group j = 1
-        for index, key_group in enumerate(macro):
-            new_key_group = Key_Group([])
-            for key in key_group:
+            # evaluate the given key strings
+            new_trigger_group = []
+            for key in trigger_group:
                 new_element = extract_data_from_key(key)            
                 if new_element is not False:
-                    if isinstance(new_element, Key_Event):
-                        new_key_group.append(new_element)
-                    elif isinstance(new_element, Key):
-                        key_events = new_element.get_key_events()
-                        new_key_group.append(key_events[0])
-                        # if not in trigger group - so Key Instances as triggers are handled correctly
-                        if index >= 1: 
-                            new_key_group.append(key_events[1])
-            new_macro.append(new_key_group)
-        macro_triggers.append(new_macro[0])
-        # trigger is the key to the to be played keygroup
-        macros_dict[new_macro[0]] = new_macro[1:]
-        macros_sequence_counter_dict[new_macro[0]] = 0
+                    new_trigger_group.append(new_element)
+            replacement_key = extract_data_from_key(replacement_key)
+            
+            # check if any given key is a Key Instance - has to be treated differently just to 
+            # be able to use v:8 instead of -v:-8 and +v:+8
+            both_are_Keys = False
+            if isinstance(new_trigger_group[0], Key) or isinstance(replacement_key, Key):
+                # if one is Key Instance but the other Key_Event -> convert Key_Event into Key
+                if not isinstance(new_trigger_group[0], Key):
+                    temp = new_trigger_group[0]
+                    new_trigger_group[0] = Key(temp.get_vk_code(), key_string=temp.get_key_string())    
+                if not isinstance(replacement_key, Key):
+                    # TODO:
+                    # here toggle is lost in conversion
+                    if replacement_key.is_toggle():
+                        pass # Key_Event.get_key_events() returns [ke, ke] - that should handle it
+                    else:
+                        temp = replacement_key
+                        replacement_key = Key(temp.get_vk_code(), key_string=temp.get_key_string())
+                both_are_Keys = True
+            
+            trigger_key, *trigger_rest = new_trigger_group
+            
+            if not both_are_Keys:
+                trigger_group = Key_Group(new_trigger_group)
+                rebind_triggers.append(trigger_group)
+                rebinds_dict[trigger_group] = replacement_key
+                        
+            else:
+                trigger_events = trigger_key.get_key_events()
+                
+                replacement_events = replacement_key.get_key_events()
+                for index in [0,1]:
+                    trigger_group = Key_Group([trigger_events[index]] + trigger_rest)
+                    rebind_triggers.append(trigger_group)
+                    rebinds_dict[trigger_group] = replacement_events[index]
+    except Exception as error:
+        print(f"ERROR: {error} \n -> in Rebind: {rebind}")
+        raise Exception(error)
+                  
+    # extract macros   
+    try:      
+        for macro in macros_hr:
+            new_macro = []
+            # trigger j = 0, key_group j = 1
+            for index, key_group in enumerate(macro):
+                new_key_group = Key_Group([])
+                for key in key_group:
+                    new_element = extract_data_from_key(key)            
+                    if new_element is not False:
+                        if isinstance(new_element, Key_Event):
+                            new_key_group.append(new_element)
+                        elif isinstance(new_element, Key):
+                            key_events = new_element.get_key_events()
+                            new_key_group.append(key_events[0])
+                            # if not in trigger group - so Key Instances as triggers are handled correctly
+                            if index >= 1: 
+                                new_key_group.append(key_events[1])
+                new_macro.append(new_key_group)
+            macro_triggers.append(new_macro[0])
+            # trigger is the key to the to be played keygroup
+            macros_dict[new_macro[0]] = new_macro[1:]
+            macros_sequence_counter_dict[new_macro[0]] = 0
+    except Exception as error:
+        print(f"ERROR: {error} \n -> in Macro: {macro}")
+        raise Exception(error)
         
     # extract all triggers for suppression of repeated keys: test V1.0.2.1 Bugfix
     all_triggers = rebind_triggers + macro_triggers
@@ -659,6 +665,7 @@ def execute_key_event(key_event, with_delay=False, stop_event=None):
         # reset macro sequence
         if vk_code <= 0:
             reset_code = - vk_code
+            print(reset_code)
             # reset current trigger of this event - return this code to alias tread
             if reset_code == 255:
                 return reset_code
@@ -679,7 +686,8 @@ def execute_key_event(key_event, with_delay=False, stop_event=None):
                         _, stop_event = macro_thread_dict[macro_triggers[reset_code]]
                         stop_event.set()
                     except KeyError as error:
-                        print(f"reset_{reset_code}: interrupt for macro with trigger {error} unsuccessful")
+                        if DEBUG2:
+                            print(f"reset_{reset_code}: interrupt for macro with trigger {error} unsuccessful")
                 except IndexError:
                     print(f"wrong index for reset - no macro with index: {reset_code}")
         else:
@@ -694,12 +702,6 @@ def execute_key_event(key_event, with_delay=False, stop_event=None):
                 delay_times = delay_times[:2]
             
             send_key_event(key_event)
-            # is_mouse_key = check_for_mouse_vk_code(vk_code)
-            # key_code = get_key_code(is_mouse_key, vk_code)
-            # if is_press:
-            #     controller_dict[is_mouse_key].press(key_code)
-            # else:
-            #     controller_dict[is_mouse_key].release(key_code)
             
             if ACT_DELAY and with_delay:
                 delay_time = get_random_delay(*delay_times)
@@ -1092,7 +1094,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     Filter and handle keyboard events.
     """
     global WIN32_FILTER_PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
-    global last_real_ke, last_virtual_ke, toggle_state_dict
+    global toggle_state_dict
     global time_real, time_simulated, time_all, TIME_DIFF
     global macro_thread_dict, macros_sequence_counter_dict
 
@@ -1596,13 +1598,16 @@ def reset_global_variable_changes():
 
 def apply_args_and_groups(focus_name = None):
     global multi_focus_dict, sys_start_args, default_start_arguments, default_group_lines
+    
+    apply_start_arguments(sys_start_args)
+    
+    reload_from_file()
+    # needs to be done after reloading of file or else it will not have the actual data
     if focus_name is not None:
         focus_start_arguments, focus_group_lines = multi_focus_dict[focus_name]
     else:
         focus_start_arguments, focus_group_lines = [],[]
-    
-    apply_start_arguments(sys_start_args)
-    reload_from_file()
+        
     apply_start_arguments(default_start_arguments + focus_start_arguments)
     presort_lines(default_group_lines + focus_group_lines)
     initialize_groups()
@@ -1716,71 +1721,60 @@ class Focus_Thread(Thread):
                 
             except AttributeError:
                 pass
-              
-            if not FOCUS_THREAD_PAUSED and not MANUAL_PAUSED:
-    
-                if active_window != last_active_window or manually_paused:
-                    if active_window != last_active_window:
-                        last_active_window = active_window
-                    # to make sure it activates ne focus setting even if manually paused in other app than resumed
-                    if manually_paused:
-                        manually_paused = False
-                    
-                    found_new_focus_app = False
+            
+            if active_window not in ["FST Status Indicator", "FST Crosshair"]:
+                if not FOCUS_THREAD_PAUSED and not MANUAL_PAUSED:
+        
+                    if active_window != last_active_window or manually_paused:
+                        if active_window != last_active_window:
+                            last_active_window = active_window
+                        # to make sure it activates ne focus setting even if manually paused in other app than resumed
+
+                        if manually_paused:
+                            manually_paused = False
                         
-                    for focus_name in multi_focus_dict_keys:
-                        if active_window.lower().find(focus_name) >= 0:
-                            found_new_focus_app = True
-                            FOCUS_APP_NAME = focus_name
-                            break
-                                    
-                    if found_new_focus_app:
-                        # if WIN32_FILTER_PAUSED or not initialized_at_start:
-                        #if WIN32_FILTER_PAUSED or app_changed:
-                        try:
-                            #reset_key_states()
-                            reset_global_variable_changes()
-                            apply_args_and_groups(focus_name)
-                            system('cls||clear')
-                            display_groups()
-                            print("\n--- reloaded sucessfully ---")
-                            print(f'>>> FOCUS APP FOUND: resuming with app: \n    {active_window}\n')
-                            if CONTROLS_ENABLED:
-                                display_control_text()
-                            with paused_lock:
-                                WIN32_FILTER_PAUSED = False
+                        found_new_focus_app = False
+                            
+                        for focus_name in multi_focus_dict_keys:
+                            if active_window.lower().find(focus_name) >= 0:
+                                found_new_focus_app = True
+                                FOCUS_APP_NAME = focus_name
+                                break
+                                        
+                        if found_new_focus_app:
+                            # if WIN32_FILTER_PAUSED or not initialized_at_start:
+                            #if WIN32_FILTER_PAUSED or app_changed:
+                            try:
+                                update_args_and_groups(focus_name)
+                                update_group_display()
+                                print(f'\n>>> FOCUS APP FOUND: resuming with app: \n    {active_window}\n')
+                                with paused_lock:
+                                    WIN32_FILTER_PAUSED = False
 
-                        except Exception:
-                            print('--- reloading of groups files failed - not resumed, still paused ---')
-                    
-                    else:
-                        FOCUS_APP_NAME = None
-                        if WIN32_FILTER_PAUSED:
-                            # print out active window when paused and it changes
-                            # to help find the name :-D
-                            print(f"> Active Window: {active_window}")
-
+                            except Exception as error:
+                                print('--- reloading of groups files failed - not resumed, still paused ---')
+                                print(f" -> aborted reloading due to: {error}")
+                        
                         else:
-                            release_all_toggles()
-                            stop_all_repeating_keys()
-                            #reset_key_states()
-                            reset_global_variable_changes()
-                            apply_args_and_groups()
-                            system('cls||clear')
-                            display_groups()
-                            print("\n--- reloaded sucessfully ---")
-                            print(f'>>> NO FOCUS APP FOUND: looking for: {', '.join(multi_focus_dict_keys)}\n')
-                            if CONTROLS_ENABLED:
-                                display_control_text()
-                            with paused_lock:
-                                WIN32_FILTER_PAUSED = True
-                                
-                            print(f"> Active Window: {active_window}")
-                                     
-                    
-            else:
-                manually_paused = True
-                      
+                            FOCUS_APP_NAME = None
+                            if WIN32_FILTER_PAUSED:
+                                # print out active window when paused and it changes
+                                # to help find the name :-D
+                                print(f"> Active Window: {active_window}")
+
+                            else:
+                                update_args_and_groups()
+                                update_group_display()
+                                print(f'\n>>> NO FOCUS APP FOUND: looking for: {', '.join(multi_focus_dict_keys)}\n')
+                                with paused_lock:
+                                    WIN32_FILTER_PAUSED = True
+                                    
+                                print(f"> Active Window: {active_window}")
+                                        
+                        
+                else:
+                    manually_paused = True
+                        
             sleep(0.5)
 
     def pause(self):
@@ -1797,7 +1791,19 @@ class Focus_Thread(Thread):
 
     def end(self):
         self.stop = True
-              
+
+def update_args_and_groups(focus_name = None):
+    release_all_toggles()
+    stop_all_repeating_keys()
+    reset_global_variable_changes()
+    apply_args_and_groups(focus_name)        
+    
+def update_group_display():
+    system('cls||clear')
+    display_groups()
+    #print("\n--- reloaded sucessfully ---")
+    if CONTROLS_ENABLED:
+        display_control_text()      
               
 'GUI elements'
 class Status_Indicator:
@@ -1813,14 +1819,11 @@ class Status_Indicator:
         
         # Calculate the position to center the window
         self.x_position = (self.screen_width) - 60
-        self.y_position = 20
+        self.y_position = 0
         
         # Set the window geometry to 2x2 pixels centered on the screen
         self.root.geometry(f'100x100+{self.x_position}+{self.y_position}')
-        
-        
-        #self.root.geometry("100x100")
-        self.root.attributes("-alpha", 1)  # Set transparency level
+        self.root.attributes("-alpha", 0.4)  # Set transparency level
         self.root.wm_attributes("-topmost", 1)  # Keep the window on top
         self.root.wm_attributes("-transparentcolor", "yellow")
 
@@ -1837,7 +1840,11 @@ class Status_Indicator:
 
         # Create a right-click context menu
         self.context_menu = tk.Menu(self.root, tearoff=0)
+        # self.context_menu.attributes("-alpha", 0.4) 
         
+        self.context_menu.add_command(label="Open config file", command=self.open_config_file)
+        self.context_menu.add_command(label="Reload from file", command=self.reload_from_file)
+        self.context_menu.add_separator()
         self.context_menu.add_command(label="Toggle Pause", command=control_toggle_pause)
         self.context_menu.add_command(label="Return to Menu", command=control_return_to_menu)
         self.context_menu.add_command(label="Exit Program", command=control_exit_program)
@@ -1851,6 +1858,14 @@ class Status_Indicator:
         self.canvas.bind("<Button-3>", self.show_context_menu)
         
         self.stop = False
+        
+    def reload_from_file(self):
+        update_args_and_groups(FOCUS_APP_NAME)
+        update_group_display()
+        print(f'\n>>> file reloaded for focus app: {FOCUS_APP_NAME}\n')
+        
+    def open_config_file(self):
+        startfile(FILE_NAME)
         
     def toggle_crosshair(self):
         global CROSSHAIR_ENABLED
@@ -1920,7 +1935,7 @@ class Status_Indicator:
                 if self.crosshair_enabled:
                     self.crosshair_deactivate()
                 self.close_window()
-            sleep(0.5)
+            sleep(1)
     
     def end(self):
         self.stop = True
@@ -1940,6 +1955,9 @@ class Crosshair():
         # Create a new Tkinter window
         self.root = root
         
+        # Set title to recognise it in focus window
+        self.root.title("FST Crosshair")
+        
         # Remove window decorations
         self.root.overrideredirect(True)
         
@@ -1947,19 +1965,21 @@ class Crosshair():
         self.root.attributes('-alpha', 1)
         
         # delta x,y for the midpoint of the crosshair
-        x = CROSSHAIR_DELTA_X - 1  # for me this is the center of the screen
-        y = CROSSHAIR_DELTA_Y - 1
+        delta_x = CROSSHAIR_DELTA_X - 1  # for me this is the center of the screen
+        delta_y = CROSSHAIR_DELTA_Y - 1
         
         # base size has to be at least double the max of |x| or |y|
-        min_canvas_size = 2 * max(abs(x), abs(y)) + 25   # add a bit of buffer (25)
-        print(min_canvas_size)
+        # min_canvas_size = 2 * max(abs(delta_x), abs(delta_y)) + 25   # add a bit of buffer (25)
+        # print(min_canvas_size)
         
-        # adapt canvas size to be big enough for the delta values
-        if min_canvas_size < 100:
-            self.size = 100 
-        else: 
-            # make it a multiplicative of 100
-            self.size = (min_canvas_size // 100 + 1) * 100
+        # # adapt canvas size to be big enough for the delta values
+        # if min_canvas_size < 100:
+        #     self.size = 100 
+        # else: 
+        #     # make it a multiplicative of 100
+        #     self.size = (min_canvas_size // 100 + 1) * 100
+        
+        self.size = 100 
         
         # middle point distance from coordinate system of he canvas
         mid = self.size // 2
@@ -1969,8 +1989,8 @@ class Crosshair():
         self.screen_height = self.root.winfo_screenheight()
         
         # Calculate the position to center the window
-        self.x_position = (self.screen_width // 2) - mid
-        self.y_position = (self.screen_height // 2) - mid
+        self.x_position = (self.screen_width // 2) - mid + delta_x
+        self.y_position = (self.screen_height // 2) - mid + delta_y
         
         # Set the window geometry to 2x2 pixels centered on the screen
         self.root.geometry(f'{self.size}x{self.size}+{self.x_position}+{self.y_position}')
@@ -1985,24 +2005,23 @@ class Crosshair():
         color = rgbtohex(255, 0, 255)
         
         # Draw the crosshair lines
-        self.canvas.create_line(mid+0+x, mid+10+y, mid+0+x, mid+25+y, fill=color)    # Vertical line
-        self.canvas.create_line(mid+1+x, mid+10+y, mid+1+x, mid+25+y, fill=color)    # Vertical line
-        self.canvas.create_line(mid-1+x, mid+10+y, mid-1+x, mid+25+y, fill="black")  # Vertical line
+        self.canvas.create_line(mid+0, mid+10, mid+0, mid+25, fill=color)    # Vertical line
+        self.canvas.create_line(mid+1, mid+10, mid+1, mid+25, fill=color)    # Vertical line
+        self.canvas.create_line(mid-1, mid+10, mid-1, mid+25, fill="black")  # Vertical line
         
-        self.canvas.create_line(mid+10+x, mid+0+y, mid+25+x, mid+0+y, fill=color)    # Horizontal line right
-        self.canvas.create_line(mid+10+x, mid+1+y, mid+25+x, mid+1+y, fill=color)    # Horizontal line right
-        self.canvas.create_line(mid+10+x, mid+2+y, mid+25+x, mid+2+y, fill="black")  # Horizontal line right
+        self.canvas.create_line(mid+11, mid+0, mid+26, mid+0, fill=color)    # Horizontal line right
+        self.canvas.create_line(mid+11, mid+1, mid+26, mid+1, fill=color)    # Horizontal line right
+        self.canvas.create_line(mid+11, mid+2, mid+26, mid+2, fill="black")  # Horizontal line right
         
-        self.canvas.create_line(mid-25+x, mid+0+y, mid-10+x, mid+0+y, fill=color)    # Horizontal line left
-        self.canvas.create_line(mid-25+x, mid+1+y, mid-10+x, mid+1+y, fill=color)    # tHorizontal line left
-        self.canvas.create_line(mid-25+x, mid+2+y, mid-10+x, mid+2+y, fill="black")  # Horizontal line left
+        self.canvas.create_line(mid-25, mid+0, mid-10, mid+0, fill=color)    # Horizontal line left
+        self.canvas.create_line(mid-25, mid+1, mid-10, mid+1, fill=color)    # tHorizontal line left
+        self.canvas.create_line(mid-25, mid+2, mid-10, mid+2, fill="black")  # Horizontal line left
         
-    
-        self.canvas.create_line(mid-1+x, mid+0+y, mid-1+x, mid+2+y, fill=color)      # Dot
-        self.canvas.create_line(mid+2+x, mid+0+y, mid+2+x, mid+3+y, fill=color)      # Dot
-        self.canvas.create_line(mid-1+x, mid+2+y, mid+2+x, mid+2+y, fill=color)      # Dot
-        self.canvas.create_line(mid-1+x, mid+3+y, mid+3+x, mid+3+y, fill="black")    # Dot
-        self.canvas.create_line(mid-2+x, mid+0+y, mid-2+x, mid+3+y, fill="black")    # Dot
+        self.canvas.create_line(mid-1, mid+0, mid-1, mid+2, fill=color)      # Dot
+        self.canvas.create_line(mid+2, mid+0, mid+2, mid+3, fill=color)      # Dot
+        self.canvas.create_line(mid-1, mid+2, mid+2, mid+2, fill=color)      # Dot
+        self.canvas.create_line(mid-1, mid+3, mid+3, mid+3, fill="black")    # Dot
+        self.canvas.create_line(mid-2, mid+0, mid-2, mid+3, fill="black")    # Dot
         
         # Set the window to be always on top and transparent again for drawing
         self.root.attributes('-topmost', True)

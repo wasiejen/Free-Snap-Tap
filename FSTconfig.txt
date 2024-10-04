@@ -17,6 +17,11 @@ v::b,u,r,b
 #+hori_scroll   :: f|0
 #-hori_scroll   :: h|0
 
+-vert_scroll :: x|0
++vert_scroll :: y|0
+-mouse_x2 :: g
++mouse_x2 :: h
+
 
 <focus>sublime
 <arg>-crosshair=60,0
