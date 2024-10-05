@@ -93,8 +93,8 @@ alias_thread_logging = []
 pressed_keys = set()
 released_keys = set()
 # collect active key press/release states to prevent refiring macros while holding a key
-real_key_press_states = {}
-all_key_press_states = {}
+real_key_press_states_dict = {}
+all_key_press_states_dict = {}
 
 # toggle state tracker
 toggle_state_dict = {}
@@ -616,18 +616,18 @@ def release_all_toggles():
         toggle_state_dict[vk_code] = False
 
 def release_all_currently_not_pressed_keys():
-    global all_key_press_states, real_key_press_states
+    global all_key_press_states_dict, real_key_press_states_dict
     
-    for key, is_press in all_key_press_states.items(): 
+    for key, is_press in all_key_press_states_dict.items(): 
         if is_press:
             print(f"to released pressed key: {key}")
             try:
-                real_key_is_press = real_key_press_states[key]
+                real_key_is_press = real_key_press_states_dict[key]
             except KeyError:
                 real_key_is_press = False
             if not real_key_is_press:
                 send_key_event(Key_Event(key, False))
-                all_key_press_states[key] = False
+                all_key_press_states_dict[key] = False
                 
     release_all_toggles()
                 
@@ -832,7 +832,7 @@ def constraint_evaluation(constraint_to_evaluate, current_ke):
     def ap(key_string):
         vk_code, _ = get_vk_code_and_press_from_keystring(key_string)
         try:
-            return all_key_press_states[vk_code]
+            return all_key_press_states_dict[vk_code]
         except KeyError:
             return False
         
@@ -927,7 +927,7 @@ def constraint_evaluation(constraint_to_evaluate, current_ke):
             vk_code, is_press = get_vk_code_and_press_from_keystring(constraint_to_evaluate)
             easy_eval_succeeded = True
             try:
-                key_press = all_key_press_states[vk_code]
+                key_press = all_key_press_states_dict[vk_code]
             except KeyError:
                 key_press = False
             if is_press == key_press:
@@ -1130,7 +1130,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     Filter and handle keyboard events.
     """
     global WIN32_FILTER_PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
-    global toggle_state_dict, all_key_press_states
+    global toggle_state_dict, all_key_press_states_dict
     global time_real, time_simulated, time_all, TIME_DIFF
     global macro_thread_dict, macros_sequence_counter_dict
 
@@ -1197,7 +1197,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
         # exclude mouse events from this
         if vk_code >= 8:
             try:
-                press_state = real_key_press_states[vk_code]
+                press_state = real_key_press_states_dict[vk_code]
             except KeyError:
                 press_state = None
                 
@@ -1208,7 +1208,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
             else:
                 # if not the same -> changed -> evaluate normally for macros
                 real_key_repeated = False
-                real_key_press_states[vk_code] = current_ke.get_is_press()
+                real_key_press_states_dict[vk_code] = current_ke.get_is_press()
         else:
             real_key_repeated = False
         
@@ -1425,7 +1425,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
         # might interfere with tap_groups - test it
         if not key_is_in_tap_groups and not is_keydown:
             try:
-                if vk_code > 7 and real_key_press_states[vk_code] is True:
+                if vk_code > 7 and real_key_press_states_dict[vk_code] is True:
                     listener.suppress_event()
             except KeyError:
                 pass
@@ -1440,7 +1440,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     
     # save press state of all keys to release them on focus change
     if vk_code >= 0:
-        all_key_press_states[vk_code] = current_ke.get_is_press()
+        all_key_press_states_dict[vk_code] = current_ke.get_is_press()
         
     
 
