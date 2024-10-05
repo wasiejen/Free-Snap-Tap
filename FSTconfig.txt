@@ -8,6 +8,11 @@
 a, d
 w, s
 # Rebinds
+
+# let us replace the original key_event with our own :-D
+#caps_lock : caps_lock
+
+
 #c : shift
 shift : h
 # Macros
@@ -28,3 +33,14 @@ v::b,u,r,b
 <arg>-crosshair=60,0
 
 v::h,i,h,o
+
+<focus>discord
+#caps_lock : caps_lock
+# press and release produces each one caps_lock press and release
+#-caps_lock :: -caps_lock    
+# shorthand for: -caps_lock :: -caps_lock, +caps_lock
+#+caps_lock :: caps_lock
+# shorthand for: +caps_lock :: -caps_lock, +caps_lock
+
+caps_lock : caps_lock                          # replace original real key events
++caps_lock :: +caps_lock|50, caps_lock|50         # on release simulate a release and followed by a press and release

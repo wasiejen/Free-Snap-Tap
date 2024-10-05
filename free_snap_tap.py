@@ -19,7 +19,7 @@ CROSSHAIR_DELTA_X = 0
 CROSSHAIR_DELTA_Y = 0
 
 # global variables
-DEBUG = False
+DEBUG = True
 DEBUG2 = False
 WIN32_FILTER_PAUSED = True
 MANUAL_PAUSED = False
@@ -94,6 +94,7 @@ pressed_keys = set()
 released_keys = set()
 # collect active key press/release states to prevent refiring macros while holding a key
 real_key_press_states = {}
+all_key_press_states = {}
 
 # toggle state tracker
 toggle_state_dict = {}
@@ -414,7 +415,7 @@ def initialize_groups():
         vk_code = convert_to_vk_code(key)
             
         if key_modifier is None:
-            new_element = (Key(vk_code, delays=delays, key_string=key))
+            new_element = (Key(vk_code, constraints=delays, key_string=key))
         elif key_modifier == 'down':
             new_element = (Key_Event(vk_code, True, delays, key_string=key))
         elif key_modifier == 'up':
@@ -607,11 +608,29 @@ def stop_all_repeating_keys():
         if repeat_thread.is_alive():
             stop_event.set()
             repeat_thread.join()
-            
+
+#TODO
 def release_all_toggles():
     for vk_code in toggle_state_dict.keys():
-        execute_key_event(Key_Event(vk_code, False))
+        send_key_event(Key_Event(vk_code, False))
         toggle_state_dict[vk_code] = False
+
+def release_all_currently_not_pressed_keys():
+    global all_key_press_states, real_key_press_states
+    
+    for key, is_press in all_key_press_states.items(): 
+        if is_press:
+            print(f"to released pressed key: {key}")
+            try:
+                real_key_is_press = real_key_press_states[key]
+            except KeyError:
+                real_key_is_press = False
+            if not real_key_is_press:
+                send_key_event(Key_Event(key, False))
+                all_key_press_states[key] = False
+                
+    release_all_toggles()
+                
 
 def reset_key_states():
     global pressed_keys, released_keys
@@ -630,101 +649,92 @@ def get_key_code(is_mouse_key, vk_code):
 def check_constraint_fulfillment(key_event, get_also_delays=False):
     fullfilled = True
     temp_delays = []
-    delays = key_event.get_delays()
-    for delay in delays:
-        if isinstance(delay, int):
-            temp_delays.append(delay)
-        elif isinstance(delay, str):
-            result = delay_evaluation(delay, key_event)
+    constraints = key_event.get_constraints()
+    for constraint in constraints:
+        if isinstance(constraint, int):
+            temp_delays.append(constraint)
+        elif isinstance(constraint, str):
+            result = constraint_evaluation(constraint, key_event)
             if isinstance(result, bool):
                 fullfilled = fullfilled and result
-            if isinstance(result, int):
+            elif isinstance(result, int):
                 temp_delays.append(result)
+            elif result is None:
+                pass
             else:
-                print(f"! Constraint {delay} is not valid.")
+                print(f"! Constraint {constraint} is not valid.")
                 
     if get_also_delays:
         return fullfilled, temp_delays
     else:
         return fullfilled
-  
-def execute_key_event(key_event, with_delay=False, stop_event=None):
+    
+def reset_macro_sequence_by_reset_code(vk_code, trigger_group):
     global macros_sequence_counter_dict, macro_triggers
-    global repeat_thread_dict
     
-    # def check_for_mouse_vk_code(vk_code):
-    #     return vk_code in mouse_vk_codes
-    
-    vk_code, is_press, delays = key_event.get_all()
-    
-    # replace delays with evaluated delay
-    constraint_fulfilled, delay_times = check_constraint_fulfillment(key_event, get_also_delays=True)
-    
-    if constraint_fulfilled:
-        
-        # reset macro sequence
-        if vk_code <= 0:
-            reset_code = - vk_code
-            print(reset_code)
-            # reset current trigger of this event - return this code to alias tread
-            if reset_code == 255:
-                return reset_code
+    reset_code = vk_code
+    print(f"reset code played: {reset_code}")
+    # reset current trigger of this event - return this code to alias tread
+    try:
+        try:
+            # reset self macro sequence
+            if reset_code == -255:
+                    macros_sequence_counter_dict[trigger_group] = 0
             # reset every sequence counter
-            elif reset_code == 256:
+            elif reset_code == -256:
                 for index in len(macro_triggers):
-                    try:
-                        macros_sequence_counter_dict[macro_triggers[index]] = 0
-                        _, stop_event = macro_thread_dict[macro_triggers[index]]
-                        stop_event.set()
-                    except KeyError as error:
-                        print(f"reset_all: macro thread for trigger {error} not found")
-            # reset a specific macro according to index  
-            else:
-                try:
-                    macros_sequence_counter_dict[macro_triggers[reset_code]] = 0
-                    try:
-                        _, stop_event = macro_thread_dict[macro_triggers[reset_code]]
-                        stop_event.set()
-                    except KeyError as error:
-                        if DEBUG2:
-                            print(f"reset_{reset_code}: interrupt for macro with trigger {error} unsuccessful")
-                except IndexError:
-                    print(f"wrong index for reset - no macro with index: {reset_code}")
-        else:
-            
-            if len(delay_times) == 0:
-                delay_times = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
-            elif len(delay_times) == 1:
-                delay_times = delay_times*2
-            elif len(delay_times) == 2:
-                pass
-            else:
-                delay_times = delay_times[:2]
-            
-            send_key_event(key_event)
-            
-            if ACT_DELAY and with_delay:
-                delay_time = get_random_delay(*delay_times)
-                # if not in a thread just play sleep for the delay
-                if stop_event is None:
-                    sleep(delay_time / 1000)
-                # if in thread, sleep in increments and break if stop_event is set
-                else:
-                    sleep_increment = 5 # 5 ms
-                    num_sleep_increments = (delay_time // sleep_increment )
-                    num_sleep_rest = (delay_time % sleep_increment)
-                    if DEBUG: 
-                        print(f"incremental delay: {delay_time}, num_sleep_increments {num_sleep_increments}, num_sleep_rest {num_sleep_rest}")
-                    sleep(num_sleep_rest / 1000)
-                    for i in range(num_sleep_increments):
-                        if not stop_event.is_set():
-                            sleep(sleep_increment / 1000)
-                        else:
-                            if DEBUG:
-                                print("stop event recognised")
-                            break
 
-def delay_evaluation(delay_eval, current_ke):
+                    macros_sequence_counter_dict[macro_triggers[index]] = 0
+                    _, stop_event = macro_thread_dict[macro_triggers[index]]
+                    stop_event.set()
+            # reset a specific macro seq according to index
+            else:
+                macros_sequence_counter_dict[macro_triggers[reset_code]] = 0
+                _, stop_event = macro_thread_dict[macro_triggers[reset_code]]
+                stop_event.set()
+                    
+        except KeyError as error:
+            print(f"reset_all: macro thread for trigger {error} not found")
+    except IndexError:
+            print(f"wrong index for reset - no macro with index: {reset_code}")
+             
+                
+def execute_key_event(key_event, delay_times = [], with_delay=False, stop_event=None):
+    
+    if len(delay_times) == 0:
+        delay_times = [ALIAS_MAX_DELAY_IN_MS, ALIAS_MIN_DELAY_IN_MS]
+    elif len(delay_times) == 1:
+        delay_times = delay_times*2
+    elif len(delay_times) == 2:
+        pass
+    else:
+        delay_times = delay_times[:2]
+    
+    send_key_event(key_event)
+    
+    if ACT_DELAY and with_delay:
+        delay_time = get_random_delay(*delay_times)
+        # print(f" --- waiting for: {delay_time}")
+        # if not in a thread just play sleep for the delay
+        if stop_event is None:
+            sleep(delay_time / 1000)
+        # if in thread, sleep in increments and break if stop_event is set
+        else:
+            sleep_increment = 5 # 5 ms
+            num_sleep_increments = (delay_time // sleep_increment )
+            num_sleep_rest = (delay_time % sleep_increment)
+            if DEBUG: 
+                print(f"incremental delay: {delay_time}, num_sleep_increments {num_sleep_increments}, num_sleep_rest {num_sleep_rest}")
+            sleep(num_sleep_rest / 1000)
+            for i in range(num_sleep_increments):
+                if not stop_event.is_set():
+                    sleep(sleep_increment / 1000)
+                else:
+                    if DEBUG:
+                        print("stop event recognised")
+                    break
+
+def constraint_evaluation(constraint_to_evaluate, current_ke):
     global repeat_thread_dict
     
     # first get vk_code and is_press
@@ -809,12 +819,26 @@ def delay_evaluation(delay_eval, current_ke):
             breaktime = x / (500/100)
         return round(breaktime)
     
+    # press of real keys
     def p(key_string):
         vk_code, _ = get_vk_code_and_press_from_keystring(key_string)
         return vk_code in pressed_keys
+    # release of real keys
     
     def r(key_string):
         return not p(key_string)   
+    
+    # press of all keys (incl simulated)
+    def ap(key_string):
+        vk_code, _ = get_vk_code_and_press_from_keystring(key_string)
+        try:
+            return all_key_press_states[vk_code]
+        except KeyError:
+            return False
+        
+    # relese of all keys (incl simulated)
+    def ar(key_string):
+        return not ap(key_string)   
 
     # give out time since last key press/release
     def last(key_string, time_list = time_real):
@@ -830,10 +854,13 @@ def delay_evaluation(delay_eval, current_ke):
             return 0
         
     # double click - gets the time since the last click  
-    def dc(time_list = time_real):
+    def dc(key_string = None, time_list = time_real):
         _, _, time_released, time_pressed = time_list
         # use current key event that activated trigger to get reliable double click
-        vk_code = current_ke.get_vk_code()
+        if key_string is None:
+            vk_code = current_ke.get_vk_code()
+        else:
+            vk_code, _ = get_vk_code_and_press_from_keystring(key_string)
         try:
             if DEBUG:
                 print(time_released[vk_code] + time_pressed[vk_code])
@@ -894,28 +921,37 @@ def delay_evaluation(delay_eval, current_ke):
         return True
 
     easy_eval_succeeded = False
-    first_char = delay_eval[0]
+    first_char = constraint_to_evaluate[0]
     if first_char in ['!', '+', '-']:
         try:
-            vk_code, is_press = get_vk_code_and_press_from_keystring(delay_eval)
+            vk_code, is_press = get_vk_code_and_press_from_keystring(constraint_to_evaluate)
             easy_eval_succeeded = True
-            if is_press:
-                return vk_code in pressed_keys
+            try:
+                key_press = all_key_press_states[vk_code]
+            except KeyError:
+                key_press = False
+            if is_press == key_press:
+                return True
             else:
-                return vk_code not in pressed_keys
+                return False
         except Exception as error:
             print(error)
+            
+    # |(reset(2))
     
     if not easy_eval_succeeded:
-        result = eval(delay_eval)
+        result = eval(constraint_to_evaluate)
+        ### print(f"result of '{constraint_to_evaluate}' is '{result}'")
         if DEBUG2:
-            print(f"evaluated {delay_eval} to: {result}")
+            print(f"evaluated {constraint_to_evaluate} to: {result}")
         # if it is a number and if negativ change it to 0
         if isinstance(result, float):
             result = int(result)
         if isinstance(result, int):
             if result < 0:
-                result = 0     
+                result = 0    
+        if result is None:
+            result = True
 
         return result
  
@@ -1094,7 +1130,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
     Filter and handle keyboard events.
     """
     global WIN32_FILTER_PAUSED, MANUAL_PAUSED, STOPPED, MENU_ENABLED
-    global toggle_state_dict
+    global toggle_state_dict, all_key_press_states
     global time_real, time_simulated, time_all, TIME_DIFF
     global macro_thread_dict, macros_sequence_counter_dict
 
@@ -1123,10 +1159,17 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
         # first check every other given trigger before evaluating constraints    
         if activated:
             for key in keys:
-                ##240923 commented out to check all suffixes and execute invocations nad not stop before eval all suffixes
-                # if not activated:
-                #     return False
-                activated = activated and check_constraint_fulfillment(key)
+                
+                constraints_fulfilled = check_constraint_fulfillment(key)
+                # if reset code then ignore result for activation
+                if key.get_vk_code() < 0:
+                    if constraints_fulfilled:
+                        reset_macro_sequence_by_reset_code(key.get_vk_code(), trigger_group)
+                else:
+                    ##240923 commented out to check all suffixes and execute invocations nad not stop before eval all suffixes
+                    # if not activated:
+                    #     return False
+                    activated = activated and constraints_fulfilled
         return activated    
     
     key_replaced = False
@@ -1227,66 +1270,68 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                 
                 'MACROS HERE'
                 # check for macro triggers     
-                _activated_triggers = []     
-                for trigger_group in macro_triggers:
-                    if is_trigger_activated(current_ke, trigger_group):                         
-                        _activated_triggers.append(trigger_group)  
-                        if DEBUG:
-                            print(f"trigger group {trigger_group} activated")
+                # _activated_triggers = []     
+                # for trigger_group in macro_triggers:
+                #     if is_trigger_activated(current_ke, trigger_group):                         
+                #         _activated_triggers.append(trigger_group)  
+                #         if DEBUG:
+                #             print(f"trigger group {trigger_group} activated")
                        
                 # play triggered macros
-                for trigger in _activated_triggers:
-                    alias_fired = True
-                    
-                    'MACRO SEQUENCES COUNTER HANDLING'
-                    macro_groups = macros_dict[trigger]
-                    if len(macro_groups) == 1:
-                        key_sequence = macro_groups[0].get_key_events()
-                    else:
-                        if macros_sequence_counter_dict[trigger] >= len(macro_groups):
-                            macros_sequence_counter_dict[trigger] = 0
-                        key_sequence = macro_groups[macros_sequence_counter_dict[trigger]].get_key_events()
-                        macros_sequence_counter_dict[trigger] += 1
+                # for trigger_group in _activated_triggers:
+                for trigger_group in macro_triggers:
+                    if is_trigger_activated(current_ke, trigger_group): 
+                        alias_fired = True
                         
-                    'MACRO playback'
-                    # only spawn a thread for execution if more than one key event in to be played key sequence
-                    if DEBUG:
-                        print(f"key_sequence: {key_sequence}")
-                    # if there is an empty key group ... just ignore it and do not supress the triggerkey
-                    if len(key_sequence) == 0:
-                        pass
-                    # if there is only one key in the sequence, play it as a rebind?
-                    # elif len(key_sequence) == 1:
-                    #     key_event = key_sequence[0]
-                    #     if key_event.is_toggle():
-                    #         key_event = get_next_toggle_state_key_event(key_event)
-                    #     execute_key_event(key_event)
-                    elif len(key_sequence) > 0:
-                        try:
-                            macro_thread, stop_event = macro_thread_dict[trigger]
-                            ## interruptable threads
-                            if macro_thread.is_alive():
-                                if DEBUG:
-                                    print(f"{trigger}-macro: still alive - try to stop")
-                                stop_event.set()
-                                macro_thread.join()
-                        except KeyError:
-                            # this thread was not started before
+                        'MACRO SEQUENCES COUNTER HANDLING'
+                        macro_groups = macros_dict[trigger_group]
+                        if len(macro_groups) == 1:
+                            key_sequence = macro_groups[0].get_key_events()
+                        else:
+                            if macros_sequence_counter_dict[trigger_group] >= len(macro_groups):
+                                macros_sequence_counter_dict[trigger_group] = 0
+                            key_sequence = macro_groups[macros_sequence_counter_dict[trigger_group]].get_key_events()
+                            macros_sequence_counter_dict[trigger_group] += 1
+                            
+                        'MACRO playback'
+                        # only spawn a thread for execution if more than one key event in to be played key sequence
+                        if DEBUG:
+                            print(f"key_sequence: {key_sequence}")
+                        # if there is an empty key group ... just ignore it and do not supress the triggerkey
+                        if len(key_sequence) == 0:
                             pass
-                        
-                        # reset stop event
-                        stop_event = Event()
+                        # if there is only one key in the sequence, play it as a rebind?
+                        # elif len(key_sequence) == 1:
+                        #     key_event = key_sequence[0]
+                        #     if key_event.is_toggle():
+                        #         key_event = get_next_toggle_state_key_event(key_event)
+                        #     execute_key_event(key_event)
+                        elif len(key_sequence) > 0:
+                            try:
+                                macro_thread, stop_event = macro_thread_dict[trigger_group]
+                                ## interruptable threads
+                                if macro_thread.is_alive():
+                                    if DEBUG:
+                                        print(f"{trigger_group}-macro: still alive - try to stop")
+                                    stop_event.set()
+                                    macro_thread.join()
+                            except KeyError:
+                                # this thread was not started before
+                                pass
+                            
+                            # reset stop event
+                            stop_event = Event()
 
-                        macro_thread = Alias_Thread(key_sequence, stop_event, trigger)
-                        # save thread and stop event to find it again for possible interruption
-                        macro_thread_dict[trigger] = [macro_thread, stop_event]
-                        macro_thread.start() 
-                        
-                    if DEBUG:
-                        print("> playing makro:", trigger)
-                        
-                    if EXEC_ONLY_ONE_TRIGGERED_MACRO:
-                        break
+                            macro_thread = Alias_Thread(key_sequence, stop_event, trigger_group)
+                            # save thread and stop event to find it again for possible interruption
+                            macro_thread_dict[trigger_group] = [macro_thread, stop_event]
+                            macro_thread.start() 
+                            
+                        if DEBUG:
+                            print("> playing makro:", trigger_group)
+                            
+                        if EXEC_ONLY_ONE_TRIGGERED_MACRO:
+                            break
                 
                 'PREVENT NEXT KEY EVENT FROM TRIGGERING OLD EVENTS'               
                 # to remove the key from released_keys after evaluation of triggers
@@ -1308,6 +1353,10 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
             # Toggle paused/resume if the DELETE combination is pressed
             elif check_for_combination(TOGGLE_ON_OFF_Combination):
                 control_toggle_pause()
+        
+        # TODO: as key_event? 'release_all_pressed_keys'
+        if check_for_combination(['esc']):
+            release_all_currently_not_pressed_keys()
 
         'TAP GROUP EVALUATION HERE'
         # Snap Tap Part of Evaluation
@@ -1335,7 +1384,7 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
         
         # if replacement happened suppress source key event   
         if key_replaced is True:
-            execute_key_event(current_ke)
+            send_key_event(current_ke)
             listener.suppress_event()
         
         # supress event that triggered an alias - done here because it should also update tap groups before
@@ -1353,9 +1402,11 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
         # fecthing current vk and press - not needed atm but as precaution if I put it somewhere else xD
         vk_code, is_keydown, _ = current_ke.get_all()
         
+        key_is_in_tap_groups = False
         for tap_group in tap_groups:
             vk_codes = tap_group.get_vk_codes()
             if vk_code in vk_codes:
+                key_is_in_tap_groups = True
                 active_key = tap_group.get_active_key()
                 # if None all simulated keys are allowed - so no supression
                 if active_key is None:
@@ -1369,10 +1420,29 @@ def win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mou
                     else: 
                         if is_keydown:
                             listener.suppress_event()
-                            
+        
+        # intercept simulated releases of keys that are still pressed
+        # might interfere with tap_groups - test it
+        if not key_is_in_tap_groups and not is_keydown:
+            try:
+                if vk_code > 7 and real_key_press_states[vk_code] is True:
+                    listener.suppress_event()
+            except KeyError:
+                pass
+
+        
+                         
         # save time of simulated and send keys
         set_key_times(key_event_time, vk_code, is_keydown, time_simulated)
         set_key_times(key_event_time, vk_code, is_keydown, time_all) 
+        
+    
+    
+    # save press state of all keys to release them on focus change
+    if vk_code >= 0:
+        all_key_press_states[vk_code] = current_ke.get_is_press()
+        
+    
 
 
 'control helper functions'
@@ -1380,7 +1450,7 @@ def control_return_to_menu():
     global MENU_ENABLED, listener, mouse_listener
     MENU_ENABLED = True
     print('--- Stopping - Return to menu ---')
-    release_all_toggles()
+    release_all_currently_not_pressed_keys()
     stop_all_repeating_keys()
     listener.stop()
     mouse_listener.stop()
@@ -1388,7 +1458,7 @@ def control_return_to_menu():
 def control_exit_program():
     global STOPPED, listener, mouse_listener
     print('--- Stopping execution ---')
-    release_all_toggles()
+    release_all_currently_not_pressed_keys()
     stop_all_repeating_keys()
     listener.stop()
     mouse_listener.stop()
@@ -1415,7 +1485,7 @@ def control_toggle_pause():
         with paused_lock:
             WIN32_FILTER_PAUSED = True
             MANUAL_PAUSED = True
-        release_all_toggles()
+        release_all_currently_not_pressed_keys()
         stop_all_repeating_keys() 
            
            
@@ -1617,33 +1687,40 @@ class Alias_Thread(Thread):
     '''
     execute macros/alias in its own threads so the delay is not interfering with key evaluation
     '''
-    def __init__(self, key_sequence, stop_event, trigger):
+    def __init__(self, key_group, stop_event, trigger_group):
         Thread.__init__(self)
         self.daemon = True
-        self.key_events = key_sequence
+        self.key_group = key_group
         self.stop_event = stop_event
-        self.trigger = trigger
+        self.trigger_group = trigger_group
         
     def run(self): 
         global macros_sequence_counter_dict
+        to_be_played_key_events = []
         try:   
             # Key_events ans Keys here ...
-            for key_event in self.key_events:
-                #alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.get_key_string()}")
+            print(f"> playing macro: {self.trigger_group} :: {self.key_group}")
+            for key_event in self.key_group:
+                
+                # check all constraints at start!
+                constraint_fulfilled, delay_times = check_constraint_fulfillment(key_event, get_also_delays=True)
+                if constraint_fulfilled:
+                    to_be_played_key_events.append([key_event, delay_times])
+                    print(f">> will play '{key_event}' with delays: {delay_times}")
+
+            for key_event, delay_times in to_be_played_key_events:
+                # alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.get_key_string()}")
                 if self.stop_event.is_set():
                     break
                 else:
-                    if key_event.is_toggle():
-                        key_event = get_next_toggle_state_key_event(key_event)
-                    
-                    # send key event and handles interruption of delay
-                    # retun vk_code if negativ as a reset function for macro sequences
-                    # -255 is self reset - every other negative number correspond to -vk_code index of macro_triggers
-                    reset_code = execute_key_event(key_event, with_delay=True, stop_event=self.stop_event)
-                    if reset_code is not None:
-                        if reset_code == -255:
-                            macros_sequence_counter_dict[self.trigger] = 0
-                            break
+                    # if key_event.is_toggle():
+                    #     key_event = get_next_toggle_state_key_event(key_event)
+                    vk_code = key_event.get_vk_code()
+                    if vk_code <= 0:
+                        reset_macro_sequence_by_reset_code(vk_code, self.trigger_group)
+                    else:
+                        # send key event and handles interruption of delay
+                        execute_key_event(key_event, delay_times, with_delay=True, stop_event=self.stop_event)
                        
         except Exception as error:
             print(error)
@@ -1657,7 +1734,7 @@ class Repeat_Thread(Thread):
         Thread.__init__(self)
         self.daemon = True
         vk_code, is_press, delays = key_event.get_all()
-        self.key_event = Key_Event(vk_code, is_press, delays=delays[1:], key_string=key_event.get_key_string())
+        self.key_event = Key_Event(vk_code, is_press, constraints=delays[1:], key_string=key_event.get_key_string())
         self.stop_event = stop_event
         self.time = time
         self.time_increment = time_increment
@@ -1671,7 +1748,8 @@ class Repeat_Thread(Thread):
             if self.reset:
                 self.reset = False
             else:
-                execute_key_event(self.key_event)
+                if check_constraint_fulfillment(self.key_event):
+                    execute_key_event(self.key_event)
                 
             for index in range(self.number_of_increments):
                 if not self.stop_event.is_set() and not self.reset:
@@ -1793,7 +1871,7 @@ class Focus_Thread(Thread):
         self.stop = True
 
 def update_args_and_groups(focus_name = None):
-    release_all_toggles()
+    release_all_currently_not_pressed_keys()
     stop_all_repeating_keys()
     reset_global_variable_changes()
     apply_args_and_groups(focus_name)        
@@ -1836,6 +1914,8 @@ class Status_Indicator:
 
         # Bind mouse events to make the window draggable
         self.root.bind("<ButtonPress-1>", self.on_start)
+        self.root.bind('<Double-1>', self.open_config_file) # left mouse button double click
+        self.root.bind('<Button-2>', self.open_config_file) # middle mouse button
         self.root.bind("<B1-Motion>", self.on_drag)
 
         # Create a right-click context menu
@@ -1858,16 +1938,14 @@ class Status_Indicator:
         self.canvas.bind("<Button-3>", self.show_context_menu)
         
         self.stop = False
-    def open_config_file(self):
+ 
+    def open_config_file(self, event = None):
         startfile(FILE_NAME)
         
     def reload_from_file(self):
         update_args_and_groups(FOCUS_APP_NAME)
         update_group_display()
         print(f'\n>>> file reloaded for focus app: {FOCUS_APP_NAME}\n')
-        
-    def open_config_file(self):
-        startfile(FILE_NAME)
         
     def toggle_crosshair(self):
         global CROSSHAIR_ENABLED
@@ -1915,22 +1993,37 @@ class Status_Indicator:
 
     def update_indicator(self):
         global STOPPED
+        wait_one_round = False
+        manual = MANUAL_PAUSED
+        win32 = WIN32_FILTER_PAUSED
         while not self.stop:
             if STATUS_INDICATOR:
-                if MANUAL_PAUSED or WIN32_FILTER_PAUSED:
-                    self.status = False
-                else:
-                    self.status = True
-            color = "green" if self.status else "red"
-            self.canvas.itemconfig(self.indicator, fill=color)    
+                    
+                # only update if there is a change
+                if manual is not MANUAL_PAUSED or win32 is not WIN32_FILTER_PAUSED:
+                    manual = MANUAL_PAUSED
+                    win32 = WIN32_FILTER_PAUSED
+                    
+                    if MANUAL_PAUSED or WIN32_FILTER_PAUSED:
+                        self.status = False
+                    else:
+                        self.status = True
+                        wait_one_round = True
+                    color = "green" if self.status else "red"
+                    self.canvas.itemconfig(self.indicator, fill=color)    
                 
             # activate and deactive crosshair from tk.mainloop
-            if CROSSHAIR_ENABLED:
-                if not self.crosshair_enabled:
-                    self.crosshair_activate()
+            # wait an extra round for the new window to settle itself
+            if wait_one_round:
+                wait_one_round = False
+                print("> waiting one round")
             else:
-                if self.crosshair_enabled:
-                    self.crosshair_deactivate()
+                if CROSSHAIR_ENABLED:
+                    if not self.crosshair_enabled:
+                        self.crosshair_activate()
+                else:
+                    if self.crosshair_enabled:
+                        self.crosshair_deactivate()
                     
             # if mainthread is inactive already than end indicator
             if not main_thread.is_alive():
@@ -1951,8 +2044,6 @@ class Crosshair():
     
     def __init__(self, root):
         
-        def rgbtohex(r,g,b):
-            return f'#{r:02x}{g:02x}{b:02x}'
 
         # Create a new Tkinter window
         self.root = root
@@ -1963,8 +2054,17 @@ class Crosshair():
         # Remove window decorations
         self.root.overrideredirect(True)
         
+        self.root.bind('<Button-1>', self.restart)
+        
         # Set the window to be transparent
         self.root.attributes('-alpha', 1)
+        
+        self.built_crosshair()
+        
+    def built_crosshair(self):
+        
+        def rgbtohex(r,g,b):
+            return f'#{r:02x}{g:02x}{b:02x}'
         
         # delta x,y for the midpoint of the crosshair
         delta_x = CROSSHAIR_DELTA_X - 1  # for me this is the center of the screen
@@ -2033,8 +2133,13 @@ class Crosshair():
     #     # Start the Tkinter main loop
     #     self.root.mainloop()
         
-    def destroy(self):
+    def destroy(self, event = None):
         self.root.destroy()
+        
+    def restart(self, event = None):
+        print("restarting crosshair")
+        self.canvas.destroy()
+        self.built_crosshair()
 
 def start_indicator_gui(root):
     global indicator, indicator_thread
@@ -2067,7 +2172,7 @@ def main():
 
     while not STOPPED:
         reset_key_states()
-        release_all_toggles()
+        release_all_currently_not_pressed_keys()
         
         mouse_listener = mouse.Listener(win32_event_filter=mouse_win32_event_filter)
         mouse_listener.start()
