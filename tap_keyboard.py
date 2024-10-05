@@ -1,14 +1,14 @@
 class Key_Event(object):
     
-    def __init__(self, vk_code, is_press=True, delays=[0,0], key_string = None, toggle = False):
+    def __init__(self, vk_code, is_press=True, constraints=[0,0], key_string = None, toggle = False):
         self._key_string = key_string
         self._vk_code = vk_code
         self._is_press = is_press
-        self._delays = delays
+        self._constraints = constraints
         self._toggle = toggle
         
     def get_all(self):
-        return self._vk_code, self._is_press, self._delays
+        return self._vk_code, self._is_press, self._constraints
 
     def get_vk_code(self):
         return self._vk_code
@@ -16,8 +16,8 @@ class Key_Event(object):
     def get_is_press(self):
         return self._is_press
 
-    def get_delays(self):
-        return self._delays
+    def get_constraints(self):
+        return self._constraints
     
     def __hash__(self):
         # return hash((self._vk_code, self._state_pressed))
@@ -31,7 +31,7 @@ class Key_Event(object):
         return self._key_string
     
     def get_opposite_key_event(self):
-        return Key_Event(self._vk_code, not self._is_press, self._delays, self._key_string)
+        return Key_Event(self._vk_code, not self._is_press, self._constraints, self._key_string)
     
     def is_prohibited(self):
         return self._prohibited
@@ -50,25 +50,27 @@ class Key_Event(object):
     
     # def __str__(self):
     #     if self._key_string is None:
-    #         return f"Key_Event({self._vk_code}, {self._is_press}, {self._delays})"
+    #         return f"Key_Event({self._vk_code}, {self._is_press}, {self._constraints})"
     #     else:
-    #         return f"Key_Event({self._key_string}, {self._is_press}, {self._delays})"
+    #         return f"Key_Event({self._key_string}, {self._is_press}, {self._constraints})"
         
     def __repr__(self):
-        delay = ''
+        constraints = ''
+        for constraint in self._constraints:
+            constraints = f"{constraints}|{constraint}"
         if self._key_string is None:
-            return f"{self._get_sign()}{self._vk_code}{delay}"
+            return f"{self._get_sign()}{self._vk_code}{constraints}"
         else:
-            return f"{self._get_sign()}{self._key_string}{delay}"
-            # return f"{self._get_sign()}{self._key_string}{delay}"
+            return f"{self._get_sign()}{self._key_string}{constraints}"
+            # return f"{self._get_sign()}{self._key_string}{constraints}"
    
 class Key(object):
     
-    def __init__(self, vk_code, key_string='', delays=[0,0]) -> None:
+    def __init__(self, vk_code, key_string='', constraints=[0,0]) -> None:
         self._key_string = key_string
-        self._delays = delays
+        self._constraints = constraints
         self._vk_code = vk_code
-        key_event = Key_Event(self._vk_code, True, delays=delays, key_string=key_string)
+        key_event = Key_Event(self._vk_code, True, constraints=constraints, key_string=key_string)
         self._key_events = [key_event, key_event.get_opposite_key_event()]
 
         
@@ -82,12 +84,10 @@ class Key(object):
         return self._key_events
     
     def __repr__(self):
-        delay = f"|{self._delays[0]}|{self._delays[1]}"
-        delay = ''
-        if self._reversed:
-            return f"!{self._key_string}{delay}"
-        else:
-            return f"{self._key_string}{delay}"        
+        constraints = ''
+        for constraint in self._constraints:
+            constraints = f"{constraints}|{constraint}"
+        return f"{self._key_string}{constraints}"        
      
 class Key_Group(object):
     

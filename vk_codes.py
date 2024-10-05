@@ -3,11 +3,11 @@
 # and write them into the dictionary. There is no problem if there are multiple key_strings for the same vk_code.
 vk_codes_dict = {
     # mouse keys
-    'mouse_left': 1, 'left_mouse': 1, 
-    'mouse_right': 2, 'right_mouse': 2, 
-    'mouse_middle': 3, 'middle_mouse': 3,
-    'mouse_x1': 4, 
-    'mouse_x2': 5,
+    'mouse_left': 1,   'left_mouse': 1,   'ml': 1, 
+    'mouse_right': 2,  'right_mouse': 2,  'mr': 2, 
+    'mouse_middle': 3, 'middle_mouse': 3, 'mm': 3,
+    'mouse_x1': 4, 'mx1' : 4,
+    'mouse_x2': 5, 'mx2' : 5,
     'scroll_vertical' : 6, 'scroll_vert' : 6, 'vert_scroll' : 6,
     'scroll_horizontal' : 7, 'scroll_hori' : 7, 'hori_scroll' : 7,
     
