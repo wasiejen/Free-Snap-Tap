@@ -8,7 +8,7 @@ from time import time, sleep # sleep(0.005) = 5 ms
 import pygetwindow as gw # to get name of actual window for focusapp function
 
 from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_dict.py
-from tap_keyboard import Key_Event, Key_Group, Key, Tap_Group
+from tap_keyboard import Focus_Group_Manager, File_Handler, Tap_Keyboard, Key_Event, Key_Group, Key, Tap_Group
 
 import tkinter as tk
 
@@ -19,7 +19,7 @@ CROSSHAIR_DELTA_X = 0
 CROSSHAIR_DELTA_Y = 0
 
 # global variables
-DEBUG = True
+DEBUG = False
 DEBUG2 = False
 WIN32_FILTER_PAUSED = True
 MANUAL_PAUSED = False
@@ -31,7 +31,6 @@ PRINT_VK_CODES = False
 EXEC_ONLY_ONE_TRIGGERED_MACRO = False
 
 # for focus setting
-FOCUS_APP_NAME = None
 FOCUS_THREAD_PAUSED = True
 paused_lock = Lock()
 
@@ -129,205 +128,12 @@ repeat_thread_dict = {}
 
 TIME_DIFF = None
 
-# focusapp_name as key, [start arguments, lines]
-multi_focus_dict = {}
-multi_focus_dict_keys = []
-default_start_arguments = []
-default_group_lines = []
 
 sys_start_args = []
 
-'file handling and hr display of groups'
-def load_from_file(file_name):
-    '''
-    reads in the file and removes the commented out lines, keys and inline comments;
-    joins multiline macro sequences; 
-    '''    
 
-    def clean_lines(lines):
-        comments_cleaned_lines = []
-        for line in lines:
-            if len(line) > 1:
-                if line.startswith('<focus>'):
-                    comments_cleaned_lines.append(line)
-                else:
-                    line = line.strip().replace(" ","")
-                    if len(line) > 1:
-                        # strip all comments from line
-                        group = line.split(',')
-                        # ignore line if first char is a #
-                        if group[0][0] == '#':
-                            pass
-                        else:
-                            # remove commented out keys
-                            cleaned_group = []
-                            for key in group:
-                                # ignore commented out keys
-                                if key[0] != '#': 
-                                    # ignore comments after keys
-                                    cleaned_group.append(key.split('#')[0]) 
-                                # if commented out key before :, add :
-                                elif key.find(':') >= 0:
-                                    cleaned_group.append(':')
-                                    
-                            cleaned_line = ','.join(cleaned_group)
-                            comments_cleaned_lines.append(cleaned_line)
-        
-        # clean multiline macro seauences and joins them together
-        multiline_cleaned_lines = []
-        for line in comments_cleaned_lines:
-            if len(line) > 1 and line[0] == ':':
-                # add multiline to last multiline sequence
-                multiline_cleaned_lines[-1] += line
-            else:
-                multiline_cleaned_lines.append(line)
-                
-        return multiline_cleaned_lines
 
-    temp_file = []
-    with open(file_name, 'r') as file:
-        for line in file:
-            temp_file.append(line) 
 
-    cleaned_lines = clean_lines(temp_file) 
-    
-    global multi_focus_dict, multi_focus_dict_keys
-    global default_start_arguments, default_group_lines
-        
-    focus_name = None
-    multi_focus_dict = {}
-    multi_focus_dict_keys = []
-    default_start_arguments = []
-    default_group_lines = []
-    for line in cleaned_lines:
-        if line.startswith('<focus>'):
-            focus_name = line.replace('<focus>', '').replace('\n', '').lower()
-            multi_focus_dict[focus_name] = [[], []]
-        elif line.startswith('<arg>'):
-            line = line.replace('<arg>', '').replace('\n', '').lower()
-            if focus_name is None:
-                default_start_arguments.append(line)
-            else:
-                multi_focus_dict[focus_name][0].append(line)
-        else:
-            if focus_name is None:
-                default_group_lines.append(line)
-            else:
-                multi_focus_dict[focus_name][1].append(line)
-    
-    multi_focus_dict_keys = multi_focus_dict.keys()
-
-def reload_from_file():
-    # try loading  from file
-    try:
-        load_from_file(FILE_NAME)
-    # if no file exist create new one
-    except FileNotFoundError:
-        create_new_group_file()             
-
-def write_out_new_file(file_name):
-    """
-    Create a new file if config file was not found with minimal tap groups
-
-    """
-    global tap_groups_hr, rebinds_hr, macros_hr
-    
-    with open(file_name, 'w') as file:
-        # tapgroups
-        file.write("# Tap Groups\n")
-        for tap_group in tap_groups_hr:
-            # file.write(f"{tap_group}\n")
-            file.write(', '.join(tap_group)+'\n')         
-        # rebinds
-        file.write("# Rebinds\n")
-        # for rebind in rebinds_hr:
-        #     file.write(' : '.join([', '.join(rebind[0]),', '.join(rebind[1])]))
-        # macros
-        file.write("# Macros\n")
-        # for macro in macros_hr:
-        #     # TODO: to adapt to save key sequences - necessary - mainly used to create new file if none found
-        #     file.write(' :: '.join([', '.join(macro[0]),', '.join(macro[1])]))
-    
-def presort_lines(lines):
-    '''
-    saves cleaned lines according to formatting in different containers;
-    saved in variable_hr (human readable)
-    '''
-    global tap_groups_hr, rebinds_hr, macros_hr
-    
-    tap_groups_hr = []
-    rebinds_hr = []
-    macros_hr = []
-    
-    # sort the lines into their categories for later initialization
-    for line in lines:                   
-        groups = line.split(':')
-        # tap groups
-        if len(groups) == 1: 
-            tap_groups_hr.append(groups[0].split(','))
-        # rebinds
-        elif len(groups) == 2:
-            trigger_group = groups[0].split(',')
-            key_group = groups[1].split(',')
-            # rebind
-            # if len(trigger_group) == 1 and len(key_group) == 1:
-            if len(key_group) == 1:
-                rebinds_hr.append([trigger_group, key_group[0]])
-            else:
-                print(f"{key_group} is not a valid rebind (only one key_event/key allowed") 
-                print("   use :: instead of : to declare it as a macro")
-            # macro
-        elif len(groups) > 2 and len(groups[1]) == 0:
-            trigger_group = groups[0].split(',')
-            if len(groups) > 3:
-                # for group in groups[2:]:
-                #     trigger_group.append(group.split(','))
-                key_groups = [group.split(',') for group in groups[2:]]
-                macros_hr.append([trigger_group] + key_groups)
-            else:
-                key_group = groups[2].split(',')
-                macros_hr.append([trigger_group, key_group])
-
-def display_groups():
-    """
-    Display the current tap groups.
-    """
-    global tap_groups_hr, rebinds_hr, macros_hr
-    print("# Tap Groups")
-    for index, tap_group in enumerate(tap_groups_hr):
-        # print(f"{tap_group}\n")
-        print(f"[{index}] " + ', '.join(tap_group)+'')         
-    # rebinds
-    print("\n# Rebinds")
-    for index, rebind in enumerate(rebinds_hr):
-        # print(f"[{index}] " + ' : '.join([rebind[0], rebind[1]]))
-        print(f"[{index}] " + ' : '.join([', '.join(rebind[0]), rebind[1]]))
-    # macros
-    print("\n# Macros")
-    for index, *group in enumerate(macros_hr):
-        group = group[0]
-        first_line = f"[{index}] " + ' :: '.join([', '.join(group[0]),', '.join(group[1])])
-        position = first_line.find('::')
-        print(first_line)
-        if len(group) > 2:
-            for gr in group[2:]:
-                print(" " * (position+1) + ": " + ', '.join(gr))
-
-def add_group(new_group, data_object):
-    """
-    Add a new tap group.
-    """
-    data_object.append(new_group)
-
-def create_new_group_file():
-    """
-    Reset Tap Groups and save new tap_group.txt with a+d and w+s tap groups
-    """
-    global tap_groups_hr
-    tap_groups_hr = []
-    add_group(['a','d'], tap_groups_hr)
-    add_group(['w','s'], tap_groups_hr)
-    write_out_new_file(FILE_NAME)
 
 
 'initializing'
@@ -426,7 +232,7 @@ def initialize_groups():
     
     # extract tap groups
     try:
-        for group in tap_groups_hr:
+        for group in file_handler.tap_groups_hr:
             keys = []
             for key_string in group:
                 key = convert_to_vk_code(key_string)
@@ -438,7 +244,7 @@ def initialize_groups():
          
     # extract rebinds
     try:
-        for rebind in rebinds_hr:
+        for rebind in file_handler.rebinds_hr:
             trigger_group, replacement_key = rebind
             
             # evaluate the given key strings
@@ -488,7 +294,7 @@ def initialize_groups():
                   
     # extract macros   
     try:      
-        for macro in macros_hr:
+        for macro in file_handler.macros_hr:
             new_macro = []
             # trigger j = 0, key_group j = 1
             for index, key_group in enumerate(macro):
@@ -1471,7 +1277,7 @@ def control_toggle_pause():
         reset_global_variable_changes()
         apply_args_and_groups(FOCUS_APP_NAME)
         system('cls||clear')
-        display_groups()
+        file_handler.display_groups()
         print("\n--- reloaded sucessfully ---")
         print('--- manuelly resumed ---\n')
         if CONTROLS_ENABLED:
@@ -1507,7 +1313,7 @@ def display_menu():
             print("Please try again.\n")
             invalid_input = False
             text = ""
-        display_groups()
+        file_handler.display_groups()
         print('\n------ Options -------')
         print("0. Toggle debugging output for V0.9.3 formula evaluation.")
         print(f"1. Open file:'{FILE_NAME}' in your default editor.")
@@ -1667,19 +1473,19 @@ def reset_global_variable_changes():
     CROSSHAIR_DELTA_Y = 0
 
 def apply_args_and_groups(focus_name = None):
-    global multi_focus_dict, sys_start_args, default_start_arguments, default_group_lines
+    global sys_start_args
     
     apply_start_arguments(sys_start_args)
     
-    reload_from_file()
+    file_handler.reload_from_file()
     # needs to be done after reloading of file or else it will not have the actual data
     if focus_name is not None:
-        focus_start_arguments, focus_group_lines = multi_focus_dict[focus_name]
+        focus_start_arguments, focus_group_lines = focus_manager.multi_focus_dict[focus_name]
     else:
         focus_start_arguments, focus_group_lines = [],[]
         
-    apply_start_arguments(default_start_arguments + focus_start_arguments)
-    presort_lines(default_group_lines + focus_group_lines)
+    apply_start_arguments(focus_manager.default_start_arguments + focus_start_arguments)
+    file_handler.presort_lines(focus_manager.default_group_lines + focus_group_lines)
     initialize_groups()
     
 'Theading'
@@ -1773,7 +1579,7 @@ class Focus_Thread(Thread):
 
     def run(self):
         global WIN32_FILTER_PAUSED, MANUAL_PAUSED, paused_lock, FOCUS_THREAD_PAUSED
-        global multi_focus_dict, multi_focus_dict_keys, FOCUS_APP_NAME
+        global FOCUS_APP_NAME
         last_active_window = ''
         found_new_focus_app = False
         manually_paused = False
@@ -1813,7 +1619,7 @@ class Focus_Thread(Thread):
                         
                         found_new_focus_app = False
                             
-                        for focus_name in multi_focus_dict_keys:
+                        for focus_name in focus_manager.multi_focus_dict_keys:
                             if active_window.lower().find(focus_name) >= 0:
                                 found_new_focus_app = True
                                 FOCUS_APP_NAME = focus_name
@@ -1843,7 +1649,7 @@ class Focus_Thread(Thread):
                             else:
                                 update_args_and_groups()
                                 update_group_display()
-                                print(f'\n>>> NO FOCUS APP FOUND: looking for: {', '.join(multi_focus_dict_keys)}\n')
+                                print(f'\n>>> NO FOCUS APP FOUND: looking for: {', '.join(focus_manager.multi_focus_dict_keys)}\n')
                                 with paused_lock:
                                     WIN32_FILTER_PAUSED = True
                                     
@@ -1878,7 +1684,7 @@ def update_args_and_groups(focus_name = None):
     
 def update_group_display():
     system('cls||clear')
-    display_groups()
+    file_handler.display_groups()
     #print("\n--- reloaded sucessfully ---")
     if CONTROLS_ENABLED:
         display_control_text()      
@@ -2153,17 +1959,18 @@ def start_indicator_gui(root):
 
 'Main'   
 def main():
-    global default_start_arguments, default_group_lines, sys_start_args
+    global sys_start_args
     global listener, mouse_listener, keyboard_listener
     global focus_thread, main_thread
        
     focus_active = False
+    focus_thread = None
     
     if DEBUG:
-        print(f"tap_groups_hr: {tap_groups_hr}")
+        print(f"tap_groups_hr: {file_handler.tap_groups_hr}")
         print(f"tap_groups: {tap_groups}")
 
-    if len(multi_focus_dict_keys) > 0:
+    if len(focus_manager.multi_focus_dict_keys) > 0:
         focus_active = True
    
     if focus_active:
@@ -2180,35 +1987,42 @@ def main():
         listener.start()
         
         if MENU_ENABLED:
-            if focus_thread.is_alive():
-                focus_thread.pause()
+            if focus_thread is not None:
+                if focus_thread.is_alive():
+                    focus_thread.pause()
             display_menu()
         else:
-            display_groups()
+            file_handler.display_groups()
 
         print('\n--- Free Snap Tap started ---')
         if CONTROLS_ENABLED:
             display_control_text()
-            print(f">>> focus looks for: {', '.join(multi_focus_dict_keys)}")
-        if focus_thread.is_alive():
-            focus_thread.restart()
+            print(f">>> focus looks for: {', '.join(focus_manager.multi_focus_dict_keys)}")
+        if focus_thread is not None:
+            if focus_thread.is_alive():
+                focus_thread.restart()
 
         listener.join()
             
         mouse_listener.stop()
         mouse_listener.join()
-            
-    if focus_thread.is_alive():
-        focus_thread.end()
-        focus_thread.join()
+        
+        
+    if focus_thread is not None:       
+        if focus_thread.is_alive():
+            focus_thread.end()
+            focus_thread.join()
     
-        sleep(0.5)
+    sleep(0.5)
 
     sys.exit(1)
 
 if __name__ == "__main__":
     starttime = time()   # for alias thread event logging
     
+    focus_manager = Focus_Group_Manager()
+    file_handler = File_Handler(FILE_NAME, focus_manager)
+    tap_keyboard = Tap_Keyboard(focus_manager=focus_manager)
     # check if start arguments are passed
     if len(sys.argv) > 1:
         sys_start_args = sys.argv[1:]
