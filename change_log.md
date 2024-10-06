@@ -65,3 +65,9 @@
   - change color on key_press to show what would be active an what not to test it out before using it in the program
 
 - arduino controlled via PySerial um die virtuellen Key Events als echte HID events zu senden. Und so AC potentiell immer umgehen zu können.
+
+- how to make it work again without a focus name?
+
+- fix focus lines comments not being stripped
+
+- reset of repeated keys should be done by repeating thread? not by state_manager!

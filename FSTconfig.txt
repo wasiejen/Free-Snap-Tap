@@ -9,7 +9,7 @@ w, s
 
 # let us replace the original key_event with our own :-D
 <focus>visual
-<arg>-crosshair=-10,-10
+#<arg>-crosshair=-10,-10
 #caps_lock : caps_lock
 
 
@@ -30,7 +30,7 @@ v::b,u,r,b
 
 
 <focus>sublime
-<arg>-crosshair=60,0
+#<arg>-crosshair=60,0
 
 v::h,i,h,o
 
