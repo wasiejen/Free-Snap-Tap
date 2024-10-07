@@ -13,7 +13,6 @@ from tap_keyboard import Key_Event, Key_Group, Key, Tap_Group
 
 import tkinter as tk
 
-DEBUG3 = False
 
 # Control key combinations
 EXIT_Combination = ["alt", "end"] # END key vkcode 35, ALT 164
@@ -537,9 +536,6 @@ class Config_Manager():
         default_start_arguments = []
         default_group_lines = []
         
-        if DEBUG3:
-            print(cleaned_lines)
-        
         for line in cleaned_lines:
             if line.startswith('<focus>'):
                 focus_name = line.replace('<focus>', '').replace('\n', '').lower()
@@ -710,8 +706,8 @@ class Argument_Manager():
         self.ALIAS_MIN_DELAY_IN_MS = Argument_Manager.ALIAS_MIN_DELAY_IN_MS 
         self.ALIAS_MAX_DELAY_IN_MS = Argument_Manager.ALIAS_MAX_DELAY_IN_MS   
         self.EXEC_ONLY_ONE_TRIGGERED_MACRO = Argument_Manager.EXEC_ONLY_ONE_TRIGGERED_MACRO
-        self.STATUS_INDICATOR = Argument_Manager.STATUS_INDICATOR
-        self.STATUS_INDICATOR_SIZE = Argument_Manager.STATUS_INDICATOR_SIZE
+        # self.STATUS_INDICATOR = Argument_Manager.STATUS_INDICATOR
+        # self.STATUS_INDICATOR_SIZE = Argument_Manager.STATUS_INDICATOR_SIZE
         self.CROSSHAIR_ENABLED = Argument_Manager.CROSSHAIR_ENABLED
         self.CROSSHAIR_DELTA_X = Argument_Manager.CROSSHAIR_DELTA_X
         self.CROSSHAIR_DELTA_Y = Argument_Manager.CROSSHAIR_DELTA_Y
@@ -1805,17 +1801,17 @@ class Tap_Keyboard():
         print('--- Stopping - Return to menu ---')
         self.state_manager.release_all_currently_not_pressed_keys()
         self.state_manager.stop_all_repeating_keys()
+        self._mouse_listener.stop()
         self._listener.stop()
-        self.mouse_listener.stop()
 
     def control_exit_program(self):
         print('--- Stopping execution ---')
         self.state_manager.release_all_currently_not_pressed_keys()
         self.state_manager.stop_all_repeating_keys()
-        self.listener.stop()
-        self.mouse_listener.stop()
+        self._mouse_listener.stop()
+        self._listener.stop()
         self.args.STOPPED = True
-        #exit()
+        exit()
 
     def control_toggle_pause(self):
         if self.args.WIN32_FILTER_PAUSED:
@@ -1882,8 +1878,7 @@ def display_menu():
     while True:       
         # clear the CLI
         if not tap_keyboard.args.DEBUG:
-            pass
-            #XXX hsystem('cls||clear')
+            system('cls||clear')
         if invalid_input:
             print(text)
             print("Please try again.\n")
@@ -1931,8 +1926,8 @@ def display_control_text():
     print('--- enter MENU again with ALT + PAGE_DOWN ---\n')
 
 def update_group_display():
-    #XXX
-    #system('cls||clear')
+    if not tap_keyboard.args.DEBUG:
+        system('cls||clear')
     config_manager.display_groups()
     #print("\n--- reloaded sucessfully ---")
     if tap_keyboard.args.CONTROLS_ENABLED:
@@ -1958,7 +1953,7 @@ class Alias_Thread(Thread):
         to_be_played_key_events = []
         try:   
             # Key_events ans Keys here ...
-            if DEBUG3:
+            if self._tk.args.DEBUG2:
                 print(f"> playing macro: {self.trigger_group} :: {self.key_group}")
             for key_event in self.key_group:
                 
@@ -1966,7 +1961,7 @@ class Alias_Thread(Thread):
                 constraint_fulfilled, delay_times = self._tk.output_manager.check_constraint_fulfillment(key_event, get_also_delays=True)
                 if constraint_fulfilled:
                     to_be_played_key_events.append([key_event, delay_times])
-                    if DEBUG3: 
+                    if self._tk.args.DEBUG2:
                         print(f">> will play '{key_event}' with delays: {delay_times}")
 
             for key_event, delay_times in to_be_played_key_events:
@@ -2153,7 +2148,11 @@ class Status_Indicator():
         self.root.wm_attributes("-topmost", 1)  # Keep the window on top
         self.root.wm_attributes("-transparentcolor", "yellow")
 
-        print(f"self._tk.args.STATUS_INDICATOR_SIZE: {self._tk.args.STATUS_INDICATOR_SIZE}")
+        # waiting for the rest of the program to finish loading or else it might get the wrong value
+        # for status indicator size
+        sleep(1)
+        
+        # print(f"self._tk.args.STATUS_INDICATOR_SIZE: {self._tk.args.STATUS_INDICATOR_SIZE}")
         # Create a canvas for the indicator
         self.canvas = tk.Canvas(self.root, width=100+self._tk.args.STATUS_INDICATOR_SIZE, height=100+self._tk.args.STATUS_INDICATOR_SIZE, bg='yellow', highlightthickness=0)
         self.canvas.pack()
@@ -2418,8 +2417,6 @@ def main():
         listener = keyboard.Listener(win32_event_filter=tap_keyboard.keyboard_win32_event_filter)
         tap_keyboard.listener = listener
         
-        mouse_listener.start()
-        listener.start()
         
         if tap_keyboard.args.MENU_ENABLED:
             if focus_thread is not None:
@@ -2429,6 +2426,9 @@ def main():
         else:
             config_manager.display_groups()
 
+        mouse_listener.start()
+        listener.start()
+        
         print('\n--- Free Snap Tap started ---')
         if tap_keyboard.args.CONTROLS_ENABLED:
             display_control_text()
@@ -2441,6 +2441,8 @@ def main():
             
         mouse_listener.stop()
         mouse_listener.join()
+        
+        
         
         
     if focus_thread is not None:       
@@ -2465,16 +2467,17 @@ if __name__ == "__main__":
     
 
     tap_keyboard.args.apply_start_args_by_focus_name()
-    tap_keyboard.apply_focus_groups()
+    #tap_keyboard.apply_focus_groups()
+    
     if tap_keyboard.args.STATUS_INDICATOR:
         main_thread = Thread(target=main)
         main_thread.start()
         try:
             root = tk.Tk()
             indicator = Status_Indicator(root, tap_keyboard)
-            # indicator_thread = Thread(target=indicator.update_indicator)
-            # indicator_thread.daemon = True  # Daemonize thread
-            # indicator_thread.start()
+            indicator_thread = Thread(target=indicator.update_indicator)
+            indicator_thread.daemon = True  # Daemonize thread
+            indicator_thread.start()
             indicator.run()
         except RuntimeError:
             pass
