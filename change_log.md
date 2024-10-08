@@ -62,11 +62,14 @@
 ## bugfix:
 - the reset key_event did not work before (reset_0 to reset_30 and reset_all did work)
   - reset will now reset the macro sequence it was started from/in
+- fix focus lines comments not being stripped
+  - fixed and upgraded to also stripping leading or trailing whitespaces
 
 ### todo
 - how to make it work again without a focus name?
+- reset of toggle via toggled key is not working right now
+- time evaluated keys can be added to rebinds lik e:e if another rebind/macro uses invocation tr('-e') for example, or else it will be repeated like all other key_events that are not a trigger. repeat breaks long press invocation.
 
-- fix focus lines comments not being stripped
 
 ```bash
 

@@ -1,6 +1,6 @@
 '''
 Free-Snap-Tap V1.1
-last updated: 241008-1643
+last updated: 241008-2259
 '''
 
 from pynput import keyboard, mouse
@@ -9,9 +9,9 @@ from os import startfile
 import sys 
 from time import sleep 
 import tkinter as tk
-import pprint
 
-from fst_keyboard import FST_Keyboard, Focus_Group_Manager, Config_Manager, CONSTANTS
+from fst_keyboard import FST_Keyboard
+from fst_manager import CONSTANTS, Config_Manager, Focus_Group_Manager
 from fst_threads import Focus_Thread
 
 
@@ -26,8 +26,8 @@ CONSTANTS.DEBUG3 = True
 # Define File name for saving of everything, can be any filetype
 # But .txt or .cfg recommended for easier editing
 # CONSTANTS.FILE_NAME = 'FSTconfig.txt'
-# CONSTANTS.FILE_NAME = 'FSTconfig_test.txt'
-CONSTANTS.FILE_NAME = 'allinone.txt'
+CONSTANTS.FILE_NAME = 'FSTconfig_test.txt'
+# CONSTANTS.FILE_NAME = 'allinone.txt'
 
 # Control key combinations (vk_code and/or key_string) 
 # (1,2 or more keys possible - depends on rollover of your keyboard)
