@@ -1,4 +1,4 @@
-# observations
+# change log
 
 ## changes:
 
@@ -13,6 +13,10 @@
   - use always`+reset` because it is handled like a key event and must be fulfilled (in this case must be released which is for all reset keys always True) before the constraints will be checked
   - only if the constraints all result in True will the reset activated
 
+### rebinds
+
+- reset key_events that reset macro sequences now also work in rebinds as replacement key
+
 ### macro/ macro sequences:
 
 - the constraint check of a played group (rebind or macro) (not trigger group) will be all checked at the same time now. 
@@ -22,6 +26,10 @@
 - removed toggle option from played macro groups 
   - (maybe unnecessary????)
   - I want to rework that because the key states tracking now allows a better solution for this
+
+### repeat keys
+
+- stop_repeat will now again evaluate to False to suppress the playback of the stopped keys
 
 ### general behavior
 - all key states (press or release) are now tracked - real keys states as well as simulated key states
@@ -43,14 +51,22 @@
   - even if manually paused
 
 ### internal
-
 - renamed everything with delay as constraint to better fit the evolved functionality
 - seperated execute_key_event into its functional parts to realise more flexible reset and constraint handling
+
+### refactoring
+- refactoring of all global mutable states
+- creation of manager classes to handle different aspects of the functionalities
+- class FST_keyboard binds it all together and offers access to the managers
 
 ## bugfix:
 - the reset key_event did not work before (reset_0 to reset_30 and reset_all did work)
   - reset will now reset the macro sequence it was started from/in
 
+### todo
+- how to make it work again without a focus name?
+
+- fix focus lines comments not being stripped
 
 ```bash
 
@@ -66,8 +82,10 @@
 
 - arduino controlled via PySerial um die virtuellen Key Events als echte HID events zu senden. Und so AC potentiell immer umgehen zu können.
 
-- how to make it work again without a focus name?
 
-- fix focus lines comments not being stripped
+
+
 
 - reset of repeated keys should be done by repeating thread? not by state_manager!
+
+- possible to activate FST window when return to menu? to push it to the forground?

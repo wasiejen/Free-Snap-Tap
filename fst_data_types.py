@@ -1,26 +1,14 @@
+'''
+Free-Snap-Tap V1.1
+last updated: 241008-1643
+'''
 
 from abc import ABC, abstractmethod
-# from threading import Lock
-
-
-# from pynput import keyboard, mouse
-# #from vk_codes import vk_codes_dict
-# from random import randint # randint(3, 9)) 
-# from time import sleep
-# from threading import Thread, Lock, Event
-
-
-# from tap_threads import Focus_Thread, Repeat_Thread, Alias_Thread
-
-# DEBUG = False
-# DEBUG2 = False
-
-# abstract class Input_Event -> Keyboard_Event, Mouse_Event
-
-
 
 class Input_Event(ABC):
-
+    '''
+    #XXX
+    '''
     def __init__(self, vk_code, constraints=[0,0], key_string = ''):
         self._key_string = key_string
         self._vk_code = vk_code
@@ -72,11 +60,13 @@ class Input_Event(ABC):
     
 
 class Key_Event(Input_Event):
-    
-    def __init__(self, vk_code, is_press=True, constraints=[0,0], key_string = None):
+    '''
+    #XXX
+    '''    
+    def __init__(self, vk_code, is_press=True, constraints=[0,0], key_string = None, is_toggle = False):
         super().__init__(vk_code, constraints=constraints, key_string=key_string)
         self._is_press = is_press
-        self._is_toggle = False
+        self._is_toggle = is_toggle
         
     @property
     def is_press(self):
@@ -85,6 +75,9 @@ class Key_Event(Input_Event):
     @property
     def is_toggle(self):
         return self._is_toggle
+    @is_toggle.setter
+    def is_toggle(self, new_bool):
+        self._is_toggle = new_bool
 
     def get_all(self):
         return self._vk_code, self._is_press, self._constraints
@@ -108,12 +101,19 @@ class Key_Event(Input_Event):
     
    
 class Key(Input_Event):
-    
+    '''
+    #XXX
+    '''    
     def __init__(self, vk_code, key_string='', constraints=[0,0], is_toggle=False):
         super().__init__(vk_code, constraints=constraints, key_string=key_string)
         self._is_toggle = is_toggle
-        key_event = Key_Event(self._vk_code, is_press=True, constraints=constraints, key_string=key_string)
-        self._key_events = [key_event, key_event.get_opposite_key_event()]
+        
+        self.key_event = Key_Event(self._vk_code, is_press=True, constraints=constraints, key_string=key_string)
+        if self._is_toggle:
+            self.key_event.is_toggle = True
+            self._key_events = [self.key_event, self.key_event]
+        else:
+            self._key_events = [self.key_event, self.key_event.get_opposite_key_event()]
     
     @property
     def is_toggle(self):
@@ -135,7 +135,9 @@ class Key(Input_Event):
 # not yet updated implementation
    
 class Key_Group(object):
-    
+    '''
+    #XXX
+    '''    
     def __init__(self, key_events=[]):
         if isinstance(key_events, Key_Event):
             key_events = [key_events]
@@ -253,7 +255,9 @@ class Key_Group(object):
     
     
 class Tap_Group(object):
-     
+    '''
+    #XXX
+    '''     
     def __init__(self, keys = []) -> None:
          self.keys = keys
          self.states = {}
