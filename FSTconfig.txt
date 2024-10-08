@@ -1,6 +1,7 @@
 <arg>-status_indicator=20
 <arg>-aliasdelay=50,50
 <arg>-tapdelay=10,5
+<arg>-debug
 
 # Tap Groups
 a, d
