@@ -44,11 +44,12 @@
 - crosshair now waits 1 extra second after switching focus groups due to window changes to make it more likely to recognise the right window and its size better
 
 ### On window change:
-- all currently pressed keys will be released on window change 
+- all currently pressed simulated keys will be released on window change 
   - dependent on rebinds or macros it was possible to get stuck keys until the real key was pressed again to release the key state
   - will ignore currently pressed real keys and not release these
-- `esc` now also releases all not currently pressed keys
+- `esc` now also releases all not currently pressed simulated keys
   - even if manually paused
+- `alt+tab` will now also try to release all currently pressed simulated keys
 
 ### internal
 - renamed everything with delay as constraint to better fit the evolved functionality
@@ -64,11 +65,17 @@
   - reset will now reset the macro sequence it was started from/in
 - fix focus lines comments not being stripped
   - fixed and upgraded to also stripping leading or trailing whitespaces
+- reset of toggle via real key is working again
 
 ### todo
 - how to make it work again without a focus name?
-- reset of toggle via toggled key is not working right now
-- time evaluated keys can be added to rebinds lik e:e if another rebind/macro uses invocation tr('-e') for example, or else it will be repeated like all other key_events that are not a trigger. repeat breaks long press invocation.
+
+- alt key gets stuck when tapping out of focus game with alt+tab
+
+- key combination will only be played if exactly these are pressed and no else??? was because shift changes numpad
+
+- [x] shift, control and alt change keys that the system will get, so when these are active they need to be deactivated first???
+- DONE
 
 
 ```bash

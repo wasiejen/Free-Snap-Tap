@@ -20,6 +20,8 @@ class CONSTANTS():
     DEBUG = False
     DEBUG2 = False
     DEBUG3 = False
+    DEBUG4 = False
+    DEBUG_NUMPAD = False
 
     # Define File name for saving of everything, can be any filetype
     # But .txt or .cfg recommended for easier editing
@@ -284,23 +286,18 @@ class Output_Manager():
             repeat_time = int(key_string)
             # reset stop event
             stop_event = Event()
-            if CONSTANTS.DEBUG3:
-                print(f"D3: trying to start repeat for {key_string} with repeat_time {repeat_time}")
-
             repeat_thread = Repeat_Thread(current_ke, stop_event, repeat_time, self._fst, time_increment=100)
             # save thread and stop event to find it again for possible interruption
             self._repeat_thread_dict[current_ke] = [repeat_thread, stop_event]
             repeat_thread.start() 
-            if CONSTANTS.DEBUG3:
-                print("D3: repeat started")
             return None
         
         def stop_repeat():
             try:
                 repeat_thread, stop_event = self._repeat_thread_dict[current_ke]
                 if repeat_thread.is_alive():
-                    if CONSTANTS.DEBUG:
-                        print(f"D1: {current_ke}-repeat: still alive - try to stop")
+                    if CONSTANTS.DEBUG2:
+                        print(f"D2: {current_ke}-repeat: still alive - try to stop")
                     stop_event.set()
                     ##1
                     repeat_thread.join()
@@ -682,6 +679,8 @@ class Argument_Manager():
     DEBUG  = False
     DEBUG2 = False
     DEBUG3 = False
+    DEBUG_NUMPAD = False
+    
     WIN32_FILTER_PAUSED = True
     MANUAL_PAUSED = False
     STOPPED = False
@@ -707,6 +706,7 @@ class Argument_Manager():
         Argument_Manager.DEBUG  = CONSTANTS.DEBUG 
         Argument_Manager.DEBUG2 = CONSTANTS.DEBUG2
         Argument_Manager.DEBUG3 = CONSTANTS.DEBUG3
+        Argument_Manager.DEBUG_NUMPAD = CONSTANTS.DEBUG_NUMPAD
         # to only set up the variable and not reset it with every focus change
         self.STATUS_INDICATOR = Argument_Manager.STATUS_INDICATOR
         self.STATUS_INDICATOR_SIZE = Argument_Manager.STATUS_INDICATOR_SIZE
@@ -908,11 +908,14 @@ class Input_State_Manager():
     SIMULATED = 'simulated'
     ALL = 'all'
     
+    ALL_MODIFIER_KEYS = [160, 161, 162, 163, 164, 165]
+    
     def __init__(self, fst_keyboard):#, fst_keyboard):
         self._fst = fst_keyboard
         
         # collect active key press/release states to prevent refiring macros while holding a key
         self._real_key_press_states_dict = {}
+        self._simulated_key_press_states_dict = {}
         self._all_key_press_states_dict = {}
 
         # toggle state tracker
@@ -926,9 +929,9 @@ class Input_State_Manager():
         # time_all = [time_all_last_pressed, time_all_last_released, time_all_released, time_all_pressed]
         self._time_all = [{}, {}, {}, {}]
         
-    @property
-    def pressed_keys(self):
-        return self._pressed_keys
+    # @property
+    # def pressed_keys(self):
+    #     return self._pressed_keys
     
     def get_real_key_press_state(self, vk_code):
         try:
@@ -936,11 +939,22 @@ class Input_State_Manager():
         except KeyError:
             self.set_real_key_press_state(vk_code, False)
             return False
-
     def set_real_key_press_state(self, vk_code, is_press):
+        # print(f"real key state of {vk_code} set to {is_press}")
         self._real_key_press_states_dict[vk_code] = is_press
         self._all_key_press_states_dict[vk_code] = is_press
 
+    def get_simulated_key_press_state(self, vk_code):
+        try:
+            return self._simulated_key_press_states_dict[vk_code]
+        except KeyError:
+            self.set_simulated_key_press_state(vk_code, False)
+            return False
+    def set_simulated_key_press_state(self, vk_code, is_press):
+        if vk_code > 0:
+            self._simulated_key_press_states_dict[vk_code] = is_press
+            self._all_key_press_states_dict[vk_code] = is_press
+            
     def get_all_key_press_state(self, vk_code):
         try:
             return self._all_key_press_states_dict[vk_code]
@@ -950,7 +964,8 @@ class Input_State_Manager():
     def set_all_key_press_state(self, vk_code, is_press):
         if vk_code > 0:
             self._all_key_press_states_dict[vk_code] = is_press
-        
+
+
     def get_toggle_state(self, vk_code):
         try:
             return self._toggle_states_dict[vk_code]
@@ -974,36 +989,38 @@ class Input_State_Manager():
     def time_all(self):
         return self._time_all
 
-    def get_key_press_state(self, vk_code):
-        return vk_code in self._pressed_keys
+    # def get_key_press_state(self, vk_code):
+    #     return vk_code in self._pressed_keys
     
-    def add_key_press_state(self, vk_code):    
-        self._pressed_keys.add(vk_code)    
+    # def add_key_press_state(self, vk_code):    
+    #     self._pressed_keys.add(vk_code)    
         
-    def remove_key_press_state(self, vk_code):
-        try:
-            self._pressed_keys.remove(vk_code)
-        except KeyError:
-            pass
+    # def remove_key_press_state(self, vk_code):
+    #     try:
+    #         self._pressed_keys.remove(vk_code)
+    #     except KeyError:
+    #         pass
         
-    def manage_key_press_states_by_event(self, key_event):
-        vk_code, is_keydown, _ = key_event.get_all() 
-        if is_keydown:
-            self.add_key_press_state(vk_code)
-        else:
-            self.remove_key_press_state(vk_code)
-        if CONSTANTS.DEBUG3:
-            pprint.pp(f"pressed keys: {self._pressed_keys}")
+    # def manage_key_press_states_by_event(self, key_event):
+    #     vk_code, is_keydown, _ = key_event.get_all() 
+    #     if is_keydown:
+    #         self.add_key_press_state(vk_code)
+    #     else:
+    #         self.remove_key_press_state(vk_code)
+    #     if CONSTANTS.DEBUG3:
+    #         pprint.pp(f"pressed keys: {self._pressed_keys}")
 
     def get_next_toggle_state_key_event(self, key_event):
         vk_code, _, constraints = key_event.get_all()
         is_press_toggle = self.get_toggle_state(vk_code)
         self.set_toggle_state(vk_code, not is_press_toggle)
-        return Key_Event(vk_code, not is_press_toggle, constraints, is_toggle=True)
+        ###XXX 241009-1043
+        return Key_Event(vk_code, not is_press_toggle, constraints, key_string = key_event.key_string, is_toggle=True)
 
     def set_toggle_state_to_curr_ke(self, key_event):
         vk_code, is_press, _ =  key_event.get_all()
         if vk_code in self._toggle_states_dict_keys:
+            print(f"toogle state for {key_event} updated")
             self.set_toggle_state(vk_code, is_press)
 
     def stop_all_repeating_keys(self):
@@ -1019,14 +1036,38 @@ class Input_State_Manager():
             self.set_toggle_state(vk_code, False)
 
     def release_all_currently_pressed_keys(self):
+        ###XXX 241009-1049 do not release real keys, 241009-1100 now again release all keys - works better
+    
+        # first release all modifert keys
+        for vk_code in Input_State_Manager.ALL_MODIFIER_KEYS:
+            if not self.get_real_key_press_state(vk_code):
+                if CONSTANTS.DEBUG2:
+                    print(f"D2: released pressed modifier key: {vk_code}")
+                self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
+                self.set_simulated_key_press_state(vk_code, False)
+                
+        # release remaining simulated keys
         for vk_code, is_press in self._all_key_press_states_dict.items(): 
             if is_press:
-                if CONSTANTS.DEBUG3:
-                    print(f"D3: released pressed key: {vk_code}")
-                self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
-                self.set_real_key_press_state(vk_code, False)         
+                # only reset simulated keys
+                if self.get_simulated_key_press_state(vk_code) is True:
+                    if CONSTANTS.DEBUG2:
+                        print(f"D2: released key: {vk_code}")
+                    self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
+                # but overwrite all key states with False
+                #self.set_all_key_press_state(vk_code, False)     
+                
+                
+                # self.set_real_key_press_state(vk_code, False)         
+                # self.set_simulated_key_press_state(vk_code, False)         
+        self.reset_states_dicts()
         self.release_all_toggles()
-                    
+    
+    def reset_states_dicts(self):
+        self._real_key_press_states_dict = {}
+        self._simulated_key_press_states_dict = {}
+        self._all_key_press_states_dict = {}
+        
     def get_time_lists(self):
         return [self._time_real, self._time_simulated, self._time_all]
 
