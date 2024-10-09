@@ -74,7 +74,7 @@ class Repeat_Thread(Thread):
         self._fst = fst_keyboard
         
     def run(self): 
-        print(f"now repeating: {self.key_event} at interval of {self.time} ms")
+        print(f"START REPEAT: {self.key_event} with interval of {self.time} ms")
 
         while not self.stop_event.is_set():
             if self.reset:
@@ -88,6 +88,8 @@ class Repeat_Thread(Thread):
                     sleep(self.time_increment / 1000)
                 else:
                     break
+        
+        print(f"STOP REPEAT: {self.key_event} with interval of {self.time} ms")
                 
     def reset_timer(self):
         self.reset = True

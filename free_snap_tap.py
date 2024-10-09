@@ -16,12 +16,16 @@ from fst_threads import Focus_Thread
 
 
 # will not overwrite debug settings in config
-# CONSTANTS.DEBUG = True
 CONSTANTS.DEBUG = False
-CONSTANTS.DEBUG2 = True
-# CONSTANTS.DEBUG2 = False
-# CONSTANTS.DEBUG3 = True
+# CONSTANTS.DEBUG = True
+CONSTANTS.DEBUG2 = False
+# CONSTANTS.DEBUG2 = True
 CONSTANTS.DEBUG3 = False
+# CONSTANTS.DEBUG3 = True
+
+# debug options on numpad numbers - if you use them do not turn on
+# CONSTANTS.DEBUG_COMBINATIONS = False
+CONSTANTS.DEBUG_NUMPAD = True
 
 # Define File name for saving of everything, can be any filetype
 # But .txt or .cfg recommended for easier editing
@@ -334,7 +338,7 @@ def main():
         mouse_listener.start()
         listener.start()
         
-        fst_keyboard.state_manager.release_all_currently_pressed_keys()
+        #fst_keyboard.state_manager.release_all_currently_pressed_keys()
         
         print('\n--- Free Snap Tap started ---')
         if fst_keyboard.args.CONTROLS_ENABLED:
