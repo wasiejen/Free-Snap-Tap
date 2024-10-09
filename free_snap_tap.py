@@ -324,28 +324,30 @@ def main():
         
         
         if fst_keyboard.args.MENU_ENABLED:
-            if focus_thread is not None:
+            if focus_active:
                 if focus_thread.is_alive():
                     focus_thread.pause()
             fst_keyboard.cli_menu.display_menu()
         else:
             config_mgr.display_groups()
         
-        if focus_thread is not None:
+        if focus_active:
             if focus_thread.is_alive():
                 focus_thread.restart()
             
         mouse_listener.start()
         listener.start()
         
-        #fst_keyboard.state_manager.release_all_currently_pressed_keys()
+        # if no focus app is given in config file, then start default as always active
+        if not focus_active:
+            fst_keyboard.update_args_and_groups()
+            fst_keyboard.cli_menu.update_group_display()
+            fst_keyboard.args.WIN32_FILTER_PAUSED = False
         
-        print('\n--- Free Snap Tap started ---')
-        if fst_keyboard.args.CONTROLS_ENABLED:
-            fst_keyboard.cli_menu.display_control_text()
+        print('--- Free Snap Tap started ---')
         if focus_active:
             fst_keyboard.cli_menu.display_focus_names()
-        if focus_thread is not None:
+        if focus_active:
             if not focus_thread.is_alive():
                 focus_thread.start()
 
@@ -354,7 +356,7 @@ def main():
         mouse_listener.stop()
         mouse_listener.join()
             
-    if focus_thread is not None:       
+    if focus_active:       
         if focus_thread.is_alive():
             focus_thread.end()
             focus_thread.join()
