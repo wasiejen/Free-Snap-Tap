@@ -35,6 +35,7 @@ class FST_Keyboard():
     SUPPRESS_CODE = -999
     
     TIME_DIFF = None
+    START_TIME = None
         
     def __init__(self, config_manager, focus_manager = None, args = None):
         
@@ -424,9 +425,7 @@ class FST_Keyboard():
         
         def time_in_millisec():
             return int(time() * 1000)
-
-
-        
+       
         def is_trigger_activated(current_ke, trigger_group):
             keys = trigger_group.get_key_events()
             # only trigger on the first key_event in trigger group
@@ -463,11 +462,12 @@ class FST_Keyboard():
         current_ke = Key_Event(vk_code, is_keydown)
         
         if CONSTANTS.DEBUG4:
-            print(f"D4: INPUT: {"simulated key: " if is_simulated else "real key: "} {current_ke }")
-        
+            print(f"D4:->-> IN  ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
+
         # get the time difference from system time to the key_event_time
         if FST_Keyboard.TIME_DIFF is None:
             FST_Keyboard.TIME_DIFF = time_in_millisec() - key_event_time
+            FST_Keyboard.START_TIME = key_event_time
             # set all key_times to starting time
             self.state_manager.init_all_key_times_to_starting_time(key_event_time)
         
@@ -494,28 +494,30 @@ class FST_Keyboard():
             else:
                 trigger_key_repeated = False
             
-            # here best place to start tracking the timings of presses and releases
+            # track every real key state in a dict - to recognise repeating
+            self.state_manager.set_real_key_press_state(current_ke.vk_code, current_ke.is_press)
+            # track real key presses extra (in a set())
+            self.state_manager.manage_key_press_states_by_event(current_ke)
+            
+            
+            # here best place to start tracking the timings of presses and releases of real keys
             # only update times if not repeated
             if not real_input_repeated:
                 self.state_manager.set_key_times(key_event_time, vk_code, is_keydown, self.state_manager.REAL)
                 self.state_manager.set_key_times(key_event_time, vk_code, is_keydown, self.state_manager.ALL)       
 
-                # every real key state will be saved
-                self.state_manager.set_real_key_press_state(current_ke.vk_code, current_ke.is_press)
-
-                'DEBUG COMBINATIONS'
+                'DEBUG COMBINATIONS HANDLING'
                 if CONSTANTS.DEBUG_NUMPAD:
                     self.check_debug_numpad_actions()
                 
+                'CONTROL HANDLING'
                 self.check_control_actions()
-
-                      
+ 
             # Replace some Buttons :-D
             if not self.args.WIN32_FILTER_PAUSED and not self.args.PRINT_VK_CODES:
                 
-                ###XXX 241008-2233
                 if not to_be_suppressed:
-                    'REBINDS HERE'
+                    'REBINDS HANDLING'
                     # check for rebinds and replace current key event with replacement key event
                     for trigger_group in self._rebind_triggers:
                         
@@ -547,11 +549,12 @@ class FST_Keyboard():
                                         to_be_suppressed = True
                                 break
                             
-                    if key_replaced and not to_be_suppressed:
-                        pass
-                        # keys that are replaced WILL ALWAYS BE SUPPRESSED, so no need to update press state, 
-                        # when replacement key_event is send out it will be a simulated key - always
-                        
+                    if key_replaced and not to_be_suppressed:                     
+                        # 241009-1459 press state set is updated here with new key (not the press state dict!)
+                        self.state_manager.remove_key_press_state(old_ke.vk_code)
+                        self.state_manager.manage_key_press_states_by_event(current_ke)
+                        if CONSTANTS.DEBUG4:
+                           print(f"D4: updated replacmenet key {current_ke}, removed {old_ke}") 
                                                                                  
                     'STOP REPEATED KEYS FROM HERE'        
                     # prevent evaluation of repeated key events
@@ -625,8 +628,6 @@ class FST_Keyboard():
                                 if self.args.EXEC_ONLY_ONE_TRIGGERED_MACRO:
                                     break
                 
-                # self.check_control_actions()
-                
                 'TAP GROUP EVALUATION HERE'
                 # Snap Tap Part of Evaluation
                 # Intercept key events if not PAUSED
@@ -661,20 +662,11 @@ class FST_Keyboard():
                 if alias_fired is True:
                     to_be_suppressed = True
 
+        'PREVENT CONTRADICTING KEYS IN TAP GROUPS AND IN GENERAL'
         # here the interception of interference of alias with tap groups is realized
         if is_simulated:
-            # fecthing current vk and press - not needed atm but as precaution if I put it somewhere else xD
             vk_code, is_keydown, _ = current_ke.get_all()
-            
-            # if is_simulated:
-            #     press_state = self.state_manager.get_simulated_key_press_state(vk_code)
-            #     if press_state == current_ke.is_press:
-            #         simulated_input_repeated = True
-            #         ###XXX 241009-1021. testing to reduce output of simulated keys
-            #         # different from intented behavior of real key repeat
-            #         # to_be_supressed = True
-            
-            
+                        
             key_is_in_tap_groups = False
             for tap_group in self._tap_groups:
                 vk_codes = tap_group.get_vk_codes()
@@ -703,23 +695,32 @@ class FST_Keyboard():
                 # if it is a toggle key, then let it through even if it contradicts real key state
                 if vk_code in self.state_manager.toggle_states_dict_keys:
                     pass
-                
-                if not is_mouse_event and self.state_manager.get_real_key_press_state(vk_code):
+                # 241009-1456
+                if not is_mouse_event and self.state_manager.get_key_press_state(vk_code):
                     if CONSTANTS.DEBUG2:
                         print(f"D2 suppressed {current_ke} because it would release real key press state")
                     to_be_suppressed = True
         
         
+        'ALL SUPPRESSION DONE HERE'
         # here arrive all key_events that will be send - last place to intercept
         if to_be_suppressed:
+            
+            # 241009-1541 if real key was used in a macro, remove it from pressed key set, 
+            # to be not used to filter out opposing sim keys
+            # if not is_simulated and not key_replaced:
+            if alias_fired:
+                self.state_manager.remove_key_press_state(current_ke.vk_code)
+                if CONSTANTS.DEBUG4:
+                    print(f"D4: removed {current_ke} from pressed keys")
+            
             if key_replaced and current_ke.is_toggle:
-                if CONSTANTS.DEBUG3:
-                    print(f"D3: suppressed - but let through bec of toggle: {current_ke}")
+                ###XXX even needed anymore???
+                if CONSTANTS.DEBUG4:
+                    print(f"D4: not suppressed bec of toggle: {current_ke}")
             else:
-                if CONSTANTS.DEBUG3:
-                    print(f"D3: suppressed - repeating or general suppress: {current_ke}")
-                ###XXX test 241008-2229
-                #self.state_manager.set_real_key_press_state(current_ke.vk_code, False)
+                if CONSTANTS.DEBUG4:
+                    print(f"D4:---- SUPPRESSED: {current_ke}")
                 self._listener.suppress_event()     
                 
         # everything that will be send arrives here      
@@ -731,10 +732,10 @@ class FST_Keyboard():
                 self.state_manager.set_key_times(key_event_time, vk_code, is_keydown, self.state_manager.ALL) 
                 # save press state of all keys to release them on focus change
                 self.state_manager.set_simulated_key_press_state(vk_code, current_ke.is_press)
-                # self.state_manager.set_all_key_press_state(vk_code, current_ke.is_press)
             
         if CONSTANTS.DEBUG4:
-            print(f"D4: OUT: {"simulated key: " if is_simulated else "real key: "} {current_ke } is send to system")
+            print(f"D4:<-<- OUT ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
+                        
 
     def check_for_combination(self, vk_codes):                 
         all_active = True

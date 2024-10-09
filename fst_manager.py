@@ -913,6 +913,8 @@ class Input_State_Manager():
     def __init__(self, fst_keyboard):#, fst_keyboard):
         self._fst = fst_keyboard
         
+        self._pressed_keys = set()
+        
         # collect active key press/release states to prevent refiring macros while holding a key
         self._real_key_press_states_dict = {}
         self._simulated_key_press_states_dict = {}
@@ -928,10 +930,11 @@ class Input_State_Manager():
         self._time_simulated = [{}, {}, {}, {}]
         # time_all = [time_all_last_pressed, time_all_last_released, time_all_released, time_all_pressed]
         self._time_all = [{}, {}, {}, {}]
-        
-    # @property
-    # def pressed_keys(self):
-    #     return self._pressed_keys
+      
+    ###XXX 241009-1450   
+    @property
+    def pressed_keys(self):
+        return self._pressed_keys
     
     def get_real_key_press_state(self, vk_code):
         try:
@@ -989,26 +992,32 @@ class Input_State_Manager():
     def time_all(self):
         return self._time_all
 
-    # def get_key_press_state(self, vk_code):
-    #     return vk_code in self._pressed_keys
+
+    ###XXX 241009-1450 
+
+    def get_key_press_state(self, vk_code):
+        return vk_code in self._pressed_keys
     
-    # def add_key_press_state(self, vk_code):    
-    #     self._pressed_keys.add(vk_code)    
+    def add_key_press_state(self, vk_code):    
+        self._pressed_keys.add(vk_code)    
         
-    # def remove_key_press_state(self, vk_code):
-    #     try:
-    #         self._pressed_keys.remove(vk_code)
-    #     except KeyError:
-    #         pass
+    def remove_key_press_state(self, vk_code):
+        try:
+            self._pressed_keys.remove(vk_code)
+        except KeyError:
+            pass
         
-    # def manage_key_press_states_by_event(self, key_event):
-    #     vk_code, is_keydown, _ = key_event.get_all() 
-    #     if is_keydown:
-    #         self.add_key_press_state(vk_code)
-    #     else:
-    #         self.remove_key_press_state(vk_code)
-    #     if CONSTANTS.DEBUG3:
-    #         pprint.pp(f"pressed keys: {self._pressed_keys}")
+    def manage_key_press_states_by_event(self, key_event):
+        vk_code, is_keydown, _ = key_event.get_all() 
+        if is_keydown:
+            self.add_key_press_state(vk_code)
+        else:
+            self.remove_key_press_state(vk_code)
+        if CONSTANTS.DEBUG3:
+            pprint.pp(f"pressed keys: {self._pressed_keys}")
+
+    ###
+
 
     def get_next_toggle_state_key_event(self, key_event):
         vk_code, _, constraints = key_event.get_all()
@@ -1037,10 +1046,13 @@ class Input_State_Manager():
 
     def release_all_currently_pressed_keys(self):
         ###XXX 241009-1049 do not release real keys, 241009-1100 now again release all keys - works better
-    
+        if CONSTANTS.DEBUG2:
+            print(f"D2: releasing all keys")
         # first release all modifert keys
         for vk_code in Input_State_Manager.ALL_MODIFIER_KEYS:
+            ###XXX 241009-1603
             if not self.get_real_key_press_state(vk_code):
+            # if not vk_code in self.pressed_keys:
                 if CONSTANTS.DEBUG2:
                     print(f"D2: released pressed modifier key: {vk_code}")
                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
@@ -1051,6 +1063,7 @@ class Input_State_Manager():
             if is_press:
                 # only reset simulated keys
                 if self.get_simulated_key_press_state(vk_code) is True:
+                # if self.get_simulated_key_press_state(vk_code) is True and not vk_code in self.pressed_keys:
                     if CONSTANTS.DEBUG2:
                         print(f"D2: released key: {vk_code}")
                     self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
@@ -1064,6 +1077,7 @@ class Input_State_Manager():
         self.release_all_toggles()
     
     def reset_states_dicts(self):
+        self._pressed_keys = set()
         self._real_key_press_states_dict = {}
         self._simulated_key_press_states_dict = {}
         self._all_key_press_states_dict = {}
