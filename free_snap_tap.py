@@ -20,8 +20,8 @@ from fst_threads import Focus_Thread
 CONSTANTS.DEBUG = False
 CONSTANTS.DEBUG2 = True
 # CONSTANTS.DEBUG2 = False
-CONSTANTS.DEBUG3 = True
-# CONSTANTS.DEBUG3 = False
+# CONSTANTS.DEBUG3 = True
+CONSTANTS.DEBUG3 = False
 
 # Define File name for saving of everything, can be any filetype
 # But .txt or .cfg recommended for easier editing
