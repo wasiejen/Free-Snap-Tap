@@ -1,13 +1,19 @@
 <arg>-status_indicator=20
 <arg>-aliasdelay=50,50
 <arg>-tapdelay=10,5
+<arg>-debug
 
-<focus>visual
-<arg>-crosshair=-10,-10
 # Tap Groups
 a, d
 w, s
 # Rebinds
+
+# let us replace the original key_event with our own :-D
+<focus>visual
+#<arg>-crosshair=-10,-10
+#caps_lock : caps_lock
+
+
 #c : shift
 shift : h
 # Macros
@@ -25,6 +31,17 @@ v::b,u,r,b
 
 
 <focus>sublime
-<arg>-crosshair=60,0
+#<arg>-crosshair=60,0
 
 v::h,i,h,o
+
+<focus>discord
+#caps_lock : caps_lock
+# press and release produces each one caps_lock press and release
+#-caps_lock :: -caps_lock    
+# shorthand for: -caps_lock :: -caps_lock, +caps_lock
+#+caps_lock :: caps_lock
+# shorthand for: +caps_lock :: -caps_lock, +caps_lock
+
+caps_lock : caps_lock                          # replace original real key events
++caps_lock :: +caps_lock|50, caps_lock|50         # on release simulate a release and followed by a press and release
