@@ -1,9 +1,8 @@
 '''
 Free-Snap-Tap V1.1
-last updated: 241008-2259
+last updated: 241010-0144
 '''
 
-from pynput import keyboard, mouse
 from threading import Thread 
 from os import startfile 
 import sys 
@@ -11,8 +10,8 @@ from time import sleep
 import tkinter as tk
 
 from fst_keyboard import FST_Keyboard
-from fst_manager import CONSTANTS, Config_Manager, Focus_Group_Manager
-from fst_threads import Focus_Thread
+from fst_manager import CONSTANTS
+
 
 
 # will not overwrite debug settings in config
@@ -24,7 +23,7 @@ CONSTANTS.DEBUG3 = False
 # CONSTANTS.DEBUG3 = True
 
 # debug options on numpad numbers - if you use them do not turn on
-# CONSTANTS.DEBUG_COMBINATIONS = False
+# CONSTANTS.DEBUG_NUMPAD = False
 CONSTANTS.DEBUG_NUMPAD = True
 
 # Define File name for saving of everything, can be any filetype
@@ -62,13 +61,13 @@ class Status_Indicator():
         self.root.wm_attributes("-topmost", 1)  # Keep the window on top
         self.root.wm_attributes("-transparentcolor", "yellow")
         
-        # print(f"self._fst.args.STATUS_INDICATOR_SIZE: {self._fst.args.STATUS_INDICATOR_SIZE}")
+        # print(f"self._fst.arg_manager.STATUS_INDICATOR_SIZE: {self._fst.arg_manager.STATUS_INDICATOR_SIZE}")
         # Create a canvas for the indicator
-        self.canvas = tk.Canvas(self.root, width=100+self._fst.args.STATUS_INDICATOR_SIZE, height=100+self._fst.args.STATUS_INDICATOR_SIZE, bg='yellow', highlightthickness=0)
+        self.canvas = tk.Canvas(self.root, width=100+self._fst.arg_manager.STATUS_INDICATOR_SIZE, height=100+self._fst.arg_manager.STATUS_INDICATOR_SIZE, bg='yellow', highlightthickness=0)
         self.canvas.pack()
 
         # Draw the indicator
-        self.indicator = self.canvas.create_oval(20, 20, 20+self._fst.args.STATUS_INDICATOR_SIZE, 20+self._fst.args.STATUS_INDICATOR_SIZE, fill="green")
+        self.indicator = self.canvas.create_oval(20, 20, 20+self._fst.arg_manager.STATUS_INDICATOR_SIZE, 20+self._fst.arg_manager.STATUS_INDICATOR_SIZE, fill="green")
 
         # Bind mouse events to make the window draggable
         self.root.bind("<ButtonPress-1>", self.on_start)
@@ -78,7 +77,6 @@ class Status_Indicator():
 
         # Create a right-click context menu
         self.context_menu = tk.Menu(self.root, tearoff=0)
-        # self.context_menu.attributes("-alpha", 0.4) 
         
         self.context_menu.add_command(label="Open config file", command=self.open_config_file)
         self.context_menu.add_command(label="Reload from file", command=self.reload_from_file)
@@ -89,11 +87,12 @@ class Status_Indicator():
         self.context_menu.add_separator()
         self.context_menu.add_command(label="Close Indicator", command=self.close_window)
         self.context_menu.add_command(label="Toggle Crosshair", command=self.toggle_crosshair)
-        self.crosshair_enabled = False
-        self.crosshair = None
-
+        
         # Bind right-click to show the context menu
         self.canvas.bind("<Button-3>", self.show_context_menu)
+        
+        self.crosshair_enabled = False
+        self.crosshair = None
         
         self.stop = False
         
@@ -134,17 +133,17 @@ class Status_Indicator():
 
     def update_indicator(self):
         wait_one_round = False
-        manual = self._fst.args.MANUAL_PAUSED
-        win32 = self._fst.args.WIN32_FILTER_PAUSED
+        manual = self._fst.arg_manager.MANUAL_PAUSED
+        win32 = self._fst.arg_manager.WIN32_FILTER_PAUSED
         while not self.stop:
-            if self._fst.args.STATUS_INDICATOR:
+            if self._fst.arg_manager.STATUS_INDICATOR:
                     
                 # only update if there is a change
-                if manual is not self._fst.args.MANUAL_PAUSED or win32 is not self._fst.args.WIN32_FILTER_PAUSED:
-                    manual = self._fst.args.MANUAL_PAUSED
-                    win32 = self._fst.args.WIN32_FILTER_PAUSED
+                if manual is not self._fst.arg_manager.MANUAL_PAUSED or win32 is not self._fst.arg_manager.WIN32_FILTER_PAUSED:
+                    manual = self._fst.arg_manager.MANUAL_PAUSED
+                    win32 = self._fst.arg_manager.WIN32_FILTER_PAUSED
                     
-                    if self._fst.args.MANUAL_PAUSED or self._fst.args.WIN32_FILTER_PAUSED:
+                    if self._fst.arg_manager.MANUAL_PAUSED or self._fst.arg_manager.WIN32_FILTER_PAUSED:
                         status = False
                     else:
                         status = True
@@ -157,7 +156,7 @@ class Status_Indicator():
             if wait_one_round:
                 wait_one_round = False
             else:
-                if self._fst.args.CROSSHAIR_ENABLED:
+                if self._fst.arg_manager.CROSSHAIR_ENABLED:
                     if not self.crosshair_enabled:
                         self.crosshair_activate()
                 else:
@@ -172,11 +171,11 @@ class Status_Indicator():
             sleep(1)
             
     def toggle_crosshair(self):
-        if not self._fst.args.CROSSHAIR_ENABLED:#self.crosshair_enabled:
-            self._fst.args.CROSSHAIR_ENABLED = True
+        if not self._fst.arg_manager.CROSSHAIR_ENABLED:#self.crosshair_enabled:
+            self._fst.arg_manager.CROSSHAIR_ENABLED = True
             self.crosshair_activate()
         else:
-            self._fst.args.CROSSHAIR_ENABLED = False
+            self._fst.arg_manager.CROSSHAIR_ENABLED = False
             self.crosshair_deactivate()
         
     def crosshair_activate(self):
@@ -226,8 +225,8 @@ class Crosshair():
             return f'#{r:02x}{g:02x}{b:02x}'
         
         # delta x,y for the midpoint of the crosshair
-        delta_x = self._fst.args.CROSSHAIR_DELTA_X - 1  # for me this is the center of the screen
-        delta_y = self._fst.args.CROSSHAIR_DELTA_Y - 1
+        delta_x = self._fst.arg_manager.CROSSHAIR_DELTA_X - 1  # for me this is the center of the screen
+        delta_y = self._fst.arg_manager.CROSSHAIR_DELTA_Y - 1
         
         # base size has to be at least double the max of |x| or |y|
         # min_canvas_size = 2 * max(abs(delta_x), abs(delta_y)) + 25   # add a bit of buffer (25)
@@ -301,84 +300,64 @@ class Crosshair():
         self.built_crosshair()
   
 def main():
-      
-    focus_active = False
-    focus_thread = None
-    
+          
     if CONSTANTS.DEBUG:
-        print(f"D1: tap_groups_hr: {config_mgr.tap_groups_hr}")
+        print(f"D1: tap_groups_hr: {fst_keyboard.config_manager.tap_groups_hr}")
         print(f"D1: tap_groups: {fst_keyboard._tap_groups}")
 
-    if len(focus_mgr.multi_focus_dict_keys) > 0:
-        focus_active = True
-   
-    if focus_active:
-        focus_thread = Focus_Thread(fst_keyboard)
-
-
-    while not fst_keyboard.args.STOPPED:            
-        mouse_listener = mouse.Listener(win32_event_filter=fst_keyboard.mouse_win32_event_filter)
-        fst_keyboard.mouse_listener = mouse_listener
-        listener = keyboard.Listener(win32_event_filter=fst_keyboard.keyboard_win32_event_filter)
-        fst_keyboard.listener = listener
+    focus_active = fst_keyboard.focus_manager.init_focus_thread()
         
+    while not fst_keyboard.arg_manager.STOPPED:    
+
+        fst_keyboard.init_listener()
         
-        if fst_keyboard.args.MENU_ENABLED:
-            if focus_active:
-                if focus_thread.is_alive():
-                    focus_thread.pause()
+        if fst_keyboard.arg_manager.MENU_ENABLED:
+            fst_keyboard.focus_manager.pause_focus_thread()
             fst_keyboard.cli_menu.display_menu()
         else:
-            config_mgr.display_groups()
+            fst_keyboard.config_manager.display_groups()
         
         if focus_active:
-            if focus_thread.is_alive():
-                focus_thread.restart()
-            
-        mouse_listener.start()
-        listener.start()
+            fst_keyboard.focus_manager.restart_focus_thread()
+        
+        # start keyboard and mouse listener
+        fst_keyboard.start_listener()
         
         # if no focus app is given in config file, then start default as always active
         if not focus_active:
             fst_keyboard.update_args_and_groups()
             fst_keyboard.cli_menu.update_group_display()
-            fst_keyboard.args.WIN32_FILTER_PAUSED = False
+            fst_keyboard.arg_manager.WIN32_FILTER_PAUSED = False
         
         print('--- Free Snap Tap started ---')
+        
         if focus_active:
             fst_keyboard.cli_menu.display_focus_names()
-        if focus_active:
-            if not focus_thread.is_alive():
-                focus_thread.start()
+        fst_keyboard.focus_manager.start_focus_thread()
 
-        listener.join()
+        # wait for listener to finish on internal stop
+        fst_keyboard.join_listener()
+
+        fst_keyboard.stop_listener()
             
-        mouse_listener.stop()
-        mouse_listener.join()
-            
-    if focus_active:       
-        if focus_thread.is_alive():
-            focus_thread.end()
-            focus_thread.join()
+    fst_keyboard.focus_manager.stop_focus_thread()
     
     fst_keyboard.cli_menu.flush_the_input_buffer()
-        
-    sleep(0.5)
 
     sys.exit(1)
 
+
 if __name__ == "__main__":       
-    focus_mgr = Focus_Group_Manager()
-    config_mgr = Config_Manager(CONSTANTS.FILE_NAME, focus_mgr)
-    fst_keyboard = FST_Keyboard(config_mgr, focus_manager=focus_mgr)
     
-    fst_keyboard.args.apply_start_args_by_focus_name()
+    fst_keyboard = FST_Keyboard()
     
-    if fst_keyboard.args.STATUS_INDICATOR:
+    fst_keyboard.update_args_and_groups()
+    
+    if fst_keyboard.arg_manager.STATUS_INDICATOR:
         main_thread = Thread(target=main)
         main_thread.start()
         # waiting for the rest of the program to finish loading 
-        sleep(1)
+        sleep(0.5)
         try:
             root = tk.Tk()
             indicator = Status_Indicator(root, fst_keyboard)

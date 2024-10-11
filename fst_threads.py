@@ -1,6 +1,6 @@
 '''
 Free-Snap-Tap V1.1
-last updated: 241008-1643
+last updated: 241010-0028
 '''
 
 from threading import Thread # to play aliases without interfering with keyboard listener
@@ -27,7 +27,7 @@ class Alias_Thread(Thread):
         to_be_played_key_events = []
         try:   
             # Key_events ans Keys here ...
-            if self._fst.args.DEBUG2:
+            if self._fst.arg_manager.DEBUG2:
                 print(f"D2: > playing macro: {self.trigger_group} :: {self.key_group}")
             for key_event in self.key_group:
                 
@@ -35,7 +35,7 @@ class Alias_Thread(Thread):
                 constraint_fulfilled, delay_times = self._fst.output_manager.check_constraint_fulfillment(key_event, get_also_delays=True)
                 if constraint_fulfilled:
                     to_be_played_key_events.append([key_event, delay_times])
-                    if self._fst.args.DEBUG2:
+                    if self._fst.arg_manager.DEBUG2:
                         print(f"D2: >> will play '{key_event}' with delays: {delay_times}")
 
             for key_event, delay_times in to_be_played_key_events:
@@ -136,7 +136,7 @@ class Focus_Thread(Thread):
                 pass
             
             if active_window not in ["FST Status Indicator", "FST Crosshair"]:
-                if not self.FOCUS_THREAD_PAUSED and not self._fst.args.MANUAL_PAUSED:
+                if not self.FOCUS_THREAD_PAUSED and not self._fst.arg_manager.MANUAL_PAUSED:
         
                     if active_window != last_active_window or manually_paused:
                         if active_window != last_active_window:
@@ -159,7 +159,7 @@ class Focus_Thread(Thread):
                                 self._fst.update_args_and_groups(focus_name)
                                 self._fst.cli_menu.update_group_display()
                                 self._fst.cli_menu.display_focus_found(active_window)
-                                self._fst.args.WIN32_FILTER_PAUSED = False
+                                self._fst.arg_manager.WIN32_FILTER_PAUSED = False
 
                             except Exception as error:
                                 print('--- reloading of groups files failed - not resumed, still paused ---')
@@ -167,14 +167,14 @@ class Focus_Thread(Thread):
                         
                         else:
                             self._fst.focus_manager.FOCUS_APP_NAME = ''
-                            if self._fst.args.WIN32_FILTER_PAUSED:
+                            if self._fst.arg_manager.WIN32_FILTER_PAUSED:
                                 print(f"> Active Window: {active_window}")
 
                             else:
                                 self._fst.update_args_and_groups()
                                 self._fst.cli_menu.update_group_display()
                                 self._fst.cli_menu.display_focus_not_found()
-                                self._fst.args.WIN32_FILTER_PAUSED = True 
+                                self._fst.arg_manager.WIN32_FILTER_PAUSED = True 
                                 print(f"> Active Window: {active_window}")
                                         
                         
@@ -191,7 +191,7 @@ class Focus_Thread(Thread):
         if self.FOCUS_THREAD_PAUSED:
             # with self.paused_lock:
             self.FOCUS_THREAD_PAUSED = False
-            self._fst.args.MANUAL_PAUSED = False
+            self._fst.arg_manager.MANUAL_PAUSED = False
 
     def end(self):
         self.stop = True

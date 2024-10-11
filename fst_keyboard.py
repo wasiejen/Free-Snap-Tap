@@ -1,20 +1,21 @@
 '''
 Free-Snap-Tap V1.1
-last updated: 241008-2259
+last updated: 241010-0144
 '''
 
 from pynput import keyboard, mouse
 from threading import Event # to play aliases without interfering with keyboard listener
 from time import time # sleep(0.005) = 5 ms
 from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_dict.py
+import pprint
+
 from fst_data_types import Key_Event, Key_Group, Key, Tap_Group
 from fst_threads import Alias_Thread
-from fst_manager import CONSTANTS, CLI_menu, type_check
-from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager, Input_State_Manager
+from fst_manager import CONSTANTS, CLI_menu
+from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager 
+from fst_manager import Input_State_Manager, Config_Manager
 
-import pprint
-        
-        
+   
 class FST_Keyboard():
     '''
     #XXX
@@ -37,18 +38,15 @@ class FST_Keyboard():
     TIME_DIFF = None
     START_TIME = None
         
-    def __init__(self, config_manager, focus_manager = None, args = None):
+    def __init__(self):
         
-        self._config_manager = config_manager
-        if focus_manager is None:
-            self._focus_manager = Focus_Group_Manager()
-        else:
-            self._focus_manager = focus_manager
+        # self._focus_manager = Focus_Group_Manager() if focus_manager is None else focus_manager
+        # self._config_manager = config_manager(CONSTANTS.FILE_NAME, self._focus_manager) if config_manager is None else config_manager
+        # self._args = Argument_Manager(self) if args is None else args
+        self._focus_manager = Focus_Group_Manager(self) 
+        self._config_manager = Config_Manager(CONSTANTS.FILE_NAME, self._focus_manager) 
+        self._args = Argument_Manager(self) 
 
-        if args is None:
-            self._args = Argument_Manager(self)
-        else:
-            self._args = args
             
         self._output_manager = Output_Manager(self)
         self._state_manager = Input_State_Manager(self)
@@ -67,25 +65,26 @@ class FST_Keyboard():
         self._macro_thread_dict = {}
         self._macros_sequence_counter_dict = {}
         
-        # self._listener = None
-        # self._mouse_listener = None
+        self._mouse_listener = None
+        self._listener = None
+            
+    def init_listener(self):
+        self._mouse_listener = mouse.Listener(win32_event_filter=self.mouse_win32_event_filter)
+        self._listener = keyboard.Listener(win32_event_filter=self.keyboard_win32_event_filter)
         
-    @property
-    def listener(self):
-        return self._listener  # Return a copy to prevent external modification
-    @listener.setter
-    @type_check(keyboard.Listener)
-    def listener(self, new_listener):
-        self._listener = new_listener
+    def start_listener(self):
+        if self._mouse_listener is None or self._listener is None:
+            self.init_listener()
+        self._listener.start()
+        self._mouse_listener.start()
         
-    @property
-    def mouse_listener(self):
-        return self._mouse_listener  # Return a copy to prevent external modification
-    @mouse_listener.setter
-    @type_check(mouse.Listener)
-    def mouse_listener(self, new_listener):
-        self._mouse_listener = new_listener
-    
+    def stop_listener(self):
+        self._listener.stop()
+        self._mouse_listener.stop()
+        
+    def join_listener(self):
+        self._listener.join()
+
     @property
     def focus_manager(self):
         return self._focus_manager
@@ -93,7 +92,7 @@ class FST_Keyboard():
     def state_manager(self):
         return self._state_manager
     @property
-    def args(self):
+    def arg_manager(self):
         return self._args
     @property
     def output_manager(self):
@@ -160,7 +159,7 @@ class FST_Keyboard():
                 delays = temp_delays
                 
             else:
-                delays = [self.args.ALIAS_MAX_DELAY_IN_MS, self.args.ALIAS_MIN_DELAY_IN_MS]
+                delays = [self.arg_manager.ALIAS_MAX_DELAY_IN_MS, self.arg_manager.ALIAS_MIN_DELAY_IN_MS]
                 
             # if string empty, stop
             if key == '':
@@ -307,20 +306,22 @@ class FST_Keyboard():
     def update_args_and_groups(self, focus_name = ''):
         self._state_manager.release_all_currently_pressed_keys()
         self._state_manager.stop_all_repeating_keys()
-        self.args.reset_global_variable_changes()
-        self.args.apply_start_args_by_focus_name(focus_name)    
+        self.arg_manager.reset_global_variable_changes()
+        self.arg_manager.apply_start_args_by_focus_name(focus_name)    
         self.apply_focus_groups(focus_name)    
 
     def mouse_win32_event_filter(self, msg, data):#
         '''
-        data:
-        typedef struct tagMSLLHOOKSTRUCT {
-        POINT     pt;
-        DWORD     mouseData;
-        DWORD     flags;
-        DWORD     time;
-        ULONG_PTR dwExtraInfo;
+        
         '''
+        # data:
+        # typedef struct tagMSLLHOOKSTRUCT {
+        # POINT     pt;
+        # DWORD     mouseData;
+        # DWORD     flags;
+        # DWORD     time;
+        # ULONG_PTR dwExtraInfo;
+
         # no mousedata for left, right, middle
         # mousedata for x1: 65536: 2^16
         # mousedata for x2: 131072: 2x2^16
@@ -380,12 +381,6 @@ class FST_Keyboard():
         # skip_event = False
         # # mouse movement
         # if msg == MSG_MOUSE_MOVE:
-        #     skip_event = True
-        # veritcal scoll
-        # if msg == MSG_MOUSE_SCROLL_VERTICAL:
-        #     skip_event = True
-        # # horizontal scroll
-        # if msg == MSG_MOUSE_SCROLL_HORIZONTAL:
         #     skip_event = True
 
         if not msg == FST_Keyboard.MSG_MOUSE_MOVE:
@@ -462,7 +457,8 @@ class FST_Keyboard():
         current_ke = Key_Event(vk_code, is_keydown)
         
         if CONSTANTS.DEBUG4:
-            print(f"D4:->-> IN  ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
+            # print(f"D4:->{"->" if is_simulated else ""} IN  ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
+            print(f"D4: {"-- | ->" if is_simulated else "->"} IN  ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
 
         # get the time difference from system time to the key_event_time
         if FST_Keyboard.TIME_DIFF is None:
@@ -472,7 +468,7 @@ class FST_Keyboard():
             self.state_manager.init_all_key_times_to_starting_time(key_event_time)
         
         # to help identify vk_codes on key presses
-        if self.args.PRINT_VK_CODES or CONSTANTS.DEBUG:
+        if self.arg_manager.PRINT_VK_CODES or CONSTANTS.DEBUG:
         # if True:
             print(f"D1: time: {key_event_time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
 
@@ -514,7 +510,7 @@ class FST_Keyboard():
                 self.check_control_actions()
  
             # Replace some Buttons :-D
-            if not self.args.WIN32_FILTER_PAUSED and not self.args.PRINT_VK_CODES:
+            if not self.arg_manager.WIN32_FILTER_PAUSED and not self.arg_manager.PRINT_VK_CODES:
                 
                 if not to_be_suppressed:
                     'REBINDS HANDLING'
@@ -554,7 +550,7 @@ class FST_Keyboard():
                         self.state_manager.remove_key_press_state(old_ke.vk_code)
                         self.state_manager.manage_key_press_states_by_event(current_ke)
                         if CONSTANTS.DEBUG4:
-                           print(f"D4: updated replacmenet key {current_ke}, removed {old_ke}") 
+                           print(f"D4: -- rebind found: {old_ke} -> {current_ke}") 
                                                                                  
                     'STOP REPEATED KEYS FROM HERE'        
                     # prevent evaluation of repeated key events
@@ -568,13 +564,13 @@ class FST_Keyboard():
                             if current_ke.is_toggle:
                                 if old_ke.is_press:
                                     toggle_ke = self.state_manager.get_next_toggle_state_key_event(current_ke)
-                                    if CONSTANTS.DEBUG3:
-                                        print(f"D3: toggle arrived: {current_ke} -> {toggle_ke}")
+                                    if CONSTANTS.DEBUG4:
+                                        print(f"D4: -- toggle arrived: {current_ke} -> {toggle_ke}")
                                     current_ke = toggle_ke
                                 else:
                                     # key up needs to be supressed or else it will be evaluated 2 times each tap
-                                    if CONSTANTS.DEBUG3:
-                                        print(f"D3: toggle suppress: {current_ke}")
+                                    if CONSTANTS.DEBUG4:
+                                        print(f"D4: -- toggle suppress: {current_ke}")
                                     to_be_suppressed = True
 
                         # reset toggle state of key manually released - so toggle will start anew by pressing the key
@@ -625,13 +621,13 @@ class FST_Keyboard():
                                 if CONSTANTS.DEBUG:
                                     print("D1: > playing makro:", trigger_group)
                                     
-                                if self.args.EXEC_ONLY_ONE_TRIGGERED_MACRO:
+                                if self.arg_manager.EXEC_ONLY_ONE_TRIGGERED_MACRO:
                                     break
                 
                 'TAP GROUP EVALUATION HERE'
                 # Snap Tap Part of Evaluation
                 # Intercept key events if not PAUSED
-                if not self.args.WIN32_FILTER_PAUSED and not self.args.PRINT_VK_CODES:
+                if not self.arg_manager.WIN32_FILTER_PAUSED and not self.arg_manager.PRINT_VK_CODES:
                     vk_code, is_keydown, _ = current_ke.get_all()
                     if CONSTANTS.DEBUG: 
                         print("D1: tap group #0")
@@ -694,9 +690,11 @@ class FST_Keyboard():
                     print(f"D2: {current_ke} may be contrary to real input: real press is: {self.state_manager.get_real_key_press_state(vk_code)}")
                 # if it is a toggle key, then let it through even if it contradicts real key state
                 if vk_code in self.state_manager.toggle_states_dict_keys:
+                    if CONSTANTS.DEBUG2:
+                        print(f"D2 not suppressed {current_ke} because it is toggle")
                     pass
                 # 241009-1456
-                if not is_mouse_event and self.state_manager.get_key_press_state(vk_code):
+                elif not is_mouse_event and self.state_manager.get_key_press_state(vk_code):
                     if CONSTANTS.DEBUG2:
                         print(f"D2 suppressed {current_ke} because it would release real key press state")
                     to_be_suppressed = True
@@ -708,20 +706,15 @@ class FST_Keyboard():
             
             # 241009-1541 if real key was used in a macro, remove it from pressed key set, 
             # to be not used to filter out opposing sim keys
-            # if not is_simulated and not key_replaced:
             if alias_fired:
                 self.state_manager.remove_key_press_state(current_ke.vk_code)
                 if CONSTANTS.DEBUG4:
-                    print(f"D4: removed {current_ke} from pressed keys")
-            
-            if key_replaced and current_ke.is_toggle:
-                ###XXX even needed anymore???
-                if CONSTANTS.DEBUG4:
-                    print(f"D4: not suppressed bec of toggle: {current_ke}")
-            else:
-                if CONSTANTS.DEBUG4:
-                    print(f"D4:---- SUPPRESSED: {current_ke}")
-                self._listener.suppress_event()     
+                    print(f"D4: -- removed {current_ke} from pressed keys")
+            if CONSTANTS.DEBUG4:
+                # print(f"D4:--{"--" if is_simulated else ""} SUPPRESSED: {current_ke}")
+                print(f"D4: {"-- | XX" if is_simulated else "XX"} SUPPRESSED: {current_ke}")
+
+            self._listener.suppress_event()     
                 
         # everything that will be send arrives here      
         vk_code, is_keydown, _ = current_ke.get_all()
@@ -734,7 +727,8 @@ class FST_Keyboard():
                 self.state_manager.set_simulated_key_press_state(vk_code, current_ke.is_press)
             
         if CONSTANTS.DEBUG4:
-            print(f"D4:<-<- OUT ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
+            # print(f"D4:<-{"<-" if is_simulated else ""} OUT ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
+            print(f"D4: {"-- | <-" if is_simulated else "<-"} OUT ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
                         
 
     def check_for_combination(self, vk_codes):                 
@@ -747,7 +741,7 @@ class FST_Keyboard():
     
     def check_control_actions(self):
         'CONTROLS HERE'
-        if self.args.CONTROLS_ENABLED:                  
+        if self.arg_manager.CONTROLS_ENABLED:                  
                     # # Stop the listener if the MENU combination is pressed
             if self.check_for_combination(CONSTANTS.MENU_Combination):
                 self.control_return_to_menu()  
@@ -781,8 +775,8 @@ class FST_Keyboard():
             pprint.pp(f"all_key_state: {self.state_manager._all_key_press_states_dict}")
 
     def control_return_to_menu(self):
-        self.args.MENU_ENABLED = True
-        self.args.WIN32_FILTER_PAUSED = True
+        self.arg_manager.MENU_ENABLED = True
+        self.arg_manager.WIN32_FILTER_PAUSED = True
         print('--- Stopping - Return to menu ---')
         if CONSTANTS.DEBUG3:
             print(f"D3: return to menu with pressed keys: \n {self.state_manager._real_key_press_states_dict}")
@@ -797,29 +791,29 @@ class FST_Keyboard():
         self.state_manager.stop_all_repeating_keys()
         self._mouse_listener.stop()
         self._listener.stop()
-        self.args.STOPPED = True
+        self.arg_manager.STOPPED = True
         exit()
 
     def control_toggle_pause(self):
-        if self.args.WIN32_FILTER_PAUSED:
-            self.args.reset_global_variable_changes()
-            self.args.apply_start_args_by_focus_name(self._focus_manager.FOCUS_APP_NAME)
+        if self.arg_manager.WIN32_FILTER_PAUSED:
+            self.arg_manager.reset_global_variable_changes()
+            self.arg_manager.apply_start_args_by_focus_name(self._focus_manager.FOCUS_APP_NAME)
             self.apply_focus_groups(self._focus_manager.FOCUS_APP_NAME)
             self.cli_menu.clear_cli()
             self._config_manager.display_groups()
             print("\n--- reloaded sucessfully ---")
             print('--- manuelly resumed ---\n')
-            if self.args.CONTROLS_ENABLED:
+            if self.arg_manager.CONTROLS_ENABLED:
                 self.cli_menu.display_control_text()
             # with paused_lock:
-            self.args.WIN32_FILTER_PAUSED = False
-            self.args.MANUAL_PAUSED = False
+            self.arg_manager.WIN32_FILTER_PAUSED = False
+            self.arg_manager.MANUAL_PAUSED = False
 
         else:
             print('--- manually paused ---')
             # with paused_lock:
-            self.args.WIN32_FILTER_PAUSED = True
-            self.args.MANUAL_PAUSED = True
+            self.arg_manager.WIN32_FILTER_PAUSED = True
+            self.arg_manager.MANUAL_PAUSED = True
             self.state_manager.release_all_currently_pressed_keys()
             self.state_manager.stop_all_repeating_keys() 
             

@@ -66,9 +66,11 @@
 - fix focus lines comments not being stripped
   - fixed and upgraded to also stripping leading or trailing whitespaces
 - reset of toggle via real key is working again
+- not working when using no focus name
+- toggle key is broken ... AGAIN ... - fixed
 
 ### todo
-- how to make it work again without a focus name?
+
 
 - alt key gets stuck when tapping out of focus game with alt+tab
 

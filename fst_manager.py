@@ -1,6 +1,6 @@
 '''
 Free-Snap-Tap V1.1
-last updated: 241008-2258
+last updated: 241010-0144
 '''
 
 from pynput import keyboard, mouse
@@ -11,8 +11,8 @@ import msvcrt # to flush input stream
 from random import randint # randint(3, 9)) 
 from time import time, sleep # sleep(0.005) = 5 ms
 import pprint
-from fst_data_types import Key_Event
-from fst_threads import Repeat_Thread
+from fst_data_types import Key_Event, type_check
+from fst_threads import Repeat_Thread, Focus_Thread
 
 class CONSTANTS():
 
@@ -33,16 +33,6 @@ class CONSTANTS():
     TOGGLE_ON_OFF_Combination = ["alt", "delete"]
     MENU_Combination = ["alt", "page_down"]  
 
-
-# decorator data type_check
-def type_check(expected_type):
-    def decorator(func):
-        def wrapper(self, value):
-            if not isinstance(value, expected_type):
-                raise TypeError(f"Expected {expected_type}, got {type(value)}")
-            return func(self, value)
-        return wrapper
-    return decorator
 
 class Output_Manager():
     
@@ -115,7 +105,7 @@ class Output_Manager():
     def execute_key_event(self, key_event, delay_times = [], with_delay=False, stop_event=None):
         
         if len(delay_times) == 0:
-            delay_times = [self._fst.args.ALIAS_MAX_DELAY_IN_MS, self._fst.args.ALIAS_MIN_DELAY_IN_MS]
+            delay_times = [self._fst.arg_manager.ALIAS_MAX_DELAY_IN_MS, self._fst.arg_manager.ALIAS_MIN_DELAY_IN_MS]
         elif len(delay_times) == 1:
             delay_times = delay_times*2
         elif len(delay_times) == 2:
@@ -180,7 +170,8 @@ class Output_Manager():
                     if CONSTANTS.DEBUG2:
                         print(f"vk_code: {vk_code} time released: {key_time}")
                 except KeyError as error:
-                    print(f"time_release: no value yet for vk_code: {error}")     
+                    if CONSTANTS.DEBUG2:
+                        print(f"time_release: no value yet for vk_code: {error}")     
                     return 0
             else:
                 try:
@@ -188,7 +179,8 @@ class Output_Manager():
                     if CONSTANTS.DEBUG2:
                         print(f"vk_code: {vk_code} time pressed: {key_time}")
                 except KeyError as error:
-                    print(f"time_press: no value yet for vk_code: {error}")
+                    if CONSTANTS.DEBUG2:
+                        print(f"time_press: no value yet for vk_code: {error}")
                     return 0
             return key_time
         
@@ -299,7 +291,6 @@ class Output_Manager():
                     if CONSTANTS.DEBUG2:
                         print(f"D2: {current_ke}-repeat: still alive - try to stop")
                     stop_event.set()
-                    ##1
                     repeat_thread.join()
             except KeyError:
                 # this thread was not started before
@@ -310,15 +301,15 @@ class Output_Manager():
             try:
                 repeat_thread, stop_event = self._repeat_thread_dict[current_ke]
                 if repeat_thread.is_alive():
-                    print(f"stopping repeat for {current_ke}")
+                    # print(f"stopping repeat for {current_ke}")
                     stop_event.set()
                     repeat_thread.join()
                 else:
-                    #print(f"{current_ke} restarting repeat")
+                    # print(f"{current_ke} restarting repeat")
                     repeat(key_string)
             except KeyError:
                 # this thread was not started before
-                #print(f"{current_ke} starting repeat for first time")
+                # print(f"{current_ke} starting repeat for first time")
                 repeat(key_string)
             return False
         
@@ -408,7 +399,7 @@ class Output_Manager():
                     # only use crossover when changinging keys, or else repeating will make movement stutter
                     if key_to_send != last_key_send:
                         # only use crossover is activated and probility is over percentage
-                        is_crossover = randint(0,100) > (100 - self._fst.args.ACT_CROSSOVER_PROPABILITY_IN_PERCENT) and self._fst.args.ACT_CROSSOVER # 50% possibility
+                        is_crossover = randint(0,100) > (100 - self._fst.arg_manager.ACT_CROSSOVER_PROPABILITY_IN_PERCENT) and self._fst.arg_manager.ACT_CROSSOVER # 50% possibility
                     if is_crossover:
                         if CONSTANTS.DEBUG: 
                             print("D1: crossover")
@@ -416,8 +407,8 @@ class Output_Manager():
                     else:
                         self._keyboard_controller.release(key_code_last_key_send) 
                     # random delay if activated
-                    if self._fst.args.ACT_DELAY or self._fst.args.ACT_CROSSOVER: 
-                        delay = randint(self._fst.args.ACT_MIN_DELAY_IN_MS, self._fst.args.ACT_MAX_DELAY_IN_MS)
+                    if self._fst.arg_manager.ACT_DELAY or self._fst.arg_manager.ACT_CROSSOVER: 
+                        delay = randint(self._fst.arg_manager.ACT_MIN_DELAY_IN_MS, self._fst.arg_manager.ACT_MAX_DELAY_IN_MS)
                         if CONSTANTS.DEBUG: 
                             print(f"D1: delayed by {delay} ms")
                         sleep(delay / 1000) # in ms
@@ -843,12 +834,16 @@ class Focus_Group_Manager():
     '''
     #XXX
     '''
-    def __init__(self):
+    def __init__(self, fst_keyboard):
+        self._fst = fst_keyboard
         self._multi_focus_dict = {}
         self._multi_focus_dict_keys = []
         self._default_start_arguments = []
         self._default_group_lines = []
         self.FOCUS_APP_NAME = ''
+        
+        self.focus_active = False
+        self._focus_thread  = None
     
     @property
     def multi_focus_dict(self):
@@ -895,6 +890,31 @@ class Focus_Group_Manager():
     @type_check(str)
     def FOCUS_APP_NAME(self, new_str):
         self._FOCUS_APP_NAME = new_str
+        
+    def init_focus_thread(self):
+        if len(self._multi_focus_dict_keys) > 0:
+            self.focus_active = True
+            self._focus_thread = Focus_Thread(self._fst)
+        else:
+            self.focus_active = False
+        return self.focus_active
+            
+    def pause_focus_thread(self):
+        if self.focus_active and self._focus_thread.is_alive():
+            self._focus_thread.pause()
+        
+    def start_focus_thread(self):
+        if self.focus_active and self._focus_thread.is_alive():
+            self._focus_thread.start()
+        
+    def restart_focus_thread(self):
+        if self.focus_active and self._focus_thread.is_alive():
+            self._focus_thread.restart()
+        
+    def stop_focus_thread(self):
+        if self.focus_active and self._focus_thread.is_alive():
+            self._focus_thread.end()
+            self._focus_thread.join()
     
 class Input_State_Manager():
     '''
@@ -931,7 +951,6 @@ class Input_State_Manager():
         # time_all = [time_all_last_pressed, time_all_last_released, time_all_released, time_all_pressed]
         self._time_all = [{}, {}, {}, {}]
       
-    ###XXX 241009-1450   
     @property
     def pressed_keys(self):
         return self._pressed_keys
@@ -992,9 +1011,6 @@ class Input_State_Manager():
     def time_all(self):
         return self._time_all
 
-
-    ###XXX 241009-1450 
-
     def get_key_press_state(self, vk_code):
         return vk_code in self._pressed_keys
     
@@ -1016,20 +1032,17 @@ class Input_State_Manager():
         if CONSTANTS.DEBUG3:
             pprint.pp(f"pressed keys: {self._pressed_keys}")
 
-    ###
-
-
     def get_next_toggle_state_key_event(self, key_event):
         vk_code, _, constraints = key_event.get_all()
         is_press_toggle = self.get_toggle_state(vk_code)
         self.set_toggle_state(vk_code, not is_press_toggle)
-        ###XXX 241009-1043
         return Key_Event(vk_code, not is_press_toggle, constraints, key_string = key_event.key_string, is_toggle=True)
 
     def set_toggle_state_to_curr_ke(self, key_event):
         vk_code, is_press, _ =  key_event.get_all()
         if vk_code in self._toggle_states_dict_keys:
-            print(f"toogle state for {key_event} updated")
+            if CONSTANTS.DEBUG4:
+                print(f"D4: -- toggle state for {key_event} updated")
             self.set_toggle_state(vk_code, is_press)
 
     def stop_all_repeating_keys(self):
@@ -1047,7 +1060,24 @@ class Input_State_Manager():
     def release_all_currently_pressed_keys(self):
         ###XXX 241009-1049 do not release real keys, 241009-1100 now again release all keys - works better
         if CONSTANTS.DEBUG2:
-            print(f"D2: releasing all keys")
+            print("D2: releasing all keys")
+
+        self.release_all_modifier_keys()
+                
+        # release remaining simulated keys
+        for vk_code, is_press in self._all_key_press_states_dict.items(): 
+            if is_press:
+                # only reset simulated keys
+                if self.get_simulated_key_press_state(vk_code) is True:
+                # if self.get_simulated_key_press_state(vk_code) is True and not vk_code in self.pressed_keys:
+                    if CONSTANTS.DEBUG2:
+                        print(f"D2: released key: {vk_code}")
+                    self._fst.output_manager.send_key_event(Key_Event(vk_code, False))       
+        
+        self.release_all_toggles()
+        self.reset_states_dicts()
+    
+    def release_all_modifier_keys(self):
         # first release all modifert keys
         for vk_code in Input_State_Manager.ALL_MODIFIER_KEYS:
             ###XXX 241009-1603
@@ -1058,24 +1088,6 @@ class Input_State_Manager():
                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
                 self.set_simulated_key_press_state(vk_code, False)
                 
-        # release remaining simulated keys
-        for vk_code, is_press in self._all_key_press_states_dict.items(): 
-            if is_press:
-                # only reset simulated keys
-                if self.get_simulated_key_press_state(vk_code) is True:
-                # if self.get_simulated_key_press_state(vk_code) is True and not vk_code in self.pressed_keys:
-                    if CONSTANTS.DEBUG2:
-                        print(f"D2: released key: {vk_code}")
-                    self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
-                # but overwrite all key states with False
-                #self.set_all_key_press_state(vk_code, False)     
-                
-                
-                # self.set_real_key_press_state(vk_code, False)         
-                # self.set_simulated_key_press_state(vk_code, False)         
-        self.reset_states_dicts()
-        self.release_all_toggles()
-    
     def reset_states_dicts(self):
         self._pressed_keys = set()
         self._real_key_press_states_dict = {}
@@ -1139,7 +1151,7 @@ class CLI_menu():
         """
         Display the menu and handle user input
         """
-        self._fst.args.PRINT_VK_CODES = False
+        self._fst.arg_manager.PRINT_VK_CODES = False
         invalid_input = False
         text = ""
         while True:       
@@ -1169,11 +1181,11 @@ class CLI_menu():
             elif choice == '1':
                 startfile(self._fst.config_manager.file_name)
             elif choice == '2':
-                self._fst.args.reset_global_variable_changes()
-                self._fst.args.apply_start_args_by_focus_name(self._fst.focus_manager.FOCUS_APP_NAME)
+                self._fst.arg_manager.reset_global_variable_changes()
+                self._fst.arg_manager.apply_start_args_by_focus_name(self._fst.focus_manager.FOCUS_APP_NAME)
                 self._fst.apply_focus_groups(self._fst.focus_manager.FOCUS_APP_NAME)
             elif choice == '3':
-                self._fst.args.PRINT_VK_CODES = True
+                self._fst.arg_manager.PRINT_VK_CODES = True
                 break
             elif choice == '4':
                 exit()
@@ -1192,7 +1204,7 @@ class CLI_menu():
         self.clear_cli()
         
         self._fst.config_manager.display_groups()
-        if self._fst.args.CONTROLS_ENABLED:
+        if self._fst.arg_manager.CONTROLS_ENABLED:
             self.display_control_text()   
             
     def display_focus_names(self):
