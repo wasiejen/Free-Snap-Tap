@@ -23,8 +23,8 @@ CONSTANTS.DEBUG3 = False
 # CONSTANTS.DEBUG3 = True
 
 # debug options on numpad numbers - if you use them do not turn on
-# CONSTANTS.DEBUG_NUMPAD = False
-CONSTANTS.DEBUG_NUMPAD = True
+CONSTANTS.DEBUG_NUMPAD = False
+# CONSTANTS.DEBUG_NUMPAD = True
 
 # Define File name for saving of everything, can be any filetype
 # But .txt or .cfg recommended for easier editing

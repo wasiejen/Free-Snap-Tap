@@ -874,7 +874,7 @@ class FST_Keyboard():
             macro_to_reset.reset_sequence_counter()
             print(f"--- Macro ({alias_name}) reseted successfully by {current_ke}")
         except KeyError:
-            raise KeyError(f"--- No Macro with name {alias_name} - reset failed")
+            print(f"--- No Macro Sequence with name {alias_name} - reset failed")
         
         
     def reset_macro_sequence_by_reset_code(self, vk_code, trigger_group = None):
