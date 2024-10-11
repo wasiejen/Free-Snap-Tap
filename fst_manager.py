@@ -1265,7 +1265,7 @@ class CLI_menu():
             choice = input("\nHit [Enter] to start or enter your choice: " )
 
             if choice == '0':
-                CONSTANTS.DEBUG2 = not CONSTANTS.DEBUG2
+                CONSTANTS.DEBUG4 = not CONSTANTS.DEBUG4
             elif choice == '1':
                 startfile(self._fst.config_manager.file_name)
             elif choice == '2':
