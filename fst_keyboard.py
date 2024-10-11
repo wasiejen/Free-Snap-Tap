@@ -10,7 +10,7 @@ from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_d
 import pprint
 
 from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro
-from fst_threads import Alias_Thread
+from fst_threads import Macro_Thread
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager 
 from fst_manager import Input_State_Manager, Config_Manager
@@ -44,7 +44,7 @@ class FST_Keyboard():
         # self._config_manager = config_manager(CONSTANTS.FILE_NAME, self._focus_manager) if config_manager is None else config_manager
         # self._args = Argument_Manager(self) if args is None else args
         self._focus_manager = Focus_Group_Manager(self) 
-        self._config_manager = Config_Manager(CONSTANTS.FILE_NAME, self._focus_manager) 
+        self._config_manager = Config_Manager(CONSTANTS.FILE_NAME) 
         self._args = Argument_Manager(self) 
 
             
@@ -67,6 +67,8 @@ class FST_Keyboard():
         # colletor of all rebinds and macros, not used for anything yet 241011-1117
         self._rebinds = []
         self._macros = []
+        self._macros_alias_dict = {}
+        self._macro_sequence_alias_list = []
         
         self._mouse_listener = None
         self._listener = None
@@ -109,6 +111,9 @@ class FST_Keyboard():
     @property
     def macro_thread_dict(self):
         return self._macro_thread_dict
+    @property
+    def macro_sequence_alias_list(self):
+        return self._macro_sequence_alias_list
     
     def convert_to_vk_code(self, key):
         '''
@@ -125,7 +130,7 @@ class FST_Keyboard():
                 print(error)
                 raise KeyError
 
-    def initialize_groups(self):
+    def initialize_groups_from_presorted_lines(self):
         '''
         in new form there are rebinds and macros
         rebind are Key_Group -> Key_Event
@@ -139,69 +144,98 @@ class FST_Keyboard():
         self._macro_triggers = []
         self._all_trigger_events = []
         
-        def extract_data_from_key(key):
+        def extract_data_from_key(key_string):           
             #separate delay info from string
-            if '|' in key:
-                key, *delays = key.split('|')
+            if '|' in key_string:
+                key_string, *constraints = key_string.split('|')
                 if CONSTANTS.DEBUG: 
-                    print(f"D1: delays for {key}: {delays}")
+                    print(f"D1: delays for {key_string}: {constraints}")
                 temp_delays = []
                 # constraints = []
-                for delay in delays:
-                    if delay.startswith('('):
+                for constraint in constraints:
+                    if constraint.startswith('('):
                         # clean the brackets
-                        delay = delay[1:-1]
-                        # IDEA ##1
-                        # could look for tr(, ts( or ta( in it to determine if it is a delay or constraint
-                        temp_delays.append(delay)
+                        constraint = constraint[1:-1]
+                        temp_delays.append(constraint)
                     else:
-                        temp_delays.append(int(delay))
-                delays = temp_delays
+                        temp_delays.append(int(constraint))
+                constraints = temp_delays
                 
             else:
-                delays = [self.arg_manager.ALIAS_MAX_DELAY_IN_MS, self.arg_manager.ALIAS_MIN_DELAY_IN_MS]
+                constraints = [self.arg_manager.ALIAS_MAX_DELAY_IN_MS, self.arg_manager.ALIAS_MIN_DELAY_IN_MS]
                 
             # if string empty, stop
-            if key == '':
+            if key_string == '':
                 return False
         
-            # recognition of mofidiers +, - and #
+            # recognition of mofidiers +, -, !, ^
             # only interpret it as such when more then one char is in key
             key_modifier = None
-            if len(key) > 1: 
-                if key[0] == '-':
+            if len(key_string) > 1: 
+                if key_string[0] == '-':
                     # down key
                     key_modifier = 'down'
-                    key = key.replace('-','',1) # only replace first occurance
-                elif key[0] == '+':
+                    key_string = key_string.replace('-','',1) # only replace first occurance
+                elif key_string[0] == '+':
                     # up key
                     key_modifier = 'up'
-                    key = key.replace('+','',1)
-                elif key[0] == '!':
+                    key_string = key_string.replace('+','',1)
+                elif key_string[0] == '!':
                     # up key
                     key_modifier = 'up'
-                    key = key.replace('!','',1)
-                elif key[0] == '^':
+                    key_string = key_string.replace('!','',1)
+                elif key_string[0] == '^':
                     # up key
                     key_modifier = 'toggle'
-                    key = key.replace('^','',1)
+                    key_string = key_string.replace('^','',1)
 
             # convert string to actual vk_code
-            vk_code = self.convert_to_vk_code(key)
+            vk_code = self.convert_to_vk_code(key_string)
                 
             if key_modifier is None:
-                new_element = (Key(vk_code, constraints=delays, key_string=key))
+                new_element = (Key(vk_code, constraints=constraints, key_string=key_string))
             elif key_modifier == 'down':
-                new_element = (Key_Event(vk_code, True, delays, key_string=key))
+                new_element = (Key_Event(vk_code, True, constraints, key_string=key_string))
             elif key_modifier == 'up':
-                new_element = (Key_Event(vk_code, False, delays, key_string=key))
+                new_element = (Key_Event(vk_code, False, constraints, key_string=key_string))
             elif key_modifier == 'toggle':
-                new_element = (Key(vk_code, constraints=delays, key_string=key, is_toggle=True))
+                new_element = (Key(vk_code, constraints=constraints, key_string=key_string, is_toggle=True))
             return new_element
+        
+        def convert_key_string_group(list_of_strings, is_trigger_group = False):  
+            key_group = []
+            for key_string in list_of_strings:
+                if key_string.startswith('<'):
+                    try:
+                        key_group = key_group + key_group_by_alias[key_string]
+                    except KeyError:
+                        raise KeyError(f"Alias {key_string} is not known")
+                else:   
+                    new_element = extract_data_from_key(key_string)    
+                    if new_element is not False:
+                        if isinstance(new_element, Key_Event):
+                            key_group.append(new_element)
+                        elif isinstance(new_element, Key):
+                            key_press, key_releae = new_element.get_key_events()
+                            key_group.append(key_press)
+                            # if not in trigger group - so Key Instances as triggers are handled correctly
+                            if not is_trigger_group:
+                                key_group.append(key_releae)               
+            return key_group
+
+        # extract aliases 
+        key_group_by_alias = {}
+        try:
+            for alias, group in self.config_manager.alias_hr:
+                key_group_by_alias[alias] = convert_key_string_group(group)
+
+        except Exception as error:
+            print(f"ERROR: {error} \n -> in Alias: {group}")
+            raise Exception(error)
         
         # extract tap groups
         try:
-            for group in self.config_manager.tap_groups_hr:
+            for alias, group in self.config_manager.tap_groups_hr:
                 keys = []
                 for key_string in group:
                     key = self.convert_to_vk_code(key_string)
@@ -213,33 +247,29 @@ class FST_Keyboard():
             
         # extract rebinds
         try:
-            for rebind in self.config_manager.rebinds_hr:
+            for alias, rebind in self.config_manager.rebinds_hr:
                 trigger_group, replacement_key = rebind
                 
                 # evaluate the given key strings
-                new_trigger_group = []
-                for key in trigger_group:
-                    new_element = extract_data_from_key(key)            
-                    if new_element is not False:
-                        new_trigger_group.append(new_element)
+                new_trigger_group = convert_key_string_group(trigger_group, is_trigger_group=True)
                 replacement_key = extract_data_from_key(replacement_key)
                 
                 # check if any given key is a Key Instance - has to be treated differently just to 
                 # be able to use v:8 instead of -v:-8 and +v:+8
-                both_are_Keys = False
+                both_are_Keys = False                
                 if isinstance(new_trigger_group[0], Key) or isinstance(replacement_key, Key):
                     # if one is Key Instance but the other Key_Event -> convert Key_Event into Key
                     if not isinstance(new_trigger_group[0], Key):
                         temp = new_trigger_group[0]
                         new_trigger_group[0] = Key(temp.vk_code, key_string=temp.key_string)    
                     if not isinstance(replacement_key, Key):
-                            temp = replacement_key
-                            replacement_key = Key(temp.vk_code, constraints=temp.constraints, key_string=temp.key_string)
+                        temp = replacement_key
+                        replacement_key = Key(temp.vk_code, constraints=temp.constraints, key_string=temp.key_string)
                     both_are_Keys = True
                 
                 trigger_key, *trigger_rest = new_trigger_group
                 
-                # if both are key_events
+                # if both are key_events create ke:ke
                 if not both_are_Keys:
                     trigger_group = Key_Group(new_trigger_group)
                     ###XXX 241011-1000
@@ -247,6 +277,7 @@ class FST_Keyboard():
                     self._rebinds.append(new_rebind)
                     self._rebind_triggers.append(trigger_group)
                     self._rebinds_dict[trigger_group] = new_rebind
+                # if both are Keys then create 2 Key_Event: Key_Event rebind sinstead
                 else:
                     trigger_events = trigger_key.get_key_events()
                     replacement_events = replacement_key.get_key_events()
@@ -255,8 +286,8 @@ class FST_Keyboard():
                         ###XXX 241011-1000
                         new_rebind = Rebind(trigger_group, replacement_events[index])
                         self._rebinds.append(new_rebind)
-                        self._rebind_triggers.append(trigger_group)
-                        self._rebinds_dict[trigger_group] = new_rebind
+                        self._rebind_triggers.append(new_rebind.trigger_group)
+                        self._rebinds_dict[new_rebind.trigger_group] = new_rebind
 
         except Exception as error:
             print(f"ERROR: {error} \n -> in Rebind: {rebind}")
@@ -264,55 +295,71 @@ class FST_Keyboard():
                     
         # extract macros   
         try:      
-            for macro in self.config_manager.macros_hr:
-                temp_macro = []
-                # trigger j = 0, key_group j = 1
-                for index, key_group in enumerate(macro):
-                    new_key_group = Key_Group([])
-                    for key in key_group:
-                        new_element = extract_data_from_key(key)            
-                        if new_element is not False:
-                            if isinstance(new_element, Key_Event):
-                                new_key_group.append(new_element)
-                            elif isinstance(new_element, Key):
-                                key_events = new_element.get_key_events()
-                                new_key_group.append(key_events[0])
-                                # if not in trigger group - so Key Instances as triggers are handled correctly
-                                if index >= 1: 
-                                    new_key_group.append(key_events[1])
-                    temp_macro.append(new_key_group)
-                new_macro = Macro(temp_macro[0], temp_macro[1:])
+            num = 1
+            for alias, macro in self.config_manager.macros_hr:
+                # convert Keys into Key_Events
+                trigger_group, *key_groups = macro
+                extracted_trigger_group = Key_Group(convert_key_string_group(trigger_group, is_trigger_group=True))
+                extracted_key_groups = []
+                for key_group in key_groups:
+                    key_group = Key_Group(convert_key_string_group(key_group))
+                    extracted_key_groups.append(key_group)
+                new_macro = Macro(extracted_trigger_group, extracted_key_groups)
+                if new_macro.num_sequences > 1: 
+                    if alias != '':
+                        self._macros_alias_dict[alias[1:-1]] = new_macro
+                    else:
+                        ### XXX 241011-1756
+                        # will not be displayed because the human readable collectors do not know this xD
+                        auto_alias = f"seq_{num}"
+                        self._macros_alias_dict[auto_alias] = new_macro
+                        num += 1
                 self._macros.append(new_macro)
-                self._macro_triggers.append(temp_macro[0])
-                self._macros_dict[temp_macro[0]] = new_macro
+                self._macro_triggers.append(new_macro.trigger_group)
+                self._macros_dict[new_macro.trigger_group] = new_macro
                 
         except Exception as error:
             print(f"ERROR: {error} \n -> in Macro: {macro}")
             raise Exception(error)
 
-        # if CONSTANTS.DEBUG3:
-        #     pprint.pp(f"\nD3: tap_groups: {self._tap_groups}")
-        #     pprint.pp(f"\nD3: rebinds_dict: {self._rebinds_dict}")
-        #     pprint.pp(f"\nD3: macros_dictps: {self._macros_dict}")
+        if CONSTANTS.DEBUG3:
+            print(f"\nD3: tap_groups: {self._tap_groups}")
+            print("\nD3: rebinds:")
+            for trigger, key_event in self._rebinds_dict.items():
+                print(f"{trigger} > {key_event}")
+            print("\nD3: macros:")
+            for trigger, *groups in self._macros_dict.items():
+                print(f"{trigger} > {groups}")
+
+            # print(f"\nD3: macros_dictps: {self._macros_dict}")
             
         # extract all triggers for suppression of repeated keys: test V1.0.2.1 Bugfix
         all_triggers = self._rebind_triggers + self._macro_triggers
         for trigger_group in all_triggers:
-            self._all_trigger_events.append(trigger_group.get_trigger())
+            self._all_trigger_events.append(trigger_group.get_trigger())#
+        
+        self._macro_sequence_alias_list = self._macros_alias_dict.keys()
+
+            
+        
     
     def apply_focus_groups(self, focus_name = ''):
         if focus_name != '':
             _, focus_group_lines = self.focus_manager.multi_focus_dict[focus_name]
         else:
             _, focus_group_lines = [],[]
-        self._config_manager.presort_lines(self.focus_manager.default_group_lines + focus_group_lines)
-        self.initialize_groups()
+        default_lines = self.focus_manager.alias_lines + self.focus_manager.default_group_lines
+        self._config_manager.presort_lines(default_lines + focus_group_lines)
+        self.initialize_groups_from_presorted_lines()
         
+    def update_focus_groups(self):
+        self.focus_manager.update_groups_from_config(self.config_manager.load_config())
+
     def update_args_and_groups(self, focus_name = ''):
         self._state_manager.release_all_currently_pressed_keys()
         self._state_manager.stop_all_repeating_keys()
         self.arg_manager.reset_global_variable_changes()
-        self.arg_manager.apply_start_args_by_focus_name(focus_name)    
+        self.apply_start_args_by_focus_name(focus_name)    
         self.apply_focus_groups(focus_name)    
 
     def mouse_win32_event_filter(self, msg, data):#
@@ -592,7 +639,7 @@ class FST_Keyboard():
                                 
                                 # macro sequence handling is internal in class Macro
                                 macro = self._macros_dict[trigger_group]
-                                key_sequence = macro.get_key_events()
+                                key_sequence = macro.get_key_events_of_current_sequence()
                                     
                                 'MACRO playback'
                                 # only spawn a thread for execution if more than one key event in to be played key sequence
@@ -615,7 +662,7 @@ class FST_Keyboard():
                                         pass
                                     # reset stop event
                                     stop_event = Event()
-                                    macro_thread = Alias_Thread(key_sequence, stop_event, trigger_group, self)
+                                    macro_thread = Macro_Thread(key_sequence, stop_event, trigger_group, self)
                                     # save thread and stop event to find it again for possible interruption
                                     self._macro_thread_dict[trigger_group] = [macro_thread, stop_event]
                                     macro_thread.start() 
@@ -797,7 +844,7 @@ class FST_Keyboard():
     def control_toggle_pause(self):
         if self.arg_manager.WIN32_FILTER_PAUSED:
             self.arg_manager.reset_global_variable_changes()
-            self.arg_manager.apply_start_args_by_focus_name(self._focus_manager.FOCUS_APP_NAME)
+            self.apply_start_args_by_focus_name(self._focus_manager.FOCUS_APP_NAME)
             self.apply_focus_groups(self._focus_manager.FOCUS_APP_NAME)
             self.cli_menu.clear_cli()
             self._config_manager.display_groups()
@@ -817,6 +864,15 @@ class FST_Keyboard():
             self.state_manager.release_all_currently_pressed_keys()
             self.state_manager.stop_all_repeating_keys() 
             
+    def reset_macro_sequence_by_alias(self, alias_name, current_ke = ''):
+        try:
+            macro_to_reset = self._macros_alias_dict[alias_name]
+            macro_to_reset.reset_sequence_counter()
+            print(f"--- Macro ({alias_name}) reseted successfully by {current_ke}")
+        except KeyError:
+            raise KeyError(f"--- No Macro with name {alias_name} - reset failed")
+        
+        
     def reset_macro_sequence_by_reset_code(self, vk_code, trigger_group = None):
         
         reset_code = vk_code
@@ -847,3 +903,16 @@ class FST_Keyboard():
         except IndexError:
                 print(f"wrong index for reset - no macro with index: {reset_code}")
 
+    def apply_start_args_by_focus_name(self, focus_name = ''):
+        
+        self._args.apply_start_arguments(self._args.sys_start_args)
+        
+        self.update_focus_groups()
+
+        # needs to be done after reloading of file or else it will not have the actual data
+        if focus_name != '':
+            focus_start_arguments, _ = self.focus_manager.multi_focus_dict[focus_name]
+        else:
+            focus_start_arguments, _ = [],[]
+            
+        self._args.apply_start_arguments(self.focus_manager.default_start_arguments + focus_start_arguments)

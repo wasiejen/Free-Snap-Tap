@@ -5,6 +5,17 @@ last updated: 241008-1643
 
 from abc import ABC, abstractmethod
 
+# decorator data type_check
+def type_check(expected_type):
+    def decorator(func):
+        def wrapper(self, value):
+            if not isinstance(value, expected_type):
+                raise TypeError(f"Expected {expected_type}, got {type(value)}")
+            return func(self, value)
+        return wrapper
+    return decorator
+
+
 class Input_Event(ABC):
     '''
     #XXX
@@ -51,8 +62,14 @@ class Input_Event(ABC):
         
     def __repr__(self):
         constraints = ''
+        value = 0
         for constraint in self._constraints:
-            constraints = f"{constraints}|{constraint}"
+            if isinstance(constraint, str):
+                constraints += f"|({constraint})"
+            if isinstance(constraint, int):
+                if value != constraint:
+                    value = constraint
+                    constraints += f"{'|' + str(constraint) if constraint != 0 else ''}"
         if self._key_string is None:
             return f"{self._get_sign()}{self._vk_code}{constraints}"
         else:
@@ -132,19 +149,7 @@ class Key(Input_Event):
     def __eq__(self, other) -> bool:
         raise NotImplementedError
   
-  
-# decorator data type_check
-def type_check(expected_type):
-    def decorator(func):
-        def wrapper(self, value):
-            if not isinstance(value, expected_type):
-                raise TypeError(f"Expected {expected_type}, got {type(value)}")
-            return func(self, value)
-        return wrapper
-    return decorator
-
-# not yet updated implementation
-   
+ 
 class Key_Group(object):
     '''
     #XXX
@@ -194,7 +199,7 @@ class Key_Group(object):
         key_strings = []
         for key_event in self._key_events:
             key_strings.append(repr(key_event))
-        return "Key_Group(" + ', '.join(key_strings) + ")"
+        return "KG(" + ', '.join(key_strings) + ")"
     
     def __len__(self):
         return len(self._key_events)
@@ -208,7 +213,7 @@ class Rebind(object):
         
     @property
     def trigger_group(self):
-        return self._trigger_group.copy()
+        return self._trigger_group
     
     @trigger_group.setter
     @type_check(Key_Group)
@@ -226,6 +231,9 @@ class Rebind(object):
         
     def get_trigger(self):
         return self._trigger_group.get_trigger()
+        
+    # def get_trigger_group(self):
+    #     return self._trigger_group
         
     def __hash__(self):
         return hash(self.__repr__())
@@ -248,12 +256,18 @@ class Macro(object):
         self._sequence_counter = 0
         self._num_sequences = len(self._key_groups)
 
-
-    def append_key_group(self, new_group):
-        self._key_groups.append(new_group)
-        self._num_sequences = len(self._key_groups)
+    @property
+    def trigger_group(self):
+        return self._trigger_group
+    
+    @property
+    def num_sequences(self):
+        return self._num_sequences
+    # def append_key_group(self, new_group):
+    #     self._key_groups.append(new_group)
+    #     self._num_sequences = len(self._key_groups)
         
-    def get_key_group(self):
+    def _get_key_group(self):
         if self._num_sequences == 0:
             raise ValueError("No key groups in Macro")
         elif self._num_sequences == 1:
@@ -265,14 +279,17 @@ class Macro(object):
             self._sequence_counter += 1
             return group
         
-    def get_key_events(self):
-        return self.get_key_group().get_key_events()
+    def get_key_events_of_current_sequence(self):
+        return self._get_key_group().get_key_events()
         
     def reset_sequence_counter(self):
         self._sequence_counter = 0
         
     def get_trigger(self):
         return self._trigger_group.get_trigger()
+    
+    # def get_trigger_group(self):
+    #     return self._trigger_group
     
     def __hash__(self):
         return hash(self.__repr__())
@@ -300,82 +317,6 @@ class Macro_Sequence(Macro):
         raise NotImplementedError
     def __repr__(self):
         raise NotImplementedError
-    
-    
-# class Rebind(object):
-    
-#     def __init__(self, trigger, replacement):
-#         # if isinstance(trigger, Key_Event):
-#         self.trigger = trigger
-#         # if isinstance(replacement, Key_Event):
-#         self.replacement = replacement
-   
- 
-#     def get_trigger(self):
-#         if isinstance(self.trigger, Key):
-#             return self.trigger.get_key_events()
-#         else:
-#             return [self.trigger]
-    
-#     def get_replacement(self):
-#         return self.replacement
-    
-#     def __repr__(self):
-#         key_strings = []
-#         for key in [self.trigger, self.replacement]:
-#             key_strings.append(repr(key))
-#         return "Rebind(" + ' : '.join(key_strings) + ")"
-    
-#     # def 
-      
-# class Macro(object):
-    
-#     def __init__(self, trigger= Key_Group([]), key_events_to_play= Key_Group([])):
-#         if isinstance(trigger, Key_Event):
-#             self.trigger = Key_Group(trigger)
-#         else:
-#             self.trigger = trigger
-#         if isinstance(key_events_to_play, Key_Event):
-#             self.key_group = Key_Group(key_events_to_play)
-#         else:
-#             self.key_group = key_events_to_play
-      
-#     def get_trigger(self):
-#         return self.trigger
-    
-#     def get_key_events(self):
-#         return self.key_group.get_key_events()
-    
-#     def get_all_key_events(self):
-#         all_key_events = []
-#         for key in self.key_group:
-#             if isinstance(key, Key):
-#                 for ke in key.get_key_events():
-#                     all_key_events.append(ke)
-#             else:
-#                 all_key_events.append(key)
-#         return all_key_events
-    
-#     # def get_vk_codes(self):
-#     #     return [key.get_vk_codes() for key in self.key_group]
-    
-#     def add_key_event(self, key_event):
-#         self.key_group.add_key_event(key_event)
-        
-#     def __repr__(self):
-#         text = f"Macro({repr(self.trigger)} : {self.key_group})"               
-#         return text
-    
-#     def __hash__(self):
-#         return hash(self.__repr__())
-    
-#     def __eq__(self, other):
-#         return repr(self) == repr(other)
-        
-#     # def __str__(self):
-#     #     text = f"({repr(self.trigger)} : {self.key_group})"               
-#     #     return text
-    
     
 class Tap_Group(object):
     '''
