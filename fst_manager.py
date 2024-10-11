@@ -82,20 +82,21 @@ class Output_Manager():
         fullfilled = True
         temp_delays = []
         for constraint in key_event.constraints:
-            if isinstance(constraint, int):
-                temp_delays.append(constraint)
-            elif isinstance(constraint, str):
-                if CONSTANTS.DEBUG3:
-                    print(f"D3: string as constraint found - {constraint}")
-                result = self.constraint_evaluation(constraint, key_event)
-                if isinstance(result, bool):
-                    fullfilled = fullfilled and result
-                elif isinstance(result, int):
-                    temp_delays.append(result)
-                elif result is None:
-                    pass
-                else:
-                    print(f"! Constraint {constraint} is not valid.")
+            if fullfilled:
+                if isinstance(constraint, int):
+                    temp_delays.append(constraint)
+                elif isinstance(constraint, str):
+                    if CONSTANTS.DEBUG3:
+                        print(f"D3: string as constraint found - {constraint}")
+                    result = self.constraint_evaluation(constraint, key_event)
+                    if isinstance(result, bool):
+                        fullfilled = fullfilled and result
+                    elif isinstance(result, int):
+                        temp_delays.append(result)
+                    elif result is None:
+                        pass
+                    else:
+                        print(f"! Constraint {constraint} is not valid.")
                     
         if get_also_delays:
             return fullfilled, temp_delays
@@ -760,8 +761,16 @@ class Argument_Manager():
         self.STATUS_INDICATOR_SIZE = Argument_Manager.STATUS_INDICATOR_SIZE
         
         # getting sys arguments and saving them
-        self.sys_start_args = sys.argv[1:] if len(sys.argv) > 1 else []
+        self._sys_start_args = []
         self.reset_global_variable_changes()
+        
+    @property
+    def sys_start_args(self):
+        return self._sys_start_args
+    @sys_start_args.setter
+    @type_check(list)
+    def sys_start_args(self, new_list):
+        self._sys_start_args = new_list
         
     def reset_global_variable_changes(self):
         # self.DEBUG = Argument_Manager.DEBUG  

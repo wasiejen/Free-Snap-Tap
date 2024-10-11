@@ -490,14 +490,14 @@ class FST_Keyboard():
             # first check every other given trigger before evaluating constraints    
             if activated:
                 for key in keys:
-                    
-                    constraints_fulfilled = self.output_manager.check_constraint_fulfillment(key)
-                    # if reset code then ignore result for activation
-                    if key.vk_code < 0:
-                        if constraints_fulfilled:
-                            self.reset_macro_sequence_by_reset_code(key.vk_code, trigger_group)
-                    else:
-                        activated = activated and constraints_fulfilled
+                    if activated:
+                        constraints_fulfilled = self.output_manager.check_constraint_fulfillment(key)
+                        # if reset code then ignore result for activation
+                        if key.vk_code < 0:
+                            if constraints_fulfilled:
+                                self.reset_macro_sequence_by_reset_code(key.vk_code, trigger_group)
+                        else:
+                            activated = activated and constraints_fulfilled
             return activated    
         
         key_replaced = False
@@ -520,7 +520,7 @@ class FST_Keyboard():
             self.state_manager.init_all_key_times_to_starting_time(key_event_time)
         
         # to help identify vk_codes on key presses
-        if self.arg_manager.PRINT_VK_CODES or CONSTANTS.DEBUG:
+        if self.arg_manager.PRINT_VK_CODES:
         # if True:
             print(f"D1: time: {key_event_time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
 
@@ -905,7 +905,7 @@ class FST_Keyboard():
 
     def apply_start_args_by_focus_name(self, focus_name = ''):
         
-        self._args.apply_start_arguments(self._args.sys_start_args)
+        self._args.apply_start_arguments(self._args._sys_start_args)
         
         self.update_focus_groups()
 

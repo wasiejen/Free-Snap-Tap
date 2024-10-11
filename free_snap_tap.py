@@ -19,8 +19,8 @@ CONSTANTS.DEBUG = False
 # CONSTANTS.DEBUG = True
 CONSTANTS.DEBUG2 = False
 # CONSTANTS.DEBUG2 = True
-# CONSTANTS.DEBUG3 = False
-CONSTANTS.DEBUG3 = True
+CONSTANTS.DEBUG3 = False
+# CONSTANTS.DEBUG3 = True
 
 # debug options on numpad numbers - if you use them do not turn on
 # CONSTANTS.DEBUG_NUMPAD = False
@@ -29,8 +29,8 @@ CONSTANTS.DEBUG_NUMPAD = True
 # Define File name for saving of everything, can be any filetype
 # But .txt or .cfg recommended for easier editing
 # CONSTANTS.FILE_NAME = 'FSTconfig.txt'
-CONSTANTS.FILE_NAME = 'FSTconfig_test.txt'
-# CONSTANTS.FILE_NAME = 'allinone.txt'
+# CONSTANTS.FILE_NAME = 'FSTconfig_test.txt'
+CONSTANTS.FILE_NAME = 'allinone.txt'
 
 # Control key combinations (vk_code and/or key_string) 
 # (1,2 or more keys possible - depends on rollover of your keyboard)
@@ -349,9 +349,12 @@ def main():
     sys.exit(1)
 
 
-if __name__ == "__main__":       
+if __name__ == "__main__":    
+       
     
     fst_keyboard = FST_Keyboard()
+    print(sys.argv[1:])
+    fst_keyboard.arg_manager.sys_start_args = sys.argv[1:] if len(sys.argv) > 1 else []
     
     if fst_keyboard.arg_manager.STATUS_INDICATOR:
         main_thread = Thread(target=main)
