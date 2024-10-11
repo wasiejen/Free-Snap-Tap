@@ -19,8 +19,8 @@ CONSTANTS.DEBUG = False
 # CONSTANTS.DEBUG = True
 CONSTANTS.DEBUG2 = False
 # CONSTANTS.DEBUG2 = True
-CONSTANTS.DEBUG3 = False
-# CONSTANTS.DEBUG3 = True
+# CONSTANTS.DEBUG3 = False
+CONSTANTS.DEBUG3 = True
 
 # debug options on numpad numbers - if you use them do not turn on
 # CONSTANTS.DEBUG_NUMPAD = False
@@ -300,6 +300,8 @@ class Crosshair():
         self.built_crosshair()
   
 def main():
+    
+    fst_keyboard.update_args_and_groups()
           
     if CONSTANTS.DEBUG:
         print(f"D1: tap_groups_hr: {fst_keyboard.config_manager.tap_groups_hr}")
@@ -350,8 +352,6 @@ def main():
 if __name__ == "__main__":       
     
     fst_keyboard = FST_Keyboard()
-    
-    fst_keyboard.update_args_and_groups()
     
     if fst_keyboard.arg_manager.STATUS_INDICATOR:
         main_thread = Thread(target=main)

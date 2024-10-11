@@ -11,7 +11,7 @@ from fst_data_types import Key_Event
 
 alias_thread_logging = []
    
-class Alias_Thread(Thread):
+class Macro_Thread(Thread):
     '''
     execute macros/alias in its own threads so the delay is not interfering with key evaluation
     '''
@@ -47,7 +47,6 @@ class Alias_Thread(Thread):
                     if vk_code <= 0:
                         self._fst.reset_macro_sequence_by_reset_code(vk_code, self.trigger_group)
                     else:
-                        ###XXX 241008-1642: keep toggle off?    
                         if key_event.is_toggle:
                             key_event = self._fst.output_manager.get_next_toggle_state_key_event(key_event)
                         # send key event and handles interruption of delay

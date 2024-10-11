@@ -326,6 +326,7 @@ class Output_Manager():
         
         if CONSTANTS.DEBUG3:
             print(f"D3: received for eval: {constraint_to_evaluate} : {current_ke}")
+            
         
         easy_eval_succeeded = False
         first_char = constraint_to_evaluate[0]
@@ -340,9 +341,14 @@ class Output_Manager():
                     return False
             except Exception as error:
                 print(error)
-                
         
-        if not easy_eval_succeeded:
+        ###XXX 241011-1757        
+        # check for reset macro via alias
+        elif constraint_to_evaluate in self._fst.macro_sequence_alias_list:
+            self._fst.reset_macro_sequence_by_alias(constraint_to_evaluate, current_ke)    
+            return False        
+    
+        elif not easy_eval_succeeded:
             result = eval(constraint_to_evaluate)
             ### print(f"result of '{constraint_to_evaluate}' is '{result}'")
             if CONSTANTS.DEBUG2:
@@ -423,15 +429,16 @@ class Config_Manager():
     file handling and hr display of groups
     takes a file for input and saves the ouput in a focus_manager
     '''
-    def __init__(self, file_name = None, focus_manager = None):
+    def __init__(self, file_name = None):
         self._file_name = file_name
-        self._fm = focus_manager
+        #self._fm = focus_manager
         
         # hr = human readable form - saves the lines cleaned of comments and presorted
         # these will be shown in menu, because internally they look a bit different (esp rebinds)
         self._tap_groups_hr = []
         self._rebinds_hr = []
         self._macros_hr = []
+        self._alias_hr = []
         
     @property
     def file_name(self):
@@ -440,13 +447,13 @@ class Config_Manager():
     @type_check(str)
     def file_name(self, new_file_name):
         self._file_name = new_file_name  
-    @property
-    def focus_manager(self):
-        return self._fm
-    @focus_manager.setter
-    @type_check(str)
-    def focus_manager(self, new_focus_manager):
-        self._fm = new_focus_manager
+    #@property
+    # def focus_manager(self):
+    #     return self._fm
+    # @focus_manager.setter
+    # @type_check(str)
+    # def focus_manager(self, new_focus_manager):
+    #     self._fm = new_focus_manager
     @property
     def tap_groups_hr(self):
         return self._tap_groups_hr
@@ -456,36 +463,34 @@ class Config_Manager():
     @property
     def macros_hr(self):
         return self._macros_hr
+    @property
+    def alias_hr(self):
+        return self._alias_hr
     
     def load_config(self):
         # try loading  from file
         try:
-            self._load_from_file()
+            return self._parse_lines_for_focus_manager(self._open_config_file())
         # if no file exist create new one
         except FileNotFoundError:
             self.create_new_group_file()    
          
     
-    def clean_lines(self, lines):
+    def _clean_comments(self, lines):
         comments_cleaned_lines = []
         for line in lines:
+            line = line.replace('\n', '')
             if len(line) > 1:
                 if line.startswith('<focus>'):
                     cleaned_line = '<focus>'
-                    # strip comment
-                    temp_line = line[7:].split('#')[0]
-                    # remove leading whitespaces
-                    while temp_line.find(' ') == 0:
-                        temp_line = temp_line[1:]
-                    # remove trailing whitespaces
-                    temp_line = temp_line[::-1]
-                    while temp_line.find(' ') == 0:
-                        temp_line = temp_line[1:]
-                    # recombine with focus part
-                    cleaned_line += temp_line[::-1]
-                    comments_cleaned_lines.append(line.split('#')[0])
+                    cleaned_line += line[7:].split('#')[0].strip()
+                    comments_cleaned_lines.append(cleaned_line)
+                if line.startswith('<arg>'):
+                    cleaned_line = '<arg>'
+                    cleaned_line += line[5:].split('#')[0].strip()
+                    comments_cleaned_lines.append(cleaned_line)
                 else:
-                    line = line.strip().replace(" ","")
+                    line = line.replace(" ","")
                     if len(line) > 1:
                         # strip all comments from line
                         group = line.split(',')
@@ -506,10 +511,13 @@ class Config_Manager():
                                     
                             cleaned_line = ','.join(cleaned_group)
                             comments_cleaned_lines.append(cleaned_line)
+                            
+        return comments_cleaned_lines
         
+    def _combine_multilines(self, cleaned_lines):
         # clean multiline macro sequences and joins them together
         multiline_cleaned_lines = []
-        for line in comments_cleaned_lines:
+        for line in cleaned_lines:
             if len(line) > 1 and line[0] == ':':
                 # add multiline to last multiline sequence
                 multiline_cleaned_lines[-1] += line
@@ -521,45 +529,73 @@ class Config_Manager():
     def parse_line(self, line):
         pass
     
-    def _load_from_file(self):
+    def _parse_lines_for_focus_manager(self, file_lines):
         '''
         reads in the file and removes the commented out lines, keys and inline comments;
         joins multiline macro sequences; 
         '''    
-        
-        temp_file = []
-        with open(self._file_name, 'r') as file:
-            for line in file:
-                temp_file.append(line) 
 
-        cleaned_lines = self.clean_lines(temp_file) 
+        cleaned_lines = self._combine_multilines(self._clean_comments(file_lines) )
             
         focus_name = ''
         multi_focus_dict = {}
         default_start_arguments = []
         default_group_lines = []
+        ###XXX 241011-1147
+        alias_lines = []
         
         for line in cleaned_lines:
             if line.startswith('<focus>'):
-                focus_name = line.replace('<focus>', '').replace('\n', '').lower()
+                focus_name = line.replace('<focus>', '').lower()
                 multi_focus_dict[focus_name] = [[], []]
             elif line.startswith('<arg>'):
-                line = line.replace('<arg>', '').replace('\n', '').lower()
+                line = line.replace('<arg>', '').lower()
                 if focus_name == '':
                     default_start_arguments.append(line)
                 else:
                     multi_focus_dict[focus_name][0].append(line)
+            ###XXX 241011-1126 testinf of aliases
+            elif line.startswith('<'):
+                alias_end = line.find('>')
+                if alias_end > 1:
+                    alias = line[:alias_end+1]
+                    print(line)
+                    line = line.replace(alias, '').strip()
+                    print(line)
+                    alias_lines.append([alias, line])
+                    print(alias_lines)
             else:
-                if focus_name == '':
-                    default_group_lines.append(line)
+                if line.startswith('('):
+                    alias_end = line.find(')')
+                    if alias_end > 1:
+                        alias = line[:alias_end+1]
+                    line = line.replace(alias, '').strip()
                 else:
-                    multi_focus_dict[focus_name][1].append(line)
+                    alias = ''
+                    
+                    
+                if focus_name == '':
+                    default_group_lines.append([alias, line])
+                else:
+                    multi_focus_dict[focus_name][1].append([alias, line])
 
-        self._fm.multi_focus_dict = multi_focus_dict
-        self._fm.default_start_arguments = default_start_arguments
-        self._fm.default_group_lines = default_group_lines
+        # self._fm.multi_focus_dict = multi_focus_dict
+        # self._fm.default_start_arguments = default_start_arguments
+        # self._fm.default_group_lines = default_group_lines
+        # ###XXX 241011-1222
+        # self._fm.alias_lines = alias_lines
         
-    def write_out_new_file(self):
+        return multi_focus_dict, default_start_arguments, default_group_lines, alias_lines
+
+
+    def _open_config_file(self):
+        temp_file = []
+        with open(self._file_name, 'r') as file:
+            for line in file:
+                temp_file.append(line)
+        return temp_file
+        
+    def _write_out_new_file(self):
         """
         Create a new file if config file was not found with minimal tap groups
 
@@ -585,57 +621,74 @@ class Config_Manager():
         saves cleaned lines according to formatting in different containers;
         saved in variable_hr (human readable)
         '''
+        
         self._tap_groups_hr = []
         self._rebinds_hr = []
         self._macros_hr = []
+        self._alias_hr = []
         
         # sort the lines into their categories for later initialization
-        for line in lines:                   
-            groups = line.split(':')
-            # tap groups
-            if len(groups) == 1: 
-                self._tap_groups_hr.append(groups[0].split(','))
-            # rebinds
-            elif len(groups) == 2:
-                trigger_group = groups[0].split(',')
-                key_group = groups[1].split(',')
-                # rebind
-                # if len(trigger_group) == 1 and len(key_group) == 1:
-                if len(key_group) == 1:
-                    self._rebinds_hr.append([trigger_group, key_group[0]])
-                else:
-                    print(f"{key_group} is not a valid rebind (only one key_event/key allowed") 
-                    print("   use :: instead of : to declare it as a macro")
-                # macro
-            elif len(groups) > 2 and len(groups[1]) == 0:
-                trigger_group = groups[0].split(',')
-                if len(groups) > 3:
-                    # for group in groups[2:]:
-                    #     trigger_group.append(group.split(','))
-                    key_groups = [group.split(',') for group in groups[2:]]
-                    self._macros_hr.append([trigger_group] + key_groups)
-                else:
-                    key_group = groups[2].split(',')
-                    self._macros_hr.append([trigger_group, key_group])
+        for line in lines:    
+
+            alias, line = line
+            if alias.startswith('<'):
+                self._alias_hr.append([alias, line.split(',')])
+            else:
+               
+                groups = line.split(':')
+                # tap groups
+                if len(groups) == 1: 
+                    self._tap_groups_hr.append([alias, groups[0].split(',')])
+                # rebinds
+                elif len(groups) == 2:
+                    trigger_group = groups[0].split(',')
+                    key_group = groups[1].split(',')
+                    # rebind
+                    # if len(trigger_group) == 1 and len(key_group) == 1:
+                    if len(key_group) == 1:
+                        self._rebinds_hr.append([alias, [trigger_group, key_group[0]]])
+                    else:
+                        print(f"{key_group} is not a valid rebind (only one key_event/key allowed") 
+                        print("   use :: instead of : to declare it as a macro")
+                    # macro
+                elif len(groups) > 2 and len(groups[1]) == 0:
+                    trigger_group = groups[0].split(',')
+                    if len(groups) > 3:
+                        # for group in groups[2:]:
+                        #     trigger_group.append(group.split(','))
+                        key_groups = [group.split(',') for group in groups[2:]]
+                        self._macros_hr.append([alias, [trigger_group] + key_groups])
+                    else:
+                        key_group = groups[2].split(',')
+                        self._macros_hr.append([alias, [trigger_group, key_group]])
                     
     def display_groups(self):
         """
         Display the current tap groups.
         """
-        print("# Tap Groups")
+        # alias display
+        print("# Aliases")
+        for index, alias_group in enumerate(self._alias_hr):
+            alias, group = alias_group
+            print(f"{alias} " + ', '.join(group)+'')         
+        # tap groups
+        print("\n# Tap Groups")
         for index, tap_group in enumerate(self._tap_groups_hr):
+            alias, tap_group = tap_group
             # print(f"{tap_group}\n")
-            print(f"[{index}] " + ', '.join(tap_group)+'')         
+            print(f"[{index}]{alias} " + ', '.join(tap_group)+'')         
         # rebinds
         print("\n# Rebinds")
         for index, rebind in enumerate(self._rebinds_hr):
+            alias, rebind = rebind
             # print(f"[{index}] " + ' : '.join([rebind[0], rebind[1]]))
-            print(f"[{index}] " + ' : '.join([', '.join(rebind[0]), rebind[1]]))
+            print(f"[{index}]{alias} " + ' : '.join([', '.join(rebind[0]), rebind[1]]))
         # macros
         print("\n# Macros")
-        for index, *group in enumerate(self._macros_hr):
+        for index, group in enumerate(self._macros_hr):
+            alias, *group = group
             group = group[0]
-            first_line = f"[{index}] " + ' :: '.join([', '.join(group[0]),', '.join(group[1])])
+            first_line = f"[{index}]{alias} " + ' :: '.join([', '.join(group[0]),', '.join(group[1])])
             position = first_line.find('::')
             print(first_line)
             if len(group) > 2:
@@ -655,7 +708,7 @@ class Config_Manager():
         self._tap_groups_hr = []
         self.add_group(['a','d'], self._tap_groups_hr)
         self.add_group(['w','s'], self._tap_groups_hr)
-        self.write_out_new_file()
+        self._write_out_new_file()
 
 class Argument_Manager():
     '''
@@ -821,18 +874,21 @@ class Argument_Manager():
             else:
                 print("unknown start argument: ", arg)
 
-    def apply_start_args_by_focus_name(self, focus_name = ''):
+    # def apply_start_args_by_focus_name(self, focus_name = ''):
         
-        self.apply_start_arguments(self.sys_start_args)
+    #     self.apply_start_arguments(self.sys_start_args)
         
-        self._fst.config_manager.load_config()
-        # needs to be done after reloading of file or else it will not have the actual data
-        if focus_name != '':
-            focus_start_arguments, _ = self._fst.focus_manager.multi_focus_dict[focus_name]
-        else:
-            focus_start_arguments, _ = [],[]
+    #     self._fst.update_focus_groups()
+    #     ###XXX 241011-1409
+    #     # self._fst.focus_manager.update_groups_from_config(self._fst.config_manager.load_config())
+    #     # self._fst.config_manager.load_config()
+    #     # needs to be done after reloading of file or else it will not have the actual data
+    #     if focus_name != '':
+    #         focus_start_arguments, _ = self._fst.focus_manager.multi_focus_dict[focus_name]
+    #     else:
+    #         focus_start_arguments, _ = [],[]
             
-        self.apply_start_arguments(self._fst.focus_manager.default_start_arguments + focus_start_arguments)
+    #     self.apply_start_arguments(self._fst.focus_manager.default_start_arguments + focus_start_arguments)
 
 class Focus_Group_Manager():
     '''
@@ -844,11 +900,16 @@ class Focus_Group_Manager():
         self._multi_focus_dict_keys = []
         self._default_start_arguments = []
         self._default_group_lines = []
+        
+        
         self.FOCUS_APP_NAME = ''
         
         self.focus_active = False
         self._focus_thread  = None
     
+        ###XXX 241011-1218
+        self._alias_lines = []
+        
     @property
     def multi_focus_dict(self):
         return self._multi_focus_dict
@@ -887,6 +948,15 @@ class Focus_Group_Manager():
         self._default_group_lines = new_list
         
     @property
+    def alias_lines(self):
+        return self._alias_lines  # Return a copy to prevent external modification
+
+    @alias_lines.setter
+    @type_check(list)
+    def alias_lines(self, new_list):
+        self._alias_lines = new_list
+        
+    @property
     def FOCUS_APP_NAME(self):
         return self._FOCUS_APP_NAME
 
@@ -919,6 +989,15 @@ class Focus_Group_Manager():
         if self.focus_active and self._focus_thread.is_alive():
             self._focus_thread.end()
             self._focus_thread.join()
+            
+    def update_groups_from_config(self, config_update):
+        multi_focus_dict, default_start_arguments, default_group_lines, alias_lines = config_update
+        self._multi_focus_dict = multi_focus_dict
+        self._default_start_arguments = default_start_arguments
+        self._default_group_lines = default_group_lines
+        self._alias_lines = alias_lines
+    
+
     
 class Input_State_Manager():
     '''
