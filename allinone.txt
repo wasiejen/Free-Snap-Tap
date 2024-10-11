@@ -1,0 +1,399 @@
+#<arg>-debug
+#<arg>-crossover=15
+#<arg>-tapdelay=6,4
+#<arg>-aliasdelay=6,4
+<arg>-nomenu
+#<arg>-nocontrols
+<arg>-nodelay
+<arg>-status_indicator=15
+
+# Tap Groups
+a, d
+w, s
+# Rebinds
+# Macros
+
+#----------------------------------------
+<focus>system shock
+k : space
+
+
+#----------------------------------------
+### Counter Striked focus group
+<focus>Counter
+
+#<arg>-debug
+#<arg>-crossover=40
+<arg>-tapdelay=6,4
+<arg>-aliasdelay=6,4
+<arg>-nomenu
+#<arg>-nocontrols
+#<arg>-nodelay
+<arg>-crosshair
+
+# Tap Groups
+#a,d
+#w,s
+
+# Rebinds
+#left_windows, left_control
+<,left_control
+caps_lock : shift
+c: left_control
+shift : left_control
+v: suppress
+left_windows : suppress
+
+# Macros
++w|(tr("+w")>100)|(last("-space")>500), !s, !ctrl ::  +w|15|5, -s|(cs("+w")*1.1), +s|0|0
++s|(tr("+s")>100)|(last("-space")>500), !w, !ctrl ::  +s|15|5, -w|(cs("+s")*1.1), +w|0|0
++a|(tr("+a")>100)|(last("-space")>500), !d, !ctrl ::  +a|15|5, -d|(cs("+a")*1.1), +d|0|0
++d|(tr("+d")>100)|(last("-space")>500), !a, !ctrl ::  +d|15|5, -a|(cs("+d")*1.1), +a|0|0
+
+# jump with crouch: will not trigger if ctrl is pressed (!ctrl)
+#+space|(125<tr("+space")<400), !ctrl :: +space, -ctrl|(550-last("-space")), +ctrl|0|0 
+
+# automatic application of healing syringe and switch back to last weapon
+#+x|(100<tr("+x")<1000) :: +x|(1000-tr("+x")), -left_mouse|700|700, +left_mouse|0|0, q
+
+#double_tap to execute
+-x|(dc()<500) :: +x|(1000-dc()), -left_mouse|700|700, +left_mouse|0|0, q
+
+#buy sg552
+num1 :: b, 4, 3
+
+#----------------------------------------
+### Horizon Forbidden West
+<focus>Horizon
+
+#<arg>-debug
+#<arg>-crossover=40
+<arg>-tapdelay=6,4
+<arg>-aliasdelay=50,50
+<arg>-nomenu
+#<arg>-nocontrols
+#<arg>-nodelay
+<arg>-crosshair
+
+# Tap Groups
+
+# Rebinds
+caps_lock : ^shift
++shift|(dc()<900) : +suppress
+p: ^alt
+u : v|(toggle_repeat(6500))
+v : v|(reset_timer()) 
+
+
+# Macros
+# 0
+-left_mouse, -right_mouse :: -left_mouse|900, -alt|(p("right_mouse"))
+
+# 1
+#-mouse_x2 :: -shift|200|(ar('shift')),  +c|75|(ap('-c')),        c   |50,  #c   |50, +ctrl|(1000-last('-mx2')), -reset
+#           : -shift|(ar('shift')),  +ctrl|75|(ap('-ctrl')),  ctrl|50,  #ctrl|50, +c|450,  -reset
+#           : -shift|(ar('shift')),  +ctrl|75|(ap('-ctrl')),  ctrl|50,  #ctrl|50, +c|450,  -reset
+#           : -shift|(ar('shift')),  +ctrl|75|(ap('-ctrl')),  ctrl|50,  #ctrl|50, +c|450,  -reset 
+
+
+#-mouse_x2 :: g|50
+#-mouse_x2 :: -reset_2|(dc()>2000)
+#-mouse_x2 :: -shift|(ar('shift')), +ctrl|75|(ap('-ctrl')), -ctrl|150|(dc('-mx2')<1000), +c|75|(ap('-c')), -c|150|(dc('-mx2')>1000), +ctrl|(dc('-mx2')<1000), +c|(dc('-mx2')>1000)
+
+-mouse_x2|(dc('mx2')<1000) :: -shift|(ar('shift')),   +ctrl|75|(ap('-ctrl')),  -ctrl|150,   +c|75|(ap('-c')),         +ctrl, -shift
+-mouse_x2|(dc('mx2')>1000) :: -shift|(ar('shift')),   +c|75|(ap('-c')),        -c|150,      +ctrl|75|(ap('-ctrl')),   +c
+
+
+		   
+#			: -ctrl, +shift, -shift, +ctrl
+		
+
+#mouse_x2 : +suppress
+
+-mouse_x1 :: -g|50, +shift|50, -shift|50, +g 
++mouse_x1 : +suppress
+
+-c :: -shift|250|(ar('shift')), +c|100|(ap('-c')), -c|100, +c, -shift
+
+#-c, +reset|(dc('c')>1000):: -shift|250|(ar('shift')), +c|100|(ap('-c')), -c|100, +c, -shift
+#  	 					  : -shift|250|(ar('shift')), +c|100|(ap('-c')), -c|100, +c, -shift|50
+# +reset|(dc('c')>1000)
+
++c : +suppress
+#-shift :: -shift, -reset_1
+i :: -f|50, space|50, +f
+
+-m :: m
+	: esc
++m : +suppress
+
+-tab :: +shift|100, -tab
+
+#-hori_scroll :: -g|50, +g|0
+#+hori_scroll :: -g|50, +g|0
+
+#vert_scroll : suppress
+
+
+
+#+space :: +space, +c
+
+#-f|(dc()<500) :: -v|500|500, +v
+
+# mod macro 0
++left_mouse, -right_mouse :: +left_mouse, +alt, -reset_0
++right_mouse, -left_mouse :: +left_mouse|50|(last('-ml')>800), +right_mouse, +alt, -reset_0
+
++v|(tr("+v")>500) :: +v, v|(stop_repeat())
+#e : e # to get it repeat protection
++e|(tr("+e")>500) :: +e, +shift
++e|(dc() < 1000) :: +e, -shift
+
+-middle_mouse : +shift
+
+
+#----------------------------------------
+### Space Marine 2
+<focus>Space Marine
+
+#<arg>-debug
+#<arg>-crossover=40
+<arg>-tapdelay=6,4
+<arg>-aliasdelay=50,50
+#<arg>-nomenu
+<arg>-nocontrols
+#<arg>-nodelay
+#<arg>-crosshair
+
+
+# Tap Groups
+#a, d
+#w, s
+
+# Rebinds
+num2 : c
+num1 : middle_mouse
+num4 : space
+caps_lock : shift
+#c : suppress
+left_windows : c
+
+# Macros
+
+
+#----------------------------------------
+### Alan Wake
+<focus>Alan Wake
+
+#<arg>-debug
+#<arg>-crossover=40
+<arg>-tapdelay=6,4
+#<arg>-aliasdelay=50,50
+#<arg>-nomenu
+<arg>-nocontrols
+<arg>-nodelay
+#<arg>-crosshair
+
+# Rebinds
+caps_lock, shift
+alt, left_control
+c, space#<arg>-debug
+#<arg>-crossover=15
+#<arg>-tapdelay=6,4
+#<arg>-aliasdelay=6,4
+<arg>-nomenu
+#<arg>-nocontrols
+<arg>-nodelay
+<arg>-status_indicator=15
+
+# Tap Groups
+a, d
+w, s
+# Rebinds
+# Macros
+
+#----------------------------------------
+<focus>system shock
+k : space
+
+
+#----------------------------------------
+### Counter Striked focus group
+<focus>Counter
+
+#<arg>-debug
+#<arg>-crossover=40
+<arg>-tapdelay=6,4
+<arg>-aliasdelay=6,4
+<arg>-nomenu
+#<arg>-nocontrols
+#<arg>-nodelay
+<arg>-crosshair
+
+# Tap Groups
+#a,d
+#w,s
+
+# Rebinds
+#left_windows, left_control
+<,left_control
+caps_lock : shift
+c: left_control
+shift : left_control
+v: suppress
+left_windows : suppress
+
+# Macros
++w|(tr("+w")>100)|(last("-space")>500), !s, !ctrl ::  +w|15|5, -s|(cs("+w")*1.1), +s|0|0
++s|(tr("+s")>100)|(last("-space")>500), !w, !ctrl ::  +s|15|5, -w|(cs("+s")*1.1), +w|0|0
++a|(tr("+a")>100)|(last("-space")>500), !d, !ctrl ::  +a|15|5, -d|(cs("+a")*1.1), +d|0|0
++d|(tr("+d")>100)|(last("-space")>500), !a, !ctrl ::  +d|15|5, -a|(cs("+d")*1.1), +a|0|0
+
+# jump with crouch: will not trigger if ctrl is pressed (!ctrl)
+#+space|(125<tr("+space")<400), !ctrl :: +space, -ctrl|(550-last("-space")), +ctrl|0|0 
+
+# automatic application of healing syringe and switch back to last weapon
+#+x|(100<tr("+x")<1000) :: +x|(1000-tr("+x")), -left_mouse|700|700, +left_mouse|0|0, q
+
+#double_tap to execute
+-x|(dc()<500) :: +x|(1000-dc()), -left_mouse|700|700, +left_mouse|0|0, q
+
+#buy sg552
+num1 :: b, 4, 3
+
+#----------------------------------------
+### Horizon Forbidden West
+<focus>Horizon
+
+#<arg>-debug
+#<arg>-crossover=40
+<arg>-tapdelay=6,4
+<arg>-aliasdelay=50,50
+<arg>-nomenu
+#<arg>-nocontrols
+#<arg>-nodelay
+<arg>-crosshair
+
+# Tap Groups
+
+# Rebinds
+caps_lock : ^shift
++shift|(dc()<900) : +suppress
+p: ^alt
+u : v|(toggle_repeat(6500))
+v : v|(reset_timer()) 
+
+
+# Macros
+# 0
+-left_mouse, -right_mouse :: -left_mouse|900, -alt|(p("right_mouse"))
+
+# 1
+#-mouse_x2 :: -shift|200|(ar('shift')),  +c|75|(ap('-c')),        c   |50,  #c   |50, +ctrl|(1000-last('-mx2')), -reset
+#           : -shift|(ar('shift')),  +ctrl|75|(ap('-ctrl')),  ctrl|50,  #ctrl|50, +c|450,  -reset
+#           : -shift|(ar('shift')),  +ctrl|75|(ap('-ctrl')),  ctrl|50,  #ctrl|50, +c|450,  -reset
+#           : -shift|(ar('shift')),  +ctrl|75|(ap('-ctrl')),  ctrl|50,  #ctrl|50, +c|450,  -reset 
+
+
+#-mouse_x2 :: g|50
+#-mouse_x2 :: -reset_2|(dc()>2000)
+#-mouse_x2 :: -shift|(ar('shift')), +ctrl|75|(ap('-ctrl')), -ctrl|150|(dc('-mx2')<1000), +c|75|(ap('-c')), -c|150|(dc('-mx2')>1000), +ctrl|(dc('-mx2')<1000), +c|(dc('-mx2')>1000)
+
+-mouse_x2|(dc('mx2')<1000) :: -shift|(ar('shift')),   +ctrl|75|(ap('-ctrl')),  -ctrl|150,   +c|75|(ap('-c')),         +ctrl, -shift
+-mouse_x2|(dc('mx2')>1000) :: -shift|(ar('shift')),   +c|75|(ap('-c')),        -c|150,      +ctrl|75|(ap('-ctrl')),   +c
+
+
+		   
+#			: -ctrl, +shift, -shift, +ctrl
+		
+
+#mouse_x2 : +suppress
+
+-mouse_x1 :: -g|50, +shift|50, -shift|50, +g 
++mouse_x1 : +suppress
+
+-c :: -shift|250|(ar('shift')), +c|100|(ap('-c')), -c|100, +c, -shift
+
+#-c, +reset|(dc('c')>1000):: -shift|250|(ar('shift')), +c|100|(ap('-c')), -c|100, +c, -shift
+#  	 					  : -shift|250|(ar('shift')), +c|100|(ap('-c')), -c|100, +c, -shift|50
+# +reset|(dc('c')>1000)
+
++c : +suppress
+#-shift :: -shift, -reset_1
+i :: -f|50, space|50, +f
+
+-m :: m
+	: esc
++m : +suppress
+
+-tab :: +shift|100, -tab
+
+#-hori_scroll :: -g|50, +g|0
+#+hori_scroll :: -g|50, +g|0
+
+#vert_scroll : suppress
+
+
+
+#+space :: +space, +c
+
+#-f|(dc()<500) :: -v|500|500, +v
+
+# mod macro 0
++left_mouse, -right_mouse :: +left_mouse, +alt, -reset_0
++right_mouse, -left_mouse :: +left_mouse|50|(last('-ml')>800), +right_mouse, +alt, -reset_0
+
++v|(tr("+v")>500) :: +v, v|(stop_repeat())
+#e : e # to get it repeat protection
++e|(tr("+e")>500) :: +e, +shift
++e|(dc() < 1000) :: +e, -shift
+
+-middle_mouse : +shift
+
+
+#----------------------------------------
+### Space Marine 2
+<focus>Space Marine
+
+#<arg>-debug
+#<arg>-crossover=40
+<arg>-tapdelay=6,4
+<arg>-aliasdelay=50,50
+#<arg>-nomenu
+<arg>-nocontrols
+#<arg>-nodelay
+#<arg>-crosshair
+
+
+# Tap Groups
+#a, d
+#w, s
+
+# Rebinds
+num2 : c
+num1 : middle_mouse
+num4 : space
+caps_lock : shift
+#c : suppress
+left_windows : c
+
+# Macros
+
+
+#----------------------------------------
+### Alan Wake
+<focus>Alan Wake
+
+#<arg>-debug
+#<arg>-crossover=40
+<arg>-tapdelay=6,4
+#<arg>-aliasdelay=50,50
+#<arg>-nomenu
+<arg>-nocontrols
+<arg>-nodelay
+#<arg>-crosshair
+
+# Rebinds
+caps_lock, shift
+alt, left_control
+c, space
