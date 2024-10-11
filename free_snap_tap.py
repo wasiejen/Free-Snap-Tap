@@ -29,8 +29,8 @@ CONSTANTS.DEBUG_NUMPAD = True
 # Define File name for saving of everything, can be any filetype
 # But .txt or .cfg recommended for easier editing
 # CONSTANTS.FILE_NAME = 'FSTconfig.txt'
-# CONSTANTS.FILE_NAME = 'FSTconfig_test.txt'
-CONSTANTS.FILE_NAME = 'allinone.txt'
+CONSTANTS.FILE_NAME = 'FSTconfig_test.txt'
+# CONSTANTS.FILE_NAME = 'allinone.txt'
 
 # Control key combinations (vk_code and/or key_string) 
 # (1,2 or more keys possible - depends on rollover of your keyboard)
@@ -87,6 +87,7 @@ class Status_Indicator():
         self.context_menu.add_separator()
         self.context_menu.add_command(label="Close Indicator", command=self.close_window)
         self.context_menu.add_command(label="Toggle Crosshair", command=self.toggle_crosshair)
+        self.context_menu.add_command(label="Display internal state", command=self._fst.display_internal_repr_groups)
         
         # Bind right-click to show the context menu
         self.canvas.bind("<Button-3>", self.show_context_menu)
@@ -299,16 +300,14 @@ class Crosshair():
         self.canvas.destroy()
         self.built_crosshair()
   
-def main():
-    
-    fst_keyboard.update_args_and_groups()
+def main():    
           
     if CONSTANTS.DEBUG:
         print(f"D1: tap_groups_hr: {fst_keyboard.config_manager.tap_groups_hr}")
         print(f"D1: tap_groups: {fst_keyboard._tap_groups}")
 
     focus_active = fst_keyboard.focus_manager.init_focus_thread()
-        
+
     while not fst_keyboard.arg_manager.STOPPED:    
 
         fst_keyboard.init_listener()
@@ -351,10 +350,9 @@ def main():
 
 if __name__ == "__main__":    
        
-    
     fst_keyboard = FST_Keyboard()
-    print(sys.argv[1:])
-    fst_keyboard.arg_manager.sys_start_args = sys.argv[1:] if len(sys.argv) > 1 else []
+    fst_keyboard.set_sys_start_arguments(sys.argv[1:] if len(sys.argv) > 1 else [])
+    fst_keyboard.update_args_and_groups()
     
     if fst_keyboard.arg_manager.STATUS_INDICATOR:
         main_thread = Thread(target=main)

@@ -45,7 +45,7 @@ class FST_Keyboard():
         # self._args = Argument_Manager(self) if args is None else args
         self._focus_manager = Focus_Group_Manager(self) 
         self._config_manager = Config_Manager(CONSTANTS.FILE_NAME) 
-        self._args = Argument_Manager(self) 
+        self._arg_manager = Argument_Manager(self) 
 
             
         self._output_manager = Output_Manager(self)
@@ -98,7 +98,7 @@ class FST_Keyboard():
         return self._state_manager
     @property
     def arg_manager(self):
-        return self._args
+        return self._arg_manager
     @property
     def output_manager(self):
         return self._output_manager
@@ -144,6 +144,12 @@ class FST_Keyboard():
         self._macro_triggers = []
         self._all_trigger_events = []
         
+        self._key_group_by_alias = {}
+        
+        # only for display purposes
+        self._rebinds = []
+        self._macros = []
+        
         def extract_data_from_key(key_string):           
             #separate delay info from string
             if '|' in key_string:
@@ -162,7 +168,7 @@ class FST_Keyboard():
                 constraints = temp_delays
                 
             else:
-                constraints = [self.arg_manager.ALIAS_MAX_DELAY_IN_MS, self.arg_manager.ALIAS_MIN_DELAY_IN_MS]
+                constraints = [self._arg_manager.ALIAS_MAX_DELAY_IN_MS, self._arg_manager.ALIAS_MIN_DELAY_IN_MS]
                 
             # if string empty, stop
             if key_string == '':
@@ -207,7 +213,7 @@ class FST_Keyboard():
             for key_string in list_of_strings:
                 if key_string.startswith('<'):
                     try:
-                        key_group = key_group + key_group_by_alias[key_string]
+                        key_group = key_group + self._key_group_by_alias[key_string]
                     except KeyError:
                         raise KeyError(f"Alias {key_string} is not known")
                 else:   
@@ -224,10 +230,10 @@ class FST_Keyboard():
             return key_group
 
         # extract aliases 
-        key_group_by_alias = {}
+
         try:
             for alias, group in self.config_manager.alias_hr:
-                key_group_by_alias[alias] = convert_key_string_group(group)
+                self._key_group_by_alias[alias] = convert_key_string_group(group)
 
         except Exception as error:
             print(f"ERROR: {error} \n -> in Alias: {group}")
@@ -305,6 +311,8 @@ class FST_Keyboard():
                     key_group = Key_Group(convert_key_string_group(key_group))
                     extracted_key_groups.append(key_group)
                 new_macro = Macro(extracted_trigger_group, extracted_key_groups)
+                new_macro.alias = alias
+                
                 if new_macro.num_sequences > 1: 
                     if alias != '':
                         self._macros_alias_dict[alias[1:-1]] = new_macro
@@ -331,8 +339,6 @@ class FST_Keyboard():
             for trigger, *groups in self._macros_dict.items():
                 print(f"{trigger} > {groups}")
 
-            # print(f"\nD3: macros_dictps: {self._macros_dict}")
-            
         # extract all triggers for suppression of repeated keys: test V1.0.2.1 Bugfix
         all_triggers = self._rebind_triggers + self._macro_triggers
         for trigger_group in all_triggers:
@@ -340,9 +346,6 @@ class FST_Keyboard():
         
         self._macro_sequence_alias_list = self._macros_alias_dict.keys()
 
-            
-        
-    
     def apply_focus_groups(self, focus_name = ''):
         if focus_name != '':
             _, focus_group_lines = self.focus_manager.multi_focus_dict[focus_name]
@@ -358,13 +361,13 @@ class FST_Keyboard():
     def update_args_and_groups(self, focus_name = ''):
         self._state_manager.release_all_currently_pressed_keys()
         self._state_manager.stop_all_repeating_keys()
-        self.arg_manager.reset_global_variable_changes()
+        self._arg_manager.reset_global_variable_changes()
         self.apply_start_args_by_focus_name(focus_name)    
         self.apply_focus_groups(focus_name)    
 
     def mouse_win32_event_filter(self, msg, data):#
         '''
-        
+        #XXX
         '''
         # data:
         # typedef struct tagMSLLHOOKSTRUCT {
@@ -520,7 +523,7 @@ class FST_Keyboard():
             self.state_manager.init_all_key_times_to_starting_time(key_event_time)
         
         # to help identify vk_codes on key presses
-        if self.arg_manager.PRINT_VK_CODES:
+        if self._arg_manager.PRINT_VK_CODES:
         # if True:
             print(f"D1: time: {key_event_time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
 
@@ -562,7 +565,7 @@ class FST_Keyboard():
                 self.check_control_actions()
  
             # Replace some Buttons :-D
-            if not self.arg_manager.WIN32_FILTER_PAUSED and not self.arg_manager.PRINT_VK_CODES:
+            if not self._arg_manager.WIN32_FILTER_PAUSED and not self._arg_manager.PRINT_VK_CODES:
                 
                 if not to_be_suppressed:
                     'REBINDS HANDLING'
@@ -670,13 +673,13 @@ class FST_Keyboard():
                                 if CONSTANTS.DEBUG:
                                     print("D1: > playing makro:", trigger_group)
                                     
-                                if self.arg_manager.EXEC_ONLY_ONE_TRIGGERED_MACRO:
+                                if self._arg_manager.EXEC_ONLY_ONE_TRIGGERED_MACRO:
                                     break
                 
                 'TAP GROUP EVALUATION HERE'
                 # Snap Tap Part of Evaluation
                 # Intercept key events if not PAUSED
-                if not self.arg_manager.WIN32_FILTER_PAUSED and not self.arg_manager.PRINT_VK_CODES:
+                if not self._arg_manager.WIN32_FILTER_PAUSED and not self._arg_manager.PRINT_VK_CODES:
                     vk_code, is_keydown, _ = current_ke.get_all()
                     if CONSTANTS.DEBUG: 
                         print("D1: tap group #0")
@@ -788,7 +791,7 @@ class FST_Keyboard():
     
     def check_control_actions(self):
         'CONTROLS HERE'
-        if self.arg_manager.CONTROLS_ENABLED:                  
+        if self._arg_manager.CONTROLS_ENABLED:                  
                     # # Stop the listener if the MENU combination is pressed
             if self.check_for_combination(CONSTANTS.MENU_Combination):
                 self.control_return_to_menu()  
@@ -800,9 +803,10 @@ class FST_Keyboard():
                 self.control_toggle_pause()
                 
         'RESET ON ESC AND ALT+TAB'
-                # TODO: as key_event? 'release_all_pressed_keys'
+        # TODO: as key_event? 'release_all_pressed_keys' -> as invocation was easier -> |(stop_all_repeat())
         if self.check_for_combination(['esc']):
             self.state_manager.release_all_currently_pressed_keys()
+            self.state_manager.stop_all_repeating_keys()
         if self.check_for_combination(['alt', 'tab']):
             self.state_manager.release_all_currently_pressed_keys()
 
@@ -822,8 +826,8 @@ class FST_Keyboard():
             pprint.pp(f"all_key_state: {self.state_manager._all_key_press_states_dict}")
 
     def control_return_to_menu(self):
-        self.arg_manager.MENU_ENABLED = True
-        self.arg_manager.WIN32_FILTER_PAUSED = True
+        self._arg_manager.MENU_ENABLED = True
+        self._arg_manager.WIN32_FILTER_PAUSED = True
         print('--- Stopping - Return to menu ---')
         if CONSTANTS.DEBUG3:
             print(f"D3: return to menu with pressed keys: \n {self.state_manager._real_key_press_states_dict}")
@@ -838,29 +842,29 @@ class FST_Keyboard():
         self.state_manager.stop_all_repeating_keys()
         self._mouse_listener.stop()
         self._listener.stop()
-        self.arg_manager.STOPPED = True
+        self._arg_manager.STOPPED = True
         exit()
 
     def control_toggle_pause(self):
-        if self.arg_manager.WIN32_FILTER_PAUSED:
-            self.arg_manager.reset_global_variable_changes()
+        if self._arg_manager.WIN32_FILTER_PAUSED:
+            self._arg_manager.reset_global_variable_changes()
             self.apply_start_args_by_focus_name(self._focus_manager.FOCUS_APP_NAME)
             self.apply_focus_groups(self._focus_manager.FOCUS_APP_NAME)
             self.cli_menu.clear_cli()
             self._config_manager.display_groups()
             print("\n--- reloaded sucessfully ---")
             print('--- manuelly resumed ---\n')
-            if self.arg_manager.CONTROLS_ENABLED:
+            if self._arg_manager.CONTROLS_ENABLED:
                 self.cli_menu.display_control_text()
             # with paused_lock:
-            self.arg_manager.WIN32_FILTER_PAUSED = False
-            self.arg_manager.MANUAL_PAUSED = False
+            self._arg_manager.WIN32_FILTER_PAUSED = False
+            self._arg_manager.MANUAL_PAUSED = False
 
         else:
             print('--- manually paused ---')
             # with paused_lock:
-            self.arg_manager.WIN32_FILTER_PAUSED = True
-            self.arg_manager.MANUAL_PAUSED = True
+            self._arg_manager.WIN32_FILTER_PAUSED = True
+            self._arg_manager.MANUAL_PAUSED = True
             self.state_manager.release_all_currently_pressed_keys()
             self.state_manager.stop_all_repeating_keys() 
             
@@ -905,7 +909,7 @@ class FST_Keyboard():
 
     def apply_start_args_by_focus_name(self, focus_name = ''):
         
-        self._args.apply_start_arguments(self._args._sys_start_args)
+        self._arg_manager.apply_start_arguments(self._arg_manager._sys_start_args)
         
         self.update_focus_groups()
 
@@ -915,4 +919,29 @@ class FST_Keyboard():
         else:
             focus_start_arguments, _ = [],[]
             
-        self._args.apply_start_arguments(self.focus_manager.default_start_arguments + focus_start_arguments)
+        self._arg_manager.apply_start_arguments(self.focus_manager.default_start_arguments + focus_start_arguments)
+        
+    def set_sys_start_arguments(self, sys_args):
+        self._arg_manager.sys_start_args = sys_args
+        
+    def display_internal_repr_groups(self):                    
+
+        print("Aliases")
+        for alias, group in self.key_group_by_alias.items():
+            print(f"{alias} {group}")
+            
+        print("\n# Tap Groups")
+        for group in self._tap_groups:
+            print(f"{group}")
+
+        print("\n# Rebinds")
+        for rebind in self._rebinds:
+            print(f"{rebind}")
+
+        print("\n# Macros")
+        for macro in self._macros:
+            print(f"{macro}")
+
+        print("\n# Macro Sequences")
+        for alias, group in self._macros_alias_dict.items():
+            print(f"{group}")

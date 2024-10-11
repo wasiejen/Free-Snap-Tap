@@ -10,7 +10,6 @@ import sys # to get start arguments
 import msvcrt # to flush input stream
 from random import randint # randint(3, 9)) 
 from time import time, sleep # sleep(0.005) = 5 ms
-import pprint
 from fst_data_types import Key_Event, type_check
 from fst_threads import Repeat_Thread, Focus_Thread
 
@@ -116,7 +115,7 @@ class Output_Manager():
         
         self.send_key_event(key_event)
         
-        if self._fst._args.ACT_DELAY and with_delay:
+        if self._fst.arg_manager.ACT_DELAY and with_delay:
             delay_time = self.get_random_delay(*delay_times)
             # print(f" --- waiting for: {delay_time}")
             # if not in a thread just play sleep for the delay
@@ -274,60 +273,66 @@ class Output_Manager():
                 ##2
                 return 9999
             
-        def repeat(key_string):
+        def start_repeat(key_string):
             
             repeat_time = int(key_string)
             # reset stop event
             stop_event = Event()
             repeat_thread = Repeat_Thread(current_ke, stop_event, repeat_time, self._fst, time_increment=100)
             # save thread and stop event to find it again for possible interruption
-            self._repeat_thread_dict[current_ke] = [repeat_thread, stop_event]
+            self._repeat_thread_dict[current_ke.repr_wo_constraints()] = [repeat_thread, stop_event]
             repeat_thread.start() 
-            return None
+            return False
         
         def stop_repeat():
             try:
-                repeat_thread, stop_event = self._repeat_thread_dict[current_ke]
+                repeat_thread, stop_event = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
                 if repeat_thread.is_alive():
-                    if CONSTANTS.DEBUG2:
-                        print(f"D2: {current_ke}-repeat: still alive - try to stop")
                     stop_event.set()
                     repeat_thread.join()
-            except KeyError:
-                # this thread was not started before
-                pass
+            except KeyError as error:
+                raise KeyError(error)
             return False
+        
+        def stop_all_repeat():
+            try:
+                for repeat_thread, stop_event in self._repeat_thread_dict.items():
+                    if repeat_thread.is_alive():
+                        stop_event.set()
+                        repeat_thread.join()
+            except KeyError as error:
+                raise KeyError(error)
+            return True
         
         def toggle_repeat(key_string):
             try:
-                repeat_thread, stop_event = self._repeat_thread_dict[current_ke]
+                repeat_thread, stop_event = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
                 if repeat_thread.is_alive():
                     # print(f"stopping repeat for {current_ke}")
                     stop_event.set()
                     repeat_thread.join()
                 else:
                     # print(f"{current_ke} restarting repeat")
-                    repeat(key_string)
+                    start_repeat(key_string)
             except KeyError:
                 # this thread was not started before
                 # print(f"{current_ke} starting repeat for first time")
-                repeat(key_string)
+                start_repeat(key_string)
             return False
         
-        def reset_timer():
+        def reset_repeat():
             try:
-                repeat_thread, _ = self._repeat_thread_dict[current_ke]
+                repeat_thread, _ = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
                 if repeat_thread.is_alive():
                     repeat_thread.reset_timer()
-            except KeyError:
-                pass
+            except KeyError as error:
+                raise KeyError(error)
             return True
 
         # --------------------
         
-        if CONSTANTS.DEBUG3:
-            print(f"D3: received for eval: {constraint_to_evaluate} : {current_ke}")
-            
+        if CONSTANTS.DEBUG4:
+            print(f"D4: received for eval: {constraint_to_evaluate} : {current_ke}")   
         
         easy_eval_succeeded = False
         first_char = constraint_to_evaluate[0]
@@ -347,13 +352,13 @@ class Output_Manager():
         # check for reset macro via alias
         elif constraint_to_evaluate in self._fst.macro_sequence_alias_list:
             self._fst.reset_macro_sequence_by_alias(constraint_to_evaluate, current_ke)    
-            return False        
+            return True      
     
         elif not easy_eval_succeeded:
             result = eval(constraint_to_evaluate)
             ### print(f"result of '{constraint_to_evaluate}' is '{result}'")
-            if CONSTANTS.DEBUG2:
-                print(f"D2: evaluated {constraint_to_evaluate} to: {result}")
+            if CONSTANTS.DEBUG4:
+                print(f"D4: evaluated {constraint_to_evaluate} to: {result}")
             # if it is a number and if negativ change it to 0
             if isinstance(result, float):
                 result = int(result)
@@ -473,20 +478,21 @@ class Config_Manager():
         try:
             return self._parse_lines_for_focus_manager(self._open_config_file())
         # if no file exist create new one
-        except FileNotFoundError:
+        except FileNotFoundError as error:
+            raise FileNotFoundError(error)
             self.create_new_group_file()    
          
     
     def _clean_comments(self, lines):
         comments_cleaned_lines = []
         for line in lines:
-            line = line.replace('\n', '')
+            line = line.replace('\n', '').replace('\t', '')
             if len(line) > 1:
                 if line.startswith('<focus>'):
                     cleaned_line = '<focus>'
                     cleaned_line += line[7:].split('#')[0].strip()
                     comments_cleaned_lines.append(cleaned_line)
-                if line.startswith('<arg>'):
+                elif line.startswith('<arg>'):
                     cleaned_line = '<arg>'
                     cleaned_line += line[5:].split('#')[0].strip()
                     comments_cleaned_lines.append(cleaned_line)
@@ -542,29 +548,25 @@ class Config_Manager():
         multi_focus_dict = {}
         default_start_arguments = []
         default_group_lines = []
-        ###XXX 241011-1147
         alias_lines = []
         
         for line in cleaned_lines:
             if line.startswith('<focus>'):
                 focus_name = line.replace('<focus>', '').lower()
                 multi_focus_dict[focus_name] = [[], []]
+                print(f"new focus name found: {focus_name}")
             elif line.startswith('<arg>'):
                 line = line.replace('<arg>', '').lower()
                 if focus_name == '':
                     default_start_arguments.append(line)
                 else:
                     multi_focus_dict[focus_name][0].append(line)
-            ###XXX 241011-1126 testinf of aliases
             elif line.startswith('<'):
                 alias_end = line.find('>')
                 if alias_end > 1:
                     alias = line[:alias_end+1]
-                    print(line)
                     line = line.replace(alias, '').strip()
-                    print(line)
                     alias_lines.append([alias, line])
-                    print(alias_lines)
             else:
                 if line.startswith('('):
                     alias_end = line.find(')')
@@ -579,12 +581,6 @@ class Config_Manager():
                     default_group_lines.append([alias, line])
                 else:
                     multi_focus_dict[focus_name][1].append([alias, line])
-
-        # self._fm.multi_focus_dict = multi_focus_dict
-        # self._fm.default_start_arguments = default_start_arguments
-        # self._fm.default_group_lines = default_group_lines
-        # ###XXX 241011-1222
-        # self._fm.alias_lines = alias_lines
         
         return multi_focus_dict, default_start_arguments, default_group_lines, alias_lines
 
@@ -917,7 +913,7 @@ class Focus_Group_Manager():
         self._focus_thread  = None
     
         ###XXX 241011-1218
-        self._alias_lines = []
+        self._alias_group_lines = []
         
     @property
     def multi_focus_dict(self):
@@ -958,12 +954,12 @@ class Focus_Group_Manager():
         
     @property
     def alias_lines(self):
-        return self._alias_lines  # Return a copy to prevent external modification
+        return self._alias_group_lines  # Return a copy to prevent external modification
 
     @alias_lines.setter
     @type_check(list)
     def alias_lines(self, new_list):
-        self._alias_lines = new_list
+        self._alias_group_lines = new_list
         
     @property
     def FOCUS_APP_NAME(self):
@@ -975,6 +971,7 @@ class Focus_Group_Manager():
         self._FOCUS_APP_NAME = new_str
         
     def init_focus_thread(self):
+        
         if len(self._multi_focus_dict_keys) > 0:
             self.focus_active = True
             self._focus_thread = Focus_Thread(self._fst)
@@ -987,7 +984,7 @@ class Focus_Group_Manager():
             self._focus_thread.pause()
         
     def start_focus_thread(self):
-        if self.focus_active and self._focus_thread.is_alive():
+        if self.focus_active:
             self._focus_thread.start()
         
     def restart_focus_thread(self):
@@ -1002,9 +999,10 @@ class Focus_Group_Manager():
     def update_groups_from_config(self, config_update):
         multi_focus_dict, default_start_arguments, default_group_lines, alias_lines = config_update
         self._multi_focus_dict = multi_focus_dict
+        self._multi_focus_dict_keys = self._multi_focus_dict.keys()
         self._default_start_arguments = default_start_arguments
         self._default_group_lines = default_group_lines
-        self._alias_lines = alias_lines
+        self._alias_group_lines = alias_lines
     
 
     
@@ -1121,8 +1119,6 @@ class Input_State_Manager():
             self.add_key_press_state(vk_code)
         else:
             self.remove_key_press_state(vk_code)
-        if CONSTANTS.DEBUG3:
-            pprint.pp(f"pressed keys: {self._pressed_keys}")
 
     def get_next_toggle_state_key_event(self, key_event):
         vk_code, _, constraints = key_event.get_all()
@@ -1213,7 +1209,7 @@ class Input_State_Manager():
             try:
                 time_released[vk_code] = time_last_pressed[vk_code] - time_last_released[vk_code]
                 #print(f"time released: {time_released[vk_code]}")
-            except KeyError as error:
+            except KeyError:
                 pass
                 #print(f"no key yet for: {error}")     
         else:
@@ -1221,7 +1217,7 @@ class Input_State_Manager():
             try:
                 time_pressed[vk_code] = time_last_released[vk_code] - time_last_pressed[vk_code]
                 #print(f"time pressed: {time_pressed[vk_code]}")
-            except KeyError as error:
+            except KeyError:
                 pass
                 #print(f"no key yet for vk_code: {error}")
 
@@ -1274,7 +1270,7 @@ class CLI_menu():
                 startfile(self._fst.config_manager.file_name)
             elif choice == '2':
                 self._fst.arg_manager.reset_global_variable_changes()
-                self._fst.arg_manager.apply_start_args_by_focus_name(self._fst.focus_manager.FOCUS_APP_NAME)
+                self._fst.apply_start_args_by_focus_name(self._fst.focus_manager.FOCUS_APP_NAME)
                 self._fst.apply_focus_groups(self._fst.focus_manager.FOCUS_APP_NAME)
             elif choice == '3':
                 self._fst.arg_manager.PRINT_VK_CODES = True
@@ -1290,7 +1286,7 @@ class CLI_menu():
     def display_control_text(self):
         print('\n--- toggle PAUSED with ALT + DELETE ---')
         print('--- STOP execution with ALT + END ---')
-        print('--- enter MENU again with ALT + PAGE_DOWN ---\n')
+        print('--- enter MENU again with ALT + PAGE_DOWN ---')
 
     def update_group_display(self):
         self.clear_cli()
@@ -1300,7 +1296,7 @@ class CLI_menu():
             self.display_control_text()   
             
     def display_focus_names(self):
-        print(f">>> looking for focus names: {', '.join(self._fst.focus_manager.multi_focus_dict_keys)}")
+        print(f"\n>>> looking for focus names: {', '.join(self._fst.focus_manager.multi_focus_dict_keys)}")
     
     def display_focus_found(self, active_window):
         print(f'\n>>> FOCUS APP FOUND: resuming with app: \n    {active_window}\n')

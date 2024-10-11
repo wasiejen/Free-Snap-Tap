@@ -69,20 +69,26 @@
 - not working when using no focus name
 - toggle key is broken ... AGAIN ... - fixed
 
+# --- alias updates
+
+- stop_all_repeat()
+  - eval to True
+- aliases
+- names and 
+- resets for sequences with names and ke|(name)
+  - eval to True
+- eval of constraints will abort following constraints if one results in False
+
+???:
+-should every invocation or reset as invocation result in True?
+  - can always be stopped from sending by following up with a False eval .. e.g. |(False)
+  - start_repeat, toggle_repeat eval to False, because a Repeat thread takes constraints[1:] with into the repeat ...
+    - so v|(start_repeat)|(False) would try to repeat v|(False) and never send anything
+  - and stop_repeat eval to False - because is needs to be used with the same ke to be stopped and when you want to stop something you do not want to execute it first again...
+
 ### todo
 
-
 - alt key gets stuck when tapping out of focus game with alt+tab
-
-- key combination will only be played if exactly these are pressed and no else??? was because shift changes numpad
-
-- [x] shift, control and alt change keys that the system will get, so when these are active they need to be deactivated first???
-- DONE
-
-
-```bash
-
-```
 
 ### ideas:
 
