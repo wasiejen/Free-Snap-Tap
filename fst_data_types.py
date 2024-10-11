@@ -225,7 +225,7 @@ class Rebind(object):
         self._replacement = new_list
         
     def get_trigger(self):
-        return self._trigger_group[0]
+        return self._trigger_group.get_trigger()
         
     def __hash__(self):
         return hash(self.__repr__())
@@ -242,16 +242,51 @@ class Rebind(object):
     
 class Macro(object):
     
-    def __init__(self):
-        pass
+    def __init__(self, trigger_group, key_groups):
+        self._trigger_group = trigger_group
+        self._key_groups = key_groups
+        self._sequence_counter = 0
+        self._num_sequences = len(self._key_groups)
+
+
+    def append_key_group(self, new_group):
+        self._key_groups.append(new_group)
+        self._num_sequences = len(self._key_groups)
+        
+    def get_key_group(self):
+        if self._num_sequences == 0:
+            raise ValueError("No key groups in Macro")
+        elif self._num_sequences == 1:
+            return self._key_groups[0]
+        else:
+            if self._sequence_counter >= self._num_sequences:
+                self._sequence_counter = 0
+            group = self._key_groups[self._sequence_counter]
+            self._sequence_counter += 1
+            return group
+        
+    def get_key_events(self):
+        return self.get_key_group().get_key_events()
+        
+    def reset_sequence_counter(self):
+        self._sequence_counter = 0
+        
+    def get_trigger(self):
+        return self._trigger_group.get_trigger()
     
     def __hash__(self):
         return hash(self.__repr__())
 
     def __eq__(self, other):
         raise NotImplementedError
+    
     def __repr__(self):
-        raise NotImplementedError
+        output = f"{self._trigger_group} :: {self._key_groups[0]}"
+        if self._num_sequences > 1:
+            inset = output.find('::')
+            for key_group in self._key_groups:
+                output += f"\n{' ' * inset} : {key_group}"
+        return output
     
 class Macro_Sequence(Macro):
     

@@ -101,3 +101,21 @@
 - reset of repeated keys should be done by repeating thread? not by state_manager!
 
 - possible to activate FST window when return to menu? to push it to the forground?
+
+
+- refactor 2: internal structure refactor:
+  - new Rebind class
+  - new Macro class
+  - move initialize_groups to config_manager
+  - make it possible to evaluate one line of config code at a time
+    - for later usage in gui
+    - for seperation of concern
+    - structure like:
+      - parse_line
+        - clean_line(line: string) -> string of line
+          - returns line without comments or None if all comment
+        - initialize_line() -> Tap_group, Rebind or Macro
+          - presort_line(line: string)  and dependent on result call
+            - init_tap_group
+            - init_rebind
+            - init_macro
