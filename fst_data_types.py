@@ -117,6 +117,12 @@ class Key_Event(Input_Event):
     def _get_sign(self):
         return '-' if self._is_press else '+'
     
+    def repr_wo_constraints(self):
+        if self._key_string is None:
+            return f"{self._get_sign()}{self._vk_code}"
+        else:
+            return f"{self._get_sign()}{self._key_string}" 
+    
    
 class Key(Input_Event):
     '''
@@ -210,6 +216,15 @@ class Rebind(object):
     def __init__(self, trigger_group, replacement):
         self._trigger_group = trigger_group
         self._replacement = replacement
+        self._alias = ''
+        
+    @property
+    def alias(self):
+        return self._alias
+    @alias.setter
+    @type_check(str)
+    def alias(self, alias):
+        self._alias = alias
         
     @property
     def trigger_group(self):
@@ -245,7 +260,7 @@ class Rebind(object):
         return equal
     
     def __repr__(self):
-        return f"{self._trigger_group} : {self._replacement}"
+        return f"{self._alias} {self._trigger_group} : {self._replacement}"
         
     
 class Macro(object):
@@ -255,6 +270,15 @@ class Macro(object):
         self._key_groups = key_groups
         self._sequence_counter = 0
         self._num_sequences = len(self._key_groups)
+        self._alias = ''
+        
+    @property
+    def alias(self):
+        return self._alias
+    @alias.setter
+    @type_check(str)
+    def alias(self, alias):
+        self._alias = alias
 
     @property
     def trigger_group(self):
@@ -263,9 +287,7 @@ class Macro(object):
     @property
     def num_sequences(self):
         return self._num_sequences
-    # def append_key_group(self, new_group):
-    #     self._key_groups.append(new_group)
-    #     self._num_sequences = len(self._key_groups)
+    
         
     def _get_key_group(self):
         if self._num_sequences == 0:
@@ -288,9 +310,6 @@ class Macro(object):
     def get_trigger(self):
         return self._trigger_group.get_trigger()
     
-    # def get_trigger_group(self):
-    #     return self._trigger_group
-    
     def __hash__(self):
         return hash(self.__repr__())
 
@@ -298,38 +317,47 @@ class Macro(object):
         raise NotImplementedError
     
     def __repr__(self):
-        output = f"{self._trigger_group} :: {self._key_groups[0]}"
+        output = f"{self._alias} {self._trigger_group} :: {self._key_groups[0]}"
         if self._num_sequences > 1:
             inset = output.find('::')
-            for key_group in self._key_groups:
+            for key_group in self._key_groups[1:]:
                 output += f"\n{' ' * inset} : {key_group}"
         return output
     
-class Macro_Sequence(Macro):
+# class Macro_Sequence(Macro):
     
-    def __init__(self):
-        super().__init__(self)
+#     def __init__(self):
+#         super().__init__(self)
 
-    def __hash__(self):
-        return hash(self.__repr__())
+#     def __hash__(self):
+#         return hash(self.__repr__())
     
-    def __eq__(self, other):
-        raise NotImplementedError
-    def __repr__(self):
-        raise NotImplementedError
+#     def __eq__(self, other):
+#         raise NotImplementedError
+#     def __repr__(self):
+#         raise NotImplementedError
     
 class Tap_Group(object):
     '''
     #XXX
     '''     
     def __init__(self, keys = []) -> None:
-         self.keys = keys
-         self.states = {}
-         self.active_key = None
-         for code in self.keys:
-             self.states[code] = 0
-         self.last_key_pressed = None
-         self.last_key_send = None
+        self.keys = keys
+        self.states = {}
+        self.active_key = None
+        for code in self.keys:
+            self.states[code] = 0
+        self.last_key_pressed = None
+        self.last_key_send = None
+        self._alias = ''
+        
+    @property
+    def alias(self):
+        return self._alias
+    @alias.setter
+    @type_check(str)
+    def alias(self, alias):
+        self._alias = alias
      
     def update_tap_states(self, vk_code, is_press):
         if is_press:
