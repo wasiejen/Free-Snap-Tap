@@ -9,7 +9,7 @@ from time import time # sleep(0.005) = 5 ms
 from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_dict.py
 import pprint
 
-from fst_data_types import Key_Event, Key_Group, Key, Tap_Group
+from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro
 from fst_threads import Alias_Thread
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager 
@@ -62,8 +62,11 @@ class FST_Keyboard():
         self._macro_triggers = [] 
         self._all_trigger_events = []
         
-        self._macro_thread_dict = {}
-        self._macros_sequence_counter_dict = {}
+        self._macro_thread_dict = {}        
+        
+        # colletor of all rebinds and macros, not used for anything yet 241011-1117
+        self._rebinds = []
+        self._macros = []
         
         self._mouse_listener = None
         self._listener = None
@@ -106,9 +109,6 @@ class FST_Keyboard():
     @property
     def macro_thread_dict(self):
         return self._macro_thread_dict
-    @property
-    def macros_sequence_counter_dict(self):
-        return self._macros_sequence_counter_dict
     
     def convert_to_vk_code(self, key):
         '''
@@ -132,7 +132,7 @@ class FST_Keyboard():
         key_group are a list of Key_Event, Keys
         macros are Key_Group : key_Groups
         '''
-        c = []
+        self._tap_groups = []
         self._rebinds_dict = {}
         self._rebind_triggers = []
         self._macros_dict = {}
@@ -242,18 +242,22 @@ class FST_Keyboard():
                 # if both are key_events
                 if not both_are_Keys:
                     trigger_group = Key_Group(new_trigger_group)
+                    ###XXX 241011-1000
+                    new_rebind = Rebind(trigger_group, replacement_key)
+                    self._rebinds.append(new_rebind)
                     self._rebind_triggers.append(trigger_group)
-                    self._rebinds_dict[trigger_group] = replacement_key
-                            
+                    self._rebinds_dict[trigger_group] = new_rebind
                 else:
                     trigger_events = trigger_key.get_key_events()
                     replacement_events = replacement_key.get_key_events()
                     for index in [0,1]:
                         trigger_group = Key_Group([trigger_events[index]] + trigger_rest)
+                        ###XXX 241011-1000
+                        new_rebind = Rebind(trigger_group, replacement_events[index])
+                        self._rebinds.append(new_rebind)
                         self._rebind_triggers.append(trigger_group)
-                        self._rebinds_dict[trigger_group] = replacement_events[index]
-                        
-                        
+                        self._rebinds_dict[trigger_group] = new_rebind
+
         except Exception as error:
             print(f"ERROR: {error} \n -> in Rebind: {rebind}")
             raise Exception(error)
@@ -261,7 +265,7 @@ class FST_Keyboard():
         # extract macros   
         try:      
             for macro in self.config_manager.macros_hr:
-                new_macro = []
+                temp_macro = []
                 # trigger j = 0, key_group j = 1
                 for index, key_group in enumerate(macro):
                     new_key_group = Key_Group([])
@@ -276,11 +280,12 @@ class FST_Keyboard():
                                 # if not in trigger group - so Key Instances as triggers are handled correctly
                                 if index >= 1: 
                                     new_key_group.append(key_events[1])
-                    new_macro.append(new_key_group)
-                self._macro_triggers.append(new_macro[0])
-                # trigger is the key to the to be played keygroup
-                self._macros_dict[new_macro[0]] = new_macro[1:]
-                self._macros_sequence_counter_dict[new_macro[0]] = 0
+                    temp_macro.append(new_key_group)
+                new_macro = Macro(temp_macro[0], temp_macro[1:])
+                self._macros.append(new_macro)
+                self._macro_triggers.append(temp_macro[0])
+                self._macros_dict[temp_macro[0]] = new_macro
+                
         except Exception as error:
             print(f"ERROR: {error} \n -> in Macro: {macro}")
             raise Exception(error)
@@ -519,7 +524,10 @@ class FST_Keyboard():
                         
                         if is_trigger_activated(current_ke, trigger_group):
                             try:
-                                replacement_ke = self._rebinds_dict[trigger_group]
+                                ###XXX 241011-1014
+                                rebind = self._rebinds_dict[trigger_group]
+                                replacement_ke = rebind.replacement
+                                # replacement_ke = self._rebinds_dict[trigger_group]
                                 old_ke = current_ke
                                 current_ke = replacement_ke
                                 key_replaced = True
@@ -582,15 +590,9 @@ class FST_Keyboard():
                             if is_trigger_activated(current_ke, trigger_group): 
                                 alias_fired = True
                                 
-                                'MACRO SEQUENCES COUNTER HANDLING'
-                                macro_groups = self._macros_dict[trigger_group]
-                                if len(macro_groups) == 1:
-                                    key_sequence = macro_groups[0].get_key_events()
-                                else:
-                                    if self._macros_sequence_counter_dict[trigger_group] >= len(macro_groups):
-                                        self._macros_sequence_counter_dict[trigger_group] = 0
-                                    key_sequence = macro_groups[self._macros_sequence_counter_dict[trigger_group]].get_key_events()
-                                    self._macros_sequence_counter_dict[trigger_group] += 1
+                                # macro sequence handling is internal in class Macro
+                                macro = self._macros_dict[trigger_group]
+                                key_sequence = macro.get_key_events()
                                     
                                 'MACRO playback'
                                 # only spawn a thread for execution if more than one key event in to be played key sequence
@@ -711,7 +713,6 @@ class FST_Keyboard():
                 if CONSTANTS.DEBUG4:
                     print(f"D4: -- removed {current_ke} from pressed keys")
             if CONSTANTS.DEBUG4:
-                # print(f"D4:--{"--" if is_simulated else ""} SUPPRESSED: {current_ke}")
                 print(f"D4: {"-- | XX" if is_simulated else "XX"} SUPPRESSED: {current_ke}")
 
             self._listener.suppress_event()     
@@ -727,7 +728,6 @@ class FST_Keyboard():
                 self.state_manager.set_simulated_key_press_state(vk_code, current_ke.is_press)
             
         if CONSTANTS.DEBUG4:
-            # print(f"D4:<-{"<-" if is_simulated else ""} OUT ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
             print(f"D4: {"-- | <-" if is_simulated else "<-"} OUT ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
                         
 
@@ -829,17 +829,16 @@ class FST_Keyboard():
                     if trigger_group is None:
                         print("ERROR: self reset only possible from the macro sequence to be reseted")
                     else:
-                        self._macros_sequence_counter_dict[trigger_group] = 0
+                        self._macros_dict[trigger_group].reset_sequence_counter()
                 # reset every sequence counter
                 elif reset_code == -256:
-                    for index in len(self._macro_triggers):
-
-                        self._macros_sequence_counter_dict[self._macro_triggers[index]] = 0
-                        _, stop_event = self._macro_thread_dict[self._macro_triggers[index]]
+                    for trigger_group in self._macro_triggers:
+                        self._macros_dict[trigger_group].reset_sequence_counter()
+                        _, stop_event = self._macro_thread_dict[trigger_group]
                         stop_event.set()
                 # reset a specific macro seq according to index
                 else:
-                    self._macros_sequence_counter_dict[self._macro_triggers[reset_code]] = 0
+                    self._macros_dict[self._macro_triggers[reset_code]].reset_sequence_counter()
                     _, stop_event = self._macro_thread_dict[self._macro_triggers[reset_code]]
                     stop_event.set()
                         

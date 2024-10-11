@@ -432,14 +432,14 @@ class Config_Manager():
         self._tap_groups_hr = []
         self._rebinds_hr = []
         self._macros_hr = []
+        
     @property
     def file_name(self):
         return self._file_name
-    
     @file_name.setter
     @type_check(str)
     def file_name(self, new_file_name):
-        self._file_name = new_file_name
+        self._file_name = new_file_name  
     @property
     def focus_manager(self):
         return self._fm
@@ -464,71 +464,75 @@ class Config_Manager():
         # if no file exist create new one
         except FileNotFoundError:
             self.create_new_group_file()    
-            
+         
+    
+    def clean_lines(self, lines):
+        comments_cleaned_lines = []
+        for line in lines:
+            if len(line) > 1:
+                if line.startswith('<focus>'):
+                    cleaned_line = '<focus>'
+                    # strip comment
+                    temp_line = line[7:].split('#')[0]
+                    # remove leading whitespaces
+                    while temp_line.find(' ') == 0:
+                        temp_line = temp_line[1:]
+                    # remove trailing whitespaces
+                    temp_line = temp_line[::-1]
+                    while temp_line.find(' ') == 0:
+                        temp_line = temp_line[1:]
+                    # recombine with focus part
+                    cleaned_line += temp_line[::-1]
+                    comments_cleaned_lines.append(line.split('#')[0])
+                else:
+                    line = line.strip().replace(" ","")
+                    if len(line) > 1:
+                        # strip all comments from line
+                        group = line.split(',')
+                        # ignore line if first char is a #
+                        if group[0][0] == '#':
+                            pass
+                        else:
+                            # remove commented out keys
+                            cleaned_group = []
+                            for key in group:
+                                # ignore commented out keys
+                                if key[0] != '#': 
+                                    # ignore comments after keys
+                                    cleaned_group.append(key.split('#')[0]) 
+                                # if commented out key before :, add :
+                                elif key.find(':') >= 0:
+                                    cleaned_group.append(':')
+                                    
+                            cleaned_line = ','.join(cleaned_group)
+                            comments_cleaned_lines.append(cleaned_line)
+        
+        # clean multiline macro sequences and joins them together
+        multiline_cleaned_lines = []
+        for line in comments_cleaned_lines:
+            if len(line) > 1 and line[0] == ':':
+                # add multiline to last multiline sequence
+                multiline_cleaned_lines[-1] += line
+            else:
+                multiline_cleaned_lines.append(line)
+                
+        return multiline_cleaned_lines
+
+    def parse_line(self, line):
+        pass
+    
     def _load_from_file(self):
         '''
         reads in the file and removes the commented out lines, keys and inline comments;
         joins multiline macro sequences; 
         '''    
-
-        def clean_lines(lines):
-            comments_cleaned_lines = []
-            for line in lines:
-                if len(line) > 1:
-                    if line.startswith('<focus>'):
-                        cleaned_line = '<focus>'
-                        # strip comment
-                        temp_line = line[7:].split('#')[0]
-                        # remove leading whitespaces
-                        while temp_line.find(' ') == 0:
-                            temp_line = temp_line[1:]
-                        # remove trailing whitespaces
-                        temp_line = temp_line[::-1]
-                        while temp_line.find(' ') == 0:
-                            temp_line = temp_line[1:]
-                        # recombine with focus part
-                        cleaned_line += temp_line[::-1]
-                        comments_cleaned_lines.append(line.split('#')[0])
-                    else:
-                        line = line.strip().replace(" ","")
-                        if len(line) > 1:
-                            # strip all comments from line
-                            group = line.split(',')
-                            # ignore line if first char is a #
-                            if group[0][0] == '#':
-                                pass
-                            else:
-                                # remove commented out keys
-                                cleaned_group = []
-                                for key in group:
-                                    # ignore commented out keys
-                                    if key[0] != '#': 
-                                        # ignore comments after keys
-                                        cleaned_group.append(key.split('#')[0]) 
-                                    # if commented out key before :, add :
-                                    elif key.find(':') >= 0:
-                                        cleaned_group.append(':')
-                                        
-                                cleaned_line = ','.join(cleaned_group)
-                                comments_cleaned_lines.append(cleaned_line)
-            
-            # clean multiline macro seauences and joins them together
-            multiline_cleaned_lines = []
-            for line in comments_cleaned_lines:
-                if len(line) > 1 and line[0] == ':':
-                    # add multiline to last multiline sequence
-                    multiline_cleaned_lines[-1] += line
-                else:
-                    multiline_cleaned_lines.append(line)
-                    
-            return multiline_cleaned_lines
-
+        
         temp_file = []
         with open(self._file_name, 'r') as file:
             for line in file:
                 temp_file.append(line) 
 
-        cleaned_lines = clean_lines(temp_file) 
+        cleaned_lines = self.clean_lines(temp_file) 
             
         focus_name = ''
         multi_focus_dict = {}
