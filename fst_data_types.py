@@ -84,7 +84,8 @@ class Key_Event(Input_Event):
     
     def __hash__(self):
         # return hash((self._vk_code, self._state_pressed))
-        return hash(f"{self._get_sign()}{self._vk_code}")
+        # return hash(f"{self._get_sign()}{self._vk_code}")
+        return hash(self.__repr__())
     
     # to be able to use complimentory to the Key class and return 2 Key_events
     def get_key_events(self):
@@ -132,6 +133,16 @@ class Key(Input_Event):
         raise NotImplementedError
   
   
+# decorator data type_check
+def type_check(expected_type):
+    def decorator(func):
+        def wrapper(self, value):
+            if not isinstance(value, expected_type):
+                raise TypeError(f"Expected {expected_type}, got {type(value)}")
+            return func(self, value)
+        return wrapper
+    return decorator
+
 # not yet updated implementation
    
 class Key_Group(object):
@@ -141,30 +152,39 @@ class Key_Group(object):
     def __init__(self, key_events=[]):
         if isinstance(key_events, Key_Event):
             key_events = [key_events]
-        self.key_group = key_events
-      
+        self._key_events = key_events
+    
+    @property
+    def key_events(self):
+        return self._key_events.copy()
+    
+    @key_events.setter
+    @type_check(list)
+    def key_events(self, new_list):
+        self._key_events = new_list
+        
     def get_key_events(self):
-        return self.key_group
+        return self._key_events
     
     def get_vk_codes(self):
-        return [key.vk_codes for key in self.key_group]
+        return [key.vk_codes for key in self._key_events]
     
     def add_key_event(self, key_event):
-        self.key_group.append(key_event)
+        self._key_events.append(key_event)
         
     def append(self, key_event):
-        self.key_group.append(key_event)
+        self._key_events.append(key_event)
         
     def get_trigger(self):
-        return self.key_group[0]
+        return self._key_events[0]
     
     def __hash__(self):
         return hash(self.__repr__())
       
     def __eq__(self, other) -> bool:
-        if len(self.key_group) == len(other.get_key_events()):
+        if len(self._key_events) == len(other.get_key_events()):
             equal = True
-            for my_key_event, other_key_event in zip(self.key_group, other.get_key_events()):
+            for my_key_event, other_key_event in zip(self._key_events, other.get_key_events()):
                 equal = equal and my_key_event == other_key_event
             return equal
         else:
@@ -172,13 +192,81 @@ class Key_Group(object):
 
     def __repr__(self):
         key_strings = []
-        for key_event in self.key_group:
+        for key_event in self._key_events:
             key_strings.append(repr(key_event))
         return "Key_Group(" + ', '.join(key_strings) + ")"
     
     def __len__(self):
-        return len(self.key_group)
-      
+        return len(self._key_events)
+    
+    
+class Rebind(object):
+    
+    def __init__(self, trigger_group, replacement):
+        self._trigger_group = trigger_group
+        self._replacement = replacement
+        
+    @property
+    def trigger_group(self):
+        return self._trigger_group.copy()
+    
+    @trigger_group.setter
+    @type_check(Key_Group)
+    def trigger_group(self, new_list):
+        self._trigger_group = new_list
+
+    @property
+    def replacement(self):
+        return self._replacement
+    
+    @replacement.setter
+    @type_check(Key_Event)
+    def replacement(self, new_list):
+        self._replacement = new_list
+        
+    def get_trigger(self):
+        return self._trigger_group[0]
+        
+    def __hash__(self):
+        return hash(self.__repr__())
+    
+    def __eq__(self, other):
+        equal = True
+        equal = equal and self.trigger_group == other.trigger_group
+        equal = equal and self.replacement == other.replacement
+        return equal
+    
+    def __repr__(self):
+        return f"{self._trigger_group} : {self._replacement}"
+        
+    
+class Macro(object):
+    
+    def __init__(self):
+        pass
+    
+    def __hash__(self):
+        return hash(self.__repr__())
+
+    def __eq__(self, other):
+        raise NotImplementedError
+    def __repr__(self):
+        raise NotImplementedError
+    
+class Macro_Sequence(Macro):
+    
+    def __init__(self):
+        super().__init__(self)
+
+    def __hash__(self):
+        return hash(self.__repr__())
+    
+    def __eq__(self, other):
+        raise NotImplementedError
+    def __repr__(self):
+        raise NotImplementedError
+    
+    
 # class Rebind(object):
     
 #     def __init__(self, trigger, replacement):
