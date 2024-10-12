@@ -155,7 +155,7 @@ class FST_Keyboard():
             if '|' in key_string:
                 key_string, *constraints = key_string.split('|')
                 if CONSTANTS.DEBUG: 
-                    print(f"D1: delays for {key_string}: {constraints}")
+                    print(f"D1: Constraints for {key_string}: {constraints}")
                 temp_delays = []
                 # constraints = []
                 for constraint in constraints:
