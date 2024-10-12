@@ -328,6 +328,9 @@ class Output_Manager():
             except KeyError as error:
                 raise KeyError(error)
             return True
+        
+        def test(a,b,c):
+            print(f"received: {a}, {b} and {c}")
 
         # --------------------
         
@@ -619,6 +622,58 @@ class Config_Manager():
         saved in variable_hr (human readable)
         '''
         
+        def split_ignore_brackets(group):
+            '''
+            splits the group but ignoring the commas that are in brackets
+            used for evaluations that use commas to deliver 2 or more parameters
+            '''
+            
+            key_string = group
+            valid_commas = []
+            start_pos = 0
+
+            open_count = 0
+            
+            while True:
+                next_comma = key_string.find(',', start_pos)
+                next_open = key_string.find('(', start_pos)
+                next_close = key_string.find(')', start_pos)
+                if open_count == 0:
+                    if next_comma == -1:
+                        valid_commas.append(len(key_string))
+                        break
+                    elif next_open == -1:
+                        first = next_comma
+                        valid_commas.append(next_comma)
+                    else:
+                        first = min(next_comma, next_open)
+                        if first == next_comma:
+                            valid_commas.append(next_comma)
+                        else:
+                            open_count += 1
+                elif open_count > 0:
+                    if next_open == -1:
+                        first = next_close
+                        open_count -= 1
+                    else:
+                        first = min(next_open, next_close)
+                        if first == next_close:
+                            open_count -= 1
+                        else:
+                            open_count += 1
+                # print(f"count: {open_count} , start_pos: {start_pos} , first: {first}")
+                # print(f"valid commas: {valid_commas}")
+                start_pos = first+1
+
+            split_group = []
+            start = 0
+            for comma in valid_commas:
+                split_group.append(key_string[start:comma])
+                start = comma+1
+                
+            return split_group
+        
+        
         self._tap_groups_hr = []
         self._rebinds_hr = []
         self._macros_hr = []
@@ -629,17 +684,17 @@ class Config_Manager():
 
             alias, line = line
             if alias.startswith('<'):
-                self._alias_hr.append([alias, line.split(',')])
+                self._alias_hr.append([alias, split_ignore_brackets(line)])
             else:
                
                 groups = line.split(':')
                 # tap groups
                 if len(groups) == 1: 
-                    self._tap_groups_hr.append([alias, groups[0].split(',')])
+                    self._tap_groups_hr.append([alias, split_ignore_brackets(groups[0])])
                 # rebinds
                 elif len(groups) == 2:
-                    trigger_group = groups[0].split(',')
-                    key_group = groups[1].split(',')
+                    trigger_group = split_ignore_brackets(groups[0])
+                    key_group = split_ignore_brackets(groups[1])
                     # rebind
                     # if len(trigger_group) == 1 and len(key_group) == 1:
                     if len(key_group) == 1:
@@ -649,14 +704,14 @@ class Config_Manager():
                         print("   use :: instead of : to declare it as a macro")
                     # macro
                 elif len(groups) > 2 and len(groups[1]) == 0:
-                    trigger_group = groups[0].split(',')
+                    trigger_group = split_ignore_brackets(groups[0])
                     if len(groups) > 3:
                         # for group in groups[2:]:
                         #     trigger_group.append(group.split(','))
-                        key_groups = [group.split(',') for group in groups[2:]]
+                        key_groups = [split_ignore_brackets(group) for group in groups[2:]]
                         self._macros_hr.append([alias, [trigger_group] + key_groups])
                     else:
-                        key_group = groups[2].split(',')
+                        key_group = split_ignore_brackets(groups[2])
                         self._macros_hr.append([alias, [trigger_group, key_group]])
                     
     def display_groups(self):
