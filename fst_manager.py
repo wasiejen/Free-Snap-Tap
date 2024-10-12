@@ -11,7 +11,7 @@ import msvcrt # to flush input stream
 from random import randint # randint(3, 9)) 
 from time import time, sleep # sleep(0.005) = 5 ms
 from fst_data_types import Key_Event, type_check
-from fst_threads import Repeat_Thread, Focus_Thread
+from fst_threads import Focus_Thread, Alias_Repeat_Thread
 
 class CONSTANTS():
 
@@ -273,26 +273,48 @@ class Output_Manager():
                 ##2
                 return 9999
             
-        def start_repeat(key_string):
-            
-            repeat_time = int(key_string)
-            # reset stop event
+        def start_repeat(alias_string, repeat_time):
+            repeat_time = int(repeat_time)
             stop_event = Event()
-            repeat_thread = Repeat_Thread(current_ke, stop_event, repeat_time, self._fst, time_increment=100)
-            # save thread and stop event to find it again for possible interruption
-            self._repeat_thread_dict[current_ke.repr_wo_constraints()] = [repeat_thread, stop_event]
+            repeat_thread = Alias_Repeat_Thread(alias_string, repeat_time, stop_event, self._fst)
+            self._repeat_thread_dict[alias_string] = [repeat_thread, stop_event]
             repeat_thread.start() 
-            return False
-        
-        def stop_repeat():
+            return True
+            
+        def toggle_repeat(alias_string, repeat_time):
             try:
-                repeat_thread, stop_event = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
+                repeat_thread, stop_event = self._repeat_thread_dict[alias_string]
+                if repeat_thread.is_alive():
+                    # print(f"stopping repeat for {current_ke}")
+                    stop_event.set()
+                    repeat_thread.join()
+                else:
+                    # print(f"{current_ke} restarting repeat")
+                    start_repeat(alias_string, repeat_time)
+            except KeyError:
+                # this thread was not started before
+                # print(f"{current_ke} starting repeat for first time")
+                start_repeat(alias_string, repeat_time)
+            return True
+        
+        def stop_repeat(alias_string):
+            try:
+                repeat_thread, stop_event = self._repeat_thread_dict[alias_string]
                 if repeat_thread.is_alive():
                     stop_event.set()
                     repeat_thread.join()
             except KeyError as error:
                 raise KeyError(error)
-            return False
+            return True
+        
+        def reset_repeat(alias_string):
+            try:
+                repeat_thread, _ = self._repeat_thread_dict[alias_string]
+                if repeat_thread.is_alive():
+                    repeat_thread.reset_timer()
+            except KeyError as error:
+                raise KeyError(error)
+            return True
         
         def stop_all_repeat():
             try:
@@ -303,31 +325,63 @@ class Output_Manager():
             except KeyError as error:
                 raise KeyError(error)
             return True
+            
+        # def start_repeat(key_string):
+            
+        #     repeat_time = int(key_string)
+        #     # reset stop event
+        #     stop_event = Event()
+        #     repeat_thread = Repeat_Thread(current_ke, stop_event, repeat_time, self._fst, time_increment=100)
+        #     # save thread and stop event to find it again for possible interruption
+        #     self._repeat_thread_dict[current_ke.repr_wo_constraints()] = [repeat_thread, stop_event]
+        #     repeat_thread.start() 
+        #     return False
         
-        def toggle_repeat(key_string):
-            try:
-                repeat_thread, stop_event = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
-                if repeat_thread.is_alive():
-                    # print(f"stopping repeat for {current_ke}")
-                    stop_event.set()
-                    repeat_thread.join()
-                else:
-                    # print(f"{current_ke} restarting repeat")
-                    start_repeat(key_string)
-            except KeyError:
-                # this thread was not started before
-                # print(f"{current_ke} starting repeat for first time")
-                start_repeat(key_string)
-            return False
+        # def stop_repeat():
+        #     try:
+        #         repeat_thread, stop_event = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
+        #         if repeat_thread.is_alive():
+        #             stop_event.set()
+        #             repeat_thread.join()
+        #     except KeyError as error:
+        #         raise KeyError(error)
+        #     return False
         
-        def reset_repeat():
-            try:
-                repeat_thread, _ = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
-                if repeat_thread.is_alive():
-                    repeat_thread.reset_timer()
-            except KeyError as error:
-                raise KeyError(error)
-            return True
+        
+        # def stop_all_repeat():
+        #     try:
+        #         for repeat_thread, stop_event in self._repeat_thread_dict.items():
+        #             if repeat_thread.is_alive():
+        #                 stop_event.set()
+        #                 repeat_thread.join()
+        #     except KeyError as error:
+        #         raise KeyError(error)
+        #     return True
+        
+        # def toggle_repeat(key_string):
+        #     try:
+        #         repeat_thread, stop_event = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
+        #         if repeat_thread.is_alive():
+        #             # print(f"stopping repeat for {current_ke}")
+        #             stop_event.set()
+        #             repeat_thread.join()
+        #         else:
+        #             # print(f"{current_ke} restarting repeat")
+        #             start_repeat(key_string)
+        #     except KeyError:
+        #         # this thread was not started before
+        #         # print(f"{current_ke} starting repeat for first time")
+        #         start_repeat(key_string)
+        #     return False
+        
+        # def reset_repeat():
+        #     try:
+        #         repeat_thread, _ = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
+        #         if repeat_thread.is_alive():
+        #             repeat_thread.reset_timer()
+        #     except KeyError as error:
+        #         raise KeyError(error)
+        #     return True
         
         def test(a,b,c):
             print(f"received: {a}, {b} and {c}")
