@@ -34,7 +34,6 @@ class CONSTANTS():
 
 
 class Output_Manager():
-    
     '''
     #XXX
     '''
@@ -611,6 +610,8 @@ class Config_Manager():
         default_start_arguments = []
         default_group_lines = []
         alias_lines = []
+
+        
         
         for line in cleaned_lines:
             if line.startswith('<focus>'):
@@ -637,8 +638,6 @@ class Config_Manager():
                     line = line.replace(alias, '').strip()
                 else:
                     alias = ''
-                    
-                    
                 if focus_name == '':
                     default_group_lines.append([alias, line])
                 else:
@@ -786,6 +785,10 @@ class Config_Manager():
         self._macros_hr = []
         self._alias_hr = []
         
+        count_tap = 1
+        count_rebind = 1
+        count_macro = 1
+        count_macro_sequence = 1
         # sort the lines into their categories for later initialization
         for line in lines:    
 
@@ -797,13 +800,19 @@ class Config_Manager():
                 groups = line.split(':')
                 # tap groups
                 if len(groups) == 1: 
+                    # generate default names for Tap Groups
+                    if alias == '':
+                        alias = f"(TAP_{count_tap})"
+                        count_tap += 1
                     self._tap_groups_hr.append([alias, split_ignore_brackets(groups[0])])
                 # rebinds
                 elif len(groups) == 2:
                     trigger_group = split_ignore_brackets(groups[0])
                     key_group = split_ignore_brackets(groups[1])
-                    # rebind
-                    # if len(trigger_group) == 1 and len(key_group) == 1:
+                    # generate default names for Rebinds
+                    if alias == '':
+                        alias = f"(REB_{count_rebind})"
+                        count_rebind += 1
                     if len(key_group) == 1:
                         self._rebinds_hr.append([alias, [trigger_group, key_group[0]]])
                     else:
@@ -813,46 +822,84 @@ class Config_Manager():
                 elif len(groups) > 2 and len(groups[1]) == 0:
                     trigger_group = split_ignore_brackets(groups[0])
                     if len(groups) > 3:
-                        # for group in groups[2:]:
-                        #     trigger_group.append(group.split(','))
+                        # generate default names for Macro Sequences
+                        if alias == '':
+                            alias = f"(SEQ_{count_macro_sequence})"
+                            count_macro_sequence += 1
+                        
                         key_groups = [split_ignore_brackets(group) for group in groups[2:]]
                         self._macros_hr.append([alias, [trigger_group] + key_groups])
                     else:
+                        # generate default names for Macros
+                        if alias == '':
+                            alias = f"(MAC_{count_macro})"
+                            count_macro += 1
                         key_group = split_ignore_brackets(groups[2])
                         self._macros_hr.append([alias, [trigger_group, key_group]])
+                    
+    # def display_groups(self):
+    #     """
+    #     Display the current tap groups.
+    #     """
+    #     # alias display
+    #     print("# Aliases")
+    #     for alias_group in self._alias_hr:
+    #         alias, group = alias_group
+    #         print(f"{alias} " + ', '.join(group)+'')         
+    #     # tap groups
+    #     print("\n# Tap Groups")
+    #     for tap_group in self._tap_groups_hr:
+    #         alias, tap_group = tap_group
+    #         print(f"{alias} " + ', '.join(tap_group)+'')         
+    #     # rebinds
+    #     print("\n# Rebinds")
+    #     for rebind in self._rebinds_hr:
+    #         alias, rebind = rebind
+    #         print(f"{alias} " + ' : '.join([', '.join(rebind[0]), rebind[1]]))
+    #     # macros
+    #     print("\n# Macros")
+    #     for group in self._macros_hr:
+    #         alias, *group = group
+    #         group = group[0]
+    #         first_line = f"{alias} " + ' :: '.join([', '.join(group[0]),', '.join(group[1])])
+    #         position = first_line.find('::')
+    #         print(first_line)
+    #         if len(group) > 2:
+    #             for gr in group[2:]:
+    #                 print(" " * (position+1) + ": " + ', '.join(gr))
                     
     def display_groups(self):
         """
         Display the current tap groups.
         """
         # alias display
+        
+        inset = '     '
+        
         print("# Aliases")
-        for index, alias_group in enumerate(self._alias_hr):
+        for alias_group in self._alias_hr:
             alias, group = alias_group
             print(f"{alias} " + ', '.join(group)+'')         
         # tap groups
         print("\n# Tap Groups")
-        for index, tap_group in enumerate(self._tap_groups_hr):
+        for tap_group in self._tap_groups_hr:
             alias, tap_group = tap_group
-            # print(f"{tap_group}\n")
-            print(f"[{index}]{alias} " + ', '.join(tap_group)+'')         
+            print(f"{alias} " + ', '.join(tap_group)+'')         
         # rebinds
         print("\n# Rebinds")
-        for index, rebind in enumerate(self._rebinds_hr):
+        for rebind in self._rebinds_hr:
             alias, rebind = rebind
-            # print(f"[{index}] " + ' : '.join([rebind[0], rebind[1]]))
-            print(f"[{index}]{alias} " + ' : '.join([', '.join(rebind[0]), rebind[1]]))
+            print(f"{alias} " + ' : '.join([', '.join(rebind[0]), rebind[1]]))
         # macros
         print("\n# Macros")
-        for index, group in enumerate(self._macros_hr):
+        for group in self._macros_hr:
             alias, *group = group
             group = group[0]
-            first_line = f"[{index}]{alias} " + ' :: '.join([', '.join(group[0]),', '.join(group[1])])
-            position = first_line.find('::')
+            first_line = f"{alias} " + f' \n{inset}:: '.join([', '.join(group[0]),', '.join(group[1])])
             print(first_line)
             if len(group) > 2:
                 for gr in group[2:]:
-                    print(" " * (position+1) + ": " + ', '.join(gr))
+                    print(f"{inset} : " + ', '.join(gr))
 
     def add_group(self, new_group, data_object):
         """
@@ -1041,22 +1088,6 @@ class Argument_Manager():
             else:
                 print("unknown start argument: ", arg)
 
-    # def apply_start_args_by_focus_name(self, focus_name = ''):
-        
-    #     self.apply_start_arguments(self.sys_start_args)
-        
-    #     self._fst.update_focus_groups()
-    #     ###XXX 241011-1409
-    #     # self._fst.focus_manager.update_groups_from_config(self._fst.config_manager.load_config())
-    #     # self._fst.config_manager.load_config()
-    #     # needs to be done after reloading of file or else it will not have the actual data
-    #     if focus_name != '':
-    #         focus_start_arguments, _ = self._fst.focus_manager.multi_focus_dict[focus_name]
-    #     else:
-    #         focus_start_arguments, _ = [],[]
-            
-    #     self.apply_start_arguments(self._fst.focus_manager.default_start_arguments + focus_start_arguments)
-
 class Focus_Group_Manager():
     '''
     #XXX
@@ -1074,7 +1105,6 @@ class Focus_Group_Manager():
         self.focus_active = False
         self._focus_thread  = None
     
-        ###XXX 241011-1218
         self._alias_group_lines = []
         
     @property

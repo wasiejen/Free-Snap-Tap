@@ -44,13 +44,6 @@ class Macro_Thread(Thread):
                     self.stop_event.clear()
                     break
                 else:
-                    ###XXX 241013-1758 deactivate - eval takes over reset function by name
-                    # vk_code = key_event.vk_code
-                    # if vk_code <= 0:
-
-                    #     self._fst.reset_macro_sequence_by_alias(self.alias_name)
-                    #     # self._fst.reset_macro_sequence_by_reset_code(vk_code, self.alias_name)
-                    # else:
                     if key_event.is_toggle:
                         key_event = self._fst.output_manager.get_next_toggle_state_key_event(key_event)
                     # send key event and handles interruption of delay
@@ -74,24 +67,13 @@ class Alias_Repeat_Thread(Thread):
         self.number_of_increments = self.repeat_time // time_increment
         self._fst = fst_keyboard
         self.reset = False
-        self.macro_stop_event = Event()
-        # self.macro_return_event = Event()
-        
+        self.macro_stop_event = Event()        
          
     def run(self): 
         print(f"START REPEAT: {self.alias_name} with interval of {self.repeat_time} ms")
 
         while not self.stop_event.is_set():
             if self.reset:
-                ###XXX241013-1422
-                # the the macro thread has a chance to register set before clear
-                # sleep(0.05)
-                # self.macro_stop_event.clear()
-                
-                ###XXX 241013-2002
-                # if not self.macro_stop_event.is_set():
-                #     print("replacing macro stop event after self clearing")
-                #     self.macro_stop_event = Event()
                 self.macro_stop_event = Event()
                 self.reset = False
                 print(f"{self.alias_name} reset")

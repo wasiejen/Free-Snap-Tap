@@ -282,7 +282,6 @@ class FST_Keyboard():
                 # if both are key_events create ke:ke
                 if not both_are_Keys:
                     trigger_group = Key_Group(new_trigger_group)
-                    ###XXX 241011-1000
                     new_rebind = Rebind(trigger_group, replacement_key)
                     self._rebinds.append(new_rebind)
                     self._rebind_triggers.append(trigger_group)
@@ -293,7 +292,6 @@ class FST_Keyboard():
                     replacement_events = replacement_key.get_key_events()
                     for index in [0,1]:
                         trigger_group = Key_Group([trigger_events[index]] + trigger_rest)
-                        ###XXX 241011-1000
                         new_rebind = Rebind(trigger_group, replacement_events[index])
                         self._rebinds.append(new_rebind)
                         self._rebind_triggers.append(new_rebind.trigger_group)
@@ -319,11 +317,8 @@ class FST_Keyboard():
                 
                 if new_macro.num_sequences > 1: 
                     if alias != '':
-                        # self._macros_alias_dict[alias] = new_macro
-                        ###XXX 241013-0021 tobe able to use ke|(alias) for reset
                         self._macros_alias_dict[alias[1:-1]] = new_macro
                     else:
-                        ### XXX 241011-1756
                         # will not be displayed because the human readable collectors do not know this xD
                         auto_alias = f"seq_{num}"
                         self._macros_alias_dict[auto_alias] = new_macro
@@ -582,10 +577,8 @@ class FST_Keyboard():
                         
                         if is_trigger_activated(current_ke, trigger_group):
                             try:
-                                ###XXX 241011-1014
                                 rebind = self._rebinds_dict[trigger_group]
                                 replacement_ke = rebind.replacement
-                                # replacement_ke = self._rebinds_dict[trigger_group]
                                 old_ke = current_ke
                                 current_ke = replacement_ke
                                 key_replaced = True
@@ -605,14 +598,6 @@ class FST_Keyboard():
                                     if not constraints_fulfilled:
                                         to_be_suppressed = True
                                     
-                                    ###XXX 241013-1754 deactivate
-                                    ### check_constraint takes over this function
-                                    # handling of reset codes for macro sequences in rebinds
-                                    # elif current_ke.vk_code <= 0:
-                                    #     macro = self._macros_dict[trigger_group]
-                                    #     self.reset_macro_sequence_by_alias[macro.alias]
-                                    #     #self.reset_macro_sequence_by_reset_code(current_ke.vk_code)
-                                    #     to_be_suppressed = True
                                 break
                             
                     if key_replaced and not to_be_suppressed:                     
@@ -784,7 +769,7 @@ class FST_Keyboard():
              ## interruptable threads
             if macro_thread.is_alive():
                 if CONSTANTS.DEBUG:
-                    print(f"D1: {alias_name}-macro: still alive - try to stop")
+                    print(f"D1: {alias_name} is still alive - trying to stop")
                 stop_event_old.set()
                 macro_thread.join()
         except KeyError:
@@ -793,12 +778,11 @@ class FST_Keyboard():
             pass
             # reset stop event
         
-        ###XXX 241013-1421
         if stop_event.is_set():
             stop_event.clear()
         # stop_event = Event()
         macro_thread = Macro_Thread(key_sequence, stop_event, alias_name, self)
-                                    # save thread and stop event to find it again for possible interruption
+        # save thread and stop event to find it again for possible interruption
         self._macro_thread_dict[alias_name] = [macro_thread, stop_event]
         macro_thread.start()
                         
@@ -825,10 +809,9 @@ class FST_Keyboard():
                 self.control_toggle_pause()
                 
         'RESET ON ESC AND ALT+TAB'
-        # TODO: as key_event? 'release_all_pressed_keys' -> as invocation was easier -> |(stop_all_repeat())
         if self.check_for_combination(['esc']):
             self.state_manager.release_all_currently_pressed_keys()
-            self.state_manager.stop_all_repeating_keys()
+            # self.state_manager.stop_all_repeating_keys()
         if self.check_for_combination(['alt', 'tab']):
             self.state_manager.release_all_currently_pressed_keys()
 
@@ -900,36 +883,6 @@ class FST_Keyboard():
             print(f"--- No Macro Sequence with name {alias_name} - reset failed")
             if CONSTANTS.DEBUG:
                 print(f"all sequence names: {self._macros_alias_dict.keys()}")
-        
-    # def reset_macro_sequence_by_reset_code(self, vk_code, trigger_group = None):
-        
-    #     reset_code = vk_code
-    #     print(f"reset code played: {reset_code}")
-    #     # reset current trigger of this event - return this code to alias tread
-    #     try:
-    #         try:
-    #             # reset self macro sequence
-    #             if reset_code == -255:
-    #                 if trigger_group is None:
-    #                     print("ERROR: self reset only possible from the macro sequence to be reseted")
-    #                 else:
-    #                     self._macros_dict[trigger_group].reset_sequence_counter()
-    #             # reset every sequence counter
-    #             elif reset_code == -256:
-    #                 for trigger_group in self._macro_triggers:
-    #                     self._macros_dict[trigger_group].reset_sequence_counter()
-    #                     _, stop_event = self._macro_thread_dict[trigger_group]
-    #                     stop_event.set()
-    #             # reset a specific macro seq according to index
-    #             else:
-    #                 self._macros_dict[self._macro_triggers[reset_code]].reset_sequence_counter()
-    #                 _, stop_event = self._macro_thread_dict[self._macro_triggers[reset_code]]
-    #                 stop_event.set()
-                        
-    #         except KeyError as error:
-    #             print(f"reset_all: macro thread for trigger {error} not found")
-    #     except IndexError:
-    #             print(f"wrong index for reset - no macro with index: {reset_code}")
 
     def apply_start_args_by_focus_name(self, focus_name = ''):
         
