@@ -665,6 +665,7 @@ class FST_Keyboard():
                                     pass
                                 elif len(key_sequence) > 0:
                                     
+                                    
                                     self.start_macro_playback(macro.alias, key_sequence) 
                                     
                                 if CONSTANTS.DEBUG:
@@ -779,14 +780,15 @@ class FST_Keyboard():
 
     def start_macro_playback(self, alias_name, key_sequence, stop_event = Event()):
         try:
-            macro_thread, stop_event = self._macro_thread_dict[alias_name]
+            macro_thread, stop_event_old = self._macro_thread_dict[alias_name]
              ## interruptable threads
             if macro_thread.is_alive():
                 if CONSTANTS.DEBUG:
                     print(f"D1: {alias_name}-macro: still alive - try to stop")
-                stop_event.set()
+                stop_event_old.set()
                 macro_thread.join()
         except KeyError:
+            print(f"macro stop unsucessful - could not find Macro {alias_name}")
              # this thread was not started before
             pass
             # reset stop event

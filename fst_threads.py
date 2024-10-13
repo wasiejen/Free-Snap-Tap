@@ -41,6 +41,7 @@ class Macro_Thread(Thread):
             for key_event, delay_times in to_be_played_key_events:
                 # alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.key_string}")
                 if self.stop_event.is_set():
+                    self.stop_event.clear()
                     break
                 else:
                     ###XXX 241013-1758 deactivate - eval takes over reset function by name
@@ -74,6 +75,7 @@ class Alias_Repeat_Thread(Thread):
         self._fst = fst_keyboard
         self.reset = False
         self.macro_stop_event = Event()
+        # self.macro_return_event = Event()
         
          
     def run(self): 
@@ -83,17 +85,24 @@ class Alias_Repeat_Thread(Thread):
             if self.reset:
                 ###XXX241013-1422
                 # the the macro thread has a chance to register set before clear
-                sleep(0.05)
-                self.macro_stop_event.clear()
-                # self.macro_stop_event = Event
+                # sleep(0.05)
+                # self.macro_stop_event.clear()
+                
+                ###XXX 241013-2002
+                # if not self.macro_stop_event.is_set():
+                #     print("replacing macro stop event after self clearing")
+                #     self.macro_stop_event = Event()
+                self.macro_stop_event = Event()
                 self.reset = False
                 print(f"{self.alias_name} reset")
             else:
                 print(f"{self.alias_name} execute")
                 self._fst.start_macro_playback(self.alias_name, self._fst.key_group_by_alias[self.alias_name], self.macro_stop_event)
             for index in range(self.number_of_increments):
-                if self.stop_event.is_set() or self.reset:
-                    self.macro_stop_event.set()        
+                if self.stop_event.is_set():
+                    self.macro_stop_event.set()
+                    break
+                elif self.reset:
                     break
                 else:
                     sleep(self.time_increment / 1000)
