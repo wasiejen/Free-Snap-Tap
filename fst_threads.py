@@ -62,7 +62,7 @@ class Alias_Repeat_Thread(Thread):
     '''
     repeatatly execute a key event based on a timer
     '''
-    def __init__(self, alias_name, repeat_time, stop_event, fst_keyboard, time_increment=500):
+    def __init__(self, alias_name, repeat_time, stop_event, fst_keyboard, time_increment=100):
         Thread.__init__(self)
         self.daemon = True
         self.alias_name = alias_name
@@ -74,34 +74,29 @@ class Alias_Repeat_Thread(Thread):
         self.reset = False
         self.macro_stop_event = Event()
         
-        
-        
+         
     def run(self): 
         print(f"START REPEAT: {self.alias_name} with interval of {self.repeat_time} ms")
 
         while not self.stop_event.is_set():
             if self.reset:
+                ###XXX241013-1422
+                # the the macro thread has a chance to register set before clear
+                sleep(0.01)
                 self.macro_stop_event.clear()
+                # self.macro_stop_event = Event
                 self.reset = False
                 print(f"{self.alias_name} reset")
             else:
                 print(f"{self.alias_name} execute")
-                
-                
                 self._fst.start_macro_playback(self.alias_name, self._fst.key_group_by_alias[self.alias_name], self.macro_stop_event)
-                
-                # starte ich ein alias thread??
-                # soll er interruptable sein?
-                
-                # if self._fst.output_manager.check_constraint_fulfillment(self.key_event):
-                #     self._fst.output_manager.execute_key_event(self.key_event)
-                
             for index in range(self.number_of_increments):
-                if not self.stop_event.is_set() and not self.reset:
-                    sleep(self.time_increment / 1000)
-                else:
+                if self.stop_event.is_set() or self.reset:
+                    self.macro_stop_event.set()        
                     break
-        
+                else:
+                    sleep(self.time_increment / 1000)
+        # if stopped also stop the macro if it is still running
         print(f"STOP REPEAT: {self.alias_name} with interval of {self.repeat_time} ms")
                 
     def reset_timer(self):
