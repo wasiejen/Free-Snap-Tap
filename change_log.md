@@ -93,15 +93,29 @@
 - reset press state before releasing all keys to prevent suppression because of contradiction a real key state
 
 - repeat on ke basis?
-  - toggle_repeat|<alias>
+  - ke vk_code as differentiation 
+  - changed behavior of Repeat_thread - would then get a key_group based on the alias that is needs to play
+    - how to define the interval? interval from start or delay after last part is executed?
+  - toggle_repeat|<alias>4000
   - start_repeat|<alias>
   - stop_repeat|<alias>
   - reset_repeat|<alias>
 
-  - ke|toggle_repeat('<alias>') 
+  - reset|(name) as general reset statement instead of reset ke
+    - removal of reset_0-reset_30
+    - removal of code for reset by resetcode
+  - reset_all
+  
+
+could be equivalent to:
+
+  - ke|(toggle_repeat('<alias>4000'))
   - ke|start_repeat('<alias>') 
   - ke|stop_repeat('<alias>') 
   - ke|reset_repeat('<alias>') 
+
+- Do I need the ability to use commas in evaluations for that?
+  - would have to look for '(' and ')' and ignore commas in it
 
 ### todo
 

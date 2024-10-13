@@ -319,6 +319,8 @@ class FST_Keyboard():
                 
                 if new_macro.num_sequences > 1: 
                     if alias != '':
+                        # self._macros_alias_dict[alias] = new_macro
+                        ###XXX 241013-0021 tobe able to use ke|(alias) for reset
                         self._macros_alias_dict[alias[1:-1]] = new_macro
                     else:
                         ### XXX 241011-1756
@@ -776,18 +778,21 @@ class FST_Keyboard():
     def start_macro_playback(self, alias_name, key_sequence, stop_event = Event()):
         try:
             macro_thread, stop_event = self._macro_thread_dict[alias_name]
-                                        ## interruptable threads
+             ## interruptable threads
             if macro_thread.is_alive():
                 if CONSTANTS.DEBUG:
                     print(f"D1: {alias_name}-macro: still alive - try to stop")
                 stop_event.set()
                 macro_thread.join()
         except KeyError:
-                                        # this thread was not started before
+             # this thread was not started before
             pass
-                                    # reset stop event
-                          
-        stop_event.clear()
+            # reset stop event
+        
+        ###XXX 241013-1421
+        if stop_event.is_set():
+            stop_event.clear()
+        # stop_event = Event()
         macro_thread = Macro_Thread(key_sequence, stop_event, alias_name, self)
                                     # save thread and stop event to find it again for possible interruption
         self._macro_thread_dict[alias_name] = [macro_thread, stop_event]
@@ -887,8 +892,10 @@ class FST_Keyboard():
             macro_to_reset.reset_sequence_counter()
             print(f"--- Macro ({alias_name}) reseted successfully by {current_ke}")
         except KeyError:
+            
             print(f"--- No Macro Sequence with name {alias_name} - reset failed")
-        
+            if CONSTANTS.DEBUG:
+                print(f"all sequence names: {self._macros_alias_dict.keys()}")
         
     # def reset_macro_sequence_by_reset_code(self, vk_code, trigger_group = None):
         

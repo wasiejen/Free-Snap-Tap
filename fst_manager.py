@@ -325,6 +325,9 @@ class Output_Manager():
             except KeyError as error:
                 raise KeyError(error)
             return True
+        
+        def reset(alias_string):
+            self._fst.reset_macro_sequence_by_alias(alias_string)
             
         # def start_repeat(key_string):
             
@@ -676,22 +679,28 @@ class Config_Manager():
         saved in variable_hr (human readable)
         '''
         
-        def split_ignore_brackets(group):
+        def split_ignore_brackets2(group):
             '''
             splits the group but ignoring the commas that are in brackets
             used for evaluations that use commas to deliver 2 or more parameters
             '''
+            # when no open bracket in group, then just use default split
+            if group.find('(') == -1:
+                return group.split(',')
             
             key_string = group
             valid_commas = []
             start_pos = 0
 
             open_count = 0
-            
+
+            next_comma = key_string.find(',', start_pos)
+            next_open = key_string.find('(', start_pos)
+            next_close = key_string.find(')', start_pos)
+
+            # next_by_symbol = {',': next_comma, '(': next_open, ')': next_close}
+
             while True:
-                next_comma = key_string.find(',', start_pos)
-                next_open = key_string.find('(', start_pos)
-                next_close = key_string.find(')', start_pos)
                 if open_count == 0:
                     if next_comma == -1:
                         valid_commas.append(len(key_string))
@@ -703,21 +712,41 @@ class Config_Manager():
                         first = min(next_comma, next_open)
                         if first == next_comma:
                             valid_commas.append(next_comma)
+                            # next comma
+                            symbol = ','
                         else:
                             open_count += 1
+                            # next open
+                            symbol = '('
                 elif open_count > 0:
                     if next_open == -1:
                         first = next_close
                         open_count -= 1
+                        # next close
+                        symbol = ')'
                     else:
                         first = min(next_open, next_close)
                         if first == next_close:
                             open_count -= 1
+                            #next close
+                            symbol = ')'
                         else:
                             open_count += 1
+                            #next open
+                            symbol = '('
                 # print(f"count: {open_count} , start_pos: {start_pos} , first: {first}")
                 # print(f"valid commas: {valid_commas}")
                 start_pos = first+1
+                
+                if symbol == ',':
+                    next_comma = key_string.find(',', start_pos)
+                if symbol == '(':
+                    next_open = key_string.find('(', start_pos)
+                else:
+                    next_close = key_string.find(')', start_pos)
+                    if open_count == 0:
+                        next_comma = key_string.find(',', start_pos)
+                    
 
             split_group = []
             start = 0
@@ -726,6 +755,28 @@ class Config_Manager():
                 start = comma+1
                 
             return split_group
+        
+        def split_ignore_brackets(group):
+            split_group = group.split(',')
+            count_open = []
+            new_group = []
+            
+            for el in split_group:
+                count_open.append(el.count('(') - el.count(')'))
+            
+            temp = ''
+            sum = 0
+            for el, count in zip(split_group, count_open):
+                if temp == '':
+                    temp += el
+                else:
+                    temp += ', ' + el
+                sum += count
+                if sum == 0:
+                    new_group.append(temp)
+                    temp = ''
+            
+            return new_group
         
         
         self._tap_groups_hr = []
