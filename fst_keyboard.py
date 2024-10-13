@@ -201,6 +201,8 @@ class FST_Keyboard():
 
             # convert string to actual vk_code
             vk_code = self.convert_to_vk_code(key_string)
+            if vk_code == 0:
+                key_modifier == 'up'
                 
             if key_modifier is None:
                 new_element = (Key(vk_code, constraints=constraints, key_string=key_string))
