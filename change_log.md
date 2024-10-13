@@ -82,9 +82,40 @@
 ???:
 -should every invocation or reset as invocation result in True?
   - can always be stopped from sending by following up with a False eval .. e.g. |(False)
-  - start_repeat, toggle_repeat eval to False, because a Repeat thread takes constraints[1:] with into the repeat ...
-    - so v|(start_repeat)|(False) would try to repeat v|(False) and never send anything
-  - and stop_repeat eval to False - because is needs to be used with the same ke to be stopped and when you want to stop something you do not want to execute it first again...
+  - (start_repeat()), (toggle_repeat()) MUST eval to False, because a Repeat_thread takes constraints[1:] with it into the repeat ...
+    - so v|(start_repeat)|(False) would try to repeat v|(False) and never send anything - learning by trial xD
+  - and (stop_repeat()) eval to False - because is needs to be used with the same ke to be stopped and when you want to stop something you do not want to execute it first again ...
+
+### Idea and TODO:
+- lots of doc_string missing
+- use aliases for repeat input: e.g. ke|toggle_repeat('<repeat_scan>') 
+  - would be no longer dependent on actual ke and way more flexible and easy to use
+- reset press state before releasing all keys to prevent suppression because of contradiction a real key state
+
+- repeat on ke basis?
+  - ke vk_code as differentiation 
+  - changed behavior of Repeat_thread - would then get a key_group based on the alias that is needs to play
+    - how to define the interval? interval from start or delay after last part is executed?
+  - toggle_repeat|<alias>4000
+  - start_repeat|<alias>
+  - stop_repeat|<alias>
+  - reset_repeat|<alias>
+
+  - reset|(name) as general reset statement instead of reset ke
+    - removal of reset_0-reset_30
+    - removal of code for reset by resetcode
+  - reset_all
+  
+
+could be equivalent to:
+
+  - ke|(toggle_repeat('<alias>4000'))
+  - ke|start_repeat('<alias>') 
+  - ke|stop_repeat('<alias>') 
+  - ke|reset_repeat('<alias>') 
+
+- Do I need the ability to use commas in evaluations for that?
+  - would have to look for '(' and ')' and ignore commas in it
 
 ### todo
 

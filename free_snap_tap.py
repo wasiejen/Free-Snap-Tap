@@ -87,7 +87,7 @@ class Status_Indicator():
         self.context_menu.add_separator()
         self.context_menu.add_command(label="Close Indicator", command=self.close_window)
         self.context_menu.add_command(label="Toggle Crosshair", command=self.toggle_crosshair)
-        self.context_menu.add_command(label="Display internal state", command=self._fst.display_internal_repr_groups)
+        #self.context_menu.add_command(label="Display internal state", command=self._fst.display_internal_repr_groups)
         
         # Bind right-click to show the context menu
         self.canvas.bind("<Button-3>", self.show_context_menu)
