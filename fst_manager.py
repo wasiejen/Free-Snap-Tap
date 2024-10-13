@@ -113,7 +113,9 @@ class Output_Manager():
         else:
             delay_times = delay_times[:2]
         
-        self.send_key_event(key_event)
+        ###XXX 241013-1803 prevent all internal vk_codees from being executed
+        if key_event.vk_code > 0:
+            self.send_key_event(key_event)
         
         if self._fst.arg_manager.ACT_DELAY and with_delay:
             delay_time = self.get_random_delay(*delay_times)
@@ -386,8 +388,8 @@ class Output_Manager():
         #         raise KeyError(error)
         #     return True
         
-        def test(a,b,c):
-            print(f"received: {a}, {b} and {c}")
+        # def test(a,b,c):
+        #     print(f"received: {a}, {b} and {c}")
 
         # --------------------
         
@@ -1144,7 +1146,9 @@ class Focus_Group_Manager():
             self._focus_thread.pause()
         
     def start_focus_thread(self):
-        if self.focus_active:
+        if self._focus_thread.is_alive():
+            pass
+        elif self.focus_active:
             self._focus_thread.start()
         
     def restart_focus_thread(self):

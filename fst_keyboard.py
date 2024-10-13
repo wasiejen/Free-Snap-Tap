@@ -605,12 +605,14 @@ class FST_Keyboard():
                                     if not constraints_fulfilled:
                                         to_be_suppressed = True
                                     
+                                    ###XXX 241013-1754 deactivate
+                                    ### check_constraint takes over this function
                                     # handling of reset codes for macro sequences in rebinds
-                                    elif current_ke.vk_code <= 0:
-                                        macro = self._macros_dict[trigger_group]
-                                        self.reset_macro_sequence_by_alias[macro.alias]
-                                        #self.reset_macro_sequence_by_reset_code(current_ke.vk_code)
-                                        to_be_suppressed = True
+                                    # elif current_ke.vk_code <= 0:
+                                    #     macro = self._macros_dict[trigger_group]
+                                    #     self.reset_macro_sequence_by_alias[macro.alias]
+                                    #     #self.reset_macro_sequence_by_reset_code(current_ke.vk_code)
+                                    #     to_be_suppressed = True
                                 break
                             
                     if key_replaced and not to_be_suppressed:                     

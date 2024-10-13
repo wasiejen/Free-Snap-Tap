@@ -43,16 +43,17 @@ class Macro_Thread(Thread):
                 if self.stop_event.is_set():
                     break
                 else:
-                    vk_code = key_event.vk_code
-                    if vk_code <= 0:
+                    ###XXX 241013-1758 deactivate - eval takes over reset function by name
+                    # vk_code = key_event.vk_code
+                    # if vk_code <= 0:
 
-                        self._fst.reset_macro_sequence_by_alias(self.alias_name)
-                        # self._fst.reset_macro_sequence_by_reset_code(vk_code, self.alias_name)
-                    else:
-                        if key_event.is_toggle:
-                            key_event = self._fst.output_manager.get_next_toggle_state_key_event(key_event)
-                        # send key event and handles interruption of delay
-                        self._fst.output_manager.execute_key_event(key_event, delay_times, with_delay=True, stop_event=self.stop_event)
+                    #     self._fst.reset_macro_sequence_by_alias(self.alias_name)
+                    #     # self._fst.reset_macro_sequence_by_reset_code(vk_code, self.alias_name)
+                    # else:
+                    if key_event.is_toggle:
+                        key_event = self._fst.output_manager.get_next_toggle_state_key_event(key_event)
+                    # send key event and handles interruption of delay
+                    self._fst.output_manager.execute_key_event(key_event, delay_times, with_delay=True, stop_event=self.stop_event)
                        
         except Exception as error:
             print(error)
@@ -82,7 +83,7 @@ class Alias_Repeat_Thread(Thread):
             if self.reset:
                 ###XXX241013-1422
                 # the the macro thread has a chance to register set before clear
-                sleep(0.01)
+                sleep(0.05)
                 self.macro_stop_event.clear()
                 # self.macro_stop_event = Event
                 self.reset = False
@@ -103,42 +104,6 @@ class Alias_Repeat_Thread(Thread):
         self.macro_stop_event.set()
         self.reset = True
         
-# class Repeat_Thread(Thread):
-#     '''
-#     repeatatly execute a key event based on a timer
-#     '''
-#     def __init__(self, key_event, stop_event, time, fst_keyboard, time_increment=500):
-#         Thread.__init__(self)
-#         self.daemon = True
-#         vk_code, is_press, constraints = key_event.get_all()
-#         self.key_event = Key_Event(vk_code, is_press, constraints=constraints[1:], key_string=key_event.key_string)
-#         self.stop_event = stop_event
-#         self.time = time
-#         self.time_increment = time_increment
-#         self.number_of_increments = time // time_increment
-#         self.reset = False
-#         self._fst = fst_keyboard
-        
-#     def run(self): 
-#         print(f"START REPEAT: {self.key_event} with interval of {self.time} ms")
-
-#         while not self.stop_event.is_set():
-#             if self.reset:
-#                 self.reset = False
-#             else:
-#                 if self._fst.output_manager.check_constraint_fulfillment(self.key_event):
-#                     self._fst.output_manager.execute_key_event(self.key_event)
-                
-#             for index in range(self.number_of_increments):
-#                 if not self.stop_event.is_set() and not self.reset:
-#                     sleep(self.time_increment / 1000)
-#                 else:
-#                     break
-        
-#         print(f"STOP REPEAT: {self.key_event} with interval of {self.time} ms")
-                
-#     def reset_timer(self):
-#         self.reset = True
             
 class Focus_Thread(Thread):
     '''
