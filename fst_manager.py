@@ -895,11 +895,12 @@ class Config_Manager():
         for group in self._macros_hr:
             alias, *group = group
             group = group[0]
-            first_line = f"{alias} " + f' \n{inset}:: '.join([', '.join(group[0]),', '.join(group[1])])
+            position = len(alias)-2
+            first_line = f"{alias} " + f'\n{' '*position}:: '.join([', '.join(group[0]),', '.join(group[1])])
             print(first_line)
             if len(group) > 2:
                 for gr in group[2:]:
-                    print(f"{inset} : " + ', '.join(gr))
+                    print(f"{' '*position} : " + ', '.join(gr))
 
     def add_group(self, new_group, data_object):
         """
