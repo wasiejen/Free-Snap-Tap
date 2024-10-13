@@ -11,7 +11,7 @@ import msvcrt # to flush input stream
 from random import randint # randint(3, 9)) 
 from time import time, sleep # sleep(0.005) = 5 ms
 from fst_data_types import Key_Event, type_check
-from fst_threads import Repeat_Thread, Focus_Thread
+from fst_threads import Focus_Thread, Alias_Repeat_Thread
 
 class CONSTANTS():
 
@@ -34,7 +34,6 @@ class CONSTANTS():
 
 
 class Output_Manager():
-    
     '''
     #XXX
     '''
@@ -113,7 +112,9 @@ class Output_Manager():
         else:
             delay_times = delay_times[:2]
         
-        self.send_key_event(key_event)
+        ###XXX 241013-1803 prevent all internal vk_codees from being executed
+        if key_event.vk_code > 0:
+            self.send_key_event(key_event)
         
         if self._fst.arg_manager.ACT_DELAY and with_delay:
             delay_time = self.get_random_delay(*delay_times)
@@ -273,26 +274,48 @@ class Output_Manager():
                 ##2
                 return 9999
             
-        def start_repeat(key_string):
-            
-            repeat_time = int(key_string)
-            # reset stop event
+        def start_repeat(alias_string, repeat_time):
+            repeat_time = int(repeat_time)
             stop_event = Event()
-            repeat_thread = Repeat_Thread(current_ke, stop_event, repeat_time, self._fst, time_increment=100)
-            # save thread and stop event to find it again for possible interruption
-            self._repeat_thread_dict[current_ke.repr_wo_constraints()] = [repeat_thread, stop_event]
+            repeat_thread = Alias_Repeat_Thread(alias_string, repeat_time, stop_event, self._fst)
+            self._repeat_thread_dict[alias_string] = [repeat_thread, stop_event]
             repeat_thread.start() 
-            return False
-        
-        def stop_repeat():
+            return True
+            
+        def toggle_repeat(alias_string, repeat_time):
             try:
-                repeat_thread, stop_event = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
+                repeat_thread, stop_event = self._repeat_thread_dict[alias_string]
+                if repeat_thread.is_alive():
+                    # print(f"stopping repeat for {current_ke}")
+                    stop_event.set()
+                    repeat_thread.join()
+                else:
+                    # print(f"{current_ke} restarting repeat")
+                    start_repeat(alias_string, repeat_time)
+            except KeyError:
+                # this thread was not started before
+                # print(f"{current_ke} starting repeat for first time")
+                start_repeat(alias_string, repeat_time)
+            return True
+        
+        def stop_repeat(alias_string):
+            try:
+                repeat_thread, stop_event = self._repeat_thread_dict[alias_string]
                 if repeat_thread.is_alive():
                     stop_event.set()
                     repeat_thread.join()
             except KeyError as error:
                 raise KeyError(error)
-            return False
+            return True
+        
+        def reset_repeat(alias_string):
+            try:
+                repeat_thread, _ = self._repeat_thread_dict[alias_string]
+                if repeat_thread.is_alive():
+                    repeat_thread.reset_timer()
+            except KeyError as error:
+                raise KeyError(error)
+            return True
         
         def stop_all_repeat():
             try:
@@ -304,30 +327,68 @@ class Output_Manager():
                 raise KeyError(error)
             return True
         
-        def toggle_repeat(key_string):
-            try:
-                repeat_thread, stop_event = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
-                if repeat_thread.is_alive():
-                    # print(f"stopping repeat for {current_ke}")
-                    stop_event.set()
-                    repeat_thread.join()
-                else:
-                    # print(f"{current_ke} restarting repeat")
-                    start_repeat(key_string)
-            except KeyError:
-                # this thread was not started before
-                # print(f"{current_ke} starting repeat for first time")
-                start_repeat(key_string)
-            return False
+        def reset(alias_string):
+            self._fst.reset_macro_sequence_by_alias(alias_string)
+            
+        # def start_repeat(key_string):
+            
+        #     repeat_time = int(key_string)
+        #     # reset stop event
+        #     stop_event = Event()
+        #     repeat_thread = Repeat_Thread(current_ke, stop_event, repeat_time, self._fst, time_increment=100)
+        #     # save thread and stop event to find it again for possible interruption
+        #     self._repeat_thread_dict[current_ke.repr_wo_constraints()] = [repeat_thread, stop_event]
+        #     repeat_thread.start() 
+        #     return False
         
-        def reset_repeat():
-            try:
-                repeat_thread, _ = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
-                if repeat_thread.is_alive():
-                    repeat_thread.reset_timer()
-            except KeyError as error:
-                raise KeyError(error)
-            return True
+        # def stop_repeat():
+        #     try:
+        #         repeat_thread, stop_event = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
+        #         if repeat_thread.is_alive():
+        #             stop_event.set()
+        #             repeat_thread.join()
+        #     except KeyError as error:
+        #         raise KeyError(error)
+        #     return False
+        
+        
+        # def stop_all_repeat():
+        #     try:
+        #         for repeat_thread, stop_event in self._repeat_thread_dict.items():
+        #             if repeat_thread.is_alive():
+        #                 stop_event.set()
+        #                 repeat_thread.join()
+        #     except KeyError as error:
+        #         raise KeyError(error)
+        #     return True
+        
+        # def toggle_repeat(key_string):
+        #     try:
+        #         repeat_thread, stop_event = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
+        #         if repeat_thread.is_alive():
+        #             # print(f"stopping repeat for {current_ke}")
+        #             stop_event.set()
+        #             repeat_thread.join()
+        #         else:
+        #             # print(f"{current_ke} restarting repeat")
+        #             start_repeat(key_string)
+        #     except KeyError:
+        #         # this thread was not started before
+        #         # print(f"{current_ke} starting repeat for first time")
+        #         start_repeat(key_string)
+        #     return False
+        
+        # def reset_repeat():
+        #     try:
+        #         repeat_thread, _ = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
+        #         if repeat_thread.is_alive():
+        #             repeat_thread.reset_timer()
+        #     except KeyError as error:
+        #         raise KeyError(error)
+        #     return True
+        
+        # def test(a,b,c):
+        #     print(f"received: {a}, {b} and {c}")
 
         # --------------------
         
@@ -549,6 +610,8 @@ class Config_Manager():
         default_start_arguments = []
         default_group_lines = []
         alias_lines = []
+
+        
         
         for line in cleaned_lines:
             if line.startswith('<focus>'):
@@ -575,8 +638,6 @@ class Config_Manager():
                     line = line.replace(alias, '').strip()
                 else:
                     alias = ''
-                    
-                    
                 if focus_name == '':
                     default_group_lines.append([alias, line])
                 else:
@@ -619,29 +680,139 @@ class Config_Manager():
         saved in variable_hr (human readable)
         '''
         
+        def split_ignore_brackets2(group):
+            '''
+            splits the group but ignoring the commas that are in brackets
+            used for evaluations that use commas to deliver 2 or more parameters
+            '''
+            # when no open bracket in group, then just use default split
+            if group.find('(') == -1:
+                return group.split(',')
+            
+            key_string = group
+            valid_commas = []
+            start_pos = 0
+
+            open_count = 0
+
+            next_comma = key_string.find(',', start_pos)
+            next_open = key_string.find('(', start_pos)
+            next_close = key_string.find(')', start_pos)
+
+            # next_by_symbol = {',': next_comma, '(': next_open, ')': next_close}
+
+            while True:
+                if open_count == 0:
+                    if next_comma == -1:
+                        valid_commas.append(len(key_string))
+                        break
+                    elif next_open == -1:
+                        first = next_comma
+                        valid_commas.append(next_comma)
+                    else:
+                        first = min(next_comma, next_open)
+                        if first == next_comma:
+                            valid_commas.append(next_comma)
+                            # next comma
+                            symbol = ','
+                        else:
+                            open_count += 1
+                            # next open
+                            symbol = '('
+                elif open_count > 0:
+                    if next_open == -1:
+                        first = next_close
+                        open_count -= 1
+                        # next close
+                        symbol = ')'
+                    else:
+                        first = min(next_open, next_close)
+                        if first == next_close:
+                            open_count -= 1
+                            #next close
+                            symbol = ')'
+                        else:
+                            open_count += 1
+                            #next open
+                            symbol = '('
+                # print(f"count: {open_count} , start_pos: {start_pos} , first: {first}")
+                # print(f"valid commas: {valid_commas}")
+                start_pos = first+1
+                
+                if symbol == ',':
+                    next_comma = key_string.find(',', start_pos)
+                if symbol == '(':
+                    next_open = key_string.find('(', start_pos)
+                else:
+                    next_close = key_string.find(')', start_pos)
+                    if open_count == 0:
+                        next_comma = key_string.find(',', start_pos)
+                    
+
+            split_group = []
+            start = 0
+            for comma in valid_commas:
+                split_group.append(key_string[start:comma])
+                start = comma+1
+                
+            return split_group
+        
+        def split_ignore_brackets(group):
+            split_group = group.split(',')
+            count_open = []
+            new_group = []
+            
+            for el in split_group:
+                count_open.append(el.count('(') - el.count(')'))
+            
+            temp = ''
+            sum = 0
+            for el, count in zip(split_group, count_open):
+                if temp == '':
+                    temp += el
+                else:
+                    temp += ', ' + el
+                sum += count
+                if sum == 0:
+                    new_group.append(temp)
+                    temp = ''
+            
+            return new_group
+        
+        
         self._tap_groups_hr = []
         self._rebinds_hr = []
         self._macros_hr = []
         self._alias_hr = []
         
+        count_tap = 1
+        count_rebind = 1
+        count_macro = 1
+        count_macro_sequence = 1
         # sort the lines into their categories for later initialization
         for line in lines:    
 
             alias, line = line
             if alias.startswith('<'):
-                self._alias_hr.append([alias, line.split(',')])
+                self._alias_hr.append([alias, split_ignore_brackets(line)])
             else:
                
                 groups = line.split(':')
                 # tap groups
                 if len(groups) == 1: 
-                    self._tap_groups_hr.append([alias, groups[0].split(',')])
+                    # generate default names for Tap Groups
+                    if alias == '':
+                        alias = f"(TAP_{count_tap})"
+                        count_tap += 1
+                    self._tap_groups_hr.append([alias, split_ignore_brackets(groups[0])])
                 # rebinds
                 elif len(groups) == 2:
-                    trigger_group = groups[0].split(',')
-                    key_group = groups[1].split(',')
-                    # rebind
-                    # if len(trigger_group) == 1 and len(key_group) == 1:
+                    trigger_group = split_ignore_brackets(groups[0])
+                    key_group = split_ignore_brackets(groups[1])
+                    # generate default names for Rebinds
+                    if alias == '':
+                        alias = f"(REB_{count_rebind})"
+                        count_rebind += 1
                     if len(key_group) == 1:
                         self._rebinds_hr.append([alias, [trigger_group, key_group[0]]])
                     else:
@@ -649,48 +820,86 @@ class Config_Manager():
                         print("   use :: instead of : to declare it as a macro")
                     # macro
                 elif len(groups) > 2 and len(groups[1]) == 0:
-                    trigger_group = groups[0].split(',')
+                    trigger_group = split_ignore_brackets(groups[0])
                     if len(groups) > 3:
-                        # for group in groups[2:]:
-                        #     trigger_group.append(group.split(','))
-                        key_groups = [group.split(',') for group in groups[2:]]
+                        # generate default names for Macro Sequences
+                        if alias == '':
+                            alias = f"(SEQ_{count_macro_sequence})"
+                            count_macro_sequence += 1
+                        
+                        key_groups = [split_ignore_brackets(group) for group in groups[2:]]
                         self._macros_hr.append([alias, [trigger_group] + key_groups])
                     else:
-                        key_group = groups[2].split(',')
+                        # generate default names for Macros
+                        if alias == '':
+                            alias = f"(MAC_{count_macro})"
+                            count_macro += 1
+                        key_group = split_ignore_brackets(groups[2])
                         self._macros_hr.append([alias, [trigger_group, key_group]])
+                    
+    # def display_groups(self):
+    #     """
+    #     Display the current tap groups.
+    #     """
+    #     # alias display
+    #     print("# Aliases")
+    #     for alias_group in self._alias_hr:
+    #         alias, group = alias_group
+    #         print(f"{alias} " + ', '.join(group)+'')         
+    #     # tap groups
+    #     print("\n# Tap Groups")
+    #     for tap_group in self._tap_groups_hr:
+    #         alias, tap_group = tap_group
+    #         print(f"{alias} " + ', '.join(tap_group)+'')         
+    #     # rebinds
+    #     print("\n# Rebinds")
+    #     for rebind in self._rebinds_hr:
+    #         alias, rebind = rebind
+    #         print(f"{alias} " + ' : '.join([', '.join(rebind[0]), rebind[1]]))
+    #     # macros
+    #     print("\n# Macros")
+    #     for group in self._macros_hr:
+    #         alias, *group = group
+    #         group = group[0]
+    #         first_line = f"{alias} " + ' :: '.join([', '.join(group[0]),', '.join(group[1])])
+    #         position = first_line.find('::')
+    #         print(first_line)
+    #         if len(group) > 2:
+    #             for gr in group[2:]:
+    #                 print(" " * (position+1) + ": " + ', '.join(gr))
                     
     def display_groups(self):
         """
         Display the current tap groups.
         """
         # alias display
+        
+        inset = '     '
+        
         print("# Aliases")
-        for index, alias_group in enumerate(self._alias_hr):
+        for alias_group in self._alias_hr:
             alias, group = alias_group
             print(f"{alias} " + ', '.join(group)+'')         
         # tap groups
         print("\n# Tap Groups")
-        for index, tap_group in enumerate(self._tap_groups_hr):
+        for tap_group in self._tap_groups_hr:
             alias, tap_group = tap_group
-            # print(f"{tap_group}\n")
-            print(f"[{index}]{alias} " + ', '.join(tap_group)+'')         
+            print(f"{alias} " + ', '.join(tap_group)+'')         
         # rebinds
         print("\n# Rebinds")
-        for index, rebind in enumerate(self._rebinds_hr):
+        for rebind in self._rebinds_hr:
             alias, rebind = rebind
-            # print(f"[{index}] " + ' : '.join([rebind[0], rebind[1]]))
-            print(f"[{index}]{alias} " + ' : '.join([', '.join(rebind[0]), rebind[1]]))
+            print(f"{alias} " + ' : '.join([', '.join(rebind[0]), rebind[1]]))
         # macros
         print("\n# Macros")
-        for index, group in enumerate(self._macros_hr):
+        for group in self._macros_hr:
             alias, *group = group
             group = group[0]
-            first_line = f"[{index}]{alias} " + ' :: '.join([', '.join(group[0]),', '.join(group[1])])
-            position = first_line.find('::')
+            first_line = f"{alias} " + f' \n{inset}:: '.join([', '.join(group[0]),', '.join(group[1])])
             print(first_line)
             if len(group) > 2:
                 for gr in group[2:]:
-                    print(" " * (position+1) + ": " + ', '.join(gr))
+                    print(f"{inset} : " + ', '.join(gr))
 
     def add_group(self, new_group, data_object):
         """
@@ -879,22 +1088,6 @@ class Argument_Manager():
             else:
                 print("unknown start argument: ", arg)
 
-    # def apply_start_args_by_focus_name(self, focus_name = ''):
-        
-    #     self.apply_start_arguments(self.sys_start_args)
-        
-    #     self._fst.update_focus_groups()
-    #     ###XXX 241011-1409
-    #     # self._fst.focus_manager.update_groups_from_config(self._fst.config_manager.load_config())
-    #     # self._fst.config_manager.load_config()
-    #     # needs to be done after reloading of file or else it will not have the actual data
-    #     if focus_name != '':
-    #         focus_start_arguments, _ = self._fst.focus_manager.multi_focus_dict[focus_name]
-    #     else:
-    #         focus_start_arguments, _ = [],[]
-            
-    #     self.apply_start_arguments(self._fst.focus_manager.default_start_arguments + focus_start_arguments)
-
 class Focus_Group_Manager():
     '''
     #XXX
@@ -912,7 +1105,6 @@ class Focus_Group_Manager():
         self.focus_active = False
         self._focus_thread  = None
     
-        ###XXX 241011-1218
         self._alias_group_lines = []
         
     @property
@@ -984,7 +1176,9 @@ class Focus_Group_Manager():
             self._focus_thread.pause()
         
     def start_focus_thread(self):
-        if self.focus_active:
+        if self._focus_thread.is_alive():
+            pass
+        elif self.focus_active:
             self._focus_thread.start()
         
     def restart_focus_thread(self):
