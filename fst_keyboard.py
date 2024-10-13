@@ -201,6 +201,7 @@ class FST_Keyboard():
 
             # convert string to actual vk_code
             vk_code = self.convert_to_vk_code(key_string)
+            ###XXX None Key handling s up to prevent double eval of constraints and is always valid in trigger
             if vk_code == 0:
                 key_modifier == 'up'
                 
@@ -775,7 +776,7 @@ class FST_Keyboard():
                 stop_event_old.set()
                 macro_thread.join()
         except KeyError:
-            print(f"macro stop unsucessful - could not find Macro {alias_name}")
+            print(f"macro stop unsucessful - might just be first start of {alias_name}")
              # this thread was not started before
             pass
             # reset stop event
