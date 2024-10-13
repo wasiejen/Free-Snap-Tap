@@ -196,7 +196,7 @@ vk_codes_dict = {
     
     # none key that will never be executed but constraints will be evaluated 
     # to add reset or repeat with extra constraint checks
-    'none': 0, 'NONE': 0, 'None': 0, 'null': 0, 'nil': 0, 'zero': 0,
+    'none': 0, 'NONE': 0, 'None': 0,
     
     ###XXX 241013-1812
     'reset': "not supported anymore - use reset evaluation |(*name to reset*)",
