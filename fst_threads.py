@@ -76,9 +76,9 @@ class Alias_Repeat_Thread(Thread):
             if self.reset:
                 self.macro_stop_event = Event()
                 self.reset = False
-                print(f"{self.alias_name} reset")
+                #print(f"D4: Repeat: {self.alias_name} reset")
             else:
-                print(f"{self.alias_name} execute")
+                #print(f"D4: Repeat: {self.alias_name} execute")
                 self._fst.start_macro_playback(self.alias_name, self._fst.key_group_by_alias[self.alias_name], self.macro_stop_event)
             for index in range(self.number_of_increments):
                 if self.stop_event.is_set():

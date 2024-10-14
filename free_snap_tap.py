@@ -28,9 +28,9 @@ CONSTANTS.DEBUG_NUMPAD = False
 
 # Define File name for saving of everything, can be any filetype
 # But .txt or .cfg recommended for easier editing
-# CONSTANTS.FILE_NAME = 'FSTconfig.txt'
-CONSTANTS.FILE_NAME = 'FSTconfig_test.txt'
-# CONSTANTS.FILE_NAME = 'allinone.txt'
+CONSTANTS.FILE_NAME = 'FSTconfig.txt'
+# CONSTANTS.FILE_NAME = 'FSTconfig_test.txt'
+
 
 # Control key combinations (vk_code and/or key_string) 
 # (1,2 or more keys possible - depends on rollover of your keyboard)
@@ -87,7 +87,7 @@ class Status_Indicator():
         self.context_menu.add_separator()
         self.context_menu.add_command(label="Close Indicator", command=self.close_window)
         self.context_menu.add_command(label="Toggle Crosshair", command=self.toggle_crosshair)
-        #self.context_menu.add_command(label="Display internal state", command=self._fst.display_internal_repr_groups)
+        self.context_menu.add_command(label="Display internal state", command=self._fst.display_internal_repr_groups)
         
         # Bind right-click to show the context menu
         self.canvas.bind("<Button-3>", self.show_context_menu)
