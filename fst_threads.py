@@ -176,6 +176,8 @@ class Focus_Thread(Thread):
                                 self._fst.update_args_and_groups()
                                 self._fst.cli_menu.update_group_display()
                                 self._fst.cli_menu.display_focus_not_found()
+                                ###XXX give chance to the controller to release the pressed keys
+                                sleep(0.2)
                                 self._fst.arg_manager.WIN32_FILTER_PAUSED = True 
                                 print(f"> Active Window: {active_window}")
                                         

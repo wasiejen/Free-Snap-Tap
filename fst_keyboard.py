@@ -817,8 +817,8 @@ class FST_Keyboard():
         if self.check_for_combination(['esc']):
             self.state_manager.release_all_currently_pressed_keys()
             # self.state_manager.stop_all_repeating_keys()
-        if self.check_for_combination(['alt', 'tab']):
-            self.state_manager.release_all_currently_pressed_keys()
+        # if self.check_for_combination(['alt', 'tab']):
+        #     self.state_manager.release_all_currently_pressed_keys()
 
     def check_debug_numpad_actions(self):
         if self.check_for_combination(['num1']):
@@ -892,17 +892,13 @@ class FST_Keyboard():
                 print(f"all sequence names: {self._macros_alias_dict.keys()}")
 
     def apply_start_args_by_focus_name(self, focus_name = ''):
-        
         self._arg_manager.apply_start_arguments(self._arg_manager._sys_start_args)
-        
         self.update_focus_groups()
-
         # needs to be done after reloading of file or else it will not have the actual data
         if focus_name != '':
             focus_start_arguments, _ = self.focus_manager.multi_focus_dict[focus_name]
         else:
-            focus_start_arguments, _ = [],[]
-            
+            focus_start_arguments, _ = [],[]  
         self._arg_manager.apply_start_arguments(self.focus_manager.default_start_arguments + focus_start_arguments)
         
     def set_sys_start_arguments(self, sys_args):
@@ -912,20 +908,16 @@ class FST_Keyboard():
 
         print("Aliases")
         for alias, group in self.key_group_by_alias.items():
-            print(f"{alias} {group}")
-            
+            print(f"{alias} {group}")  
         print("\n# Tap Groups")
         for group in self._tap_groups:
             print(f"{group}")
-
         print("\n# Rebinds")
         for rebind in self._rebinds:
             print(f"{rebind}")
-
         print("\n# Macros")
         for macro in self._macros:
             print(f"{macro}")
-
         print("\n# Macro Sequences")
         for alias, group in self._macros_alias_dict.items():
             print(f"{group}")
