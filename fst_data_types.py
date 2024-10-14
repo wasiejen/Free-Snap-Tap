@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1
-last updated: 241008-1643
+Free-Snap-Tap V1.1.2b
+last updated: 241014-1437
 '''
 
 from abc import ABC, abstractmethod
