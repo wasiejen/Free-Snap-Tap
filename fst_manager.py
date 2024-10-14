@@ -1347,7 +1347,6 @@ class Input_State_Manager():
         if CONSTANTS.DEBUG2:
             print("D2: releasing all keys")
 
-        self.release_all_modifier_keys()
                 
         # release remaining simulated keys
         for vk_code, is_press in self._all_key_press_states_dict.items(): 
@@ -1359,15 +1358,23 @@ class Input_State_Manager():
                         print(f"D2: released key: {vk_code}")
                     self._fst.output_manager.send_key_event(Key_Event(vk_code, False))       
         
+        self.release_all_modifier_keys()
         self.release_all_toggles()
         self.reset_states_dicts()
     
     def release_all_modifier_keys(self):
         # first release all modifert keys
         for vk_code in Input_State_Manager.ALL_MODIFIER_KEYS:
-            ###XXX 241009-1603
-            if not self.get_real_key_press_state(vk_code):
-            # if not vk_code in self.pressed_keys:
+
+            # self._pressed_keys = set()
+            self._real_key_press_states_dict = {}
+            ###XXX 241014-0308
+            ### -
+            # if not self.get_real_key_press_state(vk_code):
+            if not self.pressed_keys:
+            ### -
+            ### + trying to prevent supression of releasing of keys
+            ### +
                 if CONSTANTS.DEBUG2:
                     print(f"D2: released pressed modifier key: {vk_code}")
                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
