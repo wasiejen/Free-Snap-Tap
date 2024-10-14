@@ -305,7 +305,8 @@ class Output_Manager():
                     stop_event.set()
                     repeat_thread.join()
             except KeyError as error:
-                raise KeyError(error)
+                print(f"can not find a Repeat called {alias_string} - stop_repeat()")
+                # raise KeyError(error)
             return True
         
         def reset_repeat(alias_string):
@@ -314,18 +315,26 @@ class Output_Manager():
                 if repeat_thread.is_alive():
                     repeat_thread.reset_timer()
             except KeyError as error:
-                raise KeyError(error)
+                print(f"can not find a Repeat called {alias_string} - reset_repeat()")
+                # raise KeyError(error)
             return True
         
         def stop_all_repeat():
+
+            # for repeat_thread, stop_event in self._repeat_thread_dict.items():
+            #     if repeat_thread.is_alive():
+            #         stop_event.set()
+            #         repeat_thread.join()
             try:
                 for repeat_thread, stop_event in self._repeat_thread_dict.items():
                     if repeat_thread.is_alive():
                         stop_event.set()
                         repeat_thread.join()
-            except KeyError as error:
-                raise KeyError(error)
+            except AttributeError as error:
+                print(f"can not find a Repeat called {repeat_thread} - reset_all_repeat()")
             return True
+
+
         
         def reset(alias_string):
             self._fst.reset_macro_sequence_by_alias(alias_string)
