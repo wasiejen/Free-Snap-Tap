@@ -128,7 +128,9 @@ class FST_Keyboard():
         except KeyError:
             try:
                 key_int = int(key)
-                if 0 < key_int < 256:
+                ###XXX 241014-0223
+                if 0 <= key_int < 256:
+                # if 0 < key_int < 256:
                     return key_int
             except ValueError as error:
                 print(error)
@@ -175,8 +177,9 @@ class FST_Keyboard():
                 constraints = [self._arg_manager.ALIAS_MAX_DELAY_IN_MS, self._arg_manager.ALIAS_MIN_DELAY_IN_MS]
                 
             # if string empty, stop
-            if key_string == '':
-                return False
+            ###XXX 241014-0223 to enable None ke with empty string
+            # if key_string == '':
+            #     return False
         
             # recognition of mofidiers +, -, !, ^
             # only interpret it as such when more then one char is in key
@@ -201,10 +204,7 @@ class FST_Keyboard():
 
             # convert string to actual vk_code
             vk_code = self.convert_to_vk_code(key_string)
-            ###XXX None Key handling s up to prevent double eval of constraints and is always valid in trigger
-            if vk_code == 0:
-                key_modifier == 'up'
-                
+                            
             if key_modifier is None:
                 new_element = (Key(vk_code, constraints=constraints, key_string=key_string))
             elif key_modifier == 'down':
@@ -230,7 +230,9 @@ class FST_Keyboard():
                             key_group.append(new_element)
                         elif isinstance(new_element, Key):
                             key_press, key_releae = new_element.get_key_events()
-                            key_group.append(key_press)
+                            ###XXX hacks to enable empty ke with only one + element
+                            if new_element.vk_code > 0:
+                                key_group.append(key_press)
                             # if not in trigger group - so Key Instances as triggers are handled correctly
                             if not is_trigger_group:
                                 key_group.append(key_releae)               
@@ -746,8 +748,8 @@ class FST_Keyboard():
             # to be not used to filter out opposing sim keys
             if alias_fired:
                 self.state_manager.remove_key_press_state(current_ke.vk_code)
-                if CONSTANTS.DEBUG4:
-                    print(f"D4: -- removed {current_ke} from pressed keys")
+                if CONSTANTS.DEBUG3:
+                    print(f"D3: -- removed {current_ke} from pressed keys")
             if CONSTANTS.DEBUG4:
                 print(f"D4: {"-- | XX" if is_simulated else "XX"} SUPPRESSED: {current_ke}")
 
@@ -827,6 +829,8 @@ class FST_Keyboard():
             CONSTANTS.DEBUG3 = not CONSTANTS.DEBUG3
         if self.check_for_combination(['num4']):
             CONSTANTS.DEBUG4 = not CONSTANTS.DEBUG4
+        if self.check_for_combination(['num5']):
+            self.display_internal_repr_groups()
         if self.check_for_combination(['num7']):
             pprint.pp(f"real_key_state: {self.state_manager._real_key_press_states_dict}")
             pprint.pp(f"sim_key_state: {self.state_manager._simulated_key_press_states_dict}")
@@ -880,9 +884,9 @@ class FST_Keyboard():
         try:
             macro_to_reset = self._macros_alias_dict[alias_name]
             macro_to_reset.reset_sequence_counter()
-            print(f"--- Macro ({alias_name}) reseted successfully by {current_ke}")
+            if CONSTANTS.DEBUG4:
+                print(f"D4: -- Macro ({alias_name}) reseted successfully by {current_ke}")
         except KeyError:
-            
             print(f"--- No Macro Sequence with name {alias_name} - reset failed")
             if CONSTANTS.DEBUG:
                 print(f"all sequence names: {self._macros_alias_dict.keys()}")

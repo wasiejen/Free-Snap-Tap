@@ -895,12 +895,12 @@ class Config_Manager():
         for group in self._macros_hr:
             alias, *group = group
             group = group[0]
-            position = len(alias)-2
-            first_line = f"{alias} " + f'\n{' '*position}:: '.join([', '.join(group[0]),', '.join(group[1])])
+            position = len(alias)-1
+            first_line = f"{alias} {', '.join(group[0])} :"
             print(first_line)
-            if len(group) > 2:
-                for gr in group[2:]:
-                    print(f"{' '*position} : " + ', '.join(gr))
+            if len(group) > 1:
+                for gr in group[1:]:
+                    print(f"{' '*position}: " + ', '.join(gr))
 
     def add_group(self, new_group, data_object):
         """
@@ -1026,6 +1026,8 @@ class Argument_Manager():
             if arg == "-debug":
                 self.DEBUG = True
                 CONSTANTS.DEBUG = True
+            if arg == "-debug_numpad":
+                CONSTANTS.DEBUG_NUMPAD = True
             # start directly without showing the menu
             elif arg == "-nomenu":
                 self.MENU_ENABLED = False
