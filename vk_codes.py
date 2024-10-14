@@ -1,3 +1,7 @@
+'''
+Free-Snap-Tap V1.1.2b
+last updated: 241014-1437
+'''
 # Dictionary mapping strings and keys to their VK codes
 # just add your own key strings, identify the vk_codes by using the "3. print virtual key codes to identify keys." of the menu
 # and write them into the dictionary. It is no problem if there are multiple key_strings for the same vk_code.

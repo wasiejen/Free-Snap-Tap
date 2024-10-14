@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1
-last updated: 241010-0028
+Free-Snap-Tap V1.1.2b
+last updated: 241014-1437
 '''
 
 from threading import Thread, Event # to play aliases without interfering with keyboard listener
