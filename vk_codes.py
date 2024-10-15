@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1.2b
-last updated: 241014-1437
+Free-Snap-Tap V1.1.3
+last updated: 241015-1041
 '''
 # Dictionary mapping strings and keys to their VK codes
 # just add your own key strings, identify the vk_codes by using the "3. print virtual key codes to identify keys." of the menu

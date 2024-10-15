@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1.2b
-last updated: 241014-1437
+Free-Snap-Tap V1.1.3
+last updated: 241015-1259
 '''
 
 from pynput import keyboard, mouse
@@ -103,40 +103,40 @@ class Output_Manager():
                                         
     def execute_key_event(self, key_event, delay_times = [], with_delay=False, stop_event=None):
         
-        if len(delay_times) == 0:
-            delay_times = [self._fst.arg_manager.ALIAS_MAX_DELAY_IN_MS, self._fst.arg_manager.ALIAS_MIN_DELAY_IN_MS]
-        elif len(delay_times) == 1:
-            delay_times = delay_times*2
-        elif len(delay_times) == 2:
-            pass
-        else:
-            delay_times = delay_times[:2]
-        
         ###XXX 241013-1803 prevent all internal vk_codees from being executed
         if key_event.vk_code > 0:
+            if len(delay_times) == 0:
+                delay_times = [self._fst.arg_manager.ALIAS_MAX_DELAY_IN_MS, self._fst.arg_manager.ALIAS_MIN_DELAY_IN_MS]
+            elif len(delay_times) == 1:
+                delay_times = delay_times*2
+            elif len(delay_times) == 2:
+                pass
+            else:
+                delay_times = delay_times[:2]
+        
             self.send_key_event(key_event)
         
-        if self._fst.arg_manager.ACT_DELAY and with_delay:
-            delay_time = self.get_random_delay(*delay_times)
-            # print(f" --- waiting for: {delay_time}")
-            # if not in a thread just play sleep for the delay
-            if stop_event is None:
-                sleep(delay_time / 1000)
-            # if in thread, sleep in increments and break if stop_event is set
-            else:
-                sleep_increment = 5 # 5 ms
-                num_sleep_increments = (delay_time // sleep_increment )
-                num_sleep_rest = (delay_time % sleep_increment)
-                if CONSTANTS.DEBUG: 
-                    print(f"D1: incremental delay: {delay_time}, num_sleep_increments {num_sleep_increments}, num_sleep_rest {num_sleep_rest}")
-                sleep(num_sleep_rest / 1000)
-                for i in range(num_sleep_increments):
-                    if not stop_event.is_set():
-                        sleep(sleep_increment / 1000)
-                    else:
-                        if CONSTANTS.DEBUG:
-                            print("D1: stop event recognised")
-                        break
+            if self._fst.arg_manager.ACT_DELAY and with_delay:
+                delay_time = self.get_random_delay(*delay_times)
+                # print(f" --- waiting for: {delay_time}")
+                # if not in a thread just play sleep for the delay
+                if stop_event is None:
+                    sleep(delay_time / 1000)
+                # if in thread, sleep in increments and break if stop_event is set
+                else:
+                    sleep_increment = 5 # 5 ms
+                    num_sleep_increments = (delay_time // sleep_increment )
+                    num_sleep_rest = (delay_time % sleep_increment)
+                    if CONSTANTS.DEBUG: 
+                        print(f"D1: incremental delay: {delay_time}, num_sleep_increments {num_sleep_increments}, num_sleep_rest {num_sleep_rest}")
+                    sleep(num_sleep_rest / 1000)
+                    for i in range(num_sleep_increments):
+                        if not stop_event.is_set():
+                            sleep(sleep_increment / 1000)
+                        else:
+                            if CONSTANTS.DEBUG:
+                                print("D1: stop event recognised")
+                            break
 
     def constraint_evaluation(self, constraint_to_evaluate, current_ke):
         
@@ -320,96 +320,38 @@ class Output_Manager():
             return True
         
         def stop_all_repeat():
-
-            # for repeat_thread, stop_event in self._repeat_thread_dict.items():
-            #     if repeat_thread.is_alive():
-            #         stop_event.set()
-            #         repeat_thread.join()
             try:
-                for repeat_thread, stop_event in self._repeat_thread_dict.items():
+                for repeat_thread, stop_event in self._repeat_thread_dict.values():
                     if repeat_thread.is_alive():
                         stop_event.set()
                         repeat_thread.join()
+                if CONSTANTS.DEBUG4:
+                    print("D4: -- Eval: stopped all Repeat")
             except AttributeError as error:
                 print(f"can not find a Repeat called {repeat_thread} - reset_all_repeat()")
             return True
 
-
-        
         def reset(alias_string):
-            self._fst.reset_macro_sequence_by_alias(alias_string)
+            self._fst.reset_macro_sequence_by_name(alias_string, current_ke)
+            return True
             
-        # def start_repeat(key_string):
+        def release_all_keys():
+            self._fst.release_all_currently_pressed_simulated_keys()
+            if CONSTANTS.DEBUG4:
+                print("D4: -- Eval: released all keys")
+            return True
             
-        #     repeat_time = int(key_string)
-        #     # reset stop event
-        #     stop_event = Event()
-        #     repeat_thread = Repeat_Thread(current_ke, stop_event, repeat_time, self._fst, time_increment=100)
-        #     # save thread and stop event to find it again for possible interruption
-        #     self._repeat_thread_dict[current_ke.repr_wo_constraints()] = [repeat_thread, stop_event]
-        #     repeat_thread.start() 
-        #     return False
-        
-        # def stop_repeat():
-        #     try:
-        #         repeat_thread, stop_event = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
-        #         if repeat_thread.is_alive():
-        #             stop_event.set()
-        #             repeat_thread.join()
-        #     except KeyError as error:
-        #         raise KeyError(error)
-        #     return False
-        
-        
-        # def stop_all_repeat():
-        #     try:
-        #         for repeat_thread, stop_event in self._repeat_thread_dict.items():
-        #             if repeat_thread.is_alive():
-        #                 stop_event.set()
-        #                 repeat_thread.join()
-        #     except KeyError as error:
-        #         raise KeyError(error)
-        #     return True
-        
-        # def toggle_repeat(key_string):
-        #     try:
-        #         repeat_thread, stop_event = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
-        #         if repeat_thread.is_alive():
-        #             # print(f"stopping repeat for {current_ke}")
-        #             stop_event.set()
-        #             repeat_thread.join()
-        #         else:
-        #             # print(f"{current_ke} restarting repeat")
-        #             start_repeat(key_string)
-        #     except KeyError:
-        #         # this thread was not started before
-        #         # print(f"{current_ke} starting repeat for first time")
-        #         start_repeat(key_string)
-        #     return False
-        
-        # def reset_repeat():
-        #     try:
-        #         repeat_thread, _ = self._repeat_thread_dict[current_ke.repr_wo_constraints()]
-        #         if repeat_thread.is_alive():
-        #             repeat_thread.reset_timer()
-        #     except KeyError as error:
-        #         raise KeyError(error)
-        #     return True
-        
-        # def test(a,b,c):
-        #     print(f"received: {a}, {b} and {c}")
-
-        # --------------------
         
         if CONSTANTS.DEBUG4:
             print(f"D4: received for eval: {constraint_to_evaluate} : {current_ke}")   
         
-        easy_eval_succeeded = False
-        first_char = constraint_to_evaluate[0]
-        if first_char in ['!', '+', '-']:
+        
+        if constraint_to_evaluate in ['', '!']:
+            return False
+
+        elif constraint_to_evaluate[0] in ['!', '+', '-']:
             try:
                 vk_code, is_press = get_vk_code_and_press_from_keystring(constraint_to_evaluate)
-                easy_eval_succeeded = True
                 key_press = self._fst.state_manager.get_all_key_press_state(vk_code)
                 if is_press == key_press:
                     return True
@@ -417,14 +359,20 @@ class Output_Manager():
                     return False
             except Exception as error:
                 print(error)
-        
-        ###XXX 241011-1757        
-        # check for reset macro via alias
+
+        # check for sequence reset via alias
         elif constraint_to_evaluate in self._fst.macro_sequence_alias_list:
-            self._fst.reset_macro_sequence_by_alias(constraint_to_evaluate, current_ke)    
+            
+            reset(constraint_to_evaluate) 
             return True      
-    
-        elif not easy_eval_succeeded:
+
+        # check for interruptable macro thread
+        elif constraint_to_evaluate in self._fst.macro_thread_dict.keys():
+            
+            self._fst.interrupt_macro_by_name(constraint_to_evaluate)
+            return True      
+
+        else:
             result = eval(constraint_to_evaluate)
             ### print(f"result of '{constraint_to_evaluate}' is '{result}'")
             if CONSTANTS.DEBUG4:
@@ -1351,43 +1299,78 @@ class Input_State_Manager():
             self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
             self.set_toggle_state(vk_code, False)
 
-    def release_all_currently_pressed_keys(self):
+
+
+
+###XXX 241014-1926 backup
+
+    # def release_all_currently_pressed_keys(self):
+    #     ###XXX 241009-1049 do not release real keys, 241009-1100 now again release all keys - works better
+    #     if CONSTANTS.DEBUG2:
+    #         print("D2: releasing all keys")
+
+                
+    #     # release remaining simulated keys
+    #     for vk_code, is_press in self._all_key_press_states_dict.items(): 
+    #         if is_press:
+    #             # only reset simulated keys
+    #             if self.get_simulated_key_press_state(vk_code) is True:
+    #             # if self.get_simulated_key_press_state(vk_code) is True and not vk_code in self.pressed_keys:
+    #                 if CONSTANTS.DEBUG2:
+    #                     print(f"D2: released key: {vk_code}")
+    #                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))       
+        
+    #     self.release_all_modifier_keys()
+    #     self.release_all_toggles()
+    #     self.reset_states_dicts()
+    
+    # def release_all_modifier_keys(self):
+    #     # first release all modifert keys
+    #     for vk_code in Input_State_Manager.ALL_MODIFIER_KEYS:
+
+    #         # self._pressed_keys = set()
+    #         self._real_key_press_states_dict = {}
+    #         ###XXX 241014-0308
+    #         ### -
+    #         # if not self.get_real_key_press_state(vk_code):
+    #         if not self.pressed_keys:
+    #         ### -
+    #         ### + trying to prevent supression of releasing of keys
+    #         ### +
+    #             if CONSTANTS.DEBUG2:
+    #                 print(f"D2: released pressed modifier key: {vk_code}")
+    #             self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
+    #             self.set_simulated_key_press_state(vk_code, False)
+   
+###XXX 241014-1926 changed 
+
+    def release_all_currently_pressed_simulated_keys(self):
         ###XXX 241009-1049 do not release real keys, 241009-1100 now again release all keys - works better
         if CONSTANTS.DEBUG2:
             print("D2: releasing all keys")
-
-                
+      
         # release remaining simulated keys
         for vk_code, is_press in self._all_key_press_states_dict.items(): 
             if is_press:
                 # only reset simulated keys
                 if self.get_simulated_key_press_state(vk_code) is True:
-                # if self.get_simulated_key_press_state(vk_code) is True and not vk_code in self.pressed_keys:
                     if CONSTANTS.DEBUG2:
                         print(f"D2: released key: {vk_code}")
                     self._fst.output_manager.send_key_event(Key_Event(vk_code, False))       
         
         self.release_all_modifier_keys()
+        
         self.release_all_toggles()
         self.reset_states_dicts()
     
     def release_all_modifier_keys(self):
         # first release all modifert keys
         for vk_code in Input_State_Manager.ALL_MODIFIER_KEYS:
-
-            # self._pressed_keys = set()
-            self._real_key_press_states_dict = {}
-            ###XXX 241014-0308
-            ### -
-            # if not self.get_real_key_press_state(vk_code):
             if not self.pressed_keys:
-            ### -
-            ### + trying to prevent supression of releasing of keys
-            ### +
                 if CONSTANTS.DEBUG2:
                     print(f"D2: released pressed modifier key: {vk_code}")
                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
-                self.set_simulated_key_press_state(vk_code, False)
+                self.set_simulated_key_press_state(vk_code, False)            
                 
     def reset_states_dicts(self):
         self._pressed_keys = set()
@@ -1467,7 +1450,7 @@ class CLI_menu():
                 text = ""
             self._fst.config_manager.display_groups()
             print('\n------ Options -------')
-            print("0. Toggle debugging output for V0.9.3 formula evaluation.")
+            print("0. Toggle debugging output with evaluation results")
             print(f"1. Open file:'{self._fst.config_manager.file_name}' in your default editor.")
             print("2. Reload everything from file.")
             print("3. Print virtual key codes to identify keys.")

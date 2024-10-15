@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1.2b
-last updated: 241014-1437
+Free-Snap-Tap V1.1.3
+last updated: 241015-1041
 '''
 
 from abc import ABC, abstractmethod
@@ -283,12 +283,14 @@ class Macro(object):
     @property
     def trigger_group(self):
         return self._trigger_group
-    
     @property
     def num_sequences(self):
         return self._num_sequences
+    @property
+    def sequence_counter(self):
+        return self._sequence_counter
     
-        
+
     def _get_key_group(self):
         if self._num_sequences == 0:
             raise ValueError("No key groups in Macro")
@@ -306,6 +308,8 @@ class Macro(object):
         
     def reset_sequence_counter(self):
         self._sequence_counter = 0
+    def get_sequence_counter(self):
+        return self._sequence_counter
         
     def get_trigger(self):
         return self._trigger_group.get_trigger()

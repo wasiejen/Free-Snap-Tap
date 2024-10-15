@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1.2b
-last updated: 241014-1437
+Free-Snap-Tap V1.1.3
+last updated: 241015-1300
 '''
 
 from threading import Thread, Event # to play aliases without interfering with keyboard listener
@@ -23,10 +23,35 @@ class Macro_Thread(Thread):
         self.alias_name = alias_name
         self._fst = fst_keyboard
         
+    # def run(self): 
+    #     to_be_played_key_events = []
+    #     try:   
+    #         # Key_events ans Keys here ...
+    #         if self._fst.arg_manager.DEBUG2:
+    #             print(f"D2: > playing macro: {self.alias_name} :: {self.key_group}")
+    #         for key_event in self.key_group:
+                
+    #             # check all constraints at start!
+    #             constraint_fulfilled, delay_times = self._fst.output_manager.check_constraint_fulfillment(key_event, get_also_delays=True)
+    #             if constraint_fulfilled:
+    #                 to_be_played_key_events.append([key_event, delay_times])
+    #                 if self._fst.arg_manager.DEBUG2:
+    #                     print(f"D2: >> will play '{key_event}' with delays: {delay_times}")
+
+    #         for key_event, delay_times in to_be_played_key_events:
+    #             # alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.key_string}")
+    #             if self.stop_event.is_set():
+    #                 self.stop_event.clear()
+    #                 break
+    #             else:
+    #                 if key_event.is_toggle:
+    #                     key_event = self._fst.output_manager.get_next_toggle_state_key_event(key_event)
+    #                 # send key event and handles interruption of delay
+    #                 self._fst.output_manager.execute_key_event(key_event, delay_times, with_delay=True, stop_event=self.stop_event)
+        
     def run(self): 
-        to_be_played_key_events = []
+
         try:   
-            # Key_events ans Keys here ...
             if self._fst.arg_manager.DEBUG2:
                 print(f"D2: > playing macro: {self.alias_name} :: {self.key_group}")
             for key_event in self.key_group:
@@ -34,20 +59,14 @@ class Macro_Thread(Thread):
                 # check all constraints at start!
                 constraint_fulfilled, delay_times = self._fst.output_manager.check_constraint_fulfillment(key_event, get_also_delays=True)
                 if constraint_fulfilled:
-                    to_be_played_key_events.append([key_event, delay_times])
-                    if self._fst.arg_manager.DEBUG2:
-                        print(f"D2: >> will play '{key_event}' with delays: {delay_times}")
-
-            for key_event, delay_times in to_be_played_key_events:
-                # alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.key_string}")
-                if self.stop_event.is_set():
-                    self.stop_event.clear()
-                    break
-                else:
-                    if key_event.is_toggle:
-                        key_event = self._fst.output_manager.get_next_toggle_state_key_event(key_event)
-                    # send key event and handles interruption of delay
-                    self._fst.output_manager.execute_key_event(key_event, delay_times, with_delay=True, stop_event=self.stop_event)
+                    if self.stop_event.is_set():
+                        self.stop_event.clear()
+                        break
+                    else:
+                        if key_event.is_toggle:
+                            key_event = self._fst.output_manager.get_next_toggle_state_key_event(key_event)
+                        # send key event and handles interruption of delay
+                        self._fst.output_manager.execute_key_event(key_event, delay_times, with_delay=True, stop_event=self.stop_event)
                        
         except Exception as error:
             print(error)
