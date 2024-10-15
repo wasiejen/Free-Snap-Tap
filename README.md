@@ -7,6 +7,7 @@
 A minimalistic Python-based Snap Tapping program compatible with all keyboards and supports:
 
 ## General (very short) overview of functionalities
+For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
 
 <img src="https://github.com/user-attachments/assets/c730d4ed-d16c-43ca-8368-409fb661b399" alt="crosshair" width="200"/>
 <img src="https://github.com/user-attachments/assets/abbed088-8271-4160-98b6-ca770d12757c" alt="crosshair" width="250"/>
@@ -44,6 +45,7 @@ A minimalistic Python-based Snap Tapping program compatible with all keyboards a
 13. [Crosshair] `<arg>-crosshair` or `<arg>-crosshair=*pixel delta x*,*pixel delta y*`
     - displays a simple crosshair as overlay and can be controlled on a per game basis
   
+Function Documentation V1.1.3 now in the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
 
 ## Example for a config file:
 
@@ -186,7 +188,7 @@ v : suppress              # v will always suppressed
 
 ```
 
-## For function documentation and usage see the wiki
+## For function documentation and usage see the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
 
 ## How Free Snap Tap Works 
 
@@ -239,63 +241,6 @@ or navigate to the Free-Snap-Tap repo folder and type in:
 ```bash
 python ./free_snap_tap.py
 ```
-
-## [Configuration]
-
-- text file can be changed from default "FSTconfig.txt" to any file you want to, with the help of the startargument `-file=*file_name*`
-- all startarguments can be used either with a .bat file, by adding them to the link to the .exe or .py file, or by including them in the config file with `<arg>*start_argument*`, e.g. `<arg>-nomenu`
-- focus app names can be defined in the config file via `<focus>*name of the app*`
-  - everything BEFORE the first \<focus> will be seen as default start arguments and groupings and applied in general (evene outsite of focus apps) and to all following focus app groupings
-  - everything following this \<focus> definition up until the next \<focus> will be applied when the focus app name given is found in the current active window
-
-```bash
-<arg>-status_indicator=15
-#----------------------------------------
-### Counter Strike focus group
-<focus>Counter
-
-#<arg>-debug
-#<arg>-crossover=40
-<arg>-tapdelay=6,4
-<arg>-aliasdelay=6,4
-#<arg>-nomenu
-#<arg>-nocontrols
-#<arg>-nodelay
-<arg>-crosshair
-# <arg>-crosshair=10,10
-
-# Tap Groups
-a,d
-w,s
-
-# Rebinds
-...
-```
-
-### [Start Arguments]
-
-Only the startargument `-file="filename" should now be used as start argument in the batch or in link. 
-Everything else should be put in the config file and then can be applied on a per Game based as needed.
-- use the same arguments in the config just instead with \<arg> in front. See above example.
-
--  `<arg>-nomenu` skips the menu and will be directly active
--  `<arg>-file="filename"`: (with or without "): custom save file
--  `<arg>-debug`: print out some debug info
--  `<arg>-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  
--  `<arg>-tapdelay="number, number"`: sets the default min and max delay of "number,number" ms for Tap_Groups
--  `<arg>-aliasdelay="number, number"`: sets the default min and max delay of "number,number" ms for Macros/Aliases
--  `<arg>-crossover="number"`: sets the probability of "number" percent for a crossover (can be set in a range of 0-100)
-   - A crossover is key event reversal with delay - press and release are overlapping the time of delay
--  `<arg>-nodelay`: deactivates delay and crossover
-
-- `<arg>-status_indicator=*size in pixel*`: a dot overlay that changes based on being active to green and on incative to red
-- `<arg>-crosshair` displays a simple crosshair as overlay and can be controlled on a per game basis in the center of the screen
-- `<arg>-crosshair=*pixel delta x*,*pixel delta y*`: changes centerpoint according the delta x and y values in pixels
-
-**(deprecated)**
-Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_tap.exe)
- - use the start Arguments without \<arg>
- - everything still works as normal start arguments, but than could change in future
 
 ## Current Version Information
 
