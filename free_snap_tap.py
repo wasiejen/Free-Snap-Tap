@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1.2b
-last updated: 241014-1437
+Free-Snap-Tap V1.1.3
+last updated: 241015-1041
 '''
 
 from threading import Thread 

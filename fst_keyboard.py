@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1.2b
-last updated: 241014-1437
+Free-Snap-Tap V1.1.3
+last updated: 241015-1300
 '''
 
 from pynput import keyboard, mouse
@@ -128,7 +128,7 @@ class FST_Keyboard():
         except KeyError:
             try:
                 key_int = int(key)
-                ###XXX 241014-0223
+                #not 0 < to enable None and empty ke
                 if 0 <= key_int < 256:
                 # if 0 < key_int < 256:
                     return key_int
@@ -176,8 +176,7 @@ class FST_Keyboard():
             else:
                 constraints = [self._arg_manager.ALIAS_MAX_DELAY_IN_MS, self._arg_manager.ALIAS_MIN_DELAY_IN_MS]
                 
-            # if string empty, stop
-            ###XXX 241014-0223 to enable None ke with empty string
+            # to enable empty ke with empty string
             # if key_string == '':
             #     return False
         
@@ -308,7 +307,6 @@ class FST_Keyboard():
                     
         # extract macros   
         try:      
-            num = 1
             for alias, macro in self.config_manager.macros_hr:
                 # convert Keys into Key_Events
                 trigger_group, *key_groups = macro
@@ -318,16 +316,13 @@ class FST_Keyboard():
                     key_group = Key_Group(convert_key_string_group(key_group))
                     extracted_key_groups.append(key_group)
                 new_macro = Macro(extracted_trigger_group, extracted_key_groups)
-                new_macro.alias = alias
                 
+                ###XXX 241014-2035
+                new_macro.alias = alias[1:-1]
+
                 if new_macro.num_sequences > 1: 
-                    if alias != '':
-                        self._macros_alias_dict[alias[1:-1]] = new_macro
-                    else:
-                        # will not be displayed because the human readable collectors do not know this xD
-                        auto_alias = f"seq_{num}"
-                        self._macros_alias_dict[auto_alias] = new_macro
-                        num += 1
+                    self._macros_alias_dict[new_macro.alias] = new_macro
+
                 self._macros.append(new_macro)
                 self._macro_triggers.append(new_macro.trigger_group)
                 self._macros_dict[new_macro.trigger_group] = new_macro
@@ -365,7 +360,7 @@ class FST_Keyboard():
         self.focus_manager.update_groups_from_config(self.config_manager.load_config())
 
     def update_args_and_groups(self, focus_name = ''):
-        self._state_manager.release_all_currently_pressed_keys()
+        self._state_manager.release_all_currently_pressed_simulated_keys()
         self._state_manager.stop_all_repeating_keys()
         self._arg_manager.reset_global_variable_changes()
         self.apply_start_args_by_focus_name(focus_name)    
@@ -501,14 +496,7 @@ class FST_Keyboard():
                 for key in keys:
                     if activated:
                         constraints_fulfilled = self.output_manager.check_constraint_fulfillment(key)
-                        # if reset code then ignore result for activation
-                        if key.vk_code < 0:
-                            if constraints_fulfilled:
-                                macro = self._macros_dict[trigger_group]
-                                self.reset_macro_sequence_by_alias[macro.alias]
-                                #self.reset_macro_sequence_by_reset_code(key.vk_code, trigger_group)
-                        else:
-                            activated = activated and constraints_fulfilled
+                        activated = activated and constraints_fulfilled
             return activated    
         
         key_replaced = False
@@ -769,6 +757,19 @@ class FST_Keyboard():
             print(f"D4: {"-- | <-" if is_simulated else "<-"} OUT ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
 
     def start_macro_playback(self, alias_name, key_sequence, stop_event = Event()):
+
+        self.interrupt_macro_by_name(alias_name)
+        
+        if stop_event.is_set():
+            stop_event.clear()
+        # stop_event = Event()
+        macro_thread = Macro_Thread(key_sequence, stop_event, alias_name, self)
+        # save thread and stop event to find it again for possible interruption
+        self._macro_thread_dict[alias_name] = [macro_thread, stop_event]
+        macro_thread.start()
+    
+    
+    def interrupt_macro_by_name(self, alias_name):
         try:
             macro_thread, stop_event_old = self._macro_thread_dict[alias_name]
              ## interruptable threads
@@ -778,19 +779,9 @@ class FST_Keyboard():
                 stop_event_old.set()
                 macro_thread.join()
         except KeyError:
-            print(f"macro stop unsucessful - might just be first start of {alias_name}")
-             # this thread was not started before
-            pass
-            # reset stop event
-        
-        if stop_event.is_set():
-            stop_event.clear()
-        # stop_event = Event()
-        macro_thread = Macro_Thread(key_sequence, stop_event, alias_name, self)
-        # save thread and stop event to find it again for possible interruption
-        self._macro_thread_dict[alias_name] = [macro_thread, stop_event]
-        macro_thread.start()
-                        
+            if CONSTANTS.DEBUG4:
+                print(f"D4: -- macro stop unsucessful - might just be the first start of {alias_name}")
+            pass          
 
     def check_for_combination(self, vk_codes):                 
         all_active = True
@@ -813,9 +804,9 @@ class FST_Keyboard():
             elif self.check_for_combination(CONSTANTS.TOGGLE_ON_OFF_Combination):
                 self.control_toggle_pause()
                 
-        'RESET ON ESC AND ALT+TAB'
-        if self.check_for_combination(['esc']):
-            self.state_manager.release_all_currently_pressed_keys()
+        # 'RESET ON ESC AND ALT+TAB'
+        # if self.check_for_combination(['esc']):
+        #     self.state_manager.release_all_currently_pressed_simulated_keys()
             # self.state_manager.stop_all_repeating_keys()
         # if self.check_for_combination(['alt', 'tab']):
         #     self.state_manager.release_all_currently_pressed_keys()
@@ -843,14 +834,14 @@ class FST_Keyboard():
         print('--- Stopping - Return to menu ---')
         if CONSTANTS.DEBUG3:
             print(f"D3: return to menu with pressed keys: \n {self.state_manager._real_key_press_states_dict}")
-        self.state_manager.release_all_currently_pressed_keys()
+        self.state_manager.release_all_currently_pressed_simulated_keys()
         self.state_manager.stop_all_repeating_keys()
         self._mouse_listener.stop()
         self._listener.stop()
 
     def control_exit_program(self):
         print('--- Stopping execution ---')
-        self.state_manager.release_all_currently_pressed_keys()
+        self.state_manager.release_all_currently_pressed_simulated_keys()
         self.state_manager.stop_all_repeating_keys()
         self._mouse_listener.stop()
         self._listener.stop()
@@ -877,15 +868,31 @@ class FST_Keyboard():
             # with paused_lock:
             self._arg_manager.WIN32_FILTER_PAUSED = True
             self._arg_manager.MANUAL_PAUSED = True
-            self.state_manager.release_all_currently_pressed_keys()
+            self.state_manager.release_all_currently_pressed_simulated_keys()
             self.state_manager.stop_all_repeating_keys() 
             
-    def reset_macro_sequence_by_alias(self, alias_name, current_ke = ''):
+            
+            
+            
+            
+            
+            
+            
+    def reset_macro_sequence_by_name(self, alias_name, current_ke = ''):
+        
+        ###XXX if macro and not macro sequence? interrupt the macro without starting it
+        ###XXX different easy eval for that - not needed here any more even if it would work - 
+        # only triggered when a seqence macro and restart will interrupt it anyway
+        ###self.interrupt_macro_by_name(alias_name)
+        
+        ### +
         try:
             macro_to_reset = self._macros_alias_dict[alias_name]
-            macro_to_reset.reset_sequence_counter()
-            if CONSTANTS.DEBUG4:
-                print(f"D4: -- Macro ({alias_name}) reseted successfully by {current_ke}")
+            ###XXX 241014-1952 only reset if not already resetted or unused
+            if macro_to_reset.get_sequence_counter() > 0:
+                macro_to_reset.reset_sequence_counter()
+                if CONSTANTS.DEBUG4:
+                    print(f"D4: -- Macro ({alias_name}) reseted successfully by {current_ke}")
         except KeyError:
             print(f"--- No Macro Sequence with name {alias_name} - reset failed")
             if CONSTANTS.DEBUG:
@@ -903,6 +910,9 @@ class FST_Keyboard():
         
     def set_sys_start_arguments(self, sys_args):
         self._arg_manager.sys_start_args = sys_args
+          
+    def release_all_currently_pressed_simulated_keys(self):
+        self._state_manager.release_all_currently_pressed_simulated_keys()
         
     def display_internal_repr_groups(self):                    
 

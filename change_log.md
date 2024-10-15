@@ -1,5 +1,51 @@
 # change log
 
+
+241014-1943
+- macro sequence reset via `|(*macro name*)` now also interrupts an active macro
+- small improv on releasing all keys that are not currently pressed on window change and on hitting esc
+- only reset a macro sequence counter if not already at 0  ###XXX 241014-1952
+- easy eval for False -> `|()` or `|(!)` is the sme as `|(False)`
+- removed esc combination to release all keys and stop all repeated keys, can now be used as invocations as needed
+  - new invocations
+  - `|stop_all_repeat()`
+  - `|release_all_keys()`
+```bash
+(esc_repeat_stop) +esc|(stop_all_repeat())|(release_all_keys())|(map_open_close)|(!) : +esc
+```
+241015-1227
+- macro playback: key event contraints will now again be evaluated a time to be played
+  - to make reset invocation work as expected
+- removed delay for None and empty ke
+- updated readme
+
+
+ideas:
+- include presort in load_config of config_manager? NO! presort gets the alias groups, focus group and default groups
+- on initializing macros - when Key as trigger used then create a macro for -ke of Key and a supress Rebind for +ke of Key
+- alias on a focus group basis?
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## changes:
 
 ### trigger_groups:

@@ -1,47 +1,51 @@
+# default groups are defined before he first <focus> and will always be 
+# active and also applied if a focus app is recognised before the focus groups will be apllied on top
+
 <arg>-status_indicator=20
-<arg>-aliasdelay=50,50
+#<arg>-crossover=40
+<arg>-aliasdelay=10,5
 <arg>-tapdelay=10,5
-<arg>-debug
+#<arg>-nomenu
+#<arg>-nocontrols
+#<arg>-nodelay
 
 # Tap Groups
 a, d
 w, s
+
 # Rebinds
 
-# let us replace the original key_event with our own :-D
-<focus>visual
-#<arg>-crosshair=-10,-10
-#caps_lock : caps_lock
-
-
-#c : shift
-shift : h
 # Macros
-v::b,u,r,b
-#+vert_scroll   :: t|0
-#-vert_scroll   :: g|0
-#+hori_scroll   :: f|0
-#-hori_scroll   :: h|0
-
--vert_scroll :: x|0
-+vert_scroll :: y|0
-
--mouse_x2 :: g
-+mouse_x2 :: h
 
 
-<focus>sublime
-#<arg>-crosshair=60,0
+### Example for Counters Strike with counterstrafing
+-----------------------------
+# Counter Strike focus group - everything following <focus> will activate when an active
+# window matches the name or has the part of the name in itself that is given after <focus>
 
-v::h,i,h,o
+<focus> Counter
 
-<focus>discord
-#caps_lock : caps_lock
-# press and release produces each one caps_lock press and release
-#-caps_lock :: -caps_lock    
-# shorthand for: -caps_lock :: -caps_lock, +caps_lock
-#+caps_lock :: caps_lock
-# shorthand for: +caps_lock :: -caps_lock, +caps_lock
+#<arg>-debug
+#<arg>-crossover=40
+<arg>-tapdelay=8,2        # random delay between 2 and 8 ms
+<arg>-aliasdelay=10,4     # default delay for macros between each key event (press, release) bet 4 and 10 ms
+#<arg>-nomenu
+#<arg>-nocontrols
+#<arg>-nodelay
 
-caps_lock : caps_lock                          # replace original real key events
-+caps_lock :: +caps_lock|50, caps_lock|50         # on release simulate a release and followed by a press and release
+# Tap Groups
+
+# Rebinds
+
+# Macros
+# automatic counter strafing when w key released
+# will not trigger if crouched (!ctrl) or opposite key is pressed (!s for forward)
+# (tr("+w")>100): will only trigger if movement key was pressed for at least 100 ms
+# (last("-space")>500): will only trigger if time since last press of space is longer than 500 ms
+# (cs("+w")): counterstrafe will be dynamically adjusted based on time of pressed movement key 
+# cs() is a hard coded function that uses a polynomial function to approximate the acceleration
+#    ingame and calculate the needed length for a counterstrafe to come to a stop
+(counterstrafing forward) +w|(tr("+w")>100)|(last("-space")>500), !s, !ctrl ::  +w|15|5, -s|(cs("+w")*1.1), +s|0|0
+(counterstrafing back)    +s|(tr("+s")>100)|(last("-space")>500), !w, !ctrl ::  +s|15|5, -w|(cs("+s")*1.1), +w|0|0
+(counterstrafing left)    +a|(tr("+a")>100)|(last("-space")>500), !d, !ctrl ::  +a|15|5, -d|(cs("+a")*1.1), +d|0|0
+(counterstrafing right)   +d|(tr("+d")>100)|(last("-space")>500), !a, !ctrl ::  +d|15|5, -a|(cs("+d")*1.1), +a|0|0
