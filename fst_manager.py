@@ -52,6 +52,8 @@ class Output_Manager():
                                         }
         self._mouse_vk_codes = self._mouse_vk_codes_dict.keys()
         self._repeat_thread_dict = {}
+
+        self.variables = {}
         
     @property
     def repeat_thread_dict(self):
@@ -104,39 +106,49 @@ class Output_Manager():
     def execute_key_event(self, key_event, delay_times = [], with_delay=False, stop_event=None):
         
         ###XXX 241013-1803 prevent all internal vk_codees from being executed
-        if key_event.vk_code > 0:
-            if len(delay_times) == 0:
+        ###XXX 241015-2147 delays for internal vk_codes enabled if manual delay is given
+        
+        None_ke_with_delay = True
+
+        # if None ke has manual delays, they will be played .. if no delay is given default delay will NOT be applied
+        if len(delay_times) == 0:
+            if key_event.vk_code > 0:
                 delay_times = [self._fst.arg_manager.ALIAS_MAX_DELAY_IN_MS, self._fst.arg_manager.ALIAS_MIN_DELAY_IN_MS]
-            elif len(delay_times) == 1:
-                delay_times = delay_times*2
-            elif len(delay_times) == 2:
-                pass
             else:
-                delay_times = delay_times[:2]
-        
+                None_ke_with_delay = False
+        elif len(delay_times) == 1:
+            delay_times = delay_times*2
+        elif len(delay_times) == 2:
+            pass
+        else:
+            delay_times = delay_times[:2]
+    
+        # None ke will not be played
+        if key_event.vk_code > 0:
             self.send_key_event(key_event)
-        
-            if self._fst.arg_manager.ACT_DELAY and with_delay:
-                delay_time = self.get_random_delay(*delay_times)
-                # print(f" --- waiting for: {delay_time}")
-                # if not in a thread just play sleep for the delay
-                if stop_event is None:
-                    sleep(delay_time / 1000)
-                # if in thread, sleep in increments and break if stop_event is set
-                else:
-                    sleep_increment = 5 # 5 ms
-                    num_sleep_increments = (delay_time // sleep_increment )
-                    num_sleep_rest = (delay_time % sleep_increment)
-                    if CONSTANTS.DEBUG: 
-                        print(f"D1: incremental delay: {delay_time}, num_sleep_increments {num_sleep_increments}, num_sleep_rest {num_sleep_rest}")
-                    sleep(num_sleep_rest / 1000)
-                    for i in range(num_sleep_increments):
-                        if not stop_event.is_set():
-                            sleep(sleep_increment / 1000)
-                        else:
-                            if CONSTANTS.DEBUG:
-                                print("D1: stop event recognised")
-                            break
+ 
+        if self._fst.arg_manager.ACT_DELAY and with_delay and None_ke_with_delay:
+            delay_time = self.get_random_delay(*delay_times)
+            # print(f" --- waiting for: {delay_time}")
+            # if not in a thread just play sleep for the delay
+            if stop_event is None:
+                sleep(delay_time / 1000)
+            # if in thread, sleep in increments and break if stop_event is set
+            else:
+                sleep_increment = 5 # 5 ms
+                num_sleep_increments = (delay_time // sleep_increment )
+                num_sleep_rest = (delay_time % sleep_increment)
+                if CONSTANTS.DEBUG: 
+                    print(f"D1: incremental delay: {delay_time}, num_sleep_increments {num_sleep_increments}, num_sleep_rest {num_sleep_rest}")
+                sleep(num_sleep_rest / 1000)
+                for i in range(num_sleep_increments):
+                    if not stop_event.is_set():
+                        sleep(sleep_increment / 1000)
+                    else:
+                        if CONSTANTS.DEBUG:
+                            print("D1: stop event recognised")
+                        break
+                        
 
     def constraint_evaluation(self, constraint_to_evaluate, current_ke):
         
@@ -340,15 +352,54 @@ class Output_Manager():
             if CONSTANTS.DEBUG4:
                 print("D4: -- Eval: released all keys")
             return True
+        
+        def type(key_string):
+            self._keyboard_controller.type(key_string)
+            return True
+        
+        def write(key_string):
+            return type(key_string)
+        
+        
+        
+        
+        def set(key_string):
+            self.variables[key_string] = True
+            print(f'variable {key_string} set')
+            return True
+        
+        def is_set(key_string):
+            try:
+                print(f'variable {key_string} is {"True" if self.variables[key_string] else "False"}')
+                return self.variables[key_string]
+            except KeyError:
+                print(f'variable {key_string} not set')
+                return False
+        def clear(key_string):
+            self.variables[key_string] = False
+            print(f'variable {key_string} cleared')
+            return True
+        def clear_all_variables():
+            self.clear_all_variables()
+            # for key_string in self.variables:
+            #     self.variables[key_string] = False
+            #     print(f'variable {key_string} cleared')
+            return True
+        
+        
+        
+        
+            
             
         
         if CONSTANTS.DEBUG4:
             print(f"D4: received for eval: {constraint_to_evaluate} : {current_ke}")   
         
-        
+        # short eval for (False)
         if constraint_to_evaluate in ['', '!']:
             return False
 
+        # short eval for pressed or not pressed
         elif constraint_to_evaluate[0] in ['!', '+', '-']:
             try:
                 vk_code, is_press = get_vk_code_and_press_from_keystring(constraint_to_evaluate)
@@ -372,6 +423,7 @@ class Output_Manager():
             self._fst.interrupt_macro_by_name(constraint_to_evaluate)
             return True      
 
+        # only if not found in short eval do the real eval
         else:
             result = eval(constraint_to_evaluate)
             ### print(f"result of '{constraint_to_evaluate}' is '{result}'")
@@ -447,6 +499,9 @@ class Output_Manager():
                 else:
                     self._keyboard_controller.press(key_code_to_send) 
                 tap_group.set_last_key_send(key_to_send)
+                
+    def clear_all_variables(self):
+        self.variables = {}
 
 class Config_Manager():
     '''
@@ -1345,23 +1400,30 @@ class Input_State_Manager():
 ###XXX 241014-1926 changed 
 
     def release_all_currently_pressed_simulated_keys(self):
+        print(f"pressed keys on release: {self._pressed_keys}")
+        active_keys = []
+        for key, item in self._simulated_key_press_states_dict.items():
+            if item is True:
+             active_keys.append(key)
+        print(f"pressed simulated keys on release: {active_keys}")
+        
         ###XXX 241009-1049 do not release real keys, 241009-1100 now again release all keys - works better
         if CONSTANTS.DEBUG2:
             print("D2: releasing all keys")
       
         # release remaining simulated keys
-        for vk_code, is_press in self._all_key_press_states_dict.items(): 
+        for vk_code, is_press in self._simulated_key_press_states_dict.items(): 
+        # for vk_code, is_press in self._all_key_press_states_dict.items(): 
             if is_press:
                 # only reset simulated keys
-                if self.get_simulated_key_press_state(vk_code) is True:
-                    if CONSTANTS.DEBUG2:
-                        print(f"D2: released key: {vk_code}")
-                    self._fst.output_manager.send_key_event(Key_Event(vk_code, False))       
+                if CONSTANTS.DEBUG2:
+                    print(f"D2: released key: {vk_code}")
+                self._fst.output_manager.send_key_event(Key_Event(vk_code, False))       
         
-        self.release_all_modifier_keys()
+        # self.release_all_modifier_keys()
         
         self.release_all_toggles()
-        self.reset_states_dicts()
+        # self.reset_states_dicts()
     
     def release_all_modifier_keys(self):
         # first release all modifert keys
@@ -1370,7 +1432,7 @@ class Input_State_Manager():
                 if CONSTANTS.DEBUG2:
                     print(f"D2: released pressed modifier key: {vk_code}")
                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
-                self.set_simulated_key_press_state(vk_code, False)            
+                #self.set_simulated_key_press_state(vk_code, False)            
                 
     def reset_states_dicts(self):
         self._pressed_keys = set()
