@@ -233,7 +233,7 @@ class FST_Keyboard():
                             if new_element.vk_code > 0:
                                 key_group.append(key_press)
                             # if not in trigger group - so Key Instances as triggers are handled correctly
-                            if not is_trigger_group:
+                            if not is_trigger_group or new_element.vk_code <= 0:
                                 key_group.append(key_releae)               
             return key_group
 
@@ -332,13 +332,7 @@ class FST_Keyboard():
             raise Exception(error)
 
         if CONSTANTS.DEBUG3:
-            print(f"\nD3: tap_groups: {self._tap_groups}")
-            print("\nD3: rebinds:")
-            for trigger, key_event in self._rebinds_dict.items():
-                print(f"{trigger} > {key_event}")
-            print("\nD3: macros:")
-            for trigger, *groups in self._macros_dict.items():
-                print(f"{trigger} > {groups}")
+            self.display_internal_repr_groups()
 
         # extract all triggers for suppression of repeated keys: test V1.0.2.1 Bugfix
         all_triggers = self._rebind_triggers + self._macro_triggers
@@ -360,7 +354,7 @@ class FST_Keyboard():
         self.focus_manager.update_groups_from_config(self.config_manager.load_config())
 
     def update_args_and_groups(self, focus_name = ''):
-        self._state_manager.release_all_currently_pressed_simulated_keys()
+        self.release_all_currently_pressed_simulated_keys()
         self._state_manager.stop_all_repeating_keys()
         self._arg_manager.reset_global_variable_changes()
         self.apply_start_args_by_focus_name(focus_name)    
@@ -712,6 +706,7 @@ class FST_Keyboard():
                                 to_be_suppressed = True
                                 break
             
+            ###XXX 241016-1101 general condradiction prevention disabled to test
             # # intercept simulated releases of keys that are still pressed           
             if not key_is_in_tap_groups and not is_keydown:
                 if CONSTANTS.DEBUG2:
@@ -725,7 +720,7 @@ class FST_Keyboard():
                 elif not is_mouse_event and self.state_manager.get_key_press_state(vk_code):
                     if CONSTANTS.DEBUG2:
                         print(f"D2 suppressed {current_ke} because it would release real key press state")
-                    to_be_suppressed = True
+            #         to_be_suppressed = True
         
         
         'ALL SUPPRESSION DONE HERE'
@@ -834,15 +829,15 @@ class FST_Keyboard():
         print('--- Stopping - Return to menu ---')
         if CONSTANTS.DEBUG3:
             print(f"D3: return to menu with pressed keys: \n {self.state_manager._real_key_press_states_dict}")
-        self.state_manager.release_all_currently_pressed_simulated_keys()
-        self.state_manager.stop_all_repeating_keys()
+        self.release_all_currently_pressed_simulated_keys()
+        self._state_manager.stop_all_repeating_keys()
         self._mouse_listener.stop()
         self._listener.stop()
 
     def control_exit_program(self):
         print('--- Stopping execution ---')
-        self.state_manager.release_all_currently_pressed_simulated_keys()
-        self.state_manager.stop_all_repeating_keys()
+        self.release_all_currently_pressed_simulated_keys()
+        self._state_manager.stop_all_repeating_keys()
         self._mouse_listener.stop()
         self._listener.stop()
         self._arg_manager.STOPPED = True
@@ -868,8 +863,8 @@ class FST_Keyboard():
             # with paused_lock:
             self._arg_manager.WIN32_FILTER_PAUSED = True
             self._arg_manager.MANUAL_PAUSED = True
-            self.state_manager.release_all_currently_pressed_simulated_keys()
-            self.state_manager.stop_all_repeating_keys() 
+            self.release_all_currently_pressed_simulated_keys()
+            self._state_manager.stop_all_repeating_keys() 
             
             
             
@@ -913,6 +908,7 @@ class FST_Keyboard():
           
     def release_all_currently_pressed_simulated_keys(self):
         self._state_manager.release_all_currently_pressed_simulated_keys()
+        self._output_manager.clear_all_variables()
         
     def display_internal_repr_groups(self):                    
 
@@ -931,3 +927,5 @@ class FST_Keyboard():
         print("\n# Macro Sequences")
         for alias, group in self._macros_alias_dict.items():
             print(f"{group}")
+            
+    

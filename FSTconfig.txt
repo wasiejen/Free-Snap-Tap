@@ -19,7 +19,7 @@ w, s
 
 
 ### Example for Counters Strike with counterstrafing
------------------------------
+# -----------------------------
 # Counter Strike focus group - everything following <focus> will activate when an active
 # window matches the name or has the part of the name in itself that is given after <focus>
 
@@ -45,7 +45,7 @@ w, s
 # (cs("+w")): counterstrafe will be dynamically adjusted based on time of pressed movement key 
 # cs() is a hard coded function that uses a polynomial function to approximate the acceleration
 #    ingame and calculate the needed length for a counterstrafe to come to a stop
-(counterstrafing forward) +w|(tr("+w")>100)|(last("-space")>500), !s, !ctrl ::  +w|15|5, -s|(cs("+w")*1.1), +s|0|0
-(counterstrafing back)    +s|(tr("+s")>100)|(last("-space")>500), !w, !ctrl ::  +s|15|5, -w|(cs("+s")*1.1), +w|0|0
-(counterstrafing left)    +a|(tr("+a")>100)|(last("-space")>500), !d, !ctrl ::  +a|15|5, -d|(cs("+a")*1.1), +d|0|0
-(counterstrafing right)   +d|(tr("+d")>100)|(last("-space")>500), !a, !ctrl ::  +d|15|5, -a|(cs("+d")*1.1), +a|0|0
+(counterstrafing_forward) +w|(tr("+w")>100)|(last("-space")>500), !s, !ctrl ::  +w|15|5, -s|(cs("+w")*1.1), +s|0|0
+(counterstrafing_back)    +s|(tr("+s")>100)|(last("-space")>500), !w, !ctrl ::  +s|15|5, -w|(cs("+s")*1.1), +w|0|0
+(counterstrafing_left)    +a|(tr("+a")>100)|(last("-space")>500), !d, !ctrl ::  +a|15|5, -d|(cs("+a")*1.1), +d|0|0
+(counterstrafing_right)   +d|(tr("+d")>100)|(last("-space")>500), !a, !ctrl ::  +d|15|5, -a|(cs("+d")*1.1), +a|0|0
