@@ -113,7 +113,7 @@ class Output_Manager():
         # if None ke has manual delays, they will be played .. if no delay is given default delay will NOT be applied
         if len(delay_times) == 0:
             if key_event.vk_code > 0:
-                delay_times = [self._fst.arg_manager.ALIAS_MAX_DELAY_IN_MS, self._fst.arg_manager.ALIAS_MIN_DELAY_IN_MS]
+                delay_times = [self._fst.arg_manager.MACRO_MAX_DELAY_IN_MS, self._fst.arg_manager.MACRO_MIN_DELAY_IN_MS]
             else:
                 None_ke_with_delay = False
         elif len(delay_times) == 1:
@@ -965,8 +965,8 @@ class Argument_Manager():
     ACT_CROSSOVER_PROPABILITY_IN_PERCENT = 50
 
     # Alias delay between presses and releases
-    ALIAS_MIN_DELAY_IN_MS = ACT_MIN_DELAY_IN_MS 
-    ALIAS_MAX_DELAY_IN_MS = ACT_MAX_DELAY_IN_MS
+    MACRO_MIN_DELAY_IN_MS = ACT_MIN_DELAY_IN_MS 
+    MACRO_MAX_DELAY_IN_MS = ACT_MAX_DELAY_IN_MS
 
     def __init__(self, fst_keyboard):
         self._fst = fst_keyboard
@@ -1001,8 +1001,8 @@ class Argument_Manager():
         self.ACT_CROSSOVER_PROPABILITY_IN_PERCENT = Argument_Manager.ACT_CROSSOVER_PROPABILITY_IN_PERCENT
         self.ACT_MIN_DELAY_IN_MS = Argument_Manager.ACT_MIN_DELAY_IN_MS
         self.ACT_MAX_DELAY_IN_MS = Argument_Manager.ACT_MAX_DELAY_IN_MS
-        self.ALIAS_MIN_DELAY_IN_MS = Argument_Manager.ALIAS_MIN_DELAY_IN_MS 
-        self.ALIAS_MAX_DELAY_IN_MS = Argument_Manager.ALIAS_MAX_DELAY_IN_MS   
+        self.MACRO_MIN_DELAY_IN_MS = Argument_Manager.MACRO_MIN_DELAY_IN_MS 
+        self.MACRO_MAX_DELAY_IN_MS = Argument_Manager.MACRO_MAX_DELAY_IN_MS   
         self.EXEC_ONLY_ONE_TRIGGERED_MACRO = Argument_Manager.EXEC_ONLY_ONE_TRIGGERED_MACRO
         self.CROSSHAIR_ENABLED = Argument_Manager.CROSSHAIR_ENABLED
         self.CROSSHAIR_DELTA_X = Argument_Manager.CROSSHAIR_DELTA_X
@@ -1060,8 +1060,12 @@ class Argument_Manager():
                 print(f"Tap delays set to: min:{self.ACT_MIN_DELAY_IN_MS}, max:{self.ACT_MAX_DELAY_IN_MS}")
             elif arg[:12] == "-aliasdelay=" and len(arg) > 12:
                 self.ACT_DELAY = True
-                self.ALIAS_MIN_DELAY_IN_MS, self.ALIAS_MAX_DELAY_IN_MS = extract_delays(arg[12:])
-                print(f"Alias delays set to: min:{self.ALIAS_MIN_DELAY_IN_MS}, max:{self.ALIAS_MAX_DELAY_IN_MS}")
+                self.MACRO_MIN_DELAY_IN_MS, self.MACRO_MAX_DELAY_IN_MS = extract_delays(arg[12:])
+                print(f"Macro delays set to: min:{self.MACRO_MIN_DELAY_IN_MS}, max:{self.MACRO_MAX_DELAY_IN_MS}")
+            elif arg[:12] == "-macrodelay=" and len(arg) > 12:
+                self.ACT_DELAY = True
+                self.MACRO_MIN_DELAY_IN_MS, self.MACRO_MAX_DELAY_IN_MS = extract_delays(arg[12:])
+                print(f"Macro delays set to: min:{self.MACRO_MIN_DELAY_IN_MS}, max:{self.MACRO_MAX_DELAY_IN_MS}")
             elif arg == "-crossover":
                 self.ACT_CROSSOVER = True          
             elif arg[:11] == "-crossover=" and len(arg) > 11:
