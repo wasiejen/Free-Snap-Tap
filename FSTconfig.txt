@@ -1,13 +1,15 @@
-# default groups are defined before he first <focus> and will always be 
-# active and also applied if a focus app is recognised before the focus groups will be apllied on top
+# default groups are defined before the first <focus> and will always be active if NO focus group is defined!
+# and will also be applied if a focus app is recognised before the focus groups will be apllied on top
 
-<arg>-status_indicator=20
-#<arg>-crossover=40
-<arg>-aliasdelay=10,5
-<arg>-tapdelay=10,5
-#<arg>-nomenu
-#<arg>-nocontrols
-#<arg>-nodelay
+<arg>-status_indicator=20 # starts the indicator overlay in the right upper corner with a diameter of 20 pixel
+
+#<arg>-crossover=40       # anti_cheat measure - press and release will be switched with 40% propability
+<arg>-tapdelay=8,2        # random delay between 2 and 8 ms
+<arg>-macrodelay=10,4     # default delay for macros between each key event (press, release) bet 4 and 10 ms
+#<arg>-nomenu             # starts program directly without the need to hit Enter
+#<arg>-nocontrols         # removes the controls on alt+del, alt+end and alt+page_up
+#<arg>-nodelay            # removes delay on tap groups and macros 
+#<arg>-crosshair          # adds a crosshair in monitor center (needs -status_indicator in default group to work)
 
 # Tap Groups
 a, d
@@ -25,13 +27,14 @@ w, s
 
 <focus> Counter
 
-#<arg>-debug
-#<arg>-crossover=40
+#<arg>-crossover=40       # anti_cheat measure - press and release will be switched with 40% propability
 <arg>-tapdelay=8,2        # random delay between 2 and 8 ms
-<arg>-aliasdelay=10,4     # default delay for macros between each key event (press, release) bet 4 and 10 ms
-#<arg>-nomenu
-#<arg>-nocontrols
-#<arg>-nodelay
+<arg>-macrodelay=10,4     # default delay for macros between each key event (press, release) bet 4 and 10 ms
+#<arg>-nomenu             # starts program directly without the need to hit Enter
+#<arg>-nocontrols         # removes the controls on alt+del, alt+end and alt+page_up
+#<arg>-nodelay            # removes delay on tap groups and macros 
+
+#<arg>-crosshair          # adds a crosshair in monitor center (needs -status_indicator in default group to work)
 
 # Tap Groups
 

@@ -174,7 +174,7 @@ class FST_Keyboard():
                 constraints = temp_constraints
                 
             else:
-                constraints = [self._arg_manager.ALIAS_MAX_DELAY_IN_MS, self._arg_manager.ALIAS_MIN_DELAY_IN_MS]
+                constraints = [self._arg_manager.MACRO_MAX_DELAY_IN_MS, self._arg_manager.MACRO_MIN_DELAY_IN_MS]
                 
             # to enable empty ke with empty string
             # if key_string == '':
