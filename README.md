@@ -82,6 +82,9 @@ w, s
 ### NEW with V1.1.0
 <arg>-crosshair   # displays a simple crosshair in the center of the main screen
 
+### NEW with V1.1.0
+<arg>-crosshair   # displays a simple crosshair in the center of the main screen
+
 # Tap Groups
 # a,d                     # already applied in default part of the file
 # w,s                     # already applied in default part of the file
