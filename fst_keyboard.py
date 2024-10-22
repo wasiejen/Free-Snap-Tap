@@ -203,6 +203,11 @@ class FST_Keyboard():
 
             # convert string to actual vk_code
             vk_code = self.convert_to_vk_code(key_string)
+            
+            # if none key is found set it as up to force it to be seen as key_event
+            if vk_code <= 0:
+                key_modifier = 'up'
+                
                             
             if key_modifier is None:
                 new_element = (Key(vk_code, constraints=constraints, key_string=key_string))
@@ -275,7 +280,8 @@ class FST_Keyboard():
                     # if one is Key Instance but the other Key_Event -> convert Key_Event into Key
                     if not isinstance(new_trigger_group[0], Key):
                         temp = new_trigger_group[0]
-                        new_trigger_group[0] = Key(temp.vk_code, key_string=temp.key_string)    
+                        ###XXX 241022-1341
+                        new_trigger_group[0] = Key(temp.vk_code, constraints=temp.constraints, key_string=temp.key_string)    
                     if not isinstance(replacement_key, Key):
                         temp = replacement_key
                         replacement_key = Key(temp.vk_code, constraints=temp.constraints, key_string=temp.key_string)
@@ -439,8 +445,8 @@ class FST_Keyboard():
             key_event_time = data.time
             is_keydown = is_press(msg)
             is_simulated = is_simulated_key_event(data.flags)
-            if CONSTANTS.DEBUG:
-                print(f"D1: vk_coe: {vk_code}, simulated: {is_simulated}, msg: {msg}")       
+            # if CONSTANTS.DEBUG:
+            #     print(f"D1: vk_coe: {vk_code}, simulated: {is_simulated}, msg: {msg}")       
             if vk_code is not None:      
                 self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event=True)
             else:
@@ -480,6 +486,7 @@ class FST_Keyboard():
                     
             activated = True
             for key in keys:                         
+                print(f"key press state to check: {key}")
                 if key.is_press:
                     activated = activated and self.state_manager.get_real_key_press_state(key.vk_code)
                 else:
@@ -487,6 +494,7 @@ class FST_Keyboard():
                     
             # first check every other given trigger before evaluating constraints    
             if activated:
+                print(f"key constraints to check: {key}")
                 for key in keys:
                     if activated:
                         constraints_fulfilled = self.output_manager.check_constraint_fulfillment(key)
@@ -501,10 +509,6 @@ class FST_Keyboard():
         
         current_ke = Key_Event(vk_code, is_keydown)
         
-        if CONSTANTS.DEBUG4:
-            # print(f"D4:->{"->" if is_simulated else ""} IN  ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
-            print(f"D4: {"-- | ->" if is_simulated else "->"} IN  ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
-
         # get the time difference from system time to the key_event_time
         if FST_Keyboard.TIME_DIFF is None:
             FST_Keyboard.TIME_DIFF = time_in_millisec() - key_event_time
@@ -512,6 +516,10 @@ class FST_Keyboard():
             # set all key_times to starting time
             self.state_manager.init_all_key_times_to_starting_time(key_event_time)
         
+        if CONSTANTS.DEBUG4:
+            # print(f"D4:->{"->" if is_simulated else ""} IN  ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
+            print(f"D4: {"-- | ->" if is_simulated else "->"} IN  ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
+            
         # to help identify vk_codes on key presses
         if self._arg_manager.PRINT_VK_CODES:
         # if True:
@@ -763,7 +771,6 @@ class FST_Keyboard():
         self._macro_thread_dict[alias_name] = [macro_thread, stop_event]
         macro_thread.start()
     
-    
     def interrupt_macro_by_name(self, alias_name):
         try:
             macro_thread, stop_event_old = self._macro_thread_dict[alias_name]
@@ -866,13 +873,7 @@ class FST_Keyboard():
             self.release_all_currently_pressed_simulated_keys()
             self._state_manager.stop_all_repeating_keys() 
             
-            
-            
-            
-            
-            
-            
-            
+              
     def reset_macro_sequence_by_name(self, alias_name, current_ke = ''):
         
         ###XXX if macro and not macro sequence? interrupt the macro without starting it

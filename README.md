@@ -214,10 +214,10 @@ Snap Tapping is a feature that enhances your keyboard's responsiveness by priori
 ## Installation
 
 1. **Install Python:** Ensure Python 3.6 or higher is installed on your system. You can download it from [python.org](https://www.python.org/).
-2. **Install `pynput` Package:** Open your terminal or command prompt and run:
+2. **Install `pynput and pygetwindow` Package:** Open your terminal or command prompt and run:
 
 ```bash
-pip install pynput
+pip install pynput, pygetwindow
 ```
 
 or navigate to the Free-Snap-Tap repo folder and type in:
@@ -228,7 +228,7 @@ pip install -r requirements.txt
 
 3. **Starting the Program:**
 
-    3.1 **Option A: directly:** By  clicking/executing the `example_batch_file.bat` file.
+    3.1 **Option A: directly:** By clicking/executing `free_snap_tap.py` or the  `example_batch_file.bat` file.
 
     3.2 **Option B: via Command Line:** Start a Command Line/Terminal, navigate to the folder containing the .py file and use one of the following commands:
 
