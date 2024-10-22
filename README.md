@@ -52,34 +52,35 @@ Function Documentation V1.1.3 now in the [Wiki](https://github.com/wasiejen/Free
 # default groups are defined before he first <focus> and will always be 
 # active and also applied if a focus app is recognised before the focus groups will be apllied on top
 
-#<arg>-debug
-#<arg>-crossover=40
-#<arg>-tapdelay=6,4
-#<arg>-aliasdelay=6,4
-#<arg>-nomenu
-#<arg>-nocontrols
-<arg>-nodelay
+#<arg>-crossover=40       # anti_cheat measure - press and release will be switched with 40% propability
+#<arg>-tapdelay=8,2        # random delay between 2 and 8 ms
+#<arg>-macrodelay=10,4     # default delay for macros between each key event (press, release) bet 4 and 10 ms
+#<arg>-nomenu             # starts program directly without the need to hit Enter
+#<arg>-nocontrols         # removes the controls on alt+del, alt+end and alt+page_up
+<arg>-nodelay            # removes delay on tap groups and macros 
+#<arg>-crosshair          # adds a crosshair in monitor center (needs -status_indicator in default group to work)
 
 ### NEW since V1.1.0 (only usable as default argument)
-<arg>-status_indicator=20  # starts the status indicator with a size of 20 pixel on startup
+<arg>-status_indicator=20  # starts the status indicator in the upper right corner with a size of 20 pixel on startup
 
 #Tap Groups
 a, d
 w, s
-
 
 #----------------------------------------
 # Counter Strike focus group - everything following <focus> will activate when an active
 # window matches the name or has the part of the name in itself that is given after <focus>
 <focus>Counter
 
-#<arg>-debug
-#<arg>-crossover=40
+#<arg>-crossover=40       # anti_cheat measure - press and release will be switched with 40% propability
 <arg>-tapdelay=8,2        # random delay between 2 and 8 ms
-<arg>-aliasdelay=10,4     # default delay for macros between each key event (press, release) bet 4 and 10 ms
-#<arg>-nomenu
-#<arg>-nocontrols
-#<arg>-nodelay
+<arg>-macrodelay=10,4     # default delay for macros between each key event (press, release) bet 4 and 10 ms
+#<arg>-nomenu             # starts program directly without the need to hit Enter
+#<arg>-nocontrols         # removes the controls on alt+del, alt+end and alt+page_up
+#<arg>-nodelay            # removes delay on tap groups and macros 
+
+### NEW with V1.1.0
+<arg>-crosshair   # displays a simple crosshair in the center of the main screen
 
 ### NEW with V1.1.0
 <arg>-crosshair   # displays a simple crosshair in the center of the main screen
@@ -102,10 +103,10 @@ v : suppress              # v will always suppressed
 # (cs("+w")): counterstrafe will be dynamically adjusted based on time of pressed movement key 
 # cs() is a hard coded function that uses a polynomial function to approximate the acceleration
 #    ingame and calculate the needed length for a counterstrafe to come to a stop
-(counterstrafing_forward) +w|(tr("+w")>100)|(last("-space")>500), !s, !ctrl ::  +w|15|5, -s|(cs("+w")*1.1), +s|0|0
-(counterstrafing_back)    +s|(tr("+s")>100)|(last("-space")>500), !w, !ctrl ::  +s|15|5, -w|(cs("+s")*1.1), +w|0|0
-(counterstrafing_left)    +a|(tr("+a")>100)|(last("-space")>500), !d, !ctrl ::  +a|15|5, -d|(cs("+a")*1.1), +d|0|0
-(counterstrafing_right)   +d|(tr("+d")>100)|(last("-space")>500), !a, !ctrl ::  +d|15|5, -a|(cs("+d")*1.1), +a|0|0
+(counterstrafing_forward) +w|(tr("+w")>100)|(last("-space")>500), !s, !ctrl ::  +w|15|5, -s|(cs("+w")*1.1), +s|0
+(counterstrafing_back)    +s|(tr("+s")>100)|(last("-space")>500), !w, !ctrl ::  +s|15|5, -w|(cs("+s")*1.1), +w|0
+(counterstrafing_left)    +a|(tr("+a")>100)|(last("-space")>500), !d, !ctrl ::  +a|15|5, -d|(cs("+a")*1.1), +d|0
+(counterstrafing_right)   +d|(tr("+d")>100)|(last("-space")>500), !a, !ctrl ::  +d|15|5, -a|(cs("+d")*1.1), +a|0
 
 # jump with crouch: will not trigger if ctrl is pressed (!ctrl)
 # will only trigger if space press was 125-400 ms long and the crouch will go at most to 600 ms after the initial space press
@@ -123,7 +124,7 @@ v : suppress              # v will always suppressed
 <focus> Horizon
 
 <arg>-tapdelay=6,4
-<arg>-aliasdelay=40,40
+<arg>-macrodelay=40,40
 <arg>-nomenu
 
 ### NEW with V1.1.0
@@ -216,10 +217,10 @@ Snap Tapping is a feature that enhances your keyboard's responsiveness by priori
 ## Installation
 
 1. **Install Python:** Ensure Python 3.6 or higher is installed on your system. You can download it from [python.org](https://www.python.org/).
-2. **Install `pynput` Package:** Open your terminal or command prompt and run:
+2. **Install `pynput and pygetwindow` Package:** Open your terminal or command prompt and run:
 
 ```bash
-pip install pynput
+pip install pynput, pygetwindow
 ```
 
 or navigate to the Free-Snap-Tap repo folder and type in:
@@ -230,7 +231,7 @@ pip install -r requirements.txt
 
 3. **Starting the Program:**
 
-    3.1 **Option A: directly:** By  clicking/executing the `example_batch_file.bat` file.
+    3.1 **Option A: directly:** By clicking/executing `free_snap_tap.py` or the  `example_batch_file.bat` file.
 
     3.2 **Option B: via Command Line:** Start a Command Line/Terminal, navigate to the folder containing the .py file and use one of the following commands:
 
