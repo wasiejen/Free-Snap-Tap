@@ -363,22 +363,36 @@ class Output_Manager():
         
         
         
-        def set(key_string):
-            self.variables[key_string] = True
-            print(f'variable {key_string} set')
+        def set(key_string, value = True):
+            self.variables[key_string] = value
+            if CONSTANTS.DEBUG4:
+                print(f'variable {key_string} set')
             return True
+        
         
         def is_set(key_string):
             try:
-                print(f'variable {key_string} is {"True" if self.variables[key_string] else "False"}')
+                #print(f'variable {key_string} is {self.variables[key_string]}')
                 return self.variables[key_string]
             except KeyError:
                 print(f'variable {key_string} not set')
                 return False
+        def get(key_string):
+            return is_set()
+            
+        def check(key_string, value = True):
+            try:
+                return self.variables[key_string] == value
+            except KeyError:
+                print(f'variable {key_string} not set')
+                return False
+            
         def clear(key_string):
             self.variables[key_string] = False
-            print(f'variable {key_string} cleared')
+            if CONSTANTS.DEBUG4:
+                print(f'variable {key_string} cleared')
             return True
+        
         def clear_all_variables():
             self.clear_all_variables()
             # for key_string in self.variables:
@@ -386,11 +400,25 @@ class Output_Manager():
             #     print(f'variable {key_string} cleared')
             return True
         
+        def incr(key_string):
+            try:
+                self.variables[key_string] += 1
+            except KeyError:
+                set(key_string, 0)
+                print(f'variable {key_string} set to 0')
+            return True
         
+        def decr(key_string):
+            try:
+                self.variables[key_string] += -1
+            except KeyError:
+                set(key_string, 0)
+                print(f'variable {key_string} set to 0')
+            return True
         
-        
-            
-            
+
+        # ---------------------------
+        # eval starts from here
         
         if CONSTANTS.DEBUG4:
             print(f"D4: received for eval: {constraint_to_evaluate} : {current_ke}")   
@@ -1427,7 +1455,7 @@ class Input_State_Manager():
         # self.release_all_modifier_keys()
         
         self.release_all_toggles()
-        # self.reset_states_dicts()
+        self.reset_states_dicts()
     
     def release_all_modifier_keys(self):
         # first release all modifert keys

@@ -4,7 +4,7 @@
 <arg>-status_indicator=20 # starts the indicator overlay in the right upper corner with a diameter of 20 pixel
 
 #<arg>-crossover=40       # anti_cheat measure - press and release will be switched with 40% propability
-<arg>-tapdelay=8,2        # random delay between 2 and 8 ms
+<arg>-tapdelay=8,2        # random delay for snap tap keys (tap_groups) between 2 and 8 ms
 <arg>-macrodelay=10,4     # default delay for macros between each key event (press, release) bet 4 and 10 ms
 #<arg>-nomenu             # starts program directly without the need to hit Enter
 #<arg>-nocontrols         # removes the controls on alt+del, alt+end and alt+page_up
@@ -28,7 +28,7 @@ w, s
 <focus> Counter
 
 #<arg>-crossover=40       # anti_cheat measure - press and release will be switched with 40% propability
-<arg>-tapdelay=8,2        # random delay between 2 and 8 ms
+<arg>-tapdelay=8,2        # random delay for snap tap keys (tap_groups) between 2 and 8 ms
 <arg>-macrodelay=10,4     # default delay for macros between each key event (press, release) bet 4 and 10 ms
 #<arg>-nomenu             # starts program directly without the need to hit Enter
 #<arg>-nocontrols         # removes the controls on alt+del, alt+end and alt+page_up
