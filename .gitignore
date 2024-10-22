@@ -1,4 +1,5 @@
 /icons
+/.venv
 /dist
 /build
 /testing

@@ -1,13 +1,9 @@
 @echo off
+:: activate virtual environment
+call ./.venv/Scripts/activate.bat
+
 python .\free_snap_tap.py ^
 ::-debug ^
-::-file=FSTconfig.txt ^
--crossover=20 ^
--tapdelay=5,2 ^
--aliasdelay=5,2 ^
-::-nomenu ^
-::-nocontrols ^
-::-nodelay ^
--focusapp=sublime
+-file=FSTconfig_test.txt 
 
 pause

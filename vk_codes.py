@@ -201,9 +201,12 @@ vk_codes_dict = {
     # none key that will never be executed but constraints will be evaluated 
     # to add reset or repeat with extra constraint checks
     'none': 0, 'NONE': 0, 'None': 0, '': 0, '_': 0,
+    ###XXX 241015-2136
+    'reset': 0, 'delay': 0, 
+
     
     ###XXX 241013-1812
-    'reset': "not supported anymore - use reset evaluation |(*name to reset*)",
+    # 'reset': "not supported anymore - use reset evaluation |(*name to reset*)",
     
     # supress keys with binding to:
     'suppress': -999,
