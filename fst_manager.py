@@ -1432,12 +1432,12 @@ class Input_State_Manager():
 ###XXX 241014-1926 changed 
 
     def release_all_currently_pressed_simulated_keys(self):
-        print(f"pressed keys on release: {self._pressed_keys}")
+        # print(f"pressed keys on release: {self._pressed_keys}")
         active_keys = []
         for key, item in self._simulated_key_press_states_dict.items():
             if item is True:
              active_keys.append(key)
-        print(f"pressed simulated keys on release: {active_keys}")
+        # print(f"pressed simulated keys on release: {active_keys}")
         
         ###XXX 241009-1049 do not release real keys, 241009-1100 now again release all keys - works better
         if CONSTANTS.DEBUG2:
