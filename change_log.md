@@ -1,4 +1,6 @@
 ## V1.1.4 main_testing branch Changelog
+241023-1055
+- removed some debug output
 
 - None ke can have manual delays - no default delays will be applied in any case
   - if a delay is given it will be played

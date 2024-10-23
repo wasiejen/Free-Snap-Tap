@@ -220,7 +220,7 @@ Snap Tapping is a feature that enhances your keyboard's responsiveness by priori
 2. **Install `pynput and pygetwindow` Package:** Open your terminal or command prompt and run:
 
 ```bash
-pip install pynput, pygetwindow
+pip install pynput pygetwindow
 ```
 
 or navigate to the Free-Snap-Tap repo folder and type in:

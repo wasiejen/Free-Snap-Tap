@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1.3
-last updated: 241015-1300
+Free-Snap-Tap V1.1.4b
+last updated: 241023-1056
 '''
 
 from pynput import keyboard, mouse
