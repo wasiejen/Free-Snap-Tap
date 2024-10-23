@@ -486,7 +486,6 @@ class FST_Keyboard():
                     
             activated = True
             for key in keys:                         
-                print(f"key press state to check: {key}")
                 if key.is_press:
                     activated = activated and self.state_manager.get_real_key_press_state(key.vk_code)
                 else:
@@ -494,7 +493,6 @@ class FST_Keyboard():
                     
             # first check every other given trigger before evaluating constraints    
             if activated:
-                print(f"key constraints to check: {key}")
                 for key in keys:
                     if activated:
                         constraints_fulfilled = self.output_manager.check_constraint_fulfillment(key)
