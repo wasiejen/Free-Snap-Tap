@@ -7,9 +7,9 @@ last updated: 241015-1041
 # and write them into the dictionary. It is no problem if there are multiple key_strings for the same vk_code.
 vk_codes_dict = {
     # mouse keys
-    'mouse_left': 1,   'left_mouse': 1,   'ml': 1, 
-    'mouse_right': 2,  'right_mouse': 2,  'mr': 2, 
-    'mouse_middle': 3, 'middle_mouse': 3, 'mm': 3,
+    'mouse_left': 1,   'left_mouse': 1,   'ml': 1, 'lm': 1, 
+    'mouse_right': 2,  'right_mouse': 2,  'mr': 2, 'rm': 2, 
+    'mouse_middle': 3, 'middle_mouse': 3, 'mm': 3, 
     'mouse_x1': 4, 'mx1' : 4,
     'mouse_x2': 5, 'mx2' : 5,
     'scroll_vertical' : 6, 'scroll_vert' : 6, 'vert_scroll' : 6,
