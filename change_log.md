@@ -1,3 +1,29 @@
+## V1.1.5 changelog
+
+241028-1323
+bugfix:
+- when active window returned empty the script crashed 
+  - fixed
+- evaluations with python code that hat spaces in it like (not is_set('var')) were not recognized correctly 
+  - fixed
+- if a line in the config file started with whitespaces and could lead to wrong recognition of start arguments and commented out lines
+  - leading whitespaces will now be removed
+  - fixed
+- automatic shortening of active window name removed the name of e.g. the game because of some versioning info following it. So if the last part of the window name is not the game name, then it could happen that the game name would be removed
+  - now it will always check the full name for the focus name 
+  - removed shortening due to many possible naming schemes
+  - fixed 
+
+added:
+- eval `|(is_repeat_active('aliasname'))` -> True or False dependent on if a repeat is active
+
+
+changed
+- changed default value of set to 1 and clear to 0 (in python 0 -> False and 1 -> True)
+  - to always work in variables with numbers and not mix numbers and boolean values
+- status_indicator now starts with red as default and only changes when focus name is recognized
+- cleaned up some code for the drawing of the status_indicator
+
 ## V1.1.4 main_testing branch Changelog
 241023-1055
 - removed some debug output

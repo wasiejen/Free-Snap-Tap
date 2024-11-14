@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1.4b
-last updated: 241023-1056
+Free-Snap-Tap V1.1.5
+last updated: 241030-0928
 '''
 
 from pynput import keyboard, mouse
@@ -11,7 +11,7 @@ import msvcrt # to flush input stream
 from random import randint # randint(3, 9)) 
 from time import time, sleep # sleep(0.005) = 5 ms
 from fst_data_types import Key_Event, type_check
-from fst_threads import Focus_Thread, Alias_Repeat_Thread
+from fst_threads import Focus_Thread, Macro_Repeat_Thread
 
 class CONSTANTS():
 
@@ -287,9 +287,11 @@ class Output_Manager():
                 return 9999
             
         def start_repeat(alias_string, repeat_time):
+            stop_repeat(alias_string)
+            
             repeat_time = int(repeat_time)
             stop_event = Event()
-            repeat_thread = Alias_Repeat_Thread(alias_string, repeat_time, stop_event, self._fst)
+            repeat_thread = Macro_Repeat_Thread(alias_string, repeat_time, stop_event, self._fst)
             self._repeat_thread_dict[alias_string] = [repeat_thread, stop_event]
             repeat_thread.start() 
             return True
@@ -317,9 +319,23 @@ class Output_Manager():
                     stop_event.set()
                     repeat_thread.join()
             except KeyError as error:
-                print(f"can not find a Repeat called {alias_string} - stop_repeat()")
+                if CONSTANTS.DEBUG3:
+                    print(f"can not find a Repeat called {alias_string} - stop_repeat()")
                 # raise KeyError(error)
             return True
+        
+        def is_repeat_active(alias_string):
+            try:
+                repeat_thread, stop_event = self._repeat_thread_dict[alias_string]
+                if repeat_thread.is_alive():
+                    return True
+                else:
+                    return False
+            except KeyError as error:
+                if CONSTANTS.DEBUG3:
+                    print(f"can not find a Repeat called {alias_string} - stop_repeat()")
+                # raise KeyError(error)
+            return False
         
         def reset_repeat(alias_string):
             try:
@@ -327,7 +343,8 @@ class Output_Manager():
                 if repeat_thread.is_alive():
                     repeat_thread.reset_timer()
             except KeyError as error:
-                print(f"can not find a Repeat called {alias_string} - reset_repeat()")
+                if CONSTANTS.DEBUG3:
+                    print(f"can not find a Repeat called {alias_string} - reset_repeat()")
                 # raise KeyError(error)
             return True
         
@@ -340,7 +357,8 @@ class Output_Manager():
                 if CONSTANTS.DEBUG4:
                     print("D4: -- Eval: stopped all Repeat")
             except AttributeError as error:
-                print(f"can not find a Repeat called {repeat_thread} - reset_all_repeat()")
+                if CONSTANTS.DEBUG3:
+                    print(f"can not find a Repeat called {repeat_thread} - reset_all_repeat()")
             return True
 
         def reset(alias_string):
@@ -363,32 +381,40 @@ class Output_Manager():
         
         
         
-        def set(key_string, value = True):
+        def set(key_string, value = 1):
+            if value is True:
+                value = 1
+            elif value is False:
+                value = 0
             self.variables[key_string] = value
             if CONSTANTS.DEBUG4:
-                print(f'variable {key_string} set')
+                print(f'variable {key_string} set to: {value}')
             return True
         
         
         def is_set(key_string):
             try:
                 #print(f'variable {key_string} is {self.variables[key_string]}')
-                return self.variables[key_string]
+                return True if self.variables[key_string] != 0 else False
             except KeyError:
-                print(f'variable {key_string} not set')
+                set(key_string, 0)
+                if CONSTANTS.DEBUG3:
+                    print(f'variable {key_string} not set')
                 return False
         def get(key_string):
             return is_set()
             
-        def check(key_string, value = True):
+        def check(key_string, value = 1):
             try:
                 return self.variables[key_string] == value
             except KeyError:
-                print(f'variable {key_string} not set')
+                set(key_string, 0)
+                if CONSTANTS.DEBUG3:
+                    print(f'variable {key_string} not set')
                 return False
             
         def clear(key_string):
-            self.variables[key_string] = False
+            self.variables[key_string] = 0
             if CONSTANTS.DEBUG4:
                 print(f'variable {key_string} cleared')
             return True
@@ -416,6 +442,10 @@ class Output_Manager():
                 print(f'variable {key_string} set to 0')
             return True
         
+        
+        def cli(key_string):
+            print(key_string)
+            return True
 
         # ---------------------------
         # eval starts from here
@@ -587,7 +617,9 @@ class Config_Manager():
     def _clean_comments(self, lines):
         comments_cleaned_lines = []
         for line in lines:
-            line = line.replace('\n', '').replace('\t', '')
+            
+            ###XXX 241029-0711 added strip to allow whitespaces in front
+            line = line.replace('\n', '').replace('\t', '').strip()
             if len(line) > 1:
                 if line.startswith('<focus>'):
                     cleaned_line = '<focus>'
@@ -598,7 +630,8 @@ class Config_Manager():
                     cleaned_line += line[5:].split('#')[0].strip()
                     comments_cleaned_lines.append(cleaned_line)
                 else:
-                    line = line.replace(" ","")
+                    ###XXX 241028-1224: commented out to make eval with spaces possible
+                    # line = line.replace(" ","")
                     if len(line) > 1:
                         # strip all comments from line
                         group = line.split(',')
@@ -612,7 +645,9 @@ class Config_Manager():
                                 # ignore commented out keys
                                 if key[0] != '#': 
                                     # ignore comments after keys
-                                    cleaned_group.append(key.split('#')[0]) 
+                                    ###XXX 241028-1225 added
+                                    cleaned_group.append(key.split('#')[0].strip()) 
+                                    # cleaned_group.append(key.split('#')[0]) 
                                 # if commented out key before :, add :
                                 elif key.find(':') >= 0:
                                     cleaned_group.append(':')
@@ -836,8 +871,8 @@ class Config_Manager():
             if alias.startswith('<'):
                 self._alias_hr.append([alias, split_ignore_brackets(line)])
             else:
-               
-                groups = line.split(':')
+                ###XXX 241028-1243 added strip()
+                groups = [x.strip() for x in line.split(':')]
                 # tap groups
                 if len(groups) == 1: 
                     # generate default names for Tap Groups

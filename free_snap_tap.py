@@ -12,8 +12,6 @@ import tkinter as tk
 from fst_keyboard import FST_Keyboard
 from fst_manager import CONSTANTS
 
-
-
 # will not overwrite debug settings in config
 CONSTANTS.DEBUG = False
 # CONSTANTS.DEBUG = True
@@ -26,11 +24,11 @@ CONSTANTS.DEBUG3 = False
 CONSTANTS.DEBUG_NUMPAD = False
 # CONSTANTS.DEBUG_NUMPAD = True
 
+
 # Define File name for saving of everything, can be any filetype
 # But .txt or .cfg recommended for easier editing
 CONSTANTS.FILE_NAME = 'FSTconfig.txt'
 # CONSTANTS.FILE_NAME = 'FSTconfig_test.txt'
-
 
 # Control key combinations (vk_code and/or key_string) 
 # (1,2 or more keys possible - depends on rollover of your keyboard)
@@ -44,6 +42,10 @@ class Status_Indicator():
     def __init__(self, root, fst_keyboard):
         self.root = root
         self._fst = fst_keyboard
+        self.crosshair_enabled = False
+        self.crosshair = None
+        self.stop = False
+        
         self.root.title("FST Status Indicator")
         self.root.overrideredirect(True)  # Remove window decorations
         
@@ -51,23 +53,32 @@ class Status_Indicator():
         self.screen_width = self.root.winfo_screenwidth()
         self.screen_height = self.root.winfo_screenheight()
         
-        # Calculate the position to center the window
-        self.x_position = (self.screen_width) - 60
-        self.y_position = 0
+        # Calculate the size and position of the window
+        user_size = self._fst.arg_manager.STATUS_INDICATOR_SIZE
+        padding = 20
+        dpadding = 2* padding
+        x_size = dpadding + user_size
+        if x_size < 100:
+            x_size = 100
+        y_size = dpadding + user_size
+        x_position = (self.screen_width) - x_size
+        y_position = 0
         
-        # Set the window geometry to 2x2 pixels centered on the screen
-        self.root.geometry(f'100x100+{self.x_position}+{self.y_position}')
+        # Set the window geometry placement
+        self.root.geometry(f'{x_size}x{y_size}+{x_position}+{y_position}')
         self.root.attributes("-alpha", 0.5)  # Set transparency level
         self.root.wm_attributes("-topmost", 1)  # Keep the window on top
         self.root.wm_attributes("-transparentcolor", "yellow")
         
         # print(f"self._fst.arg_manager.STATUS_INDICATOR_SIZE: {self._fst.arg_manager.STATUS_INDICATOR_SIZE}")
         # Create a canvas for the indicator
-        self.canvas = tk.Canvas(self.root, width=100+self._fst.arg_manager.STATUS_INDICATOR_SIZE, height=100+self._fst.arg_manager.STATUS_INDICATOR_SIZE, bg='yellow', highlightthickness=0)
+        
+        
+        self.canvas = tk.Canvas(self.root, width=x_size, height=y_size, bg='yellow', highlightthickness=0)
         self.canvas.pack()
 
         # Draw the indicator
-        self.indicator = self.canvas.create_oval(20, 20, 20+self._fst.arg_manager.STATUS_INDICATOR_SIZE, 20+self._fst.arg_manager.STATUS_INDICATOR_SIZE, fill="green")
+        self.indicator = self.canvas.create_oval(x_size - padding - user_size, padding, x_size - padding, y_size - padding, fill="red")
 
         # Bind mouse events to make the window draggable
         self.root.bind("<ButtonPress-1>", self.on_start)
@@ -91,12 +102,6 @@ class Status_Indicator():
         
         # Bind right-click to show the context menu
         self.canvas.bind("<Button-3>", self.show_context_menu)
-        
-        self.crosshair_enabled = False
-        self.crosshair = None
-        
-        self.stop = False
-        
 
     def open_config_file(self, event = None):
         startfile(self._fst.config_manager.file_name)
@@ -105,8 +110,6 @@ class Status_Indicator():
         self._fst.update_args_and_groups(self._fst.focus_manager.FOCUS_APP_NAME)
         self._fst.cli_menu.update_group_display()
         print(f'\n>>> file reloaded for focus app: {self._fst.focus_manager.FOCUS_APP_NAME}\n')
-        
-
 
     def on_start(self, event):
         # Record the starting position of the mouse
