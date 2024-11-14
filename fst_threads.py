@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1.3
-last updated: 241015-1300
+Free-Snap-Tap V1.1.5
+last updated: 241105-2004
 '''
 
 from threading import Thread, Event # to play aliases without interfering with keyboard listener
@@ -72,7 +72,7 @@ class Macro_Thread(Thread):
             print(error)
             alias_thread_logging.append(error)
 
-class Alias_Repeat_Thread(Thread):
+class Macro_Repeat_Thread(Thread):
     '''
     repeatatly execute a key event based on a timer
     '''
@@ -131,48 +131,56 @@ class Focus_Thread(Thread):
 
     def run(self):
         last_active_window = ''
+        shortened_active_window = ''
         found_new_focus_app = False
         manually_paused = False
         while not self.stop:
             try:
-                active_window = gw.getActiveWindow().title
-
-                # shorten the active window name
-                if len(active_window) >= 25:
-                    reverse = active_window[::-1]
-                    del1 = reverse.find('–')
-                    del2 = reverse.find('-')
-                    del3 = reverse.find('/')
-                    del4 = reverse.find('\\')
-                    del_min = 100
-                    for deliminator in [del1, del2, del3, del4]:
-                        if deliminator != -1 and deliminator < del_min:
-                            del_min = deliminator 
-                    reverse_shortened = reverse[:del_min]
-                    active_window = reverse_shortened[::-1]
-                    if active_window[0] == ' ':
-                        active_window = active_window[1:]    
-                
+                active_window = gw.getActiveWindow().title               
             except AttributeError:
                 pass
             
-            if active_window not in ["FST Status Indicator", "FST Crosshair"]:
-                if not self.FOCUS_THREAD_PAUSED and not self._fst.arg_manager.MANUAL_PAUSED:
-        
-                    if active_window != last_active_window or manually_paused:
-                        if active_window != last_active_window:
-                            last_active_window = active_window
-                        # to make sure it activates ne focus setting even if manually paused in other app than resumed
-
+            if active_window != last_active_window or manually_paused:
+                if active_window != last_active_window:
+                    last_active_window = active_window
+                    
+                # shorten the active window name
+                ###XXX 241105-1858 
+                # if len(active_window) >= 25:
+                #     reverse = active_window[::-1]
+                #     del1 = reverse.find('–')
+                #     del2 = reverse.find('-')
+                #     del3 = reverse.find('/')
+                #     del4 = reverse.find('\\')
+                #     del_min = 100
+                #     for deliminator in [del1, del2, del3, del4]:
+                #         if deliminator != -1 and deliminator < del_min:
+                #             del_min = deliminator 
+                #     reverse_shortened = reverse[:del_min]
+                #     shortened_active_window = reverse_shortened[::-1].strip()
+                # else:
+                #     shortened_active_window = '--'
+                    
+                if active_window not in ["FST Status Indicator", "FST Crosshair"]:
+                    if not self.FOCUS_THREAD_PAUSED and not self._fst.arg_manager.MANUAL_PAUSED:
+            
                         if manually_paused:
                             manually_paused = False
                         
                         found_new_focus_app = False
                             
                         for focus_name in self._fst.focus_manager.multi_focus_dict_keys:
+                            # check the shortened window name
+                            # if shortened_active_window.lower().find(focus_name) >= 0:
+                            #     found_new_focus_app = True
+                            #     self._fst.focus_manager.FOCUS_APP_NAME = focus_name
+                            #     active_window = shortened_active_window
+                            #     break
+                            # check full window name
                             if active_window.lower().find(focus_name) >= 0:
                                 found_new_focus_app = True
                                 self._fst.focus_manager.FOCUS_APP_NAME = focus_name
+                                
                                 break
                                         
                         if found_new_focus_app:
@@ -199,10 +207,10 @@ class Focus_Thread(Thread):
                                 sleep(0.2)
                                 self._fst.arg_manager.WIN32_FILTER_PAUSED = True 
                                 print(f"> Active Window: {active_window}")
-                                        
-                        
-                else:
-                    manually_paused = True
+                                            
+                            
+                    else:
+                        manually_paused = True
                         
             sleep(0.5)
 
