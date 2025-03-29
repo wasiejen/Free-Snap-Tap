@@ -1,5 +1,31 @@
 ## V1.1.5 changelog
 
+250309-1052
+- added "caret" key   # left of key 1 on qwertz layout
+  - vk_code 220
+250329-1939
+- when using type/write of a macro with modifier keys as trigger, the modifier keys will now be released for the duration of the typing/writing and then reengage.
+  - e.g. if -d, -alt, -shift should print out the current date, then when hitting d the alt and shift press will be released to make it possible to write out the datestring and will be automatically reengaged afterwords
+- new `|(date())`, and `|(date_time())` functions for writing out he current date in yymmdd and yymmdd-HHMM format
+  - I just need it alot :-)
+- added start argument `<arg>-always_active`
+  - indicator will be blue and all default tap groups, rebinds and macros will be active always
+  - focus groups will be activated like normal and still show green indicator
+
+
+
+nice-to-have:
+- status symbol instead of overlay may be useful if used all the time
+
+
+bugtracker:
+- shorthand for pressed keys as suffix is not working 
+  - `f3|-alt : ...` not working like `f3, -alt : ...`
+
+features I would like to have:
+- alias key groups would be nice to only work for the focus app and not globally if defined in a focus group
+- `is_repeat_inactive(<alias>)` ? or just leave `not is_repeat_active(<alias>)` ?
+
 241028-1323
 bugfix:
 - when active window returned empty the script crashed 

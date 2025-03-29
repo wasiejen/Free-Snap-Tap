@@ -12,6 +12,7 @@ from random import randint # randint(3, 9))
 from time import time, sleep # sleep(0.005) = 5 ms
 from fst_data_types import Key_Event, type_check
 from fst_threads import Focus_Thread, Macro_Repeat_Thread
+import datetime
 
 class CONSTANTS():
 
@@ -372,15 +373,13 @@ class Output_Manager():
             return True
         
         def type(key_string):
+            release_modifier()
             self._keyboard_controller.type(key_string)
             return True
         
         def write(key_string):
             return type(key_string)
-        
-        
-        
-        
+
         def set(key_string, value = 1):
             if value is True:
                 value = 1
@@ -442,10 +441,20 @@ class Output_Manager():
                 print(f'variable {key_string} set to 0')
             return True
         
-        
         def cli(key_string):
             print(key_string)
             return True
+        
+        def date():
+            current_date = datetime.datetime.now().strftime("%y%m%d")
+            return type(current_date)
+
+        def date_time():
+            current_date_time = datetime.datetime.now().strftime("%y%m%d-%H%M")
+            return type(current_date_time)
+        
+        def release_modifier():
+            self._fst.state_manager.release_all_modifier_keys()
 
         # ---------------------------
         # eval starts from here
@@ -1019,6 +1028,8 @@ class Argument_Manager():
     PRINT_VK_CODES = False
 
     EXEC_ONLY_ONE_TRIGGERED_MACRO = False
+    
+    ALWAYS_ACTIVE = False
 
     # AntiCheat testing (ACT)
     ACT_DELAY = True
@@ -1070,6 +1081,7 @@ class Argument_Manager():
         self.CROSSHAIR_ENABLED = Argument_Manager.CROSSHAIR_ENABLED
         self.CROSSHAIR_DELTA_X = Argument_Manager.CROSSHAIR_DELTA_X
         self.CROSSHAIR_DELTA_Y = Argument_Manager.CROSSHAIR_DELTA_Y
+        self.ALWAYS_ACTIVE = Argument_Manager.ALWAYS_ACTIVE
 
     'start argument handling'
     def apply_start_arguments(self, argv):
@@ -1167,6 +1179,8 @@ class Argument_Manager():
                 x, y = arg[11:].strip().replace(' ', '').split(',')
                 self.CROSSHAIR_DELTA_X, self.CROSSHAIR_DELTA_Y = int(x), int(y)
                 print(f"set crosshair delta is set to: {self.CROSSHAIR_DELTA_X}, {self.CROSSHAIR_DELTA_Y}")
+            elif arg[:14] == "-always_active":
+                self.ALWAYS_ACTIVE = True
             else:
                 print("unknown start argument: ", arg)
 
@@ -1493,9 +1507,9 @@ class Input_State_Manager():
         self.reset_states_dicts()
     
     def release_all_modifier_keys(self):
-        # first release all modifert keys
+        # first release all modifier keys
         for vk_code in Input_State_Manager.ALL_MODIFIER_KEYS:
-            if not self.pressed_keys:
+            if vk_code in self.pressed_keys:
                 if CONSTANTS.DEBUG2:
                     print(f"D2: released pressed modifier key: {vk_code}")
                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
@@ -1628,6 +1642,10 @@ class CLI_menu():
         
     def display_focus_not_found(self):
         print('\n>>> NO FOCUS APP FOUND')
+        self.display_focus_names()
+        
+    def display_default_active(self):
+        print('\n>>> DEFAULT GROUP ACTIVE')
         self.display_focus_names()
         
     def flush_the_input_buffer(self):

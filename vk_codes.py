@@ -187,12 +187,13 @@ vk_codes_dict = {
     'oem_clear': 254,
     
     # some vk_codes for german keyboard layout
-    '<': 226, 
+    '<': 226, 'smaller': 226, 
     'ä': 222, 
     'ö': 192, 
     'ü': 186, 
     '´': 221, 
     'ß': 219,
+    'caret' : 220, # key left of 1 on qwertz layout
     'copilot': 134, # actually a 3 key combination with 134 as somewhat unique vk_code id
     
     

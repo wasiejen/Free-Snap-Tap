@@ -139,20 +139,36 @@ class Status_Indicator():
         wait_one_round = False
         manual = self._fst.arg_manager.MANUAL_PAUSED
         win32 = self._fst.arg_manager.WIN32_FILTER_PAUSED
+        focus_name = self._fst.focus_manager.FOCUS_APP_NAME
+        if self._fst.arg_manager.ALWAYS_ACTIVE:
+            old_color, color = "", "blue"
+        else:
+            old_color, color = "", "red"
+            
         while not self.stop:
             if self._fst.arg_manager.STATUS_INDICATOR:
-                    
+                  
+
                 # only update if there is a change
-                if manual is not self._fst.arg_manager.MANUAL_PAUSED or win32 is not self._fst.arg_manager.WIN32_FILTER_PAUSED:
+                if (manual is not self._fst.arg_manager.MANUAL_PAUSED or 
+                    win32 is not self._fst.arg_manager.WIN32_FILTER_PAUSED or
+                    focus_name is not self._fst.focus_manager.FOCUS_APP_NAME):
+                    
                     manual = self._fst.arg_manager.MANUAL_PAUSED
                     win32 = self._fst.arg_manager.WIN32_FILTER_PAUSED
+                    focus_name = self._fst.focus_manager.FOCUS_APP_NAME
                     
                     if self._fst.arg_manager.MANUAL_PAUSED or self._fst.arg_manager.WIN32_FILTER_PAUSED:
-                        status = False
+                        color = "brown"
                     else:
-                        status = True
+                        if self._fst.arg_manager.ALWAYS_ACTIVE and focus_name == '':
+                            color = "blue"
+                        else:   
+                            color = "green"
                         wait_one_round = True
-                    color = "green" if status else "red"
+   
+                if old_color != color:
+                    old_color = color
                     self.canvas.itemconfig(self.indicator, fill=color)    
                 
             # activate and deactive crosshair from tk.mainloop
