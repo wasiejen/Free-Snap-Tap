@@ -11,7 +11,12 @@
 - added start argument `<arg>-always_active`
   - indicator will be blue and all default tap groups, rebinds and macros will be active always
   - focus groups will be activated like normal and still show green indicator
-
+- added system tray option
+  - `<arg>-try_icon` now starts a tray icon with the same menu as the overlay
+  - tray icon and overlay can be used at the same time or seperately
+- removed option for crosshair atm
+  - only usable when the overlay is active because it is dependent on it
+  - temporarily disabled
 
 
 nice-to-have:
