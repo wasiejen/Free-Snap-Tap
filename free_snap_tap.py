@@ -611,11 +611,20 @@ if __name__ == "__main__":
 
             except RuntimeError:
                 pass
-   
-    if not main_thread.is_alive(): 
-        if not trayicon_thread.is_alive():
-            updater.end()   
-        main()
+    
+    if not trayicon_thread.is_alive():
+        updater.end()   
+    main()
+    
+    # try:
+    #     if not main_thread.is_alive(): 
+    #         if not trayicon_thread.is_alive():
+    #             updater.end()   
+    #         main()
+    # except NameError:
+    #         if not trayicon_thread.is_alive():
+    #             updater.end()   
+    #         main()
     
     if trayicon_thread.is_alive():
         trayicon.end()
