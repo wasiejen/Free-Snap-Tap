@@ -1013,6 +1013,8 @@ class Argument_Manager():
     CROSSHAIR_ENABLED = False
     CROSSHAIR_DELTA_X = 0
     CROSSHAIR_DELTA_Y = 0
+    
+    TRAY_ICON = False
 
     # global variables
     DEBUG  = False
@@ -1181,6 +1183,8 @@ class Argument_Manager():
                 print(f"set crosshair delta is set to: {self.CROSSHAIR_DELTA_X}, {self.CROSSHAIR_DELTA_Y}")
             elif arg[:14] == "-always_active":
                 self.ALWAYS_ACTIVE = True
+            elif arg[:10] == "-tray_icon":
+                self.TRAY_ICON = True
             else:
                 print("unknown start argument: ", arg)
 
