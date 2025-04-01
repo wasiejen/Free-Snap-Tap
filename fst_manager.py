@@ -1032,6 +1032,7 @@ class Argument_Manager():
     EXEC_ONLY_ONE_TRIGGERED_MACRO = False
     
     ALWAYS_ACTIVE = False
+    CMD_WINDOW_HIDDEN = False
 
     # AntiCheat testing (ACT)
     ACT_DELAY = True
@@ -1185,6 +1186,8 @@ class Argument_Manager():
                 self.ALWAYS_ACTIVE = True
             elif arg[:10] == "-tray_icon":
                 self.TRAY_ICON = True
+            elif arg[:16] == "-hide_cmd_window":
+                self.CMD_WINDOW_HIDDEN = True
             else:
                 print("unknown start argument: ", arg)
 
