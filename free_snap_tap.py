@@ -133,7 +133,7 @@ class Tray_Icon:
             image = Image.new('RGBA', (size+both_borders, size+both_borders), (0, 0, 0, 0)) #transparent background
             draw = ImageDraw.Draw(image)
             draw.ellipse((0 + border, 0 + border, size + border, size + border), fill=color)
-            draw.text((border*2, size/4+border), "FST", font=font, fill="white")
+            draw.text((border+1, size/4+border), "FST", font=font, fill="white")
             self.images[color] = image
             
     # def update_image(self, color="red"):
