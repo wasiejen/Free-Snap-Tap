@@ -12,11 +12,13 @@
   - indicator will be blue and all default tap groups, rebinds and macros will be active always
   - focus groups will be activated like normal and still show green indicator
 - added system tray option
-  - `<arg>-try_icon` now starts a tray icon with the same menu as the overlay
+  - `<arg>-tray_icon` now starts a tray icon with the same menu as the overlay
   - tray icon and overlay can be used at the same time or seperately
 - removed option for crosshair atm
   - only usable when the overlay is active because it is dependent on it
   - temporarily disabled
+- now start argument `<arg>-hide_cmd_window` will hide the cmd window after starting up
+- added menu options to hide and show again the cmd window
 
 
 nice-to-have:
@@ -26,6 +28,8 @@ nice-to-have:
 bugtracker:
 - shorthand for pressed keys as suffix is not working 
   - `f3|-alt : ...` not working like `f3, -alt : ...`
+- when returning to menu and restaring filter, the always on function is not working. there needs to be activated a focus group and then it works again like intented ...
+
 
 features I would like to have:
 - alias key groups would be nice to only work for the focus app and not globally if defined in a focus group

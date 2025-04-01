@@ -38,6 +38,7 @@ CONSTANTS.EXIT_Combination = ["alt", "end"]
 CONSTANTS.TOGGLE_ON_OFF_Combination = ["alt", "delete"]
 CONSTANTS.MENU_Combination = ["alt", "page_down"]  
  
+setting_up_complete = False
 
 class Updater:
     
@@ -76,7 +77,12 @@ class Updater:
             color = "blue"
         else:
             color =  "red"
-            
+        
+        # wait for tray icon and overlay to be set up
+        while not setting_up_complete:
+            sleep(0.5)
+        sleep(0.5)
+        
         while not self.stop:
             if self._fst.arg_manager.STATUS_INDICATOR or self._fst.arg_manager.TRAY_ICON:
 
@@ -115,9 +121,10 @@ class Tray_Icon:
     def __init__(self, fst_keyboard):
         self._fst = fst_keyboard
         self.stop = False
-        # self.crosshair_enabled = False
-        # self.crosshair = None
-        # self.icon = None
+        # if self._fst.arg_manager.ALWAYS_ACTIVE:
+        #     self.color = "blue"
+        # else:
+        #     self.color =  "red"
         self.color = None
         self.images = {}
         self.fill_images() # Initial image creation
@@ -126,15 +133,15 @@ class Tray_Icon:
 
     def fill_images(self):
         max = 64  #icon size is 64x64
-        border = 6
+        border = 2
         size = max - 2* border
         both_borders = border * 2
-        font = ImageFont.truetype("arial.ttf", size/2)
+        font = ImageFont.truetype("arial.ttf", size/2+6)
         for color in ["red", "green", "blue"]:
             image = Image.new('RGBA', (size+both_borders, size+both_borders), (0, 0, 0, 0)) #transparent background
             draw = ImageDraw.Draw(image)
             draw.ellipse((0 + border, 0 + border, size + border, size + border), fill=color)
-            draw.text((border+1, size/4+border), "FST", font=font, fill="white")
+            draw.text((border-1, size/4-3), "FST", font=font, fill="white")
             self.images[color] = image
 
     def create_menu(self):
@@ -211,6 +218,10 @@ class Status_Overlay():
         self.root.title("FST Status Indicator")
         self.root.overrideredirect(True)  # Remove window decorations
         
+        # if self._fst.arg_manager.ALWAYS_ACTIVE:
+        #     self.color = "blue"
+        # else:
+        #     self.color =  "red"
         self.color = None
         # Get the screen width and height
         self.screen_width = self.root.winfo_screenwidth()
@@ -400,7 +411,7 @@ if __name__ == "__main__":
     
     # hide command window at start but inform user before
     if fst_keyboard.arg_manager.CMD_WINDOW_HIDDEN:
-        print("ATTENTION: cmd window will now be hidden, can be shown again via tray icon menu")
+        print("\nATTENTION: cmd window will now be hidden, can be shown again via tray icon menu\n")
         sleep(3)
         toggle_console(False)
     
@@ -426,6 +437,7 @@ if __name__ == "__main__":
                 root = tk.Tk()
                 overlay = Status_Overlay(root, fst_keyboard)
                 updater.set_overlay(overlay)
+                setting_up_complete = True
                 overlay.run()
 
             except RuntimeError:
@@ -436,7 +448,12 @@ if __name__ == "__main__":
                     updater.end()   
             except NameError:
                 pass
+            setting_up_complete = True
             main()
+    else:
+        updater.end()
+        setting_up_complete = True
+        main()
         
     try:
         if not update_thread.is_alive():
