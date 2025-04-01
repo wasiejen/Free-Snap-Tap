@@ -9,6 +9,7 @@ from time import sleep
 import tkinter as tk
 import pystray
 from PIL import Image, ImageDraw, ImageFont
+import ctypes
 
 from fst_keyboard import FST_Keyboard
 from fst_manager import CONSTANTS
@@ -107,7 +108,17 @@ class Updater:
                     #self.overlay.update_crosshair()
 
             sleep(0.5)
-  
+
+# Console window control functions
+user32 = ctypes.WinDLL('user32', use_last_error=True)
+SW_HIDE, SW_SHOW = 0, 5  
+
+def get_console_window():
+    return ctypes.windll.kernel32.GetConsoleWindow()
+
+def toggle_console(show: bool):
+    if hwnd := get_console_window():
+        user32.ShowWindow(hwnd, SW_SHOW if show else SW_HIDE)
 
 class Tray_Icon:
     
@@ -117,7 +128,6 @@ class Tray_Icon:
         # self.crosshair_enabled = False
         # self.crosshair = None
         self.icon = None
-
         self.color = None
         self.images = {}
         self.fill_images() # Initial image creation
@@ -125,8 +135,9 @@ class Tray_Icon:
         self.update_thread = None
 
     def fill_images(self):
-        size = 40
-        border = 4
+        max = 64  #icon size is 64x64
+        border = 6
+        size = max - 2* border
         both_borders = border * 2
         font = ImageFont.truetype("arial.ttf", size/2)
         for color in ["red", "green", "blue"]:
@@ -153,12 +164,15 @@ class Tray_Icon:
             #pystray.MenuSeparator(),
             pystray.MenuItem("Toggle Pause", self.toggle_pause),
             pystray.MenuItem("Return to Menu", self.return_to_menu),
-            pystray.MenuItem("Exit Program", self.exit_program),
             pystray.Menu.SEPARATOR,
             #pystray.MenuSeparator(),
+            pystray.MenuItem('Show Console', lambda: toggle_console(True)),
+            pystray.MenuItem('Hide Console', lambda: toggle_console(False)),
             #pystray.MenuItem("Close Indicator", self.close_indicator),
             #pystray.MenuItem("Toggle Crosshair", self.toggle_crosshair),
-            pystray.MenuItem("Display internal state", self.display_internal_state),
+            #pystray.MenuItem("Display internal state", self.display_internal_state),
+            pystray.Menu.SEPARATOR,
+            pystray.MenuItem("Exit Program", self.exit_program),6
         )
         return menu
     
@@ -171,11 +185,14 @@ class Tray_Icon:
     #     self.update_image(color)
     #     self.tray_icon.icon = self.image # Update the icon
         
-    def run(self):
+    def start_icon(self):
     #     self.update_thread = threading.Thread(target=self.update_indicator)
     #     self.update_thread.daemon = True  # Allow the main program to exit even if the thread is running
     #     self.update_thread.start()
-        self.tray_icon.run()
+        try:
+            self.tray_icon.run()
+        except AttributeError as err:
+            print(err)
         
     # Implement the menu item actions (placeholders)
     def open_config_file(self):
@@ -202,6 +219,10 @@ class Tray_Icon:
 
     def display_internal_state(self):
         self._fst.display_internal_repr_groups()
+        
+
+
+
 
  
 class Status_Overlay():
@@ -234,7 +255,7 @@ class Status_Overlay():
         
         # Set the window geometry placement
         self.root.geometry(f'{x_size}x{y_size}+{x_position}+{y_position}')
-        self.root.attributes("-alpha", 0.5)  # Set transparency level
+        self.root.attributes("-alpha", 1)  # Set transparency level
         self.root.wm_attributes("-topmost", 1)  # Keep the window on top
         self.root.wm_attributes("-transparentcolor", "yellow")
         
@@ -414,8 +435,8 @@ class Status_Overlay():
     #     self.crosshair = None
     #     self.crosshair_enabled = False
     
-    def end(self):
-        self.stop = True
+    # def end(self):
+    #     self.stop = True
         
     def close_window(self):
         self.end()
@@ -586,11 +607,17 @@ if __name__ == "__main__":
     update_thread.daemon = True  # Daemonize thread
     update_thread.start()
     
+    # hide command window at start but inform user before
+    # if fst_keyboard.arg_manager.CMD_WINDOW_HIDDEN:
+    #     print("ATTENTION: cmd window will now be hidden, can be shown again via tray icon menu")
+    #     sleep(3)
+    #     toggle_console(False)
+    
     if fst_keyboard.arg_manager.TRAY_ICON or fst_keyboard.arg_manager.STATUS_INDICATOR:
         if fst_keyboard.arg_manager.TRAY_ICON:
             try:
                 trayicon = Tray_Icon(fst_keyboard)
-                trayicon_thread = Thread(target=trayicon.run)
+                trayicon_thread = Thread(target=trayicon.tray_icon.run)
                 trayicon_thread.daemon = True  # Daemonize thread
                 trayicon_thread.start()
                 updater.set_icon(trayicon)
@@ -612,7 +639,10 @@ if __name__ == "__main__":
             except RuntimeError:
                 pass
     
-    if not trayicon_thread.is_alive():
+    try:
+        if trayicon_thread.is_alive():
+            pass
+    except NameError:
         updater.end()   
     main()
     
