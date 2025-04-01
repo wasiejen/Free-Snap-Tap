@@ -127,7 +127,7 @@ class Tray_Icon:
         self.stop = False
         # self.crosshair_enabled = False
         # self.crosshair = None
-        self.icon = None
+        # self.icon = None
         self.color = None
         self.images = {}
         self.fill_images() # Initial image creation
@@ -285,9 +285,12 @@ class Status_Overlay():
         self.context_menu.add_command(label="Return to Menu", command=self.return_to_menu)
         self.context_menu.add_command(label="Exit Program", command=self.exit_program)
         self.context_menu.add_separator()
-        self.context_menu.add_command(label="Close Indicator", command=self.close_window)
+        self.context_menu.add_command(label='Show Console', command = lambda: toggle_console(True))
+        self.context_menu.add_command(label='Hide Console', command = lambda: toggle_console(False))
         #self.context_menu.add_command(label="Toggle Crosshair", command=self.toggle_crosshair)
         self.context_menu.add_command(label="Display internal state", command=self.display_internal_state)
+        self.context_menu.add_separator()
+        self.context_menu.add_command(label="Close Indicator", command=self.close_window)
         
         # Bind right-click to show the context menu
         self.canvas.bind("<Button-3>", self.show_context_menu)
