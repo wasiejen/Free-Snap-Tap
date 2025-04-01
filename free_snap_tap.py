@@ -109,16 +109,6 @@ class Updater:
 
             sleep(0.5)
 
-# Console window control functions
-user32 = ctypes.WinDLL('user32', use_last_error=True)
-SW_HIDE, SW_SHOW = 0, 5  
-
-def get_console_window():
-    return ctypes.windll.kernel32.GetConsoleWindow()
-
-def toggle_console(show: bool):
-    if hwnd := get_console_window():
-        user32.ShowWindow(hwnd, SW_SHOW if show else SW_HIDE)
 
 class Tray_Icon:
     
@@ -146,15 +136,6 @@ class Tray_Icon:
             draw.ellipse((0 + border, 0 + border, size + border, size + border), fill=color)
             draw.text((border+1, size/4+border), "FST", font=font, fill="white")
             self.images[color] = image
-            
-    # def update_image(self, color="red"):
-    #     """Updates the image based on the current status."""
-    #     #size = self._fst.arg_manager.STATUS_INDICATOR_SIZE
-    #     size = 25
-    #     image = Image.new('RGBA', (size, size), (0, 0, 0, 0)) #transparent background
-    #     draw = ImageDraw.Draw(image)
-    #     draw.ellipse((0, 0, size, size), fill=color)
-    #     self.image = image
 
     def create_menu(self):
         menu = (
@@ -168,11 +149,9 @@ class Tray_Icon:
             #pystray.MenuSeparator(),
             pystray.MenuItem('Show Console', lambda: toggle_console(True)),
             pystray.MenuItem('Hide Console', lambda: toggle_console(False)),
-            #pystray.MenuItem("Close Indicator", self.close_indicator),
-            #pystray.MenuItem("Toggle Crosshair", self.toggle_crosshair),
             #pystray.MenuItem("Display internal state", self.display_internal_state),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem("Exit Program", self.exit_program),6
+            pystray.MenuItem("Exit Program", self.exit_program),
         )
         return menu
     
@@ -220,11 +199,6 @@ class Tray_Icon:
     def display_internal_state(self):
         self._fst.display_internal_repr_groups()
         
-
-
-
-
- 
 class Status_Overlay():
     
     def __init__(self, root, fst_keyboard):
@@ -261,8 +235,6 @@ class Status_Overlay():
         
         # print(f"self._fst.arg_manager.STATUS_INDICATOR_SIZE: {self._fst.arg_manager.STATUS_INDICATOR_SIZE}")
         # Create a canvas for the indicator
-        
-        
         self.canvas = tk.Canvas(self.root, width=x_size, height=y_size, bg='yellow', highlightthickness=0)
         self.canvas.pack()
 
@@ -347,206 +319,10 @@ class Status_Overlay():
         self.color = color
         self.canvas.itemconfig(self.indicator, fill=color) 
         
-    # def update_crosshair(self):
-    #     if self._fst.arg_manager.CROSSHAIR_ENABLED:
-    #         if not self.crosshair_enabled:
-    #             self.crosshair_activate()
-    #     else:
-    #         if self.crosshair_enabled:
-    #             self.crosshair_deactivate()
-                
-    #     # if mainthread is inactive already than end indicator
-    #     if not main_thread.is_alive():
-    #         if self.crosshair_enabled:
-    #             self.crosshair_deactivate()
-    #         self.close_window()
-        
-
-    # # def update_indicator(self):
-    #     wait_one_round = False
-    #     manual = self._fst.arg_manager.MANUAL_PAUSED
-    #     win32 = self._fst.arg_manager.WIN32_FILTER_PAUSED
-    #     focus_name = self._fst.focus_manager.FOCUS_APP_NAME
-    #     if self._fst.arg_manager.ALWAYS_ACTIVE:
-    #         old_color, color = "", "blue"
-    #     else:
-    #         old_color, color = "", "red"
-            
-    #     while not self.stop:
-    #         if self._fst.arg_manager.STATUS_INDICATOR:
-                  
-
-    #             # only update if there is a change
-    #             if (manual is not self._fst.arg_manager.MANUAL_PAUSED or 
-    #                 win32 is not self._fst.arg_manager.WIN32_FILTER_PAUSED or
-    #                 focus_name is not self._fst.focus_manager.FOCUS_APP_NAME):
-                    
-    #                 manual = self._fst.arg_manager.MANUAL_PAUSED
-    #                 win32 = self._fst.arg_manager.WIN32_FILTER_PAUSED
-    #                 focus_name = self._fst.focus_manager.FOCUS_APP_NAME
-                    
-    #                 if self._fst.arg_manager.MANUAL_PAUSED or self._fst.arg_manager.WIN32_FILTER_PAUSED:
-    #                     color = "red"
-    #                 else:
-    #                     if self._fst.arg_manager.ALWAYS_ACTIVE and focus_name == '':
-    #                         color = "blue"
-    #                     else:   
-    #                         color = "green"
-    #                     wait_one_round = True
-   
-    #             if old_color != color:
-    #                 old_color = color
-    #                 self.canvas.itemconfig(self.indicator, fill=color)    
-                
-    #         # activate and deactive crosshair from tk.mainloop
-    #         # wait an extra round for the new window to settle itself
-    #         if wait_one_round:
-    #             wait_one_round = False
-    #         else:
-    #             if self._fst.arg_manager.CROSSHAIR_ENABLED:
-    #                 if not self.crosshair_enabled:
-    #                     self.crosshair_activate()
-    #             else:
-    #                 if self.crosshair_enabled:
-    #                     self.crosshair_deactivate()
-                    
-    #         # if mainthread is inactive already than end indicator
-    #         if not main_thread.is_alive():
-    #             if self.crosshair_enabled:
-    #                 self.crosshair_deactivate()
-    #             self.close_window()
-                
-    #         print("overlay update")
-    #         sleep(1)
-            
-    # def toggle_crosshair(self):
-    #     if not self._fst.arg_manager.CROSSHAIR_ENABLED:#self.crosshair_enabled:
-    #         self._fst.arg_manager.CROSSHAIR_ENABLED = True
-    #         self.crosshair_activate()
-    #     else:
-    #         self._fst.arg_manager.CROSSHAIR_ENABLED = False
-    #         self.crosshair_deactivate()
-        
-    # def crosshair_activate(self):
-    #     if self.crosshair is not None:
-    #         self.crosshair_deactivate()
-    #     self.crosshair = Crosshair(tk.Toplevel(), self._fst)
-    #     self.crosshair_enabled = True
-        
-    # def crosshair_deactivate(self):
-    #     self.crosshair.destroy()
-    #     self.crosshair = None
-    #     self.crosshair_enabled = False
-    
-    # def end(self):
-    #     self.stop = True
-        
     def close_window(self):
         self.end()
         # Properly close the Tkinter window and stop the main loop
         self.root.destroy()
-
-# class Crosshair():
-    
-#     def __init__(self, root, fst_keyboard):
-        
-
-#         # Create a new Tkinter window
-#         self.root = root
-#         self._fst = fst_keyboard
-        
-#         # Set title to recognise it in focus window
-#         self.root.title("FST Crosshair")
-        
-#         # Remove window decorations
-#         self.root.overrideredirect(True)
-        
-#         self.root.bind('<Button-1>', self.restart)
-        
-#         # Set the window to be transparent
-#         self.root.attributes('-alpha', 1)
-        
-#         self.built_crosshair()
-        
-#     def built_crosshair(self):
-        
-#         def rgbtohex(r,g,b):
-#             return f'#{r:02x}{g:02x}{b:02x}'
-        
-#         # delta x,y for the midpoint of the crosshair
-#         delta_x = self._fst.arg_manager.CROSSHAIR_DELTA_X - 1  # for me this is the center of the screen
-#         delta_y = self._fst.arg_manager.CROSSHAIR_DELTA_Y - 1
-        
-#         # base size has to be at least double the max of |x| or |y|
-#         # min_canvas_size = 2 * max(abs(delta_x), abs(delta_y)) + 25   # add a bit of buffer (25)
-#         # print(min_canvas_size)
-        
-#         # # adapt canvas size to be big enough for the delta values
-#         # if min_canvas_size < 100:
-#         #     self.size = 100 
-#         # else: 
-#         #     # make it a multiplicative of 100
-#         #     self.size = (min_canvas_size // 100 + 1) * 100
-        
-#         self.size = 100 
-        
-#         # middle point distance from coordinate system of he canvas
-#         mid = self.size // 2
-        
-#         # Get the screen width and height
-#         self.screen_width = self.root.winfo_screenwidth()
-#         self.screen_height = self.root.winfo_screenheight()
-        
-#         # Calculate the position to center the window
-#         self.x_position = (self.screen_width // 2) - mid + delta_x
-#         self.y_position = (self.screen_height // 2) - mid + delta_y
-        
-#         # Set the window geometry to 2x2 pixels centered on the screen
-#         self.root.geometry(f'{self.size}x{self.size}+{self.x_position}+{self.y_position}')
-        
-#         # Create a canvas to draw the crosshair
-#         self.canvas = tk.Canvas(self.root, width=self.size, height=self.size, bg='white', highlightthickness=0)
-#         self.canvas.pack()
-
-#         # set color to glowing pink - that should be usable in most games :-D
-#         # would be interesting if it would be possible to make it the complementory color of 
-#         # the window below
-#         color = rgbtohex(255, 0, 255)
-        
-#         # Draw the crosshair lines
-#         self.canvas.create_line(mid+0, mid+10, mid+0, mid+25, fill=color)    # Vertical line
-#         self.canvas.create_line(mid+1, mid+10, mid+1, mid+25, fill=color)    # Vertical line
-#         self.canvas.create_line(mid-1, mid+10, mid-1, mid+25, fill="black")  # Vertical line
-        
-#         self.canvas.create_line(mid+11, mid+0, mid+26, mid+0, fill=color)    # Horizontal line right
-#         self.canvas.create_line(mid+11, mid+1, mid+26, mid+1, fill=color)    # Horizontal line right
-#         self.canvas.create_line(mid+11, mid+2, mid+26, mid+2, fill="black")  # Horizontal line right
-        
-#         self.canvas.create_line(mid-25, mid+0, mid-10, mid+0, fill=color)    # Horizontal line left
-#         self.canvas.create_line(mid-25, mid+1, mid-10, mid+1, fill=color)    # tHorizontal line left
-#         self.canvas.create_line(mid-25, mid+2, mid-10, mid+2, fill="black")  # Horizontal line left
-        
-#         self.canvas.create_line(mid-1, mid+0, mid-1, mid+2, fill=color)      # Dot
-#         self.canvas.create_line(mid+2, mid+0, mid+2, mid+3, fill=color)      # Dot
-#         self.canvas.create_line(mid-1, mid+2, mid+2, mid+2, fill=color)      # Dot
-#         self.canvas.create_line(mid-1, mid+3, mid+3, mid+3, fill="black")    # Dot
-#         self.canvas.create_line(mid-2, mid+0, mid-2, mid+3, fill="black")    # Dot
-        
-#         # Set the window to be always on top and transparent again for drawing
-#         self.root.attributes('-topmost', True)
-#         self.root.attributes('-transparentcolor', 'white')
-
-#     # def run(self):
-#     #     # Start the Tkinter main loop
-#     #     self.root.mainloop()
-        
-#     def destroy(self, event = None):
-#         self.root.destroy()
-        
-#     def restart(self, event = None):
-#         print("restarting crosshair")
-#         self.canvas.destroy()
-#         self.built_crosshair()
   
 def main():    
           
@@ -596,6 +372,18 @@ def main():
     sys.exit(1)
 
 
+# Console window control functions - to hide and unhide cmd window
+user32 = ctypes.WinDLL('user32', use_last_error=True)
+SW_HIDE, SW_SHOW = 0, 5  
+
+def get_console_window():
+    return ctypes.windll.kernel32.GetConsoleWindow()
+
+def toggle_console(show: bool):
+    if hwnd := get_console_window():
+        user32.ShowWindow(hwnd, SW_SHOW if show else SW_HIDE)
+
+
 if __name__ == "__main__":    
     overlay = None
     fst_keyboard = FST_Keyboard()
@@ -611,10 +399,10 @@ if __name__ == "__main__":
     update_thread.start()
     
     # hide command window at start but inform user before
-    # if fst_keyboard.arg_manager.CMD_WINDOW_HIDDEN:
-    #     print("ATTENTION: cmd window will now be hidden, can be shown again via tray icon menu")
-    #     sleep(3)
-    #     toggle_console(False)
+    if fst_keyboard.arg_manager.CMD_WINDOW_HIDDEN:
+        print("ATTENTION: cmd window will now be hidden, can be shown again via tray icon menu")
+        sleep(3)
+        toggle_console(False)
     
     if fst_keyboard.arg_manager.TRAY_ICON or fst_keyboard.arg_manager.STATUS_INDICATOR:
         if fst_keyboard.arg_manager.TRAY_ICON:
@@ -627,6 +415,7 @@ if __name__ == "__main__":
             except RuntimeError:
                 pass
         
+        # start tkinter_overlay as main thread or else just the main
         if fst_keyboard.arg_manager.STATUS_INDICATOR:
             # for an tk overlay the tk interface must run in the top thread and the main must run in a seperate thread
             main_thread = Thread(target=main)
@@ -641,26 +430,24 @@ if __name__ == "__main__":
 
             except RuntimeError:
                 pass
-    
+        else:
+            try:
+                if not trayicon_thread.is_alive():
+                    updater.end()   
+            except NameError:
+                pass
+            main()
+        
     try:
-        if trayicon_thread.is_alive():
-            pass
-    except NameError:
-        updater.end()   
-    main()
-    
-    # try:
-    #     if not main_thread.is_alive(): 
-    #         if not trayicon_thread.is_alive():
-    #             updater.end()   
-    #         main()
-    # except NameError:
-    #         if not trayicon_thread.is_alive():
-    #             updater.end()   
-    #         main()
-    
-    if trayicon_thread.is_alive():
-        trayicon.end()
+        if not update_thread.is_alive():
+            updater.end()       
+    except NameError: 
+        pass
+    try:
+        if not trayicon_thread.is_alive():
+            trayicon.end()        
+    except NameError: 
+        pass
 
     sys.exit(1)
 
