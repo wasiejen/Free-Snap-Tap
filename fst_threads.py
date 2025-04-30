@@ -136,8 +136,10 @@ class Focus_Thread(Thread):
         default_active = False
         active_window = "None"
         while not self.stop:
-            active_window = gw.getActiveWindow().title               
-
+            try:
+                active_window = gw.getActiveWindow().title               
+            except AttributeError:
+                active_window = "None"
             # when windows name changed
             if active_window != last_active_window or manually_paused:
                 if active_window != last_active_window:
