@@ -37,6 +37,7 @@ CONSTANTS.TOGGLE_ON_OFF_Combination = ["alt", "delete"]
 CONSTANTS.MENU_Combination = ["alt", "page_down"]  
  
 setting_up_complete = False
+console_visible = True
 
 class Updater:
     
@@ -147,14 +148,18 @@ class Tray_Icon:
             pystray.MenuItem("Toggle Pause", self.toggle_pause),
             pystray.MenuItem("Return to Menu", self.return_to_menu),
             pystray.Menu.SEPARATOR,
-            pystray.MenuItem('Show Console', lambda: toggle_console(True)),
-            pystray.MenuItem('Hide Console', lambda: toggle_console(False)),
+            pystray.MenuItem('Show Console', lambda: set_console_visibility(True)),
+            pystray.MenuItem('Hide Console', lambda: set_console_visibility(False)),
+            pystray.MenuItem("Toggle Console", self.toggle_console_on_left_click, default=True),
             #pystray.MenuItem("Display internal state", self.display_internal_state),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem("Exit Program", self.exit_program),
         )
         return menu
     
+    def toggle_console_on_left_click(self):
+        switch_console_visibility()
+        
     def update(self, color):
         self.color = color
         self.tray_icon.icon = self.images[color] # Update the icon 
@@ -248,8 +253,8 @@ class Status_Overlay():
         self.context_menu.add_command(label="Return to Menu", command=self.return_to_menu)
         self.context_menu.add_command(label="Exit Program", command=self.exit_program)
         self.context_menu.add_separator()
-        self.context_menu.add_command(label='Show Console', command = lambda: toggle_console(True))
-        self.context_menu.add_command(label='Hide Console', command = lambda: toggle_console(False))
+        self.context_menu.add_command(label='Show Console', command = lambda: set_console_visibility(True))
+        self.context_menu.add_command(label='Hide Console', command = lambda: set_console_visibility(False))
         #self.context_menu.add_command(label="Toggle Crosshair", command=self.toggle_crosshair)
         self.context_menu.add_command(label="Display internal state", command=self.display_internal_state)
         self.context_menu.add_separator()
@@ -390,14 +395,22 @@ WS_EX_APPWINDOW = 0x00040000
 _hwnd = kernel32.GetConsoleWindow()
 _original_style = user32.GetWindowLongPtrW(_hwnd, GWL_EXSTYLE) if _hwnd else None
 
-def get_console_window():
-    return kernel32.GetConsoleWindow()
+def switch_console_visibility():
+    global console_visible
+    if console_visible:
+        set_console_visibility(False)
+        console_visible = False
+    else:
+        set_console_visibility(True)
+        console_visible = True
 
-def toggle_console(show: bool):
-    if not (hwnd := get_console_window()):
+# Function to toggle console visibility
+def set_console_visibility(show: bool):
+    if not (hwnd := kernel32.GetConsoleWindow()):
         return
 
     global _original_style
+    global console_visible
     
     # Initialize style tracking on first use
     if _original_style is None:
@@ -406,12 +419,14 @@ def toggle_console(show: bool):
     if show:  # Restore original configuration
         user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, _original_style)
         user32.ShowWindow(hwnd, SW_SHOW)
+        console_visible = True
     else:     # Apply Win11-compatible hide
         new_style = (_original_style & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW
         user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_style)
         user32.ShowWindow(hwnd, SW_HIDE)
+        console_visible = False
 
-
+set_console_visibility(False)  # Hide console window at startup
 
 if __name__ == "__main__":    
     overlay = None
@@ -429,9 +444,12 @@ if __name__ == "__main__":
     
     # hide command window at start but inform user before
     if fst_keyboard.arg_manager.CMD_WINDOW_HIDDEN:
-        print("\nATTENTION: cmd window will now be hidden, can be shown again via tray icon menu\n")
-        sleep(3)
-        toggle_console(False)
+        # print("\nATTENTION: cmd window will now be hidden, can be shown again via tray icon menu\n")
+        # sleep(3)
+        # toggle_console(False)
+        pass
+    else:
+        set_console_visibility(True)
     
     if fst_keyboard.arg_manager.TRAY_ICON or fst_keyboard.arg_manager.STATUS_INDICATOR:
         if fst_keyboard.arg_manager.TRAY_ICON:
