@@ -25,8 +25,6 @@ CONSTANTS.DEBUG3 = False
 # debug options on numpad numbers - if you use them do not turn on
 CONSTANTS.DEBUG_NUMPAD = False
 # CONSTANTS.DEBUG_NUMPAD = True
-
-
 # Define File name for saving of everything, can be any filetype
 # But .txt or .cfg recommended for easier editing
 CONSTANTS.FILE_NAME = 'FSTconfig.txt'
@@ -121,10 +119,6 @@ class Tray_Icon:
     def __init__(self, fst_keyboard):
         self._fst = fst_keyboard
         self.stop = False
-        # if self._fst.arg_manager.ALWAYS_ACTIVE:
-        #     self.color = "blue"
-        # else:
-        #     self.color =  "red"
         self.color = None
         self.images = {}
         self.fill_images() # Initial image creation
@@ -134,14 +128,15 @@ class Tray_Icon:
     def fill_images(self):
         max = 64  #icon size is 64x64
         border = 2
-        size = max - 2* border
+        size = max - 2 * border
         both_borders = border * 2
-        font = ImageFont.truetype("arial.ttf", size/2+6)
+        font_size = size/2+6
+        font = ImageFont.truetype("arial.ttf", font_size )
         for color in ["red", "green", "blue"]:
             image = Image.new('RGBA', (size+both_borders, size+both_borders), (0, 0, 0, 0)) #transparent background
             draw = ImageDraw.Draw(image)
             draw.ellipse((0 + border, 0 + border, size + border, size + border), fill=color)
-            draw.text((border-1, size/4-3), "FST", font=font, fill="white")
+            draw.text((border-1, (max - font_size)/2), "FST", font=font, fill="white")
             self.images[color] = image
 
     def create_menu(self):
@@ -149,11 +144,9 @@ class Tray_Icon:
             pystray.MenuItem("Open config file", self.open_config_file),
             pystray.MenuItem("Reload from file", self.reload_from_file),
             pystray.Menu.SEPARATOR,
-            #pystray.MenuSeparator(),
             pystray.MenuItem("Toggle Pause", self.toggle_pause),
             pystray.MenuItem("Return to Menu", self.return_to_menu),
             pystray.Menu.SEPARATOR,
-            #pystray.MenuSeparator(),
             pystray.MenuItem('Show Console', lambda: toggle_console(True)),
             pystray.MenuItem('Hide Console', lambda: toggle_console(False)),
             #pystray.MenuItem("Display internal state", self.display_internal_state),
@@ -164,23 +157,14 @@ class Tray_Icon:
     
     def update(self, color):
         self.color = color
-        self.tray_icon.icon = self.images[color] # Update the icon
-        
-    # def update_old(self, color):
-    #     self.color = color
-    #     self.update_image(color)
-    #     self.tray_icon.icon = self.image # Update the icon
+        self.tray_icon.icon = self.images[color] # Update the icon 
         
     def start_icon(self):
-    #     self.update_thread = threading.Thread(target=self.update_indicator)
-    #     self.update_thread.daemon = True  # Allow the main program to exit even if the thread is running
-    #     self.update_thread.start()
         try:
             self.tray_icon.run()
         except AttributeError as err:
             print(err)
-        
-    # Implement the menu item actions (placeholders)
+
     def open_config_file(self):
         self._fst.open_config_file()
 
@@ -217,11 +201,7 @@ class Status_Overlay():
         
         self.root.title("FST Status Indicator")
         self.root.overrideredirect(True)  # Remove window decorations
-        
-        # if self._fst.arg_manager.ALWAYS_ACTIVE:
-        #     self.color = "blue"
-        # else:
-        #     self.color =  "red"
+
         self.color = None
         # Get the screen width and height
         self.screen_width = self.root.winfo_screenwidth()
@@ -382,17 +362,55 @@ def main():
 
     sys.exit(1)
 
+# 250430-1306 old control function
 
+# # Console window control functions - to hide and unhide cmd window
+# user32 = ctypes.WinDLL('user32', use_last_error=True)
+# SW_HIDE, SW_SHOW = 0, 5  
+
+# def get_console_window():
+#     return ctypes.windll.kernel32.GetConsoleWindow()
+
+# def toggle_console(show: bool):
+#     if hwnd := get_console_window():
+#         user32.ShowWindow(hwnd, SW_SHOW if show else SW_HIDE)
+
+# >>> 250430-1251 
 # Console window control functions - to hide and unhide cmd window
+
+# Window style constants
 user32 = ctypes.WinDLL('user32', use_last_error=True)
-SW_HIDE, SW_SHOW = 0, 5  
+kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
+SW_HIDE, SW_SHOW = 0, 5
+GWL_EXSTYLE = -20
+WS_EX_TOOLWINDOW = 0x00000080
+WS_EX_APPWINDOW = 0x00040000
+
+# Store original state at module load
+_hwnd = kernel32.GetConsoleWindow()
+_original_style = user32.GetWindowLongPtrW(_hwnd, GWL_EXSTYLE) if _hwnd else None
 
 def get_console_window():
-    return ctypes.windll.kernel32.GetConsoleWindow()
+    return kernel32.GetConsoleWindow()
 
 def toggle_console(show: bool):
-    if hwnd := get_console_window():
-        user32.ShowWindow(hwnd, SW_SHOW if show else SW_HIDE)
+    if not (hwnd := get_console_window()):
+        return
+
+    global _original_style
+    
+    # Initialize style tracking on first use
+    if _original_style is None:
+        _original_style = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
+
+    if show:  # Restore original configuration
+        user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, _original_style)
+        user32.ShowWindow(hwnd, SW_SHOW)
+    else:     # Apply Win11-compatible hide
+        new_style = (_original_style & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW
+        user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_style)
+        user32.ShowWindow(hwnd, SW_HIDE)
+
 
 
 if __name__ == "__main__":    
