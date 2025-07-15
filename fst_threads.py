@@ -157,8 +157,12 @@ class Focus_Thread(Thread):
                         # check if it is one of the focus groups
                         for focus_name in self._fst.focus_manager.multi_focus_dict_keys:
                             if active_window.lower().find(focus_name) >= 0:
-                                found_new_focus_app = True
-                                self._fst.focus_manager.FOCUS_APP_NAME = focus_name
+                                
+                                old_focus_name = self._fst.focus_manager.FOCUS_APP_NAME
+                                if old_focus_name != focus_name:
+                                    # print(f"> Focus changed from '{old_focus_name}' to '{focus_name}'")
+                                    self._fst.focus_manager.FOCUS_APP_NAME = focus_name
+                                    found_new_focus_app = True
                                 
                                 break
                                                
