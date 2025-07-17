@@ -1009,7 +1009,7 @@ class Argument_Manager():
     ## config manager has the control over the arguments
 
     STATUS_INDICATOR = False
-    STATUS_INDICATOR_SIZE = 40
+    STATUS_INDICATOR_SIZE = 10
     CROSSHAIR_ENABLED = False
     CROSSHAIR_DELTA_X = 0
     CROSSHAIR_DELTA_Y = 0
@@ -1174,14 +1174,14 @@ class Argument_Manager():
                 self.STATUS_INDICATOR = True
                 self.STATUS_INDICATOR_SIZE = int(arg[18:])
                 print(f"set indicator size to: {self.STATUS_INDICATOR_SIZE}")
-            # elif arg == "-crosshair":
-            #     self.CROSSHAIR_ENABLED = True
-            #     print(f"set crosshair to: {self.CROSSHAIR_ENABLED}")
-            # elif arg[:11] == "-crosshair="  and len(arg) > 11:
-            #     self.CROSSHAIR_ENABLED = True
-            #     x, y = arg[11:].strip().replace(' ', '').split(',')
-            #     self.CROSSHAIR_DELTA_X, self.CROSSHAIR_DELTA_Y = int(x), int(y)
-            #     print(f"set crosshair delta is set to: {self.CROSSHAIR_DELTA_X}, {self.CROSSHAIR_DELTA_Y}")
+            elif arg == "-crosshair":
+                self.CROSSHAIR_ENABLED = True
+                print(f"set crosshair to: {self.CROSSHAIR_ENABLED}")
+            elif arg[:11] == "-crosshair="  and len(arg) > 11:
+                self.CROSSHAIR_ENABLED = True
+                x, y = arg[11:].strip().replace(' ', '').split(',')
+                self.CROSSHAIR_DELTA_X, self.CROSSHAIR_DELTA_Y = int(x), int(y)
+                print(f"set crosshair delta is set to: {self.CROSSHAIR_DELTA_X}, {self.CROSSHAIR_DELTA_Y}")
             elif arg[:14] == "-always_active":
                 self.ALWAYS_ACTIVE = True
             elif arg[:10] == "-tray_icon":
