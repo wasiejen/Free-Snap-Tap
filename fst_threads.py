@@ -131,10 +131,12 @@ class Focus_Thread(Thread):
 
     def run(self):
         last_active_window = ''
-        found_new_focus_app = False
+        found_valid_focus_name = False
         manually_paused = False
         default_active = False
         active_window = "None"
+        old_focus_name = "None"
+        focus_name_changed = False
         while not self.stop:
             try:
                 active_window = gw.getActiveWindow().title               
@@ -148,25 +150,30 @@ class Focus_Thread(Thread):
                 # if not one of my own spawned windows
                 if active_window not in ["FST Status Indicator", "FST Crosshair", "FST_Overlay"]:
                     if not self.FOCUS_THREAD_PAUSED and not self._fst.arg_manager.MANUAL_PAUSED:
+                        
+                        #print(f"> Active Window: {active_window}")
             
                         if manually_paused:
                             manually_paused = False
                         
-                        found_new_focus_app = False
+                        found_valid_focus_name = False
+                        focus_name_changed = False
 
                         # check if it is one of the focus groups
                         for focus_name in self._fst.focus_manager.multi_focus_dict_keys:
                             if active_window.lower().find(focus_name) >= 0:
                                 
+                                found_valid_focus_name = True
+                                
+                                # save previous focus app name
                                 old_focus_name = self._fst.focus_manager.FOCUS_APP_NAME
                                 if old_focus_name != focus_name:
                                     # print(f"> Focus changed from '{old_focus_name}' to '{focus_name}'")
                                     self._fst.focus_manager.FOCUS_APP_NAME = focus_name
-                                    found_new_focus_app = True
-                                
+                                    focus_name_changed = True
                                 break
                                                
-                        if found_new_focus_app:
+                        if found_valid_focus_name and focus_name_changed:
                             try:
                                 default_active = False
                                 self._fst.update_args_and_groups(focus_name)
@@ -177,6 +184,9 @@ class Focus_Thread(Thread):
                             except Exception as error:
                                 print('--- reloading of groups files failed - not resumed, still paused ---')
                                 print(f" -> aborted reloading due to: {error}")
+                                
+                        elif found_valid_focus_name and not focus_name_changed:
+                            pass
                         
                         # if not found a focus group set input filter to paused
                         else:
