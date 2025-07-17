@@ -1,5 +1,36 @@
 ## V1.1.5 changelog
 
+250717-0717
+
+- overlay:
+  - removed tkinter
+  - overlay now runs on pyqt base
+  - all overlay elements now see through for interactions like mouse clicks
+  - status indicator now in the right upper corner of the screen
+  - screen/monitor for overlay can be changed via option in tray_icon
+    - "Overlay to next screen"
+  - crosshair reintroduced as part of the pyqt overlay
+    - optimised for 1080p, no scaling implemented yet
+  - status indicator size now adapts based on focus group settings
+    - if it should be hidden set the status_indicator=0 (size to 0)
+
+
+- focus group
+  - now it is tracked if the app changes before focus settings are reapplied
+    e.g. if a browser window changes it name based on which browser tab is open, then the focus setting will no longer reapply with every name change of the window 
+
+- bugs:
+  - tray_icon menu seems to have problems with MS Windows scaling when monitors use different scaling values
+    - displayed sometimes big, sometimes small without separators and not interactive anymore
+    - maybe a problem with the overlay?
+
+
+
+
+250430-2047
+- changed toggle console to an implementation that also works for windows 11
+- added left click toggle console option for system tray icon for easier access
+  - should maybe instead use this for pausing???
 250309-1052
 - added "caret" key   # left of key 1 on qwertz layout
   - vk_code 220

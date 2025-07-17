@@ -146,7 +146,7 @@ class Focus_Thread(Thread):
                     last_active_window = active_window
                     
                 # if not one of my own spawned windows
-                if active_window not in ["FST Status Indicator", "FST Crosshair"]:
+                if active_window not in ["FST Status Indicator", "FST Crosshair", "FST_Overlay"]:
                     if not self.FOCUS_THREAD_PAUSED and not self._fst.arg_manager.MANUAL_PAUSED:
             
                         if manually_paused:
