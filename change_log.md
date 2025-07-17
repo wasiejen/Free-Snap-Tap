@@ -1,5 +1,9 @@
 ## V1.1.5 changelog
 
+250717-1613
+
+- bugfix: stopped focus group reactivation on name change of window - logic from previous update was wrong
+
 250717-0717
 
 - overlay:
