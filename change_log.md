@@ -1,5 +1,29 @@
 ## V1.1.5 changelog
 
+
+250723-1655
+
+overlay:
+  - changed overlay and crosshair implementation from overlaylib directly to pyqt5
+  - size of crosshair and status overlay now scales with monitor height - 1080p=1.0x, 2160p=2.0x and scales linearly between
+  - crosshair will now always be spawned on the monitor the cursor is currently at
+  - reenabled menu on status menu
+  - manual hide and show of crosshair via status menu
+  - hide and show of status menu now toggable via status symbol menu and tray-icon menu
+  - status symbol can now be dragged again
+  - scaling on monitor change with different heights now much better and without lag
+  - much smoother implementation of scaling on monitor change of status symbol
+
+new Nuitka executables:
+  - with pyqt the size of the executables notably increased to over 40mb.
+  - wanted it to be smaller and if possible faster
+  - Now second way of building is via nuitka which compiles to C and then creates the executable
+    - should be faster and less resouce intensive in general
+    - filesize now down to around 22 mb
+  - pyinstaller executables still available
+    - much faster build process :-)
+
+
 250717-1613
 
 - bugfix: stopped focus group reactivation on name change of window - logic from previous update was wrong

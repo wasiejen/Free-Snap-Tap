@@ -5,7 +5,7 @@ last updated: 250723-1350
 
 from threading import Thread 
 import sys 
-from time import sleep 
+from time import sleep
 #import tkinter as tk
 import pystray
 from PIL import Image, ImageDraw, ImageFont
@@ -13,16 +13,33 @@ import ctypes
 
 from fst_keyboard import FST_Keyboard
 from fst_manager import CONSTANTS
-from overlay import StatusOverlay, CrosshairOverlay
+from overlay import StatusOverlay
 from PyQt5.QtWidgets import QApplication
+import datetime
 
-# import overlay_lib
-# from overlay_lib import Vector2D, RgbaColor, SkDrawCircle, FlDrawCircle, DrawLine
+CURRENT_DATE_TIME = datetime.datetime.now().strftime("%y%m%d-%H%M")
+
+# Compilation mode, support OS-specific options
+# nuitka-project: --standalone
+# nuitka-project: --onefile
+# link time optimization
+# nuitka-project: --lto=yes
+
+# The PyQt5 plugin covers qt-plugins
+# nuitka-project: --enable-plugin=pyqt5
+# nuitka-project: --include-qt-plugins=platforms
+# nuitka-project: --noinclude-qt-plugins=iconengines
+# nuitka-project: --noinclude-qt-plugins=imageformats
+# nuitka-project: --noinclude-qt-plugins=mediaservice
+# nuitka-project: --noinclude-qt-plugins=platformthemes
+# nuitka-project: --noinclude-qt-plugins=printsupport
+# nuitka-project: --noinclude-qt-plugins=styles
+# nuitka-project: --windows-icon-from-ico="{MAIN_DIRECTORY}/icons/keyboard.ico"
+# nuitka-project: --output-filename=free_snap_tap_nuitka_.exe
 
 
-# from PyQt5 import QtCore, QtGui
-# from PyQt5.QtWidgets import QApplication, QWidget, QPushButton, QVBoxLayout, QLabel
-# from PyQt5.QtGui import QPainter
+# python -m nuitka --standalone --onefile --enable-plugin=pyqt5  --include-qt-plugins=platforms --windows-icon-from-ico=./icons/keyboard.ico free_snap_tap.py --output-filename=free_snap_tap_nuitka.exe
+
 
 
 # will not overwrite debug settings in config
