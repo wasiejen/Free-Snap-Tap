@@ -841,7 +841,7 @@ class FST_Keyboard():
         self._listener.stop()
 
     def control_exit_program(self, source = ""):
-        print('--- Stopping execution ---')
+        print('--- Stopping execution --- ' + source)
         self.release_all_currently_pressed_simulated_keys()
         self._state_manager.stop_all_repeating_keys()
         self._mouse_listener.stop()
@@ -936,5 +936,5 @@ class FST_Keyboard():
     def reload_from_file(self):
         self.update_args_and_groups(self._focus_manager.FOCUS_APP_NAME)
         self._cli_menu.update_group_display()
-        print(f'\n>>> file reloaded for focus app: {self._fst.focus_manager.FOCUS_APP_NAME}\n')
+        print(f'\n>>> file reloaded for focus app: {self._focus_manager.FOCUS_APP_NAME}\n')
     

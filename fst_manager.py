@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1.5
-last updated: 241030-0928
+Free-Snap-Tap V1.1.6
+last updated: 250723-1012
 '''
 
 from pynput import keyboard, mouse
@@ -36,7 +36,7 @@ class CONSTANTS():
 
 class Output_Manager():
     '''
-    #XXX
+    This class manages the output of the FST_Keyboard.
     '''
 
     def __init__(self, fst_keyboard):
@@ -390,7 +390,6 @@ class Output_Manager():
                 print(f'variable {key_string} set to: {value}')
             return True
         
-        
         def is_set(key_string):
             try:
                 #print(f'variable {key_string} is {self.variables[key_string]}')
@@ -400,6 +399,7 @@ class Output_Manager():
                 if CONSTANTS.DEBUG3:
                     print(f'variable {key_string} not set')
                 return False
+            
         def get(key_string):
             return is_set()
             
@@ -1003,7 +1003,7 @@ class Config_Manager():
 
 class Argument_Manager():
     '''
-    #XXX
+    manages the global variables and start arguments
     '''
     ### config of these variables should be done via config
     ## config manager has the control over the arguments
@@ -1193,7 +1193,7 @@ class Argument_Manager():
 
 class Focus_Group_Manager():
     '''
-    #XXX
+    This class manages the focus groups for the FST_Keyboard.
     '''
     def __init__(self, fst_keyboard):
         self._fst = fst_keyboard
@@ -1300,8 +1300,6 @@ class Focus_Group_Manager():
         self._default_start_arguments = default_start_arguments
         self._default_group_lines = default_group_lines
         self._alias_group_lines = alias_lines
-    
-
     
 class Input_State_Manager():
     '''
