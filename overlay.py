@@ -1,14 +1,12 @@
 '''
 Free-Snap-Tap V1.1.6
-last updated: 250723-1350
+last updated: 250723-1528
 '''
 
 import sys
-from PyQt5.QtWidgets import QWidget, QApplication, QMenu, QLabel, QVBoxLayout, QMessageBox
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QPainter, QColor, QPen, QMoveEvent, QCursor
-
-from PyQt5.QtCore import qInstallMessageHandler
+from PyQt5.QtWidgets import QWidget, QApplication, QMenu
+from PyQt5.QtCore import Qt, qInstallMessageHandler
+from PyQt5.QtGui import QPainter, QColor, QPen, QCursor
 
 def customMessageHandler(mode, context, message):
     # Suppress QWindowsWindow::setGeometry warnings
@@ -72,7 +70,7 @@ class StatusOverlay(QWidget):
         self.user_size = self._fst.arg_manager.STATUS_INDICATOR_SIZE
         self.setWindowTitle("FST Status Indicator")
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
-        #self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setAttribute(Qt.WA_TranslucentBackground)
         self.set_window_size_and_position(padding=self.padding, user_size=self.user_size, init=True)  # Initialize size based on screen geometry
 
         self.color_name = "red"
