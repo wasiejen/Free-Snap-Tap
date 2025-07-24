@@ -127,8 +127,10 @@ class Output_Manager():
         # None ke will not be played
         if key_event.vk_code > 0:
             self.send_key_event(key_event)
- 
-        if self._fst.arg_manager.ACT_DELAY and with_delay and None_ke_with_delay:
+            #print(f"D1: playing key_event: {key_event} without delays: {delay_times}")
+
+        if self._fst.arg_manager.ACT_DELAY or with_delay or None_ke_with_delay:
+            #print(f"D1: waiting for delay: {delay_times}")
             delay_time = self.get_random_delay(*delay_times)
             # print(f" --- waiting for: {delay_time}")
             # if not in a thread just play sleep for the delay

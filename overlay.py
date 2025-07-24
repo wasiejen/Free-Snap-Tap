@@ -26,14 +26,14 @@ user32 = ctypes.WinDLL('user32', use_last_error=True)
 kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
 SW_HIDE, SW_SHOW = 0, 5
 GWL_EXSTYLE = -20
-WS_EX_TOOLWINDOW = 0x00000080
-WS_EX_APPWINDOW = 0x00040000
+# WS_EX_TOOLWINDOW = 0x00000080
+# WS_EX_APPWINDOW = 0x00040000
 
 console_visible = True
 
 # Store original state at module load
-_hwnd = kernel32.GetConsoleWindow()
-_original_style = user32.GetWindowLongPtrW(_hwnd, GWL_EXSTYLE) if _hwnd else None
+# _hwnd = kernel32.GetConsoleWindow()
+# _original_style = user32.GetWindowLongPtrW(_hwnd, GWL_EXSTYLE) if _hwnd else None
 
 def switch_console_visibility():
     global console_visible
@@ -75,8 +75,41 @@ def set_console_visibility(show: bool):
 #     new_style = (style & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW
 #     user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_style)
 
+def get_current_screen():
+    # center_point = self.geometry().center()
+    # screen = QApplication.screenAt(center_point)
+    screen = QApplication.screenAt(QCursor.pos())
+    if not screen:
+        screen = QApplication.primaryScreen()
+    return screen  
+            
+def get_device_pixel_ratio(screen):
+    return screen.devicePixelRatio() 
 
   
+    
+# def calc_size_multiplier(screen):
+#     # Raw pixels, e.g. 2160x3840 at 150% scaling
+#     virtual_geom = screen.geometry()
+#     min_pixel = min(virtual_geom.width(), virtual_geom.height())
+#     dpr = get_device_pixel_ratio(screen)
+#     min_pixel = min_pixel
+    
+#     print(f"Screen geometry: {screen.size()}, Device Pixel Ratio: {dpr}, Min pixel: {min_pixel}")
+    
+#     # Define resolution thresholds for scaling
+#     min_res = 720     # Lower bound, anything ≤ 720p gets smallest
+#     baseline = 1080   # Standard reference size (scaling factor of 1)
+#     max_res = 2160    # 4K and above, scaling factor of 2
+#     if min_pixel <= min_res:
+#         return 0.67
+#     elif min_pixel >= max_res:
+#         return 2.0
+#     else:
+#         # Linear interpolate between 0.67 (at 720p) and 2.0 (at 2160p)
+#         multiplier = round(0.67 + (min_pixel - min_res) * (2.0 - 0.67) / (max_res - min_res), 1)
+#         return multiplier 
+
     
 
 class GUI_Manager(QWidget):
@@ -315,14 +348,11 @@ class Tray_Icon(QSystemTrayIcon):
 
 # --- Crosshair Overlay ---
 class CrosshairOverlay(QWidget):
-    def __init__(self, fst_keyboard, thickness=1, color=(255,0,255), parent=None, size_multiplier=1.0):
+    def __init__(self, fst_keyboard, crosshair_size=64,thickness=3, color=(255,0,255), parent=None):
         super().__init__(parent)
         self._fst = fst_keyboard
-        self._crosshair_size = 32  # Default size of the crosshair overlay
+        self._crosshair_size = crosshair_size  # Default size of the crosshair overlay
         self._thickness = thickness
-        self.crosshair_size = int(self._crosshair_size * size_multiplier)  # Span of the crosshair overlay
-        self.thickness = int(self._thickness * size_multiplier)
-        self.size_multiplier = size_multiplier
         self.color = QColor(*color)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -347,8 +377,11 @@ class CrosshairOverlay(QWidget):
         screen_geom = screen.geometry()
         screen_center = screen_geom.center()
         # screen_height = screen_geom.height()
-        size_multiplier = calc_size_multiplier(screen)
-        # size_multiplier = get_device_pixel_ratio(screen)
+        # size_multiplier = calc_size_multiplier(screen)
+        size_multiplier =  1 / get_device_pixel_ratio(screen)
+        
+        
+        self.size_multiplier = size_multiplier  # Store for later use in paintEvent
         self.crosshair_size = int(self._crosshair_size * size_multiplier)  # Span of the crosshair overlay
         self.thickness = int(self._thickness * size_multiplier)
         print(f"Crosshair added: Device Pixel Ratio: {get_device_pixel_ratio(screen)}, Size multiplier: {size_multiplier}")
@@ -365,16 +398,19 @@ class CrosshairOverlay(QWidget):
         pen.setWidth(self.thickness)
         painter.setPen(pen)
         c = self.crosshair_size // 2  # Local center
-
-        # Crosshair lines, precisely positioned (relative to center)
-        sm = self.size_multiplier
-        outer_radius = int(14 * sm)
-        inner_radius = int(7 * sm)
-        cube_distance = int(2 * sm)
-        cube_distance_down = int(3 * sm)
+        
+        # Crosshair lines,  positioned relative to center
+        padding = 4
+        spacing = 1
+        outer_radius = (self.crosshair_size - padding) // 2
+        inner_radius = outer_radius // 2 + spacing
+        cube_distance = self.crosshair_size // 16 + spacing
+        cube_distance_down = cube_distance + spacing
+        
         painter.drawLine(c - outer_radius, c, c - inner_radius, c)
         painter.drawLine(c + outer_radius, c, c + inner_radius, c)
-        painter.drawLine(c, c + outer_radius, c, c + inner_radius + 1)
+        painter.drawLine(c, c + outer_radius, c, c + inner_radius + spacing)
+        pen.setWidth(self.thickness*0.67)
         painter.drawLine(c - cube_distance, c, c - cube_distance, c + cube_distance_down)
         painter.drawLine(c + cube_distance, c, c + cube_distance, c + cube_distance_down)
         painter.drawLine(c + cube_distance, c + cube_distance_down, c - cube_distance, c + cube_distance_down)
@@ -437,7 +473,7 @@ class StatusOverlay(QWidget):
         screen = get_current_screen()
         # Get the current global cursor position
         # screen_height = screen.geometry().height()
-        size_multiplier = calc_size_multiplier(screen)
+        size_multiplier = get_device_pixel_ratio(screen)
         # size_multiplier = get_device_pixel_ratio(screen)
         user_size = int(user_size * size_multiplier)
         padding = int(padding * size_multiplier)
@@ -584,40 +620,7 @@ class StatusOverlay(QWidget):
         self.show()
         # Repaint to ensure color is updated
         self.update()
-
-def get_current_screen():
-    # center_point = self.geometry().center()
-    # screen = QApplication.screenAt(center_point)
-    screen = QApplication.screenAt(QCursor.pos())
-    if not screen:
-        screen = QApplication.primaryScreen()
-    return screen  
-            
-def get_device_pixel_ratio(screen):
-    return screen.devicePixelRatio() 
-    
-    
-def calc_size_multiplier(screen):
-    # Raw pixels, e.g. 2160x3840 at 150% scaling
-    virtual_geom = screen.geometry()  
-    min_pixel = min(virtual_geom.width(), virtual_geom.height())
-    dpr = get_device_pixel_ratio(screen)
-    min_pixel = min_pixel * dpr  # Adjust for device pixel ratio
-    # Define resolution thresholds for scaling
-    min_res = 720     # Lower bound, anything ≤ 720p gets smallest
-    baseline = 1080   # Standard reference size (scaling factor of 1)
-    max_res = 2160    # 4K and above, scaling factor of 2
-    if min_pixel <= min_res:
-        return 0.67
-    elif min_pixel >= max_res:
-        return 2.0
-    else:
-        # Linear interpolate between 0.67 (at 720p) and 2.0 (at 2160p)
-        multiplier = round(0.67 + (min_pixel - min_res) * (2.0 - 0.67) / (max_res - min_res), 1)
-        return multiplier
-            
-        
-
+           
 
 # --- Dummy usage stub for testing ---
 if __name__ == "__main__":

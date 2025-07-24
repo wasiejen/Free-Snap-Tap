@@ -45,6 +45,8 @@ CONSTANTS.DEBUG2 = False
 # CONSTANTS.DEBUG2 = True
 CONSTANTS.DEBUG3 = False
 # CONSTANTS.DEBUG3 = True
+CONSTANTS.DEBUG4 = False
+# CONSTANTS.DEBUG4 = True
 
 # debug options on numpad numbers - if you use them do not turn on
 CONSTANTS.DEBUG_NUMPAD = False

@@ -5,8 +5,7 @@ last updated: 241105-2004
 
 from threading import Thread, Event # to play aliases without interfering with keyboard listener
 from time import sleep # sleep(0.005) = 5 ms
-import pygetwindow as gw # to get name of actual window for focusapp function
-
+import pygetwindow as gw
 
 
 alias_thread_logging = []
@@ -58,6 +57,7 @@ class Macro_Thread(Thread):
                 
                 # check all constraints at start!
                 constraint_fulfilled, delay_times = self._fst.output_manager.check_constraint_fulfillment(key_event, get_also_delays=True)
+
                 if constraint_fulfilled:
                     if self.stop_event.is_set():
                         self.stop_event.clear()
