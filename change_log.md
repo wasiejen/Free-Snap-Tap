@@ -1,5 +1,15 @@
 ## V1.1.5 changelog
 
+250724-0054
+gui:
+- completely migrated to PySide6 (Oficcial Qt6 implementation) with every gui element, Tray_Icon, Status_indicator, Crosshair and Update_Thread now all implemented in PySide6
+- PySide6 is fully supported in nuitka compared to PyQt5
+- Every GUI element new utilises the same Threading Management thanks to QT
+- now longer racing condition of update thread and close logic
+- every Qt-element now a child of GUI_Manager
+  - very easy close handling
+
+
 
 250723-1655
 
