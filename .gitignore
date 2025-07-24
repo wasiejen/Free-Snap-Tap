@@ -5,9 +5,15 @@
 /testing
 /pictures
 /__pycache__
+/free_snap_tap.build
+/free_snap_tap.dist
+/free_snap_tap.onefile-build
 free_snap_tap.spec
 test_batch.bat
-free_snap_tap.exe
 FSTconfig_test.txt
 new_features.md
 wiki.md
+*.exe
+*.dll
+*.cmd
+*.vbs

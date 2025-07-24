@@ -5,8 +5,7 @@ last updated: 241105-2004
 
 from threading import Thread, Event # to play aliases without interfering with keyboard listener
 from time import sleep # sleep(0.005) = 5 ms
-import pygetwindow as gw # to get name of actual window for focusapp function
-
+import pygetwindow as gw
 
 
 alias_thread_logging = []
@@ -58,6 +57,7 @@ class Macro_Thread(Thread):
                 
                 # check all constraints at start!
                 constraint_fulfilled, delay_times = self._fst.output_manager.check_constraint_fulfillment(key_event, get_also_delays=True)
+
                 if constraint_fulfilled:
                     if self.stop_event.is_set():
                         self.stop_event.clear()
@@ -131,60 +131,51 @@ class Focus_Thread(Thread):
 
     def run(self):
         last_active_window = ''
-        shortened_active_window = ''
-        found_new_focus_app = False
+        found_valid_focus_name = False
         manually_paused = False
+        default_active = False
+        active_window = "None"
+        old_focus_name = "None"
+        focus_name_changed = False
         while not self.stop:
             try:
                 active_window = gw.getActiveWindow().title               
             except AttributeError:
-                pass
-            
+                active_window = "None"
+            # when windows name changed
             if active_window != last_active_window or manually_paused:
                 if active_window != last_active_window:
                     last_active_window = active_window
                     
-                # shorten the active window name
-                ###XXX 241105-1858 
-                # if len(active_window) >= 25:
-                #     reverse = active_window[::-1]
-                #     del1 = reverse.find('–')
-                #     del2 = reverse.find('-')
-                #     del3 = reverse.find('/')
-                #     del4 = reverse.find('\\')
-                #     del_min = 100
-                #     for deliminator in [del1, del2, del3, del4]:
-                #         if deliminator != -1 and deliminator < del_min:
-                #             del_min = deliminator 
-                #     reverse_shortened = reverse[:del_min]
-                #     shortened_active_window = reverse_shortened[::-1].strip()
-                # else:
-                #     shortened_active_window = '--'
-                    
-                if active_window not in ["FST Status Indicator", "FST Crosshair"]:
+                # if not one of my own spawned windows
+                if active_window not in ["FST Status Indicator", "FST Crosshair", "FST_Overlay"]:
                     if not self.FOCUS_THREAD_PAUSED and not self._fst.arg_manager.MANUAL_PAUSED:
+                        
+                        #print(f"> Active Window: {active_window}")
             
                         if manually_paused:
                             manually_paused = False
                         
-                        found_new_focus_app = False
-                            
+                        found_valid_focus_name = False
+                        focus_name_changed = False
+
+                        # check if it is one of the focus groups
                         for focus_name in self._fst.focus_manager.multi_focus_dict_keys:
-                            # check the shortened window name
-                            # if shortened_active_window.lower().find(focus_name) >= 0:
-                            #     found_new_focus_app = True
-                            #     self._fst.focus_manager.FOCUS_APP_NAME = focus_name
-                            #     active_window = shortened_active_window
-                            #     break
-                            # check full window name
                             if active_window.lower().find(focus_name) >= 0:
-                                found_new_focus_app = True
-                                self._fst.focus_manager.FOCUS_APP_NAME = focus_name
                                 
+                                found_valid_focus_name = True
+                                
+                                # save previous focus app name
+                                old_focus_name = self._fst.focus_manager.FOCUS_APP_NAME
+                                if old_focus_name != focus_name:
+                                    # print(f"> Focus changed from '{old_focus_name}' to '{focus_name}'")
+                                    self._fst.focus_manager.FOCUS_APP_NAME = focus_name
+                                    focus_name_changed = True
                                 break
-                                        
-                        if found_new_focus_app:
+                                               
+                        if found_valid_focus_name and focus_name_changed:
                             try:
+                                default_active = False
                                 self._fst.update_args_and_groups(focus_name)
                                 self._fst.cli_menu.update_group_display()
                                 self._fst.cli_menu.display_focus_found(active_window)
@@ -193,22 +184,34 @@ class Focus_Thread(Thread):
                             except Exception as error:
                                 print('--- reloading of groups files failed - not resumed, still paused ---')
                                 print(f" -> aborted reloading due to: {error}")
+                                
+                        elif found_valid_focus_name and not focus_name_changed:
+                            pass
                         
+                        # if not found a focus group set input filter to paused
                         else:
                             self._fst.focus_manager.FOCUS_APP_NAME = ''
-                            if self._fst.arg_manager.WIN32_FILTER_PAUSED:
-                                print(f"> Active Window: {active_window}")
-
-                            else:
-                                self._fst.update_args_and_groups()
-                                self._fst.cli_menu.update_group_display()
-                                self._fst.cli_menu.display_focus_not_found()
-                                ###XXX give chance to the controller to release the pressed keys
-                                sleep(0.2)
-                                self._fst.arg_manager.WIN32_FILTER_PAUSED = True 
-                                print(f"> Active Window: {active_window}")
-                                            
+                            if self._fst.arg_manager.ALWAYS_ACTIVE:
+                                if not default_active:
+                                    default_active = True
+                                    self._fst.update_args_and_groups()
+                                    self._fst.cli_menu.update_group_display()
+                                    self._fst.cli_menu.display_default_active()
+                                    self._fst.arg_manager.WIN32_FILTER_PAUSED = False
                             
+                            else:  
+                                if self._fst.arg_manager.WIN32_FILTER_PAUSED:
+                                    print(f"> Active Window: {active_window}")
+                                    pass
+                                else:
+                                    self._fst.update_args_and_groups()
+                                    self._fst.cli_menu.update_group_display()
+                                    self._fst.cli_menu.display_focus_not_found()
+                                    ###XXX give chance to the controller to release the pressed keys
+                                    sleep(0.2)
+                                    self._fst.arg_manager.WIN32_FILTER_PAUSED = True 
+                                    print(f"> Active Window: {active_window}")
+                                                  
                     else:
                         manually_paused = True
                         

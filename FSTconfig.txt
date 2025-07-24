@@ -1,7 +1,8 @@
 # default groups are defined before the first <focus> and will always be active if NO focus group is defined!
 # and will also be applied if a focus app is recognised before the focus groups will be apllied on top
 
-<arg>-status_indicator=20 # starts the indicator overlay in the right upper corner with a diameter of 20 pixel
+<arg>-status_indicator=10 # starts the indicator overlay in the right upper corner with a diameter of 20 pixel
+<arg>-tray_icon           # adds a try_icon to the task_bar, options shown with right click
 
 #<arg>-crossover=40       # anti_cheat measure - press and release will be switched with 40% propability
 <arg>-tapdelay=8,2        # random delay for snap tap keys (tap_groups) between 2 and 8 ms
@@ -10,6 +11,8 @@
 #<arg>-nocontrols         # removes the controls on alt+del, alt+end and alt+page_up
 #<arg>-nodelay            # removes delay on tap groups and macros 
 #<arg>-crosshair          # adds a crosshair in monitor center (needs -status_indicator in default group to work)
+
+<arg>-always_active       # the dafault groups (before the first <focus> definition) will be always active
 
 # Tap Groups
 a, d
@@ -31,10 +34,10 @@ w, s
 <arg>-tapdelay=8,2        # random delay for snap tap keys (tap_groups) between 2 and 8 ms
 <arg>-macrodelay=10,4     # default delay for macros between each key event (press, release) bet 4 and 10 ms
 #<arg>-nomenu             # starts program directly without the need to hit Enter
-#<arg>-nocontrols         # removes the controls on alt+del, alt+end and alt+page_up
+<arg>-nocontrols         # removes the controls on alt+del, alt+end and alt+page_up
 #<arg>-nodelay            # removes delay on tap groups and macros 
 
-#<arg>-crosshair          # adds a crosshair in monitor center (needs -status_indicator in default group to work)
+<arg>-crosshair           # adds a crosshair in monitor center (needs <arg>-status_indicator in default group to work)
 
 # Tap Groups
 
@@ -45,7 +48,7 @@ w, s
 # will not trigger if crouched (!ctrl) or opposite key is pressed (!s for forward)
 # (tr("+w")>100): will only trigger if movement key was pressed for at least 100 ms
 # (last("-space")>500): will only trigger if time since last press of space is longer than 500 ms
-# (cs("+w")): counterstrafe will be dynamically adjusted based on time of pressed movement key 
+# (cs("+w")): counterstrafe will be dynamically adjusted based on time of pressed movement key (= speed)
 # cs() is a hard coded function that uses a polynomial function to approximate the acceleration
 #    ingame and calculate the needed length for a counterstrafe to come to a stop
 (counterstrafing_forward) +w|(tr("+w")>100)|(last("-space")>500), !s, !ctrl ::  +w|15|5, -s|(cs("+w")*1.1), +s|0|0

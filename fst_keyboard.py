@@ -8,6 +8,7 @@ from threading import Event # to play aliases without interfering with keyboard 
 from time import time # sleep(0.005) = 5 ms
 from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_dict.py
 import pprint
+from os import startfile 
 
 from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro
 from fst_threads import Macro_Thread
@@ -839,14 +840,15 @@ class FST_Keyboard():
         self._mouse_listener.stop()
         self._listener.stop()
 
-    def control_exit_program(self):
-        print('--- Stopping execution ---')
+    def control_exit_program(self, source = ""):
+        print('--- Stopping execution --- ' + source)
         self.release_all_currently_pressed_simulated_keys()
         self._state_manager.stop_all_repeating_keys()
         self._mouse_listener.stop()
         self._listener.stop()
         self._arg_manager.STOPPED = True
-        exit()
+        # if source != "icon":
+        #     exit()
 
     def control_toggle_pause(self):
         if self._arg_manager.WIN32_FILTER_PAUSED:
@@ -927,4 +929,12 @@ class FST_Keyboard():
         for alias, group in self._macros_alias_dict.items():
             print(f"{group}")
             
+    def open_config_file(self):
+        startfile(self._config_manager.file_name)
+        
+        
+    def reload_from_file(self):
+        self.update_args_and_groups(self._focus_manager.FOCUS_APP_NAME)
+        self._cli_menu.update_group_display()
+        print(f'\n>>> file reloaded for focus app: {self._focus_manager.FOCUS_APP_NAME}\n')
     
