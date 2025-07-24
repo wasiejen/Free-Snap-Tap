@@ -9,7 +9,7 @@ from time import sleep
 
 from fst_keyboard import FST_Keyboard
 from fst_manager import CONSTANTS
-from overlay import GUI_Manager, set_console_visibility
+from fst_overlay import GUI_Manager, set_console_visibility
 from PySide6.QtWidgets import QApplication
 import datetime
 
