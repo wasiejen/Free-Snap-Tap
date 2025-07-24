@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1.6
-last updated: 250723-1704
+Free-Snap-Tap V1.2.0
+last updated: 250724-1435
 '''
 
 from threading import Thread 
@@ -33,10 +33,7 @@ CURRENT_DATE_TIME = datetime.datetime.now().strftime("%y%m%d-%H%M")
 # nuitka-project: --windows-icon-from-ico="{MAIN_DIRECTORY}/icons/keyboard.ico"
 # nuitka-project: --output-filename=free_snap_tap_nuitka.exe
 
-
 # python -m nuitka --standalone --onefile --enable-plugin=pyqt5  --include-qt-plugins=platforms --windows-icon-from-ico=./icons/keyboard.ico free_snap_tap.py --output-filename=free_snap_tap_nuitka.exe
-
-
 
 # will not overwrite debug settings in config
 CONSTANTS.DEBUG = False
@@ -109,13 +106,10 @@ def main():
     
     fst_keyboard.cli_menu.flush_the_input_buffer()
 
-    sys.exit(1)
-
 
 if __name__ == "__main__":    
     
     set_console_visibility(False)  # Hide console window at startup
-
     
     fst_keyboard = FST_Keyboard()
     fst_keyboard.set_sys_start_arguments(sys.argv[1:] if len(sys.argv) > 1 else [])
@@ -149,11 +143,8 @@ if __name__ == "__main__":
                     
         # gui_manager.start_update_timer()  # Start the periodic update timer
         gui_manager.start()  # Start the Qt event loop
-        sys.exit(1)
     else:
         # if no tray icon or status indicator, just run the main function
         main()
- 
-
-    
-
+        
+    sys.exit(1)  # Exit the script after main function completes

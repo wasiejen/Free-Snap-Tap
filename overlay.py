@@ -1,12 +1,12 @@
 '''
-Free-Snap-Tap V1.1.6
-last updated: 250723-1528
+Free-Snap-Tap V1.2.0
+last updated: 250724-1434
 '''
 
 import sys
-from PySide6.QtWidgets import QWidget, QApplication, QMenu, QSystemTrayIcon, QMenu
-from PySide6.QtCore import Qt, qInstallMessageHandler, QObject, Signal, QTimer
-from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont, QAction
+from PySide6.QtWidgets import QWidget, QApplication, QMenu, QSystemTrayIcon
+from PySide6.QtCore import Qt, qInstallMessageHandler, Signal, QTimer
+from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont
 
 import ctypes
 
@@ -303,7 +303,7 @@ class Tray_Icon(QSystemTrayIcon):
         max_size = 64  # icon size 64x64
         border = 2
         size = max_size - 2 * border
-        both_borders = border * 2
+        # both_borders = border * 2
         font_size = int(size / 2 - 2)
 
         font = QFont("Arial", font_size, QFont.Bold)
