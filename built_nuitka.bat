@@ -10,7 +10,7 @@ python -m nuitka free_snap_tap.py
 
 :: --- Rename and move executable ---
 :: Define source (dist) and destination (current dir)
-set src=free_snap_tap_nuitka_.exe
+set src=free_snap_tap_nuitka.exe
 set dest=.
 
 :: Get current date and time in YYMMDD-HHMM format
@@ -24,7 +24,7 @@ set newname=free_snap_tap_nuitka_%filedate%.exe
 :: Check if source file exists
 if exist %src% (
     :: Move and rename the file
-    copy /y %src% %dest%
+    copy /y %src% %dest%\free_snap_tap_nuitka_.exe
     move /y %src% %dest%\%newname%
     echo Moved and renamed: %newname%
 ) else (

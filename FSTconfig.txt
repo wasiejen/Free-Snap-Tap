@@ -1,7 +1,7 @@
 # default groups are defined before the first <focus> and will always be active if NO focus group is defined!
 # and will also be applied if a focus app is recognised before the focus groups will be apllied on top
 
-<arg>-status_indicator=20 # starts the indicator overlay in the right upper corner with a diameter of 20 pixel
+<arg>-status_indicator=10 # starts the indicator overlay in the right upper corner with a diameter of 20 pixel
 <arg>-tray_icon           # adds a try_icon to the task_bar, options shown with right click
 
 #<arg>-crossover=40       # anti_cheat measure - press and release will be switched with 40% propability
