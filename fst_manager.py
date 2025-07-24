@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1.5
-last updated: 241030-0928
+Free-Snap-Tap V1.2.0
+last updated: 250724-1434
 '''
 
 from pynput import keyboard, mouse
@@ -12,6 +12,7 @@ from random import randint # randint(3, 9))
 from time import time, sleep # sleep(0.005) = 5 ms
 from fst_data_types import Key_Event, type_check
 from fst_threads import Focus_Thread, Macro_Repeat_Thread
+import datetime
 
 class CONSTANTS():
 
@@ -35,7 +36,7 @@ class CONSTANTS():
 
 class Output_Manager():
     '''
-    #XXX
+    This class manages the output of the FST_Keyboard.
     '''
 
     def __init__(self, fst_keyboard):
@@ -126,8 +127,10 @@ class Output_Manager():
         # None ke will not be played
         if key_event.vk_code > 0:
             self.send_key_event(key_event)
- 
-        if self._fst.arg_manager.ACT_DELAY and with_delay and None_ke_with_delay:
+            #print(f"D1: playing key_event: {key_event} without delays: {delay_times}")
+
+        if self._fst.arg_manager.ACT_DELAY or with_delay or None_ke_with_delay:
+            #print(f"D1: waiting for delay: {delay_times}")
             delay_time = self.get_random_delay(*delay_times)
             # print(f" --- waiting for: {delay_time}")
             # if not in a thread just play sleep for the delay
@@ -318,7 +321,7 @@ class Output_Manager():
                 if repeat_thread.is_alive():
                     stop_event.set()
                     repeat_thread.join()
-            except KeyError as error:
+            except KeyError:
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - stop_repeat()")
                 # raise KeyError(error)
@@ -331,7 +334,7 @@ class Output_Manager():
                     return True
                 else:
                     return False
-            except KeyError as error:
+            except KeyError:
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - stop_repeat()")
                 # raise KeyError(error)
@@ -342,7 +345,7 @@ class Output_Manager():
                 repeat_thread, _ = self._repeat_thread_dict[alias_string]
                 if repeat_thread.is_alive():
                     repeat_thread.reset_timer()
-            except KeyError as error:
+            except KeyError:
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - reset_repeat()")
                 # raise KeyError(error)
@@ -356,7 +359,7 @@ class Output_Manager():
                         repeat_thread.join()
                 if CONSTANTS.DEBUG4:
                     print("D4: -- Eval: stopped all Repeat")
-            except AttributeError as error:
+            except AttributeError:
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {repeat_thread} - reset_all_repeat()")
             return True
@@ -372,15 +375,13 @@ class Output_Manager():
             return True
         
         def type(key_string):
+            release_modifier()
             self._keyboard_controller.type(key_string)
             return True
         
         def write(key_string):
             return type(key_string)
-        
-        
-        
-        
+
         def set(key_string, value = 1):
             if value is True:
                 value = 1
@@ -391,7 +392,6 @@ class Output_Manager():
                 print(f'variable {key_string} set to: {value}')
             return True
         
-        
         def is_set(key_string):
             try:
                 #print(f'variable {key_string} is {self.variables[key_string]}')
@@ -401,6 +401,7 @@ class Output_Manager():
                 if CONSTANTS.DEBUG3:
                     print(f'variable {key_string} not set')
                 return False
+            
         def get(key_string):
             return is_set()
             
@@ -442,10 +443,20 @@ class Output_Manager():
                 print(f'variable {key_string} set to 0')
             return True
         
-        
         def cli(key_string):
             print(key_string)
             return True
+        
+        def date():
+            current_date = datetime.datetime.now().strftime("%y%m%d")
+            return type(current_date)
+
+        def date_time():
+            current_date_time = datetime.datetime.now().strftime("%y%m%d-%H%M")
+            return type(current_date_time)
+        
+        def release_modifier():
+            self._fst.state_manager.release_all_modifier_keys()
 
         # ---------------------------
         # eval starts from here
@@ -949,7 +960,7 @@ class Config_Manager():
         """
         # alias display
         
-        inset = '     '
+        # inset = '     '
         
         print("# Aliases")
         for alias_group in self._alias_hr:
@@ -994,16 +1005,18 @@ class Config_Manager():
 
 class Argument_Manager():
     '''
-    #XXX
+    manages the global variables and start arguments
     '''
     ### config of these variables should be done via config
     ## config manager has the control over the arguments
 
     STATUS_INDICATOR = False
-    STATUS_INDICATOR_SIZE = 40
+    STATUS_INDICATOR_SIZE = 10
     CROSSHAIR_ENABLED = False
     CROSSHAIR_DELTA_X = 0
     CROSSHAIR_DELTA_Y = 0
+    
+    TRAY_ICON = False
 
     # global variables
     DEBUG  = False
@@ -1019,6 +1032,9 @@ class Argument_Manager():
     PRINT_VK_CODES = False
 
     EXEC_ONLY_ONE_TRIGGERED_MACRO = False
+    
+    ALWAYS_ACTIVE = False
+    CMD_WINDOW_HIDDEN = False
 
     # AntiCheat testing (ACT)
     ACT_DELAY = True
@@ -1070,6 +1086,7 @@ class Argument_Manager():
         self.CROSSHAIR_ENABLED = Argument_Manager.CROSSHAIR_ENABLED
         self.CROSSHAIR_DELTA_X = Argument_Manager.CROSSHAIR_DELTA_X
         self.CROSSHAIR_DELTA_Y = Argument_Manager.CROSSHAIR_DELTA_Y
+        self.ALWAYS_ACTIVE = Argument_Manager.ALWAYS_ACTIVE
 
     'start argument handling'
     def apply_start_arguments(self, argv):
@@ -1167,12 +1184,18 @@ class Argument_Manager():
                 x, y = arg[11:].strip().replace(' ', '').split(',')
                 self.CROSSHAIR_DELTA_X, self.CROSSHAIR_DELTA_Y = int(x), int(y)
                 print(f"set crosshair delta is set to: {self.CROSSHAIR_DELTA_X}, {self.CROSSHAIR_DELTA_Y}")
+            elif arg[:14] == "-always_active":
+                self.ALWAYS_ACTIVE = True
+            elif arg[:10] == "-tray_icon":
+                self.TRAY_ICON = True
+            elif arg[:16] == "-hide_cmd_window":
+                self.CMD_WINDOW_HIDDEN = True
             else:
                 print("unknown start argument: ", arg)
 
 class Focus_Group_Manager():
     '''
-    #XXX
+    This class manages the focus groups for the FST_Keyboard.
     '''
     def __init__(self, fst_keyboard):
         self._fst = fst_keyboard
@@ -1279,8 +1302,6 @@ class Focus_Group_Manager():
         self._default_start_arguments = default_start_arguments
         self._default_group_lines = default_group_lines
         self._alias_group_lines = alias_lines
-    
-
     
 class Input_State_Manager():
     '''
@@ -1493,9 +1514,9 @@ class Input_State_Manager():
         self.reset_states_dicts()
     
     def release_all_modifier_keys(self):
-        # first release all modifert keys
+        # first release all modifier keys
         for vk_code in Input_State_Manager.ALL_MODIFIER_KEYS:
-            if not self.pressed_keys:
+            if vk_code in self.pressed_keys:
                 if CONSTANTS.DEBUG2:
                     print(f"D2: released pressed modifier key: {vk_code}")
                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
@@ -1628,6 +1649,10 @@ class CLI_menu():
         
     def display_focus_not_found(self):
         print('\n>>> NO FOCUS APP FOUND')
+        self.display_focus_names()
+        
+    def display_default_active(self):
+        print('\n>>> DEFAULT GROUP ACTIVE')
         self.display_focus_names()
         
     def flush_the_input_buffer(self):
