@@ -1,5 +1,21 @@
 ## V1.1.5 changelog
 
+250724-1441
+- set Version to 1.2.0
+- Bugfixes: mainly fix for delays not working
+- complete migrate to Qt with Interface
+- Nuitka (C compile) Build Process (faster execution and smaller program size)
+
+
+250724-1341
+- Revised overlay.py to simplify and improve crosshair and status overlay scaling logic, now using device pixel ratio directly. 
+- Removed and commented out unused code and constants, and added DEBUG4 option in free_snap_tap.py.
+
+- Adjusted delay logic in fst_manager.py 
+- BUG fixed: no delay was played at all - not sure yet since when and where that bug came from, but it prevented any delay to be applied ...
+  - I can not find in the history when the BUG was introduced - most like when implementing None|delay and since then only in special cases and for None vk_code delay was played at all.
+  - why did this not appear earlier? that is such a fundamental bug ...
+
 250724-0054
 gui:
 - completely migrated to PySide6 (Oficcial Qt6 implementation) with every gui element, Tray_Icon, Status_indicator, Crosshair and Update_Thread now all implemented in PySide6
@@ -8,8 +24,6 @@ gui:
 - now longer racing condition of update thread and close logic
 - every Qt-element now a child of GUI_Manager
   - very easy close handling
-
-
 
 250723-1655
 
@@ -33,7 +47,6 @@ new Nuitka executables:
   - pyinstaller executables still available
     - much faster build process :-)
 
-
 250717-1613
 
 - bugfix: stopped focus group reactivation on name change of window - logic from previous update was wrong
@@ -52,7 +65,6 @@ new Nuitka executables:
   - status indicator size now adapts based on focus group settings
     - if it should be hidden set the status_indicator=0 (size to 0)
 
-
 - focus group
   - now it is tracked if the app changes before focus settings are reapplied
     e.g. if a browser window changes it name based on which browser tab is open, then the focus setting will no longer reapply with every name change of the window 
@@ -61,9 +73,6 @@ new Nuitka executables:
   - tray_icon menu seems to have problems with MS Windows scaling when monitors use different scaling values
     - displayed sometimes big, sometimes small without separators and not interactive anymore
     - maybe a problem with the overlay?
-
-
-
 
 250430-2047
 - changed toggle console to an implementation that also works for windows 11

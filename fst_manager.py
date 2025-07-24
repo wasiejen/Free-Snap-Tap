@@ -1,6 +1,6 @@
 '''
-Free-Snap-Tap V1.1.6
-last updated: 250723-1012
+Free-Snap-Tap V1.2.0
+last updated: 250724-1434
 '''
 
 from pynput import keyboard, mouse
@@ -321,7 +321,7 @@ class Output_Manager():
                 if repeat_thread.is_alive():
                     stop_event.set()
                     repeat_thread.join()
-            except KeyError as error:
+            except KeyError:
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - stop_repeat()")
                 # raise KeyError(error)
@@ -334,7 +334,7 @@ class Output_Manager():
                     return True
                 else:
                     return False
-            except KeyError as error:
+            except KeyError:
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - stop_repeat()")
                 # raise KeyError(error)
@@ -345,7 +345,7 @@ class Output_Manager():
                 repeat_thread, _ = self._repeat_thread_dict[alias_string]
                 if repeat_thread.is_alive():
                     repeat_thread.reset_timer()
-            except KeyError as error:
+            except KeyError:
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - reset_repeat()")
                 # raise KeyError(error)
@@ -359,7 +359,7 @@ class Output_Manager():
                         repeat_thread.join()
                 if CONSTANTS.DEBUG4:
                     print("D4: -- Eval: stopped all Repeat")
-            except AttributeError as error:
+            except AttributeError:
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {repeat_thread} - reset_all_repeat()")
             return True
@@ -960,7 +960,7 @@ class Config_Manager():
         """
         # alias display
         
-        inset = '     '
+        # inset = '     '
         
         print("# Aliases")
         for alias_group in self._alias_hr:
