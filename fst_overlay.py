@@ -348,7 +348,7 @@ class Tray_Icon(QSystemTrayIcon):
 
 # --- Crosshair Overlay ---
 class CrosshairOverlay(QWidget):
-    def __init__(self, fst_keyboard, crosshair_size=64,thickness=3, color=(255,0,255), parent=None):
+    def __init__(self, fst_keyboard, crosshair_size=100,thickness=3, color=(255,0,255), parent=None):
         super().__init__(parent)
         self._fst = fst_keyboard
         self._crosshair_size = crosshair_size  # Default size of the crosshair overlay
@@ -407,13 +407,31 @@ class CrosshairOverlay(QWidget):
         cube_distance = self.crosshair_size // 16 + spacing
         cube_distance_down = cube_distance + spacing
         
-        painter.drawLine(c - outer_radius, c, c - inner_radius, c)
-        painter.drawLine(c + outer_radius, c, c + inner_radius, c)
-        painter.drawLine(c, c + outer_radius, c, c + inner_radius + spacing)
-        pen.setWidth(self.thickness*0.67)
-        painter.drawLine(c - cube_distance, c, c - cube_distance, c + cube_distance_down)
-        painter.drawLine(c + cube_distance, c, c + cube_distance, c + cube_distance_down)
-        painter.drawLine(c + cube_distance, c + cube_distance_down, c - cube_distance, c + cube_distance_down)
+        shadow_pen = QPen(QColor(0,0,0))
+        shadow = 2
+        c_shadow = c + shadow
+        
+        def paint_crosshair(c, pen):
+            painter.setPen(pen)
+            painter.drawLine(c - outer_radius, c, c - inner_radius, c)
+            painter.drawLine(c + outer_radius, c, c + inner_radius, c)
+            painter.drawLine(c, c + outer_radius, c, c + inner_radius + spacing)
+            pen.setWidth(self.thickness*0.67)
+            painter.drawLine(c - cube_distance, c, c - cube_distance, c + cube_distance_down)
+            painter.drawLine(c + cube_distance, c, c + cube_distance, c + cube_distance_down)
+            painter.drawLine(c + cube_distance, c + cube_distance_down, c - cube_distance, c + cube_distance_down)
+        
+        paint_crosshair(c_shadow, shadow_pen)  # Draw shadow first
+        paint_crosshair(c, pen)
+        
+        # painter.setPen(pen)
+        # painter.drawLine(c - outer_radius, c, c - inner_radius, c)
+        # painter.drawLine(c + outer_radius, c, c + inner_radius, c)
+        # painter.drawLine(c, c + outer_radius, c, c + inner_radius + spacing)
+        # pen.setWidth(self.thickness*0.67)
+        # painter.drawLine(c - cube_distance, c, c - cube_distance, c + cube_distance_down)
+        # painter.drawLine(c + cube_distance, c, c + cube_distance, c + cube_distance_down)
+        # painter.drawLine(c + cube_distance, c + cube_distance_down, c - cube_distance, c + cube_distance_down)
 
 # --- Status Overlay ---
 class StatusOverlay(QWidget):

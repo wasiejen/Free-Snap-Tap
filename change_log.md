@@ -1,3 +1,11 @@
+
+250905-1424
+- Removed automatic lower() of all focus group names (was implemented for easier recognition)
+  - lead to the inability to use special symbols in the focus group name, e.g. Trademark symbol in "Battlefield™ 6" :-)
+  - But now one has to mind upper and lower case in the focus names ^^
+- Defined Alias will now be a part of the focus group instead of always being part of the dafault group
+- Crosshair overlay now draws a shadow and uses a larger default size
+
 ## V1.1.5 changelog
 
 250724-1441

@@ -128,8 +128,10 @@ class Output_Manager():
         if key_event.vk_code > 0:
             self.send_key_event(key_event)
             #print(f"D1: playing key_event: {key_event} without delays: {delay_times}")
-
-        if self._fst.arg_manager.ACT_DELAY or with_delay or None_ke_with_delay:
+        #250730-1733
+        if len(delay_times) == 0:
+            pass
+        elif self._fst.arg_manager.ACT_DELAY or with_delay or None_ke_with_delay:
             #print(f"D1: waiting for delay: {delay_times}")
             delay_time = self.get_random_delay(*delay_times)
             # print(f" --- waiting for: {delay_time}")
@@ -406,13 +408,22 @@ class Output_Manager():
             return is_set()
             
         def check(key_string, value = 1):
-            try:
-                return self.variables[key_string] == value
-            except KeyError:
-                set(key_string, 0)
-                if CONSTANTS.DEBUG3:
-                    print(f'variable {key_string} not set')
-                return False
+            if isinstance(value, int):
+                try:
+                    return self.variables[key_string] == value
+                except KeyError:
+                    set(key_string, 0)
+                    if CONSTANTS.DEBUG3:
+                        print(f'variable {key_string} not set')
+                    return False
+            elif isinstance(value, (list, tuple)):
+                try:
+                    return self.variables[key_string] in value
+                except KeyError:
+                    set(key_string, 0)
+                    if CONSTANTS.DEBUG3:
+                        print(f'variable {key_string} not set')
+                    return False
             
         def clear(key_string):
             self.variables[key_string] = 0
@@ -449,11 +460,11 @@ class Output_Manager():
         
         def date():
             current_date = datetime.datetime.now().strftime("%y%m%d")
-            return type(current_date)
+            return current_date
 
         def date_time():
             current_date_time = datetime.datetime.now().strftime("%y%m%d-%H%M")
-            return type(current_date_time)
+            return current_date_time
         
         def release_modifier():
             self._fst.state_manager.release_all_modifier_keys()
@@ -694,14 +705,12 @@ class Config_Manager():
         focus_name = ''
         multi_focus_dict = {}
         default_start_arguments = []
-        default_group_lines = []
-        alias_lines = []
-
-        
+        default_group_lines = []        
         
         for line in cleaned_lines:
             if line.startswith('<focus>'):
-                focus_name = line.replace('<focus>', '').lower()
+                # 250905-1355: testing fix for special symbols in names like Trademark sign
+                focus_name = line.replace('<focus>', '')
                 multi_focus_dict[focus_name] = [[], []]
                 print(f"new focus name found: {focus_name}")
             elif line.startswith('<arg>'):
@@ -710,26 +719,31 @@ class Config_Manager():
                     default_start_arguments.append(line)
                 else:
                     multi_focus_dict[focus_name][0].append(line)
-            elif line.startswith('<'):
-                alias_end = line.find('>')
-                if alias_end > 1:
-                    alias = line[:alias_end+1]
-                    line = line.replace(alias, '').strip()
-                    alias_lines.append([alias, line])
+            
             else:
-                if line.startswith('('):
-                    alias_end = line.find(')')
+                # alias lines that save a defined series of keyevents for easier usage in config
+                if line.startswith('<'):
+                    alias_end = line.find('>')
                     if alias_end > 1:
-                        alias = line[:alias_end+1]
-                    line = line.replace(alias, '').strip()
+                        line_name = line[:alias_end+1]
+                        line = line.replace(line_name, '').strip()
+                    
+                # add name of the actual line: e.g. key_group, macro, etc
+                elif line.startswith('('):
+                    line_name_end = line.find(')')
+                    if line_name_end > 1:
+                        line_name = line[:line_name_end+1]
+                    line = line.replace(line_name, '').strip()
                 else:
-                    alias = ''
+                    line_name = ''
+                    
+                # sort into focus groups or default group    
                 if focus_name == '':
-                    default_group_lines.append([alias, line])
+                    default_group_lines.append([line_name, line])
                 else:
-                    multi_focus_dict[focus_name][1].append([alias, line])
+                    multi_focus_dict[focus_name][1].append([line_name, line])
         
-        return multi_focus_dict, default_start_arguments, default_group_lines, alias_lines
+        return multi_focus_dict, default_start_arguments, default_group_lines
 
 
     def _open_config_file(self):
@@ -1209,8 +1223,7 @@ class Focus_Group_Manager():
         
         self.focus_active = False
         self._focus_thread  = None
-    
-        self._alias_group_lines = []
+
         
     @property
     def multi_focus_dict(self):
@@ -1248,16 +1261,7 @@ class Focus_Group_Manager():
     @type_check(list)
     def default_group_lines(self, new_list):
         self._default_group_lines = new_list
-        
-    @property
-    def alias_lines(self):
-        return self._alias_group_lines  # Return a copy to prevent external modification
-
-    @alias_lines.setter
-    @type_check(list)
-    def alias_lines(self, new_list):
-        self._alias_group_lines = new_list
-        
+                
     @property
     def FOCUS_APP_NAME(self):
         return self._FOCUS_APP_NAME
@@ -1296,12 +1300,11 @@ class Focus_Group_Manager():
             self._focus_thread.join()
             
     def update_groups_from_config(self, config_update):
-        multi_focus_dict, default_start_arguments, default_group_lines, alias_lines = config_update
+        multi_focus_dict, default_start_arguments, default_group_lines = config_update
         self._multi_focus_dict = multi_focus_dict
         self._multi_focus_dict_keys = self._multi_focus_dict.keys()
         self._default_start_arguments = default_start_arguments
         self._default_group_lines = default_group_lines
-        self._alias_group_lines = alias_lines
     
 class Input_State_Manager():
     '''
@@ -1442,6 +1445,14 @@ class Input_State_Manager():
             self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
             self.set_toggle_state(vk_code, False)
 
+    def reset_all_lists(self):
+        self._pressed_keys = set()
+        self._real_key_press_states_dict = {}
+        self._simulated_key_press_states_dict = {}
+        self._all_key_press_states_dict = {}
+        self._toggle_states_dict = {}
+        self._toggle_states_dict_keys = []
+        
 
 
 
@@ -1569,7 +1580,7 @@ class Input_State_Manager():
 
 class CLI_menu():
     '''
-    #XXX
+    manages the command line interface menu
     '''        
     def __init__(self, fst_keyboard):
         self._fst = fst_keyboard
