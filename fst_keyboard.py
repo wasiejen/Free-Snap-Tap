@@ -19,7 +19,7 @@ from fst_manager import Input_State_Manager, Config_Manager
    
 class FST_Keyboard():
     '''
-    #XXX
+    Main class to handle keyboard and mouse input and output
     '''
     # CONSTANTS for key events
     WM_KEYDOWN = [256,260] # _PRESS_MESSAGES = (_WM_KEYDOWN, _WM_SYSKEYDOWN)
@@ -349,11 +349,11 @@ class FST_Keyboard():
         self._macro_sequence_alias_list = self._macros_alias_dict.keys()
 
     def apply_focus_groups(self, focus_name = ''):
+        default_lines = self.focus_manager.default_group_lines
         if focus_name != '':
             _, focus_group_lines = self.focus_manager.multi_focus_dict[focus_name]
         else:
             _, focus_group_lines = [],[]
-        default_lines = self.focus_manager.alias_lines + self.focus_manager.default_group_lines
         self._config_manager.presort_lines(default_lines + focus_group_lines)
         self.initialize_groups_from_presorted_lines()
         
@@ -364,12 +364,14 @@ class FST_Keyboard():
         self.release_all_currently_pressed_simulated_keys()
         self._state_manager.stop_all_repeating_keys()
         self._arg_manager.reset_global_variable_changes()
+        # reset all lists to make sure nothing remains from previous focus groups
+        self._state_manager.reset_all_lists()
         self.apply_start_args_by_focus_name(focus_name)    
         self.apply_focus_groups(focus_name)    
 
     def mouse_win32_event_filter(self, msg, data):#
         '''
-        #XXX
+        Mouse event filter for Win32 API messages.
         '''
         # data:
         # typedef struct tagMSLLHOOKSTRUCT {
@@ -713,7 +715,7 @@ class FST_Keyboard():
                                 to_be_suppressed = True
                                 break
             
-            ###XXX 241016-1101 general condradiction prevention disabled to test
+            ###XXX 241016-1101 general contradiction prevention disabled to test
             # # intercept simulated releases of keys that are still pressed           
             if not key_is_in_tap_groups and not is_keydown:
                 if CONSTANTS.DEBUG2:
@@ -727,7 +729,9 @@ class FST_Keyboard():
                 elif not is_mouse_event and self.state_manager.get_key_press_state(vk_code):
                     if CONSTANTS.DEBUG2:
                         print(f"D2 suppressed {current_ke} because it would release real key press state")
-            #         to_be_suppressed = True
+                    ### 250730-2308 reactivated - why was is deactivated?
+                    ### 250819 macros with control keys need the supression ability to release the modifier keys when playing macros
+                    #to_be_suppressed = True
         
         
         'ALL SUPPRESSION DONE HERE'
@@ -813,20 +817,20 @@ class FST_Keyboard():
         #     self.state_manager.release_all_currently_pressed_keys()
 
     def check_debug_numpad_actions(self):
-        if self.check_for_combination(['num1']):
+        if self.check_for_combination(['alt','num1']):
             CONSTANTS.DEBUG = not CONSTANTS.DEBUG
-        if self.check_for_combination(['num2']):
+        if self.check_for_combination(['alt','num2']):
             CONSTANTS.DEBUG2 = not CONSTANTS.DEBUG2
-        if self.check_for_combination(['num3']):
+        if self.check_for_combination(['alt','num3']):
             CONSTANTS.DEBUG3 = not CONSTANTS.DEBUG3
-        if self.check_for_combination(['num4']):
+        if self.check_for_combination(['alt','num4']):
             CONSTANTS.DEBUG4 = not CONSTANTS.DEBUG4
-        if self.check_for_combination(['num5']):
+        if self.check_for_combination(['alt','num5']):
             self.display_internal_repr_groups()
-        if self.check_for_combination(['num7']):
+        if self.check_for_combination(['alt','num7']):
             pprint.pp(f"real_key_state: {self.state_manager._real_key_press_states_dict}")
             pprint.pp(f"sim_key_state: {self.state_manager._simulated_key_press_states_dict}")
-        if self.check_for_combination(['num8']):
+        if self.check_for_combination(['alt','num8']):
             pprint.pp(f"all_key_state: {self.state_manager._all_key_press_states_dict}")
 
     def control_return_to_menu(self):
