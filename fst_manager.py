@@ -13,6 +13,7 @@ from time import time, sleep # sleep(0.005) = 5 ms
 from fst_data_types import Key_Event, type_check
 from fst_threads import Focus_Thread, Macro_Repeat_Thread
 import datetime
+import re #regular expression
 
 class CONSTANTS():
 
@@ -711,6 +712,11 @@ class Config_Manager():
             if line.startswith('<focus>'):
                 # 250905-1355: testing fix for special symbols in names like Trademark sign
                 focus_name = line.replace('<focus>', '')
+                # # 250905-1455: XXX-1
+                # #only allow letters, numbers and spaces in focus_name
+                focus_name = re.sub(r'[^a-zA-Z0-9 ]', '', focus_name)
+                
+                
                 multi_focus_dict[focus_name] = [[], []]
                 print(f"new focus name found: {focus_name}")
             elif line.startswith('<arg>'):
