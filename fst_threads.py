@@ -3,10 +3,14 @@ Free-Snap-Tap V1.1.5
 last updated: 241105-2004
 '''
 
-from threading import Thread, Event # to play aliases without interfering with keyboard listener
-from time import sleep # sleep(0.005) = 5 ms
-import pygetwindow as gw
+from threading import (  # to play aliases without interfering with keyboard listener
+    Event,
+    Thread,
+)
+from time import sleep  # sleep(0.005) = 5 ms
 
+import pygetwindow as gw
+import re #regular expression
 
 alias_thread_logging = []
    
@@ -146,7 +150,12 @@ class Focus_Thread(Thread):
             if active_window != last_active_window or manually_paused:
                 if active_window != last_active_window:
                     last_active_window = active_window
-                    
+                
+                # # 250905-1455: XXX-1
+                # #only allow letters, numbers and spaces in active window name
+                active_window = re.sub(r'[^a-zA-Z0-9 ]', '', active_window)
+                
+                
                 # if not one of my own spawned windows
                 if active_window not in ["FST Status Indicator", "FST Crosshair", "FST_Overlay"]:
                     if not self.FOCUS_THREAD_PAUSED and not self._fst.arg_manager.MANUAL_PAUSED:
@@ -161,7 +170,9 @@ class Focus_Thread(Thread):
 
                         # check if it is one of the focus groups
                         for focus_name in self._fst.focus_manager.multi_focus_dict_keys:
-                            if active_window.lower().find(focus_name) >= 0:
+                            # 250905-1455: XXX-1: remove lower
+                            #if active_window.lower().find(focus_name) >= 0:
+                            if active_window.find(focus_name) >= 0:
                                 
                                 found_valid_focus_name = True
                                 

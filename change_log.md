@@ -1,3 +1,7 @@
+250905-1522
+- focus name will be cleaned by regular expression [^a-zA-Z0-9 ], so no more non english letters, special symbols etc. (spaces will be kept)
+- e.g. even if used "Battlefield™ 6" it will be handled as "Battlefield 6" internally
+
 
 250905-1424
 - Removed automatic lower() of all focus group names (was implemented for easier recognition)
