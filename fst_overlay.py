@@ -380,10 +380,15 @@ class CrosshairOverlay(QWidget):
         # size_multiplier = calc_size_multiplier(screen)
         size_multiplier =  1 / get_device_pixel_ratio(screen)
         
+        print(f"Screen geometry: {screen.size()}, Device Pixel Ratio: {get_device_pixel_ratio(screen)}, Size multiplier: {size_multiplier}")
+        
         
         self.size_multiplier = size_multiplier  # Store for later use in paintEvent
         self.crosshair_size = int(self._crosshair_size * size_multiplier)  # Span of the crosshair overlay
         self.thickness = int(self._thickness * size_multiplier)
+        
+        print(f"Crosshair size: {self.crosshair_size}, Thickness: {self.thickness}")
+        
         print(f"Crosshair added: Device Pixel Ratio: {get_device_pixel_ratio(screen)}, Size multiplier: {size_multiplier}")
         dx = getattr(self._fst.arg_manager, "CROSSHAIR_DELTA_X", 0)
         dy = getattr(self._fst.arg_manager, "CROSSHAIR_DELTA_Y", 0)
@@ -404,7 +409,7 @@ class CrosshairOverlay(QWidget):
         spacing = 1
         outer_radius = (self.crosshair_size - padding) // 2
         inner_radius = outer_radius // 2 + spacing
-        cube_distance = self.crosshair_size // 16 + spacing
+        cube_distance = self.crosshair_size // 20 + spacing
         cube_distance_down = cube_distance + spacing
         
         shadow_pen = QPen(QColor(0,0,0))
@@ -415,12 +420,14 @@ class CrosshairOverlay(QWidget):
             painter.setPen(pen)
             painter.drawLine(c - outer_radius, c, c - inner_radius, c)
             painter.drawLine(c + outer_radius, c, c + inner_radius, c)
-            painter.drawLine(c, c + outer_radius, c, c + inner_radius + spacing)
-            pen.setWidth(self.thickness*0.67)
-            painter.drawLine(c - cube_distance, c, c - cube_distance, c + cube_distance_down)
-            painter.drawLine(c + cube_distance, c, c + cube_distance, c + cube_distance_down)
-            painter.drawLine(c + cube_distance, c + cube_distance_down, c - cube_distance, c + cube_distance_down)
-        
+            painter.drawLine(c, c + outer_radius, c, c + inner_radius)# + spacing)
+            # pen.setWidth(self.thickness*0.67)
+            # painter.drawLine(c - cube_distance, c, c - cube_distance, c + cube_distance_down)
+            # painter.drawLine(c + cube_distance, c, c + cube_distance, c + cube_distance_down)
+            # painter.drawLine(c + cube_distance, c + cube_distance_down, c - cube_distance, c + cube_distance_down)
+            # draw a circle in the center with variable diameter
+            painter.drawRect(c - self.thickness//2, c - self.thickness//2, self.thickness, self.thickness)
+
         paint_crosshair(c_shadow, shadow_pen)  # Draw shadow first
         paint_crosshair(c, pen)
         
