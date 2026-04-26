@@ -1,3 +1,10 @@
+260426-1856
+- added extra focus names via comma inline behind <focus>
+- renamed increase function inc() -> incr()
+  - decr() was defined 2 times -> commented out old one for now
+- same triggers of rebinds and macros will now overwritten with the newest version
+  - printout in cli will still display old and new
+
 251207-0037
 - added backup and restore functionality for save games
   - added start argument `-save_dir=` and `-backup_root_dir=`
