@@ -15,6 +15,7 @@ from fst_threads import Focus_Thread, Macro_Repeat_Thread
 import datetime
 import re #regular expression
 from fst_save_file_handler import make_backup as mb, restore_backup as rb
+import pyperclip # to copy mouse position to clipboard for easier pasting
 
 class CONSTANTS():
 
@@ -40,24 +41,67 @@ class Output_Manager():
     '''
     This class manages the output of the FST_Keyboard.
     '''
+    # helper class wrapper for mouse scroll, because it needs to be handled differently than normal key presses
+    # class mouse_scroller():
+    #     def __init__(self, mouse_controller):
+    #         self._mouse_controller = mouse_controller
+            
+    #     def scroll(self, dx, dy):
+    #         self._mouse_controller.scroll(dx, dy)
+            
+    #     def scroll_up(self, value):
+    #         self.scroll(0, value) # scroll up by specified units
+        
+    #     def scroll_down(self, value):
+    #         self.scroll(0, -value) # scroll down by specified units
+        
+    #     def scroll_right(self, value):
+    #         self.scroll(value, 0) # scroll right by specified units
+            
+    #     def scroll_left(self, value):
+    #         self.scroll(-1, 0) # scroll left by 1 unit
+            
+        # def press(self, key):
+        #     if key == "-6":
+        #         self.scroll_up()
+        #     elif key == "-7":
+        #         self.scroll_right()
+                
+        # def release(self, key):
+        #     if key == "-6":
+        #         self.scroll_down()
+        #     elif key == "-7":
+        #         self.scroll_left()
+
 
     def __init__(self, fst_keyboard):
         self._fst = fst_keyboard
         # Initialize the Controller
         self._keyboard_controller = keyboard.Controller()
         self._mouse_controller = mouse.Controller()
-        self._controller_dict = {True: self._mouse_controller, False: self._keyboard_controller}
+        # self._mouse_scroller = self.mouse_scroller(self._mouse_controller)
+        
+
+        self._controller_dict = {True: self._mouse_controller, False: self._keyboard_controller} 
+        
         self._mouse_vk_codes_dict = {   1: mouse.Button.left, 
                                         2: mouse.Button.right, 
                                         3: mouse.Button.middle,
                                         4: mouse.Button.x1,
                                         5: mouse.Button.x2,
+                                        # -6: self._mouse_scroller, # scroll vertical
+                                        # -7: self._mouse_scroller, # scroll horizontal
+                                        
                                         }
         self._mouse_vk_codes = self._mouse_vk_codes_dict.keys()
         self._repeat_thread_dict = {}
 
         self.variables = {}
         
+    @property
+    def mouse(self):
+        return self._mouse_controller
+    
     @property
     def repeat_thread_dict(self):
         return self._repeat_thread_dict
@@ -504,6 +548,38 @@ class Output_Manager():
             if CONSTANTS.DEBUG4:
                 print(f"D4: -- Eval: restored backup from {restored_path}")
             return True
+        
+        def scroll_up(value):
+            self._mouse_controller.scroll(0, value)
+            return True
+        
+        def scroll_down(value):
+            self._mouse_controller.scroll(0, -value)
+            return True
+        
+        def scroll_right(value):
+            self._mouse_controller.scroll(value, 0)
+            return True
+        
+        def scroll_left(value): 
+            self._mouse_controller.scroll(-value, 0)
+            return True
+        
+        def mouse_move_abs(dx, dy):
+            self._mouse_controller.position = (dx, dy)
+            return True
+        
+        def mouse_move(dx, dy):
+            self._mouse_controller.move(dx, dy)
+            return True
+        
+        def mouse_get_pos():
+            position = self._mouse_controller.position
+            print(f"{position} copied to clipboard")
+            # save in clipboard for easier pasting            
+            pyperclip.copy(f"{position}")  
+            return True
+
 
         # ---------------------------
         # eval starts from here

@@ -1,5 +1,22 @@
+260426-2158
+- mouse scrolling added via functions:
+  - vertical scrolling: `_|(scroll_up("value"))`, `_|(scroll_down("value"))`
+  - horizontal scrolling: `_|(scroll_left("value"))`, `_|(scroll_right("value"))`
+  - e.g. `-up :: _|(scroll_up("value"))`
+- mouse movement added via functions:
+  - relative movement from current positon:
+    - `_|(mouse_move("dx", "dy"))`
+    - `-up ::    _|(mouse_move(0,-50))`
+    - `-left ::  _|(mouse_move(-50,0))`
+    - `-down ::  _|(mouse_move(0,50))`
+    - `-right :: _|(mouse_move(50,0))`
+  - absolute movement:
+    - `_|(mouse_move_abs("dx", "dy"))`
+- function `mouse_get_pos()` added that will print out current absolut position and copy the tuble of coordinates into the clipboard of windows for easier pasting
+
 260426-1856
 - added extra focus names via comma inline behind <focus>
+  - `<focus> group1, group2, group3`
 - renamed increase function inc() -> incr()
   - decr() was defined 2 times -> commented out old one for now
 - same triggers of rebinds and macros will now overwritten with the newest version

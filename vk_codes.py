@@ -12,8 +12,8 @@ vk_codes_dict = {
     'mouse_middle': 3, 'middle_mouse': 3, 'mm': 3, 
     'mouse_x1': 4, 'mx1' : 4,
     'mouse_x2': 5, 'mx2' : 5,
-    'scroll_vertical' : 6, 'scroll_vert' : 6, 'vert_scroll' : 6,
-    'scroll_horizontal' : 7, 'scroll_hori' : 7, 'hori_scroll' : 7,
+    #'scroll_vertical' : 6, 'scroll_vert' : 6, 'vert_scroll' : 6,
+    #'scroll_horizontal' : 7, 'scroll_hori' : 7, 'hori_scroll' : 7,
     
     # letter keys
     'A': 65, 'a': 65, 
@@ -125,10 +125,10 @@ vk_codes_dict = {
     'right_menu': 165,
     
     # direction keys
-    'left_arrow': 37, 
-    'up_arrow': 38, 
-    'right_arrow': 39, 
-    'down_arrow': 40,
+    'left_arrow': 37, 'left': 37, 
+    'up_arrow': 38, 'up': 38, 
+    'right_arrow': 39,'right': 39, 
+    'down_arrow': 40,'down': 40,
     
     # menu keys
     'select': 41, 
