@@ -6,7 +6,7 @@ call ./.venv/Scripts/activate.bat
 pip3 freeze > requirements.txt
 
 :: Build with Pyinstaller
-pyinstaller --onefile --windowed --icon=./icons/keyboard.ico free_snap_tap.py %*
+pyinstaller --onefile --windowed --exclude=PyQt5 --icon=./icons/keyboard.ico free_snap_tap.py %*
 
 :: --- Rename and move executable ---
 :: Define source (dist) and destination (current dir)
