@@ -294,9 +294,12 @@ class FST_Keyboard():
                 if not both_are_Keys:
                     trigger_group = Key_Group(new_trigger_group)
                     new_rebind = Rebind(trigger_group, replacement_key)
-                    self._rebinds.append(new_rebind)
-                    self._rebind_triggers.append(trigger_group)
+                    
+                    #260426-1931
+                    if trigger_group not in self._rebinds_dict.keys():
+                        self._rebind_triggers.append(trigger_group)
                     self._rebinds_dict[trigger_group] = new_rebind
+                    
                 # if both are Keys then create 2 Key_Event: Key_Event rebind sinstead
                 else:
                     trigger_events = trigger_key.get_key_events()
@@ -304,9 +307,18 @@ class FST_Keyboard():
                     for index in [0,1]:
                         trigger_group = Key_Group([trigger_events[index]] + trigger_rest)
                         new_rebind = Rebind(trigger_group, replacement_events[index])
-                        self._rebinds.append(new_rebind)
-                        self._rebind_triggers.append(new_rebind.trigger_group)
+                        
+                        #260426-1931                        
+                        # if a trigger is already existing do not add another trigger in self._rebind_triggers
+                        # maybe better to replace with check if trigger_group in self._rebind_dict.keys()?
+                        if new_rebind.trigger_group not in self._rebinds_dict.keys():
+                            self._rebind_triggers.append(new_rebind.trigger_group)
                         self._rebinds_dict[new_rebind.trigger_group] = new_rebind
+                            
+                        
+            # 260426-1920: collect self._rebinds for printout after loop to prevent multiple cases of the same trigger before being able to be recognised in loop
+            for rebind in self._rebinds_dict.values():
+                self._rebinds.append(rebind)
 
         except Exception as error:
             print(f"ERROR: {error} \n -> in Rebind: {rebind}")
@@ -330,9 +342,14 @@ class FST_Keyboard():
                 if new_macro.num_sequences > 1: 
                     self._macros_alias_dict[new_macro.alias] = new_macro
 
-                self._macros.append(new_macro)
-                self._macro_triggers.append(new_macro.trigger_group)
+                #self._macros.append(new_macro)
+                if new_macro.trigger_group not in self._macros_dict.keys():
+                    self._macro_triggers.append(new_macro.trigger_group)
                 self._macros_dict[new_macro.trigger_group] = new_macro
+                
+            #260426-1935 collect self._macros for printout after loop to prevent multiple cases of the same trigger before being able to be recognised in loop
+            for macro in self._macros_dict.values():
+                self._macros.append(macro)
                 
         except Exception as error:
             print(f"ERROR: {error} \n -> in Macro: {macro}")

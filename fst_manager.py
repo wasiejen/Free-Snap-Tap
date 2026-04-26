@@ -415,18 +415,18 @@ class Output_Manager():
                     print(f'variable {key_string} not set')
                 return 0
             
-        def inc(key_string, delta=1):
-            try:
-                set(key_string, self.variables[key_string] + delta)
-                return True
-            except KeyError:
-                set(key_string, delta)
-                if CONSTANTS.DEBUG3:
-                    print(f'variable {key_string} not set')
-                return True
+        # def inc(key_string, delta=1):
+        #     try:
+        #         set(key_string, self.variables[key_string] + delta)
+        #         return True
+        #     except KeyError:
+        #         set(key_string, delta)
+        #         if CONSTANTS.DEBUG3:
+        #             print(f'variable {key_string} not set')
+        #         return True
             
-        def decr(key_string, delta=1):
-            inc(key_string, delta=-delta)
+        # def decr(key_string, delta=1):
+        #     inc(key_string, delta=-delta)
 
             
         def check(key_string, value = 1):
@@ -464,8 +464,8 @@ class Output_Manager():
             try:
                 self.variables[key_string] += 1
             except KeyError:
-                set(key_string, 0)
-                print(f'variable {key_string} set to 0')
+                set(key_string, 1)
+                print(f'variable {key_string} set to 1')
             return True
         
         def decr(key_string):
@@ -681,7 +681,20 @@ class Config_Manager():
             if len(line) > 1:
                 if line.startswith('<focus>'):
                     cleaned_line = '<focus>'
-                    cleaned_line += line[7:].split('#')[0].strip()
+                    ##TODO: 260426-1838 multiple focus groups seperated by comma
+                    focus_group_names = line[7:].split('#')[0].split(',')
+                    
+                    if len(focus_group_names) > 1:
+                        # strip whitespace from focus group names and join them with comma again
+                        focus_group_names =  ",".join([name.strip() for name in focus_group_names])
+                    else:
+                        focus_group_names = focus_group_names[0].strip()
+                        
+                    cleaned_line += focus_group_names
+
+                        
+                    #cleaned_line += line[7:].split('#')[0].strip() 
+                    
                     comments_cleaned_lines.append(cleaned_line)
                 elif line.startswith('<arg>'):
                     cleaned_line = '<arg>'
@@ -741,17 +754,31 @@ class Config_Manager():
         focus_name = ''
         multi_focus_dict = {}
         default_start_arguments = []
-        default_group_lines = []        
+        default_group_lines = []   
+        extra_focus_names = []     
         
         for line in cleaned_lines:
             if line.startswith('<focus>'):
+                
+                ##260426-1851 allow multiple focus groups seperated by comma
+                if extra_focus_names != []:
+                    print(f"extra focus names found for {focus_name}: {extra_focus_names}")
+                    for extra_focus_name in extra_focus_names:
+                        multi_focus_dict[extra_focus_name] = multi_focus_dict[focus_name]
+                extra_focus_names = []
+                
                 # 250905-1355: testing fix for special symbols in names like Trademark sign
                 focus_name = line.replace('<focus>', '')
                 # # 250905-1455: XXX-1
                 # #only allow letters, numbers and spaces in focus_name
-                focus_name = re.sub(r'[^a-zA-Z0-9 ]', '', focus_name)
+                focus_name = re.sub(r'[^a-zA-Z0-9, ]', '', focus_name)
                 
-                
+                ##260426-1851 allow multiple focus groups seperated by comma
+                focus_group_names = focus_name.split(',')
+                if len(focus_group_names) > 1:
+                   focus_name = focus_group_names[0]
+                   extra_focus_names = focus_group_names[1:]
+                   
                 multi_focus_dict[focus_name] = [[], []]
                 print(f"new focus name found: {focus_name}")
             elif line.startswith('<arg>'):
