@@ -14,6 +14,7 @@ from fst_data_types import Key_Event, type_check
 from fst_threads import Focus_Thread, Macro_Repeat_Thread
 import datetime
 import re #regular expression
+from fst_save_file_handler import make_backup as mb, restore_backup as rb
 
 class CONSTANTS():
 
@@ -406,7 +407,27 @@ class Output_Manager():
                 return False
             
         def get(key_string):
-            return is_set()
+            try:
+                return self.variables[key_string]
+            except KeyError:
+                set(key_string, 0)
+                if CONSTANTS.DEBUG3:
+                    print(f'variable {key_string} not set')
+                return 0
+            
+        def inc(key_string, delta=1):
+            try:
+                set(key_string, self.variables[key_string] + delta)
+                return True
+            except KeyError:
+                set(key_string, delta)
+                if CONSTANTS.DEBUG3:
+                    print(f'variable {key_string} not set')
+                return True
+            
+        def decr(key_string, delta=1):
+            inc(key_string, delta=-delta)
+
             
         def check(key_string, value = 1):
             if isinstance(value, int):
@@ -469,6 +490,20 @@ class Output_Manager():
         
         def release_modifier():
             self._fst.state_manager.release_all_modifier_keys()
+            
+        def make_backup(save_dir=self._fst.arg_manager.SAVE_DIR, backup_root_dir=self._fst.arg_manager.BACKUP_ROOT_DIR):
+            backup_path = mb(save_dir, backup_root_dir)
+            print(f"Made backup to {backup_path}")
+            if CONSTANTS.DEBUG4:
+                print(f"D4: -- Eval: made backup to {backup_path}")
+            return True
+        
+        def restore_backup(save_dir=self._fst.arg_manager.SAVE_DIR, backup_root_dir=self._fst.arg_manager.BACKUP_ROOT_DIR):
+            restored_path = rb(save_dir, backup_root_dir)
+            print(f"Restored backup from {restored_path}")
+            if CONSTANTS.DEBUG4:
+                print(f"D4: -- Eval: restored backup from {restored_path}")
+            return True
 
         # ---------------------------
         # eval starts from here
@@ -1066,6 +1101,9 @@ class Argument_Manager():
     # Alias delay between presses and releases
     MACRO_MIN_DELAY_IN_MS = ACT_MIN_DELAY_IN_MS 
     MACRO_MAX_DELAY_IN_MS = ACT_MAX_DELAY_IN_MS
+    
+    SAVE_DIR = ""
+    BACKUP_ROOT_DIR = ""
 
     def __init__(self, fst_keyboard):
         self._fst = fst_keyboard
@@ -1107,6 +1145,8 @@ class Argument_Manager():
         self.CROSSHAIR_DELTA_X = Argument_Manager.CROSSHAIR_DELTA_X
         self.CROSSHAIR_DELTA_Y = Argument_Manager.CROSSHAIR_DELTA_Y
         self.ALWAYS_ACTIVE = Argument_Manager.ALWAYS_ACTIVE
+        self.SAVE_DIR = Argument_Manager.SAVE_DIR
+        self.BACKUP_ROOT_DIR = Argument_Manager.BACKUP_ROOT_DIR
 
     'start argument handling'
     def apply_start_arguments(self, argv):
@@ -1210,6 +1250,12 @@ class Argument_Manager():
                 self.TRAY_ICON = True
             elif arg[:16] == "-hide_cmd_window":
                 self.CMD_WINDOW_HIDDEN = True
+            elif arg[:10] == "-save_dir=" and len(arg) > 10:
+                self.SAVE_DIR = arg[10:].strip()
+                print(f"set save directory to: {self.SAVE_DIR}")
+            elif arg[:17] == "-backup_root_dir=" and len(arg) > 17:
+                self.BACKUP_ROOT_DIR = arg[17:].strip()
+                print(f"set backup root directory to: {self.BACKUP_ROOT_DIR}")
             else:
                 print("unknown start argument: ", arg)
 

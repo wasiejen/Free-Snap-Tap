@@ -1,3 +1,12 @@
+251207-0037
+- added backup and restore functionality for save games
+  - added start argument `-save_dir=` and `-backup_root_dir=`
+  - save dir will be backupped incrementally in format "save-YYMMDD-HHMMSS"
+  - at start of focus group the start arguments have to be set and then the backup can be started with the evals `|(make_backup())` and `|(restore_backup())`
+  - restore backup will restore the last backup as replacement into the save dir
+
+- eval `|(get("variable"))` will now return the value/content of the variable instead of returning True or False dependend on the variables content
+
 250905-1522
 - focus name will be cleaned by regular expression [^a-zA-Z0-9 ], so no more non english letters, special symbols etc. (spaces will be kept)
 - e.g. even if used "Battlefield™ 6" it will be handled as "Battlefield 6" internally

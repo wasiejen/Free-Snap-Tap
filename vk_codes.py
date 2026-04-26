@@ -111,8 +111,8 @@ vk_codes_dict = {
     'page_down': 34, 
     'end': 35, 
     'home': 36,
-    'left_windows': 91, 
-    'right_windows': 92, 
+    'left_windows': 91, 'lwin': 91, 
+    'right_windows': 92, 'rwin': 92, 
     'applications': 93,
     'sleep': 95, 
     'num_lock': 144, 
@@ -196,6 +196,19 @@ vk_codes_dict = {
     'caret' : 220, # key left of 1 on qwertz layout
     'copilot': 134, # actually a 3 key combination with 134 as somewhat unique vk_code id
     
+    # Naga Side Keys :-) == F13-F24
+    'Naga1':  124, 'naga1':  124,
+    'Naga2':  125, 'naga2':  125,
+    'Naga3':  126, 'naga3':  126,
+    'Naga4':  127, 'naga4':  127,
+    'Naga5':  128, 'naga5':  128,
+    'Naga6':  129, 'naga6':  129,
+    'Naga7':  130, 'naga7':  130,
+    'Naga8':  131, 'naga8':  131,
+    'Naga9':  132, 'naga9':  132,
+    'Naga10': 133, 'naga10': 133,
+    'Naga11': 134, 'naga11': 134,
+    'Naga12': 135, 'naga12': 135,
     
     # -----------------only for internal usage --------------------
     
