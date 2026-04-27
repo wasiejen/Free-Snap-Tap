@@ -579,8 +579,28 @@ class Output_Manager():
             # save in clipboard for easier pasting            
             pyperclip.copy(f"{position}")  
             return True
+        
+        # show_message(*text*, *duration in s*, *text_size in px*, *background_color*, *text_color*)
+        def show_message(text, d=3., ts=12, bgc="rgba(40, 150, 40, 200)", tc="white"):
+            self._fst.toast_callback(text, d, ts, bgc, tc, timer=0)
+            return True
+        
+        def show_timer(text, d=3., ts=12, bgc="rgba(150, 150, 40, 200)", tc="white"):
+            self._fst.toast_callback(text, d, ts, bgc, tc, timer=1)
+            return True
 
-
+        def set_var(key_string, text):
+            self.variables[key_string] = text
+            return True
+            
+        def get_var(key_string):
+            try:
+                return self.variables[key_string]
+            except KeyError:
+                set_var(key_string, "None")
+                print(f'variable {key_string} set to "None"')
+                return self.variables[key_string]
+            
         # ---------------------------
         # eval starts from here
         
