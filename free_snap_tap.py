@@ -9,7 +9,7 @@ from time import sleep
 
 from fst_keyboard import FST_Keyboard
 from fst_manager import CONSTANTS
-from fst_overlay import GUI_Manager, set_console_visibility
+from fst_overlay import GUI_Manager, set_console_visibility, ToastBridge
 from PySide6.QtWidgets import QApplication
 import datetime
 
@@ -133,6 +133,11 @@ if __name__ == "__main__":
         main_thread.start()
         app = QApplication([])
         gui_manager = GUI_Manager(fst_keyboard, app=app)
+        
+        bridge = ToastBridge()
+        bridge.signal_show_toast.connect(gui_manager.show_message)
+        fst_keyboard.toast_callback = bridge.trigger_toast
+        
 
         if fst_keyboard.arg_manager.TRAY_ICON:
             gui_manager.tray_icon.show()

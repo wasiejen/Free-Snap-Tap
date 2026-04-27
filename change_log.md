@@ -1,17 +1,40 @@
+260427-1400
+- added toast box for messages and timers
+  - added toast message function that will be displayed under the status indicator overlay, that will vanish after set duration (ms)
+    - show_message(*text*, *duration in s*, *text_size in px*, *background_color*, *text_color*)
+      - `_|(show_message("test"))` # minimal message shown for 3 s
+      - `_|(show_message("test", d=15, ts=15, bgc="green", tc="white"))`
+      - bgc und tc also usable via `bgc="rgba(40, 40, 40, 200)"` and thus with alpha (transparency)
+  - added timer toast message function that displays a countdown timer on the right side of the message text
+    - `-up :: _|(show_timer("test", d=15, ts=15, bgc="green"))`
+  - example with usage of alias use the same formatting for different timers
+    ```
+      # alias for timer that can be used for different timer when in combination with `get_var` and `set_var`
+      <timer> _|(show_timer(get_var("text"), d=get_var("dur"), ts=15, bgc="rgba(40, 200, 40, 200)", tc="white"))
+      -up :: _|(set_var("text","UPPPP 15"))|(set_var("dur",15)), <timer>
+      -left :: _|(set_var("text","LEFFT 10"))|(set_var("dur",10)), <timer>
+      -right :: <timer>
+      -down :: _|(show_message("test", d=15, ts=15, bgc="green"))
+    ```
+- added function `get_var` and `set_var` for arbitrary variable assignments
+  - if `get_var` is called before `set_var`, then the variable will be set to the string "None"
+- added test_overlay.py for easier testing of the gui
+
+
 260426-2158
 - mouse scrolling added via functions:
-  - vertical scrolling: `_|(scroll_up("value"))`, `_|(scroll_down("value"))`
-  - horizontal scrolling: `_|(scroll_left("value"))`, `_|(scroll_right("value"))`
-  - e.g. `-up :: _|(scroll_up("value"))`
+  - vertical scrolling: `_|(scroll_up(*value*))`, `_|(scroll_down(*value*))`
+  - horizontal scrolling: `_|(scroll_left(*value*))`, `_|(scroll_right(*value*))`
+  - e.g. `-up :: _|(scroll_up(*value*))`
 - mouse movement added via functions:
   - relative movement from current positon:
-    - `_|(mouse_move("dx", "dy"))`
+    - `_|(mouse_move(*dx*, *dy*))`
     - `-up ::    _|(mouse_move(0,-50))`
     - `-left ::  _|(mouse_move(-50,0))`
     - `-down ::  _|(mouse_move(0,50))`
     - `-right :: _|(mouse_move(50,0))`
   - absolute movement:
-    - `_|(mouse_move_abs("dx", "dy"))`
+    - `_|(mouse_move_abs(*dx*, *dy*))`
 - function `mouse_get_pos()` added that will print out current absolut position and copy the tuble of coordinates into the clipboard of windows for easier pasting
 
 260426-1856
