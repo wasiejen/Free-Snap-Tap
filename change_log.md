@@ -1,3 +1,20 @@
+260427-2009
+- Add several utility actions to Output_Manager: 
+  - `get_time` # in ms since epoch
+  - `mouse_get_pos` # return tuble of x,y coordinate of current mouse position and copies it into clipboard for easier pasting
+  - `mouse_save_to_var`
+  - `mouse_move_to_var`
+  - `copy_to_clipboard`
+  - `paste`
+  - `save_into_file`
+  - `append_to_file`
+  - `empty_file`
+  - `print_all_variables`
+  - `clear_console`
+- Show toast messages when starting/stopping repeats and when making/restoring backups. 
+- Update make_backup/restore_backup to return both path and name, and adjust fst_save_file_handler to return (path, name) tuples. A
+- lso import time alongside datetime.
+
 260427-1400
 - added toast box for messages and timers
   - added toast message function that will be displayed under the status indicator overlay, that will vanish after set duration (ms)
