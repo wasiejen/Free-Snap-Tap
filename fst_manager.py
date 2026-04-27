@@ -12,7 +12,7 @@ from random import randint # randint(3, 9))
 from time import time, sleep # sleep(0.005) = 5 ms
 from fst_data_types import Key_Event, type_check
 from fst_threads import Focus_Thread, Macro_Repeat_Thread
-import datetime
+import datetime, time
 import re #regular expression
 from fst_save_file_handler import make_backup as mb, restore_backup as rb
 import pyperclip # to copy mouse position to clipboard for easier pasting
@@ -345,6 +345,7 @@ class Output_Manager():
             repeat_thread = Macro_Repeat_Thread(alias_string, repeat_time, stop_event, self._fst)
             self._repeat_thread_dict[alias_string] = [repeat_thread, stop_event]
             repeat_thread.start() 
+            show_message(f"Started repeat for {alias_string} with {repeat_time} ms", d=3., ts=12, bgc="rgba(40, 150, 40, 200)")
             return True
             
         def toggle_repeat(alias_string, repeat_time):
@@ -373,6 +374,7 @@ class Output_Manager():
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - stop_repeat()")
                 # raise KeyError(error)
+            show_message(f"Stopped repeat for {alias_string}", d=3., ts=12, bgc="rgba(150, 40, 40, 200)")
             return True
         
         def is_repeat_active(alias_string):
@@ -532,19 +534,26 @@ class Output_Manager():
             current_date_time = datetime.datetime.now().strftime("%y%m%d-%H%M")
             return current_date_time
         
+        #get current time in ms since epoch
+        def get_time():
+            current_time = int(time() * 1000)
+            return current_time
+        
         def release_modifier():
             self._fst.state_manager.release_all_modifier_keys()
             
         def make_backup(save_dir=self._fst.arg_manager.SAVE_DIR, backup_root_dir=self._fst.arg_manager.BACKUP_ROOT_DIR):
-            backup_path = mb(save_dir, backup_root_dir)
+            backup_path, backup_name = mb(save_dir, backup_root_dir)
             print(f"Made backup to {backup_path}")
+            show_message(f"Made backup to {backup_name}", d=5., ts=10, bgc="rgba(40, 150, 40, 200)")
             if CONSTANTS.DEBUG4:
                 print(f"D4: -- Eval: made backup to {backup_path}")
             return True
         
         def restore_backup(save_dir=self._fst.arg_manager.SAVE_DIR, backup_root_dir=self._fst.arg_manager.BACKUP_ROOT_DIR):
-            restored_path = rb(save_dir, backup_root_dir)
+            restored_path, restored_name = rb(save_dir, backup_root_dir)
             print(f"Restored backup from {restored_path}")
+            show_message(f"Restored backup from {restored_name}", d=5., ts=10, bgc="rgba(150, 40, 40, 200)")
             if CONSTANTS.DEBUG4:
                 print(f"D4: -- Eval: restored backup from {restored_path}")
             return True
@@ -575,10 +584,28 @@ class Output_Manager():
         
         def mouse_get_pos():
             position = self._mouse_controller.position
-            print(f"{position} copied to clipboard")
-            # save in clipboard for easier pasting            
-            pyperclip.copy(f"{position}")  
+            copy_to_clipboard(f"{position}")
+            return position
+        
+        def mouse_save_to_var(key_string):
+            position = mouse_get_pos()
+            self.variables[key_string] = position
+            print(f'mouse position {position} saved to variable {key_string}')
             return True
+        
+        def mouse_move_to_var(key_string):
+            try:
+                position = self.variables[key_string]
+                if isinstance(position, tuple) and len(position) == 2:
+                    self._mouse_controller.position = position
+                    print(f'mouse moved to position {position} from variable {key_string}')
+                    return True
+                else:
+                    print(f'variable {key_string} does not contain a valid position')
+                    return False
+            except KeyError:
+                print(f'variable {key_string} not found')
+                return False
         
         # show_message(*text*, *duration in s*, *text_size in px*, *background_color*, *text_color*)
         def show_message(text, d=3., ts=12, bgc="rgba(40, 150, 40, 200)", tc="white"):
@@ -601,6 +628,47 @@ class Output_Manager():
                 print(f'variable {key_string} set to "None"')
                 return self.variables[key_string]
             
+        def copy_to_clipboard(key_string):
+            pyperclip.copy(key_string)
+            show_message(f'"{key_string}" copied to clipboard')
+            return True
+        
+        def paste():
+            pasted_text = pyperclip.paste()
+            print(f'"{pasted_text}" pasted from clipboard')
+            return pasted_text
+        
+        def save_into_file(text, time_stamp=get_time(), mode='w', file_path='output.txt'):
+            with open(file_path, mode) as file:
+                file.write(f"{time_stamp}: {text}\n")
+            print(f'"{time_stamp}: {text}" saved into {file_path}')
+            return True
+        
+        def append_to_file(text, time_stamp=get_time(), file_path='output.txt'):
+            return save_into_file(text, time_stamp, mode='a', file_path=file_path)
+        
+        def empty_file(file_path='output.txt'):
+            open(file_path, 'w').close()
+            print(f'{file_path} has been emptied')
+            return True
+        
+        def print_all_variables():
+            if self.variables:
+                print("Current variables:")
+                for key_string, value in self.variables.items():
+                    print(f"{key_string}: {value}")
+            else:
+                print("No variables set.")
+            return True
+        
+        def clear_console():
+            if sys.platform.startswith('win'):
+                system('cls')
+            else:
+                system('clear')
+            return True
+        
+        
         # ---------------------------
         # eval starts from here
         
