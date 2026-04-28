@@ -58,20 +58,24 @@ class Macro_Thread(Thread):
             if self._fst.arg_manager.DEBUG2:
                 print(f"D2: > playing macro: {self.alias_name} :: {self.key_group}")
             for key_event in self.key_group:
-                
+                if self.stop_event.is_set():
+                    #self.stop_event.clear()
+                    break
                 # check all constraints at start!
                 constraint_fulfilled, delay_times = self._fst.output_manager.check_constraint_fulfillment(key_event, get_also_delays=True)
 
                 if constraint_fulfilled:
                     if self.stop_event.is_set():
-                        self.stop_event.clear()
+                        #self.stop_event.clear()
                         break
                     else:
                         if key_event.is_toggle:
                             key_event = self._fst.output_manager.get_next_toggle_state_key_event(key_event)
                         # send key event and handles interruption of delay
                         self._fst.output_manager.execute_key_event(key_event, delay_times, with_delay=True, stop_event=self.stop_event)
-                       
+                        
+            if self.stop_event.is_set():
+                self.stop_event.clear()           
         except Exception as error:
             print(error)
             alias_thread_logging.append(error)
@@ -80,12 +84,14 @@ class Macro_Repeat_Thread(Thread):
     '''
     repeatatly execute a key event based on a timer
     '''
-    def __init__(self, alias_name, repeat_time, stop_event, fst_keyboard, time_increment=100):
+    def __init__(self, alias_name, repeat_time, stop_event, reset_event, with_overlay, fst_keyboard, time_increment=100):
         Thread.__init__(self)
         self.daemon = True
         self.alias_name = alias_name
         self.repeat_time = repeat_time
         self.stop_event = stop_event
+        self.reset_event  = reset_event
+        self.with_overlay = with_overlay
         self.time_increment = time_increment
         self.number_of_increments = self.repeat_time // time_increment
         self._fst = fst_keyboard
@@ -96,27 +102,28 @@ class Macro_Repeat_Thread(Thread):
         print(f"START REPEAT: {self.alias_name} with interval of {self.repeat_time} ms")
 
         while not self.stop_event.is_set():
-            if self.reset:
+
+            if self.reset_event.is_set():
                 self.macro_stop_event = Event()
-                self.reset = False
-                #print(f"D4: Repeat: {self.alias_name} reset")
-            else:
-                #print(f"D4: Repeat: {self.alias_name} execute")
-                self._fst.start_macro_playback(self.alias_name, self._fst.key_group_by_alias[self.alias_name], self.macro_stop_event)
+                self.reset_event.clear() # or can i clear an Event object again?
+            #print(f"D4: Repeat: {self.alias_name} reset")
+            #print(f"D4: Repeat: {self.alias_name} execute")
+            if self.with_overlay: 
+                self._fst.timer_callback(f"{self.alias_name}", self.repeat_time // 1000, 12, "rgba(40, 150, 40, 200)", "white")
+            self._fst.start_macro_playback(self.alias_name, self._fst.key_group_by_alias[self.alias_name], self.macro_stop_event)
             for index in range(self.number_of_increments):
-                if self.stop_event.is_set():
+                if self.stop_event.is_set() or self.reset_event.is_set():
                     self.macro_stop_event.set()
-                    break
-                elif self.reset:
+                    if self.with_overlay:
+                        self._fst.remove_callback(f"{self.alias_name}", immediately=1)
                     break
                 else:
                     sleep(self.time_increment / 1000)
+        if self.with_overlay:
+            self._fst.remove_callback(f"{self.alias_name}")
         # if stopped also stop the macro if it is still running
         print(f"STOP REPEAT: {self.alias_name} with interval of {self.repeat_time} ms")
-                
-    def reset_timer(self):
-        self.macro_stop_event.set()
-        self.reset = True
+             
         
             
 class Focus_Thread(Thread):

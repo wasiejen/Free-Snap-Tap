@@ -1,17 +1,85 @@
+ideas:
+- toast timer upgrade resolution from 1s to 0.1s
+- asyncio integration instead of threading for macros and repeat functions
+  - potential to greatly reduce threading and running conditions (even if not very often problematic)
+  - remove the use of time.sleep and thus blocking behavior
+- MouseOnMove maybe usable to record relative mouse movement to record anit recoil movement in games? :_)
+- transition some global control variables like PAUSED and STOPPED to an Event System?
+  - Thread safety
+- maybe rethink how i control the UI update loop??
+  - Focus_Thread
+- replace the improvised DEBUG variable system with actual logging
+- make the config possible to be split into multiple files
+  - maybe a folder and one file per focus group?
+
+
+260428-1230
+- fixed a bug in reset_repeat logic that lead to an entire repeat time with no action before starting again
+- integrated in repeat function the toast message as timer
+  - can optionally be disabled via with_overlay=0 in function
+  - `start_repeat(alias_string, repeat_time, with_overlay=0)`
+- added remove function for toasts, which is used by the repeat function if reset to prematurely restart a loop
+  - works semi reliable on the repeat - has problems with to many repeat or with to fast restarts of a repeat and will generate multiple toasts
+  - added function `remove_toast(text, immediately=0)` and `remove_all_toasts(immediately=0)` for deleting toasts manually
+    - `immediately=1` will remove toast immediately
+    - `immediately=0` default value will recolor toast red and display DEL at timer area, will be removed 1 second after recoloring
+- added checks if status_indicator is even on before a toast/timer is posted
+
+260427-2009
+- Add several utility actions/functions to Output_Manager: 
+  - `get_time()` # in ms since epoch
+  - `mouse_get_pos()` # return tuple (x,y) coordinate of current mouse position and copies it into clipboard for easier pasting
+  - `mouse_save_to_var(var)` # saves the tuple in a variable
+  - `mouse_move_to_var(var)` # moves to the variable if it is a valid tuple
+  - `copy_to_clipboard(var)` # copies selected variable to os clipboard
+  - `paste()` # returns what is in the clipbaord for use in functions 
+    - (not sure for what yet, but when you have a copy to clipboard then why not a paste also? :-P)
+  - `save_into_file(text, time_stamp=get_time(), mode='w', file_path='output.txt')` # "{time_stamp}: {text}" saved into {file_path}')
+  - `append_to_file(text, time_stamp=get_time(), file_path='output.txt')` #
+  - `empty_file(file_path='output.txt')`
+  - `print_all_variables()`
+  - `clear_console()`
+- Show toast messages when starting/stopping repeats and when making/restoring backups. 
+- Update make_backup/restore_backup to return both path and name, and adjust fst_save_file_handler to return (path, name) tuples. A
+- lso import time alongside datetime.
+
+260427-1400
+- added toast box for messages and timers
+  - added toast message function that will be displayed under the status indicator overlay, that will vanish after set duration (ms)
+    - show_message(*text*, *duration in s*, *text_size in px*, *background_color*, *text_color*)
+      - `_|(show_message("test"))` # minimal message shown for 3 s
+      - `_|(show_message("test", d=15, ts=15, bgc="green", tc="white"))`
+      - bgc und tc also usable via `bgc="rgba(40, 40, 40, 200)"` and thus with alpha (transparency)
+  - added timer toast message function that displays a countdown timer on the right side of the message text
+    - `-up :: _|(show_timer("test", d=15, ts=15, bgc="green"))`
+  - example with usage of alias use the same formatting for different timers
+    ```
+      # alias for timer that can be used for different timer when in combination with `get_var` and `set_var`
+      <timer> _|(show_timer(get_var("text"), d=get_var("dur"), ts=15, bgc="rgba(40, 200, 40, 200)", tc="white"))
+      -up :: _|(set_var("text","UPPPP 15"))|(set_var("dur",15)), <timer>
+      -left :: _|(set_var("text","LEFFT 10"))|(set_var("dur",10)), <timer>
+      -right :: <timer>
+      -down :: _|(show_message("test", d=15, ts=15, bgc="green"))
+    ```
+- added function `get_var` and `set_var` for arbitrary variable assignments
+  - if `get_var` is called before `set_var`, then the variable will be set to the string "None"
+- added test_overlay.py for easier testing of the gui
+
+
 260426-2158
 - mouse scrolling added via functions:
-  - vertical scrolling: `_|(scroll_up("value"))`, `_|(scroll_down("value"))`
-  - horizontal scrolling: `_|(scroll_left("value"))`, `_|(scroll_right("value"))`
-  - e.g. `-up :: _|(scroll_up("value"))`
+  - vertical scrolling: `_|(scroll_up(*value*))`, `_|(scroll_down(*value*))`
+  - horizontal scrolling: `_|(scroll_left(*value*))`, `_|(scroll_right(*value*))`
+  - e.g. `-up :: _|(scroll_up(*value*))`
 - mouse movement added via functions:
   - relative movement from current positon:
-    - `_|(mouse_move("dx", "dy"))`
+    - `_|(mouse_move(*dx*, *dy*))`
     - `-up ::    _|(mouse_move(0,-50))`
     - `-left ::  _|(mouse_move(-50,0))`
     - `-down ::  _|(mouse_move(0,50))`
     - `-right :: _|(mouse_move(50,0))`
   - absolute movement:
-    - `_|(mouse_move_abs("dx", "dy"))`
+    - `_|(mouse_move_abs(*dx*, *dy*))`
 - function `mouse_get_pos()` added that will print out current absolut position and copy the tuble of coordinates into the clipboard of windows for easier pasting
 
 260426-1856

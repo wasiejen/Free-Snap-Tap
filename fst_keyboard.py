@@ -53,6 +53,10 @@ class FST_Keyboard():
         self._state_manager = Input_State_Manager(self)
         self._cli_menu = CLI_menu(self)
         
+        self.toast_callback = None # Will hold bridge.trigger_toast   
+        self.timer_callback = None # Will hold bridge.trigger_timer
+        self.remove_callback = None # Will hold bridge.remove_toast
+        
         # Tap groups define which keys are mutually exclusive
         # Key Groups define which key1 will be replaced by key2
         # if a Key Group has more than 2 keys if will be handled als alias
