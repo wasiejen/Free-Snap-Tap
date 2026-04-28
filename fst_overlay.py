@@ -243,9 +243,19 @@ class GUI_Manager(QWidget):
         else:
             self._fst.arg_manager.CROSSHAIR_ENABLED = True
         
-    def show_message(self, text, duration, text_size, bg_color, text_color, timer):
-            self.toast_manager.add_toast(text, duration, text_size, bg_color, text_color, timer)
             
+    # def add_toast(self, text, **kwargs):
+    #     self.toast_manager.add_toast(text, **kwargs)
+    
+    # def add_timer(self, text, **kwargs):
+    #     self.toast_manager.add_toast(text, **kwargs)
+        
+    # def remove_toast(self, text):
+    #     self.toast_manager.remove_toast(text)   
+    
+    # def remove_all_toasts(self):
+    #     self.toast_manager.remove_all_toasts()
+        
         
 class Tray_Icon(QSystemTrayIcon):
     """A system tray icon with a context menu for Free-Snap-Tap."""
@@ -626,18 +636,16 @@ class StatusOverlay(QWidget):
            
            
 class ToastWidget(QFrame):
-    def __init__(self, text, duration=3., text_size=12, bg_color="rgba(40, 40, 40, 200)", text_color="white", timer=0, parent=None):
+    def __init__(self, text, duration=3.0, text_size=12, bg_color="rgba(40, 40, 40, 200)", text_color="white", timer=0, parent=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.ToolTip | Qt.WindowStaysOnTopHint)
-        #self.setAttribute(Qt.WA_TranslucentBackground)
         self.id = text
         self.base_text = text
-        # Convert ms duration to seconds for the countdown
-        self.duration = duration * 1000
-        self.remaining_seconds = self.duration // 1000
+        self.text_size = text_size
+        self.text_color = text_color
         
-        # This tells the widget: "Only be as wide as your text"
-        self.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Preferred)
+        self.use_timer_display = bool(timer) # Store the flag
+        self.remaining_seconds = int(duration)
         
         self.setStyleSheet(f"""
             QFrame {{
@@ -645,7 +653,6 @@ class ToastWidget(QFrame):
                 color: {text_color};
                 border-radius: 8px;
                 padding: 0px;
-                /* border: 1px solid rgba(255, 255, 255, 40); */
             }}
             QLabel {{ 
                 background: transparent; 
@@ -656,38 +663,70 @@ class ToastWidget(QFrame):
         """)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0) # Left, Top, Right, Bottom margins
-        layout.setSpacing(0)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSizeConstraint(QVBoxLayout.SetFixedSize)
         
-        layout.setSizeConstraint(QVBoxLayout.SetFixedSize) # Crucial for tight framing
-        if timer:
+
+
+        # Set the initial text
+        if self.use_timer_display:
             self.label = QLabel(self.get_display_text())
         else:
             self.label = QLabel(f" {text} ")
         layout.addWidget(self.label)
+
+        # 2. Single Master Timer
+        # This handles both the countdown AND the eventual destruction
+        self.master_timer = QTimer(self)
+        self.master_timer.timeout.connect(self.handle_tick)
         
-        QTimer.singleShot(self.duration, self.deleteLater)
+        # Start at 1-second intervals
+        self.master_timer.start(1000) 
         
-        if timer:
-            if self.remaining_seconds > 0:
-                self.tick_timer = QTimer(self)
-                self.tick_timer.timeout.connect(self.update_countdown)
-                self.tick_timer.start(1000) # Trigger every 1 second
-            self.adjustSize()
-        
-    
+        self.adjustSize()
+
     def get_display_text(self):
-        """Formats the text to include the timer."""
-        
+        """Standardizes the countdown format."""
         return f" {self.base_text} | {self.remaining_seconds:3}s "
 
-    def update_countdown(self):
-        """Reduces the count and refreshes the label."""
+    def handle_tick(self):
+        """The single entry point for timer logic."""
         self.remaining_seconds -= 1
-        if self.remaining_seconds >= 0:
+        
+        if self.remaining_seconds <= 0:
+            self.master_timer.stop()
+            self.deleteLater()
+        elif self.use_timer_display: # No hasattr needed
             self.label.setText(self.get_display_text())
-            # Note: We don't need to call adjustSize() here unless 
-            # the character count changes drastically (e.g. 10s to 9s)
+
+    def dismiss(self, immediately):
+        """Visual confirmation before manual removal."""
+        if self.master_timer.isActive():
+            self.master_timer.stop()
+            
+        if immediately:
+            self.deleteLater()
+        else:
+            self.label.setText(f" {self.base_text} |  DEL ")
+            self.setStyleSheet(f"""
+                QFrame {{
+                    background-color: rgba(200, 40, 40, 200);
+                    color: {self.text_color};
+                    border-radius: 8px;
+                    padding: 0px;
+                }}
+                QLabel {{ 
+                    font-family: 'Consolas'; 
+                    font-size: {self.text_size}px; 
+                    font-weight: bold; 
+                }}
+            """)
+            
+            # Re-use the timer for the 1-second final delay
+            # This is more efficient than creating a singleShot
+            self.master_timer.timeout.disconnect() # Remove handle_tick
+            self.master_timer.timeout.connect(self.deleteLater)
+            self.master_timer.start(1000)
 
 class ToastManager(QWidget):
     def __init__(self, parent_overlay):
@@ -706,14 +745,52 @@ class ToastManager(QWidget):
         
         # Align children to the top-right of our static 500px box
         self.main_layout.setAlignment(Qt.AlignTop | Qt.AlignRight)
+        self.active_toasts = {} # Key: text (ID), Value: ToastWidget instance
 
-    def add_toast(self, text, duration, text_size, bg_color, text_color, timer):
-        toast = ToastWidget(text, duration, text_size, bg_color, text_color, timer)
-        self.main_layout.addWidget(toast, alignment=Qt.AlignRight)
+    def add_toast(self, text, duration, text_size, bg_color, text_color, timer=0):
+        # If a toast with the same ID already exists, remove it first
+        self.remove_toast(text, immediately=1)
+        if self._fst.arg_manager.STATUS_INDICATOR:
+            toast = ToastWidget(text, duration, text_size, bg_color, text_color, timer)
+            self.active_toasts[text] = toast
+            
+            # Auto-cleanup: remove from dict when the widget is deleted
+            toast.destroyed.connect(lambda: self._handle_destruction(text))
+            
+            self.main_layout.addWidget(toast, alignment=Qt.AlignRight)
+            self.update_position()
+            self.show()
         
-        # Position the manager once (it stays anchored)
+    def add_timer(self, text, duration, text_size, bg_color, text_color):
+        self.add_toast(text, duration, text_size, bg_color, text_color, timer=1)
+
+    def remove_toast(self, text, immediately=0):
+        """Manually find and delete a toast by its ID string."""
+        if text in self.active_toasts:
+            toast = self.active_toasts[text]
+            # deleteLater is safer than sip.delete for Qt widgets
+            toast.dismiss(immediately)  # Change text and color, then delete after 1 second
+            # We don't manually pop from dict here; 
+            # the 'destroyed' signal below handles it.
+            
+    def remove_all_toasts(self, immediately=0):
+        """Remove all active toasts using their individual dismiss logic."""
+        # .values() creates a view; list(...) creates a snapshot copy 
+        # so we don't have issues if the dict changes during iteration.
+        for toast in list(self.active_toasts.values()):
+            toast.dismiss(immediately)
+        
+        # Do NOT call self.active_toasts.clear() here.
+        # Each toast.dismiss() triggers a deleteLater(1000).
+        # When they actually vanish in 1 second, your _handle_destruction 
+        # method will pop them from the dict one by one.
+
+    def _handle_destruction(self, text):
+        """Internal cleanup when a toast disappears."""
+        if text in self.active_toasts:
+            self.active_toasts.pop(text)
+        self.check_empty()
         self.update_position()
-        self.show()
 
     def update_position(self):
         overlay_geo = self.parent_overlay.geometry()
@@ -732,8 +809,22 @@ class ToastManager(QWidget):
     
 class ToastBridge(QObject):
     # This acts as the thread-safe "translator"
-    signal_show_toast = Signal(str, int, int, str, str, int)  # text, duration, text_size, bg_color, text_color
+    signal_show_toast = Signal(str, int, int, str, str)  # text, duration, text_size, bg_color, text_color
+    signal_show_timer = Signal(str, int, int, str, str)  # text, duration, text_size, bg_color, text_color
+    signal_remove_toast = Signal(str, int) # New signal to target a specific ID
+    signal_remove_all_toasts = Signal(int) # New signal to remove all toasts
 
-    def trigger_toast(self, text, duration, text_size, bg_color, text_color, timer):
+    def trigger_toast(self, text, duration, text_size, bg_color, text_color):
         # This method can be called safely by ANY thread
-        self.signal_show_toast.emit(text, duration, text_size, bg_color, text_color, timer)
+        self.signal_show_toast.emit(text, duration, text_size, bg_color, text_color)
+
+    def trigger_timer(self, text, duration, text_size, bg_color, text_color):
+        self.signal_show_timer.emit(text, duration, text_size, bg_color, text_color)
+
+    def trigger_remove(self, text, immediately=0):
+        """Call this to instantly end a specific toast/timer."""
+        self.signal_remove_toast.emit(text, immediately)
+        
+    def trigger_remove_all(self, immediately=0):
+        """Call this to instantly end all toasts/timers."""
+        self.signal_remove_all_toasts.emit(immediately)  # Use a special wildcard ID to indicate "all"

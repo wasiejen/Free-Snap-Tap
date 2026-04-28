@@ -135,9 +135,17 @@ if __name__ == "__main__":
         gui_manager = GUI_Manager(fst_keyboard, app=app)
         
         bridge = ToastBridge()
-        bridge.signal_show_toast.connect(gui_manager.show_message)
-        fst_keyboard.toast_callback = bridge.trigger_toast
         
+        # Connect bridge signals to GUI manager slots
+        bridge.signal_show_toast.connect(gui_manager.toast_manager.add_toast)
+        bridge.signal_show_timer.connect(gui_manager.toast_manager.add_timer)
+        bridge.signal_remove_toast.connect(gui_manager.toast_manager.remove_toast)
+        bridge.signal_remove_all_toasts.connect(gui_manager.toast_manager.remove_all_toasts)
+        # Inject the bridge methods into the keyboard logic for thread-safe calls
+        fst_keyboard.toast_callback = bridge.trigger_toast
+        fst_keyboard.timer_callback = bridge.trigger_timer
+        fst_keyboard.remove_callback = bridge.trigger_remove
+        fst_keyboard.remove_all_callback = bridge.trigger_remove_all
 
         if fst_keyboard.arg_manager.TRAY_ICON:
             gui_manager.tray_icon.show()

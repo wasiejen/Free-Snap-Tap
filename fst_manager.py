@@ -12,7 +12,7 @@ from random import randint # randint(3, 9))
 from time import time, sleep # sleep(0.005) = 5 ms
 from fst_data_types import Key_Event, type_check
 from fst_threads import Focus_Thread, Macro_Repeat_Thread
-import datetime, time
+import datetime
 import re #regular expression
 from fst_save_file_handler import make_backup as mb, restore_backup as rb
 import pyperclip # to copy mouse position to clipboard for easier pasting
@@ -337,20 +337,21 @@ class Output_Manager():
                 ##2
                 return 9999
             
-        def start_repeat(alias_string, repeat_time):
+        def start_repeat(alias_string, repeat_time, with_overlay=1):
             stop_repeat(alias_string)
             
             repeat_time = int(repeat_time)
             stop_event = Event()
-            repeat_thread = Macro_Repeat_Thread(alias_string, repeat_time, stop_event, self._fst)
-            self._repeat_thread_dict[alias_string] = [repeat_thread, stop_event]
+            reset_event = Event()
+            repeat_thread = Macro_Repeat_Thread(alias_string, repeat_time, stop_event, reset_event, with_overlay, self._fst)
+            self._repeat_thread_dict[alias_string] = [repeat_thread, stop_event, reset_event]
             repeat_thread.start() 
-            show_message(f"Started repeat for {alias_string} with {repeat_time} ms", d=3., ts=12, bgc="rgba(40, 150, 40, 200)")
+            #show_message(f"Started repeat for {alias_string} with {repeat_time} ms", d=3., ts=12, bgc="rgba(40, 150, 40, 200)")
             return True
             
         def toggle_repeat(alias_string, repeat_time):
             try:
-                repeat_thread, stop_event = self._repeat_thread_dict[alias_string]
+                repeat_thread, stop_event, reset_event = self._repeat_thread_dict[alias_string]
                 if repeat_thread.is_alive():
                     # print(f"stopping repeat for {current_ke}")
                     stop_event.set()
@@ -366,7 +367,7 @@ class Output_Manager():
         
         def stop_repeat(alias_string):
             try:
-                repeat_thread, stop_event = self._repeat_thread_dict[alias_string]
+                repeat_thread, stop_event, reset_event = self._repeat_thread_dict[alias_string]
                 if repeat_thread.is_alive():
                     stop_event.set()
                     repeat_thread.join()
@@ -374,12 +375,12 @@ class Output_Manager():
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - stop_repeat()")
                 # raise KeyError(error)
-            show_message(f"Stopped repeat for {alias_string}", d=3., ts=12, bgc="rgba(150, 40, 40, 200)")
+            #show_message(f"Stopped repeat for {alias_string}", d=3., ts=12, bgc="rgba(150, 40, 40, 200)")
             return True
         
         def is_repeat_active(alias_string):
             try:
-                repeat_thread, stop_event = self._repeat_thread_dict[alias_string]
+                repeat_thread, stop_event, reset_event = self._repeat_thread_dict[alias_string]
                 if repeat_thread.is_alive():
                     return True
                 else:
@@ -392,9 +393,9 @@ class Output_Manager():
         
         def reset_repeat(alias_string):
             try:
-                repeat_thread, _ = self._repeat_thread_dict[alias_string]
+                repeat_thread, _, reset_event = self._repeat_thread_dict[alias_string]
                 if repeat_thread.is_alive():
-                    repeat_thread.reset_timer()
+                    reset_event.set()
             except KeyError:
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - reset_repeat()")
@@ -403,7 +404,7 @@ class Output_Manager():
         
         def stop_all_repeat():
             try:
-                for repeat_thread, stop_event in self._repeat_thread_dict.values():
+                for repeat_thread, stop_event, reset_event in self._repeat_thread_dict.values():
                     if repeat_thread.is_alive():
                         stop_event.set()
                         repeat_thread.join()
@@ -609,12 +610,22 @@ class Output_Manager():
         
         # show_message(*text*, *duration in s*, *text_size in px*, *background_color*, *text_color*)
         def show_message(text, d=3., ts=12, bgc="rgba(40, 150, 40, 200)", tc="white"):
-            self._fst.toast_callback(text, d, ts, bgc, tc, timer=0)
+            self._fst.toast_callback(text, d, ts, bgc, tc)
             return True
         
         def show_timer(text, d=3., ts=12, bgc="rgba(150, 150, 40, 200)", tc="white"):
-            self._fst.toast_callback(text, d, ts, bgc, tc, timer=1)
+            self._fst.timer_callback(text, d, ts, bgc, tc)
             return True
+        
+        def remove_toast(text, immediately=0):
+            self._fst.remove_callback(text)
+            return True
+        
+        def remove_all_toasts(immediately=0):
+            self._fst.remove_all_callbacks()
+            return True
+        
+        
 
         def set_var(key_string, text):
             self.variables[key_string] = text
@@ -1678,7 +1689,7 @@ class Input_State_Manager():
 
     def stop_all_repeating_keys(self):
         for key_event in self._fst.output_manager.repeat_thread_dict.keys():
-            repeat_thread, stop_event = self._fst.output_manager.repeat_thread_dict[key_event]
+            repeat_thread, stop_event, reset_event = self._fst.output_manager.repeat_thread_dict[key_event]
             if repeat_thread.is_alive():
                 stop_event.set()
                 repeat_thread.join()
