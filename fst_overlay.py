@@ -10,6 +10,10 @@ from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont
 
 import ctypes
 
+import logging
+# Use __name__ to automatically label logs with the filename
+logger = logging.getLogger(__name__)
+
 # suppress warnings about setGeometry when changing screens and drawn geometry gets out of bound
 def customMessageHandler(mode, context, message):
     # Suppress QWindowsWindow::setGeometry warnings
@@ -99,10 +103,10 @@ class GUI_Manager(QWidget):
     def __init__(self, fst_keyboard, app):
         super().__init__()
         self._fst = fst_keyboard
-        self._app = app
+        self._app = app #QApplication([])
         self.tray_icon = Tray_Icon(fst_keyboard, parent=self)
         self.overlay = StatusOverlay(fst_keyboard, parent=self)
-        self.toast_manager = ToastManager(self.overlay)
+        self.toast_manager = ToastManager(fst_keyboard, self.overlay)
         self.crosshair = CrosshairOverlay(fst_keyboard, parent=self)
         self.color = None
 
@@ -729,8 +733,9 @@ class ToastWidget(QFrame):
             self.master_timer.start(1000)
 
 class ToastManager(QWidget):
-    def __init__(self, parent_overlay):
+    def __init__(self, fst_keyboard, parent_overlay):
         super().__init__()
+        self._fst = fst_keyboard
         self.parent_overlay = parent_overlay
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowStaysOnTopHint | Qt.Tool)
         self.setAttribute(Qt.WA_TranslucentBackground)

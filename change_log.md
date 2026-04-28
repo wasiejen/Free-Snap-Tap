@@ -11,7 +11,14 @@ ideas:
 - replace the improvised DEBUG variable system with actual logging
 - make the config possible to be split into multiple files
   - maybe a folder and one file per focus group?
+- stylesheet class or collector for easier change of styles for toast messages
 
+
+260428-2159
+- first version of asyncio implemented
+  - bugs with tap groups
+  - i bet there are way more new bugs xD
+- basic logging implemented
 
 260428-1230
 - fixed a bug in reset_repeat logic that lead to an entire repeat time with no action before starting again

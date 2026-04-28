@@ -3,6 +3,7 @@ Free-Snap-Tap V1.1.5
 last updated: 241105-2004
 '''
 
+import asyncio
 from threading import (  # to play aliases without interfering with keyboard listener
     Event,
     Thread,
@@ -12,135 +13,67 @@ from time import sleep  # sleep(0.005) = 5 ms
 import pygetwindow as gw
 import re #regular expression
 
-alias_thread_logging = []
-   
-class Macro_Thread(Thread):
-    '''
-    execute macros/alias in its own threads so the delay is not interfering with key evaluation
-    '''
-    def __init__(self, key_group, stop_event, alias_name, fst_keyboard):
-        Thread.__init__(self)
-        self.daemon = True
-        self.key_group = key_group
-        self.stop_event = stop_event
-        self.alias_name = alias_name
-        self._fst = fst_keyboard
-        
-    # def run(self): 
-    #     to_be_played_key_events = []
-    #     try:   
-    #         # Key_events ans Keys here ...
-    #         if self._fst.arg_manager.DEBUG2:
-    #             print(f"D2: > playing macro: {self.alias_name} :: {self.key_group}")
-    #         for key_event in self.key_group:
-                
-    #             # check all constraints at start!
-    #             constraint_fulfilled, delay_times = self._fst.output_manager.check_constraint_fulfillment(key_event, get_also_delays=True)
-    #             if constraint_fulfilled:
-    #                 to_be_played_key_events.append([key_event, delay_times])
-    #                 if self._fst.arg_manager.DEBUG2:
-    #                     print(f"D2: >> will play '{key_event}' with delays: {delay_times}")
+import logging
+# Use __name__ to automatically label logs with the filename
+logger = logging.getLogger(__name__)
+  
 
-    #         for key_event, delay_times in to_be_played_key_events:
-    #             # alias_thread_logging.append(f"{time() - starttime:.5f}: Send virtual key: {key_event.key_string}")
-    #             if self.stop_event.is_set():
-    #                 self.stop_event.clear()
-    #                 break
-    #             else:
-    #                 if key_event.is_toggle:
-    #                     key_event = self._fst.output_manager.get_next_toggle_state_key_event(key_event)
-    #                 # send key event and handles interruption of delay
-    #                 self._fst.output_manager.execute_key_event(key_event, delay_times, with_delay=True, stop_event=self.stop_event)
-        
-    def run(self): 
-
-        try:   
-            if self._fst.arg_manager.DEBUG2:
-                print(f"D2: > playing macro: {self.alias_name} :: {self.key_group}")
-            for key_event in self.key_group:
-                if self.stop_event.is_set():
-                    #self.stop_event.clear()
-                    break
-                # check all constraints at start!
-                constraint_fulfilled, delay_times = self._fst.output_manager.check_constraint_fulfillment(key_event, get_also_delays=True)
-
-                if constraint_fulfilled:
-                    if self.stop_event.is_set():
-                        #self.stop_event.clear()
-                        break
-                    else:
-                        if key_event.is_toggle:
-                            key_event = self._fst.output_manager.get_next_toggle_state_key_event(key_event)
-                        # send key event and handles interruption of delay
-                        self._fst.output_manager.execute_key_event(key_event, delay_times, with_delay=True, stop_event=self.stop_event)
-                        
-            if self.stop_event.is_set():
-                self.stop_event.clear()           
-        except Exception as error:
-            print(error)
-            alias_thread_logging.append(error)
-
-class Macro_Repeat_Thread(Thread):
+class Macro_Repeat_Task:
     '''
     repeatatly execute a key event based on a timer
     '''
-    def __init__(self, alias_name, repeat_time, stop_event, reset_event, with_overlay, fst_keyboard, time_increment=100):
-        Thread.__init__(self)
-        self.daemon = True
+    def __init__(self, alias_name, repeat_time, with_overlay,  fst_keyboard):
+        self._fst = fst_keyboard
         self.alias_name = alias_name
         self.repeat_time = repeat_time
-        self.stop_event = stop_event
-        self.reset_event  = reset_event
         self.with_overlay = with_overlay
-        self.time_increment = time_increment
-        self.number_of_increments = self.repeat_time // time_increment
-        self._fst = fst_keyboard
-        self.reset = False
-        self.macro_stop_event = Event()        
+        self.reset_event = asyncio.Event()
+        self.stop_event = asyncio.Event()
+        self._handle = None       
          
-    def run(self): 
+    async def run(self): 
+        logger.debug(f"Macro_Repeat_Task started for {self.alias_name} with repeat time {self.repeat_time} ms")
         print(f"START REPEAT: {self.alias_name} with interval of {self.repeat_time} ms")
 
         while not self.stop_event.is_set():
-
-            if self.reset_event.is_set():
-                self.macro_stop_event = Event()
-                self.reset_event.clear() # or can i clear an Event object again?
-            #print(f"D4: Repeat: {self.alias_name} reset")
-            #print(f"D4: Repeat: {self.alias_name} execute")
             if self.with_overlay: 
                 self._fst.timer_callback(f"{self.alias_name}", self.repeat_time // 1000, 12, "rgba(40, 150, 40, 200)", "white")
-            self._fst.start_macro_playback(self.alias_name, self._fst.key_group_by_alias[self.alias_name], self.macro_stop_event)
-            for index in range(self.number_of_increments):
-                if self.stop_event.is_set() or self.reset_event.is_set():
-                    self.macro_stop_event.set()
-                    if self.with_overlay:
-                        self._fst.remove_callback(f"{self.alias_name}", immediately=1)
-                    break
-                else:
-                    sleep(self.time_increment / 1000)
-        if self.with_overlay:
-            self._fst.remove_callback(f"{self.alias_name}")
+                
+            self._handle = self._fst.start_macro_playback_repeat(self.alias_name, self._fst.key_group_by_alias[self.alias_name])
+            try:
+                await asyncio.wait_for(self.reset_event.wait(), timeout=self.repeat_time / 1000)
+            except asyncio.TimeoutError:
+                pass
+            if self.reset_event.is_set():
+                print(f"Resetting repeat task for {self.alias_name}")
+                self.reset_event.clear()
+            if self.with_overlay:
+                self._fst.remove_callback(f"{self.alias_name}")
         # if stopped also stop the macro if it is still running
         print(f"STOP REPEAT: {self.alias_name} with interval of {self.repeat_time} ms")
-             
+
+    def cancel_playback(self):
+        self.stop_event.set()
+        self._handle.cancel()
         
+    def reset(self):
+        self.reset_event.set()
+        self._handle.cancel()
             
-class Focus_Thread(Thread):
+class Focus_Task:
     '''
     Thread for observing the active window and pause toggle the evaluation of key events
     can be manually overwritten by Controls on ALT+DEL
     '''
 
     def __init__(self, fst_keyboard):#, paused_lock):
-        Thread.__init__(self)
         self.stop = False
         self.daemon = True
         self._fst = fst_keyboard
         self.FOCUS_THREAD_PAUSED = False
         # self.paused_lock = paused_lock
 
-    def run(self):
+    async def run(self):
         last_active_window = ''
         found_valid_focus_name = False
         manually_paused = False
@@ -160,7 +93,7 @@ class Focus_Thread(Thread):
                 
                 # # 250905-1455: XXX-1
                 # #only allow letters, numbers and spaces in active window name
-                active_window = re.sub(r'[^a-zA-Z0-9 ]', '', active_window)
+                active_window = re.sub(r'[^a-zA-Z0-9_. ]', '', active_window)
                 
                 
                 # if not one of my own spawned windows
@@ -226,14 +159,14 @@ class Focus_Thread(Thread):
                                     self._fst.cli_menu.update_group_display()
                                     self._fst.cli_menu.display_focus_not_found()
                                     ###XXX give chance to the controller to release the pressed keys
-                                    sleep(0.2)
+                                    await asyncio.sleep(0.2)
                                     self._fst.arg_manager.WIN32_FILTER_PAUSED = True 
                                     print(f"> Active Window: {active_window}")
                                                   
                     else:
                         manually_paused = True
                         
-            sleep(0.5)
+            await asyncio.sleep(0.25)
 
     def pause(self):
         # with self.paused_lock:
@@ -245,6 +178,6 @@ class Focus_Thread(Thread):
             self.FOCUS_THREAD_PAUSED = False
             self._fst.arg_manager.MANUAL_PAUSED = False
 
-    def end(self):
+    def stop(self):
         self.stop = True
  
