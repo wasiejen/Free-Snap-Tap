@@ -33,7 +33,7 @@ def make_backup(save_dir, backup_root_dir) -> str:
 
     # copytree requires that destination does not exist
     shutil.copytree(save_dir, backup_path)  # copies directory recursively[web:16][web:21]
-    return backup_path
+    return backup_path, backup_name
 
 
 def restore_backup(save_dir,backup_root_dir) -> str:
@@ -59,6 +59,6 @@ def restore_backup(save_dir,backup_root_dir) -> str:
         shutil.rmtree(save_dir)  # remove existing tree safely before restore[web:21][web:25]
 
     shutil.copytree(latest_path, save_dir)  # restore backup into save[web:16][web:21]
-    return latest_path
+    return latest_path, latest_name
 
 

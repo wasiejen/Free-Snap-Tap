@@ -4,8 +4,8 @@ last updated: 250724-1434
 '''
 
 import sys
-from PySide6.QtWidgets import QWidget, QApplication, QMenu, QSystemTrayIcon
-from PySide6.QtCore import Qt, qInstallMessageHandler, Signal, QTimer
+from PySide6.QtWidgets import QSizePolicy, QWidget, QApplication, QMenu, QSystemTrayIcon, QLabel, QVBoxLayout, QFrame
+from PySide6.QtCore import QObject, Qt, qInstallMessageHandler, Signal, QTimer
 from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont
 
 import ctypes
@@ -56,25 +56,6 @@ def set_console_visibility(show: bool):
         user32.ShowWindow(hwnd, SW_HIDE)
         console_visible = False
 
-# # hide the console window of the overlay from the taskbar
-# def hide_overlay_console():
-    
-#     def get_window_by_title(title):
-#         # Set the return type and argument types for FindWindowW
-#         user32.FindWindowW.restype = ctypes.wintypes.HWND
-#         user32.FindWindowW.argtypes = [ctypes.wintypes.LPCWSTR, ctypes.wintypes.LPCWSTR]
-#         # Pass None for class name to match any window class
-#         hwnd = user32.FindWindowW(None, title)
-#         return hwnd
-
-#     hwnd = get_window_by_title("FST_Overlay")
-
-#     # Initialize style tracking on first use
-#     style = user32.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)
-#    # Apply Win11-compatible hide
-#     new_style = (style & ~WS_EX_APPWINDOW) | WS_EX_TOOLWINDOW
-#     user32.SetWindowLongPtrW(hwnd, GWL_EXSTYLE, new_style)
-
 def get_current_screen():
     # center_point = self.geometry().center()
     # screen = QApplication.screenAt(center_point)
@@ -111,6 +92,8 @@ def get_device_pixel_ratio(screen):
 #         return multiplier 
 
     
+    
+    
 
 class GUI_Manager(QWidget):
     def __init__(self, fst_keyboard, app):
@@ -119,6 +102,7 @@ class GUI_Manager(QWidget):
         self._app = app
         self.tray_icon = Tray_Icon(fst_keyboard, parent=self)
         self.overlay = StatusOverlay(fst_keyboard, parent=self)
+        self.toast_manager = ToastManager(self.overlay)
         self.crosshair = CrosshairOverlay(fst_keyboard, parent=self)
         self.color = None
 
@@ -251,8 +235,6 @@ class GUI_Manager(QWidget):
     def display_internal_state(self):
         self._fst.display_internal_repr_groups()
         
-        
-        
     # --- Crosshair Toggle Logic ---
     def toggle_crosshair(self):
         if self._fst.arg_manager.CROSSHAIR_ENABLED:
@@ -260,6 +242,19 @@ class GUI_Manager(QWidget):
             # overlay.hide_indicator()
         else:
             self._fst.arg_manager.CROSSHAIR_ENABLED = True
+        
+            
+    # def add_toast(self, text, **kwargs):
+    #     self.toast_manager.add_toast(text, **kwargs)
+    
+    # def add_timer(self, text, **kwargs):
+    #     self.toast_manager.add_toast(text, **kwargs)
+        
+    # def remove_toast(self, text):
+    #     self.toast_manager.remove_toast(text)   
+    
+    # def remove_all_toasts(self):
+    #     self.toast_manager.remove_all_toasts()
         
         
 class Tray_Icon(QSystemTrayIcon):
@@ -452,7 +447,8 @@ class StatusOverlay(QWidget):
         self.counter = 0
         
         # Window appearance
-        self.padding = 5
+        self.base_padding = 5
+        self.user_padding = 5 # used also for other things, so that they scale together with the user size
         self.user_size = self._fst.arg_manager.STATUS_INDICATOR_SIZE
         self.setWindowTitle("FST Status Indicator")
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool)
@@ -474,39 +470,28 @@ class StatusOverlay(QWidget):
         self.context_menu.addAction("Toggle Crosshair", self.signal_toggle_crosshair.emit)
         self.context_menu.addSeparator()
         self.context_menu.addAction("Hide Indicator", self.toggle_status_indicator)
-        
-        
-        # layout = QVBoxLayout()
-        # #layout.setContentsMargins(padding, padding, padding, padding)
-        # label = QLabel("FST", self)
-        # label.setAlignment(Qt.AlignCenter)
-        # label.setStyleSheet("color: white; font-weight: bold; font-size: 16px;")
-        # label.setFixedSize(user_size, user_size)
-        # layout.addWidget(label)
-        # self.setLayout(layout)
-        
-        # self.setStyleSheet(f"background-color: {self.color_name};")
-        
+               
 
         self.show()
 
     # Trigger a repaint to reflect the new size
     def set_window_size_and_position(self, init=False):
         user_size = self._fst.arg_manager.STATUS_INDICATOR_SIZE
-        padding = self.padding
+
+        #padding = self.padding
         # Window appearance        
         screen = get_current_screen()
         # Get the current global cursor position
         # screen_height = screen.geometry().height()
         size_multiplier = get_device_pixel_ratio(screen)
         # size_multiplier = get_device_pixel_ratio(screen)
-        user_size = int(user_size * size_multiplier)
-        padding = int(padding * size_multiplier)
+        self.user_size = int(user_size * size_multiplier)
+        padding = int(self.base_padding  * size_multiplier)
         dpadding = 2 * padding
         
         # Calculate the new size based on user size and padding
-        x_size = dpadding + user_size
-        y_size = dpadding + user_size
+        x_size = dpadding + self.user_size
+        y_size = dpadding + self.user_size
 
         if init :
             # On init, place at top-right corner of primary screen
@@ -521,8 +506,7 @@ class StatusOverlay(QWidget):
 
         self.setGeometry(top_left_x, top_left_y, x_size, y_size)
 
-        self.user_size = user_size
-        self.padding = padding
+        self.user_padding = padding
         self.x_size = x_size
         self.y_size = y_size
         self._current_screen = screen
@@ -535,7 +519,7 @@ class StatusOverlay(QWidget):
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setBrush(self.color)
         painter.setPen(Qt.NoPen)
-        p = self.padding
+        p = self.user_padding
         s = self.user_size
         painter.drawEllipse(self.x_size - p - s, p, s, s)
         #print(f"Painting overlay at: {self.geometry()} with size ({self.x_size}, {self.y_size}) and padding {p}")      
@@ -563,7 +547,11 @@ class StatusOverlay(QWidget):
             new_left = new_center_x - self.x_size // 2
             new_top = new_center_y - self.y_size // 2
             self.move(new_left, new_top)
-
+            
+            # also drag the toast manager if it's visible
+            if hasattr(self.parent(), 'toast_manager'):
+                self.parent().toast_manager.update_position()
+                
             # Check if the screen changed during drag
             new_screen = get_current_screen()
             if new_screen != self._current_screen:
@@ -646,26 +634,197 @@ class StatusOverlay(QWidget):
         # Repaint to ensure color is updated
         self.update()
            
+           
+class ToastWidget(QFrame):
+    def __init__(self, text, duration=3.0, text_size=12, bg_color="rgba(40, 40, 40, 200)", text_color="white", timer=0, parent=None):
+        super().__init__(parent)
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.ToolTip | Qt.WindowStaysOnTopHint)
+        self.id = text
+        self.base_text = text
+        self.text_size = text_size
+        self.text_color = text_color
+        
+        self.use_timer_display = bool(timer) # Store the flag
+        self.remaining_seconds = int(duration)
+        
+        self.setStyleSheet(f"""
+            QFrame {{
+                background-color: {bg_color};
+                color: {text_color};
+                border-radius: 8px;
+                padding: 0px;
+            }}
+            QLabel {{ 
+                background: transparent; 
+                font-family: 'Consolas', 'Courier New', monospace; 
+                font-size: {text_size}px; 
+                font-weight: bold; 
+            }}
+        """)
 
-# --- Dummy usage stub for testing ---
-if __name__ == "__main__":
-    class DummyArgManager:
-        STATUS_INDICATOR_SIZE = 50
-        CROSSHAIR_DELTA_X = 0
-        CROSSHAIR_DELTA_Y = 0
-        CROSSHAIR_THICKNESS = 2
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSizeConstraint(QVBoxLayout.SetFixedSize)
+        
 
-    class DummyFST:
-        arg_manager = DummyArgManager()
-        def control_toggle_pause(self): print("Pause toggled")
-        def control_return_to_menu(self): print("Returned to menu")
-        def control_exit_program(self, from_where): print(f"Exit program: {from_where}")
-        def display_internal_repr_groups(self): print("Display internal state")
-        def open_config_file(self): print("Open config file")
-        def reload_from_file(self): print("Reload from file")
 
-    def set_console_visibility(visible): print(f"Console visible?: {visible}")
+        # Set the initial text
+        if self.use_timer_display:
+            self.label = QLabel(self.get_display_text())
+        else:
+            self.label = QLabel(f" {text} ")
+        layout.addWidget(self.label)
 
-    app = QApplication(sys.argv)
-    overlay = StatusOverlay(DummyFST(), set_console_visibility)
-    sys.exit(app.exec_())
+        # 2. Single Master Timer
+        # This handles both the countdown AND the eventual destruction
+        self.master_timer = QTimer(self)
+        self.master_timer.timeout.connect(self.handle_tick)
+        
+        # Start at 1-second intervals
+        self.master_timer.start(1000) 
+        
+        self.adjustSize()
+
+    def get_display_text(self):
+        """Standardizes the countdown format."""
+        return f" {self.base_text} | {self.remaining_seconds:3}s "
+
+    def handle_tick(self):
+        """The single entry point for timer logic."""
+        self.remaining_seconds -= 1
+        
+        if self.remaining_seconds <= 0:
+            self.master_timer.stop()
+            self.deleteLater()
+        elif self.use_timer_display: # No hasattr needed
+            self.label.setText(self.get_display_text())
+
+    def dismiss(self, immediately):
+        """Visual confirmation before manual removal."""
+        if self.master_timer.isActive():
+            self.master_timer.stop()
+            
+        if immediately:
+            self.deleteLater()
+        else:
+            self.label.setText(f" {self.base_text} |  DEL ")
+            self.setStyleSheet(f"""
+                QFrame {{
+                    background-color: rgba(200, 40, 40, 200);
+                    color: {self.text_color};
+                    border-radius: 8px;
+                    padding: 0px;
+                }}
+                QLabel {{ 
+                    font-family: 'Consolas'; 
+                    font-size: {self.text_size}px; 
+                    font-weight: bold; 
+                }}
+            """)
+            
+            # Re-use the timer for the 1-second final delay
+            # This is more efficient than creating a singleShot
+            self.master_timer.timeout.disconnect() # Remove handle_tick
+            self.master_timer.timeout.connect(self.deleteLater)
+            self.master_timer.start(1000)
+
+class ToastManager(QWidget):
+    def __init__(self, parent_overlay):
+        super().__init__()
+        self.parent_overlay = parent_overlay
+        self.setWindowFlags(Qt.FramelessWindowHint | Qt.WindowTransparentForInput | Qt.WindowStaysOnTopHint | Qt.Tool)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        
+        # FIX: Give it a large enough fixed width so it doesn't need to resize
+        # This prevents the 'jump' because the window itself never changes size.
+        self.setFixedWidth(500) 
+        
+        self.main_layout = QVBoxLayout(self)
+        self.main_layout.setContentsMargins(0, 0, 0, 0)
+        self.main_layout.setSpacing(3)
+        
+        # Align children to the top-right of our static 500px box
+        self.main_layout.setAlignment(Qt.AlignTop | Qt.AlignRight)
+        self.active_toasts = {} # Key: text (ID), Value: ToastWidget instance
+
+    def add_toast(self, text, duration, text_size, bg_color, text_color, timer=0):
+        # If a toast with the same ID already exists, remove it first
+        self.remove_toast(text, immediately=1)
+        if self._fst.arg_manager.STATUS_INDICATOR:
+            toast = ToastWidget(text, duration, text_size, bg_color, text_color, timer)
+            self.active_toasts[text] = toast
+            
+            # Auto-cleanup: remove from dict when the widget is deleted
+            toast.destroyed.connect(lambda: self._handle_destruction(text))
+            
+            self.main_layout.addWidget(toast, alignment=Qt.AlignRight)
+            self.update_position()
+            self.show()
+        
+    def add_timer(self, text, duration, text_size, bg_color, text_color):
+        self.add_toast(text, duration, text_size, bg_color, text_color, timer=1)
+
+    def remove_toast(self, text, immediately=0):
+        """Manually find and delete a toast by its ID string."""
+        if text in self.active_toasts:
+            toast = self.active_toasts[text]
+            # deleteLater is safer than sip.delete for Qt widgets
+            toast.dismiss(immediately)  # Change text and color, then delete after 1 second
+            # We don't manually pop from dict here; 
+            # the 'destroyed' signal below handles it.
+            
+    def remove_all_toasts(self, immediately=0):
+        """Remove all active toasts using their individual dismiss logic."""
+        # .values() creates a view; list(...) creates a snapshot copy 
+        # so we don't have issues if the dict changes during iteration.
+        for toast in list(self.active_toasts.values()):
+            toast.dismiss(immediately)
+        
+        # Do NOT call self.active_toasts.clear() here.
+        # Each toast.dismiss() triggers a deleteLater(1000).
+        # When they actually vanish in 1 second, your _handle_destruction 
+        # method will pop them from the dict one by one.
+
+    def _handle_destruction(self, text):
+        """Internal cleanup when a toast disappears."""
+        if text in self.active_toasts:
+            self.active_toasts.pop(text)
+        self.check_empty()
+        self.update_position()
+
+    def update_position(self):
+        overlay_geo = self.parent_overlay.geometry()
+        parent_padding = self.parent_overlay.user_padding
+        
+        # Anchor the RIGHT edge of our 500px box to the RIGHT edge of the indicator
+        x = overlay_geo.right() - self.width() - parent_padding
+        # Anchor the TOP edge of our toasts just below the indicator
+        y = overlay_geo.bottom()
+        
+        self.move(x, y)
+
+    def check_empty(self):
+        if self.main_layout.count() == 0:
+            self.hide()
+    
+class ToastBridge(QObject):
+    # This acts as the thread-safe "translator"
+    signal_show_toast = Signal(str, int, int, str, str)  # text, duration, text_size, bg_color, text_color
+    signal_show_timer = Signal(str, int, int, str, str)  # text, duration, text_size, bg_color, text_color
+    signal_remove_toast = Signal(str, int) # New signal to target a specific ID
+    signal_remove_all_toasts = Signal(int) # New signal to remove all toasts
+
+    def trigger_toast(self, text, duration, text_size, bg_color, text_color):
+        # This method can be called safely by ANY thread
+        self.signal_show_toast.emit(text, duration, text_size, bg_color, text_color)
+
+    def trigger_timer(self, text, duration, text_size, bg_color, text_color):
+        self.signal_show_timer.emit(text, duration, text_size, bg_color, text_color)
+
+    def trigger_remove(self, text, immediately=0):
+        """Call this to instantly end a specific toast/timer."""
+        self.signal_remove_toast.emit(text, immediately)
+        
+    def trigger_remove_all(self, immediately=0):
+        """Call this to instantly end all toasts/timers."""
+        self.signal_remove_all_toasts.emit(immediately)  # Use a special wildcard ID to indicate "all"
