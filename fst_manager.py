@@ -3,19 +3,25 @@ Free-Snap-Tap V1.2.0
 last updated: 250724-1434
 '''
 
+
 from pynput import keyboard, mouse
 from threading import Event # to play aliases without interfering with keyboard listener
 from os import system, startfile # to use clearing of CLI for better menu usage and opening config file
 import sys # to get start arguments
 import msvcrt # to flush input stream
 from random import randint # randint(3, 9)) 
-from time import time, sleep # sleep(0.005) = 5 ms
+from time import time # sleep(0.005) = 5 ms
 from fst_data_types import Key_Event, type_check
-from fst_threads import Focus_Thread, Macro_Repeat_Thread
+from fst_threads import Focus_Task, Macro_Repeat_Task
 import datetime
 import re #regular expression
 from fst_save_file_handler import make_backup as mb, restore_backup as rb
 import pyperclip # to copy mouse position to clipboard for easier pasting
+import asyncio
+
+import logging
+# Use __name__ to automatically label logs with the filename
+logger = logging.getLogger(__name__)
 
 class CONSTANTS():
 
@@ -150,13 +156,14 @@ class Output_Manager():
         else:
             return fullfilled
                                         
-    def execute_key_event(self, key_event, delay_times = [], with_delay=False, stop_event=None):
-        
-        ###XXX 241013-1803 prevent all internal vk_codees from being executed
-        ###XXX 241015-2147 delays for internal vk_codes enabled if manual delay is given
-        
+    async def execute_key_event(self, key_event, delay_times = [], with_delay=False):
+                
         None_ke_with_delay = True
 
+        # None ke will not be played
+        if key_event.vk_code > 0:
+            self.send_key_event(key_event)
+            
         # if None ke has manual delays, they will be played .. if no delay is given default delay will NOT be applied
         if len(delay_times) == 0:
             if key_event.vk_code > 0:
@@ -170,35 +177,12 @@ class Output_Manager():
         else:
             delay_times = delay_times[:2]
     
-        # None ke will not be played
-        if key_event.vk_code > 0:
-            self.send_key_event(key_event)
-            #print(f"D1: playing key_event: {key_event} without delays: {delay_times}")
-        #250730-1733
         if len(delay_times) == 0:
             pass
         elif self._fst.arg_manager.ACT_DELAY or with_delay or None_ke_with_delay:
             #print(f"D1: waiting for delay: {delay_times}")
             delay_time = self.get_random_delay(*delay_times)
-            # print(f" --- waiting for: {delay_time}")
-            # if not in a thread just play sleep for the delay
-            if stop_event is None:
-                sleep(delay_time / 1000)
-            # if in thread, sleep in increments and break if stop_event is set
-            else:
-                sleep_increment = 5 # 5 ms
-                num_sleep_increments = (delay_time // sleep_increment )
-                num_sleep_rest = (delay_time % sleep_increment)
-                if CONSTANTS.DEBUG: 
-                    print(f"D1: incremental delay: {delay_time}, num_sleep_increments {num_sleep_increments}, num_sleep_rest {num_sleep_rest}")
-                sleep(num_sleep_rest / 1000)
-                for i in range(num_sleep_increments):
-                    if not stop_event.is_set():
-                        sleep(sleep_increment / 1000)
-                    else:
-                        if CONSTANTS.DEBUG:
-                            print("D1: stop event recognised")
-                        break
+            await asyncio.sleep(delay_time / 1000)
                         
 
     def constraint_evaluation(self, constraint_to_evaluate, current_ke):
@@ -341,62 +325,65 @@ class Output_Manager():
             stop_repeat(alias_string)
             
             repeat_time = int(repeat_time)
-            stop_event = Event()
-            reset_event = Event()
-            repeat_thread = Macro_Repeat_Thread(alias_string, repeat_time, stop_event, reset_event, with_overlay, self._fst)
-            self._repeat_thread_dict[alias_string] = [repeat_thread, stop_event, reset_event]
-            repeat_thread.start() 
+
+            
+            repeat_task = Macro_Repeat_Task(alias_string, repeat_time, with_overlay, self._fst)
+            
+            _handle = asyncio.run_coroutine_threadsafe(repeat_task.run(), self._fst.loop)
+            _handle.add_done_callback(self._fst.check_result)
+            logger.debug(f"Starting repeat task for {alias_string} with repeat time {repeat_time} ms and with_overlay {with_overlay}")
+            self._repeat_thread_dict[alias_string] = [repeat_task, _handle]
+            
             #show_message(f"Started repeat for {alias_string} with {repeat_time} ms", d=3., ts=12, bgc="rgba(40, 150, 40, 200)")
             return True
-            
+        
+        
+        
+        def stop_repeat(alias_string):
+            try:
+                repeat_task, _handle = self._repeat_thread_dict[alias_string]
+                if not _handle.done():
+                    repeat_task.cancel_playback()
+                    _handle.cancel()
+            except (KeyError, AttributeError):
+                if CONSTANTS.DEBUG3:
+                    print(f"can not find a Repeat called {alias_string} - stop_repeat()")
+            return True
+        
         def toggle_repeat(alias_string, repeat_time):
             try:
-                repeat_thread, stop_event, reset_event = self._repeat_thread_dict[alias_string]
-                if repeat_thread.is_alive():
+                repeat_task, _handle = self._repeat_thread_dict[alias_string]
+                if not _handle.done():
                     # print(f"stopping repeat for {current_ke}")
-                    stop_event.set()
-                    repeat_thread.join()
+                    repeat_task.cancel_playback()
+                    _handle.cancel()
                 else:
                     # print(f"{current_ke} restarting repeat")
                     start_repeat(alias_string, repeat_time)
-            except KeyError:
+            except (KeyError, AttributeError):
                 # this thread was not started before
                 # print(f"{current_ke} starting repeat for first time")
                 start_repeat(alias_string, repeat_time)
             return True
         
-        def stop_repeat(alias_string):
-            try:
-                repeat_thread, stop_event, reset_event = self._repeat_thread_dict[alias_string]
-                if repeat_thread.is_alive():
-                    stop_event.set()
-                    repeat_thread.join()
-            except KeyError:
-                if CONSTANTS.DEBUG3:
-                    print(f"can not find a Repeat called {alias_string} - stop_repeat()")
-                # raise KeyError(error)
-            #show_message(f"Stopped repeat for {alias_string}", d=3., ts=12, bgc="rgba(150, 40, 40, 200)")
-            return True
-        
         def is_repeat_active(alias_string):
             try:
-                repeat_thread, stop_event, reset_event = self._repeat_thread_dict[alias_string]
-                if repeat_thread.is_alive():
+                _, _handle = self._repeat_thread_dict[alias_string]
+                if not _handle.done():
                     return True
                 else:
                     return False
-            except KeyError:
+            except (KeyError, AttributeError):
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - stop_repeat()")
-                # raise KeyError(error)
             return False
         
         def reset_repeat(alias_string):
             try:
-                repeat_thread, _, reset_event = self._repeat_thread_dict[alias_string]
-                if repeat_thread.is_alive():
-                    reset_event.set()
-            except KeyError:
+                repeat_task, _handle = self._repeat_thread_dict[alias_string]
+                if not _handle.done():
+                    repeat_task.reset()
+            except (KeyError, AttributeError):
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - reset_repeat()")
                 # raise KeyError(error)
@@ -404,16 +391,17 @@ class Output_Manager():
         
         def stop_all_repeat():
             try:
-                for repeat_thread, stop_event, reset_event in self._repeat_thread_dict.values():
-                    if repeat_thread.is_alive():
-                        stop_event.set()
-                        repeat_thread.join()
+                for alias_name, (_, _handle) in self._repeat_thread_dict.items():
+                    if not _handle.done():
+                        _handle.cancel()
                 if CONSTANTS.DEBUG4:
                     print("D4: -- Eval: stopped all Repeat")
             except AttributeError:
                 if CONSTANTS.DEBUG3:
-                    print(f"can not find a Repeat called {repeat_thread} - reset_all_repeat()")
+                    print(f"can not find a Repeat called {alias_name} - reset_all_repeat()")
             return True
+
+
 
         def reset(alias_string):
             self._fst.reset_macro_sequence_by_name(alias_string, current_ke)
@@ -745,7 +733,7 @@ class Output_Manager():
         else:
             self._controller_dict[is_mouse_key].release(key_code)          
 
-    def send_keys_for_tap_group(self, tap_group):
+    async def send_keys_for_tap_group(self, tap_group):
         """
         Send the specified key and release the last key if necessary.
         """
@@ -784,7 +772,7 @@ class Output_Manager():
                         delay = randint(self._fst.arg_manager.ACT_MIN_DELAY_IN_MS, self._fst.arg_manager.ACT_MAX_DELAY_IN_MS)
                         if CONSTANTS.DEBUG: 
                             print(f"D1: delayed by {delay} ms")
-                        sleep(delay / 1000) # in ms
+                        await asyncio.sleep(delay / 1000) # in ms
                 if is_crossover:
                     self._keyboard_controller.release(key_code_last_key_send) 
                 else:
@@ -793,6 +781,7 @@ class Output_Manager():
                 
     def clear_all_variables(self):
         self.variables = {}
+        
 
 class Config_Manager():
     '''
@@ -946,7 +935,7 @@ class Config_Manager():
                 focus_name = line.replace('<focus>', '')
                 # # 250905-1455: XXX-1
                 # #only allow letters, numbers and spaces in focus_name
-                focus_name = re.sub(r'[^a-zA-Z0-9, ]', '', focus_name)
+                focus_name = re.sub(r'[^a-zA-Z0-9,_. ]', '', focus_name)
                 
                 ##260426-1851 allow multiple focus groups seperated by comma
                 focus_group_names = focus_name.split(',')
@@ -1476,7 +1465,8 @@ class Focus_Group_Manager():
         self.FOCUS_APP_NAME = ''
         
         self.focus_active = False
-        self._focus_thread  = None
+        self._focus_task  = None
+        self.task = None
 
         
     @property
@@ -1525,33 +1515,41 @@ class Focus_Group_Manager():
     def FOCUS_APP_NAME(self, new_str):
         self._FOCUS_APP_NAME = new_str
         
-    def init_focus_thread(self):
+    def init_focus_task(self):
         
         if len(self._multi_focus_dict_keys) > 0:
             self.focus_active = True
-            self._focus_thread = Focus_Thread(self._fst)
+            self._focus_task = Focus_Task(self._fst)
         else:
             self.focus_active = False
         return self.focus_active
             
-    def pause_focus_thread(self):
-        if self.focus_active and self._focus_thread.is_alive():
-            self._focus_thread.pause()
+    def pause_focus_task(self):
+        if self.focus_active:
+            self._focus_task.pause()
         
-    def start_focus_thread(self):
-        if self._focus_thread.is_alive():
-            pass
-        elif self.focus_active:
-            self._focus_thread.start()
+    def start_focus_task(self):
+        # if still active do nothing, otherwise start it again
+        loop = asyncio.get_running_loop()
+        #loop = self._fst.loop
         
-    def restart_focus_thread(self):
-        if self.focus_active and self._focus_thread.is_alive():
-            self._focus_thread.restart()
+        def start_task(loop):
+            if self.focus_active:
+                self.task = loop.create_task(self._focus_task.run())
+            
+        if self.task is None:
+            start_task(loop)
+        elif self.task.done():
+            start_task(loop)
         
-    def stop_focus_thread(self):
-        if self.focus_active and self._focus_thread.is_alive():
-            self._focus_thread.end()
-            self._focus_thread.join()
+    def restart_focus_task(self):
+        if self.focus_active:
+            self._focus_task.restart()
+        
+    def stop_focus_task(self):
+        if self.focus_active and not self.task.done():
+            self._focus_task.stop()
+            #self.task.cancel()
             
     def update_groups_from_config(self, config_update):
         multi_focus_dict, default_start_arguments, default_group_lines = config_update
@@ -1689,10 +1687,10 @@ class Input_State_Manager():
 
     def stop_all_repeating_keys(self):
         for key_event in self._fst.output_manager.repeat_thread_dict.keys():
-            repeat_thread, stop_event, reset_event = self._fst.output_manager.repeat_thread_dict[key_event]
-            if repeat_thread.is_alive():
-                stop_event.set()
-                repeat_thread.join()
+            repeat_task, _handle = self._fst.output_manager.repeat_thread_dict[key_event]
+            if not _handle.done():
+                repeat_task.cancel_playback()
+                _handle.cancel()
 
     def release_all_toggles(self):
         for vk_code in self._toggle_states_dict_keys:

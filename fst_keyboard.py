@@ -3,20 +3,25 @@ Free-Snap-Tap V1.1.4b
 last updated: 241023-1056
 '''
 
+import asyncio
+
 from pynput import keyboard, mouse
-from threading import Event # to play aliases without interfering with keyboard listener
 from time import time # sleep(0.005) = 5 ms
 from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_dict.py
 import pprint
 from os import startfile 
 
 from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro
-from fst_threads import Macro_Thread
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager 
 from fst_manager import Input_State_Manager, Config_Manager
 
-   
+
+import logging
+# Use __name__ to automatically label logs with the filename
+logger = logging.getLogger(__name__)
+
+
 class FST_Keyboard():
     '''
     Main class to handle keyboard and mouse input and output
@@ -67,7 +72,7 @@ class FST_Keyboard():
         self._macro_triggers = [] 
         self._all_trigger_events = []
         
-        self._macro_thread_dict = {}        
+        self._macro_task_dict = {}        
         
         # colletor of all rebinds and macros, not used for anything yet 241011-1117
         self._rebinds = []
@@ -76,25 +81,30 @@ class FST_Keyboard():
         self._macro_sequence_alias_list = []
         self._key_group_by_alias = {}
         
+        self.loop = None
         self._mouse_listener = None
         self._listener = None
-            
+    
+  
     def init_listener(self):
         self._mouse_listener = mouse.Listener(win32_event_filter=self.mouse_win32_event_filter)
         self._listener = keyboard.Listener(win32_event_filter=self.keyboard_win32_event_filter)
+        logger.debug("Keyboard and mouse listeners initialized.")
         
     def start_listener(self):
         if self._mouse_listener is None or self._listener is None:
             self.init_listener()
         self._listener.start()
         self._mouse_listener.start()
+        logger.debug("Keyboard and mouse listeners started.")
         
     def stop_listener(self):
         self._listener.stop()
         self._mouse_listener.stop()
-        
-    def join_listener(self):
-        self._listener.join()
+        logger.debug("Keyboard and mouse listeners stopped.")
+
+    # def join_listener(self):
+    #     self._listener.join()
 
     @property
     def focus_manager(self):
@@ -116,7 +126,7 @@ class FST_Keyboard():
         return self._cli_menu
     @property
     def macro_thread_dict(self):
-        return self._macro_thread_dict
+        return self._macro_task_dict
     @property
     def macro_sequence_alias_list(self):
         return self._macro_sequence_alias_list
@@ -390,6 +400,23 @@ class FST_Keyboard():
         self.apply_start_args_by_focus_name(focus_name)    
         self.apply_focus_groups(focus_name)    
 
+    def set_loop(self, loop):
+        self.loop = loop
+        
+    # def mouse_task(self, msg, data):
+    #     '''
+    #     Task to handle mouse events, can be used for async handling if needed
+    #     '''
+    #     # asyncio.run_coroutine_threadsafe(self.mouse_win32_event_filter(msg, data), self.loop)
+    #     self.loop.call_soon_threadsafe(self.mouse_win32_event_filter, msg, data)
+        
+    # def keyboard_task(self, msg, data):
+    #     '''
+    #     Task to handle keyboard events, can be used for async handling if needed
+    #     '''
+    #     # asyncio.run_coroutine_threadsafe(self.keyboard_win32_event_filter(msg, data), self.loop)
+    #     self.loop.call_soon_threadsafe(self.keyboard_win32_event_filter, msg, data) 
+
     def mouse_win32_event_filter(self, msg, data):#
         '''
         Mouse event filter for Win32 API messages.
@@ -414,8 +441,7 @@ class FST_Keyboard():
         # Button.x1
         # Button.x2
         # Button.middle
-
-        
+               
         def is_simulated_key_event(flags):
             return flags == 1
         
@@ -449,6 +475,10 @@ class FST_Keyboard():
                 return 7
             return None
 
+        def get_coordinates():
+            x = data.pt.x
+            y = data.pt.y
+            return (x,y)
         
         # if DEBUG
         #print(f"pt: {data.pt}")
@@ -463,18 +493,23 @@ class FST_Keyboard():
         # if msg == MSG_MOUSE_MOVE:
         #     skip_event = True
 
-        if not msg == FST_Keyboard.MSG_MOUSE_MOVE:
-            
+        if msg == FST_Keyboard.MSG_MOUSE_MOVE:
+            return False
+        
+        else:
             vk_code = get_mouse_vk_code()
             key_event_time = data.time
             is_keydown = is_press(msg)
             is_simulated = is_simulated_key_event(data.flags)
+            is_mouse_event = True
             # if CONSTANTS.DEBUG:
             #     print(f"D1: vk_coe: {vk_code}, simulated: {is_simulated}, msg: {msg}")       
-            if vk_code is not None:      
-                self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event=True)
+            if vk_code is not None:    
+                self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event) 
+                # self.loop.call_soon_threadsafe(self._win32_event_filter, vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event)   
             else:
                 self._listener.suppress()
+
         
     def keyboard_win32_event_filter(self, msg, data):
         
@@ -492,7 +527,7 @@ class FST_Keyboard():
         is_keydown = is_press(msg)
         is_simulated = is_simulated_key_event(data.flags)
         self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated)
-
+        
     def _win32_event_filter(self, vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event=False):
         """
         Filter and handle keyboard and mouse events.
@@ -694,7 +729,7 @@ class FST_Keyboard():
                             tap_group.update_tap_states(vk_code, is_keydown) 
 
                             # send keys
-                            self.output_manager.send_keys_for_tap_group(tap_group)
+                            self.loop.create_task(self.output_manager.send_keys_for_tap_group(tap_group))
                             # to allow repeated keys from hold, key_to_send is a vk_code
                             if tap_group.get_active_key() != vk_code or not trigger_key_repeated:
                                 to_be_suppressed = True
@@ -768,7 +803,8 @@ class FST_Keyboard():
             if CONSTANTS.DEBUG4:
                 print(f"D4: {"-- | XX" if is_simulated else "XX"} SUPPRESSED: {current_ke}")
 
-            self._listener.suppress_event()     
+            self._listener.suppress_event()  
+  
                 
         # everything that will be send arrives here      
         vk_code, is_keydown, _ = current_ke.get_all()
@@ -782,32 +818,70 @@ class FST_Keyboard():
             
         if CONSTANTS.DEBUG4:
             print(f"D4: {"-- | <-" if is_simulated else "<-"} OUT ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
+            
+    def check_result(self, fut):
+        # try:
+        #     fut.result() # This will raise the exception if the task crashed
+        # except Exception as e:
+        #     logger.debug(f"Exception in macro task: {e}")
+        #     print(f"CRASH IN REPEAT TASK: {e}")
+        pass
 
-    def start_macro_playback(self, alias_name, key_sequence, stop_event = Event()):
-
+    # MACRO PLAYBACK for direct call from Listener Threads
+    def start_macro_playback(self, alias_name, key_sequence):
         self.interrupt_macro_by_name(alias_name)
         
-        if stop_event.is_set():
-            stop_event.clear()
-        # stop_event = Event()
-        macro_thread = Macro_Thread(key_sequence, stop_event, alias_name, self)
-        # save thread and stop event to find it again for possible interruption
-        self._macro_thread_dict[alias_name] = [macro_thread, stop_event]
-        macro_thread.start()
+        _handle = asyncio.run_coroutine_threadsafe(self.macro_task(key_sequence, alias_name), self.loop)
+        logger.debug(f"Started macro playback for {alias_name} with key sequence: {key_sequence}")
+        self._macro_task_dict[alias_name] = _handle
+        _handle.add_done_callback(self.check_result)
+        return _handle
+    
+    # change to asyncio - repeat version for macro repeat function that is already asyncio based
+    def start_macro_playback_repeat(self, alias_name, key_sequence):
+        self.interrupt_macro_by_name(alias_name)
+        
+        _handle = self.loop.create_task(self.macro_task(key_sequence, alias_name))
+        logger.debug(f"Started macro playback for {alias_name} with key sequence: {key_sequence}")
+        self._macro_task_dict[alias_name] = _handle
+        _handle.add_done_callback(self.check_result)
+        return _handle
     
     def interrupt_macro_by_name(self, alias_name):
         try:
-            macro_thread, stop_event_old = self._macro_thread_dict[alias_name]
+            _handle = self._macro_task_dict[alias_name]
              ## interruptable threads
-            if macro_thread.is_alive():
+            if not _handle.done():
                 if CONSTANTS.DEBUG:
                     print(f"D1: {alias_name} is still alive - trying to stop")
-                stop_event_old.set()
-                macro_thread.join()
+                _handle.cancel()
+
         except KeyError:
-            if CONSTANTS.DEBUG4:
-                print(f"D4: -- macro stop unsucessful - might just be the first start of {alias_name}")
-            pass          
+            logger.debug(f"D1: no macro task found for {alias_name} - maybe just the first start of it")
+        
+
+    async def macro_task(self, key_group, alias_name): 
+        '''execute the macro/alias - can be stopped by using cancel on the handle of the asyncio task from the outside'''
+
+        try:   
+            if self.arg_manager.DEBUG2:
+                print(f"D2: > playing macro: {alias_name} :: {key_group}")
+            for key_event in key_group:
+                # check all constraints at start!
+                constraint_fulfilled, delay_times = self.output_manager.check_constraint_fulfillment(key_event, get_also_delays=True)
+
+                if constraint_fulfilled:
+
+                    if key_event.is_toggle:
+                        key_event = self.output_manager.get_next_toggle_state_key_event(key_event)
+                    # send key event and handles interruption of delay
+                    await self.output_manager.execute_key_event(key_event, delay_times, with_delay=True)
+                                 
+        except Exception as error:
+            logger.exception(f"Error in macro playback of {alias_name}: {key_group} | {error}")
+
+
+
 
     def check_for_combination(self, vk_codes):                 
         all_active = True
