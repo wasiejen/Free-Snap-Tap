@@ -61,6 +61,7 @@ class FST_Keyboard():
         self.toast_callback = None # Will hold bridge.trigger_toast   
         self.timer_callback = None # Will hold bridge.trigger_timer
         self.remove_callback = None # Will hold bridge.remove_toast
+        self.remove_all_callback = None # Will hold bridge.remove_all_toast
         
         # Tap groups define which keys are mutually exclusive
         # Key Groups define which key1 will be replaced by key2
@@ -391,12 +392,14 @@ class FST_Keyboard():
     def update_focus_groups(self):
         self.focus_manager.update_groups_from_config(self.config_manager.load_config())
 
-    def update_args_and_groups(self, focus_name = ''):
+    def update_args_and_groups(self, focus_name = '', startup=True):
         self.release_all_currently_pressed_simulated_keys()
         self._state_manager.stop_all_repeating_keys()
         self._arg_manager.reset_global_variable_changes()
         # reset all lists to make sure nothing remains from previous focus groups
         self._state_manager.reset_all_lists()
+        # if not startup:
+        #     self.remove_all_callback()
         self.apply_start_args_by_focus_name(focus_name)    
         self.apply_focus_groups(focus_name)    
 
@@ -729,7 +732,9 @@ class FST_Keyboard():
                             tap_group.update_tap_states(vk_code, is_keydown) 
 
                             # send keys
-                            self.loop.create_task(self.output_manager.send_keys_for_tap_group(tap_group))
+                            self.output_manager.send_keys_for_tap_group(tap_group)
+                            #XXX 260428-2341
+                            #self.loop.create_task(self.output_manager.send_keys_for_tap_group(tap_group))
                             # to allow repeated keys from hold, key_to_send is a vk_code
                             if tap_group.get_active_key() != vk_code or not trigger_key_repeated:
                                 to_be_suppressed = True
@@ -823,7 +828,7 @@ class FST_Keyboard():
         # try:
         #     fut.result() # This will raise the exception if the task crashed
         # except Exception as e:
-        #     logger.debug(f"Exception in macro task: {e}")
+        #     logger.error(f"Exception in macro task: {e}")
         #     print(f"CRASH IN REPEAT TASK: {e}")
         pass
 

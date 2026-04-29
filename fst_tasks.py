@@ -4,12 +4,6 @@ last updated: 241105-2004
 '''
 
 import asyncio
-from threading import (  # to play aliases without interfering with keyboard listener
-    Event,
-    Thread,
-)
-from time import sleep  # sleep(0.005) = 5 ms
-
 import pygetwindow as gw
 import re #regular expression
 
@@ -47,16 +41,16 @@ class Macro_Repeat_Task:
             if self.reset_event.is_set():
                 print(f"Resetting repeat task for {self.alias_name}")
                 self.reset_event.clear()
-            if self.with_overlay:
-                self._fst.remove_callback(f"{self.alias_name}")
-        # if stopped also stop the macro if it is still running
-        print(f"STOP REPEAT: {self.alias_name} with interval of {self.repeat_time} ms")
 
     def cancel_playback(self):
+        if self.with_overlay:
+            self._fst.remove_callback(f"{self.alias_name}")
         self.stop_event.set()
         self._handle.cancel()
         
     def reset(self):
+        if self.with_overlay:
+            self._fst.remove_callback(f"{self.alias_name}")
         self.reset_event.set()
         self._handle.cancel()
             
