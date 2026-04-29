@@ -473,6 +473,7 @@ class StatusOverlay(QWidget):
         self.context_menu.addSeparator()
         self.context_menu.addAction("Toggle Crosshair", self.signal_toggle_crosshair.emit)
         self.context_menu.addSeparator()
+        self.context_menu.addAction("Remove all Toasts", self.remove_all_toasts)
         self.context_menu.addAction("Hide Indicator", self.toggle_status_indicator)
                
 
@@ -637,19 +638,26 @@ class StatusOverlay(QWidget):
         self.show()
         # Repaint to ensure color is updated
         self.update()
+        
+    def remove_all_toasts(self):
+        if hasattr(self.parent(), 'toast_manager'):
+            self.parent().toast_manager.remove_all_toasts()
+        
            
            
 class ToastWidget(QFrame):
     def __init__(self, text, duration=3.0, text_size=12, bg_color="rgba(40, 40, 40, 200)", text_color="white", timer=0, parent=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.ToolTip | Qt.WindowStaysOnTopHint)
+        self.setAttribute(Qt.WA_TranslucentBackground)
         self.id = text
+        self.duration = duration
         self.base_text = text
         self.text_size = text_size
         self.text_color = text_color
-        
+        self.resoltion = 0.1
         self.use_timer_display = bool(timer) # Store the flag
-        self.remaining_seconds = int(duration)
+        self.remaining_seconds = round(duration, 1)
         
         self.setStyleSheet(f"""
             QFrame {{
@@ -659,7 +667,7 @@ class ToastWidget(QFrame):
                 padding: 0px;
             }}
             QLabel {{ 
-                background: transparent; 
+                background: {bg_color}; 
                 font-family: 'Consolas', 'Courier New', monospace; 
                 font-size: {text_size}px; 
                 font-weight: bold; 
@@ -684,18 +692,21 @@ class ToastWidget(QFrame):
         self.master_timer = QTimer(self)
         self.master_timer.timeout.connect(self.handle_tick)
         
-        # Start at 1-second intervals
-        self.master_timer.start(1000) 
+        # Start at 0.1-second intervals
+        self.master_timer.start(100) 
         
         self.adjustSize()
 
+    def __eq__(self, other) -> bool:
+        return (self.id == other.id) and (self.duration is other.duration)
+    
     def get_display_text(self):
         """Standardizes the countdown format."""
-        return f" {self.base_text} | {self.remaining_seconds:3}s "
+        return f" {self.base_text} | {self.remaining_seconds:5.1f}s "
 
     def handle_tick(self):
         """The single entry point for timer logic."""
-        self.remaining_seconds -= 1
+        self.remaining_seconds -= 0.1
         
         if self.remaining_seconds <= 0:
             self.master_timer.stop()
@@ -711,7 +722,7 @@ class ToastWidget(QFrame):
         if immediately:
             self.deleteLater()
         else:
-            self.label.setText(f" {self.base_text} |  DEL ")
+            self.label.setText(f" {self.base_text} | DELETE ")
             self.setStyleSheet(f"""
                 QFrame {{
                     background-color: rgba(200, 40, 40, 200);
@@ -754,15 +765,18 @@ class ToastManager(QWidget):
 
     def add_toast(self, text, duration, text_size, bg_color, text_color, timer=0):
         # If a toast with the same ID already exists, remove it first
-        self.remove_toast(text, immediately=1)
+        
         if self._fst.arg_manager.STATUS_INDICATOR:
+            self.remove_toast(text, immediately=1)
+            
             toast = ToastWidget(text, duration, text_size, bg_color, text_color, timer)
             self.active_toasts[text] = toast
             
             # Auto-cleanup: remove from dict when the widget is deleted
             toast.destroyed.connect(lambda: self._handle_destruction(text))
-            
+                              
             self.main_layout.addWidget(toast, alignment=Qt.AlignRight)
+            
             self.update_position()
             self.show()
         
@@ -770,13 +784,15 @@ class ToastManager(QWidget):
         self.add_toast(text, duration, text_size, bg_color, text_color, timer=1)
 
     def remove_toast(self, text, immediately=0):
-        """Manually find and delete a toast by its ID string."""
-        if text in self.active_toasts:
-            toast = self.active_toasts[text]
-            # deleteLater is safer than sip.delete for Qt widgets
-            toast.dismiss(immediately)  # Change text and color, then delete after 1 second
-            # We don't manually pop from dict here; 
-            # the 'destroyed' signal below handles it.
+        """Manually find and delete a toast by its ID string."""            
+        for i in range(self.main_layout.count()):
+            element = self.main_layout.itemAt(i).widget()   
+            if element.id == text:
+                element.dismiss(immediately) 
+                # if text in self.active_toasts.keys():
+                #     self.active_toasts.pop(text)
+                # self.main_layout.removeWidget(element)
+                # element.deleteLater()
             
     def remove_all_toasts(self, immediately=0):
         """Remove all active toasts using their individual dismiss logic."""
@@ -784,15 +800,10 @@ class ToastManager(QWidget):
         # so we don't have issues if the dict changes during iteration.
         for toast in list(self.active_toasts.values()):
             toast.dismiss(immediately)
-        
-        # Do NOT call self.active_toasts.clear() here.
-        # Each toast.dismiss() triggers a deleteLater(1000).
-        # When they actually vanish in 1 second, your _handle_destruction 
-        # method will pop them from the dict one by one.
 
     def _handle_destruction(self, text):
         """Internal cleanup when a toast disappears."""
-        if text in self.active_toasts:
+        if text in self.active_toasts.keys():
             self.active_toasts.pop(text)
         self.check_empty()
         self.update_position()

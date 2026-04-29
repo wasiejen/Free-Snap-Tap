@@ -12,7 +12,7 @@ import msvcrt # to flush input stream
 from random import randint # randint(3, 9)) 
 from time import time # sleep(0.005) = 5 ms
 from fst_data_types import Key_Event, type_check
-from fst_threads import Focus_Task, Macro_Repeat_Task
+from fst_tasks import Focus_Task, Macro_Repeat_Task
 import datetime
 import re #regular expression
 from fst_save_file_handler import make_backup as mb, restore_backup as rb
@@ -45,41 +45,8 @@ class CONSTANTS():
 
 class Output_Manager():
     '''
-    This class manages the output of the FST_Keyboard.
+    This class is responsible for sending key events to the system and evaluating constraints for key events.
     '''
-    # helper class wrapper for mouse scroll, because it needs to be handled differently than normal key presses
-    # class mouse_scroller():
-    #     def __init__(self, mouse_controller):
-    #         self._mouse_controller = mouse_controller
-            
-    #     def scroll(self, dx, dy):
-    #         self._mouse_controller.scroll(dx, dy)
-            
-    #     def scroll_up(self, value):
-    #         self.scroll(0, value) # scroll up by specified units
-        
-    #     def scroll_down(self, value):
-    #         self.scroll(0, -value) # scroll down by specified units
-        
-    #     def scroll_right(self, value):
-    #         self.scroll(value, 0) # scroll right by specified units
-            
-    #     def scroll_left(self, value):
-    #         self.scroll(-1, 0) # scroll left by 1 unit
-            
-        # def press(self, key):
-        #     if key == "-6":
-        #         self.scroll_up()
-        #     elif key == "-7":
-        #         self.scroll_right()
-                
-        # def release(self, key):
-        #     if key == "-6":
-        #         self.scroll_down()
-        #     elif key == "-7":
-        #         self.scroll_left()
-
-
     def __init__(self, fst_keyboard):
         self._fst = fst_keyboard
         # Initialize the Controller
@@ -94,11 +61,8 @@ class Output_Manager():
                                         2: mouse.Button.right, 
                                         3: mouse.Button.middle,
                                         4: mouse.Button.x1,
-                                        5: mouse.Button.x2,
-                                        # -6: self._mouse_scroller, # scroll vertical
-                                        # -7: self._mouse_scroller, # scroll horizontal
-                                        
-                                        }
+                                        5: mouse.Button.x2   
+                                    }
         self._mouse_vk_codes = self._mouse_vk_codes_dict.keys()
         self._repeat_thread_dict = {}
 
@@ -331,13 +295,10 @@ class Output_Manager():
             
             _handle = asyncio.run_coroutine_threadsafe(repeat_task.run(), self._fst.loop)
             _handle.add_done_callback(self._fst.check_result)
-            logger.debug(f"Starting repeat task for {alias_string} with repeat time {repeat_time} ms and with_overlay {with_overlay}")
             self._repeat_thread_dict[alias_string] = [repeat_task, _handle]
             
             #show_message(f"Started repeat for {alias_string} with {repeat_time} ms", d=3., ts=12, bgc="rgba(40, 150, 40, 200)")
             return True
-        
-        
         
         def stop_repeat(alias_string):
             try:
@@ -390,9 +351,11 @@ class Output_Manager():
             return True
         
         def stop_all_repeat():
+            logger.debug(f"Stop all repeat called: {self._repeat_thread_dict.items()}")
             try:
-                for alias_name, (_, _handle) in self._repeat_thread_dict.items():
+                for alias_name, (repeat_task, _handle) in self._repeat_thread_dict.items():
                     if not _handle.done():
+                        repeat_task.cancel_playback()
                         _handle.cancel()
                 if CONSTANTS.DEBUG4:
                     print("D4: -- Eval: stopped all Repeat")
@@ -731,13 +694,36 @@ class Output_Manager():
         if is_press:
             self._controller_dict[is_mouse_key].press(key_code)
         else:
-            self._controller_dict[is_mouse_key].release(key_code)          
-
-    async def send_keys_for_tap_group(self, tap_group):
+            self._controller_dict[is_mouse_key].release(key_code)                       
+                
+    # 260429-1441 - added crossover and delay for tap groups as async coroutines - everything else runs without async directly in the listener thread
+    def send_keys_for_tap_group(self, tap_group):
         """
         Send the specified key and release the last key if necessary.
         """
-        # TODO remove delay from here, because it stops listener for the time of delay also ...
+        
+        async def send_async(key_to_send, last_key_send, key_code_to_send, key_code_last_key_send):
+            is_crossover = False
+            if key_to_send != last_key_send:
+                # only use crossover is activated and probility is over percentage
+                is_crossover = randint(0,100) > (100 - self._fst.arg_manager.ACT_CROSSOVER_PROPABILITY_IN_PERCENT) and self._fst.arg_manager.ACT_CROSSOVER # 50% possibility
+            if is_crossover:
+                if CONSTANTS.DEBUG: 
+                    print("D1: crossover")
+                self._keyboard_controller.press(key_code_to_send)
+            else:
+                self._keyboard_controller.release(key_code_last_key_send) 
+            if self._fst.arg_manager.ACT_DELAY or self._fst.arg_manager.ACT_CROSSOVER: 
+                delay = randint(self._fst.arg_manager.ACT_MIN_DELAY_IN_MS, self._fst.arg_manager.ACT_MAX_DELAY_IN_MS)
+                if CONSTANTS.DEBUG: 
+                    print(f"D1: delayed by {delay} ms")
+                await asyncio.sleep(delay / 1000) # in ms
+            if is_crossover:
+                self._keyboard_controller.release(key_code_last_key_send) 
+            else:
+                self._keyboard_controller.press(key_code_to_send)   
+                                   
+        
         key_to_send = tap_group.get_active_key()
         last_key_send = tap_group.get_last_key_send()
         
@@ -755,27 +741,16 @@ class Output_Manager():
                     self._keyboard_controller.release(key_code_last_key_send) 
                 tap_group.set_last_key_send(None)            
             else:
-                is_crossover = False
-                if last_key_send is not None:
-                    # only use crossover when changinging keys, or else repeating will make movement stutter
-                    if key_to_send != last_key_send:
-                        # only use crossover is activated and probility is over percentage
-                        is_crossover = randint(0,100) > (100 - self._fst.arg_manager.ACT_CROSSOVER_PROPABILITY_IN_PERCENT) and self._fst.arg_manager.ACT_CROSSOVER # 50% possibility
-                    if is_crossover:
-                        if CONSTANTS.DEBUG: 
-                            print("D1: crossover")
-                        self._keyboard_controller.press(key_code_to_send)
-                    else:
+                if last_key_send is not None:    
+                    if not self._fst.arg_manager.ACT_DELAY and not self._fst.arg_manager.ACT_CROSSOVER:
                         self._keyboard_controller.release(key_code_last_key_send) 
-                    # random delay if activated
-                    if self._fst.arg_manager.ACT_DELAY or self._fst.arg_manager.ACT_CROSSOVER: 
-                        delay = randint(self._fst.arg_manager.ACT_MIN_DELAY_IN_MS, self._fst.arg_manager.ACT_MAX_DELAY_IN_MS)
-                        if CONSTANTS.DEBUG: 
-                            print(f"D1: delayed by {delay} ms")
-                        await asyncio.sleep(delay / 1000) # in ms
-                if is_crossover:
-                    self._keyboard_controller.release(key_code_last_key_send) 
-                else:
+                        self._keyboard_controller.press(key_code_to_send)  
+                    else:
+                        try:
+                            asyncio.run_coroutine_threadsafe(send_async(key_to_send, last_key_send, key_code_to_send, key_code_last_key_send), self._fst.loop)
+                        except Exception as e:
+                            logger.error(f"Error occurred while calling send_keys_with_delay: {e}")  
+                else:   
                     self._keyboard_controller.press(key_code_to_send) 
                 tap_group.set_last_key_send(key_to_send)
                 

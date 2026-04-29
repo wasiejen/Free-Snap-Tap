@@ -19,7 +19,7 @@ import logging
 # Use __name__ to automatically label logs with the filename
 logging.basicConfig(
     filename='fst.log', 
-    filemode='a', # 'a' for append (default), 'w' to overwrite each time
+    filemode='w', # 'a' for append (default), 'w' to overwrite each time
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.DEBUG # Capture everything from DEBUG level and up
 )
@@ -147,15 +147,16 @@ class MainLogic:
 
 
 if __name__ == "__main__":  
+    logger.info(f"--- FST startet ---")
     
     set_console_visibility(False)  # Hide console window at startup
     
     fst_keyboard = FST_Keyboard()
     fst_keyboard.set_sys_start_arguments(sys.argv[1:] if len(sys.argv) > 1 else [])
-    fst_keyboard.update_args_and_groups()
+    fst_keyboard.update_args_and_groups(startup=True)
     
     logic = MainLogic(fst_keyboard)
-    
+    logger.info(f"--- logic gestartet ---")
     # waiting for the rest of the program to finish loading 
     sleep(0.5)
     

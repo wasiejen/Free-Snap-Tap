@@ -1,24 +1,36 @@
 ideas:
-- toast timer upgrade resolution from 1s to 0.1s
-- asyncio integration instead of threading for macros and repeat functions
-  - potential to greatly reduce threading and running conditions (even if not very often problematic)
-  - remove the use of time.sleep and thus blocking behavior
-- MouseOnMove maybe usable to record relative mouse movement to record anit recoil movement in games? :_)
+
+- MouseOnMove maybe usable to record relative mouse movement to record manual anti recoil movement in games? :_)
 - transition some global control variables like PAUSED and STOPPED to an Event System?
   - Thread safety
-- maybe rethink how i control the UI update loop??
-  - Focus_Thread
 - replace the improvised DEBUG variable system with actual logging
+  - not entirely but at least fot expection handling
 - make the config possible to be split into multiple files
   - maybe a folder and one file per focus group?
 - stylesheet class or collector for easier change of styles for toast messages
+- change macro and rebind alias_name to representation of it if not overwritten via config (name)
+- change logging level via starting arguments
 
 
 260428-2159
-- first version of asyncio implemented
-  - bugs with tap groups
-  - i bet there are way more new bugs xD
+AsyncIO instead of Threading:
+- Focus_Thread -> Focus_Task: now async in secondary MainLogic async thread
+- Macro_Tthread -> Macro_Task: also async
+  - a lot less overhead
+  - a lot easier interruption handling
+- Macro_Repeat_Thread -> Macro_Repeat_Task: async
+  - better interruption handling - no longer race-conditions possible
+- Tap Groups random delay and crossover now running async, everything else runs direcly in listener thread
+
+Toast Box System:
+- toast timer upgrade resolution from 1s to 0.1s
+- added remove_all_toast option in overlay menu
+- toast are now clickthrough :-)
+
+Logging
 - basic logging implemented
+
+
 
 260428-1230
 - fixed a bug in reset_repeat logic that lead to an entire repeat time with no action before starting again
