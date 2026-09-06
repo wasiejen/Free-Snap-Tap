@@ -4,8 +4,8 @@ last updated: 250724-1435
 '''
 
 import asyncio
-from threading import Thread 
-import sys 
+from threading import Thread
+import sys
 from time import sleep
 import datetime
 
@@ -18,7 +18,7 @@ from PySide6.QtWidgets import QApplication
 import logging
 # Use __name__ to automatically label logs with the filename
 logging.basicConfig(
-    filename='fst.log', 
+    filename='fst.log',
     filemode='w', # 'a' for append (default), 'w' to overwrite each time
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.DEBUG # Capture everything from DEBUG level and up
@@ -67,12 +67,12 @@ CURRENT_DATE_TIME = datetime.datetime.now().strftime("%y%m%d-%H%M")
 CONSTANTS.FILE_NAME = 'FSTconfig.txt'
 # CONSTANTS.FILE_NAME = 'FSTconfig_test.txt'
 
-# Control key combinations (vk_code and/or key_string) 
+# Control key combinations (vk_code and/or key_string)
 # (1,2 or more keys possible - depends on rollover of your keyboard)
 CONSTANTS.EXIT_Combination = ["alt", "end"]
 CONSTANTS.TOGGLE_ON_OFF_Combination = ["alt", "delete"]
-CONSTANTS.MENU_Combination = ["alt", "page_down"]  
- 
+CONSTANTS.MENU_Combination = ["alt", "page_down"]
+
 app = None
 
 class MainLogic:
@@ -93,7 +93,7 @@ class MainLogic:
             self.loop.run_forever()
         finally:
             self.cleanup
-        
+
     def cleanup(self):
         """Clean up resources on shutdown."""
         print("Cleaning up resources...")
@@ -103,40 +103,40 @@ class MainLogic:
         self.loop.close()
         print("Secondary thread fully exited.")
 
-        
-    async def run(self):    
-            
+
+    async def run(self):
+
         if CONSTANTS.DEBUG:
             print(f"D1: tap_groups_hr: {self.fst_keyboard.config_manager.tap_groups_hr}")
             print(f"D1: tap_groups: {self.fst_keyboard._tap_groups}")
 
         focus_active = self.fst_keyboard.focus_manager.init_focus_task()
 
-        while not self.fst_keyboard.arg_manager.STOPPED:    
+        while not self.fst_keyboard.arg_manager.STOPPED:
 
             self.fst_keyboard.set_loop(self.loop)
             self.fst_keyboard.init_listener()
-            
+
             if self.fst_keyboard.arg_manager.MENU_ENABLED:
                 self.fst_keyboard.focus_manager.pause_focus_task()
                 self.fst_keyboard.cli_menu.display_menu()
             else:
                 self.fst_keyboard.config_manager.display_groups()
-            
+
             if focus_active:
                 self.fst_keyboard.focus_manager.restart_focus_task()
-            
+
             # start keyboard and mouse listener
             self.fst_keyboard.start_listener()
-            
+
             # if no focus app is given in config file, then start default as always active
             if not focus_active:
                 self.fst_keyboard.update_args_and_groups()
                 self.fst_keyboard.cli_menu.update_group_display()
                 self.fst_keyboard.arg_manager.WIN32_FILTER_PAUSED = False
-            
+
             print('--- Free Snap Tap started ---')
-            
+
             if focus_active:
                 self.fst_keyboard.cli_menu.display_focus_names()
             self.fst_keyboard.focus_manager.start_focus_task()
@@ -146,20 +146,20 @@ class MainLogic:
                 await asyncio.sleep(3600)
 
 
-if __name__ == "__main__":  
+if __name__ == "__main__":
     logger.info(f"--- FST startet ---")
-    
+
     set_console_visibility(False)  # Hide console window at startup
-    
+
     fst_keyboard = FST_Keyboard()
     fst_keyboard.set_sys_start_arguments(sys.argv[1:] if len(sys.argv) > 1 else [])
     fst_keyboard.update_args_and_groups(startup=True)
-    
+
     logic = MainLogic(fst_keyboard)
     logger.info(f"--- logic gestartet ---")
-    # waiting for the rest of the program to finish loading 
+    # waiting for the rest of the program to finish loading
     sleep(0.5)
-    
+
     # hide command window at start but inform user before
     if fst_keyboard.arg_manager.CMD_WINDOW_HIDDEN:
         #print("\nATTENTION: cmd window will now be hidden, can be shown again via tray icon menu\n")
@@ -168,19 +168,19 @@ if __name__ == "__main__":
         pass
     else:
         set_console_visibility(True)
-    
+
     if fst_keyboard.arg_manager.TRAY_ICON or fst_keyboard.arg_manager.STATUS_INDICATOR:
         logging.info("Starting in GUI mode with tray icon or status indicator enabled.")
-        # GUI MODE: Start logic in a secondary thread        
+        # GUI MODE: Start logic in a secondary thread
         # Spawn and start the thread
         logic_thread = Thread(target=logic.start_async_thread, daemon=True)
         logic_thread.start()
 
         app = QApplication([])
         gui_manager = GUI_Manager(fst_keyboard, app)
-        
+
         bridge = ToastBridge()
-        
+
         # Connect bridge signals to GUI manager slots
         bridge.signal_show_toast.connect(gui_manager.toast_manager.add_toast)
         bridge.signal_show_timer.connect(gui_manager.toast_manager.add_timer)
@@ -194,11 +194,11 @@ if __name__ == "__main__":
 
         if fst_keyboard.arg_manager.TRAY_ICON:
             gui_manager.tray_icon.show()
-          
+
         # start QT overlay
-        if fst_keyboard.arg_manager.STATUS_INDICATOR:    
-            gui_manager.overlay.show()      
-                    
+        if fst_keyboard.arg_manager.STATUS_INDICATOR:
+            gui_manager.overlay.show()
+
         # gui_manager.start_update_timer()  # Start the periodic update timer
         gui_manager.start()  # Start the Qt event loop
     else:
@@ -209,5 +209,5 @@ if __name__ == "__main__":
             asyncio.run(logic.run())
         except KeyboardInterrupt:
             logging.info("Keyboard interrupt received.")
-        
+
     sys.exit(1)  # Exit the script after main function completes
