@@ -123,10 +123,10 @@ class TestStateEval:
         assert om_env.om.constraint_evaluation('+shift', ke) is False
         assert om_env.om.constraint_evaluation('!shift', ke) is False
 
-    def test_unknown_key_state_constraint_passes(self, om_env):
-        # unknown key string -> exception swallowed, None result treated as passing
+    def test_unknown_key_state_constraint_fails(self, om_env):
+        # unknown key string in a state constraint fails the constraint (fail-closed)
         assert om_env.om.check_constraint_fulfillment(
-            Key_Event(VK_A, constraints=['-zz_unknown'])) is True
+            Key_Event(VK_A, constraints=['-zz_unknown'])) is False
 
 
 class TestDoubleClickAndCounterstrafe:

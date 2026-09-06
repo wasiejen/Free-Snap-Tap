@@ -652,6 +652,8 @@ class Output_Manager():
                     return False
             except Exception as error:
                 print(error)
+                # unknown key in a state constraint fails the constraint (fail-closed)
+                return False
 
         # check for sequence reset via alias
         elif constraint_to_evaluate in self._fst.macro_sequence_alias_list:
