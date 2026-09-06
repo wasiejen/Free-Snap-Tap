@@ -204,20 +204,25 @@
    used); now works. Test: `tests/test_data_types.py::TestKeyGroup::test_get_vk_codes`.
 5. **WIKI says macros are "played in its own thread"** (line 114) — they are asyncio tasks
    now (`macro_task`, `fst_keyboard.py:868-883`; repeat tasks in `fst_tasks.py`). Doc stale,
-   behavior (interruptible, non-blocking) is kept.
+   behavior (interruptible, non-blocking) is kept. **Decision (2026-09-06): maintainer
+   updates the WIKI.**
 6. **`|(name)` semantics differ between macros and sequences** — a macro name interrupts
    playback (`662-666`) but does not reset anything; a sequence name resets the counter
    (`656-660`) but does not interrupt. WIKI line 128/130 attributes both effects to the same
-   invocation. See also #1 in section 2.
+   invocation. See also #1 in section 2. **Decision (2026-09-06): keep as-is; maintainer
+   clarifies the WIKI** (self-consistent: a sequence's next trigger interrupts stale playback).
 7. **`|reset('name')` on a non-sequence macro name** only prints
    "No Macro Sequence ... reset failed" (`fst_keyboard.py:996-997`) and returns `True`; the
    macro itself is not interrupted (contrast with `|(name)` which interrupts started macros).
+   **Decision (2026-09-06): keep as-is** (reset() is a sequence concept; printed notice is the
+   feedback for user error).
 8. **State shorthand constraints (`-ke`/`+ke`/`!ke` as a suffix) use the *all* (real+
-   simulated) press state** (`get_all_key_press_state`, `fst_manager.py:645-652`), while
-   trigger-state checks use the *real* state (`fst_keyboard.py:552-554`). Also, an unknown
-   key string in such a constraint is caught, printed, and treated as *passing*
-   (`fst_manager.py:653-654` + `check_constraint_fulfillment` 113-114) — a typo silently
-   disables the constraint. **VERIFY** intended scope.
+   simulated) press state** (`get_all_key_press_state`, `fst_manager.py`), while trigger-state
+   checks use the *real* state (`fst_keyboard.py`). **Decision (2026-09-06): the all-state
+   read is intentional and kept** (a macro may have simulated a key a later trigger should
+   see). Unknown key strings in such a constraint previously passed silently (typo disabled
+   the constraint); **now fail the constraint** (fail-closed, printed) — fixed 2026-09-06,
+   test `tests/test_output_manager.py::TestStateEval::test_unknown_key_state_constraint_fails`.
 9. **`dc()`'s key-string sign is ignored** — `dc("-ke")` and `dc("+ke")` return the same
    value (the `is_press` of the argument is discarded, `fst_manager.py:279`); what matters is
    the phase of the *current* event. WIKI line 185 is ambiguous here. **VERIFY.**
@@ -295,7 +300,8 @@ tests (`tests/test_output_manager.py`, `tests/test_input_state_manager.py`,
   valid" and pass. Float→int coercion and negative→0 clamping happen in `constraint_evaluation`
   (674-679). `VERIFY`: order, short-circuit, int-as-delay.
 - **`!` / state shorthand / suppress** — `''` and `!` → False (640-642); a bare `-ke`/`+ke`/`!ke`
-  constraint → all-press-state check (645-652, unknown key silently passes — see 4 #8);
+  constraint → all-press-state check (kept, see 4 #8); unknown key now fails the
+  constraint (fixed 2026-09-06);
   `suppress` rebind target → `SUPPRESS_CODE` (`fst_keyboard.py:42`, `647-648`) → original
   event suppressed, nothing sent; any failed trigger constraint → original event *not*
   suppressed (`fst_keyboard.py:651-656` only applies to replacement checks). `VERIFY`.
