@@ -814,57 +814,46 @@ class Config_Manager():
     def _clean_comments(self, lines):
         comments_cleaned_lines = []
         for line in lines:
-            
-            ###XXX 241029-0711 added strip to allow whitespaces in front
+            ###XXX 241029-0711 strip to allow whitespaces in front
             line = line.replace('\n', '').replace('\t', '').strip()
-            if len(line) > 1:
-                if line.startswith('<focus>'):
-                    cleaned_line = '<focus>'
-                    ##TODO: 260426-1838 multiple focus groups seperated by comma
-                    focus_group_names = line[7:].split('#')[0].split(',')
-                    
-                    if len(focus_group_names) > 1:
-                        # strip whitespace from focus group names and join them with comma again
-                        focus_group_names =  ",".join([name.strip() for name in focus_group_names])
-                    else:
-                        focus_group_names = focus_group_names[0].strip()
-                        
-                    cleaned_line += focus_group_names
-
-                        
-                    #cleaned_line += line[7:].split('#')[0].strip() 
-                    
-                    comments_cleaned_lines.append(cleaned_line)
-                elif line.startswith('<arg>'):
-                    cleaned_line = '<arg>'
-                    cleaned_line += line[5:].split('#')[0].strip()
-                    comments_cleaned_lines.append(cleaned_line)
+            if not line:
+                continue
+            if line.startswith('<focus>'):
+                cleaned_line = '<focus>'
+                ##260426-1838 multiple focus groups seperated by comma
+                focus_group_names = line[7:].split('#')[0].split(',')
+                if len(focus_group_names) > 1:
+                    # strip whitespace from focus group names and join them with comma again
+                    focus_group_names = ",".join([name.strip() for name in focus_group_names])
                 else:
-                    ###XXX 241028-1224: commented out to make eval with spaces possible
-                    # line = line.replace(" ","")
-                    if len(line) > 1:
-                        # strip all comments from line
-                        group = line.split(',')
-                        # ignore line if first char is a #
-                        if group[0][0] == '#':
-                            pass
-                        else:
-                            # remove commented out keys
-                            cleaned_group = []
-                            for key in group:
-                                # ignore commented out keys
-                                if key[0] != '#': 
-                                    # ignore comments after keys
-                                    ###XXX 241028-1225 added
-                                    cleaned_group.append(key.split('#')[0].strip()) 
-                                    # cleaned_group.append(key.split('#')[0]) 
-                                # if commented out key before :, add :
-                                elif key.find(':') >= 0:
-                                    cleaned_group.append(':')
-                                    
-                            cleaned_line = ','.join(cleaned_group)
-                            comments_cleaned_lines.append(cleaned_line)
-                            
+                    focus_group_names = focus_group_names[0].strip()
+                cleaned_line += focus_group_names
+                comments_cleaned_lines.append(cleaned_line)
+            elif line.startswith('<arg>'):
+                cleaned_line = '<arg>'
+                cleaned_line += line[5:].split('#')[0].strip()
+                comments_cleaned_lines.append(cleaned_line)
+            elif line[0] == '#':
+                continue
+            else:
+                ###XXX 241028-1224: commented out to make eval with spaces possible
+                # line = line.replace(" ","")
+                cleaned_group = []
+                for key in line.split(','):
+                    # ignore fully commented out keys
+                    if key.strip().startswith('#'):
+                        # if commented out key before :, add :
+                        if key.find(':') >= 0:
+                            cleaned_group.append(':')
+                    else:
+                        # ignore comments after keys
+                        cleaned_key = key.split('#')[0].strip()
+                        if cleaned_key:
+                            cleaned_group.append(cleaned_key)
+                cleaned_line = ','.join(cleaned_group)
+                if cleaned_line:
+                    comments_cleaned_lines.append(cleaned_line)
+
         return comments_cleaned_lines
         
     def _combine_multilines(self, cleaned_lines):

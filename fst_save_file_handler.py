@@ -21,23 +21,30 @@ def _timestamp_name() -> str:
     return datetime.now().strftime("save-%y%m%d-%H%M%S")
 
 
-def make_backup(save_dir, backup_root_dir) -> str:
-    """Copy ./save to ./backup/save-YYMMDD-HHMMSS and return backup path."""
+def make_backup(save_dir, backup_root_dir) -> tuple:
+    """Copy ./save to ./backup/save-YYMMDD-HHMMSS and return (backup_path, backup_name)."""
     if not os.path.isdir(save_dir):
         raise FileNotFoundError(f"'save' folder not found at {save_dir}")
 
     os.makedirs(backup_root_dir, exist_ok=True)
 
-    backup_name = _timestamp_name()
+    # two saves within the same second would collide, so append a counter until the name is free
+    base_name = _timestamp_name()
+    backup_name = base_name
     backup_path = os.path.join(backup_root_dir, backup_name)
+    counter = 1
+    while os.path.exists(backup_path):
+        backup_name = f"{base_name}-{counter}"
+        backup_path = os.path.join(backup_root_dir, backup_name)
+        counter += 1
 
     # copytree requires that destination does not exist
-    shutil.copytree(save_dir, backup_path)  # copies directory recursively[web:16][web:21]
+    shutil.copytree(save_dir, backup_path)  # copies directory recursively
     return backup_path, backup_name
 
 
-def restore_backup(save_dir,backup_root_dir) -> str:
-    """Restore the most recent backup into ./save (overwriting current save)."""
+def restore_backup(save_dir,backup_root_dir) -> tuple:
+    """Restore the most recent backup into ./save (overwriting current save). Returns (latest_path, latest_name)."""
     if not os.path.isdir(backup_root_dir):
         raise FileNotFoundError(f"'backup' folder not found at {backup_root_dir}")
 
