@@ -29,6 +29,14 @@ ab
 cd
 """
 
+MULTI_FOCUS_LAST_CONFIG = """\
+<focus>C
+cd
+
+<focus>A, B
+ab
+"""
+
 
 def write_config(tmp_path, content):
     path = tmp_path / 'config.txt'
@@ -62,6 +70,15 @@ def test_load_config_raises_on_missing_file(tmp_path):
 
 def test_multi_focus_shares_group(tmp_path):
     multi_focus, _, _ = Config_Manager(write_config(tmp_path, MULTI_FOCUS_CONFIG)).load_config()
+
+    assert set(multi_focus) == {'A', 'B', 'C'}
+    assert multi_focus['B'] is multi_focus['A']
+    assert multi_focus['A'][1] == [ ['', 'ab'] ]
+    assert multi_focus['C'][1] == [ ['', 'cd'] ]
+
+
+def test_multi_focus_extras_of_last_section_registered(tmp_path):
+    multi_focus, _, _ = Config_Manager(write_config(tmp_path, MULTI_FOCUS_LAST_CONFIG)).load_config()
 
     assert set(multi_focus) == {'A', 'B', 'C'}
     assert multi_focus['B'] is multi_focus['A']

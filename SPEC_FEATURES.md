@@ -263,11 +263,20 @@
      `a|(p("shift")) : b`. Related notes for the WIKI (TODO.md #2): a signed key on the
      *right* side of a Key rebind (e.g. `a : -b`) is reinterpreted as a plain `Key`
      (press+release pair), and keys inside `p(...)`-style evals must be quoted strings.
-15. **Focus matching is case-sensitive substring** (`str.find`, `fst_tasks.py:109`) — WIKI
-    says "part or the full name" but not case behavior; `<focus>` name sanitization strips
-    most special chars (`fst_manager.py:902`) while window titles are sanitized separately
-    (`fst_tasks.py:90`) — a mismatch there (e.g. a `™` in a game title) silently disables
-    that focus group. **VERIFY.**
+15. **Focus matching is a case-sensitive substring** (`str.find`, `fst_tasks.py:109`) —
+    WIKI says "part or the full name" but not case behavior. **Verified (2026-09-06): the
+    previously suspected sanitization mismatch does not exist** — window titles
+    (`fst_tasks.py:90`) and `<focus>` names (`fst_manager.py`) use the same character
+    class (the name class additionally allows `,`, which is inert since multi-`<focus>`
+    names are split on commas at parse time); e.g. `™` is stripped on both sides.
+    **Decision (2026-09-06): keep case-sensitive; maintainer documents it in the WIKI.**
+16. **Extra focus names of the last `<focus>` section were dropped** — the lazy
+    registration only ran when the *next* `<focus>` line was parsed, so e.g.
+    `<focus>CS2, cs2 alt` as the final section never registered `cs2 alt`.
+    **FIXED (2026-09-06, maintainer's version):** extra names are now linked to the
+    original entry immediately at parse time (they are aliases of the same config and
+    never change independently); new entries use `copy.deepcopy([[], []])`.
+    Test: `tests/test_config_parse.py::test_multi_focus_extras_of_last_section_registered`.
 
 ## 5. VERIFY — semantics NOT yet covered by tests (code as of this commit)
 

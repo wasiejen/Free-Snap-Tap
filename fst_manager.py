@@ -9,7 +9,7 @@ from threading import Event # to play aliases without interfering with keyboard 
 from os import system, startfile # to use clearing of CLI for better menu usage and opening config file
 import sys # to get start arguments
 import msvcrt # to flush input stream
-from random import randint # randint(3, 9)) 
+from random import randint # randint(3, 9))
 from time import time # sleep(0.005) = 5 ms
 from fst_data_types import Key_Event, type_check
 from fst_tasks import Focus_Task, Macro_Repeat_Task
@@ -18,6 +18,7 @@ import re #regular expression
 from fst_save_file_handler import make_backup as mb, restore_backup as rb
 import pyperclip # to copy mouse position to clipboard for easier pasting
 import asyncio
+import copy
 
 import logging
 # Use __name__ to automatically label logs with the filename
@@ -36,11 +37,11 @@ class CONSTANTS():
     # But .txt or .cfg recommended for easier editing
     FILE_NAME = 'FSTconfig.txt'
 
-    # Control key combinations (vk_code and/or key_string) 
+    # Control key combinations (vk_code and/or key_string)
     # (1,2,3, ... keys possible - depends on rollover of your keyboard)
     EXIT_Combination = ["alt", "end"]
     TOGGLE_ON_OFF_Combination = ["alt", "delete"]
-    MENU_Combination = ["alt", "page_down"]  
+    MENU_Combination = ["alt", "page_down"]
 
 
 class Output_Manager():
@@ -53,41 +54,41 @@ class Output_Manager():
         self._keyboard_controller = keyboard.Controller()
         self._mouse_controller = mouse.Controller()
         # self._mouse_scroller = self.mouse_scroller(self._mouse_controller)
-        
 
-        self._controller_dict = {True: self._mouse_controller, False: self._keyboard_controller} 
-        
-        self._mouse_vk_codes_dict = {   1: mouse.Button.left, 
-                                        2: mouse.Button.right, 
+
+        self._controller_dict = {True: self._mouse_controller, False: self._keyboard_controller}
+
+        self._mouse_vk_codes_dict = {   1: mouse.Button.left,
+                                        2: mouse.Button.right,
                                         3: mouse.Button.middle,
                                         4: mouse.Button.x1,
-                                        5: mouse.Button.x2   
+                                        5: mouse.Button.x2
                                     }
         self._mouse_vk_codes = self._mouse_vk_codes_dict.keys()
         self._repeat_thread_dict = {}
 
         self.variables = {}
-        
+
     @property
     def mouse(self):
         return self._mouse_controller
-    
+
     @property
     def repeat_thread_dict(self):
         return self._repeat_thread_dict
-    
+
     @repeat_thread_dict.setter
     @type_check(dict)
     def repeat_thread_dict(self, new_dict):
         self._repeat_thread_dict = new_dict
-        
+
     'send keys and suffix evaluation'
 
     def get_random_delay(self, max, min):
-        if min > max: 
+        if min > max:
             min,max = max,min
-        return randint(min, max)        
-    
+        return randint(min, max)
+
     def get_key_code(self, is_mouse_key, vk_code):
         if is_mouse_key:
             key_code = self._mouse_vk_codes_dict[vk_code]
@@ -114,20 +115,20 @@ class Output_Manager():
                         pass
                     else:
                         print(f"! Constraint {constraint} is not valid.")
-                    
+
         if get_also_delays:
             return fullfilled, temp_delays
         else:
             return fullfilled
-                                        
+
     async def execute_key_event(self, key_event, delay_times = [], with_delay=False):
-                
+
         None_ke_with_delay = True
 
         # None ke will not be played
         if key_event.vk_code > 0:
             self.send_key_event(key_event)
-            
+
         # if None ke has manual delays, they will be played .. if no delay is given default delay will NOT be applied
         if len(delay_times) == 0:
             if key_event.vk_code > 0:
@@ -140,20 +141,20 @@ class Output_Manager():
             pass
         else:
             delay_times = delay_times[:2]
-    
+
         if len(delay_times) == 0:
             pass
         elif self._fst.arg_manager.ACT_DELAY or with_delay or None_ke_with_delay:
             #print(f"D1: waiting for delay: {delay_times}")
             delay_time = self.get_random_delay(*delay_times)
             await asyncio.sleep(delay_time / 1000)
-                        
+
 
     def constraint_evaluation(self, constraint_to_evaluate, current_ke):
-        
+
         def time_in_millisec():
             return int(time() * 1000)
-        
+
         # first get vk_code and is_press
         def get_vk_code_and_press_from_keystring(key_string):
             vk_code, is_press = None, None
@@ -165,10 +166,10 @@ class Output_Manager():
                 is_press = True
                 key_string = key_string[1:]
             else:
-                is_press = False  
+                is_press = False
             vk_code = self._fst.convert_to_vk_code(key_string.strip('"').strip("'"))
             return vk_code, is_press
-        
+
         def get_key_time_template(key_string, time_list):
             '''
             template for all press and release time functions -> time in ms
@@ -183,7 +184,7 @@ class Output_Manager():
                         print(f"vk_code: {vk_code} time released: {key_time}")
                 except KeyError as error:
                     if CONSTANTS.DEBUG2:
-                        print(f"time_release: no value yet for vk_code: {error}")     
+                        print(f"time_release: no value yet for vk_code: {error}")
                     return 0
             else:
                 try:
@@ -195,25 +196,25 @@ class Output_Manager():
                         print(f"time_press: no value yet for vk_code: {error}")
                     return 0
             return key_time
-        
+
         def tr(key_string):
             '''
             real press and release time function -> time in ms
             '''
             return get_key_time_template(key_string, self._fst.state_manager.time_real)
-        
+
         def ts(key_string):
             '''
             simulated press and release time function -> time in ms
             '''
             return get_key_time_template(key_string, self._fst.state_manager.time_simulated)
-        
+
         def ta(key_string):
             '''
             all combined (real and simulated) press and release time function -> time in ms
             '''
             return get_key_time_template(key_string, self._fst.state_manager.time_all)
-        
+
         # hardcoded counterstrafe with a polynomial function to destribe acceleration
         def cs(key_string):
             x = tr(key_string)
@@ -228,7 +229,7 @@ class Output_Manager():
             # just a guess for now
             breaktime = velocity * 100 / 250
             return round(breaktime)
-            
+
         # hardcoded counterstrafe linear
         def csl(key_string):
             x = tr(key_string)
@@ -237,24 +238,24 @@ class Output_Manager():
             else:
                 breaktime = x / (500/100)
             return round(breaktime)
-        
+
         # press of real keys
         def p(key_string):
             vk_code, _ = get_vk_code_and_press_from_keystring(key_string)
             return self._fst.state_manager.get_real_key_press_state(vk_code)
         # release of real keys
-        
+
         def r(key_string):
-            return not p(key_string)   
-        
+            return not p(key_string)
+
         # press of all keys (incl simulated)
         def ap(key_string):
             vk_code, _ = get_vk_code_and_press_from_keystring(key_string)
             return self._fst.state_manager.get_all_key_press_state(vk_code)
-            
+
         # relese of all keys (incl simulated)
         def ar(key_string):
-            return not ap(key_string)   
+            return not ap(key_string)
 
         # give out time since last key press/release
         def last(key_string, time_list = self._fst.state_manager.time_real):
@@ -268,8 +269,8 @@ class Output_Manager():
                 return current_time - time_last_pressed[vk_code] if is_press else current_time - time_last_released[vk_code]
             except KeyError:
                 return 0
-            
-        # double click - gets the time since the last click  
+
+        # double click - gets the time since the last click
         def dc(key_string = None, time_list = self._fst.state_manager.time_real):
             _, _, time_released, time_pressed = time_list
             # use current key event that activated trigger to get reliable double click
@@ -284,22 +285,22 @@ class Output_Manager():
             except KeyError:
                 ##2
                 return 9999
-            
+
         def start_repeat(alias_string, repeat_time, with_overlay=1):
             stop_repeat(alias_string)
-            
+
             repeat_time = int(repeat_time)
 
-            
+
             repeat_task = Macro_Repeat_Task(alias_string, repeat_time, with_overlay, self._fst)
-            
+
             _handle = asyncio.run_coroutine_threadsafe(repeat_task.run(), self._fst.loop)
             _handle.add_done_callback(self._fst.check_result)
             self._repeat_thread_dict[alias_string] = [repeat_task, _handle]
-            
+
             #show_message(f"Started repeat for {alias_string} with {repeat_time} ms", d=3., ts=12, bgc="rgba(40, 150, 40, 200)")
             return True
-        
+
         def stop_repeat(alias_string):
             try:
                 repeat_task, _handle = self._repeat_thread_dict[alias_string]
@@ -310,7 +311,7 @@ class Output_Manager():
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - stop_repeat()")
             return True
-        
+
         def toggle_repeat(alias_string, repeat_time):
             try:
                 repeat_task, _handle = self._repeat_thread_dict[alias_string]
@@ -326,7 +327,7 @@ class Output_Manager():
                 # print(f"{current_ke} starting repeat for first time")
                 start_repeat(alias_string, repeat_time)
             return True
-        
+
         def is_repeat_active(alias_string):
             try:
                 _, _handle = self._repeat_thread_dict[alias_string]
@@ -338,7 +339,7 @@ class Output_Manager():
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - stop_repeat()")
             return False
-        
+
         def reset_repeat(alias_string):
             try:
                 repeat_task, _handle = self._repeat_thread_dict[alias_string]
@@ -349,7 +350,7 @@ class Output_Manager():
                     print(f"can not find a Repeat called {alias_string} - reset_repeat()")
                 # raise KeyError(error)
             return True
-        
+
         def stop_all_repeat():
             logger.debug(f"Stop all repeat called: {self._repeat_thread_dict.items()}")
             try:
@@ -369,18 +370,18 @@ class Output_Manager():
         def reset(alias_string):
             self._fst.reset_macro_sequence_by_name(alias_string, current_ke)
             return True
-            
+
         def release_all_keys():
             self._fst.release_all_currently_pressed_simulated_keys()
             if CONSTANTS.DEBUG4:
                 print("D4: -- Eval: released all keys")
             return True
-        
+
         def type(key_string):
             release_modifier()
             self._keyboard_controller.type(key_string)
             return True
-        
+
         def write(key_string):
             return type(key_string)
 
@@ -393,7 +394,7 @@ class Output_Manager():
             if CONSTANTS.DEBUG4:
                 print(f'variable {key_string} set to: {value}')
             return True
-        
+
         def is_set(key_string):
             try:
                 #print(f'variable {key_string} is {self.variables[key_string]}')
@@ -403,7 +404,7 @@ class Output_Manager():
                 if CONSTANTS.DEBUG3:
                     print(f'variable {key_string} not set')
                 return False
-            
+
         def get(key_string):
             try:
                 return self.variables[key_string]
@@ -412,7 +413,7 @@ class Output_Manager():
                 if CONSTANTS.DEBUG3:
                     print(f'variable {key_string} not set')
                 return 0
-            
+
         # def inc(key_string, delta=1):
         #     try:
         #         set(key_string, self.variables[key_string] + delta)
@@ -422,11 +423,11 @@ class Output_Manager():
         #         if CONSTANTS.DEBUG3:
         #             print(f'variable {key_string} not set')
         #         return True
-            
+
         # def decr(key_string, delta=1):
         #     inc(key_string, delta=-delta)
 
-            
+
         def check(key_string, value = 1):
             if isinstance(value, int):
                 try:
@@ -444,20 +445,20 @@ class Output_Manager():
                     if CONSTANTS.DEBUG3:
                         print(f'variable {key_string} not set')
                     return False
-            
+
         def clear(key_string):
             self.variables[key_string] = 0
             if CONSTANTS.DEBUG4:
                 print(f'variable {key_string} cleared')
             return True
-        
+
         def clear_all_variables():
             self.clear_all_variables()
             # for key_string in self.variables:
             #     self.variables[key_string] = False
             #     print(f'variable {key_string} cleared')
             return True
-        
+
         def incr(key_string):
             try:
                 self.variables[key_string] += 1
@@ -465,7 +466,7 @@ class Output_Manager():
                 set(key_string, 1)
                 print(f'variable {key_string} set to 1')
             return True
-        
+
         def decr(key_string):
             try:
                 self.variables[key_string] += -1
@@ -473,11 +474,11 @@ class Output_Manager():
                 set(key_string, 0)
                 print(f'variable {key_string} set to 0')
             return True
-        
+
         def cli(key_string):
             print(key_string)
             return True
-        
+
         def date():
             current_date = datetime.datetime.now().strftime("%y%m%d")
             return current_date
@@ -485,15 +486,15 @@ class Output_Manager():
         def date_time():
             current_date_time = datetime.datetime.now().strftime("%y%m%d-%H%M")
             return current_date_time
-        
+
         #get current time in ms since epoch
         def get_time():
             current_time = int(time() * 1000)
             return current_time
-        
+
         def release_modifier():
             self._fst.state_manager.release_all_modifier_keys()
-            
+
         def make_backup(save_dir=self._fst.arg_manager.SAVE_DIR, backup_root_dir=self._fst.arg_manager.BACKUP_ROOT_DIR):
             backup_path, backup_name = mb(save_dir, backup_root_dir)
             print(f"Made backup to {backup_path}")
@@ -501,7 +502,7 @@ class Output_Manager():
             if CONSTANTS.DEBUG4:
                 print(f"D4: -- Eval: made backup to {backup_path}")
             return True
-        
+
         def restore_backup(save_dir=self._fst.arg_manager.SAVE_DIR, backup_root_dir=self._fst.arg_manager.BACKUP_ROOT_DIR):
             restored_path, restored_name = rb(save_dir, backup_root_dir)
             print(f"Restored backup from {restored_path}")
@@ -509,42 +510,42 @@ class Output_Manager():
             if CONSTANTS.DEBUG4:
                 print(f"D4: -- Eval: restored backup from {restored_path}")
             return True
-        
+
         def scroll_up(value):
             self._mouse_controller.scroll(0, value)
             return True
-        
+
         def scroll_down(value):
             self._mouse_controller.scroll(0, -value)
             return True
-        
+
         def scroll_right(value):
             self._mouse_controller.scroll(value, 0)
             return True
-        
-        def scroll_left(value): 
+
+        def scroll_left(value):
             self._mouse_controller.scroll(-value, 0)
             return True
-        
+
         def mouse_move_abs(dx, dy):
             self._mouse_controller.position = (dx, dy)
             return True
-        
+
         def mouse_move(dx, dy):
             self._mouse_controller.move(dx, dy)
             return True
-        
+
         def mouse_get_pos():
             position = self._mouse_controller.position
             copy_to_clipboard(f"{position}")
             return position
-        
+
         def mouse_save_to_var(key_string):
             position = mouse_get_pos()
             self.variables[key_string] = position
             print(f'mouse position {position} saved to variable {key_string}')
             return True
-        
+
         def mouse_move_to_var(key_string):
             try:
                 position = self.variables[key_string]
@@ -558,30 +559,30 @@ class Output_Manager():
             except KeyError:
                 print(f'variable {key_string} not found')
                 return False
-        
+
         # show_message(*text*, *duration in s*, *text_size in px*, *background_color*, *text_color*)
         def show_message(text, d=3., ts=12, bgc="rgba(40, 150, 40, 200)", tc="white"):
             self._fst.toast_callback(text, d, ts, bgc, tc)
             return True
-        
+
         def show_timer(text, d=3., ts=12, bgc="rgba(150, 150, 40, 200)", tc="white"):
             self._fst.timer_callback(text, d, ts, bgc, tc)
             return True
-        
+
         def remove_toast(text, immediately=0):
             self._fst.remove_callback(text)
             return True
-        
+
         def remove_all_toasts(immediately=0):
             self._fst.remove_all_callbacks()
             return True
-        
-        
+
+
 
         def set_var(key_string, text):
             self.variables[key_string] = text
             return True
-            
+
         def get_var(key_string):
             try:
                 return self.variables[key_string]
@@ -589,31 +590,31 @@ class Output_Manager():
                 set_var(key_string, "None")
                 print(f'variable {key_string} set to "None"')
                 return self.variables[key_string]
-            
+
         def copy_to_clipboard(key_string):
             pyperclip.copy(key_string)
             show_message(f'"{key_string}" copied to clipboard')
             return True
-        
+
         def paste():
             pasted_text = pyperclip.paste()
             print(f'"{pasted_text}" pasted from clipboard')
             return pasted_text
-        
+
         def save_into_file(text, time_stamp=get_time(), mode='w', file_path='output.txt'):
             with open(file_path, mode) as file:
                 file.write(f"{time_stamp}: {text}\n")
             print(f'"{time_stamp}: {text}" saved into {file_path}')
             return True
-        
+
         def append_to_file(text, time_stamp=get_time(), file_path='output.txt'):
             return save_into_file(text, time_stamp, mode='a', file_path=file_path)
-        
+
         def empty_file(file_path='output.txt'):
             open(file_path, 'w').close()
             print(f'{file_path} has been emptied')
             return True
-        
+
         def print_all_variables():
             if self.variables:
                 print("Current variables:")
@@ -622,21 +623,21 @@ class Output_Manager():
             else:
                 print("No variables set.")
             return True
-        
+
         def clear_console():
             if sys.platform.startswith('win'):
                 system('cls')
             else:
                 system('clear')
             return True
-        
-        
+
+
         # ---------------------------
         # eval starts from here
-        
+
         if CONSTANTS.DEBUG4:
-            print(f"D4: received for eval: {constraint_to_evaluate} : {current_ke}")   
-        
+            print(f"D4: received for eval: {constraint_to_evaluate} : {current_ke}")
+
         # short eval for (False)
         if constraint_to_evaluate in ['', '!']:
             return False
@@ -657,15 +658,15 @@ class Output_Manager():
 
         # check for sequence reset via alias
         elif constraint_to_evaluate in self._fst.macro_sequence_alias_list:
-            
-            reset(constraint_to_evaluate) 
-            return True      
+
+            reset(constraint_to_evaluate)
+            return True
 
         # check for interruptable macro thread
         elif constraint_to_evaluate in self._fst.macro_thread_dict.keys():
-            
+
             self._fst.interrupt_macro_by_name(constraint_to_evaluate)
-            return True      
+            return True
 
         # only if not found in short eval do the real eval
         else:
@@ -684,87 +685,87 @@ class Output_Manager():
                 result = int(result)
             if isinstance(result, int):
                 if result < 0:
-                    result = 0    
+                    result = 0
             if result is None:
                 result = True
 
             return result
-    
+
     def send_key_event(self, key_event):
-        
+
         def check_for_mouse_vk_code(vk_code):
             return vk_code in self._mouse_vk_codes
-        
+
         vk_code, is_press, _ = key_event.get_all()
-        
+
         is_mouse_key = check_for_mouse_vk_code(vk_code)
         key_code = self.get_key_code(is_mouse_key, vk_code)
         if is_press:
             self._controller_dict[is_mouse_key].press(key_code)
         else:
-            self._controller_dict[is_mouse_key].release(key_code)                       
-                
+            self._controller_dict[is_mouse_key].release(key_code)
+
     # 260429-1441 - added crossover and delay for tap groups as async coroutines - everything else runs without async directly in the listener thread
     def send_keys_for_tap_group(self, tap_group):
         """
         Send the specified key and release the last key if necessary.
         """
-        
+
         async def send_async(key_to_send, last_key_send, key_code_to_send, key_code_last_key_send):
             is_crossover = False
             if key_to_send != last_key_send:
                 # only use crossover is activated and probility is over percentage
                 is_crossover = randint(0,100) > (100 - self._fst.arg_manager.ACT_CROSSOVER_PROPABILITY_IN_PERCENT) and self._fst.arg_manager.ACT_CROSSOVER # 50% possibility
             if is_crossover:
-                if CONSTANTS.DEBUG: 
+                if CONSTANTS.DEBUG:
                     print("D1: crossover")
                 self._keyboard_controller.press(key_code_to_send)
             else:
-                self._keyboard_controller.release(key_code_last_key_send) 
-            if self._fst.arg_manager.ACT_DELAY or self._fst.arg_manager.ACT_CROSSOVER: 
+                self._keyboard_controller.release(key_code_last_key_send)
+            if self._fst.arg_manager.ACT_DELAY or self._fst.arg_manager.ACT_CROSSOVER:
                 delay = randint(self._fst.arg_manager.ACT_MIN_DELAY_IN_MS, self._fst.arg_manager.ACT_MAX_DELAY_IN_MS)
-                if CONSTANTS.DEBUG: 
+                if CONSTANTS.DEBUG:
                     print(f"D1: delayed by {delay} ms")
                 await asyncio.sleep(delay / 1000) # in ms
             if is_crossover:
-                self._keyboard_controller.release(key_code_last_key_send) 
+                self._keyboard_controller.release(key_code_last_key_send)
             else:
-                self._keyboard_controller.press(key_code_to_send)   
-                                   
-        
+                self._keyboard_controller.press(key_code_to_send)
+
+
         key_to_send = tap_group.get_active_key()
         last_key_send = tap_group.get_last_key_send()
-        
-        if CONSTANTS.DEBUG: 
+
+        if CONSTANTS.DEBUG:
             print(f"D1: last_key_send: {last_key_send}")
             print(f"D1: key_to_send: {key_to_send}")
-            
+
         key_code_to_send = keyboard.KeyCode.from_vk(key_to_send)
         key_code_last_key_send = keyboard.KeyCode.from_vk(last_key_send)
-        
+
         # only send if key to send is not the same as last key send
         if key_to_send != last_key_send:
             if key_to_send is None:
                 if last_key_send is not None:
-                    self._keyboard_controller.release(key_code_last_key_send) 
-                tap_group.set_last_key_send(None)            
+                    self._keyboard_controller.release(key_code_last_key_send)
+                tap_group.set_last_key_send(None)
             else:
-                if last_key_send is not None:    
+                if last_key_send is not None:
                     if not self._fst.arg_manager.ACT_DELAY and not self._fst.arg_manager.ACT_CROSSOVER:
-                        self._keyboard_controller.release(key_code_last_key_send) 
-                        self._keyboard_controller.press(key_code_to_send)  
+                        self._keyboard_controller.release(key_code_last_key_send)
+                        self._keyboard_controller.press(key_code_to_send)
                     else:
                         try:
                             asyncio.run_coroutine_threadsafe(send_async(key_to_send, last_key_send, key_code_to_send, key_code_last_key_send), self._fst.loop)
                         except Exception as e:
-                            logger.error(f"Error occurred while calling send_keys_with_delay: {e}")  
-                else:   
-                    self._keyboard_controller.press(key_code_to_send) 
+                            logger.error(f"Error occurred while calling send_keys_with_delay: {e}")
+                else:
+                    self._keyboard_controller.press(key_code_to_send)
                 tap_group.set_last_key_send(key_to_send)
-                
+
     def clear_all_variables(self):
         self.variables = {}
-        
+
 
 class Config_Manager():
     '''
@@ -774,21 +775,21 @@ class Config_Manager():
     def __init__(self, file_name = None):
         self._file_name = file_name
         #self._fm = focus_manager
-        
+
         # hr = human readable form - saves the lines cleaned of comments and presorted
         # these will be shown in menu, because internally they look a bit different (esp rebinds)
         self._tap_groups_hr = []
         self._rebinds_hr = []
         self._macros_hr = []
         self._alias_hr = []
-        
+
     @property
     def file_name(self):
         return self._file_name
     @file_name.setter
     @type_check(str)
     def file_name(self, new_file_name):
-        self._file_name = new_file_name  
+        self._file_name = new_file_name
     #@property
     # def focus_manager(self):
     #     return self._fm
@@ -808,7 +809,7 @@ class Config_Manager():
     @property
     def alias_hr(self):
         return self._alias_hr
-    
+
     def load_config(self):
         # try loading  from file
         try:
@@ -816,9 +817,9 @@ class Config_Manager():
         # if no file exist create new one
         except FileNotFoundError as error:
             raise FileNotFoundError(error)
-            self.create_new_group_file()    
-         
-    
+            self.create_new_group_file()
+
+
     def _clean_comments(self, lines):
         comments_cleaned_lines = []
         for line in lines:
@@ -863,7 +864,7 @@ class Config_Manager():
                     comments_cleaned_lines.append(cleaned_line)
 
         return comments_cleaned_lines
-        
+
     def _combine_multilines(self, cleaned_lines):
         # clean multiline macro sequences and joins them together
         multiline_cleaned_lines = []
@@ -873,57 +874,55 @@ class Config_Manager():
                 multiline_cleaned_lines[-1] += line
             else:
                 multiline_cleaned_lines.append(line)
-                
+
         return multiline_cleaned_lines
 
     def parse_line(self, line):
         pass
-    
+
     def _parse_lines_for_focus_manager(self, file_lines):
         '''
         reads in the file and removes the commented out lines, keys and inline comments;
-        joins multiline macro sequences; 
-        '''    
+        joins multiline macro sequences;
+        '''
 
         cleaned_lines = self._combine_multilines(self._clean_comments(file_lines) )
-            
+
         focus_name = ''
         multi_focus_dict = {}
         default_start_arguments = []
-        default_group_lines = []   
-        extra_focus_names = []     
-        
+        default_group_lines = []
+        extra_focus_names = []
+
         for line in cleaned_lines:
             if line.startswith('<focus>'):
-                
+                focus_name = line.replace('<focus>', '')
+                # #only allow letters, numbers and spaces in focus_name
+                focus_name = re.sub(r'[^a-zA-Z0-9,_. ]', '', focus_name)
+
+                ##260426-1851 allow multiple focus groups seperated by comma
+                focus_group_names = focus_name.split(',')
+                if len(focus_group_names) > 1:
+                   focus_name = focus_group_names[0]
+                   extra_focus_names = focus_group_names[1:]
+
+                multi_focus_dict[focus_name] = copy.deepcopy([[], []])
+
                 ##260426-1851 allow multiple focus groups seperated by comma
                 if extra_focus_names != []:
                     print(f"extra focus names found for {focus_name}: {extra_focus_names}")
                     for extra_focus_name in extra_focus_names:
                         multi_focus_dict[extra_focus_name] = multi_focus_dict[focus_name]
                 extra_focus_names = []
-                
-                # 250905-1355: testing fix for special symbols in names like Trademark sign
-                focus_name = line.replace('<focus>', '')
-                # # 250905-1455: XXX-1
-                # #only allow letters, numbers and spaces in focus_name
-                focus_name = re.sub(r'[^a-zA-Z0-9,_. ]', '', focus_name)
-                
-                ##260426-1851 allow multiple focus groups seperated by comma
-                focus_group_names = focus_name.split(',')
-                if len(focus_group_names) > 1:
-                   focus_name = focus_group_names[0]
-                   extra_focus_names = focus_group_names[1:]
-                   
-                multi_focus_dict[focus_name] = [[], []]
-                print(f"new focus name found: {focus_name}")
+
+                print(f"new focus name found: {focus_group_names}")
             elif line.startswith('<arg>'):
                 line = line.replace('<arg>', '').lower()
                 if focus_name == '':
                     default_start_arguments.append(line)
                 else:
                     multi_focus_dict[focus_name][0].append(line)
-            
+
             else:
                 # alias lines that save a defined series of keyevents for easier usage in config
                 if line.startswith('<'):
@@ -931,7 +930,7 @@ class Config_Manager():
                     if alias_end > 1:
                         line_name = line[:alias_end+1]
                         line = line.replace(line_name, '').strip()
-                    
+
                 # add name of the actual line: e.g. key_group, macro, etc
                 elif line.startswith('('):
                     line_name_end = line.find(')')
@@ -940,13 +939,13 @@ class Config_Manager():
                     line = line.replace(line_name, '').strip()
                 else:
                     line_name = ''
-                    
-                # sort into focus groups or default group    
+
+                # sort into focus groups or default group
                 if focus_name == '':
                     default_group_lines.append([line_name, line])
                 else:
                     multi_focus_dict[focus_name][1].append([line_name, line])
-        
+
         return multi_focus_dict, default_start_arguments, default_group_lines
 
 
@@ -956,7 +955,7 @@ class Config_Manager():
             for line in file:
                 temp_file.append(line)
         return temp_file
-        
+
     def _write_out_new_file(self):
         """
         Create a new file if config file was not found with minimal tap groups
@@ -967,7 +966,7 @@ class Config_Manager():
             file.write("# Tap Groups\n")
             for tap_group in self._tap_groups_hr:
                 # file.write(f"{tap_group}\n")
-                file.write(', '.join(tap_group)+'\n')         
+                file.write(', '.join(tap_group)+'\n')
             # rebinds
             file.write("# Rebinds\n")
             # for rebind in self._rebinds_hr:
@@ -977,13 +976,13 @@ class Config_Manager():
             # for macro in self._macros_hr:
             #     # TODO: to adapt to save key sequences - necessary - mainly used to create new file if none found
             #     file.write(' :: '.join([', '.join(macro[0]),', '.join(macro[1])]))
-        
+
     def presort_lines(self, lines):
         '''
         saves cleaned lines according to formatting in different containers;
         saved in variable_hr (human readable)
         '''
-        
+
         def split_ignore_brackets2(group):
             '''
             splits the group but ignoring the commas that are in brackets
@@ -992,7 +991,7 @@ class Config_Manager():
             # when no open bracket in group, then just use default split
             if group.find('(') == -1:
                 return group.split(',')
-            
+
             key_string = group
             valid_commas = []
             start_pos = 0
@@ -1042,7 +1041,7 @@ class Config_Manager():
                 # print(f"count: {open_count} , start_pos: {start_pos} , first: {first}")
                 # print(f"valid commas: {valid_commas}")
                 start_pos = first+1
-                
+
                 if symbol == ',':
                     next_comma = key_string.find(',', start_pos)
                 if symbol == '(':
@@ -1051,24 +1050,24 @@ class Config_Manager():
                     next_close = key_string.find(')', start_pos)
                     if open_count == 0:
                         next_comma = key_string.find(',', start_pos)
-                    
+
 
             split_group = []
             start = 0
             for comma in valid_commas:
                 split_group.append(key_string[start:comma])
                 start = comma+1
-                
+
             return split_group
-        
+
         def split_ignore_brackets(group):
             split_group = group.split(',')
             count_open = []
             new_group = []
-            
+
             for el in split_group:
                 count_open.append(el.count('(') - el.count(')'))
-            
+
             temp = ''
             sum = 0
             for el, count in zip(split_group, count_open):
@@ -1080,21 +1079,21 @@ class Config_Manager():
                 if sum == 0:
                     new_group.append(temp)
                     temp = ''
-            
+
             return new_group
-        
-        
+
+
         self._tap_groups_hr = []
         self._rebinds_hr = []
         self._macros_hr = []
         self._alias_hr = []
-        
+
         count_tap = 1
         count_rebind = 1
         count_macro = 1
         count_macro_sequence = 1
         # sort the lines into their categories for later initialization
-        for line in lines:    
+        for line in lines:
 
             alias, line = line
             if alias.startswith('<'):
@@ -1103,7 +1102,7 @@ class Config_Manager():
                 ###XXX 241028-1243 added strip()
                 groups = [x.strip() for x in line.split(':')]
                 # tap groups
-                if len(groups) == 1: 
+                if len(groups) == 1:
                     # generate default names for Tap Groups
                     if alias == '':
                         alias = f"(TAP_{count_tap})"
@@ -1120,7 +1119,7 @@ class Config_Manager():
                     if len(key_group) == 1:
                         self._rebinds_hr.append([alias, [trigger_group, key_group[0]]])
                     else:
-                        print(f"{key_group} is not a valid rebind (only one key_event/key allowed") 
+                        print(f"{key_group} is not a valid rebind (only one key_event/key allowed")
                         print("   use :: instead of : to declare it as a macro")
                     # macro
                 elif len(groups) > 2 and len(groups[1]) == 0:
@@ -1130,7 +1129,7 @@ class Config_Manager():
                         if alias == '':
                             alias = f"(SEQ_{count_macro_sequence})"
                             count_macro_sequence += 1
-                        
+
                         key_groups = [split_ignore_brackets(group) for group in groups[2:]]
                         self._macros_hr.append([alias, [trigger_group] + key_groups])
                     else:
@@ -1140,7 +1139,7 @@ class Config_Manager():
                             count_macro += 1
                         key_group = split_ignore_brackets(groups[2])
                         self._macros_hr.append([alias, [trigger_group, key_group]])
-                    
+
     # def display_groups(self):
     #     """
     #     Display the current tap groups.
@@ -1149,12 +1148,12 @@ class Config_Manager():
     #     print("# Aliases")
     #     for alias_group in self._alias_hr:
     #         alias, group = alias_group
-    #         print(f"{alias} " + ', '.join(group)+'')         
+    #         print(f"{alias} " + ', '.join(group)+'')
     #     # tap groups
     #     print("\n# Tap Groups")
     #     for tap_group in self._tap_groups_hr:
     #         alias, tap_group = tap_group
-    #         print(f"{alias} " + ', '.join(tap_group)+'')         
+    #         print(f"{alias} " + ', '.join(tap_group)+'')
     #     # rebinds
     #     print("\n# Rebinds")
     #     for rebind in self._rebinds_hr:
@@ -1171,24 +1170,24 @@ class Config_Manager():
     #         if len(group) > 2:
     #             for gr in group[2:]:
     #                 print(" " * (position+1) + ": " + ', '.join(gr))
-                    
+
     def display_groups(self):
         """
         Display the current tap groups.
         """
         # alias display
-        
+
         # inset = '     '
-        
+
         print("# Aliases")
         for alias_group in self._alias_hr:
             alias, group = alias_group
-            print(f"{alias} " + ', '.join(group)+'')         
+            print(f"{alias} " + ', '.join(group)+'')
         # tap groups
         print("\n# Tap Groups")
         for tap_group in self._tap_groups_hr:
             alias, tap_group = tap_group
-            print(f"{alias} " + ', '.join(tap_group)+'')         
+            print(f"{alias} " + ', '.join(tap_group)+'')
         # rebinds
         print("\n# Rebinds")
         for rebind in self._rebinds_hr:
@@ -1233,7 +1232,7 @@ class Argument_Manager():
     CROSSHAIR_ENABLED = False
     CROSSHAIR_DELTA_X = 0
     CROSSHAIR_DELTA_Y = 0
-    
+
     TRAY_ICON = False
 
     # global variables
@@ -1241,7 +1240,7 @@ class Argument_Manager():
     DEBUG2 = False
     DEBUG3 = False
     DEBUG_NUMPAD = False
-    
+
     WIN32_FILTER_PAUSED = True
     MANUAL_PAUSED = False
     STOPPED = False
@@ -1250,7 +1249,7 @@ class Argument_Manager():
     PRINT_VK_CODES = False
 
     EXEC_ONLY_ONE_TRIGGERED_MACRO = False
-    
+
     ALWAYS_ACTIVE = False
     CMD_WINDOW_HIDDEN = False
 
@@ -1262,26 +1261,26 @@ class Argument_Manager():
     ACT_CROSSOVER_PROPABILITY_IN_PERCENT = 50
 
     # Alias delay between presses and releases
-    MACRO_MIN_DELAY_IN_MS = ACT_MIN_DELAY_IN_MS 
+    MACRO_MIN_DELAY_IN_MS = ACT_MIN_DELAY_IN_MS
     MACRO_MAX_DELAY_IN_MS = ACT_MAX_DELAY_IN_MS
-    
+
     SAVE_DIR = ""
     BACKUP_ROOT_DIR = ""
 
     def __init__(self, fst_keyboard):
         self._fst = fst_keyboard
-        Argument_Manager.DEBUG  = CONSTANTS.DEBUG 
+        Argument_Manager.DEBUG  = CONSTANTS.DEBUG
         Argument_Manager.DEBUG2 = CONSTANTS.DEBUG2
         Argument_Manager.DEBUG3 = CONSTANTS.DEBUG3
         Argument_Manager.DEBUG_NUMPAD = CONSTANTS.DEBUG_NUMPAD
         # to only set up the variable and not reset it with every focus change
         self.STATUS_INDICATOR = Argument_Manager.STATUS_INDICATOR
         self.STATUS_INDICATOR_SIZE = Argument_Manager.STATUS_INDICATOR_SIZE
-        
+
         # getting sys arguments and saving them
         self._sys_start_args = []
         self.reset_global_variable_changes()
-        
+
     @property
     def sys_start_args(self):
         return self._sys_start_args
@@ -1289,9 +1288,9 @@ class Argument_Manager():
     @type_check(list)
     def sys_start_args(self, new_list):
         self._sys_start_args = new_list
-        
+
     def reset_global_variable_changes(self):
-        # self.DEBUG = Argument_Manager.DEBUG  
+        # self.DEBUG = Argument_Manager.DEBUG
         # self.DEBUG2 = Argument_Manager.DEBUG2
         # self.DEBUG3 = Argument_Manager.DEBUG3
         self.MENU_ENABLED = Argument_Manager.MENU_ENABLED
@@ -1301,8 +1300,8 @@ class Argument_Manager():
         self.ACT_CROSSOVER_PROPABILITY_IN_PERCENT = Argument_Manager.ACT_CROSSOVER_PROPABILITY_IN_PERCENT
         self.ACT_MIN_DELAY_IN_MS = Argument_Manager.ACT_MIN_DELAY_IN_MS
         self.ACT_MAX_DELAY_IN_MS = Argument_Manager.ACT_MAX_DELAY_IN_MS
-        self.MACRO_MIN_DELAY_IN_MS = Argument_Manager.MACRO_MIN_DELAY_IN_MS 
-        self.MACRO_MAX_DELAY_IN_MS = Argument_Manager.MACRO_MAX_DELAY_IN_MS   
+        self.MACRO_MIN_DELAY_IN_MS = Argument_Manager.MACRO_MIN_DELAY_IN_MS
+        self.MACRO_MAX_DELAY_IN_MS = Argument_Manager.MACRO_MAX_DELAY_IN_MS
         self.EXEC_ONLY_ONE_TRIGGERED_MACRO = Argument_Manager.EXEC_ONLY_ONE_TRIGGERED_MACRO
         self.CROSSHAIR_ENABLED = Argument_Manager.CROSSHAIR_ENABLED
         self.CROSSHAIR_DELTA_X = Argument_Manager.CROSSHAIR_DELTA_X
@@ -1314,7 +1313,7 @@ class Argument_Manager():
     'start argument handling'
     def apply_start_arguments(self, argv):
         print(f"apply arguments: {argv}")
-        
+
         def extract_delays(arg):
             try:
                 delays = [int(delay) for delay in arg.replace(' ','').split(',')]
@@ -1329,13 +1328,13 @@ class Argument_Manager():
                 else:
                     print("delay not in range 0<delay<=1000 ms")
             return sorted(valid_delays)
-        
+
 
         for arg in argv:
             # if commented out do nothing
             if arg[0] == ':' or '#':
                 pass
-            if self.DEBUG: 
+            if self.DEBUG:
                 print(f"D1: {arg}")
             # enable debug print outs
             if arg == "-debug":
@@ -1349,7 +1348,7 @@ class Argument_Manager():
             # use custom tap groups file for loading and saving
             elif arg[:6] == '-file=' and len(arg) > 6:
                 file_name = arg[6:]
-                if self.DEBUG: 
+                if self.DEBUG:
                     print(f"D1: {file_name}")
                 self._fst.config_manager.file_name = file_name
             # Start with controls disabled
@@ -1370,9 +1369,9 @@ class Argument_Manager():
                 self.MACRO_MIN_DELAY_IN_MS, self.MACRO_MAX_DELAY_IN_MS = extract_delays(arg[12:])
                 print(f"Macro delays set to: min:{self.MACRO_MIN_DELAY_IN_MS}, max:{self.MACRO_MAX_DELAY_IN_MS}")
             elif arg == "-crossover":
-                self.ACT_CROSSOVER = True          
+                self.ACT_CROSSOVER = True
             elif arg[:11] == "-crossover=" and len(arg) > 11:
-                self.ACT_CROSSOVER = True    
+                self.ACT_CROSSOVER = True
                 try:
                     probability = int(arg[11:])
                 except Exception:
@@ -1432,34 +1431,34 @@ class Focus_Group_Manager():
         self._multi_focus_dict_keys = []
         self._default_start_arguments = []
         self._default_group_lines = []
-        
-        
+
+
         self.FOCUS_APP_NAME = ''
-        
+
         self.focus_active = False
         self._focus_task  = None
         self.task = None
 
-        
+
     @property
     def multi_focus_dict(self):
         return self._multi_focus_dict
-    
+
     @multi_focus_dict.setter
     @type_check(dict)
     def multi_focus_dict(self, new_dict):
         self._multi_focus_dict = new_dict
         self._multi_focus_dict_keys = new_dict.keys()
-         
+
     @property
     def multi_focus_dict_keys(self):
         return self._multi_focus_dict_keys
-    
+
     # @multi_focus_dict_keys.setter
     # @type_check(dict_keys)
     # def multi_focus_dict_keys(self, new_list):
     #     self._multi_focus_dict_keys = new_list
-        
+
     @property
     def default_start_arguments(self):
         return self._default_start_arguments  # Return a copy to prevent external modification
@@ -1477,7 +1476,7 @@ class Focus_Group_Manager():
     @type_check(list)
     def default_group_lines(self, new_list):
         self._default_group_lines = new_list
-                
+
     @property
     def FOCUS_APP_NAME(self):
         return self._FOCUS_APP_NAME
@@ -1486,53 +1485,53 @@ class Focus_Group_Manager():
     @type_check(str)
     def FOCUS_APP_NAME(self, new_str):
         self._FOCUS_APP_NAME = new_str
-        
+
     def init_focus_task(self):
-        
+
         if len(self._multi_focus_dict_keys) > 0:
             self.focus_active = True
             self._focus_task = Focus_Task(self._fst)
         else:
             self.focus_active = False
         return self.focus_active
-            
+
     def pause_focus_task(self):
         if self.focus_active:
             self._focus_task.pause()
-        
+
     def start_focus_task(self):
         # if still active do nothing, otherwise start it again
         loop = asyncio.get_running_loop()
         #loop = self._fst.loop
-        
+
         def start_task(loop):
             if self.focus_active:
                 self.task = loop.create_task(self._focus_task.run())
-            
+
         if self.task is None:
             start_task(loop)
         elif self.task.done():
             start_task(loop)
-        
+
     def restart_focus_task(self):
         if self.focus_active:
             self._focus_task.restart()
-        
+
     def stop_focus_task(self):
         if self.focus_active and not self.task.done():
             self._focus_task.stop()
             #self.task.cancel()
-            
+
     def update_groups_from_config(self, config_update):
         multi_focus_dict, default_start_arguments, default_group_lines = config_update
         self._multi_focus_dict = multi_focus_dict
         self._multi_focus_dict_keys = self._multi_focus_dict.keys()
         self._default_start_arguments = default_start_arguments
         self._default_group_lines = default_group_lines
-    
+
 class Input_State_Manager():
     '''
-    manages key press and release states 
+    manages key press and release states
     keeps track of:
     - is pressed or not
     - times of key press and releases
@@ -1541,14 +1540,14 @@ class Input_State_Manager():
     REAL = 'real'
     SIMULATED = 'simulated'
     ALL = 'all'
-    
+
     ALL_MODIFIER_KEYS = [160, 161, 162, 163, 164, 165]
-    
+
     def __init__(self, fst_keyboard):#, fst_keyboard):
         self._fst = fst_keyboard
-        
+
         self._pressed_keys = set()
-        
+
         # collect active key press/release states to prevent refiring macros while holding a key
         self._real_key_press_states_dict = {}
         self._simulated_key_press_states_dict = {}
@@ -1564,11 +1563,11 @@ class Input_State_Manager():
         self._time_simulated = [{}, {}, {}, {}]
         # time_all = [time_all_last_pressed, time_all_last_released, time_all_released, time_all_pressed]
         self._time_all = [{}, {}, {}, {}]
-      
+
     @property
     def pressed_keys(self):
         return self._pressed_keys
-    
+
     def get_real_key_press_state(self, vk_code):
         try:
             return self._real_key_press_states_dict[vk_code]
@@ -1590,7 +1589,7 @@ class Input_State_Manager():
         if vk_code > 0:
             self._simulated_key_press_states_dict[vk_code] = is_press
             self._all_key_press_states_dict[vk_code] = is_press
-            
+
     def get_all_key_press_state(self, vk_code):
         try:
             return self._all_key_press_states_dict[vk_code]
@@ -1610,11 +1609,11 @@ class Input_State_Manager():
             self._toggle_states_dict_keys  = self._toggle_states_dict.keys()
             return False
     def set_toggle_state(self, vk_code, is_press):
-        self._toggle_states_dict[vk_code] = is_press 
-        
+        self._toggle_states_dict[vk_code] = is_press
+
     @property
     def toggle_states_dict_keys(self):
-        return self._toggle_states_dict_keys                      
+        return self._toggle_states_dict_keys
     @property
     def time_real(self):
         return self._time_real
@@ -1627,18 +1626,18 @@ class Input_State_Manager():
 
     def get_key_press_state(self, vk_code):
         return vk_code in self._pressed_keys
-    
-    def add_key_press_state(self, vk_code):    
-        self._pressed_keys.add(vk_code)    
-        
+
+    def add_key_press_state(self, vk_code):
+        self._pressed_keys.add(vk_code)
+
     def remove_key_press_state(self, vk_code):
         try:
             self._pressed_keys.remove(vk_code)
         except KeyError:
             pass
-        
+
     def manage_key_press_states_by_event(self, key_event):
-        vk_code, is_keydown, _ = key_event.get_all() 
+        vk_code, is_keydown, _ = key_event.get_all()
         if is_keydown:
             self.add_key_press_state(vk_code)
         else:
@@ -1676,7 +1675,7 @@ class Input_State_Manager():
         self._all_key_press_states_dict = {}
         self._toggle_states_dict = {}
         self._toggle_states_dict_keys = []
-        
+
 
 
 
@@ -1687,21 +1686,21 @@ class Input_State_Manager():
     #     if CONSTANTS.DEBUG2:
     #         print("D2: releasing all keys")
 
-                
+
     #     # release remaining simulated keys
-    #     for vk_code, is_press in self._all_key_press_states_dict.items(): 
+    #     for vk_code, is_press in self._all_key_press_states_dict.items():
     #         if is_press:
     #             # only reset simulated keys
     #             if self.get_simulated_key_press_state(vk_code) is True:
     #             # if self.get_simulated_key_press_state(vk_code) is True and not vk_code in self.pressed_keys:
     #                 if CONSTANTS.DEBUG2:
     #                     print(f"D2: released key: {vk_code}")
-    #                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))       
-        
+    #                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
+
     #     self.release_all_modifier_keys()
     #     self.release_all_toggles()
     #     self.reset_states_dicts()
-    
+
     # def release_all_modifier_keys(self):
     #     # first release all modifert keys
     #     for vk_code in Input_State_Manager.ALL_MODIFIER_KEYS:
@@ -1719,8 +1718,8 @@ class Input_State_Manager():
     #                 print(f"D2: released pressed modifier key: {vk_code}")
     #             self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
     #             self.set_simulated_key_press_state(vk_code, False)
-   
-###XXX 241014-1926 changed 
+
+###XXX 241014-1926 changed
 
     def release_all_currently_pressed_simulated_keys(self):
         # print(f"pressed keys on release: {self._pressed_keys}")
@@ -1729,25 +1728,25 @@ class Input_State_Manager():
             if item is True:
              active_keys.append(key)
         # print(f"pressed simulated keys on release: {active_keys}")
-        
+
         ###XXX 241009-1049 do not release real keys, 241009-1100 now again release all keys - works better
         if CONSTANTS.DEBUG2:
             print("D2: releasing all keys")
-      
+
         # release remaining simulated keys
-        for vk_code, is_press in self._simulated_key_press_states_dict.items(): 
-        # for vk_code, is_press in self._all_key_press_states_dict.items(): 
+        for vk_code, is_press in self._simulated_key_press_states_dict.items():
+        # for vk_code, is_press in self._all_key_press_states_dict.items():
             if is_press:
                 # only reset simulated keys
                 if CONSTANTS.DEBUG2:
                     print(f"D2: released key: {vk_code}")
-                self._fst.output_manager.send_key_event(Key_Event(vk_code, False))       
-        
+                self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
+
         # self.release_all_modifier_keys()
-        
+
         self.release_all_toggles()
         self.reset_states_dicts()
-    
+
     def release_all_modifier_keys(self):
         # first release all modifier keys
         for vk_code in Input_State_Manager.ALL_MODIFIER_KEYS:
@@ -1755,14 +1754,14 @@ class Input_State_Manager():
                 if CONSTANTS.DEBUG2:
                     print(f"D2: released pressed modifier key: {vk_code}")
                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
-                #self.set_simulated_key_press_state(vk_code, False)            
-                
+                #self.set_simulated_key_press_state(vk_code, False)
+
     def reset_states_dicts(self):
         self._pressed_keys = set()
         self._real_key_press_states_dict = {}
         self._simulated_key_press_states_dict = {}
         self._all_key_press_states_dict = {}
-        
+
     def get_time_lists(self):
         return [self._time_real, self._time_simulated, self._time_all]
 
@@ -1782,9 +1781,9 @@ class Input_State_Manager():
             time_list = self._time_simulated
         elif time_list == 'all':
             time_list = self._time_all
-            
+
         time_last_pressed, time_last_released, time_released, time_pressed = time_list
-        
+
         if is_keydown:
             time_last_pressed[vk_code] = key_event_time
             try:
@@ -1792,7 +1791,7 @@ class Input_State_Manager():
                 #print(f"time released: {time_released[vk_code]}")
             except KeyError:
                 pass
-                #print(f"no key yet for: {error}")     
+                #print(f"no key yet for: {error}")
         else:
             time_last_released[vk_code] = key_event_time
             try:
@@ -1805,17 +1804,17 @@ class Input_State_Manager():
 class CLI_menu():
     '''
     manages the command line interface menu
-    '''        
+    '''
     def __init__(self, fst_keyboard):
         self._fst = fst_keyboard
-    
+
     def clear_cli(self):
         if CONSTANTS.DEBUG or CONSTANTS.DEBUG2 or CONSTANTS.DEBUG3:
             print("D1: cli not cleared")
         else:
             system('cls||clear')
-            
-    'menu display' 
+
+    'menu display'
     def display_menu(self):
         """
         Display the menu and handle user input
@@ -1823,15 +1822,15 @@ class CLI_menu():
         self._fst.arg_manager.PRINT_VK_CODES = False
         invalid_input = False
         text = ""
-        while True:       
+        while True:
             # clear the CLI
             self.clear_cli()
-            
+
             if invalid_input:
                 print(text)
                 print("Please try again.\n")
                 invalid_input = False
-                
+
                 text = ""
             self._fst.config_manager.display_groups()
             print('\n------ Options -------')
@@ -1840,7 +1839,7 @@ class CLI_menu():
             print("2. Reload everything from file.")
             print("3. Print virtual key codes to identify keys.")
             print("4. End the program/script.", flush=True)
-            
+
             self.flush_the_input_buffer()
 
             choice = input("\nHit [Enter] to start or enter your choice: " )
@@ -1871,28 +1870,27 @@ class CLI_menu():
 
     def update_group_display(self):
         self.clear_cli()
-        
+
         self._fst.config_manager.display_groups()
         if self._fst.arg_manager.CONTROLS_ENABLED:
-            self.display_control_text()   
-            
+            self.display_control_text()
+
     def display_focus_names(self):
         print(f"\n>>> looking for focus names: {', '.join(self._fst.focus_manager.multi_focus_dict_keys)}")
-    
+
     def display_focus_found(self, active_window):
         print(f'\n>>> FOCUS APP FOUND: resuming with app: \n    {active_window}\n')
-        
+
     def display_focus_not_found(self):
         print('\n>>> NO FOCUS APP FOUND')
         self.display_focus_names()
-        
+
     def display_default_active(self):
         print('\n>>> DEFAULT GROUP ACTIVE')
         self.display_focus_names()
-        
+
     def flush_the_input_buffer(self):
         sys.stdout.flush()
         # Try to flush the buffer
         while msvcrt.kbhit():
             msvcrt.getch()
-        
