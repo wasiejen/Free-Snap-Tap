@@ -199,9 +199,9 @@
    `Input_State_Manager.set_key_times`); `_time_all` fills as documented and `ta()` works.
    The duplicate write into the simulated list disappeared. Test:
    `tests/test_output_manager.py::TestTimingEval::test_ta_reads_all_list_independent_of_simulated`.
-4. **`Key_Group.get_vk_codes` has a typo** (`key.vk_codes` → `AttributeError` if called,
-   `fst_data_types.py:180-181`); currently dead code — only `Tap_Group.get_vk_codes`
-   (`fst_data_types.py:374-375`) is used.
+4. ~~**`Key_Group.get_vk_codes` has a typo**~~ **FIXED (2026-09-06):** `key.vk_codes` →
+   `key.vk_code` (`fst_data_types.py`). Was dead code (only `Tap_Group.get_vk_codes` is
+   used); now works. Test: `tests/test_data_types.py::TestKeyGroup::test_get_vk_codes`.
 5. **WIKI says macros are "played in its own thread"** (line 114) — they are asyncio tasks
    now (`macro_task`, `fst_keyboard.py:868-883`; repeat tasks in `fst_tasks.py`). Doc stale,
    behavior (interruptible, non-blocking) is kept.

@@ -178,7 +178,7 @@ class Key_Group(object):
         return self._key_events
 
     def get_vk_codes(self):
-        return [key.vk_codes for key in self._key_events]
+        return [key.vk_code for key in self._key_events]
 
     def add_key_event(self, key_event):
         self._key_events.append(key_event)

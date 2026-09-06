@@ -84,6 +84,10 @@ class TestKeyGroup:
     def test_repr(self):
         assert repr(Key_Group([Key_Event('a')])) == 'KG(-a)'
 
+    def test_get_vk_codes(self):
+        kg = Key_Group([Key_Event('a'), Key_Event('b', is_press=False)])
+        assert kg.get_vk_codes() == ['a', 'b']
+
 
 class TestRebind:
     def make_rebind(self):
