@@ -1,0 +1,8 @@
+-r requirements.txt
+
+# test tooling
+pytest==9.1.1
+pytest-qt==4.5.0
+pytest-cov==7.1.0
+freezegun==1.5.5
+ruff==0.16.6

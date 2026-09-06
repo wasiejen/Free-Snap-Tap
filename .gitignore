@@ -18,3 +18,7 @@ wiki.md
 *.cmd
 *.vbs
 fst.log
+/tests/__pycache__
+__pycache__/
+.coverage
+.pytest_cache/
