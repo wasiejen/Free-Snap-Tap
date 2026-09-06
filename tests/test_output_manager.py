@@ -74,6 +74,14 @@ class TestTimingEval:
         assert om_env.om.constraint_evaluation('ts("+a")', make_ke(is_press=False)) == 600
         assert om_env.om.constraint_evaluation('tr("+a")', make_ke(is_press=False)) == 0
 
+    def test_ta_reads_all_list_independent_of_simulated(self, om_env):
+        sm = om_env.fst.state_manager
+        sm.set_key_times(1000, VK_A, True, 'all')
+        sm.set_key_times(1400, VK_A, False, 'all')
+        assert om_env.om.constraint_evaluation('ta("+a")', make_ke(is_press=False)) == 400
+        # 'all' times must not leak into the simulated list
+        assert om_env.om.constraint_evaluation('ts("+a")', make_ke(is_press=False)) == 0
+
     def test_last_press_and_release_wall_clock(self, om_env):
         with freeze_time('2020-01-01 00:00:00'):
             om_env.fst.TIME_DIFF = 0
