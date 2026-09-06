@@ -150,3 +150,11 @@ def test_reset_direct_semantics(fake_fst):
     task._handle.cancel.assert_called_once_with()
     # no overlay given -> nothing removed
     fake_fst.remove_callback.assert_not_called()
+
+
+def test_reset_removes_overlay_callback(fake_fst):
+    task = build_task(fake_fst, with_overlay=1)
+    task._handle = MagicMock()
+    task.reset()
+    assert task.reset_event.is_set()
+    fake_fst.remove_callback.assert_called_once_with('al')
