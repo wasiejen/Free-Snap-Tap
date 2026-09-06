@@ -230,25 +230,29 @@
    events and is correct as it is; the sign carries no meaning. Maintainer clarifies the
    WIKI.
 10. **`p()` sensitivity to the current event**: real press state is updated *before* trigger
-    evaluation (`fst_keyboard.py:607`), so `+ke|(p('ke'))` is always False and `-ke|(p('ke'))`
-    always True. The sign in `p('-ke')` vs `p('+ke')` is discarded (`fst_manager.py:243`).
-    WIKI line 194 does not document this. **VERIFY.**
+    evaluation (`fst_keyboard.py`), so `+ke|(p('ke'))` is always False and `-ke|(p('ke'))`
+    always True. The sign in `p('-ke')` vs `p('+ke')` is discarded. WIKI line ~194 does not
+    document this. **Decision (2026-09-06): keep as-is; maintainer documents** the
+    after-current-event semantics and the discarded sign in the WIKI.
 11. **Invocation placement**: WIKI says invocations work "as suffix in replacement key of
-    rebinds or played key groups of macros", but trigger/constraint invocations work too
-    (`check_constraint_fulfillment` evaluates them at trigger check, `fst_keyboard.py:556-562`)
-    — with left-to-right short-circuit: an invocation after a False eval never runs. **VERIFY**
-    which placement is intended as supported.
+   rebinds or played key groups of macros", but trigger/constraint invocations work too
+   (`check_constraint_fulfillment` evaluates them at trigger check) — with left-to-right
+   short-circuit: an invocation after a False eval never runs. **Decision (2026-09-06): keep
+   working everywhere; maintainer documents** the trigger placement in the WIKI.
 12. **README doc problems** (not edited, per handoff): title line 1 mixes "Macros (Aliases)"
-    while the code treats them separately; "Python 3.6 or higher" (line 219) vs Python 3.12
-    venv; "repetition will interrupt inself" (WIKI line 216) and heading "Repetiton" (WIKI
-    line 213) typos; README line 150 comment claims the original key is *not* suppressed
-    after `|(!)` — which matches the code for rebinds (no match → no suppression) but the
-    comment's reasoning ("evaluations in sequence") is not what the code does; README 47 /
-    WIKI 4 link to the online Wiki as V1.1.3 while code is V1.2.0.
+   while the code treats them separately; "Python 3.6 or higher" (line 219) vs Python 3.12
+   venv; "repetition will interrupt inself" (WIKI line 216) and heading "Repetiton" (WIKI
+   line 213) typos; README line 150 comment claims the original key is *not* suppressed
+   after `|(!)` — which matches the code for rebinds (no match → no suppression) but the
+   comment's reasoning ("evaluations in sequence") is not what the code does; README 47 /
+   WIKI 4 link to the online Wiki as V1.1.3 while code is V1.2.0.
+   **Decision (2026-09-06): covered by TODO.md item 2 (README/WIKI rework).**
 13. **`None` ke delay**: WIKI line 259 says a `None`/empty ke "will have a default delay
-    (###XXX still up for debate)" — code: no default delay for a `None` ke without explicit
-    delay (`fst_manager.py:123-136`); manual delays are honored. Matches the "up for debate"
-    note.
+   (###XXX still up for debate)" — code: no default delay for a `None` ke without explicit
+   delay (`fst_manager.py` `execute_key_event`); manual delays are honored.
+   **Decision (2026-09-06): settled — no default delay** (a `None` ke is a pure timing
+   marker unless given explicit delays); maintainer removes the "up for debate" note in
+   the WIKI.
 14. **`suppress` of the *original* event when a rebind replacement's constraints fail** —
     e.g. `a : -b|(p(shift))` without shift held: the rebind *was* matched (`is_trigger_activated`
     already passed on trigger constraints); the replacement check fails → `to_be_suppressed`
