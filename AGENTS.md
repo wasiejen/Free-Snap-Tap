@@ -53,7 +53,7 @@ sends events with delays. Focus change re-runs `update_args_and_groups`.
 ## Test conventions
 - Tests live in `tests/`, pure unit scope so far (no real keyboard, no real time, no Windows APIs).
 - `tests/test_known_issues.py` = **xfail** file for desired-but-not-yet-true behavior. When fixed, move the test into a normal file and keep it green. A test removed from there was reviewed and **accepted as-is**.
-- Current status: **66 passed, 1 xfailed**.
+- Current status: **141 passed, 1 xfailed** (Phase 2 behavior tests added 2026-09-06).
 
 ## Maintainer decisions on the original known-issues (060926)
 - **#1 Key_Event eq vs hash** — **tabled**. eq ignores constraints; hash is repr-based. Keep the xfail until the suite covers dicts/sets of `Key_Event`.
@@ -65,7 +65,7 @@ sends events with delays. Focus change re-runs `update_args_and_groups`.
 - **#7 single-char lines** — fixed: `len(line) > 1` guard removed; single-char keys (and with trailing comment) survive cleaning.
 
 ## Open items / next steps
-- **Phase 2 (recommended next):** unit-test `Output_Manager` + `Input_State_Manager` with mocked pynput controllers + `freezegun` for time-based eval (`tr`/`last`/`dc`/`p`/`cs`). This is where most remaining logic lives (`fst_manager.py` currently ~27% covered, dragged down by these two).
+- **Phase 2 (done 2026-09-06):** unit-tested `Output_Manager` + `Input_State_Manager` with mocked pynput controllers + `freezegun` for time-based eval (`tr`/`last`/`dc`/`p`/`cs`) + filter hot path (`fst_keyboard._win32_event_filter`). `fst_manager.py` now ~64% covered. See `tests/test_output_manager.py`, `tests/test_input_state_manager.py`, `tests/test_filter_behavior.py`; gap semantics in `SPEC_FEATURES.md` section 5.
 - **Phase 3:** GUI tests with `pytest-qt` (`QT_QPA_PLATFORM=offscreen`); extend the `test_overlay.py` pattern.
 - **Phase 4:** coverage report to prioritize remaining hotspots; optionally a GitHub Actions **Windows** runner (project is Windows-only, so CI must be Windows).
 - Clean up the 5 ruff `F` findings when convenient (unused `threading.Event`, `QSizePolicy`, f-strings in `free_snap_tap.py`, unused local in `fst_overlay.py`).

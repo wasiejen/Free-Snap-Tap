@@ -257,6 +257,9 @@
 ## 5. VERIFY — semantics NOT yet covered by tests (code as of this commit)
 
 Each item states what the code appears to do; mark for a behavioral test in Phase 2.
+**Status (2026-09-06): all items below verified by the committed Phase 2 behavior
+tests (`tests/test_output_manager.py`, `tests/test_input_state_manager.py`,
+`tests/test_filter_behavior.py`) — actual behavior matches the descriptions here.**
 
 ### Eval functions
 
