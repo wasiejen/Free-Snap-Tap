@@ -254,10 +254,15 @@
    marker unless given explicit delays); maintainer removes the "up for debate" note in
    the WIKI.
 14. **`suppress` of the *original* event when a rebind replacement's constraints fail** —
-    e.g. `a : -b|(p(shift))` without shift held: the rebind *was* matched (`is_trigger_activated`
-    already passed on trigger constraints); the replacement check fails → `to_be_suppressed`
-    is set (`fst_keyboard.py:651-656`) → the **original** key is suppressed and nothing is
-    sent. This "matched but silently eaten" case is undocumented. **VERIFY** intended behavior.
+     e.g. `a : -b|(p("shift"))` without shift held: the rebind *was* matched
+     (`is_trigger_activated` already passed on trigger constraints); the replacement check
+     fails → `to_be_suppressed` is set (`fst_keyboard.py`) → the **original** key is
+     suppressed and nothing is sent. **Decision (2026-09-06): keep as-is** — consistent with
+     the general logic (replace first, then check the replacement's constraints); a user who
+     wants the original to pass instead moves the constraint to the trigger side:
+     `a|(p("shift")) : b`. Related notes for the WIKI (TODO.md #2): a signed key on the
+     *right* side of a Key rebind (e.g. `a : -b`) is reinterpreted as a plain `Key`
+     (press+release pair), and keys inside `p(...)`-style evals must be quoted strings.
 15. **Focus matching is case-sensitive substring** (`str.find`, `fst_tasks.py:109`) — WIKI
     says "part or the full name" but not case behavior; `<focus>` name sanitization strips
     most special chars (`fst_manager.py:902`) while window titles are sanitized separately
