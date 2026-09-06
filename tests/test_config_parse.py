@@ -188,3 +188,43 @@ class TestPresortLines:
         cm = Config_Manager()
         cm.presort_lines([('<run_if_not>', '-shift|(ar(shift)),-c')])
         assert cm.alias_hr == [['<run_if_not>', ['-shift|(ar(shift))', '-c']]]
+
+
+class TestFileWriting:
+    def test_create_new_group_file_writes_default_tap_groups(self, tmp_path):
+        path = tmp_path / 'new.cfg'
+        cm = Config_Manager(str(path))
+        cm.create_new_group_file()
+        assert path.exists()
+        assert path.read_text().splitlines() == [
+            '# Tap Groups', 'a, d', 'w, s', '# Rebinds', '# Macros',
+        ]
+        assert cm.tap_groups_hr == [['a', 'd'], ['w', 's']]
+
+    def test_create_new_group_file_resets_previous_groups(self, tmp_path):
+        path = tmp_path / 'new.cfg'
+        cm = Config_Manager(str(path))
+        cm.create_new_group_file()
+        cm.add_group(['x', 'z'], cm._tap_groups_hr)
+        cm.create_new_group_file()
+        # previous content is discarded; the default groups are written
+        assert path.read_text().splitlines() == [
+            '# Tap Groups', 'a, d', 'w, s', '# Rebinds', '# Macros',
+        ]
+
+    def test_write_out_new_file_writes_current_tap_groups(self, tmp_path):
+        path = tmp_path / 'cfg.txt'
+        cm = Config_Manager(str(path))
+        cm.add_group(['a', 'd'], cm._tap_groups_hr)
+        cm.add_group(['w', 's'], cm._tap_groups_hr)
+        cm._write_out_new_file()
+        assert path.read_text().splitlines() == [
+            '# Tap Groups', 'a, d', 'w, s', '# Rebinds', '# Macros',
+        ]
+
+    def test_load_config_missing_file_raises_without_creating_file(self, tmp_path):
+        path = tmp_path / 'missing.cfg'
+        with pytest.raises(FileNotFoundError):
+            Config_Manager(str(path)).load_config()
+        # the create_new_group_file() call in the handler sits behind the raise
+        assert not path.exists()
