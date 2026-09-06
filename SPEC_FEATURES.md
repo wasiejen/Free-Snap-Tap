@@ -224,8 +224,11 @@
    the constraint); **now fail the constraint** (fail-closed, printed) — fixed 2026-09-06,
    test `tests/test_output_manager.py::TestStateEval::test_unknown_key_state_constraint_fails`.
 9. **`dc()`'s key-string sign is ignored** — `dc("-ke")` and `dc("+ke")` return the same
-   value (the `is_press` of the argument is discarded, `fst_manager.py:279`); what matters is
-   the phase of the *current* event. WIKI line 185 is ambiguous here. **VERIFY.**
+   value (the `is_press` of the argument is discarded, `fst_manager.py`); what matters is
+   the phase of the *current* event. WIKI line 185 is ambiguous here. **Decision (2026-09-06):
+   keep as-is** — `time_released[vk] + time_pressed[vk]` is the interval between two press
+   events and is correct as it is; the sign carries no meaning. Maintainer clarifies the
+   WIKI.
 10. **`p()` sensitivity to the current event**: real press state is updated *before* trigger
     evaluation (`fst_keyboard.py:607`), so `+ke|(p('ke'))` is always False and `-ke|(p('ke'))`
     always True. The sign in `p('-ke')` vs `p('+ke')` is discarded (`fst_manager.py:243`).
