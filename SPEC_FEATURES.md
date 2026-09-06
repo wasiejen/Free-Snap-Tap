@@ -185,12 +185,10 @@
 
 ## 4. Discrepancies / unclear behavior — flagged for the maintainer
 
-1. **Toggle key inside a macro playback group is broken.** `macro_task` calls
-   `self.output_manager.get_next_toggle_state_key_event(...)` (`fst_keyboard.py:881`) but
-   that method only exists on `Input_State_Manager` (`fst_manager.py:1639`). A `^key` in a
-   macro's *played* group raises `AttributeError`, caught at `fst_keyboard.py:885-886` —
-   the macro aborts silently (log only). The rebind path uses `state_manager` correctly
-   (`fst_keyboard.py:676`). **VERIFY** by running a macro with a toggle key.
+1. ~~**Toggle key inside a macro playback group is broken.**~~ **FIXED (2026-09-06):**
+   `macro_task` now calls `self.state_manager.get_next_toggle_state_key_event(...)`
+   (`fst_keyboard.py:881`), matching the rebind path. Regression test:
+   `tests/test_filter_behavior.py::TestMacroPlayback::test_macro_task_toggle_key_toggles_state`.
 2. **First-ever `|(macro_name)` invocation of a single macro raises `NameError`.**
    Unknown names fall through to bare `eval()` (`fst_manager.py:669-670`); a single macro
    that never played has no entry in `macro_thread_dict`, so `|(that_macro)` is evaluated as

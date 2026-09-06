@@ -878,7 +878,7 @@ class FST_Keyboard():
                 if constraint_fulfilled:
 
                     if key_event.is_toggle:
-                        key_event = self.output_manager.get_next_toggle_state_key_event(key_event)
+                        key_event = self.state_manager.get_next_toggle_state_key_event(key_event)
                     # send key event and handles interruption of delay
                     await self.output_manager.execute_key_event(key_event, delay_times, with_delay=True)
                                  
