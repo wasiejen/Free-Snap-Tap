@@ -242,6 +242,23 @@ class TestMacroPlayback:
         assert sleeps == [0.1]
 
     @pytest.mark.asyncio
+    async def test_macro_task_toggle_key_toggles_state(self, kb_env, monkeypatch):
+        kb = kb_env.kb
+
+        async def fake_sleep(t):
+            pass
+
+        monkeypatch.setattr(asyncio, 'sleep', fake_sleep)
+        # first toggle -> press, second -> release (regression: method must live
+        # on state_manager, not output_manager)
+        await kb.macro_task([Key_Event(VK_SHIFT, is_toggle=True)], 'm')
+        kb_env.kb_mock.press.assert_called_once_with(pynput_keyboard.KeyCode.from_vk(VK_SHIFT))
+        assert kb.state_manager.get_toggle_state(VK_SHIFT) is True
+        await kb.macro_task([Key_Event(VK_SHIFT, is_toggle=True)], 'm')
+        kb_env.kb_mock.release.assert_called_once_with(pynput_keyboard.KeyCode.from_vk(VK_SHIFT))
+        assert kb.state_manager.get_toggle_state(VK_SHIFT) is False
+
+    @pytest.mark.asyncio
     async def test_interrupt_cancels_running_playback(self, kb_env):
         kb = kb_env.kb
         kb.loop = asyncio.get_running_loop()
