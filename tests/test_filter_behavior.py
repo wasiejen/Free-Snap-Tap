@@ -271,3 +271,148 @@ class TestMacroPlayback:
         # b was sent before the delay; c was cancelled away with the delay
         assert kb_env.kb_mock.press.call_count == 1
         assert kb_env.kb_mock.release.call_count == 0
+
+
+VK_ALT = 0xA4
+VK_END = 0x23
+VK_DELETE = 0x2E
+VK_PAGE_DOWN = 0x22
+
+
+def hold_keys(kb, *vks):
+    for vk in vks:
+        kb.state_manager.set_real_key_press_state(vk, True)
+
+
+def mock_control_handlers(kb):
+    for name in ('control_return_to_menu', 'control_exit_program', 'control_toggle_pause'):
+        setattr(kb, name, MagicMock())
+
+
+class TestControlActions:
+    def test_check_for_combination_string_and_int_codes(self, kb_env):
+        kb = kb_env.kb
+        assert kb.check_for_combination(['alt', 'end']) is False
+        hold_keys(kb, VK_ALT, VK_END)
+        assert kb.check_for_combination(['alt', 'end']) is True
+        assert kb.check_for_combination([VK_ALT, VK_END]) is True
+        kb.state_manager.set_real_key_press_state(VK_END, False)
+        assert kb.check_for_combination(['alt', 'end']) is False
+
+    def test_alt_end_exits_program(self, kb_env):
+        kb = kb_env.kb
+        mock_control_handlers(kb)
+        hold_keys(kb, VK_ALT, VK_END)
+        kb.check_control_actions()
+        kb.control_exit_program.assert_called_once_with()
+        kb.control_return_to_menu.assert_not_called()
+        kb.control_toggle_pause.assert_not_called()
+
+    def test_alt_page_down_returns_to_menu(self, kb_env):
+        kb = kb_env.kb
+        mock_control_handlers(kb)
+        hold_keys(kb, VK_ALT, VK_PAGE_DOWN)
+        kb.check_control_actions()
+        kb.control_return_to_menu.assert_called_once_with()
+        kb.control_exit_program.assert_not_called()
+        kb.control_toggle_pause.assert_not_called()
+
+    def test_alt_delete_toggles_pause(self, kb_env):
+        kb = kb_env.kb
+        mock_control_handlers(kb)
+        hold_keys(kb, VK_ALT, VK_DELETE)
+        kb.check_control_actions()
+        kb.control_toggle_pause.assert_called_once_with()
+        kb.control_return_to_menu.assert_not_called()
+        kb.control_exit_program.assert_not_called()
+
+    def test_menu_combination_wins_when_multiple_match(self, kb_env):
+        kb = kb_env.kb
+        mock_control_handlers(kb)
+        hold_keys(kb, VK_ALT, VK_END, VK_DELETE, VK_PAGE_DOWN)
+        kb.check_control_actions()
+        kb.control_return_to_menu.assert_called_once_with()
+        kb.control_exit_program.assert_not_called()
+        kb.control_toggle_pause.assert_not_called()
+
+    def test_partial_combination_does_nothing(self, kb_env):
+        kb = kb_env.kb
+        mock_control_handlers(kb)
+        hold_keys(kb, VK_ALT)  # modifier alone is no control
+        kb.check_control_actions()
+        assert not (kb.control_return_to_menu.call_count
+                    or kb.control_exit_program.call_count
+                    or kb.control_toggle_pause.call_count)
+
+    def test_controls_disabled_gate(self, kb_env):
+        kb = kb_env.kb
+        mock_control_handlers(kb)
+        kb.arg_manager.CONTROLS_ENABLED = False
+        hold_keys(kb, VK_ALT, VK_END)
+        kb.check_control_actions()
+        assert not (kb.control_return_to_menu.call_count
+                    or kb.control_exit_program.call_count
+                    or kb.control_toggle_pause.call_count)
+
+
+def mouse_msg_data(mouse_data=0, flags=0, t=1234):
+    return SimpleNamespace(pt=SimpleNamespace(x=1, y=2), mouseData=mouse_data,
+                           flags=flags, time=t, dwExtraInfo=0)
+
+
+class TestMouseWin32Filter:
+    def patch_filter(self, kb, monkeypatch):
+        monkeypatch.setattr(kb, '_win32_event_filter', MagicMock())
+
+    def test_movement_returns_false_and_is_ignored(self, kb_env, monkeypatch):
+        kb = kb_env.kb
+        self.patch_filter(kb, monkeypatch)
+        assert kb.mouse_win32_event_filter(512, mouse_msg_data()) is False
+        kb._win32_event_filter.assert_not_called()
+        kb._listener.suppress.assert_not_called()
+
+    def test_button_messages_map_to_vk_codes(self, kb_env, monkeypatch):
+        kb = kb_env.kb
+        self.patch_filter(kb, monkeypatch)
+        cases = [(513, 1, True), (514, 1, False),
+                 (516, 2, True), (517, 2, False),
+                 (519, 3, True), (520, 3, False)]
+        for msg, vk, is_press in cases:
+            kb.mouse_win32_event_filter(msg, mouse_msg_data())
+            kb._win32_event_filter.assert_called_with(vk, 1234, is_press, False, True)
+
+    def test_x_buttons_use_mousedata_for_vk(self, kb_env, monkeypatch):
+        kb = kb_env.kb
+        self.patch_filter(kb, monkeypatch)
+        kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=65536))   # x1 down
+        kb._win32_event_filter.assert_called_with(4, 1234, True, False, True)
+        kb.mouse_win32_event_filter(524, mouse_msg_data(mouse_data=65536))   # x1 up
+        kb._win32_event_filter.assert_called_with(4, 1234, False, False, True)
+        kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=131072))  # x2 down
+        kb._win32_event_filter.assert_called_with(5, 1234, True, False, True)
+
+    def test_scroll_messages_map_to_vk_6_and_7(self, kb_env, monkeypatch):
+        kb = kb_env.kb
+        self.patch_filter(kb, monkeypatch)
+        kb.mouse_win32_event_filter(522, mouse_msg_data(mouse_data=4287102976))  # vertical down
+        kb._win32_event_filter.assert_called_with(6, 1234, True, False, True)
+        kb.mouse_win32_event_filter(522, mouse_msg_data(mouse_data=7864320))     # vertical up
+        kb._win32_event_filter.assert_called_with(6, 1234, False, False, True)
+        kb.mouse_win32_event_filter(526, mouse_msg_data(mouse_data=4287102976))  # horizontal
+        kb._win32_event_filter.assert_called_with(7, 1234, True, False, True)
+
+    def test_simulated_flag_passthrough(self, kb_env, monkeypatch):
+        kb = kb_env.kb
+        self.patch_filter(kb, monkeypatch)
+        kb.mouse_win32_event_filter(513, mouse_msg_data(flags=1))
+        kb._win32_event_filter.assert_called_with(1, 1234, True, True, True)
+        kb.mouse_win32_event_filter(513, mouse_msg_data(flags=0))
+        kb._win32_event_filter.assert_called_with(1, 1234, True, False, True)
+
+    def test_unrecognized_mouse_event_suppresses(self, kb_env, monkeypatch):
+        kb = kb_env.kb
+        self.patch_filter(kb, monkeypatch)
+        # x-button message without x1/x2 mousedata resolves no vk_code
+        kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=0))
+        kb._win32_event_filter.assert_not_called()
+        kb._listener.suppress.assert_called_once_with()
