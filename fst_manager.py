@@ -1779,7 +1779,7 @@ class Input_State_Manager():
         elif time_list == 'simulated':
             time_list = self._time_simulated
         elif time_list == 'all':
-            time_list = self._time_simulated
+            time_list = self._time_all
             
         time_last_pressed, time_last_released, time_released, time_pressed = time_list
         

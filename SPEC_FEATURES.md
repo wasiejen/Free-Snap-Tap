@@ -194,11 +194,11 @@
    `NameError` and return `True` (silent no-op, printed under `DEBUG3`) — `fst_manager.py`
    `constraint_evaluation` else-branch. Test:
    `tests/test_output_manager.py::TestInvocations::test_unknown_macro_name_is_silent_noop`.
-3. **`ta()` (all-events timing) always returns 0.** `set_key_times` maps the `'all'` list to
-   `self._time_simulated` instead of `self._time_all` (`fst_keyboard.py` filter writes all
-   times at 616/820 → `Input_State_Manager.set_key_times` `fst_manager.py:1770-1776`), so
-   `_time_all` stays empty and `ta()`/the `ALL` timing dict never fill. WIKI documents
-   `ta("ke")` as working. **VERIFY.**
+3. ~~**`ta()` (all-events timing) always returns 0.**~~ **FIXED (2026-09-06):**
+   `set_key_times` now maps `'all'` to `self._time_all` (`fst_manager.py`,
+   `Input_State_Manager.set_key_times`); `_time_all` fills as documented and `ta()` works.
+   The duplicate write into the simulated list disappeared. Test:
+   `tests/test_output_manager.py::TestTimingEval::test_ta_reads_all_list_independent_of_simulated`.
 4. **`Key_Group.get_vk_codes` has a typo** (`key.vk_codes` → `AttributeError` if called,
    `fst_data_types.py:180-181`); currently dead code — only `Tap_Group.get_vk_codes`
    (`fst_data_types.py:374-375`) is used.
@@ -265,7 +265,7 @@ tests (`tests/test_output_manager.py`, `tests/test_input_state_manager.py`,
   Press-string `tr("-ke")` → `time_released[vk]` = idle time before this press
   (ms since last release); release-string `tr("+ke")` → `time_pressed[vk]` = hold duration.
   Returns 0 if the key has no previous event of the required phase. `ts()`/`ta()` are the
-  simulated/all variants (`205-215`) — but see section 4 #3 (`ta` never fills).
+   simulated/all variants (`205-215`) — `ta` now works (section 4 #3, fixed 2026-09-06).
   `VERIFY`: return values + press vs release sensitivity.
 - **`last("ke")`** (`260-270`) — ms since the last *press* of `ke` (real time list by
   default); `last("+ke")` → ms since last *release*. Returns 0 on no prior event.
