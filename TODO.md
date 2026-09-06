@@ -18,4 +18,6 @@ solution. Unknown constraint *names* are silent no-ops by design (see
 Full gap matrix + decisions made 2026-09-06 in `SPEC_FEATURES.md` sections 2–4.
 Known doc fixes include: WIKI "played in its own thread" → asyncio tasks (§4 #5),
 `|(name)` per-type semantics (§4 #6), `dc()` sign has no effect (§4 #9), README/WIKI
-V1.1.3 → V1.2.0 references, "Python 3.6" vs 3.12 venv, typos (§4 #12).
+V1.1.3 → V1.2.0 references, "Python 3.6" vs 3.12 venv, typos (§4 #12), replacement-side
+key reinterpretation in Key rebinds + quoted key strings inside `p(...)` (§4 #14),
+eaten-rebind suppression semantics + `a|(p("shift")) : b` pass-through pattern (§4 #14).
