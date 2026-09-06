@@ -273,10 +273,9 @@ class TestInvocations:
         assert om_env.om.constraint_evaluation('write("hello")', make_ke()) is True
         om_env.kb.type.assert_called_once_with("hello")
 
-    def test_unknown_macro_name_raises_name_error(self, om_env):
-        # first-ever invocation of a macro that never played falls through to bare eval
-        with pytest.raises(NameError):
-            om_env.om.constraint_evaluation('never_played_macro', make_ke())
+    def test_unknown_macro_name_is_silent_noop(self, om_env):
+        # unknown name falls through to bare eval; the NameError is swallowed (no-op, True)
+        assert om_env.om.constraint_evaluation('never_played_macro', make_ke()) is True
 
 
 class TestSendKeyEvent:
