@@ -667,7 +667,13 @@ class Output_Manager():
 
         # only if not found in short eval do the real eval
         else:
-            result = eval(constraint_to_evaluate)
+            try:
+                result = eval(constraint_to_evaluate)
+            except NameError as error:
+                # unknown name (e.g. invocation of a macro that never played) -> silent no-op
+                if CONSTANTS.DEBUG3:
+                    print(f"constraint {constraint_to_evaluate} not recognized - ignored: {error}")
+                return True
             ### print(f"result of '{constraint_to_evaluate}' is '{result}'")
             if CONSTANTS.DEBUG4:
                 print(f"D4: evaluated {constraint_to_evaluate} to: {result}")

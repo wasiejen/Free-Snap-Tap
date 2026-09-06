@@ -189,11 +189,11 @@
    `macro_task` now calls `self.state_manager.get_next_toggle_state_key_event(...)`
    (`fst_keyboard.py:881`), matching the rebind path. Regression test:
    `tests/test_filter_behavior.py::TestMacroPlayback::test_macro_task_toggle_key_toggles_state`.
-2. **First-ever `|(macro_name)` invocation of a single macro raises `NameError`.**
-   Unknown names fall through to bare `eval()` (`fst_manager.py:669-670`); a single macro
-   that never played has no entry in `macro_thread_dict`, so `|(that_macro)` is evaluated as
-   a Python name → `NameError`, not caught in the filter path. Only sequence names
-   (checked first) and already-started macros are safe. **VERIFY.**
+2. ~~**First-ever `|(macro_name)` invocation of a single macro raises `NameError`.**~~
+   **FIXED (2026-09-06):** unknown names falling through to bare `eval()` now swallow the
+   `NameError` and return `True` (silent no-op, printed under `DEBUG3`) — `fst_manager.py`
+   `constraint_evaluation` else-branch. Test:
+   `tests/test_output_manager.py::TestInvocations::test_unknown_macro_name_is_silent_noop`.
 3. **`ta()` (all-events timing) always returns 0.** `set_key_times` maps the `'all'` list to
    `self._time_simulated` instead of `self._time_all` (`fst_keyboard.py` filter writes all
    times at 616/820 → `Input_State_Manager.set_key_times` `fst_manager.py:1770-1776`), so
@@ -302,7 +302,8 @@ tests (`tests/test_output_manager.py`, `tests/test_input_state_manager.py`,
 - **Invocations** — `|(name)`: sequence name → `reset_macro_sequence_by_name`
   (`656-660` → `fst_keyboard.py:981-999`, only resets counter when > 0); started macro name
   → `interrupt_macro_by_name` (`662-666` → cancel task only if not done); unknown name →
-  bare `eval` (NameError — see 4 #2). `|(toggle_repeat('<alias>', ms))`: no entry or done
+   bare `eval`, `NameError` swallowed → silent no-op (see 4 #2, fixed 2026-09-06).
+   `|(toggle_repeat('<alias>', ms))`: no entry or done
   entry → starts `Macro_Repeat_Task` via `asyncio.run_coroutine_threadsafe(..., self._fst.loop)`
   (`314-328`, `288-301`); running entry → `cancel_playback()` + `handle.cancel()`.
   `|(stop_repeat('<alias>'))` same cancel path (`303-312`, unknown alias → silent True).
