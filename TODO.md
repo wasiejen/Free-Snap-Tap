@@ -13,7 +13,14 @@ Related: state-shorthand constraints now fail-closed on unknown keys (2026-09-06
 solution. Unknown constraint *names* are silent no-ops by design (see
 `SPEC_FEATURES.md` §4 #2 decision).
 
-## 2. Rework README and WIKI to the current state of the code (2026-09-06)
+## 2. Fix the 6 ruff `F` findings — cosmetic only, no behavior change (2026-09-07)
+
+`ruff check --select F .` baseline has 6 findings; fix them (remove unused imports/vars,
+clean up the f-strings) — none may change program behavior. Keep the suite green after.
+List: free_snap_tap 2×F541 (f-strings), fst_manager F401 (`threading.Event` import),
+fst_overlay F401 (`QSizePolicy`) + F841 (`cube_distance_down`), test_pynput_mouse F841.
+
+## 3. Rework README and WIKI to the current state of the code (2026-09-06)
 
 Full gap matrix + decisions made 2026-09-06 in `SPEC_FEATURES.md` sections 2–4.
 Known doc fixes include: WIKI "played in its own thread" → asyncio tasks (§4 #5),

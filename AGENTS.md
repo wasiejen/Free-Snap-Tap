@@ -92,8 +92,23 @@ sends events with delays. Focus change re-runs `update_args_and_groups`.
   dict cleanup (PySide6 routes `destroyed` globally → identity-guarded
   `_handle_destruction` with liveness probe), dict-based `check_empty` (offscreen
   destruction ordering). Left untested: `contextMenuEvent` (blocking `exec_`).
-- **Phase 4:** coverage report to prioritize remaining hotspots; optionally a GitHub
-  Actions **Windows** runner (project is Windows-only, so CI must be Windows).
+- **Phase 4 (done 2026-09-07):** coverage triage report `COVERAGE_TRIAGE.md` (committed +
+  pushed, `d161e5a`). Remaining 468 uncovered lines classified: A (testable now) = 299,
+  B (more mocking) = 50, C (deliberately not covered: 63 debug-print, 52 dead-code,
+  4 abstract-stub lines) = 119. No Windows CI added (not approved by maintainer).
+- **Phase 5 (next):** coverage push per `COVERAGE_TRIAGE.md` "Recommended order" (blocks 1–10
+  + 70-line remainder; all S/M effort). Ceiling A+B = 349 lines → 94.6 % of the three modules.
+  Suspected bugs found by the triage (recorded in the report, NOT fixed):
+  - `remove_all_toasts()` constraint calls `self._fst.remove_all_callbacks()`
+    (`fst_manager.py:579`) — no production object has that attribute (real `FST_Keyboard`
+    sets `remove_all_callback`, singular) → uncaught `AttributeError` in the win32 hot path;
+    masked in tests because `tests/conftest.py::FakeFST` defines the plural name.
+  - `convert_to_vk_code` (`fst_keyboard.py:144–153`) returns implicit `None` for out-of-range
+    numeric key strings (e.g. `"300"`) → caller `extract_data_from_key` line 224 raises
+    `TypeError` instead of `KeyError`.
+  - Dead code: `split_ignore_brackets2` (`fst_manager.py:996–1071`, never called),
+    `get_coordinates` (`fst_keyboard.py:481–484`, never called), `Config_Manager.parse_line`
+    (`fst_manager.py:890–891`, empty stub).
 - Clean up the 6 ruff `F` findings when convenient (free_snap_tap 2×F541, fst_manager
   F401 `threading.Event`, fst_overlay F401 `QSizePolicy` + F841, test_pynput_mouse F841
   — maintainer's file).
