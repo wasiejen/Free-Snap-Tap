@@ -21,4 +21,5 @@ fst.log
 /tests/__pycache__
 __pycache__/
 .coverage
+coverage.json
 .pytest_cache/
