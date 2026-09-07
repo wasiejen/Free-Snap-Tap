@@ -56,16 +56,14 @@ class Macro_Repeat_Task:
 
 class Focus_Task:
     '''
-    Thread for observing the active window and pause toggle the evaluation of key events
+    Async Task for observing the active window and pause toggle the evaluation of key events
     can be manually overwritten by Controls on ALT+DEL
     '''
 
     def __init__(self, fst_keyboard):#, paused_lock):
         self._stop = False
-        self.daemon = True
         self._fst = fst_keyboard
         self.FOCUS_THREAD_PAUSED = False
-        # self.paused_lock = paused_lock
 
     async def run(self):
         last_active_window = ''
@@ -84,32 +82,19 @@ class Focus_Task:
             if active_window != last_active_window or manually_paused:
                 if active_window != last_active_window:
                     last_active_window = active_window
-
-                # # 250905-1455: XXX-1
                 # #only allow letters, numbers and spaces in active window name
                 active_window = re.sub(r'[^a-zA-Z0-9_. ]', '', active_window)
-
-
                 # if not one of my own spawned windows
                 if active_window not in ["FST Status Indicator", "FST Crosshair", "FST_Overlay"]:
                     if not self.FOCUS_THREAD_PAUSED and not self._fst.arg_manager.MANUAL_PAUSED:
-
-                        #print(f"> Active Window: {active_window}")
-
                         if manually_paused:
                             manually_paused = False
-
                         found_valid_focus_name = False
                         focus_name_changed = False
-
                         # check if it is one of the focus groups
                         for focus_name in self._fst.focus_manager.multi_focus_dict_keys:
-                            # 250905-1455: XXX-1: remove lower
-                            #if active_window.lower().find(focus_name) >= 0:
                             if active_window.find(focus_name) >= 0:
-
                                 found_valid_focus_name = True
-
                                 # save previous focus app name
                                 old_focus_name = self._fst.focus_manager.FOCUS_APP_NAME
                                 if old_focus_name != focus_name:
@@ -117,7 +102,6 @@ class Focus_Task:
                                     self._fst.focus_manager.FOCUS_APP_NAME = focus_name
                                     focus_name_changed = True
                                 break
-
                         if found_valid_focus_name and focus_name_changed:
                             try:
                                 default_active = False
@@ -125,14 +109,11 @@ class Focus_Task:
                                 self._fst.cli_menu.update_group_display()
                                 self._fst.cli_menu.display_focus_found(active_window)
                                 self._fst.arg_manager.WIN32_FILTER_PAUSED = False
-
                             except Exception as error:
                                 print('--- reloading of groups files failed - not resumed, still paused ---')
                                 print(f" -> aborted reloading due to: {error}")
-
                         elif found_valid_focus_name and not focus_name_changed:
                             pass
-
                         # if not found a focus group set input filter to paused
                         else:
                             self._fst.focus_manager.FOCUS_APP_NAME = ''
@@ -143,7 +124,6 @@ class Focus_Task:
                                     self._fst.cli_menu.update_group_display()
                                     self._fst.cli_menu.display_default_active()
                                     self._fst.arg_manager.WIN32_FILTER_PAUSED = False
-
                             else:
                                 if self._fst.arg_manager.WIN32_FILTER_PAUSED:
                                     print(f"> Active Window: {active_window}")
@@ -156,10 +136,8 @@ class Focus_Task:
                                     await asyncio.sleep(0.2)
                                     self._fst.arg_manager.WIN32_FILTER_PAUSED = True
                                     print(f"> Active Window: {active_window}")
-
                     else:
                         manually_paused = True
-
             await asyncio.sleep(0.25)
 
     def pause(self):
