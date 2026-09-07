@@ -4,7 +4,6 @@ The control handlers mutate arg flags and stop the (mocked) listeners; the
 pause-toggle reload path is exercised with the config load and console clear
 stubbed so no file is opened and no real console is cleared.
 """
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest

@@ -4,7 +4,6 @@ start-arg application by focus name and the small property getters.
 The config load is stubbed so apply/update paths never open a file, and the
 pynput controllers are mocked so no real input can be emitted.
 """
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
