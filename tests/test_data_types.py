@@ -235,3 +235,70 @@ class TestTapGroup:
         assert tg1 == tg2
         assert hash(tg1) == hash(tg2)
         assert tg1 != Tap_Group(keys=['a'])
+
+
+class TestPropertiesAndSetters:
+    """Cover the remaining pure property getters and typed setters that the
+    equality/hash tests did not exercise."""
+
+    def test_key_event_repr_wo_constraints_with_key_string(self):
+        assert Key_Event('w', is_press=True, key_string='w').repr_wo_constraints() == '-w'
+
+    def test_key_is_toggle_property(self):
+        assert Key('a').is_toggle is False
+        assert Key('a', is_toggle=True).is_toggle is True
+
+    def test_key_repr_without_key_string_uses_vk(self):
+        assert repr(Key(0x41, key_string=None)) == '65'
+
+    def test_key_group_key_events_setter(self):
+        kg = Key_Group([Key_Event('a')])
+        kg.key_events = [Key_Event('b')]
+        assert kg.get_key_events() == [Key_Event('b')]
+
+    def test_key_group_add_key_event(self):
+        kg = Key_Group([Key_Event('a')])
+        kg.add_key_event(Key_Event('b'))
+        assert kg.get_key_events() == [Key_Event('a'), Key_Event('b')]
+
+    def test_rebind_alias_getter_and_setter(self):
+        r = Rebind(Key_Group([Key_Event('a')]), Key_Event('b'))
+        assert r.alias == ''
+        r.alias = 'my_reb'
+        assert r.alias == 'my_reb'
+
+    def test_rebind_trigger_group_setter(self):
+        r = Rebind(Key_Group([Key_Event('a')]), Key_Event('b'))
+        r.trigger_group = Key_Group([Key_Event('c')])
+        assert r.get_trigger() == Key_Event('c')
+
+    def test_rebind_replacement_setter(self):
+        r = Rebind(Key_Group([Key_Event('a')]), Key_Event('b'))
+        r.replacement = Key_Event('d')
+        assert r.replacement == Key_Event('d')
+
+    def test_rebind_get_trigger(self):
+        r = Rebind(Key_Group([Key_Event('a'), Key_Event('b')]), Key_Event('c'))
+        assert r.get_trigger() == Key_Event('a')
+
+    def test_rebind_hash(self):
+        r1 = Rebind(Key_Group([Key_Event('a')]), Key_Event('b'))
+        r2 = Rebind(Key_Group([Key_Event('a')]), Key_Event('b'))
+        assert hash(r1) == hash(r2)
+
+    def test_macro_sequence_counter_property(self):
+        m = Macro(Key_Group([Key_Event('a')]),
+                  [Key_Group([Key_Event('b')]), Key_Group([Key_Event('c')])])
+        assert m.sequence_counter == 0
+        m.get_key_events_of_current_sequence()
+        assert m.sequence_counter == 1
+
+    def test_macro_get_trigger(self):
+        m = Macro(Key_Group([Key_Event('a')]), [Key_Group([Key_Event('b')])])
+        assert m.get_trigger() == Key_Event('a')
+
+    def test_tap_group_alias_getter_and_setter(self):
+        tg = Tap_Group(keys=['a', 'd'])
+        assert tg.alias == ''
+        tg.alias = 'my_tap'
+        assert tg.alias == 'my_tap'

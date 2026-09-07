@@ -369,3 +369,198 @@ class TestCrossover:
             call.release(pynput_keyboard.KeyCode.from_vk(VK_A)),
             call.press(pynput_keyboard.KeyCode.from_vk(VK_B)),
         ]
+
+    @pytest.mark.filterwarnings("ignore:.*never awaited.*:RuntimeWarning")
+    def test_tap_group_async_scheduling_error_is_logged(self, om_env, monkeypatch):
+        # a scheduling failure must not propagate into the hot path
+        def raise_rct(*args, **kwargs):
+            raise RuntimeError('no loop')
+
+        monkeypatch.setattr(asyncio, 'run_coroutine_threadsafe', raise_rct)
+        om_env.fst.arg_manager.ACT_DELAY = True
+        tg = Tap_Group(keys=[Key(VK_A), Key(VK_B)])
+        tg.update_tap_states(VK_A, True)
+        tg.set_last_key_send(VK_A)
+        tg.update_tap_states(VK_B, True)
+        om_env.om.send_keys_for_tap_group(tg)  # no raise
+
+
+class TestPropertyAndDelayHelpers:
+    def test_mouse_property_exposes_controller(self, om_env):
+        assert om_env.om.mouse is om_env.mouse
+
+    def test_get_random_delay_swaps_when_min_gt_max(self, om_env, monkeypatch):
+        monkeypatch.setattr(fst_manager, 'randint', lambda lo, hi: lo)
+        assert om_env.om.get_random_delay(5, 20) == 5  # min 20 > max 5 -> swapped
+
+
+class TestExecuteKeyEventDelays:
+    @pytest.mark.asyncio
+    async def test_none_ke_with_empty_delays_waits_nothing(self, om_env, monkeypatch):
+        sleeps = []
+
+        async def fake_sleep(t):
+            sleeps.append(t)
+
+        monkeypatch.setattr(asyncio, 'sleep', fake_sleep)
+        await om_env.om.execute_key_event(Key_Event(0))  # None ke (vk 0), no delays
+        assert sleeps == []
+
+    @pytest.mark.asyncio
+    async def test_three_delays_are_truncated_to_two(self, om_env, monkeypatch):
+        sleeps = []
+
+        async def fake_sleep(t):
+            sleeps.append(t)
+
+        monkeypatch.setattr(asyncio, 'sleep', fake_sleep)
+        # [10, 20, 30] -> [10, 20]; get_random_delay(10, 20) exercises the swap
+        monkeypatch.setattr(fst_manager, 'randint', lambda lo, hi: lo)
+        om_env.fst.arg_manager.ACT_DELAY = True
+        await om_env.om.execute_key_event(make_ke(), delay_times=[10, 20, 30])
+        assert sleeps == [0.01]
+
+    def test_horizontal_scroll_vk_sends_scroll(self, om_env):
+        om_env.om.send_key_event(Key_Event(7, is_press=True))  # scroll_x_horizontal
+        om_env.mouse.scroll.assert_called_once_with(1, 0)
+
+
+class TestVariableConstraintFunctions:
+    def test_set_normalizes_bool_values(self, om_env):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("set('a', True)", ke) is True
+        assert om_env.om.variables['a'] == 1
+        assert om_env.om.constraint_evaluation("set('b', False)", ke) is True
+        assert om_env.om.variables['b'] == 0
+
+    def test_get_missing_variable_initializes_zero(self, om_env):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("get('nope')", ke) == 0
+        assert om_env.om.variables['nope'] == 0
+
+    def test_check_missing_int_returns_false(self, om_env):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("check('nope', 1)", ke) is False
+
+    def test_check_list_membership_hit_and_miss(self, om_env):
+        ke = make_ke()
+        om_env.om.variables['x'] = 1
+        assert om_env.om.constraint_evaluation("check('x', [1, 2])", ke) is True
+        assert om_env.om.constraint_evaluation("check('x', [3])", ke) is False
+
+    def test_check_list_missing_returns_false(self, om_env):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("check('nope', [1])", ke) is False
+
+    def test_incr_missing_variable_starts_at_one(self, om_env, capsys):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("incr('cnt')", ke) is True
+        assert om_env.om.variables['cnt'] == 1
+        assert 'set to 1' in capsys.readouterr().out
+
+    def test_decr_existing_variable(self, om_env):
+        ke = make_ke()
+        om_env.om.variables['n'] = 5
+        assert om_env.om.constraint_evaluation("decr('n')", ke) is True
+        assert om_env.om.variables['n'] == 4
+
+    def test_decr_missing_variable_starts_at_zero(self, om_env, capsys):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("decr('n')", ke) is True
+        assert om_env.om.variables['n'] == 0
+        assert 'set to 0' in capsys.readouterr().out
+
+    def test_clear_all_variables_constraint_empties_store(self, om_env):
+        ke = make_ke()
+        om_env.om.variables['hp'] = 5
+        assert om_env.om.constraint_evaluation("clear_all_variables()", ke) is True
+        assert om_env.om.variables == {}
+
+
+class TestStringVariableConstraints:
+    def test_set_var_get_var_roundtrip(self, om_env):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("set_var('x', 'hello')", ke) is True
+        assert om_env.om.constraint_evaluation("get_var('x')", ke) == 'hello'
+
+    def test_get_var_missing_variable_defaults_to_none_string(self, om_env, capsys):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("get_var('nope')", ke) == 'None'
+        assert om_env.om.variables['nope'] == 'None'
+
+    def test_cli_constraint_prints(self, om_env, capsys):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("cli('hi there')", ke) is True
+        assert 'hi there' in capsys.readouterr().out
+
+    def test_print_all_variables_empty_and_populated(self, om_env, capsys):
+        ke = make_ke()
+        om_env.om.clear_all_variables()
+        assert om_env.om.constraint_evaluation("print_all_variables()", ke) is True
+        assert 'No variables set.' in capsys.readouterr().out
+        om_env.om.variables['hp'] = 5
+        assert om_env.om.constraint_evaluation("print_all_variables()", ke) is True
+        assert 'hp: 5' in capsys.readouterr().out
+
+
+class TestDateConstraints:
+    def test_date_returns_compact_date(self, om_env):
+        ke = make_ke()
+        with freeze_time('2020-01-02 03:04:00'):
+            assert om_env.om.constraint_evaluation("date()", ke) == '200102'
+
+    def test_date_time_returns_compact_timestamp(self, om_env):
+        ke = make_ke()
+        with freeze_time('2020-01-02 03:04:00'):
+            assert om_env.om.constraint_evaluation("date_time()", ke) == '200102-0304'
+
+
+class TestCallbackConstraints:
+    def test_show_timer_routes_to_timer_callback(self, om_env):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("show_timer('t')", ke) is True
+        om_env.fst.timer_callback.assert_called_once_with(
+            't', 3., 12, "rgba(150, 150, 40, 200)", "white")
+
+    def test_remove_toast_routes_to_remove_callback(self, om_env):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("remove_toast('t')", ke) is True
+        om_env.fst.remove_callback.assert_called_once_with('t')
+
+    def test_remove_all_toasts_routes_to_fake_fst(self, om_env):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("remove_all_toasts()", ke) is True
+        om_env.fst.remove_all_callbacks.assert_called_once_with()
+
+
+class TestFileConstraints:
+    def test_save_into_file_writes_file(self, om_env, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("save_into_file('hello')", ke) is True
+        assert 'hello' in (tmp_path / 'output.txt').read_text()
+
+    def test_append_then_empty_file(self, om_env, tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("append_to_file('more')", ke) is True
+        assert om_env.om.constraint_evaluation("empty_file()", ke) is True
+        assert (tmp_path / 'output.txt').read_text() == ''
+
+
+class TestConstraintResultTypes:
+    def test_int_result_is_collected_as_delay(self, om_env):
+        ke = Key_Event(VK_A, constraints=['2'])
+        fulfilled, delays = om_env.om.check_constraint_fulfillment(ke, get_also_delays=True)
+        assert fulfilled is True
+        assert delays == [2]
+
+    def test_string_result_prints_invalid_warning(self, om_env, capsys):
+        om_env.om.variables['x'] = 'hello'
+        ke = Key_Event(VK_A, constraints=["get_var('x')"])
+        om_env.om.check_constraint_fulfillment(ke)
+        assert 'not valid' in capsys.readouterr().out
+
+    def test_eval_none_result_is_treated_as_true(self, om_env, capsys):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("print('x')", ke) is True
