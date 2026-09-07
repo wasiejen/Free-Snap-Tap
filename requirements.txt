@@ -6,7 +6,7 @@ pefile==2023.2.7
 PyGetWindow==0.0.9
 pyinstaller==6.14.2
 pyinstaller-hooks-contrib==2025.7
-pynput==1.7.7
+pynput==1.8.2
 pyperclip==1.11.0
 PyRect==0.2.0
 PySide6==6.9.1
