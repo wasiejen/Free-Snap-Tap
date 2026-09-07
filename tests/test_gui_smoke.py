@@ -60,8 +60,6 @@ def test_bridge_show_toast_signal_roundtrip(qtbot):
     assert manager.active_toasts['job'].label.text() == ' job |   5.0s '
     assert manager.isVisible()
 
-    # clean up before app shutdown: destroying a toast after its manager's
-    # C++ side is gone makes _handle_destruction hit a deleted layout
     manager.remove_all_toasts(1)
     qtbot.wait(50)
     assert manager.active_toasts == {}
@@ -78,3 +76,17 @@ def test_bridge_remove_toast_signal_roundtrip(qtbot):
 
     assert manager.active_toasts == {}
     assert manager.main_layout.count() == 0
+
+
+def test_handle_destruction_after_manager_shutdown(qtbot):
+    """Toasts destroyed together with their manager must not raise: the
+    destroyed signal can fire after the manager's C++ side is already gone."""
+    manager, bridge = make_toast_env()
+
+    bridge.trigger_toast('hello', 3, 12, 'rgba(40, 150, 40, 200)', 'white')
+    assert 'hello' in manager.active_toasts
+
+    manager.deleteLater()  # manager and its still-live toasts go away together
+    qtbot.wait(50)
+
+    assert manager.active_toasts == {}  # destroyed signal still cleaned up
