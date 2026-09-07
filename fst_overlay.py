@@ -772,7 +772,7 @@ class ToastManager(QWidget):
             self.active_toasts[text] = toast
             
             # Auto-cleanup: remove from dict when the widget is deleted
-            toast.destroyed.connect(lambda: self._handle_destruction(text))
+            toast.destroyed.connect(lambda: self._handle_destruction(toast))
                               
             self.main_layout.addWidget(toast, alignment=Qt.AlignRight)
             
@@ -800,10 +800,19 @@ class ToastManager(QWidget):
         for toast in list(self.active_toasts.values()):
             toast.dismiss(immediately)
 
-    def _handle_destruction(self, text):
+    def _handle_destruction(self, toast):
         """Internal cleanup when a toast disappears."""
-        if text in self.active_toasts.keys():
-            self.active_toasts.pop(text)
+        # PySide6 delivers destroyed notifications for other objects as
+        # well (and with an untrusted placeholder argument): only clean
+        # up when THIS toast's C++ side is actually gone, and only if it
+        # is still the entry registered under its ID (a previous
+        # duplicate's delayed destroyed signal must not wipe the
+        # replacement entry)
+        try:
+            toast.isVisible()
+        except RuntimeError:
+            if self.active_toasts.get(toast.id) is toast:
+                self.active_toasts.pop(toast.id)
         try:
             self.check_empty()
             self.update_position()
@@ -824,7 +833,9 @@ class ToastManager(QWidget):
         self.move(x, y)
 
     def check_empty(self):
-        if self.main_layout.count() == 0:
+        # The dict is the synchronous source of truth: the layout may still
+        # hold the item of a just-destroyed toast when destroyed fires
+        if not self.active_toasts:
             self.hide()
     
 class ToastBridge(QObject):

@@ -115,6 +115,11 @@ def test_add_toast_dedup_removes_existing_first(qtbot):
     with pytest.raises(RuntimeError):  # C++ side gone (C++ method call raises)
         first.label.text()
 
+    # the old toast's delayed destroyed signal must NOT wipe the
+    # replacement entry under the same ID
+    assert manager.active_toasts == {'hello': second}
+    assert manager.main_layout.count() == 1
+
 
 def test_toast_timer_countdown_ticks(qtbot):
     toast = ToastWidget('job', 3, 12, 'rgba(40, 40, 40, 200)', 'white', timer=1)
@@ -170,6 +175,7 @@ def test_remove_toast_non_immediate_delete_label(qtbot):
     qtbot.wait(50)
     assert manager.active_toasts == {}
     assert manager.main_layout.count() == 0
+    assert not manager.isVisible()  # auto-hidden once the last toast is gone
 
 
 def test_remove_toast_unknown_id_is_noop(qtbot):
@@ -201,22 +207,16 @@ def test_check_empty_hide_show_cycle(qtbot):
     qtbot.wait(50)
     assert manager.active_toasts == {}
     assert manager.main_layout.count() == 0
-
-    # check_empty hides only when the layout is actually empty; call it
-    # directly - the destroyed-signal hook runs while the dying toast is
-    # still in the layout (offscreen destruction ordering)
-    manager.check_empty()
-    assert not manager.isVisible()
+    assert not manager.isVisible()  # auto-hidden via _handle_destruction -> check_empty
 
     bridge.trigger_toast('b', 3, 12, 'rgba(40, 40, 40, 200)', 'white')
     assert manager.isVisible()  # add_toast re-shows the manager
     assert manager.main_layout.count() == 1
-    manager.check_empty()  # non-empty layout: stays visible
+    manager.check_empty()  # non-empty dict: stays visible
     assert manager.isVisible()
 
     manager.remove_all_toasts(1)
     qtbot.wait(50)
-    manager.check_empty()
     assert not manager.isVisible()
 
 
