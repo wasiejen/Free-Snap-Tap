@@ -127,3 +127,61 @@ def test_multiple_arguments_applied_in_order(am_env):
     assert am_env.am.ACT_MAX_DELAY_IN_MS == 8
     assert am_env.am.ACT_CROSSOVER_PROPABILITY_IN_PERCENT == 40
     assert am_env.am.MENU_ENABLED is False
+
+
+class TestInvalidArgumentsDoNotCrash:
+    def test_invalid_tapdelay_string_keeps_previous_range(self, am_env, capsys):
+        # used to raise NameError: 'delays' not defined
+        am_env.am.apply_start_arguments(['-tapdelay=abc'])
+        captured = capsys.readouterr()
+        assert 'invalid delay' in captured.out
+        assert am_env.am.ACT_MIN_DELAY_IN_MS == 2
+        assert am_env.am.ACT_MAX_DELAY_IN_MS == 10
+
+    def test_single_delay_applies_to_min_and_max(self, am_env):
+        # used to raise ValueError: not enough values to unpack
+        am_env.am.apply_start_arguments(['-tapdelay=50'])
+        assert am_env.am.ACT_MIN_DELAY_IN_MS == 50
+        assert am_env.am.ACT_MAX_DELAY_IN_MS == 50
+        am_env.am.apply_start_arguments(['-macrodelay=250'])
+        assert am_env.am.MACRO_MIN_DELAY_IN_MS == 250
+        assert am_env.am.MACRO_MAX_DELAY_IN_MS == 250
+
+    def test_out_of_range_delay_keeps_previous_range(self, am_env, capsys):
+        am_env.am.apply_start_arguments(['-tapdelay=2000'])
+        captured = capsys.readouterr()
+        assert 'delay not in range' in captured.out
+        assert am_env.am.ACT_MIN_DELAY_IN_MS == 2
+        assert am_env.am.ACT_MAX_DELAY_IN_MS == 10
+        # one valid and one invalid value: the valid one applies to both
+        am_env.am.apply_start_arguments(['-tapdelay=2000,5'])
+        assert am_env.am.ACT_MIN_DELAY_IN_MS == 5
+        assert am_env.am.ACT_MAX_DELAY_IN_MS == 5
+
+    def test_invalid_crossover_value_keeps_previous_probability(self, am_env, capsys):
+        # used to raise NameError: 'probability' not defined
+        am_env.am.apply_start_arguments(['-crossover=abc'])
+        captured = capsys.readouterr()
+        assert 'invalid probability' in captured.out
+        assert am_env.am.ACT_CROSSOVER is True
+        assert am_env.am.ACT_CROSSOVER_PROPABILITY_IN_PERCENT == 50
+
+    def test_crosshair_missing_y_keeps_previous_delta(self, am_env, capsys):
+        # used to raise ValueError: not enough values to unpack
+        am_env.am.apply_start_arguments(['-crosshair=5'])
+        captured = capsys.readouterr()
+        assert 'invalid crosshair delta' in captured.out
+        assert am_env.am.CROSSHAIR_ENABLED is True
+        assert am_env.am.CROSSHAIR_DELTA_X == 0
+        assert am_env.am.CROSSHAIR_DELTA_Y == 0
+
+    def test_commented_arguments_are_silently_ignored(self, am_env, capsys):
+        am_env.am.apply_start_arguments(['# a comment', ':another one'])
+        captured = capsys.readouterr()
+        assert 'unknown start argument' not in captured.out
+
+    def test_debug_does_not_print_unknown_argument(self, am_env, capsys):
+        am_env.am.apply_start_arguments(['-debug'])
+        captured = capsys.readouterr()
+        assert 'unknown start argument' not in captured.out
+        assert am_env.am.DEBUG is True
