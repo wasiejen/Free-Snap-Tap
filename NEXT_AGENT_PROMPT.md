@@ -1,126 +1,108 @@
-# NEXT AGENT PROMPT — Phase 3: GUI tests for `fst_overlay.py` (pytest-qt, offscreen)
+# NEXT AGENT PROMPT — Phase 4: coverage triage report (+ optional Windows CI)
 
 You are continuing work on the Free Snap Tap repo, branch `opencode_test` (do NOT push).
 FIRST read `AGENTS.md` (orientation, module map, sign convention `-`=pressed/`+`=released/
-`^`=toggle, run/test commands, maintainer's recorded decisions) and `TODO.md`.
+`^`=toggle, run/test commands, maintainer's recorded decisions, PySide6/pytest-qt gotchas)
+and `TODO.md`.
 
 **House rule from the maintainer: when something is unclear, ASK EARLY — do not decide
 unilaterally or spend a long time exploring an ambiguity.**
 
-Current state (verified 2026-09-07, HEAD `8479a87`):
-- Suite: **251 passed, 0 xfailed** — the old Key_Event eq/hash xfail was resolved by
-  strict repr-based eq. Run: `& .\.venv\Scripts\python.exe -m pytest -q`
+Current state (verified 2026-09-07, HEAD `3066ecb`):
+- Suite: **313 passed, 0 xfailed**. Run: `& .\.venv\Scripts\python.exe -m pytest -q`
 - Lint baseline: `& .\.venv\Scripts\ruff.exe check --select F .` → **6 findings** (free_snap_tap
   2×F541, fst_manager F401 `Event`, fst_overlay F401 `QSizePolicy` + F841
   `cube_distance_down`, test_pynput_mouse F841 — leave that maintainer file alone).
   No NEW findings allowed.
-- Coverage: `fst_tasks` 100%, `fst_save_file_handler` 100%, `vk_codes` 100%,
-  `fst_data_types` 93%, `fst_manager` 79%, `fst_keyboard` 73%, **`fst_overlay` 34%**,
-  total 72% (`pytest -q --cov=fst_data_types --cov=fst_manager --cov=fst_save_file_handler --cov=fst_keyboard --cov=fst_tasks --cov=vk_codes --cov=fst_overlay`).
-- Phase 3 prep is done and verified: `pytest-qt==4.5.0` + `PySide6==6.9.1` installed,
-  `QT_QPA_PLATFORM=offscreen` is set at the top of `tests/conftest.py` (do NOT
-  re-add it), `tests/test_gui_smoke.py` pins the offscreen environment and covers the
-  `ToastBridge` show/remove round trip (wiring pattern for the rest).
-- The repo-root `test_overlay.py` is the maintainer's **manual** wiring script
-  (threading + 30 s sleep) — reference for how `GUI_Manager`/`ToastBridge` connect,
-  **not** a pytest pattern.
-- Source changes made since the previous prompt (all committed and tested — write new
-  tests against THIS state):
-  - Data types now have **strict repr-based `__eq__` matching `__hash__`**
-    (`Key_Event`, `Key`, `Key_Group`, `Rebind`, `Macro`, `Tap_Group`). The loose
-    vk/press comparison in the filter hot path is now explicit (`is_trigger_activated`,
-    repeated-trigger suppression). Compare key events in tests by `(vk_code, is_press)`
-    or via repr.
-  - `Focus_Task.stop()` works again (attribute renamed `self._stop`).
-  - `ToastManager._handle_destruction` is guarded (try/except RuntimeError) against an
-    already-deleted C++ side — regression-tested in `test_gui_smoke.py`.
+- Coverage (`--cov=fst_data_types --cov=fst_manager --cov=fst_save_file_handler
+  --cov=fst_keyboard --cov=fst_tasks --cov=vk_codes --cov=fst_overlay`):
+  `fst_tasks` 100%, `fst_save_file_handler` 100%, `vk_codes` 100%, `fst_overlay` 99%
+  (only the blocking `contextMenuEvent`/`exec_` line remains — leave it),
+  `fst_data_types` 93%, `fst_manager` 79%, `fst_keyboard` 73%, total 84%.
+- Verified missing-line snapshot (2026-09-07, re-derive — do not trust blindly):
+  - `fst_manager.py` (274): 76, 91, 110, 114-119, 139, 145, 148, 186, 189, 195, 198,
+    268-269, 285, 314, 326, 334-343, 352, 364-367, 379, 392, 394, 397, 407, 413-417,
+    437-449, 454, 458-462, 467-469, 473-478, 481-482, 485-486, 489-490, 501-506,
+    509-514, 517-518, 521-522, 525-526, 529-530, 533-534, 537-538, 541-543, 546-549,
+    552-563, 571-572, 575-576, 579-580, 585-586, 589-594, 597-599, 602-604, 607-610,
+    613, 616-618, 621-627, 630-634, 641, 680, 684, 692, 707, 731, 738, 750-751,
+    770-771, 777, 802, 866, 891, 1002-1071, 1192-1216, 1296, 1300, 1335, 1356, 1362,
+    1370, 1392, 1400, 1421-1422, 1426-1427, 1429-1431, 1444, 1446, 1448, 1503, 1512,
+    1630-1632, 1690, 1694-1698, 1768, 1776, 1789, 1847, 1930
+  - `fst_keyboard.py` (176): 121, 136, 144-153, 180, 189, 213-214, 267-269, 279-281,
+    302-303, 338-340, 374, 384-390, 393, 396-404, 407, 482-484, 519-532, 582, 587,
+    603, 624, 644-647, 658, 667, 682, 687, 706, 709, 716, 719, 727, 733, 735, 746,
+    754-755, 768-804, 819, 821, 834-837, 840, 852-858, 876, 888, 901, 935-949,
+    952-960, 963-968, 973-993, 1010, 1014, 1017-1024, 1027, 1030-1031
+  - `fst_data_types.py` (18): 42, 47, 51, 55, 124, 144, 160, 181, 190, 223, 236, 245,
+    248, 254, 288, 312, 357, 361
+- Phase 3 (done 2026-09-07): offscreen pytest-qt GUI tests for `fst_overlay.py`;
+  bugs found & fixed while testing (see AGENTS.md "Open items" — toast dict cleanup,
+  dict-based `check_empty`, removed dangling `remove_crosshair()` call).
 
-## Task: cover `fst_overlay.py` (~34% → ~90%) with pytest-qt
+## Task A: coverage triage report (the deliverable)
 
-Offscreen GUI scope only. Mock every non-Qt dependency; one file per unit under test
-(extend `tests/test_gui_smoke.py` where that unit is already there, else a new file).
-Class map (line numbers of `__init__`): `GUI_Manager` 103, `Tray_Icon` 276,
-`CrosshairOverlay` 350, `StatusOverlay` 446, `ToastWidget` 649, `ToastManager` 747,
-`ToastBridge` 826.
+Goal: a prioritized triage of the **remaining uncovered lines** in
+`fst_manager.py`, `fst_keyboard.py` and `fst_data_types.py` — the plan for a future
+coverage push. `fst_overlay.py` is DONE — do not add GUI tests. **No new tests in
+this phase; no source changes** — the deliverable is the report.
 
-1. **ToastManager / ToastWidget depth** (extend `test_gui_smoke.py`):
-   - `add_toast` dedup: same ID → the existing toast is removed before the new one
-     appears (`active_toasts` holds exactly one under the ID).
-   - `ToastWidget` countdown: drive `toast.handle_tick()` **directly** (no real
-     waiting) — assert the `remaining_seconds` countdown text, and that a tick to
-     `<= 0` stops the timer + `deleteLater` (process destruction via `qtbot.wait(...)`).
-   - `remove_toast` non-immediate: red "DELETE" label + the 1 s re-armed timer branch.
-   - `remove_all_toasts`, `check_empty` hide/show cycle, `ToastWidget.__eq__`
-     (id + duration), remaining bridge signals (`signal_show_timer` → `add_timer`,
-     `signal_remove_all_toasts` → `remove_all_toasts`).
-2. **StatusOverlay** (`tests/test_status_overlay.py`): construct with a stand-in fst
-   (`arg_manager.STATUS_INDICATOR_SIZE` etc. — see `GUI_Manager` below); `update_color`
-   (color_name + QColor), `toggle_status_indicator` (flips the arg flag),
-   `hide_indicator`/`show_indicator`, `mouseDoubleClickEvent` → `fst.open_config_file`
-   (call the event handler with a constructed `QMouseEvent`, or `qtbot.mouseDoubleClick`),
-   left-button drag: `mousePressEvent` → `_drag_offset` set, `mouseMoveEvent` moves the
-   widget and re-positions `parent().toast_manager`, screen-change counter decrement,
-   `mouseReleaseEvent` final recenter branch, menu actions (`toggle_pause`/
-   `return_to_menu`/`open_config_file`/`reload_from_file` hit the mocked fst methods).
-   Do NOT call `contextMenuEvent` (its `exec_` is blocking) — test the action slots
-   directly.
-3. **Tray_Icon** (`tests/test_tray_icon.py`): construct (offscreen:
-   `QSystemTrayIcon.isSystemTrayAvailable()` is False — never `show()`); `update_color`
-   (known color switches icon, unknown keeps it), `on_activated(Trigger)` emits
-   `signal_toggle_console`; for the menu: get the `QAction`s from `tray_icon.menu()`
-   and call `.trigger()` on each — assert the matching signal fired; never `exec_`.
-4. **CrosshairOverlay** (`tests/test_crosshair.py`): `show_crosshair`/`hide_crosshair`
-   (visible state + `crosshair_size`/`thickness` attrs), `update_position` honoring
-   `CROSSHAIR_DELTA_X/Y` (stand-in with and without the attrs — source uses
-   `getattr(..., 0)`), `paintEvent` called directly with a `QPaintEvent` (offscreen
-   paint is fine — assert no exception).
-5. **GUI_Manager** (`tests/test_gui_manager.py`): construct with the stand-in (see
-   below) — it builds all four children, so this doubles as an integration check;
-   `perform_periodic_update` **called directly** (never start `update_timer`):
-   indicator show/hide on `STATUS_INDICATOR` change, crosshair show/hide on
-   `CROSSHAIR_ENABLED` change, color logic — red (manual/win32 paused) / blue
-   (ALWAYS_ACTIVE + empty `FOCUS_APP_NAME`) / green (running) — with tray+overlay color
-   sync; signal wiring (tray signals → manager methods; `signal_toggle_crosshair` from
-   BOTH tray and overlay → `toggle_crosshair`); `toggle_pause`/`return_to_menu`
-   delegation; `exit_program` (mock `app.quit`, expect `SystemExit` from `sys.exit(0)`).
-6. **Console helpers** (small): `customMessageHandler` (the `QWindowsWindow::setGeometry`
-   suppression branch), `switch_console_visibility`/`set_console_visibility` with
-   `monkeypatch`ed `fst_overlay.kernel32`/`user32` (no real console).
+1. Re-generate the report:
+   `& .\.venv\Scripts\python.exe -m pytest -q --cov=fst_manager --cov=fst_keyboard --cov=fst_data_types --cov-report=term-missing`
+   and confirm it matches the snapshot above (if it differs, the snapshot in this
+   prompt is stale — ASK before proceeding if the diff is unexpected).
+2. Walk **every** uncovered line range. Map each to its function/class by reading the
+   source (the file's structure — AGENTS.md has a module map). Classify each block:
+   - **A. testable now** — pure logic or mockable deps (the mocked-pynput +
+     `freezegun` patterns from `tests/` are established; `msvcrt` can be
+     monkeypatched — but NEVER run a live `msvcrt.getch()` wait in a test).
+   - **B. testable with more mocking** — Windows APIs / pygetwindow / `startfile` /
+     clipboard / threads: name the mock needed.
+   - **C. deliberately not covered** — debug-print branches, maintainer-only paths,
+     code whose only caller is dead code, or blocks that would require a real
+     display/anti-cheat environment. Justify each.
+3. Write the report to a NEW file `COVERAGE_TRIAGE.md` (repo root, LF) with:
+   - one table per module: `lines | function | class | why / mock needed | effort (S/M/L)`
+   - a "recommended order" section: top 5–10 blocks for Phase 5 by value/effort,
+     with the exact uncovered lines each would close;
+   - totals per class (how many lines each class covers) — the ceiling.
+4. **Do NOT write tests and do NOT change source.** If triage reveals a suspected
+   bug, record it in the report and your final message — do not fix it.
 
-Stand-in for a full `GUI_Manager`: `SimpleNamespace` with
-`arg_manager = SimpleNamespace(MANUAL_PAUSED=..., WIN32_FILTER_PAUSED=...,
-CROSSHAIR_ENABLED=..., STATUS_INDICATOR=..., ALWAYS_ACTIVE=...,
-STATUS_INDICATOR_SIZE=10)` and `focus_manager = SimpleNamespace(FOCUS_APP_NAME='')`;
-attach `MagicMock`s per test for `open_config_file`/`control_toggle_pause`/etc.
+## Task B: optional Windows CI — ONLY if the user explicitly approves
 
-Conventions (established in `tests/`):
-- `qtbot` for the QApplication + widget lifecycle; `qtbot.wait(...)` only in small fixed
-  doses (≤100 ms); call `QTimer`-driven slots directly instead of waiting real time.
-- No `GUI_Manager.start()` (it enters `app.exec()`), no live listeners, no threads +
-  `time.sleep` like the root script.
-- The autouse `restore_constants` fixture covers `CONSTANTS`; the offscreen env comes
-  from `tests/conftest.py`.
+The project is Windows-only (pynput selective suppression, msvcrt) → the runner MUST
+be Windows. If approved:
+- Add `.github/workflows/ci.yml` (LF): `windows-latest`, `actions/setup-python` with
+  **Python 3.12** (the venv runs 3.12.9), `pip install -r requirements.txt
+  -r requirements-dev.txt`, then the exact suite command
+  (`&` not needed in bash — `python -m pytest -q`; use `python -m pytest -q` via
+  `py`/`python` shell). No display server needed: `tests/conftest.py` pins
+  `QT_QPA_PLATFORM=offscreen`.
+- Lint step: **ASK the maintainer first how strict** — the baseline has 6 findings.
+  Options: informational only, or hard-fail when the count exceeds 6.
+- Verify locally that the exact workflow commands run green in the venv before
+  committing.
+- Commit the file on `opencode_test`; do NOT push (the remote is `wasiejen/Free-Snap-Tap`).
 
 ## Rules
-- **Tests only — do NOT change source code.** If a test reveals genuinely wrong
-  behavior, do not fix it: record it in your final report and leave the test out rather
-  than asserting buggy behavior.
+- **Report + (maybe) workflow file only — do NOT change source or test code.**
 - `FSTconfig.txt` and `FSTconfig_test.txt` are the maintainer's live files — never edit.
-- Never commit `.coverage` or `FSTconfig_test.txt` (both gitignored).
+- Never commit `.coverage` / coverage HTML artifacts (check `.gitignore`; if missing,
+  ASK before adding entries — do not add on your own).
 - Do NOT edit README/WIKI/`SPEC_FEATURES.md`/`TODO.md`/`AGENTS.md` (the maintainer
-  maintains AGENTS.md status lines himself).
-- Git note: source files are stored CRLF in the index (autocrlf); test files are LF.
+  updates AGENTS.md status lines himself).
+- Git note: source files are stored CRLF in the index (autocrlf); the new report and
+  workflow files are LF.
 - Commit per logical chunk on `opencode_test`; do NOT push.
 
 ## Definition of done
-- `& .\.venv\Scripts\python.exe -m pytest -q` fully green including the new tests.
+- `& .\.venv\Scripts\python.exe -m pytest -q` fully green, unchanged (313 passed).
 - `& .\.venv\Scripts\ruff.exe check --select F .` — same 6 findings, no new ones.
-- Report: new coverage numbers per module (expect `fst_overlay` ~85–90%; legitimate
-  leftovers: `GUI_Manager.start` — needs a mocked `app.exec()` decision — plus whatever
-  you list), what you covered, any code discrepancies or suspected bugs found (unfixed),
-  and what remains (should then only be: the remaining `fst_manager`/`fst_keyboard`
-  hotpath leftovers — eval invocations clipboard/files/toasts/mouse-vars,
-  `is_repeat_active`, numpad debug actions, control-handler bodies — for a Phase 4
-  coverage triage).
-- **Phase 4 (coverage report / optional Windows CI) starts only after the user
-  confirms Phase 3 is done.**
+- `COVERAGE_TRIAGE.md` committed, classifying 100% of the uncovered lines of the three
+  modules (nothing left unclassified, no "etc.").
+- Final report: the triage summary inline (top Phase 5 candidates + the coverage
+  ceiling per class), any suspected bugs found (unfixed), plus — only if done — the
+  CI workflow location and the maintainer decision it depended on.
+- **Phase 5 (coverage push per the triage) starts only after the user confirms
+  Phase 4 is done.**
