@@ -12,7 +12,7 @@ anti-cheat. **Windows only** — pynput selective suppression is not available o
 macOS not supported.
 
 ## Run / test
-- venv with all deps: `.venv` (do NOT reinstall from scratch; `requirements.txt` is runtime, `requirements-dev.txt` adds test tooling).
+- venv with all deps: `.venv` (do NOT reinstall from scratch; `requirements.txt` is runtime, `requirements-dev.txt` adds test tooling, `requirements-build.txt` is executable-packaging only (Nuitka/PyInstaller) — CI installs runtime+dev only).
 - Run tests: `& .\.venv\Scripts\python.exe -m pytest -q`
 - Coverage: `& .\.venv\Scripts\python.exe -m pytest -q --cov=fst_data_types --cov=fst_manager --cov=fst_save_file_handler --cov=fst_keyboard --cov=fst_tasks --cov=vk_codes --cov=fst_overlay`
 - Lint baseline: `& .\.venv\Scripts\ruff.exe check --select F .` (currently 6 cosmetic findings: unused imports/vars, f-strings. No undefined-name bugs. See "Open items".)
