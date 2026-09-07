@@ -28,3 +28,34 @@ Known doc fixes include: WIKI "played in its own thread" → asyncio tasks (§4 
 V1.1.3 → V1.2.0 references, "Python 3.6" vs 3.12 venv, typos (§4 #12), replacement-side
 key reinterpretation in Key rebinds + quoted key strings inside `p(...)` (§4 #14),
 eaten-rebind suppression semantics + `a|(p("shift")) : b` pass-through pattern (§4 #14).
+
+## 4. Dead code: `fst_manager.py` 116–117 ("None result → pass") unreachable (2026-09-07)
+
+`check_constraint_fulfillment`'s "None → pass" branch (line 117) can never run:
+`constraint_evaluation` normalizes `None` → `True` (line 692) before returning. Triage
+(`COVERAGE_TRIAGE.md`) classified it as class A — reclassification to C is your call, the
+plan file is agent-read-only. Line 117 stays uncovered in every run.
+
+## 5. Lint baseline 6 → 8 at `ca61a26`, restored at `0025a57` (2026-09-08)
+
+Two new F401s (unused `SimpleNamespace`) in `test_control_actions.py` /
+`test_facade_wiring.py` (+1 in the then-untracked `test_macro_playback_kbd.py`) broke the
+6-finding baseline; `0025a57` removed the three imports — baseline restored.
+
+## 6. Dead code: `fst_keyboard.py` 302–303 (mixed-Key rebind conversion) unreachable (2026-09-08)
+
+In `initialize_groups_from_presorted_lines`, `convert_key_string_group` only ever appends
+`Key_Event`s (bare keys expand to press/release events), so `new_trigger_group[0]` is never
+a `Key`; the block at line 295 is entered only via a `Key` replacement — which makes line
+301 `False`, so 302–303 (`replacement_key = Key(...)`) can never execute. Proven at
+`fffea8b` (rebinds `w : e` and `w : +e` both leave 302–303 uncovered). Triage listed them as
+class A ("mixed Key rebind `w : +e`") — same misclassification as entry #4. Also: triage's
+numeric example `"8" → 8` is wrong — `"8"` resolves via the dict to 56; the numeric branch
+needs a string absent from `vk_codes_dict` (e.g. `"255"`).
+
+## 7. Empty macro: comment/behavior mismatch at `fst_keyboard.py` 707 (2026-09-08)
+
+The comment says an empty key group is ignored and does "not supress the triggerkey", but
+`alias_fired = True` (line 697) is set before the empty check, so the trigger key IS
+suppressed (`_listener.suppress_event`, verified by `test_empty_macro_sequence_no_playback`).
+Either the comment or the behavior is stale — your call.
