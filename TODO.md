@@ -18,7 +18,7 @@ solution. Unknown constraint *names* are silent no-ops by design (see
 `ruff check --select F .` baseline has 6 findings; fix them (remove unused imports/vars,
 clean up the f-strings) — none may change program behavior. Keep the suite green after.
 List: free_snap_tap 2×F541 (f-strings), fst_manager F401 (`threading.Event` import),
-fst_overlay F401 (`QSizePolicy`) + F841 (`cube_distance_down`), test_pynput_mouse F841.
+fst_overlay F401 (`QSizePolicy`) + F841 (`cube_distance_down`), playground/pynput_mouse_probe F841.
 
 ## 3. Rework README and WIKI to the current state of the code (2026-09-06)
 

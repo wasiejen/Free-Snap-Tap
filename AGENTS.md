@@ -11,12 +11,30 @@ via pynput's low-level win32 filter, suppresses the original events, and re-emit
 anti-cheat. **Windows only** — pynput selective suppression is not available on Linux;
 macOS not supported.
 
+## Environment & shell
+- The agent runs on **Windows** with a **PowerShell (pwsh)** shell. **Heredocs do not
+  exist in PowerShell** — `<<EOF` / `cat > file <<EOF` will NOT parse; never emit them.
+  Write multi-line content with the file tools (or `Set-Content`), then edit the file.
+
+## Git conventions
+- Commit message: one-line subject (imperative) naming the main change. If the commit
+  covers **more than one theme** (normal — maintainer works several problems at once),
+  add up to ~3 short body lines, one per theme: e.g. `- <theme 1> …  - <bug fixed> …  - <change integrated> …`.
+  Multi-theme commits are fine, never split commits just for message style.
+  Goal: `git log` must stay readable as a small work summary on its own.
+
 ## Run / test
 - venv with all deps: `.venv` (do NOT reinstall from scratch; `requirements.txt` is runtime, `requirements-dev.txt` adds test tooling, `requirements-build.txt` is executable-packaging only (Nuitka/PyInstaller) — CI installs runtime+dev only).
 - Run tests: `& .\.venv\Scripts\python.exe -m pytest -q`
 - Coverage: `& .\.venv\Scripts\python.exe -m pytest -q --cov=fst_data_types --cov=fst_manager --cov=fst_save_file_handler --cov=fst_keyboard --cov=fst_tasks --cov=vk_codes --cov=fst_overlay`
-- Lint baseline: `& .\.venv\Scripts\ruff.exe check --select F .` (currently 6 cosmetic findings: unused imports/vars, f-strings. No undefined-name bugs. See "Open items".)
-- **Never run the live listeners in tests.** Always mock pynput controllers (see Phase 2 notes).
+- Lint baseline: `& .\.venv\Scripts\ruff.exe check --select F .` (currently 6 cosmetic findings: unused imports/vars, f-strings. No undefined-name bugs. List + rules in `TODO.md` #2.)
+- **Never run the live listeners in tests.** Always mock pynput controllers (mocked-`FakeFST` pattern in `tests/conftest.py`).
+
+## Context budget (NAP threshold)
+- Check usage between logical chunks (before heavy steps): `& .\.venv\Scripts\python.exe ..\ctxgauge\peek.py` → `CTX=n (p%)` (read-only, run from repo root).
+- **Line:** stop working when ≤ 15k tokens remain **or** 85% used — whichever comes first. Writing the NAP needs another ~10k (simple tasks) to ~15k (complex: thinking + lookups), so wrap up BEFORE the line.
+- At the line: stop at a clean point, then **ask the user** whether to write the NAP — never write it silently, and never start new work.
+- With the gauge result, give an **estimate of the tokens still needed to finish the current plan** (rough budgets: file read/inspect ≈ 1–3k per call; heavy edits / a big test run ≈ 3–8k each; small reply turn ≈ 0.3k; NAP writing ≈ 10–15k). Report estimate vs remaining window, so the user can decide to switch to the same model's larger-context variant (slower, no MTP) and finish the task.
 
 ## Sign convention (IMPORTANT — used everywhere)
 - `-key` = key **pressed** (e.g. `-w`).
@@ -41,6 +59,9 @@ file. README/WIKI have some stale examples — trust the convention above.
 - `fst_tasks.py` — asyncio `Focus_Task`, `Macro_Repeat_Task` (alias repeat).
 - `fst_save_file_handler.py` — `make_backup` / `restore_backup` (both return `(path, name)` tuple).
 - `vk_codes.py` — `vk_codes_dict` string→vk_code map.
+- `playground/` — maintainer's personal live bug probes (raw win32 mouse filter, live overlay/toast
+  flow against a dummy FST). Not part of the test suite (`pytest.ini` `testpaths = tests`); never
+  import them from package code, and exclude from EXE packaging. Run directly from the repo root.
 
 ## Data flow
 config file → `Config_Manager.load_config` (parse to dict + arg lines + group lines) →
@@ -53,7 +74,7 @@ sends events with delays. Focus change re-runs `update_args_and_groups`.
 ## Test conventions
 - Tests live in `tests/`: pure unit scope + offscreen GUI (pytest-qt 4.5.0, `QT_QPA_PLATFORM=offscreen` pinned in `tests/conftest.py`). No real keyboard, no real time, no Windows APIs.
 - `tests/test_known_issues.py` = **xfail** file for desired-but-not-yet-true behavior. When fixed, move the test into a normal file and keep it green. A test removed from there was reviewed and **accepted as-is**.
-- Current status: **313 passed, 0 xfailed** (Phase 3 GUI tests added 2026-09-07).
+- Current status: **313 passed, 0 xfailed**.
 
 ## Maintainer decisions on the original known-issues (060926)
 - **#1 shared `constraints=[0,0]` default** — accepted; delays are never mutated individually. Removed from xfail.
@@ -63,55 +84,15 @@ sends events with delays. Focus change re-runs `update_args_and_groups`.
 - **#5 comment cleaning** — fixed in `_clean_comments`: comment-after-comma (`e, # c` → `e`), commented keys (`a,#w,d,#s` → `a,d`), trailing commas removed. Empty results dropped.
 - **#6 single-char lines** — fixed: `len(line) > 1` guard removed; single-char keys (and with trailing comment) survive cleaning.
 
-## Open items / next steps
-- **Phase 2 (done 2026-09-06):** unit-tested `Output_Manager` + `Input_State_Manager`
-  with mocked pynput controllers + `freezegun` for time-based eval (`tr`/`last`/`dc`/`p`/`cs`)
-  + filter hot path (`fst_keyboard._win32_event_filter`). See `tests/test_output_manager.py`,
-  `tests/test_input_state_manager.py`, `tests/test_filter_behavior.py`; gap semantics in
-  `SPEC_FEATURES.md` section 5.
-- **class-2 coverage (done 2026-09-07):** `Focus_Task` polling (`tests/test_focus_task.py`),
-  listener lifecycle + display functions (`test_filter_behavior.py`), `CLI_menu`
-  (`tests/test_cli_menu.py`), `Focus_Group_Manager` task methods
-  (`tests/test_focus_group_manager.py`). `fst_tasks` at 100%.
-- **Phase 3 prep (done 2026-09-07):** offscreen pytest-qt env pinned in `tests/conftest.py`
-  (`QT_QPA_PLATFORM=offscreen`); smoke + `ToastBridge` round-trip tests in
-  `tests/test_gui_smoke.py`.
-- **Resolved 2026-09-07:** known-issue #1 (Key_Event eq/hash) — strict repr-based `__eq__`
-  on all data types (eq == hash == repr); the loose vk/press comparison in the filter hot
-  path is now explicit (`is_trigger_activated`, repeated-trigger suppression);
-  `tests/test_known_issues.py` removed, suite fully green. Also fixed: `Focus_Task`
-  `stop` attribute shadowing the `stop()` method (renamed `self._stop`), and
-  `ToastManager._handle_destruction` guarded against an already-deleted C++ side.
-- **Phase 3 (done 2026-09-07):** offscreen GUI tests for `fst_overlay.py` (34% → 99%)
-  with pytest-qt: ToastManager/ToastWidget depth (`tests/test_gui_smoke.py`),
-  StatusOverlay drag/menu/double-click (`test_status_overlay.py`), Tray_Icon signals
-  (`test_tray_icon.py`), CrosshairOverlay (`test_crosshair.py`), GUI_Manager periodic
-  update/wiring/exit/start (`test_gui_manager.py`), console helpers
-  (`test_console_helpers.py`). Fixed while testing: dangling `remove_crosshair()`
-  call (dead PyQt5-era leftover that crashed `StatusOverlay.close_overlay`), toast
-  dict cleanup (PySide6 routes `destroyed` globally → identity-guarded
-  `_handle_destruction` with liveness probe), dict-based `check_empty` (offscreen
-  destruction ordering). Left untested: `contextMenuEvent` (blocking `exec_`).
-- **Phase 4 (done 2026-09-07):** coverage triage report `COVERAGE_TRIAGE.md` (committed +
-  pushed, `d161e5a`). Remaining 468 uncovered lines classified: A (testable now) = 299,
-  B (more mocking) = 50, C (deliberately not covered: 63 debug-print, 52 dead-code,
-  4 abstract-stub lines) = 119. No Windows CI added (not approved by maintainer).
-- **Phase 5 (next):** coverage push per `COVERAGE_TRIAGE.md` "Recommended order" (blocks 1–10
-  + 70-line remainder; all S/M effort). Ceiling A+B = 349 lines → 94.6 % of the three modules.
-  Suspected bugs found by the triage (recorded in the report, NOT fixed):
-  - `remove_all_toasts()` constraint calls `self._fst.remove_all_callbacks()`
-    (`fst_manager.py:579`) — no production object has that attribute (real `FST_Keyboard`
-    sets `remove_all_callback`, singular) → uncaught `AttributeError` in the win32 hot path;
-    masked in tests because `tests/conftest.py::FakeFST` defines the plural name.
-  - `convert_to_vk_code` (`fst_keyboard.py:144–153`) returns implicit `None` for out-of-range
-    numeric key strings (e.g. `"300"`) → caller `extract_data_from_key` line 224 raises
-    `TypeError` instead of `KeyError`.
-  - Dead code: `split_ignore_brackets2` (`fst_manager.py:996–1071`, never called),
-    `get_coordinates` (`fst_keyboard.py:481–484`, never called), `Config_Manager.parse_line`
-    (`fst_manager.py:890–891`, empty stub).
-- Clean up the 6 ruff `F` findings when convenient (free_snap_tap 2×F541, fst_manager
-  F401 `threading.Event`, fst_overlay F401 `QSizePolicy` + F841, test_pynput_mouse F841
-  — maintainer's file).
+## Current work (phase-scoped — kept out of this file)
+Phase plans, the progress log, current baselines and the rules of the current handoff
+live in **`NEXT_AGENT_PROMPT.md`** (rewritten per handoff — read it first when you get one).
+The maintainer calls this file **`NAP.md`** (**N**ext **A**gent **P**rompt) — if the user
+says "NAP" or "write a NAP", they mean NEXT_AGENT_PROMPT.md.
+Durable maintainer TODOs live in **`TODO.md`**.
+**AGENTS.md holds stable facts and conventions only — never phase progress.** If a note
+needs to survive across phases, it belongs here only if it is a permanent convention or
+gotcha; otherwise it goes to `NEXT_AGENT_PROMPT.md`.
 
 ## Gotchas
 - `Config_Manager.load_config` opens `self._file_name` directly — point it at a `tmp_path` fixture or monkeypatch `_open_config_file`.
