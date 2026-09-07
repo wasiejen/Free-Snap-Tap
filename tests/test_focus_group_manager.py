@@ -48,7 +48,7 @@ def stop_spawned_task(monkeypatch, fgh, window_title='Other'):
         future = loop.create_future()
         loop.call_soon(future.set_result, None)
         await future
-        fgh._focus_task.stop = True
+        fgh._focus_task.stop()
 
     monkeypatch.setattr(asyncio, 'sleep', fake_sleep)
 
@@ -89,7 +89,7 @@ async def test_start_focus_task_starts_running_task(active_fgh, monkeypatch):
     assert isinstance(active_fgh.task, asyncio.Task)
     await active_fgh.task
     assert active_fgh.task.done()
-    assert active_fgh._focus_task.stop is True
+    assert active_fgh._focus_task._stop is True
 
 
 @pytest.mark.asyncio
@@ -146,13 +146,22 @@ def test_restart_focus_task_without_task_is_noop(fst):
     fgh.restart_focus_task()
 
 
+def test_stop_focus_task_stops_running_task(active_fgh):
+    active_fgh.task = MagicMock()
+    active_fgh.task.done.return_value = False
+
+    active_fgh.stop_focus_task()
+
+    assert active_fgh._focus_task._stop is True
+
+
 def test_stop_focus_task_done_task_is_noop(active_fgh):
     active_fgh.task = MagicMock()
     active_fgh.task.done.return_value = True
 
     active_fgh.stop_focus_task()
 
-    assert active_fgh._focus_task.stop is False
+    assert active_fgh._focus_task._stop is False
 
 
 def test_stop_focus_task_without_task_is_noop(fst):
