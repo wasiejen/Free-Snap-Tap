@@ -805,8 +805,13 @@ class ToastManager(QWidget):
         """Internal cleanup when a toast disappears."""
         if text in self.active_toasts.keys():
             self.active_toasts.pop(text)
-        self.check_empty()
-        self.update_position()
+        try:
+            self.check_empty()
+            self.update_position()
+        except RuntimeError:
+            # C++ side of the manager already deleted (e.g. toasts destroyed
+            # at app shutdown) - nothing left to update
+            pass
 
     def update_position(self):
         overlay_geo = self.parent_overlay.geometry()
