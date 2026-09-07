@@ -5,6 +5,18 @@ authoritative record — the change record is `git log`, the live backlog is
 `TODO.md`, agent-facing rules are `AGENTS.md` / `NEXT_AGENT_PROMPT.md`.
 May be stale; nothing here is required to be maintained.
 
+260907-2229:
+
+ideas
+! - after every commit update the NAP with the current progress
+! - each discrepancy found on commit time is to be added to TODO.md
+- clean up debug and replace it with logging. add logging to critical steps. debug3 might remain as a seperate output? debug-numpad might not be needed anymore
+- clean up commented out code and check comments on truthfulness compared to code
+- add missing docstrings
+
+
+---- old ----
+
 ideas:
 
 - MouseOnMove maybe usable to record relative mouse movement to record manual anti recoil movement in games? :_)
