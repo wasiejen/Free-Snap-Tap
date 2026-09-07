@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from fst_manager import Argument_Manager
+from fst_manager import Argument_Manager, CONSTANTS, Focus_Group_Manager
 
 
 @pytest.fixture
@@ -185,3 +185,66 @@ class TestInvalidArgumentsDoNotCrash:
         captured = capsys.readouterr()
         assert 'unknown start argument' not in captured.out
         assert am_env.am.DEBUG is True
+
+
+class TestRemainingStartArguments:
+    """The remaining -debug_numpad / -status_indicator / -always_active /
+    -tray_icon / -hide_cmd_window / -focusapp branches plus multi-value delay
+    truncation and the alias/macro invalid-delay notices."""
+
+    def test_tapdelay_truncates_to_first_two_values(self, am_env):
+        am_env.am.apply_start_arguments(['-tapdelay=1,2,3'])
+        assert am_env.am.ACT_MIN_DELAY_IN_MS == 1
+        assert am_env.am.ACT_MAX_DELAY_IN_MS == 2
+
+    def test_debug_numpad_enables_constants_flag(self, am_env):
+        am_env.am.apply_start_arguments(['-debug_numpad'])
+        assert CONSTANTS.DEBUG_NUMPAD is True
+
+    def test_invalid_aliasdelay_prints_notice(self, am_env, capsys):
+        am_env.am.apply_start_arguments(['-aliasdelay=abc'])
+        assert 'no valid alias delay' in capsys.readouterr().out
+
+    def test_invalid_macrodelay_prints_notice(self, am_env, capsys):
+        am_env.am.apply_start_arguments(['-macrodelay=abc'])
+        assert 'no valid macro delay' in capsys.readouterr().out
+
+    def test_focusapp_rejected_and_exits(self, am_env, capsys):
+        with pytest.raises(SystemExit):
+            am_env.am.apply_start_arguments(['-focusapp=cs2'])
+        assert 'Do not use the -focusapp start argument' in capsys.readouterr().out
+
+    def test_status_indicator_enables_and_sizes(self, am_env):
+        am_env.am.apply_start_arguments(['-status_indicator'])
+        assert am_env.am.STATUS_INDICATOR is True
+        am_env.am.apply_start_arguments(['-status_indicator=20'])
+        assert am_env.am.STATUS_INDICATOR_SIZE == 20
+
+    def test_always_active_tray_icon_and_hidden_cmd_window(self, am_env):
+        am_env.am.apply_start_arguments(['-always_active', '-tray_icon', '-hide_cmd_window'])
+        assert am_env.am.ALWAYS_ACTIVE is True
+        assert am_env.am.TRAY_ICON is True
+        assert am_env.am.CMD_WINDOW_HIDDEN is True
+
+
+class TestSysStartArgsProperty:
+    def test_getter_and_setter(self, am_env):
+        assert am_env.am.sys_start_args == []
+        am_env.am.sys_start_args = ['-nomenu']
+        assert am_env.am.sys_start_args == ['-nomenu']
+
+    def test_setter_type_check(self, am_env):
+        with pytest.raises(TypeError):
+            am_env.am.sys_start_args = 'not a list'
+
+
+class TestFocusGroupManagerDataHolders:
+    def test_default_start_arguments_setter(self):
+        fm = Focus_Group_Manager(SimpleNamespace())
+        fm.default_start_arguments = ['-nomenu']
+        assert fm.default_start_arguments == ['-nomenu']
+
+    def test_default_group_lines_setter(self):
+        fm = Focus_Group_Manager(SimpleNamespace())
+        fm.default_group_lines = [('', 'a')]
+        assert fm.default_group_lines == [('', 'a')]
