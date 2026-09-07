@@ -1,5 +1,9 @@
 # NEXT AGENT PROMPT — Phase 5: coverage push (per the Phase 4 triage)
 
+**Scope: Phase 5 coverage work ONLY.** Tasks defined in other docs (e.g. the `TODO.md` #2
+ruff cleanup) follow that doc's rules — this file's "tests only / do NOT change source"
+rules do NOT apply to them.
+
 You are continuing work on the Free Snap Tap repo, branch `opencode_test` (do NOT push —
 pushing is the maintainer's job; he pushed `d161e5a` on 2026-09-07).
 FIRST read `AGENTS.md` (orientation, module map, sign convention `-`=pressed/`+`=released/
@@ -60,7 +64,9 @@ Current state (2026-09-07):
 - Never commit coverage artifacts: `.coverage` is gitignored, `coverage.json` is NOT —
   keep it local only (ask before adding a `.gitignore` entry).
 - New files are LF (source files are CRLF in the index, autocrlf). Commit per logical chunk
-  on `opencode_test`; do NOT push.
+  on `opencode_test`; do NOT push. Follow the `AGENTS.md` **Git conventions**: if a commit
+  spans multiple themes, add up to ~3 short body lines, one per theme (bug fixed / idea
+  implemented / change integrated) — the commit message is your own future work log.
 
 ## Definition of done
 - `& .\.venv\Scripts\python.exe -m pytest -q` fully green (test count may grow).
@@ -69,3 +75,38 @@ Current state (2026-09-07):
   modules at 94.6 %); C lines remain by design.
 - Final report: which blocks were closed (with the before/after coverage per module), any
   suspected bugs found (unfixed), new test files + test count, suite + lint status.
+
+## Progress log (phases so far)
+
+- **Phase 2 (done 2026-09-06):** unit-tested `Output_Manager` + `Input_State_Manager`
+  with mocked pynput controllers + `freezegun` for time-based eval (`tr`/`last`/`dc`/`p`/`cs`)
+  + filter hot path (`fst_keyboard._win32_event_filter`). See `tests/test_output_manager.py`,
+  `tests/test_input_state_manager.py`, `tests/test_filter_behavior.py`; gap semantics in
+  `SPEC_FEATURES.md` section 5.
+- **class-2 coverage (done 2026-09-07):** `Focus_Task` polling (`tests/test_focus_task.py`),
+  listener lifecycle + display functions (`test_filter_behavior.py`), `CLI_menu`
+  (`tests/test_cli_menu.py`), `Focus_Group_Manager` task methods
+  (`tests/test_focus_group_manager.py`). `fst_tasks` at 100 %.
+- **Phase 3 prep (done 2026-09-07):** offscreen pytest-qt env pinned in `tests/conftest.py`
+  (`QT_QPA_PLATFORM=offscreen`); smoke + `ToastBridge` round-trip tests in
+  `tests/test_gui_smoke.py`.
+- **Resolved 2026-09-07:** known-issue #1 (Key_Event eq/hash) — strict repr-based `__eq__`
+  on all data types (eq == hash == repr); the loose vk/press comparison in the filter hot
+  path is now explicit (`is_trigger_activated`, repeated-trigger suppression);
+  `tests/test_known_issues.py` removed, suite fully green. Also fixed: `Focus_Task`
+  `stop` attribute shadowing the `stop()` method (renamed `self._stop`), and
+  `ToastManager._handle_destruction` guarded against an already-deleted C++ side.
+- **Phase 3 (done 2026-09-07):** offscreen GUI tests for `fst_overlay.py` (34 % → 99 %)
+  with pytest-qt: ToastManager/ToastWidget depth (`tests/test_gui_smoke.py`),
+  StatusOverlay drag/menu/double-click (`test_status_overlay.py`), Tray_Icon signals
+  (`test_tray_icon.py`), CrosshairOverlay (`test_crosshair.py`), GUI_Manager periodic
+  update/wiring/exit/start (`test_gui_manager.py`), console helpers
+  (`test_console_helpers.py`). Fixed while testing: dangling `remove_crosshair()`
+  call (dead PyQt5-era leftover that crashed `StatusOverlay.close_overlay`), toast
+  dict cleanup (PySide6 routes `destroyed` globally → identity-guarded
+  `_handle_destruction` with liveness probe), dict-based `check_empty` (offscreen
+  destruction ordering). Left untested: `contextMenuEvent` (blocking `exec_`).
+- **Phase 4 (done 2026-09-07):** coverage triage report `COVERAGE_TRIAGE.md` (committed +
+  pushed, `d161e5a`). Remaining 468 uncovered lines classified: A (testable now) = 299,
+  B (more mocking) = 50, C (deliberately not covered: 63 debug-print, 52 dead-code,
+  4 abstract-stub lines) = 119. No Windows CI added (not approved by maintainer).
