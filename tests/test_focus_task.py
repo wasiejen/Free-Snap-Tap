@@ -6,7 +6,7 @@ win32 filter on focus loss, the ALWAYS_ACTIVE default-group branch, the
 FOCUS_THREAD_PAUSED / MANUAL_PAUSED gating and stop().
 gw.getActiveWindow and asyncio.sleep are mocked - the fake sleep yields to the
 event loop (future + call_soon) so the coroutine advances; a counter sets
-task.stop after N ticks. No real input, no real time, no Windows APIs.
+task.stop() after N ticks. No real input, no real time, no Windows APIs.
 """
 import asyncio
 from types import SimpleNamespace
@@ -53,7 +53,7 @@ def fake_windows(monkeypatch, titles):
 
 def driving_sleep(monkeypatch, task, ticks, before_yield=None):
     """Patch asyncio.sleep with a fake that yields to the loop and sets
-    task.stop after `ticks` sleeps. before_yield(n) may run before yielding."""
+    task.stop() after `ticks` sleeps. before_yield(n) may run before yielding."""
     state = {'n': 0}
 
     async def fake_sleep(delay):
@@ -65,7 +65,7 @@ def driving_sleep(monkeypatch, task, ticks, before_yield=None):
         loop.call_soon(future.set_result, None)
         await future
         if state['n'] >= ticks:
-            task.stop = True
+            task.stop()
 
     monkeypatch.setattr(asyncio, 'sleep', fake_sleep)
     return state
@@ -85,7 +85,7 @@ async def test_focus_found_resumes_groups(monkeypatch):
     fst.cli_menu.update_group_display.assert_called_once_with()
     fst.cli_menu.display_focus_found.assert_called_once_with('CS2 2024')
     assert fst.arg_manager.WIN32_FILTER_PAUSED is False
-    assert task.stop is True
+    assert task._stop is True
 
 
 @pytest.mark.asyncio
@@ -257,10 +257,8 @@ def test_pause_and_restart_toggle_focus_thread_paused():
     assert fst.arg_manager.MANUAL_PAUSED is True
 
 
-def test_stop_attribute_gates_the_run_loop():
-    # NB: the bool attribute set in __init__ shadows the stop() method, so the
-    # attribute is the contract the loop checks (and the only way it can be set)
+def test_stop_method_stops_the_run_loop():
     task = Focus_Task(make_fst())
-    assert task.stop is False
-    task.stop = True
-    assert task.stop is True
+    assert task._stop is False
+    task.stop()
+    assert task._stop is True
