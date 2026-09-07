@@ -62,7 +62,9 @@ class Output_Manager():
                                         2: mouse.Button.right,
                                         3: mouse.Button.middle,
                                         4: mouse.Button.x1,
-                                        5: mouse.Button.x2
+                                        5: mouse.Button.x2,
+                                        6: "scroll_y_vertical",
+                                        7: "scroll_x_horizontal"
                                     }
         self._mouse_vk_codes = self._mouse_vk_codes_dict.keys()
         self._repeat_thread_dict = {}
@@ -691,19 +693,27 @@ class Output_Manager():
 
             return result
 
+    def check_for_mouse_vk_code(self, vk_code):
+        return vk_code in self._mouse_vk_codes
+
     def send_key_event(self, key_event):
-
-        def check_for_mouse_vk_code(vk_code):
-            return vk_code in self._mouse_vk_codes
-
         vk_code, is_press, _ = key_event.get_all()
-
-        is_mouse_key = check_for_mouse_vk_code(vk_code)
+        is_mouse_key = self.check_for_mouse_vk_code(vk_code)
         key_code = self.get_key_code(is_mouse_key, vk_code)
-        if is_press:
-            self._controller_dict[is_mouse_key].press(key_code)
+
+        # 260907-1049 handling scrolling - not handled before
+        if is_mouse_key and isinstance(key_code,str):
+            if key_code == "scroll_x_horizontal":
+                dx, dy = 1 if is_press else -1, 0
+            elif key_code == "scroll_y_vertical":
+                dx, dy = 0, 1 if is_press else -1
+            self._controller_dict[is_mouse_key].scroll(dx, dy)
+        # 260907-1055 all keyboard and mouse clicks
         else:
-            self._controller_dict[is_mouse_key].release(key_code)
+            if is_press:
+                self._controller_dict[is_mouse_key].press(key_code)
+            else:
+                self._controller_dict[is_mouse_key].release(key_code)
 
     # 260429-1441 - added crossover and delay for tap groups as async coroutines - everything else runs without async directly in the listener thread
     def send_keys_for_tap_group(self, tap_group):
