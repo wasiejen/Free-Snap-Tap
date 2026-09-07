@@ -203,6 +203,19 @@ def test_paint_event(qtbot, overlay):
     overlay.paintEvent(QPaintEvent(QRect(0, 0, overlay.x_size, overlay.y_size)))
 
 
+def test_exit_program_closes_overlay(qtbot, fst):
+    fst.control_exit_program = MagicMock()
+    o = StatusOverlay(fst)
+    qtbot.addWidget(o)
+    assert o.isVisible()
+
+    o.exit_program()
+
+    fst.control_exit_program.assert_called_once_with('overlay')
+    assert not o.isVisible()  # close() hides synchronously
+    qtbot.wait(50)  # process the deleteLater
+
+
 def test_display_internal_state(qtbot, overlay):
     overlay._fst.display_internal_repr_groups = MagicMock()
     overlay.display_internal_state()

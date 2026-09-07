@@ -609,7 +609,6 @@ class StatusOverlay(QWidget):
         self._fst.reload_from_file()
 
     def close_overlay(self):
-        self.remove_crosshair() 
         self.close()
         self.deleteLater()
 
