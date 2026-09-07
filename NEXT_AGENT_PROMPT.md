@@ -60,13 +60,26 @@ Current state (2026-09-07):
   `remove_all_toasts()` `AttributeError`, the `convert_to_vk_code` implicit-`None` for
   out-of-range numeric strings, the dead code blocks — leave them; they are maintainer calls.
 - `FSTconfig.txt` / `FSTconfig_test.txt`, README/WIKI/`SPEC_FEATURES.md`, `AGENTS.md`,
-  `TODO.md`, `COVERAGE_TRIAGE.md` (the plan — if it proves wrong, ASK) — never edit.
+   `COVERAGE_TRIAGE.md` (the plan — if it proves wrong, ASK) — never edit.
+- `TODO.md`: append-only (per-commit discrepancies, see post-commit routine) — never
+  rewrite existing entries.
 - Never commit coverage artifacts: `.coverage` is gitignored, `coverage.json` is NOT —
   keep it local only (ask before adding a `.gitignore` entry).
 - New files are LF (source files are CRLF in the index, autocrlf). Commit per logical chunk
   on `opencode_test`; do NOT push. Follow the `AGENTS.md` **Git conventions**: if a commit
-  spans multiple themes, add up to ~3 short body lines, one per theme (bug fixed / idea
-  implemented / change integrated) — the commit message is your own future work log.
+   spans multiple themes, add up to ~3 short body lines, one per theme (bug fixed / idea
+   implemented / change integrated) — the commit message is your own future work log.
+- **Post-commit routine (after EVERY commit):**
+  1. Update this file (NAP) with current progress — done / next task(s) / current
+     baselines (test count, lint count, coverage) / HEAD commit — so an interrupted
+     agent can resume from here with relatively current data.
+  2. Append every discrepancy found at commit time (doc/code mismatch, suspected bug,
+     stale baseline) to `TODO.md` as a new numbered entry — append only, never
+     rewrite existing entries.
+  3. Run `& .\.venv\Scripts\python.exe ..\ctxgauge\peek.py` from the repo root and judge
+     whether the remaining context is still enough for the next tasks. **If not:**
+     finish this file with all open tasks written down, stop at a clean point, and
+     inform the user — never start new work.
 
 ## Definition of done
 - `& .\.venv\Scripts\python.exe -m pytest -q` fully green (test count may grow).

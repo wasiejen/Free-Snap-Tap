@@ -23,6 +23,20 @@ macOS not supported.
   Multi-theme commits are fine, never split commits just for message style.
   Goal: `git log` must stay readable as a small work summary on its own.
 
+## Post-commit routine (after EVERY commit, no exceptions)
+1. **Update `NEXT_AGENT_PROMPT.md` (NAP) with current progress** — what is done, the
+   next task(s), current baselines (test count, lint count, coverage) and the HEAD
+   commit. Goal: an agent that was interrupted can resume from the NAP with
+   relatively current data, without re-exploring.
+2. **Append every discrepancy found at commit time to `TODO.md`** — doc/code
+   mismatches, suspected bugs, stale baselines, anything the code contradicts the
+   docs — as a new numbered entry in `TODO.md` style (`## <n>. <summary> (<date>)`).
+   Append only, never rewrite existing entries.
+3. **Context check:** run `& .\.venv\Scripts\python.exe ..\ctxgauge\peek.py` (from the
+   repo root) and judge whether the remaining context is still enough for the next
+   tasks. **If not:** finish the NAP with all open tasks written down, stop at a
+   clean point, and inform the user — never start new work.
+
 ## Run / test
 - venv with all deps: `.venv` (do NOT reinstall from scratch; `requirements.txt` is runtime, `requirements-dev.txt` adds test tooling, `requirements-build.txt` is executable-packaging only (Nuitka/PyInstaller) — CI installs runtime+dev only).
 - Run tests: `& .\.venv\Scripts\python.exe -m pytest -q`
@@ -33,7 +47,9 @@ macOS not supported.
 ## Context budget (NAP threshold)
 - Check usage between logical chunks (before heavy steps): `& .\.venv\Scripts\python.exe ..\ctxgauge\peek.py` → `CTX=n (p%)` (read-only, run from repo root).
 - **Line:** stop working when ≤ 15k tokens remain **or** 85% used — whichever comes first. Writing the NAP needs another ~10k (simple tasks) to ~15k (complex: thinking + lookups), so wrap up BEFORE the line.
-- At the line: stop at a clean point, then **ask the user** whether to write the NAP — never write it silently, and never start new work.
+- At the line (or whenever a post-commit check says the remaining context is not
+  enough for the next tasks): stop at a clean point, write all open tasks into the
+  NAP, and **inform the user** — never start new work.
 - With the gauge result, give an **estimate of the tokens still needed to finish the current plan** (rough budgets: file read/inspect ≈ 1–3k per call; heavy edits / a big test run ≈ 3–8k each; small reply turn ≈ 0.3k; NAP writing ≈ 10–15k). Report estimate vs remaining window, so the user can decide to switch to the same model's larger-context variant (slower, no MTP) and finish the task.
 
 ## Sign convention (IMPORTANT — used everywhere)
