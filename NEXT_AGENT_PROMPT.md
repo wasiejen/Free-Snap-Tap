@@ -1,4 +1,4 @@
-# NEXT AGENT PROMPT — class-2 coverage + Phase 3 preparation
+# NEXT AGENT PROMPT — Phase 3: GUI tests for `fst_overlay.py` (pytest-qt, offscreen)
 
 You are continuing work on the Free Snap Tap repo, branch `opencode_test` (do NOT push).
 FIRST read `AGENTS.md` (orientation, module map, sign convention `-`=pressed/`+`=released/
@@ -7,131 +7,120 @@ FIRST read `AGENTS.md` (orientation, module map, sign convention `-`=pressed/`+`
 **House rule from the maintainer: when something is unclear, ASK EARLY — do not decide
 unilaterally or spend a long time exploring an ambiguity.**
 
-Current state (verified 2026-09-07, HEAD `01bd312`):
-- Suite: **191 passed, 1 xfailed** (`tests/test_known_issues.py` — Key_Event eq/hash,
-  still open by maintainer decision #1). Run: `& .\.venv\Scripts\python.exe -m pytest -q`
-- Lint baseline: `& .\.venv\Scripts\ruff.exe check --select F .` → **6 findings**: the 5
-  pre-existing ones (free_snap_tap 2×F541, fst_manager F401 Event, fst_overlay F401
-  QSizePolicy + F841) **plus 1 in the maintainer's own `test_pynput_mouse.py:140`**
-  (F841 unused `key_event_time`) — leave that file alone. No NEW findings allowed.
-- Coverage of logic/building-block modules:
-  `fst_data_types` 91%, `fst_save_file_handler` 100%, `vk_codes` 100%,
-  `fst_manager` 72%, `fst_keyboard` 68%, `fst_tasks` 39%, total 72%
-  (`pytest -q --cov=fst_data_types --cov=fst_manager --cov=fst_save_file_handler --cov=fst_keyboard --cov=fst_tasks --cov=vk_codes`).
-- The maintainer's mouse commit `800fd9f` (mouse-to-mouse rebinds now play async via
-  `execute_key_event` + `run_coroutine_threadsafe`, scroll vk 6/7 implemented with
-  **inverted/traditional scroll direction** in `send_key_event`, unrecognized mouse events
-  suppressed via `_mouse_listener.suppress_event()`) is done and unit-tested
-  (`tests/test_filter_behavior.py::TestMouseToMouseRebind`, `::TestMouseWin32Filter`).
-- All 15 `SPEC_FEATURES.md` §4 items are decided; decisions are final.
-- The start-argument crashes, dead `load_config` create-call, dead `arg[0]` condition and
-  the `-debug` elif fall-through from the discrepancy report are **fixed and tested**
-  (commits `c331f1f`, `7b7b23c`). `Config_Manager.load_config` now creates the default
-  file and loads it when the file is missing (no exception).
+Current state (verified 2026-09-07, HEAD `8479a87`):
+- Suite: **251 passed, 0 xfailed** — the old Key_Event eq/hash xfail was resolved by
+  strict repr-based eq. Run: `& .\.venv\Scripts\python.exe -m pytest -q`
+- Lint baseline: `& .\.venv\Scripts\ruff.exe check --select F .` → **6 findings** (free_snap_tap
+  2×F541, fst_manager F401 `Event`, fst_overlay F401 `QSizePolicy` + F841
+  `cube_distance_down`, test_pynput_mouse F841 — leave that maintainer file alone).
+  No NEW findings allowed.
+- Coverage: `fst_tasks` 100%, `fst_save_file_handler` 100%, `vk_codes` 100%,
+  `fst_data_types` 93%, `fst_manager` 79%, `fst_keyboard` 73%, **`fst_overlay` 34%**,
+  total 72% (`pytest -q --cov=fst_data_types --cov=fst_manager --cov=fst_save_file_handler --cov=fst_keyboard --cov=fst_tasks --cov=vk_codes --cov=fst_overlay`).
+- Phase 3 prep is done and verified: `pytest-qt==4.5.0` + `PySide6==6.9.1` installed,
+  `QT_QPA_PLATFORM=offscreen` is set at the top of `tests/conftest.py` (do NOT
+  re-add it), `tests/test_gui_smoke.py` pins the offscreen environment and covers the
+  `ToastBridge` show/remove round trip (wiring pattern for the rest).
+- The repo-root `test_overlay.py` is the maintainer's **manual** wiring script
+  (threading + 30 s sleep) — reference for how `GUI_Manager`/`ToastBridge` connect,
+  **not** a pytest pattern.
+- Source changes made since the previous prompt (all committed and tested — write new
+  tests against THIS state):
+  - Data types now have **strict repr-based `__eq__` matching `__hash__`**
+    (`Key_Event`, `Key`, `Key_Group`, `Rebind`, `Macro`, `Tap_Group`). The loose
+    vk/press comparison in the filter hot path is now explicit (`is_trigger_activated`,
+    repeated-trigger suppression). Compare key events in tests by `(vk_code, is_press)`
+    or via repr.
+  - `Focus_Task.stop()` works again (attribute renamed `self._stop`).
+  - `ToastManager._handle_destruction` is guarded (try/except RuntimeError) against an
+    already-deleted C++ side — regression-tested in `test_gui_smoke.py`.
 
-## Task A: class-2 coverage (5 areas, still pure unit scope)
+## Task: cover `fst_overlay.py` (~34% → ~90%) with pytest-qt
 
-No real input, no real time, no Windows APIs, no GUI windows. Mock everything the unit
-under test touches. Add tests to existing files where a file for the unit already exists,
-otherwise a new file — one file per unit under test:
+Offscreen GUI scope only. Mock every non-Qt dependency; one file per unit under test
+(extend `tests/test_gui_smoke.py` where that unit is already there, else a new file).
+Class map (line numbers of `__init__`): `GUI_Manager` 103, `Tray_Icon` 276,
+`CrosshairOverlay` 350, `StatusOverlay` 446, `ToastWidget` 649, `ToastManager` 747,
+`ToastBridge` 826.
 
-1. **`Focus_Task` polling** (`fst_tasks.py`, ~39% → ~100%) — new `tests/test_focus_task.py`.
-   Mock `fst_tasks.gw.getActiveWindow` (return `SimpleNamespace(title=...)`, or raise
-   `AttributeError` for the "None" branch). Patch `asyncio.sleep` — **the fake must yield
-   to the loop** (create a future + `loop.call_soon(future.set_result, None)` + await it);
-   a `pass`-body fake never yields and the task never advances. Drive the loop with a
-   counter that sets `task.stop` (bool attr — note `stop()` the method sets the same attr)
-   after N ticks. Cover: focus-name found (case-sensitive **substring** via `str.find`)
-   → `FOCUS_APP_NAME` set, `update_args_and_groups(focus_name)`, `display_focus_found`,
-   `WIN32_FILTER_PAUSED=False`; name sanitization (`™` etc. stripped by the regex);
-   own windows skipped (`FST Status Indicator`, `FST Crosshair`, `FST_Overlay`);
-   no match → `FOCUS_APP_NAME=''`, `display_focus_not_found`, `WIN32_FILTER_PAUSED=True`
-   (and the already-paused no-op branch); `ALWAYS_ACTIVE` default-active branch;
-   `FOCUS_THREAD_PAUSED`/`MANUAL_PAUSED` gating (`pause()`/`restart()`); `stop()`.
-2. **Listener lifecycle** (`fst_keyboard.py:90-105`) — append to `test_filter_behavior.py`.
-   Monkeypatch `pynput.keyboard.Listener` / `pynput.mouse.Listener` **classes**;
-   `init_listener()` must pass `win32_event_filter` bound to the instance methods;
-   `start_listener()` (both started; inits when None); `stop_listener()` (both stopped).
-3. **`CLI_menu`** (`fst_manager.py`, ~1814-1906) — new `tests/test_cli_menu.py`.
-   Script `builtins.input` (iterator of choices); patch `fst_manager.system` (clear_cli),
-   `fst_manager.startfile`, `fst_manager.msvcrt.kbhit`/`getch`; choice `'4'` → `exit()`
-   → expect `SystemExit`; choices `0` (toggles `CONSTANTS.DEBUG4` — the autouse
-   `restore_constants` fixture saves it), `1` (startfile), `2` (reload calls), `3`
-   (`PRINT_VK_CODES=True`, break), `''` (break), invalid input (loop again).
-   The print-only methods (`display_control_text`, `display_focus_found/
-   not_found/names`, `display_default_active`, `update_group_display`) → capsys +
-   MagicMock FST.
-4. **Display functions** (`fst_keyboard.py`: `display_internal_repr_groups`,
-   `open_config_file`, `reload_from_file`) — append to `test_filter_behavior.py`.
-   capsys for the repr dump (populate the group dicts first); patch `fst_keyboard.startfile`
-   for `open_config_file`; `reload_from_file` → monkeypatch the instance's
-   `update_args_and_groups` + `cli_menu.update_group_display`, set
-   `focus_manager.FOCUS_APP_NAME`.
-5. **`Focus_Group_Manager` task methods** (~1525-1564) — new
-   `tests/test_focus_group_manager.py`: `init_focus_task` (keys present → creates
-   `Focus_Task`, `focus_active=True`; empty → no task), `pause_focus_task`,
-   `start_focus_task` (**async test** — it calls `asyncio.get_running_loop()`; patch
-   `gw` + `asyncio.sleep` as in item 1 so the spawned task can be stopped),
-   `restart_focus_task`, `stop_focus_task`, `update_groups_from_config`.
+1. **ToastManager / ToastWidget depth** (extend `test_gui_smoke.py`):
+   - `add_toast` dedup: same ID → the existing toast is removed before the new one
+     appears (`active_toasts` holds exactly one under the ID).
+   - `ToastWidget` countdown: drive `toast.handle_tick()` **directly** (no real
+     waiting) — assert the `remaining_seconds` countdown text, and that a tick to
+     `<= 0` stops the timer + `deleteLater` (process destruction via `qtbot.wait(...)`).
+   - `remove_toast` non-immediate: red "DELETE" label + the 1 s re-armed timer branch.
+   - `remove_all_toasts`, `check_empty` hide/show cycle, `ToastWidget.__eq__`
+     (id + duration), remaining bridge signals (`signal_show_timer` → `add_timer`,
+     `signal_remove_all_toasts` → `remove_all_toasts`).
+2. **StatusOverlay** (`tests/test_status_overlay.py`): construct with a stand-in fst
+   (`arg_manager.STATUS_INDICATOR_SIZE` etc. — see `GUI_Manager` below); `update_color`
+   (color_name + QColor), `toggle_status_indicator` (flips the arg flag),
+   `hide_indicator`/`show_indicator`, `mouseDoubleClickEvent` → `fst.open_config_file`
+   (call the event handler with a constructed `QMouseEvent`, or `qtbot.mouseDoubleClick`),
+   left-button drag: `mousePressEvent` → `_drag_offset` set, `mouseMoveEvent` moves the
+   widget and re-positions `parent().toast_manager`, screen-change counter decrement,
+   `mouseReleaseEvent` final recenter branch, menu actions (`toggle_pause`/
+   `return_to_menu`/`open_config_file`/`reload_from_file` hit the mocked fst methods).
+   Do NOT call `contextMenuEvent` (its `exec_` is blocking) — test the action slots
+   directly.
+3. **Tray_Icon** (`tests/test_tray_icon.py`): construct (offscreen:
+   `QSystemTrayIcon.isSystemTrayAvailable()` is False — never `show()`); `update_color`
+   (known color switches icon, unknown keeps it), `on_activated(Trigger)` emits
+   `signal_toggle_console`; for the menu: get the `QAction`s from `tray_icon.menu()`
+   and call `.trigger()` on each — assert the matching signal fired; never `exec_`.
+4. **CrosshairOverlay** (`tests/test_crosshair.py`): `show_crosshair`/`hide_crosshair`
+   (visible state + `crosshair_size`/`thickness` attrs), `update_position` honoring
+   `CROSSHAIR_DELTA_X/Y` (stand-in with and without the attrs — source uses
+   `getattr(..., 0)`), `paintEvent` called directly with a `QPaintEvent` (offscreen
+   paint is fine — assert no exception).
+5. **GUI_Manager** (`tests/test_gui_manager.py`): construct with the stand-in (see
+   below) — it builds all four children, so this doubles as an integration check;
+   `perform_periodic_update` **called directly** (never start `update_timer`):
+   indicator show/hide on `STATUS_INDICATOR` change, crosshair show/hide on
+   `CROSSHAIR_ENABLED` change, color logic — red (manual/win32 paused) / blue
+   (ALWAYS_ACTIVE + empty `FOCUS_APP_NAME`) / green (running) — with tray+overlay color
+   sync; signal wiring (tray signals → manager methods; `signal_toggle_crosshair` from
+   BOTH tray and overlay → `toggle_crosshair`); `toggle_pause`/`return_to_menu`
+   delegation; `exit_program` (mock `app.quit`, expect `SystemExit` from `sys.exit(0)`).
+6. **Console helpers** (small): `customMessageHandler` (the `QWindowsWindow::setGeometry`
+   suppression branch), `switch_console_visibility`/`set_console_visibility` with
+   `monkeypatch`ed `fst_overlay.kernel32`/`user32` (no real console).
+
+Stand-in for a full `GUI_Manager`: `SimpleNamespace` with
+`arg_manager = SimpleNamespace(MANUAL_PAUSED=..., WIN32_FILTER_PAUSED=...,
+CROSSHAIR_ENABLED=..., STATUS_INDICATOR=..., ALWAYS_ACTIVE=...,
+STATUS_INDICATOR_SIZE=10)` and `focus_manager = SimpleNamespace(FOCUS_APP_NAME='')`;
+attach `MagicMock`s per test for `open_config_file`/`control_toggle_pause`/etc.
 
 Conventions (established in `tests/`):
-- `kb_env` (real `FST_Keyboard`, mocked pynput **controllers**); `fake_fst`/`FakeFST`
-  (conftest) for manager-level units — `FakeFST` has **no** `focus_manager`/`cli_menu`/
-  `config_manager` attrs: attach SimpleNamespace/MagicMock per test as needed.
-- `freezegun` for wall clock where relevant; `pytest.mark.asyncio` for async tests.
-- The autouse `restore_constants` fixture saves `DEBUG*`, `FILE_NAME` and the three
-  control combinations — mutating `CONSTANTS` in tests is safe.
-
-## Task B: Phase 3 preparation (pytest-qt, offscreen)
-
-Phase 3 per `AGENTS.md` = GUI tests for `fst_overlay.py` with `pytest-qt`. Verified
-ready: `pytest-qt==4.5.0` + `PySide6==6.9.1` installed, `QT_QPA_PLATFORM=offscreen`
-QApplication smoke confirmed working in `.venv`. The repo-root `test_overlay.py` is the
-maintainer's **manual** wiring script (threading + 30 s sleep) — reference for how
-`GUI_Manager`/`ToastBridge`/`ToastManager` connect, **not** a pytest pattern.
-
-Do (bounded):
-1. In `tests/conftest.py`: `os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")` at
-   module top (before any PySide6 import happens).
-2. A new `tests/test_gui_smoke.py` using `qtbot`: create the QApplication, build a
-   trivial widget, show/raise it, process events, assert visible, close. This pins the
-   offscreen environment.
-3. One first real overlay test: `ToastBridge` signal → `ToastManager.add_toast` round
-   trip offscreen (wire `bridge.signal_show_toast` to the toast manager like the root
-   script does; assert a toast widget appears). Read `fst_overlay.py` first — build the
-   `GUI_Manager` (or the toast manager alone, whichever the constructor allows) with a
-   FakeFST-like stand-in. Do NOT run the real focus/GUI timers for real time — use
-   `qtbot.wait(...)` or fixed small timeouts only.
-
-Do NOT yet: full `fst_overlay.py` coverage (CrosshairOverlay drag/menu/dbl-click,
-Tray_Icon, `GUI_Manager` polling loop) — that is Phase 3 proper, started only after the
-user confirms Task A+B are done.
+- `qtbot` for the QApplication + widget lifecycle; `qtbot.wait(...)` only in small fixed
+  doses (≤100 ms); call `QTimer`-driven slots directly instead of waiting real time.
+- No `GUI_Manager.start()` (it enters `app.exec()`), no live listeners, no threads +
+  `time.sleep` like the root script.
+- The autouse `restore_constants` fixture covers `CONSTANTS`; the offscreen env comes
+  from `tests/conftest.py`.
 
 ## Rules
-- **Tests only — do NOT change source code.** If a test reveals genuinely wrong behavior,
-  do not fix it: record it in your final report and leave the test out rather than
-  asserting buggy behavior.
-- Never run live pynput listeners or real time-based GUI loops.
+- **Tests only — do NOT change source code.** If a test reveals genuinely wrong
+  behavior, do not fix it: record it in your final report and leave the test out rather
+  than asserting buggy behavior.
 - `FSTconfig.txt` and `FSTconfig_test.txt` are the maintainer's live files — never edit.
-  If `tests/test_big_config.py` pin drifts (the maintainer is actively adding mouse
-  rebinds to `FSTconfig_test.txt`; default-group rebinds count once per 53 focus names),
-  re-pin with an explanatory comment **after asking the user** whether the file changed.
 - Never commit `.coverage` or `FSTconfig_test.txt` (both gitignored).
 - Do NOT edit README/WIKI/`SPEC_FEATURES.md`/`TODO.md`/`AGENTS.md` (the maintainer
   maintains AGENTS.md status lines himself).
-- Git note: `fst_manager.py`/`fst_keyboard.py` are stored CRLF in the index (autocrlf);
-  test files are LF. If you ever need to stage individual hunks, convert the patch to
-  CRLF for `git apply --cached`.
+- Git note: source files are stored CRLF in the index (autocrlf); test files are LF.
 - Commit per logical chunk on `opencode_test`; do NOT push.
 
 ## Definition of done
-- `& .\.venv\Scripts\python.exe -m pytest -q` fully green (the single xfail stays the
-  Key_Event one) including the new tests.
+- `& .\.venv\Scripts\python.exe -m pytest -q` fully green including the new tests.
 - `& .\.venv\Scripts\ruff.exe check --select F .` — same 6 findings, no new ones.
-- Report: new coverage numbers per module (expect `fst_tasks` ~95%+, `fst_manager` and
-  `fst_keyboard` up), what you covered, any code discrepancies or suspected bugs found
-  (unfixed), what remains (should be only: the deferred Phase 3 overlay depth —
-  CrosshairOverlay/Tray_Icon/GUI_Manager polling — plus small leftovers: remaining eval
-  invocations (clipboard/files/toasts/mouse-vars), `is_repeat_active`, numpad debug
-  actions, control-handler bodies).
-- After the report: **start Phase 3 proper only if the user confirms.**
+- Report: new coverage numbers per module (expect `fst_overlay` ~85–90%; legitimate
+  leftovers: `GUI_Manager.start` — needs a mocked `app.exec()` decision — plus whatever
+  you list), what you covered, any code discrepancies or suspected bugs found (unfixed),
+  and what remains (should then only be: the remaining `fst_manager`/`fst_keyboard`
+  hotpath leftovers — eval invocations clipboard/files/toasts/mouse-vars,
+  `is_repeat_active`, numpad debug actions, control-handler bodies — for a Phase 4
+  coverage triage).
+- **Phase 4 (coverage report / optional Windows CI) starts only after the user
+  confirms Phase 3 is done.**
