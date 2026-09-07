@@ -824,10 +824,10 @@ class Config_Manager():
         # try loading  from file
         try:
             return self._parse_lines_for_focus_manager(self._open_config_file())
-        # if no file exist create new one
-        except FileNotFoundError as error:
-            raise FileNotFoundError(error)
+        # if no file exist create new one and load it
+        except FileNotFoundError:
             self.create_new_group_file()
+            return self._parse_lines_for_focus_manager(self._open_config_file())
 
 
     def _clean_comments(self, lines):

@@ -63,9 +63,14 @@ def test_load_config_focus_groups(tmp_path):
     assert multi_focus['Second'] == [[], []]
 
 
-def test_load_config_raises_on_missing_file(tmp_path):
-    with pytest.raises(FileNotFoundError):
-        Config_Manager(str(tmp_path / 'nope.txt')).load_config()
+def test_load_config_creates_file_on_missing(tmp_path):
+    path = tmp_path / 'nope.txt'
+    multi_focus, default_args, default_groups = Config_Manager(str(path)).load_config()
+    assert path.exists()
+    assert path.read_text().splitlines() == ['# Tap Groups', 'a, d', 'w, s', '# Rebinds', '# Macros']
+    assert multi_focus == {}
+    assert default_args == []
+    assert default_groups == [['', 'a,d'], ['', 'w,s']]
 
 
 def test_multi_focus_shares_group(tmp_path):
@@ -221,10 +226,3 @@ class TestFileWriting:
         assert path.read_text().splitlines() == [
             '# Tap Groups', 'a, d', 'w, s', '# Rebinds', '# Macros',
         ]
-
-    def test_load_config_missing_file_raises_without_creating_file(self, tmp_path):
-        path = tmp_path / 'missing.cfg'
-        with pytest.raises(FileNotFoundError):
-            Config_Manager(str(path)).load_config()
-        # the create_new_group_file() call in the handler sits behind the raise
-        assert not path.exists()
