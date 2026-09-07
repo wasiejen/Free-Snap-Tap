@@ -543,7 +543,8 @@ class FST_Keyboard():
             keys = trigger_group.get_key_events()
             # only trigger on the first key_event in trigger group
             # so only if that key is pressed the trigger can be activated
-            if current_ke != keys[0]:
+            # compare base only: runtime events carry no key_string/constraints
+            if current_ke.vk_code != keys[0].vk_code or current_ke.is_press != keys[0].is_press:
                 return False
 
             activated = True
@@ -594,7 +595,10 @@ class FST_Keyboard():
                 press_state = self._state_manager.get_real_key_press_state(vk_code)
                 if press_state == current_ke.is_press:
                     # if the key is repeated and is a trigger, it will be suppressed
-                    if current_ke in self._all_trigger_events:
+                    # compare base only: runtime events carry no key_string/constraints
+                    if any(current_ke.vk_code == trigger.vk_code
+                           and current_ke.is_press == trigger.is_press
+                           for trigger in self._all_trigger_events):
                         if CONSTANTS.DEBUG3:
                             print(f"repeated key supressed: {current_ke}")
                         to_be_suppressed = True

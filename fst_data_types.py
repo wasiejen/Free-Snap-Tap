@@ -112,7 +112,7 @@ class Key_Event(Input_Event):
         return Key_Event(self._vk_code, not self._is_press, self._constraints, self._key_string)
 
     def __eq__(self, other) -> bool:
-        return (self.vk_code == other.vk_code) and (self.is_press is other.is_press)
+        return self.__repr__() == repr(other)
 
     def _get_sign(self):
         return '-' if self._is_press else '+'
@@ -150,10 +150,16 @@ class Key(Input_Event):
         return '^' if self._is_toggle else ''
 
     def __hash__(self):
-        return hash(f"{self._get_sign()}{self._vk_code}")
+        return hash(self.__repr__())
 
     def __eq__(self, other) -> bool:
-        raise NotImplementedError
+        return self.__repr__() == repr(other)
+
+    def __repr__(self):
+        if self._key_string is None:
+            return f"{self._get_sign()}{self._vk_code}"
+        else:
+            return f"{self._get_sign()}{self._key_string}"
 
 
 class Key_Group(object):
@@ -193,13 +199,7 @@ class Key_Group(object):
         return hash(self.__repr__())
 
     def __eq__(self, other) -> bool:
-        if len(self._key_events) == len(other.get_key_events()):
-            equal = True
-            for my_key_event, other_key_event in zip(self._key_events, other.get_key_events()):
-                equal = equal and my_key_event == other_key_event
-            return equal
-        else:
-            return False
+        return self.__repr__() == repr(other)
 
     def __repr__(self):
         key_strings = []
@@ -253,11 +253,8 @@ class Rebind(object):
     def __hash__(self):
         return hash(self.__repr__())
 
-    def __eq__(self, other):
-        equal = True
-        equal = equal and self.trigger_group == other.trigger_group
-        equal = equal and self.replacement == other.replacement
-        return equal
+    def __eq__(self, other) -> bool:
+        return self.__repr__() == repr(other)
 
     def __repr__(self):
         return f"{self._alias} {self._trigger_group} : {self._replacement}"
@@ -317,8 +314,8 @@ class Macro(object):
     def __hash__(self):
         return hash(self.__repr__())
 
-    def __eq__(self, other):
-        raise NotImplementedError
+    def __eq__(self, other) -> bool:
+        return self.__repr__() == repr(other)
 
     def __repr__(self):
         output = f"{self._alias} {self._trigger_group} :: {self._key_groups[0]}"
@@ -411,6 +408,12 @@ class Tap_Group(object):
     #     for key in self.keys:
     #         key_strings.append(repr(key))
     #     return "Tap_Group(" + ','.join(key_strings) + ")"
+
+    def __eq__(self, other) -> bool:
+        return self.__repr__() == repr(other)
+
+    def __hash__(self):
+        return hash(self.__repr__())
 
     def __repr__(self):
         key_strings = []

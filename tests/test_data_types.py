@@ -31,6 +31,15 @@ class TestKeyEvent:
         assert Key_Event('w') == Key_Event('w')
         assert Key_Event('w') != Key_Event('w', is_press=False)
 
+    def test_equal_key_events_have_equal_hash(self):
+        pressed_1 = Key_Event('w', constraints=[100])
+        pressed_2 = Key_Event('w', constraints=[100])
+        assert pressed_1 == pressed_2
+        assert hash(pressed_1) == hash(pressed_2)
+
+    def test_differing_constraints_are_not_equal(self):
+        assert Key_Event('w', constraints=[100]) != Key_Event('w', constraints=[200])
+
     def test_get_key_events_returns_self_twice(self):
         ke = Key_Event('w')
         assert ke.get_key_events() == [ke, ke]
@@ -46,9 +55,10 @@ class TestKey:
         events = Key('c', is_toggle=True).get_key_events()
         assert all(event.is_press for event in events)
 
-    def test_eq_not_implemented(self):
-        with pytest.raises(NotImplementedError):
-            Key('a') == Key('a')
+    def test_eq_and_hash_based_on_repr(self):
+        assert Key('a') == Key('a')
+        assert hash(Key('a')) == hash(Key('a'))
+        assert Key('a') != Key('a', is_toggle=True)
 
     def test_hash_differs_for_toggle(self):
         assert hash(Key('a')) != hash(Key('a', is_toggle=True))
@@ -70,6 +80,16 @@ class TestKeyGroup:
 
     def test_equal_same_events(self):
         assert Key_Group([Key_Event('a')]) == Key_Group([Key_Event('a')])
+
+    def test_equal_groups_have_equal_hash(self):
+        g1 = Key_Group([Key_Event('a', constraints=[100])])
+        g2 = Key_Group([Key_Event('a', constraints=[100])])
+        assert g1 == g2
+        assert hash(g1) == hash(g2)
+
+    def test_groups_with_different_constraints_are_not_equal(self):
+        assert Key_Group([Key_Event('a', constraints=[100])]) != \
+            Key_Group([Key_Event('a', constraints=[200])])
 
     def test_not_equal_on_length_mismatch(self):
         short = Key_Group([Key_Event('a')])
@@ -162,6 +182,13 @@ class TestMacro:
         with pytest.raises(TypeError):
             m.alias = 5
 
+    def test_eq_and_hash_based_on_repr(self):
+        m1 = Macro(Key_Group([Key_Event('a')]), [Key_Group([Key_Event('b')])])
+        m2 = Macro(Key_Group([Key_Event('a')]), [Key_Group([Key_Event('b')])])
+        assert m1 == m2
+        assert hash(m1) == hash(m2)
+        assert m1 != Macro(Key_Group([Key_Event('c')]), [Key_Group([Key_Event('b')])])
+
 
 class TestTapGroup:
     def test_states_initialized_zero(self):
@@ -201,3 +228,10 @@ class TestTapGroup:
     def test_get_vk_codes_with_key_objects(self):
         tg = Tap_Group(keys=[Key_Event('a'), Key_Event('d')])
         assert tg.get_vk_codes() == ['a', 'd']
+
+    def test_eq_and_hash_based_on_repr(self):
+        tg1 = Tap_Group(keys=['a', 'd'])
+        tg2 = Tap_Group(keys=['a', 'd'])
+        assert tg1 == tg2
+        assert hash(tg1) == hash(tg2)
+        assert tg1 != Tap_Group(keys=['a'])
