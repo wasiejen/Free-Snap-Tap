@@ -203,6 +203,17 @@ def test_paint_event(qtbot, overlay):
     overlay.paintEvent(QPaintEvent(QRect(0, 0, overlay.x_size, overlay.y_size)))
 
 
+def test_display_internal_state(qtbot, overlay):
+    overlay._fst.display_internal_repr_groups = MagicMock()
+    overlay.display_internal_state()
+    overlay._fst.display_internal_repr_groups.assert_called_once()
+
+
+def test_get_current_screen_falls_back_to_primary(qtbot, monkeypatch):
+    monkeypatch.setattr(fst_overlay.QApplication, 'screenAt', staticmethod(lambda pos: None))
+    assert fst_overlay.get_current_screen() == QApplication.primaryScreen()
+
+
 def test_set_window_size_and_position_recenters_at_cursor(qtbot, overlay, monkeypatch):
     cursor_pos = QPoint(300, 250)
     monkeypatch.setattr(fst_overlay.QCursor, 'pos', classmethod(lambda cls: cursor_pos))
