@@ -148,6 +148,34 @@ def test_clean_comments_keeps_single_char_line_with_trailing_comment():
     assert cm._clean_comments(['q # single tap group is not valid\n']) == ['q']
 
 
+def test_clean_comments_commented_key_with_colon_keeps_separator():
+    cm = Config_Manager()
+    # a commented-out key that carried a ':' still splits the remaining groups
+    assert cm._clean_comments(['a, #:x\n']) == ['a,:']
+
+
+def test_file_name_setter():
+    cm = Config_Manager()
+    cm.file_name = 'custom.cfg'
+    assert cm.file_name == 'custom.cfg'
+
+
+def test_display_groups_outputs_all_categories(capsys):
+    cm = Config_Manager()
+    cm.presort_lines([
+        ('<run_if_not>', '-shift,-c'),
+        ('', 'a,d'),
+        ('', 'caps_lock : shift'),
+        ('', 'x :: a,b : c,d'),
+    ])
+    cm.display_groups()
+    out = capsys.readouterr().out
+    assert '# Aliases' in out and 'run_if_not' in out
+    assert '# Tap Groups' in out and 'a, d' in out
+    assert '# Rebinds' in out and 'caps_lock : shift' in out
+    assert '# Macros' in out
+
+
 class TestPresortLines:
     def test_tap_groups_default_name(self):
         cm = Config_Manager()

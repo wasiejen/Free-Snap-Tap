@@ -5,6 +5,7 @@ Input_State_Manager timing semantics. pynput controllers are mocked - no real
 keys are ever emitted. Wall-clock dependent eval (last()) is frozen with
 freezegun.
 """
+import sys
 from time import time
 from unittest.mock import MagicMock, call
 
@@ -564,3 +565,140 @@ class TestConstraintResultTypes:
     def test_eval_none_result_is_treated_as_true(self, om_env, capsys):
         ke = make_ke()
         assert om_env.om.constraint_evaluation("print('x')", ke) is True
+
+
+class TestClassBMouseClipboardBackup:
+    """Mouse / clipboard / backup constraint functions. pyperclip, the pynput
+    mouse controller and the fst_save_file_handler entry points are all mocked
+    - no real clipboard, mouse or file backup is ever touched."""
+
+    def patch_clipboard(self, monkeypatch):
+        clip = MagicMock()
+        monkeypatch.setattr(fst_manager, 'pyperclip', clip)
+        return clip
+
+    def test_make_backup_copies_and_toasts(self, om_env, monkeypatch):
+        monkeypatch.setattr(fst_manager, 'mb',
+                            lambda *a, **k: ('/save/dir', 'FSTconfig_2020.txt'))
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("make_backup()", ke) is True
+        om_env.fst.toast_callback.assert_called_once()
+
+    def test_restore_backup_restores_and_toasts(self, om_env, monkeypatch):
+        monkeypatch.setattr(fst_manager, 'rb',
+                            lambda *a, **k: ('/save/dir', 'FSTconfig_2020.txt'))
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("restore_backup()", ke) is True
+        om_env.fst.toast_callback.assert_called()
+
+    def test_scroll_constraints(self, om_env):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("scroll_up(5)", ke) is True
+        assert om_env.om.constraint_evaluation("scroll_down(5)", ke) is True
+        assert om_env.om.constraint_evaluation("scroll_right(5)", ke) is True
+        assert om_env.om.constraint_evaluation("scroll_left(5)", ke) is True
+        assert om_env.mouse.scroll.call_args_list == [
+            call(0, 5), call(0, -5), call(5, 0), call(-5, 0)]
+
+    def test_mouse_move_abs_and_move(self, om_env):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("mouse_move_abs(100, 200)", ke) is True
+        assert om_env.mouse.position == (100, 200)
+        assert om_env.om.constraint_evaluation("mouse_move(10, 20)", ke) is True
+        om_env.mouse.move.assert_called_once_with(10, 20)
+
+    def test_mouse_get_pos_copies_position_to_clipboard(self, om_env, monkeypatch):
+        clip = self.patch_clipboard(monkeypatch)
+        om_env.mouse.position = (3, 4)
+        ke = make_ke()
+        pos = om_env.om.constraint_evaluation("mouse_get_pos()", ke)
+        assert pos == (3, 4)
+        clip.copy.assert_called_once_with("(3, 4)")
+        om_env.fst.toast_callback.assert_called()
+
+    def test_mouse_save_to_var(self, om_env, monkeypatch, capsys):
+        self.patch_clipboard(monkeypatch)
+        om_env.mouse.position = (7, 8)
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("mouse_save_to_var('pos')", ke) is True
+        assert om_env.om.variables['pos'] == (7, 8)
+        assert 'saved to variable' in capsys.readouterr().out
+
+    def test_mouse_move_to_var_valid_position(self, om_env, capsys):
+        ke = make_ke()
+        om_env.om.variables['pos'] = (5, 6)
+        assert om_env.om.constraint_evaluation("mouse_move_to_var('pos')", ke) is True
+        assert om_env.mouse.position == (5, 6)
+        assert 'moved to position' in capsys.readouterr().out
+
+    def test_mouse_move_to_var_invalid_position(self, om_env, capsys):
+        ke = make_ke()
+        om_env.om.variables['bad'] = 42
+        assert om_env.om.constraint_evaluation("mouse_move_to_var('bad')", ke) is False
+        assert 'does not contain a valid position' in capsys.readouterr().out
+
+    def test_mouse_move_to_var_missing_variable(self, om_env, capsys):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("mouse_move_to_var('nope')", ke) is False
+        assert 'not found' in capsys.readouterr().out
+
+    def test_copy_to_clipboard(self, om_env, monkeypatch):
+        clip = self.patch_clipboard(monkeypatch)
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("copy_to_clipboard('hello')", ke) is True
+        clip.copy.assert_called_once_with('hello')
+        om_env.fst.toast_callback.assert_called()
+
+    def test_paste_returns_clipboard_text(self, om_env, monkeypatch, capsys):
+        clip = self.patch_clipboard(monkeypatch)
+        clip.paste.return_value = 'pasted text'
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("paste()", ke) == 'pasted text'
+        assert 'pasted from clipboard' in capsys.readouterr().out
+
+    def test_is_repeat_active_running(self, om_env):
+        ke = make_ke()
+        handle = MagicMock()
+        handle.done.return_value = False
+        om_env.om.repeat_thread_dict['scan'] = [MagicMock(), handle]
+        assert om_env.om.constraint_evaluation("is_repeat_active('scan')", ke) is True
+
+    def test_is_repeat_active_done_or_missing(self, om_env):
+        ke = make_ke()
+        done = MagicMock()
+        done.done.return_value = True
+        om_env.om.repeat_thread_dict['scan'] = [MagicMock(), done]
+        assert om_env.om.constraint_evaluation("is_repeat_active('scan')", ke) is False
+        assert om_env.om.constraint_evaluation("is_repeat_active('nope')", ke) is False
+
+    def test_toggle_repeat_restarts_a_finished_repeat(self, om_env, monkeypatch):
+        monkeypatch.setattr(fst_manager, 'Macro_Repeat_Task', lambda *a, **k: MagicMock())
+        started = []
+
+        def fake_rct(coro, loop):
+            handle = MagicMock()
+            handle.done.return_value = False
+            started.append(handle)
+            return handle
+
+        monkeypatch.setattr(asyncio, 'run_coroutine_threadsafe', fake_rct)
+        ke = make_ke()
+        done = MagicMock()
+        done.done.return_value = True
+        om_env.om.repeat_thread_dict['scan'] = [MagicMock(), done]
+        assert om_env.om.constraint_evaluation("toggle_repeat('scan', 6500)", ke) is True
+        assert len(started) == 1
+
+    def test_stop_all_repeat_tolerates_broken_entry(self, om_env):
+        # an entry whose handle has no done() method raises AttributeError in the loop
+        om_env.om.repeat_thread_dict['bad'] = [MagicMock(), object()]
+        assert om_env.om.constraint_evaluation("stop_all_repeat()", make_ke()) is True
+
+    def test_clear_console_win_and_other_platforms(self, om_env, monkeypatch):
+        monkeypatch.setattr(fst_manager, 'system', MagicMock())
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("clear_console()", ke) is True
+        assert fst_manager.system.call_args_list[-1] == call('cls')
+        monkeypatch.setattr(sys, 'platform', 'linux')
+        assert om_env.om.constraint_evaluation("clear_console()", ke) is True
+        assert fst_manager.system.call_args_list[-1] == call('clear')

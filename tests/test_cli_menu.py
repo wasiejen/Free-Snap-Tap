@@ -169,3 +169,15 @@ class TestDisplayMethods:
         CLI_menu(fst).update_group_display()
 
         assert 'ALT + DELETE' not in capsys.readouterr().out
+
+    def test_flush_the_input_buffer_drains_pending_keys(self, monkeypatch):
+        # kbhit True once -> the pending key is drained via getch(); never live
+        kbhit = MagicMock(side_effect=[True, False])
+        getch = MagicMock()
+        monkeypatch.setattr(fst_manager.msvcrt, 'kbhit', kbhit)
+        monkeypatch.setattr(fst_manager.msvcrt, 'getch', getch)
+
+        CLI_menu(MagicMock()).flush_the_input_buffer()
+
+        getch.assert_called_once_with()
+        assert kbhit.call_count == 2

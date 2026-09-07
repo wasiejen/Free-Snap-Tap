@@ -44,6 +44,11 @@ class TestPressStateDicts:
         assert sm.get_all_key_press_state(VK_A) is True
         assert sm.get_real_key_press_state(VK_A) is False
 
+    def test_get_all_key_press_state_unknown_key_initializes_false(self, sm):
+        # a key never written to the dict hits the KeyError branch
+        assert sm.get_all_key_press_state(VK_B) is False
+        assert sm._all_key_press_states_dict[VK_B] is False
+
 
 class TestPressedKeysSet:
     def test_event_based_add_and_remove(self, sm):
@@ -163,3 +168,24 @@ class TestResets:
         sm.reset_all_lists()
         assert sm._toggle_states_dict == {}
         assert sm.toggle_states_dict_keys == []
+
+
+class TestStopAllRepeatingKeys:
+    def test_cancels_active_repeat_handles(self):
+        fst = SimpleNamespace(output_manager=MagicMock())
+        sm = Input_State_Manager(fst)
+        task = MagicMock()
+        handle = MagicMock()
+        handle.done.return_value = False
+        done_handle = MagicMock()
+        done_handle.done.return_value = True
+        fst.output_manager.repeat_thread_dict = {
+            'x': [task, handle],
+            'y': [MagicMock(), done_handle],
+        }
+
+        sm.stop_all_repeating_keys()
+
+        task.cancel_playback.assert_called_once_with()
+        handle.cancel.assert_called_once_with()
+        done_handle.cancel.assert_not_called()
