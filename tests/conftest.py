@@ -1,7 +1,12 @@
+import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+
+# offscreen Qt platform for the pytest-qt tests (Phase 3) - must be set
+# before any PySide6 import happens
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
 
