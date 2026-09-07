@@ -29,6 +29,9 @@ def test_big_config_parses():
 
     assert len(multi_focus) == 53
     assert total_taps == 27
-    assert total_rebinds == 324
+    # default-group lines are presorted once per focus name (53), so a
+    # default-group rebind counts 53 times (5 mouse rebinds, 2026-09-07:
+    # 324 + 5 * 53 = 589)
+    assert total_rebinds == 589
     assert total_macros == 314
     assert total_aliases == 30
