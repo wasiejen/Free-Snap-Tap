@@ -13,6 +13,7 @@ from pynput import keyboard as pynput_keyboard
 import pytest
 
 import fst_manager
+import fst_keyboard
 from fst_data_types import Key_Event
 from fst_keyboard import FST_Keyboard
 
@@ -459,3 +460,106 @@ class TestMouseToMouseRebind:
             await asyncio.sleep(0)
         assert kb_env.mouse_mock.scroll.call_args_list == [call(0, 1), call(0, -1)]
         assert kb._mouse_listener.suppress_event.call_count == 2
+
+
+class TestListenerLifecycle:
+    """init/start/stop_listener wire the pynput Listener classes with the
+    instance-bound win32 filters. The Listener classes are monkeypatched so no
+    live hook is ever created."""
+
+    def patch_listener_classes(self, monkeypatch):
+        """Replace the Listener classes with callables returning instance
+        mocks; the class mocks record the win32_event_filter wiring."""
+        kb_listener = MagicMock()
+        mouse_listener = MagicMock()
+        kb_cls = MagicMock(return_value=kb_listener)
+        mouse_cls = MagicMock(return_value=mouse_listener)
+        monkeypatch.setattr('pynput.keyboard.Listener', kb_cls)
+        monkeypatch.setattr('pynput.mouse.Listener', mouse_cls)
+        return kb_listener, mouse_listener, kb_cls, mouse_cls
+
+    def test_init_listener_binds_win32_filters(self, kb_env, monkeypatch):
+        kb = kb_env.kb
+        kb._listener = None
+        kb._mouse_listener = None
+        kb_listener, mouse_listener, kb_cls, mouse_cls = \
+            self.patch_listener_classes(monkeypatch)
+
+        kb.init_listener()
+
+        kb_cls.assert_called_once_with(win32_event_filter=kb.keyboard_win32_event_filter)
+        mouse_cls.assert_called_once_with(win32_event_filter=kb.mouse_win32_event_filter)
+        assert kb._listener is kb_listener
+        assert kb._mouse_listener is mouse_listener
+
+    def test_start_listener_inits_when_missing_and_starts_both(self, kb_env, monkeypatch):
+        kb = kb_env.kb
+        kb._listener = None
+        kb._mouse_listener = None
+        kb_listener, mouse_listener, _, _ = self.patch_listener_classes(monkeypatch)
+
+        kb.start_listener()
+
+        assert kb._listener is kb_listener
+        assert kb._mouse_listener is mouse_listener
+        kb_listener.start.assert_called_once_with()
+        mouse_listener.start.assert_called_once_with()
+
+    def test_start_listener_reuses_existing_listeners(self, kb_env, monkeypatch):
+        kb = kb_env.kb
+        monkeypatch.setattr('pynput.keyboard.Listener', MagicMock())
+        monkeypatch.setattr('pynput.mouse.Listener', MagicMock())
+        kb._listener = MagicMock()
+        kb._mouse_listener = MagicMock()
+
+        kb.start_listener()
+
+        kb._listener.start.assert_called_once_with()
+        kb._mouse_listener.start.assert_called_once_with()
+
+    def test_stop_listener_stops_both(self, kb_env):
+        kb = kb_env.kb
+        kb._mouse_listener = MagicMock()
+
+        kb.stop_listener()
+
+        kb._listener.stop.assert_called_once_with()
+        kb._mouse_listener.stop.assert_called_once_with()
+
+
+class TestDisplayFunctions:
+    def test_display_internal_repr_groups_dumps_all_collections(self, kb_env, capsys):
+        kb = kb_env.kb
+        build(kb, aliases=[['<world>', ['a', 'b']]],
+              taps=[['(TAP_1)', ['a', 'b']]],
+              rebinds=[['(r)', [['a'], 'b']]],
+              macros=[['(seq)', [['a'], ['b'], ['c']]]])
+
+        kb.display_internal_repr_groups()
+
+        out = capsys.readouterr().out
+        assert 'Aliases' in out and 'Tap Groups' in out and 'Rebinds' in out
+        assert 'Macros' in out and 'Macro Sequences' in out
+        assert '<world>' in out  # alias name from the key_group_by_alias dict
+
+    def test_open_config_file_uses_config_manager_file_name(self, kb_env, monkeypatch):
+        kb = kb_env.kb
+        kb.config_manager._file_name = 'myconfig.txt'
+        monkeypatch.setattr('fst_keyboard.startfile', MagicMock())
+
+        kb.open_config_file()
+
+        fst_keyboard.startfile.assert_called_once_with('myconfig.txt')
+
+    def test_reload_from_file_reloads_groups_for_current_focus(self, kb_env, capsys, monkeypatch):
+        kb = kb_env.kb
+        kb.focus_manager.FOCUS_APP_NAME = 'cs2'
+        update = MagicMock()
+        monkeypatch.setattr(kb, 'update_args_and_groups', update)
+        kb.cli_menu.update_group_display = MagicMock()
+
+        kb.reload_from_file()
+
+        update.assert_called_once_with('cs2')
+        kb.cli_menu.update_group_display.assert_called_once_with()
+        assert 'cs2' in capsys.readouterr().out
