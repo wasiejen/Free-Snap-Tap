@@ -43,8 +43,9 @@ def fake_windows(monkeypatch, titles):
     def get_active_window():
         if not titles:
             return None
-        index[0] = min(index[0], len(titles) - 1)
-        return SimpleNamespace(title=titles[index[0]])
+        title = titles[index[0]]
+        index[0] = min(index[0] + 1, len(titles) - 1)  # repeat the last one
+        return SimpleNamespace(title=title)
 
     monkeypatch.setattr('fst_tasks.gw.getActiveWindow', get_active_window)
     return index
