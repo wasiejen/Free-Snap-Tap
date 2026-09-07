@@ -14,8 +14,8 @@ macOS not supported.
 ## Run / test
 - venv with all deps: `.venv` (do NOT reinstall from scratch; `requirements.txt` is runtime, `requirements-dev.txt` adds test tooling).
 - Run tests: `& .\.venv\Scripts\python.exe -m pytest -q`
-- Coverage: add `--cov=fst_data_types --cov=fst_manager --cov=fst_save_file_handler`
-- Lint baseline: `& .\.venv\Scripts\ruff.exe check --select F .` (currently 5 cosmetic findings: unused imports/vars, f-strings. No undefined-name bugs. See "Open items".)
+- Coverage: `& .\.venv\Scripts\python.exe -m pytest -q --cov=fst_data_types --cov=fst_manager --cov=fst_save_file_handler --cov=fst_keyboard --cov=fst_tasks --cov=vk_codes --cov=fst_overlay`
+- Lint baseline: `& .\.venv\Scripts\ruff.exe check --select F .` (currently 6 cosmetic findings: unused imports/vars, f-strings. No undefined-name bugs. See "Open items".)
 - **Never run the live listeners in tests.** Always mock pynput controllers (see Phase 2 notes).
 
 ## Sign convention (IMPORTANT — used everywhere)
@@ -51,28 +51,68 @@ each win32 event hits the filter: update state (press states + timings) → chec
 sends events with delays. Focus change re-runs `update_args_and_groups`.
 
 ## Test conventions
-- Tests live in `tests/`, pure unit scope so far (no real keyboard, no real time, no Windows APIs).
+- Tests live in `tests/`: pure unit scope + offscreen GUI (pytest-qt 4.5.0, `QT_QPA_PLATFORM=offscreen` pinned in `tests/conftest.py`). No real keyboard, no real time, no Windows APIs.
 - `tests/test_known_issues.py` = **xfail** file for desired-but-not-yet-true behavior. When fixed, move the test into a normal file and keep it green. A test removed from there was reviewed and **accepted as-is**.
-- Current status: **141 passed, 1 xfailed** (Phase 2 behavior tests added 2026-09-06).
+- Current status: **313 passed, 0 xfailed** (Phase 3 GUI tests added 2026-09-07).
 
 ## Maintainer decisions on the original known-issues (060926)
-- **#1 Key_Event eq vs hash** — **tabled**. eq ignores constraints; hash is repr-based. Keep the xfail until the suite covers dicts/sets of `Key_Event`.
-- **#2 shared `constraints=[0,0]` default** — accepted; delays are never mutated individually. Removed from xfail.
-- **#3 `Key_Group.__eq__`** — was missing `return` in the else (returned `None`); fixed to `return False`. Now a green test.
-- **#4 `Tap_Group` rudimentary** — intentional; tap groups predate the data types and need no object-based `get_vk_codes`. Tap groups must have **≥2 keys**.
-- **#5 `make_backup` same-second collision** — fixed: now appends `-1`, `-2`, … until unique (silent).
-- **#6 comment cleaning** — fixed in `_clean_comments`: comment-after-comma (`e, # c` → `e`), commented keys (`a,#w,d,#s` → `a,d`), trailing commas removed. Empty results dropped.
-- **#7 single-char lines** — fixed: `len(line) > 1` guard removed; single-char keys (and with trailing comment) survive cleaning.
+- **#1 shared `constraints=[0,0]` default** — accepted; delays are never mutated individually. Removed from xfail.
+- **#2 `Key_Group.__eq__`** — was missing `return` in the else (returned `None`); fixed to `return False`. Now a green test.
+- **#3 `Tap_Group` rudimentary** — intentional; tap groups predate the data types and need no object-based `get_vk_codes`. Tap groups must have **≥2 keys**.
+- **#4 `make_backup` same-second collision** — fixed: now appends `-1`, `-2`, … until unique (silent).
+- **#5 comment cleaning** — fixed in `_clean_comments`: comment-after-comma (`e, # c` → `e`), commented keys (`a,#w,d,#s` → `a,d`), trailing commas removed. Empty results dropped.
+- **#6 single-char lines** — fixed: `len(line) > 1` guard removed; single-char keys (and with trailing comment) survive cleaning.
 
 ## Open items / next steps
-- **Phase 2 (done 2026-09-06):** unit-tested `Output_Manager` + `Input_State_Manager` with mocked pynput controllers + `freezegun` for time-based eval (`tr`/`last`/`dc`/`p`/`cs`) + filter hot path (`fst_keyboard._win32_event_filter`). `fst_manager.py` now ~64% covered. See `tests/test_output_manager.py`, `tests/test_input_state_manager.py`, `tests/test_filter_behavior.py`; gap semantics in `SPEC_FEATURES.md` section 5.
-- **Phase 3:** GUI tests with `pytest-qt` (`QT_QPA_PLATFORM=offscreen`); extend the `test_overlay.py` pattern.
-- **Phase 4:** coverage report to prioritize remaining hotspots; optionally a GitHub Actions **Windows** runner (project is Windows-only, so CI must be Windows).
-- Clean up the 5 ruff `F` findings when convenient (unused `threading.Event`, `QSizePolicy`, f-strings in `free_snap_tap.py`, unused local in `fst_overlay.py`).
+- **Phase 2 (done 2026-09-06):** unit-tested `Output_Manager` + `Input_State_Manager`
+  with mocked pynput controllers + `freezegun` for time-based eval (`tr`/`last`/`dc`/`p`/`cs`)
+  + filter hot path (`fst_keyboard._win32_event_filter`). See `tests/test_output_manager.py`,
+  `tests/test_input_state_manager.py`, `tests/test_filter_behavior.py`; gap semantics in
+  `SPEC_FEATURES.md` section 5.
+- **class-2 coverage (done 2026-09-07):** `Focus_Task` polling (`tests/test_focus_task.py`),
+  listener lifecycle + display functions (`test_filter_behavior.py`), `CLI_menu`
+  (`tests/test_cli_menu.py`), `Focus_Group_Manager` task methods
+  (`tests/test_focus_group_manager.py`). `fst_tasks` at 100%.
+- **Phase 3 prep (done 2026-09-07):** offscreen pytest-qt env pinned in `tests/conftest.py`
+  (`QT_QPA_PLATFORM=offscreen`); smoke + `ToastBridge` round-trip tests in
+  `tests/test_gui_smoke.py`.
+- **Resolved 2026-09-07:** known-issue #1 (Key_Event eq/hash) — strict repr-based `__eq__`
+  on all data types (eq == hash == repr); the loose vk/press comparison in the filter hot
+  path is now explicit (`is_trigger_activated`, repeated-trigger suppression);
+  `tests/test_known_issues.py` removed, suite fully green. Also fixed: `Focus_Task`
+  `stop` attribute shadowing the `stop()` method (renamed `self._stop`), and
+  `ToastManager._handle_destruction` guarded against an already-deleted C++ side.
+- **Phase 3 (done 2026-09-07):** offscreen GUI tests for `fst_overlay.py` (34% → 99%)
+  with pytest-qt: ToastManager/ToastWidget depth (`tests/test_gui_smoke.py`),
+  StatusOverlay drag/menu/double-click (`test_status_overlay.py`), Tray_Icon signals
+  (`test_tray_icon.py`), CrosshairOverlay (`test_crosshair.py`), GUI_Manager periodic
+  update/wiring/exit/start (`test_gui_manager.py`), console helpers
+  (`test_console_helpers.py`). Fixed while testing: dangling `remove_crosshair()`
+  call (dead PyQt5-era leftover that crashed `StatusOverlay.close_overlay`), toast
+  dict cleanup (PySide6 routes `destroyed` globally → identity-guarded
+  `_handle_destruction` with liveness probe), dict-based `check_empty` (offscreen
+  destruction ordering). Left untested: `contextMenuEvent` (blocking `exec_`).
+- **Phase 4:** coverage report to prioritize remaining hotspots; optionally a GitHub
+  Actions **Windows** runner (project is Windows-only, so CI must be Windows).
+- Clean up the 6 ruff `F` findings when convenient (free_snap_tap 2×F541, fst_manager
+  F401 `threading.Event`, fst_overlay F401 `QSizePolicy` + F841, test_pynput_mouse F841
+  — maintainer's file).
 
 ## Gotchas
 - `Config_Manager.load_config` opens `self._file_name` directly — point it at a `tmp_path` fixture or monkeypatch `_open_config_file`.
 - `presort_lines` receives the **cleaned** lines (no spaces after commas inside key groups) — feed cleaned-form strings in tests.
 - `Output_Manager.execute_key_event` is `async` and calls `asyncio.sleep` + pynput — mock both when testing.
 - `CONSTANTS` is a real module-level class used as a global config holder; tests that mutate it should restore it.
-- The repo's `FSTconfig.txt` is the maintainer's live config — `tests/test_config_parse.py::test_real_config_parses` uses it as a regression guard.
+- The repo's `FSTconfig_test.txt` is the maintainer's live config — `tests/test_config_parse.py::test_real_config_parses` uses it as a regression guard.
+- PySide6 `destroyed` gotcha: a handler connected to `obj.destroyed` ALSO fires when
+  OTHER objects are destroyed, and the signal argument is an untrusted placeholder
+  (a bare QWidget) — capture the object in the closure and probe liveness (any C++
+  method call raises RuntimeError once the C++ side is deleted).
+- pytest-qt quirks: `QTest.mouseMove(widget, pos)` takes a LOCAL position (global =
+  widget.pos() + pos); double-click is `qtbot.mouseDClick` (NOT `mouseDoubleClick`);
+  `QSystemTrayIcon` is a QObject, not a QWidget → `qtbot.addWidget` rejects it.
+- Offscreen destruction ordering: `destroyed` fires while the dying widget's item is
+  still in its parent layout — never assert layout-count-based visibility right after
+  deletion; use the dict (synchronous source of truth).
+- NEVER call a widget's `contextMenuEvent` in tests (its `exec_` blocks the loop);
+  trigger the `QAction`s of `widget.context_menu` via `.trigger()` instead.
