@@ -1325,6 +1325,8 @@ class Argument_Manager():
         print(f"apply arguments: {argv}")
 
         def extract_delays(arg):
+            '''returns (min, max) delay in ms or None if no valid delay was given'''
+            delays = []
             try:
                 delays = [int(delay) for delay in arg.replace(' ','').split(',')]
             except Exception:
@@ -1337,20 +1339,26 @@ class Argument_Manager():
                     valid_delays.append(delay)
                 else:
                     print("delay not in range 0<delay<=1000 ms")
-            return sorted(valid_delays)
+            valid_delays = sorted(valid_delays)
+            if len(valid_delays) == 1:
+                # single delay value applies to min and max
+                return valid_delays[0], valid_delays[0]
+            if len(valid_delays) == 2:
+                return valid_delays[0], valid_delays[1]
+            return None
 
 
         for arg in argv:
             # if commented out do nothing
-            if arg[0] == ':' or '#':
-                pass
+            if arg[0] in (':', '#'):
+                continue
             if self.DEBUG:
                 print(f"D1: {arg}")
             # enable debug print outs
             if arg == "-debug":
                 self.DEBUG = True
                 CONSTANTS.DEBUG = True
-            if arg == "-debug_numpad":
+            elif arg == "-debug_numpad":
                 CONSTANTS.DEBUG_NUMPAD = True
             # start directly without showing the menu
             elif arg == "-nomenu":
@@ -1368,27 +1376,40 @@ class Argument_Manager():
                 self.ACT_DELAY = True
             elif arg[:10] == "-tapdelay=" and len(arg) > 10:
                 self.ACT_DELAY = True
-                self.ACT_MIN_DELAY_IN_MS, self.ACT_MAX_DELAY_IN_MS = extract_delays(arg[10:])
-                print(f"Tap delays set to: min:{self.ACT_MIN_DELAY_IN_MS}, max:{self.ACT_MAX_DELAY_IN_MS}")
+                delays = extract_delays(arg[10:])
+                if delays is not None:
+                    self.ACT_MIN_DELAY_IN_MS, self.ACT_MAX_DELAY_IN_MS = delays
+                    print(f"Tap delays set to: min:{self.ACT_MIN_DELAY_IN_MS}, max:{self.ACT_MAX_DELAY_IN_MS}")
+                else:
+                    print("no valid tap delay - delay range unchanged")
             elif arg[:12] == "-aliasdelay=" and len(arg) > 12:
                 self.ACT_DELAY = True
-                self.MACRO_MIN_DELAY_IN_MS, self.MACRO_MAX_DELAY_IN_MS = extract_delays(arg[12:])
-                print(f"Macro delays set to: min:{self.MACRO_MIN_DELAY_IN_MS}, max:{self.MACRO_MAX_DELAY_IN_MS}")
+                delays = extract_delays(arg[12:])
+                if delays is not None:
+                    self.MACRO_MIN_DELAY_IN_MS, self.MACRO_MAX_DELAY_IN_MS = delays
+                    print(f"Macro delays set to: min:{self.MACRO_MIN_DELAY_IN_MS}, max:{self.MACRO_MAX_DELAY_IN_MS}")
+                else:
+                    print("no valid alias delay - delay range unchanged")
             elif arg[:12] == "-macrodelay=" and len(arg) > 12:
                 self.ACT_DELAY = True
-                self.MACRO_MIN_DELAY_IN_MS, self.MACRO_MAX_DELAY_IN_MS = extract_delays(arg[12:])
-                print(f"Macro delays set to: min:{self.MACRO_MIN_DELAY_IN_MS}, max:{self.MACRO_MAX_DELAY_IN_MS}")
+                delays = extract_delays(arg[12:])
+                if delays is not None:
+                    self.MACRO_MIN_DELAY_IN_MS, self.MACRO_MAX_DELAY_IN_MS = delays
+                    print(f"Macro delays set to: min:{self.MACRO_MIN_DELAY_IN_MS}, max:{self.MACRO_MAX_DELAY_IN_MS}")
+                else:
+                    print("no valid macro delay - delay range unchanged")
             elif arg == "-crossover":
                 self.ACT_CROSSOVER = True
             elif arg[:11] == "-crossover=" and len(arg) > 11:
                 self.ACT_CROSSOVER = True
+                probability = None
                 try:
                     probability = int(arg[11:])
                 except Exception:
                     print("invalid probability - needs to be a number")
-                if 0 <= probability <= 100:
+                if probability is not None and 0 <= probability <= 100:
                     self.ACT_CROSSOVER_PROPABILITY_IN_PERCENT = probability
-                else:
+                elif probability is not None:
                     print("probability not in range 0<prob<=100 %")
             elif arg == "-nodelay":
                 self.ACT_DELAY = False
@@ -1413,9 +1434,12 @@ class Argument_Manager():
                 print(f"set crosshair to: {self.CROSSHAIR_ENABLED}")
             elif arg[:11] == "-crosshair="  and len(arg) > 11:
                 self.CROSSHAIR_ENABLED = True
-                x, y = arg[11:].strip().replace(' ', '').split(',')
-                self.CROSSHAIR_DELTA_X, self.CROSSHAIR_DELTA_Y = int(x), int(y)
-                print(f"set crosshair delta is set to: {self.CROSSHAIR_DELTA_X}, {self.CROSSHAIR_DELTA_Y}")
+                try:
+                    x, y = arg[11:].strip().replace(' ', '').split(',')
+                    self.CROSSHAIR_DELTA_X, self.CROSSHAIR_DELTA_Y = int(x), int(y)
+                    print(f"set crosshair delta is set to: {self.CROSSHAIR_DELTA_X}, {self.CROSSHAIR_DELTA_Y}")
+                except Exception:
+                    print("invalid crosshair delta - needs to be two numbers, e.g. -crosshair=5,-10")
             elif arg[:14] == "-always_active":
                 self.ALWAYS_ACTIVE = True
             elif arg[:10] == "-tray_icon":
