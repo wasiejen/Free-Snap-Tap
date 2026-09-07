@@ -412,7 +412,50 @@ class TestMouseWin32Filter:
     def test_unrecognized_mouse_event_suppresses(self, kb_env, monkeypatch):
         kb = kb_env.kb
         self.patch_filter(kb, monkeypatch)
+        kb._mouse_listener = MagicMock()
         # x-button message without x1/x2 mousedata resolves no vk_code
         kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=0))
         kb._win32_event_filter.assert_not_called()
-        kb._listener.suppress.assert_called_once_with()
+        # suppression happens on the mouse listener, not the keyboard one
+        kb._mouse_listener.suppress_event.assert_called_once_with()
+        kb._listener.suppress_event.assert_not_called()
+
+
+class TestMouseToMouseRebind:
+    @pytest.mark.asyncio
+    async def test_replacement_plays_async_not_in_hook_thread(self, kb_env, monkeypatch):
+        """Mouse-to-mouse rebinds must not send input synchronously in the
+        win32 hook thread: the replacement is scheduled on the asyncio loop."""
+        kb = kb_env.kb
+        kb.loop = asyncio.get_running_loop()
+        kb._mouse_listener = MagicMock()
+
+        async def fake_sleep(t):
+            # no real waiting, but yield to the loop so tasks scheduled via
+            # run_coroutine_threadsafe get their turn
+            loop = asyncio.get_running_loop()
+            future = loop.create_future()
+            loop.call_soon(future.set_result, None)
+            await future
+
+        monkeypatch.setattr(asyncio, 'sleep', fake_sleep)
+        build(kb, rebinds=[['(r)', [['mm'], 'scroll_vert']]])
+
+        kb._win32_event_filter(3, 1000, True, False, True)  # middle mouse down, as a mouse event
+
+        # nothing is sent while the hook call is still in flight
+        assert kb_env.mouse_mock.scroll.call_count == 0
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert kb_env.mouse_mock.scroll.call_args_list == [call(0, 1)]  # scroll_vertical press
+        assert kb_env.kb_mock.press.call_count == 0
+        assert kb_env.kb_mock.release.call_count == 0
+        # the original mouse event is suppressed on the mouse listener
+        kb._mouse_listener.suppress_event.assert_called_once_with()
+        kb._listener.suppress_event.assert_not_called()
+
+        kb._win32_event_filter(3, 1500, False, False, True)  # middle mouse up
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert kb_env.mouse_mock.scroll.call_args_list == [call(0, 1), call(0, -1)]
+        assert kb._mouse_listener.suppress_event.call_count == 2
