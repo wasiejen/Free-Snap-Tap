@@ -1,62 +1,73 @@
 # HANDOVER PLANNER — Phase 6: opencode planner/worker workflow (Tier 1 + Tier 2)
 
 FIRST read `AGENTS.md` (orientation, conventions, commit routine — do NOT edit AGENTS.md
-directly), `TODO.md` (#14/#18/#20 carry the plugin decisions), and
-`.opencode/prompt_agent_planner.md` (process rules).
+directly), `TODO.md`, and this file. House rule: when something is unclear, ASK EARLY.
 
-House rule: when something is unclear, ASK EARLY.
+## Current state (2026-09-08, post-restart proof session)
+- **v2.2 is LIVE-PROVEN at this start.** The start segment (whole `.opencode/plugin/plugin.log`,
+  gitignored — first line ts 18:26:38Z matches commit `0bd75bf`; nothing newer yet exists).
+  Transform hook fired **42×** across **6 sessions**, every payload the LIVE shape
+  `{sessionID, model:{…}}` — no agent identifier, exactly what the offline probe S4 shape 1
+  validated. Planner-side injection proven (log + offline S4); **worker side IN FLIGHT**:
+  the proof task delegated to `worker_120K_mtp` (spec = current `handover_task.md`) — quotes
+  its own `ctx:` line verbatim + reports the newest transform line in the log (child-session
+  evidence).
+- **Maintainer config change at `0bd75bf` (after the previous NAP):** `opencode.jsonc` gained
+  a `Looprunner` primary agent (Gemma 4-12B, all permissions denied, prompt = "start the
+  planner repeatedly"), worker temperatures now 0.3 (120K) / 0.5 (210K), scratchpad
+  reference now a live Windows Temp path. This start's Looprunner experiment spawned 5
+  sessions before mine — 4 planner variants (`planner_120k_mtp` ×2, `planner_runner_120k_mtp`
+  ×1, one unattributed) + 1 `worker_120K_mtp` child (created 18:32:24Z by a planner
+  delegation) — all ABORTED with `MessageAbortedError` (maintainer experimentation; 0
+  commits; the first parallel planner delegation — log lines 19/46/93 — spawned the aborted
+  worker).
+  ⚠ parallel handover delegations would clobber the mirror — if this ever runs under
+  concurrent planner instances, the proof task's DoD breaks.
+- v1.3 data (post-start, under the v1.2 skip set), segment tally at 18:47Z: events = 59:
+  `session.idle` 19, `file.watcher.updated` 16, `message.removed` 10, `session.error` 7,
+  `session.created` 6, `session.deleted` 1 — residual event types = exactly those 6 (the
+  10 v1.2-skip types: 0 lines). Looprunner storm explains the `session.*` counts;
+  `file.watcher.updated` = repo/git-index noise. Final numbers after the worker cycle →
+  v1.3 call with the maintainer.
+- FST code untouched: **434 passed**, ruff **6**, baselines confirmed by the v2.2.1 worker.
 
-## Current state (2026-09-08, HEAD `24a5d88`)
-Rebuilt across two context-limit interruptions. The plugin is now: v2 (task gate, pre-flight
-warn, summary mirror) + v1.2 (10-type skip set) + **v2.2 (ctxgauge injection for ALL
-sessions — the maintainer "both" call, gate removed; TODO #18)** + comment fixes (#19).
-- **v2.2 LANDS OFFLINE-PROVEN, LIVE AT THE NEXT OPENCODE START.** Until then the gauge
-  reaches nobody (the old gate was dead code — payload has no agent identifier, evidence:
-  78 transform lines, all `{sessionID, model:{…}}`).
-- **Offline probe is now PERSISTENT** (maintainer feedback, TODO #20):
-  `.opencode/plugin/probes/handover_probe.mjs` (committed; exact run command + PINNED
-  opencode Electron executable in its header — DO NOT hunt, DO NOT rebuild: every
-  plugin spec runs it (expect 23/23) and nothing else; exception = hook-surface change).
-  A prior cycle burned ≈10 min + a big context slice on exactly the rebuild/hunt the
-  persistence removes.
-- v1.2 live-verified (post-restart segment: 25 lines / 14 KB, zero cascade; `transform`
-  fires exactly once per LLM turn — the injection-timing evidence). Residual
-  `file.watcher.updated` (7) + `file.edited` (2) in an idle planner cycle → v1.3 call
-  waits for the first post-start delegation-cycle data (TODO #17).
-- Proof-protocol results (this phase): mirror written BY THE PLUGIN ✓ (v1.2 cycle —
-  hash-proven); transform payload shape ✓ (no agent id — why the old gate never fired);
-  `warn` absent when spec present ✓; task before/after captured ✓.
-- FST code untouched: **434 passed**, ruff **6**, coverage per `archive/260908-phase5-*.md`.
-
-## Live status (2026-09-08)
-- Task 1 (Tier 1): DONE on the plugin-side surface — everything decided through the "both"
-  call has shipped: `f3063be` (v1.2 skip), `add2303` (v2.2 both-injection), `24a5d88`
-  (persistent probe + #19 comments). Remaining = LIVE proof at one start (below).
-- Task 2 (Tier 2: custom `handover` tool, compaction hooks, resume aid, permission
-  auto-approval): NOT STARTED — starts AFTER the post-start proof cycle; it builds on the
-  v2.2 live shapes. The v2.1 session-graph spec (`.opencode/archive/260908-v21-session-
-  graph-spec.md`) is VOID as code (superseded by "both") — keep as context only.
+## Live status
+- Task 1 (Tier 1): plugin-side DONE (v1.2 skip / v2.2 both / #19 comments / #20 probe
+  persistence). Worker-side proof IN FLIGHT (see Current state).
+- Task 2 (Tier 2 — custom `handover` tool, compaction hooks, resume aid, permission
+  auto-approval): NOT STARTED — starts after the proof cycle lands; builds on the live
+  shapes now captured in the log.
 
 ## MAINTAINER CALLS (open — in order)
-1. **RESTART opencode once** — activates v2.2 (v1.2 already live since the 2026-09-08
-   restart). One start is enough: no more pending plugin changes before it.
-2. **Worker stop-line (still undecided):** add a "stop and hand back at ≤15k REM or ≥85 %"
-   rule to `prompt_agent_task.md` so workers ACT on the `ctx:` line (the line exists, the
-   rule does not — raw info to workers until it is). Planner can draft it.
-3. Carried-over: TODO #4/#6 (coverage triage 117 + 302–303), #7 (empty-macro comment),
-   #1 (vk resolution), #2 (the 6 lint findings).
+1. ~~RESTART opencode once~~ — DONE at the 18:26:38Z start; v2.2 committed before it is live.
+2. **Worker stop-line rule — draft pending approval** (append to `prompt_agent_task.md`):
+   "Stop line (REM ≤ 15k or ≥ 85 %, whichever first): do NOT start new work. Finish the
+   current step only if it is small and completes before the line — otherwise stop
+   immediately and end with the EXECUTIVE SUMMARY, ending on a final self
+   `& .\.venv\Scripts\python.exe .opencode\ctxgauge\peek.py` run quoted verbatim
+   (`CTX=… REM=…` — 'stop-line reached'). The planner decides continuation; a worker that
+   keeps working past the line is a rule violation." — approve / amend / drop.
+3. **v1.3 skip-set extension — propose with the segment's final numbers** (residual
+   `file.*` cascade + `session.idle`; the Looprunner storm skews `session.*` — may wait one
+   quiet cycle before deciding).
+4. **Looprunner during delegations:** confirm it is paused while a handover task runs
+   (this start's parallel planner instances delegated once already — no commit, but the
+   mirror would clobber). Ask, do not assume.
 
-## NEXT SESSION (post-restart) — the proof cycle, then Tier 2
-1. Delegate a SMALL handover task whose spec additionally asks the worker: **"quote your
-   `ctx:` line verbatim if you see one in your system context"** (include the line in the
-   summary) — that is the live "both" proof for workers (child sessions); the planner side
-   rides the same hook (offline S4 shape-1 covers the exact live payload).
-2. Same cycle gives the v1.3 data (measure that log segment: if `file.watcher.updated` /
-   `file.edited` are the top residual → one-line skip-set extension, decide with the
-   maintainer; if not → close #17).
-3. THEN start Tier 2 scoping from the live shapes.
+## NEXT SESSION / next steps
+1. Worker returns → read the summary (mirror + chat message), verify the commit
+   (`git log` + `git show --stat`) + baselines, count the worker-session transform lines in
+   plugin.log. If the worker QUOTES a `ctx:` line → **Tier 1 complete, both sides live**.
+   If NOT FOUND → next task = diagnose `gaugeReadout` (shell present? 3000 ms timeout?
+   cwd? — probe S4 covers the shape, live log shows whether the gauge ran).
+2. Re-measure the segment (final v1.3 numbers) → present the v1.3 proposal with Call #3.
+3. Then: **Tier 2 scoping from the LIVE shapes** — a written proposal, decisions
+   go to the maintainer. No Tier-2 code until a Tier-2 spec exists.
+4. Bookkeeping hygiene: `.opencode/handover_task_to_planner.md` will be dirty after the
+   worker returns (the mirror overwrites it post-commit — expected; committed with the next
+   bookkeeping or worker cycle).
 
 ## Context budget
-Per `AGENTS.md` §Context budget: `.opencode\ctxgauge\peek.py`; stop line REM ≤ 15k or
-≥ 85 % — wrap up BEFORE the line. Note: post-start, planner/worker `ctx:` lines should
-appear in-system automatically (v2.2) — self-run the peek anyway until proven.
+Per AGENTS.md: `& .\.venv\Scripts\python.exe .opencode\ctxgauge\peek.py` (from repo root).
+Stop line REM ≤ 15k or ≥ 85 % — wrap up BEFORE the line. Self-run peek until the
+planner-side `ctx:` injection itself is observed (proven only for workers so far).
