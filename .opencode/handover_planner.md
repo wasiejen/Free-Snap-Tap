@@ -6,7 +6,9 @@ AGENTS.md directly: edit a copy, the maintainer replaces), `TODO.md`, and
 
 House rule: when something is unclear, ASK EARLY.
 
-## Current state (2026-09-08, checked against HEAD `773e1ae`)
+## Current state (2026-09-08, checked against HEAD `65dcebf` + uncommitted worker v2 edits —
+the same edits ship in this handover's commit; stamp = last clean commit the planner
+reviewed, see worker status bullet below)
 - Tier 0 (planner/worker prompts + handover layout + scoped planner edit
   permission) is DONE: `e9da3ef` (layout + prompts + `opencode.jsonc`), `9e9c8b6`
   (docs adapted to the two-party commit routine + archive protocol), `fe06faf`
@@ -27,8 +29,13 @@ House rule: when something is unclear, ASK EARLY.
     #12 (my spec off-by-one, worker-caught) + #13 (v1 label, cosmetic) appended.
     **Effective at next opencode START** — current session still streams deltas
     into the log (expected; log is scratch + gitignored, deletable anytime).
-  - Task 2 (Tier 2) — UNLOCKED (v1 proven in use). Next: v2 ownership spec +
-    delegation (below).
+  - **Task 1 v2 (ownership) — worker-landed 2026-09-08 (handover task):** task gate +
+    pre-flight warn + summary mirror + ctxgauge injection; offline probe 19/19, 434
+    unchanged; TODO #14 (design flag: transform payload exposes no agent identifier → line
+    omitted + payload evidence-logged as kind `transform`) + #15 (instruction tension)
+    appended. Details + verbatim evidence: `.opencode/handover_task_to_planner.md`.
+  - Task 2 (Tier 2) — UNLOCKED (v1 proven in use). v2 spec landed `65dcebf`; v2 worker
+    delegated 2026-09-08 — DoD verification cycle next (below).
 - **v2 payload map (v1 evidence — design inputs, all observed live)**:
   - task args at `before`/`after` = **`{description, prompt}` — no `subagent_type`**
     in hook payloads (v1 probe's `subagent_type` was fabrication) → v2

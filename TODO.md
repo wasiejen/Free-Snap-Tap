@@ -136,3 +136,34 @@ After the v1.1 delta-filter patch the line-1 header comment still reads "Handove
 — log-only observer" while the commit subject is v1.1. Left verbatim because the patch was
 deliberately minimal ("that is the ONLY behavioral change"). Cosmetic; update the label —
 and re-check the "log-only" tag as behaviour accumulates in v2 — whenever.
+
+## 14. ctxgauge injection: `experimental.chat.system.transform` exposes no agent identifier — line omitted, evidence-logged (2026-09-08)
+
+v2 (Phase 6 / Tier 1, deliverable 4) implemented the transform hook with the pre-set
+planner-call from its task file: if the payload exposes no clean agent identifier, DO NOT
+inject for all agents — omit the line and record a design-flag. Evidence:
+- SDK types (`@opencode-ai/plugin` 1.18.29, `.opencode/node_modules`): transform input =
+  `{sessionID?: string; model: Model}` — no `agent` field (read from source per the task;
+  offline probe can only exercise synthetic shapes, never the live payload).
+- Identifier convention from the live v1 log (v1.1 summary evidence): assistant-message
+  `message.updated` lines carry `info.agent` = config agent name (`planner_120k_mtp` /
+  `worker_120K_mtp`) — but it is unproven that opencode hands the transform call one.
+- v2 therefore registers the hook, evidence-logs the raw payload as `kind:"transform"`
+  lines in `plugin.log`, and gates on `agent.toLowerCase().startsWith("planner")` — the exact
+  shape observed live in v1 logs, so if the identifier DOES arrive the injection fires with
+  zero code change. Otherwise: line omitted, no throw (offline-verified). The post-restart
+  planner reads one turn's worth of `transform` lines → the identifier question is answered
+  by log, not by guessing.
+
+Follow-up (planner call, after restart+log-read): choose a different planner-only signal —
+the spec forbids inject-for-all; nothing was added on that front by v2.
+
+## 15. Instruction conflict: AGENTS.md plan-state pre-commit vs worker's "do not touch handover_planner.md" (2026-09-08)
+
+AGENTS.md §Commit routine, step 1 says update the plan-state file BEFORE committing; the
+Phase-6 worker task said instead, flat out: do not touch `.opencode/handover_planner.md`. The
+v2 implementation resolved it: worker updated the stamp + one status bullet under
+`## Live status` only, folded into the worker's own single commit (no separate plan-state
+commit — bookkeeping stays the planner's). If the maintainer meant "never, under no worker",
+this entry is the correction point — decide which instruction wins and make it explicit, the
+conflict recurs with every delegated handover.

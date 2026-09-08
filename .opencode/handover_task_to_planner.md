@@ -1,121 +1,129 @@
-# EXECUTIVE SUMMARY — Phase 6 / Tier 1 — plugin v1.1: filter the token-stream flood
+# EXECUTIVE SUMMARY — Phase 6 / Tier 1 — plugin v2: ownership (deterministic handover)
 
-## Official BEFORE-record (live log, measured by this worker 2026-09-08 ~14:24Z)
-`.opencode/plugin.log` kept growing during the scan (this very model stream is still the
-v1 in-memory plugin's writer — see DoD note), so the numbers below are at scan completion
-and are the official before-record; they should trend ~same with time (vs planner
-snapshot: 7,733 lines / 2.48 MB):
-- **12,916 lines / 4,178,996 bytes** · 0 unparseable lines · max line length 1,450 chars
-- kind Counter: `event` **12,891**, `tool.before` 14, `tool.after` 11
-- event-type Counter: `message.part.delta` **12,585 (≈ 97.4 % of lines)** ·
-  `message.part.updated` 128 · `message.updated` 55 · `plugin.added` 45 ·
-  `session.status` 28 · `session.updated` 18 · `session.diff` 14 ·
-  `file.watcher.updated` 10 · `file.edited` 3 · `catalog.updated` 2 ·
-  `reference.updated` 1 · `integration.updated` 1 · `session.created` 1
-- tool hooks by tool (before+after): `read` 10 · `write` 7 · `bash` 7 · `task` 1
-→ ~97 % of lines are delta; the patch removes them at the source.
+## What changed (`.opencode/plugin/handover.ts` → v2)
 
-## The patch (`.opencode/plugin/handover.ts`, 2 sites, diff below)
-```diff
- const DOT = "\u2026";
-+const SKIP_EVENT_TYPES = new Set(["message.part.delta"]);
- …
- async function onEvent(input: { event?: unknown }): Promise<void> {
-   try {
-     const ev = (input?.event ?? {}) as Record<string, unknown>;
-+    const type = str(ev.type);
-+    if (type && SKIP_EVENT_TYPES.has(type)) return;
-     const props = (ev.properties ?? {}) as Record<string, unknown>;
-```
-Untouched, as specced: hook set, JSON line format (no new fields), truncation ladder
-[500/150/60] + 2000 cap, safety guards, log path/gitignore. (Header comment still reads
-"v1" — deliberate, TODO.md #13.)
+Four ownership behaviors, exactly as specced — the v1/v1.1 log (hooks, JSON line format,
+delta filter, [500/150/60] ladder + 2000-char cap) untouched, one behavior added: a `kind:"
+transform"` evidence line per transform call (deliberate — it is how the live payload shape
+becomes known; the v1.1 writer never emits that kind, so counts stay stable).
 
-## Offline probe
-Runner = v1 recipe unchanged: `%LOCALAPPDATA%\Programs\@opencode-aidesktop\OpenCode.exe`
-+ `ELECTRON_RUN_AS_NODE=1` → **Node v24.15.0**, no downloads, same cosmetic
-`MODULE_TYPELESS_PACKAGE_JSON` warning as v1 (probe deleted, log reset afterwards).
-- **One deviation, flagged:** the probe wrote to a scratch `tmpdir` `.opencode/plugin.log`
-  (fresh `mkdtemp` + `.opencode` subdir) instead of the repo log. Reason: the running
-  opencode session still holds the pre-patch plugin in memory and streams delta lines into
-  the repo log in parallel — an in-repo "exactly N lines" assertion would race it. The
-  patched plugin's behavior was fully exercised; the scratch log is its sole writer.
-- **Task spec off-by-one, recorded as TODO.md #12:** "exactly 5 lines" vs its own payload
-  list — deltas x3 skipped ⇒ 4 lines (message.updated 1 + plugin.added 1 + tool.before 1 +
-  tool.after 1). The probe asserts the correct invariant: 4 lines, zero
-  `message.part.delta` lines, 1 line per unskipped payload.
-- **Result: PROBE OK, 7/7 checks PASS** — default export is a function; hook set exactly
-  `{event, tool.execute.before, tool.execute.after}`; exactly 4 lines; no delta line
-  survives; all lines ≤ 2000 chars; all `JSON.parse`-able; kinds 2×event / 1×tool.before /
-  1×tool.after. Log lines (verbatim):
-```
-{"ts":"2026-09-08T14:26:59.396Z","kind":"event","type":"message.updated","session":"probe-session-1","agent":"planner","properties":"{\"sessionID\":\"probe-session-1\",\"info\":{\"role\":\"assistant\",\"agent\":\"planner\"}}"}
-{"ts":"2026-09-08T14:26:59.397Z","kind":"event","type":"plugin.added","properties":"{\"id\":\"agent\"}"}
-{"ts":"2026-09-08T14:26:59.397Z","kind":"tool.before","tool":"task","session":"probe-session-1","call":"probe-call-1","args":"{\"subagent_type\":\"worker\",\"prompt\":\"v1.1 probe\",\"description\":\"Tier 1 v1.1: delta filter\"}"}
-{"ts":"2026-09-08T14:26:59.397Z","kind":"tool.after","tool":"task","session":"probe-session-1","call":"probe-call-1","title":"worker: v1.1 probe","output":"\"EXECUTIVE SUMMARY ...\"","metadata":"{\"duration\":42}"}
-```
+1. **Task-file gate (before + after):** a `task` call is a HANDOVER delegation only when
+   `args.prompt` contains `.opencode/handover_task.md`. Non-handover delegations are
+   invisible to all v2 behavior (no warn, no mirror, no injection) — the v1.1 log line
+   itself is unchanged.
+2. **Pre-flight (`tool.execute.before`, handover only):** spec file missing or empty →
+   one line `{"ts":…,"kind":"warn","reason":"handover-task-file-missing-or-empty","call":…,
+   "session":…}` appended to `plugin.log`. Observation only — never blocks or mutates the
+   delegation.
+3. **Summary mirror (`tool.execute.after`, handover only):** OVERWRITES `.opencode/
+   handover_task_to_planner.md` with `output` VERBATIM — no ladder (that applies to
+   `plugin.log` lines only). `output` empty → file untouched; `metadata.truncated === true`
+   → one trailer `\n\n[TRUNCATED by opencode tool_output cap — see plugin.log call
+   <callID>]` appended. All fs best-effort, never throws.
+4. **ctxgauge injection (`experimental.chat.system.transform`):** payload logged FIRST as a
+   `kind:"transform"` evidence line; if the payload exposes an `agent` whose value starts
+   with `planner` (case-insensitive), the line `ctx: <peek.py output>` is pushed onto
+   `output.system` — gauge run via the `PluginInput` `$` shell (`.venv/Scripts/python.exe
+   .opencode/ctxgauge/peek.py`, 3 s bounded wait, nothrow, no child_process fallback). No
+   shell / no identifier → line simply omitted. No hook ever blocks indefinitely or throws.
 
-## pytest
+## Transform hook signature (read from `@opencode-ai/plugin` 1.18.29 in `.opencode/
+node_modules` — per instruction, before implementing)
+
+`"experimental.chat.system.transform"?: (input: {sessionID?: string; model: Model}, output:
+{system: string[]}) => Promise<void>` — input exposes **no agent identifier**. `BunShell`'s
+type is internal (not re-exported by the package), so the plugin uses a minimal structural
+`ShellLike` cast (only `cwd()` + tag call + `nothrow().text()` are ever called).
+
+## Offline probe — 19/19 PASS
+
+Runner = v1/v1.1 recipe unchanged: `%LOCALAPPDATA%\Programs\@opencode-aidesktop\OpenCode.exe`
++ `ELECTRON_RUN_AS_NODE=1` → Node 24.15.0; same cosmetic `MODULE_TYPELESS_PACKAGE_JSON`
+warning. **One deviation, flagged:** the probe ran with the repo root as cwd (scenario 1
+needs the REAL `handover_task.md` renamed away; scenario 3 needs the REAL mirror file), so
+`plugin.log` was written in-repo while the in-memory v1.1 writer co-appended its own lines —
+all assertions are scoped by `kind` (the running instance never emits `warn`/`transform`, so
+exact-kind counts are race-free; scenario 5's global scan covers the co-appended lines).
+Scratch files: none left; log left in its co-appended state (gitignored). (Two passes — the
+gauge tag call was matched to the declared BunShell call shape between passes and the probe
+was re-run against the final code in the tree; the counts are that final pass.)
+
+- **S1** — `before(task)` handover-shape, spec present → **no** warn line. Same, with the
+  spec temporarily renamed away (try/finally restore; restore verified BYTE-EXACT — tree
+  left exactly as found) → **exactly one** warn line, valid JSON, `reason`/`call`/`session`
+  exact. Verbatim (final run):
+  `{"ts":"2026-09-08T15:12:51.726Z","kind":"warn","reason":"handover-task-file-missing-or-empty","call":"probe-call-2","session":"probe-session-1"}`
+  Evidence sample (`transform` evidence line, SDK-signature payload → note NO `agent` field):
+  `{"ts":"2026-09-08T15:12:51.750Z","kind":"transform","session":"probe-session-2","payload":"{\"sessionID\":\"probe-session-2\",\"model\":{\"id\":\"Qwen3.8-27B-IQ3KT-120K_MTP\",\"providerID\":\"llama-swap\"}}"}`
+- **S2** — `before(task)` non-handover prompt → no warn, mirror file byte-untouched.
+- **S3** — `after(task)` handover-shape: (a) `truncated:false` + synthetic final message →
+  mirror overwritten with exactly that content; (b) `truncated:true` → trailer present,
+  verbatim; (c) `output` empty → mirror untouched. Pre-probe mirror content restored
+  byte-exact in try/finally (replaced afterwards by THIS summary — worker side, per the
+  handover routine).
+- **S4** — `system.transform`, per the probed signature: planner shape (`agent:"
+  planner_120k_mtp"` live-name shape) with the (fake) shell present → `ctx: CTX=…` appended
+  exactly once; non-planner agent, SDK-signature shape (no `agent` field at all), and
+  planner-shape with NO shell captured → all OMITTED, no throw. Four `transform` evidence
+  lines written — exactly the probe's four calls.
+- **S5** — every `plugin.log` line from the probe window: `JSON.parse`-able, ≤ 2000 chars
+  (including co-appended live v1.1 writer lines).
+
+## pytest / lint
+
 `& .\.venv\Scripts\python.exe -m pytest -q` → **434 passed, 13 warnings** (identical
-baseline; no FST code touched — tree green).
+baseline — no FST code touched). ruff `--select F`: **6 findings** — baseline unchanged.
 
-## v2 evidence (live `plugin.log`, read before reset)
-- **This delegation — `tool:before/after`, `task`, v1.1 live-cycle evidence.** The
-  `tool.before` line (log line 11973 of 12,916; verbatim):
-```
-{"ts":"2026-09-08T14:20:53.409Z","kind":"tool.before","tool":"task","session":"ses_f7eb89fa1ffexpkMmpLNw4dRbH","call":"P6sRew7hVYZteQh8eEFr4xqQQ8DgpTFQ","args":"{\"description\":\"Tier 1 v1.1: delta filter\",\"prompt\":\"Read .opencode/handover_task.md and execute exactly it — a full implementation task (patch, verify offline-probe style per AGENTS.md facts: Windows PowerShell shell, .venv, no node/bun on PATH, the Electron RUN_AS_NODE recipe is in .opencode/handover_task_to_planner.md from the v1 summary). Also read .opencode/handover_task_to_planner.md FIRST for the v1 payload findings and probe recipe. Write the EXECUTIVE SUMMARY and commit per the routine…"}
-```
-  Findings: task-tool args are `{description, prompt}` (no `subagent_type` — that was a v1
-  probe-fabrication artifact, the live payload does NOT carry it). Session-ID live format:
-  `ses_f7eb89fa1ffexpkMmpLNw4dRbH`; callID = opaque base64-ish string. The matching
-  `tool.after` for this very delegation is written by the in-memory plugin **at
-  delegation end** — it lands in the live log AFTER this summary text (it contains the
-  worker's final message as `output`), so v2 should verify it on its first log read; that
-  closes v1 post-restart checklist #2 (worker final-message arrives). Note the pre-deletion
-  repo log (reset for the commit) contained only the `before` line: 1 `task` line in
-  `tools` Counter.
-- **`plugin.added` × 45 — all fire at session start, one line each** (14:13:04.247 →
-  14:13:04.305Z; 200 ms burst = provider/model catalog registration, not repeats).
-  Each carries exactly one property — the built-in plugin `id`. Two full verbatim lines:
-```
-{"ts":"2026-09-08T14:13:04.247Z","kind":"event","type":"plugin.added","properties":"{\"id\":\"core/config-reference\"}"}
-{"ts":"2026-09-08T14:13:04.248Z","kind":"event","type":"plugin.added","properties":"{\"id\":\"agent\"}"}
-```
-  Breakdown: 8 core/config plugins (`core/config-reference`, `agent`, `command`, `skill`,
-  `models-dev`, `config-agent`, `config-command`, `config-skill`) + 33 provider ids
-  (`alibaba` … `zenmux`, incl. `anthropic`, `openai`, `google-vertex`) + 4 (`dynamic-provider`,
-  `config-plugin`, `config-provider`, `variant`). Tiny (100–120 B/line) → not a v2 filter
-  candidate; the 45 count = provider-catalog size at start.
+## Design flags (planner calls — recorded, not decided here)
 
-## v2 ideas (recorded here only — no code)
-- Rotation / size cap / per-type volume cap — still v2. Expected effect of v1.1: log line
-  volume drops ~97 % (12,916 → ~331 lines in the same window); remaining per-chunk events
-  are `message.part.updated` (128) / `message.updated` (55) — collapse or filter if growth
-  still bothers (bytes-per-hour check).
+1. **Transform payload exposes no clean agent identifier** — per the pre-set call from the
+   task (and confirmed from the SDK types: input = `{sessionID?, model}`): **NOT**
+   injecting for all agents; the line is omitted at v2's live debut unless opencode happens
+   to hand the transform call an `agent` identifier. The `agent`-field evidence from the v1
+   logs (v1.1 summary): assistant-message `message.updated` lines carry `info.agent` = the
+   CONFIG agent name (`planner_120k_mtp` / `worker_120K_mtp`) — the gate is exactly
+   `startsWith("planner")`, so if the identifier DOES arrive live, injection fires with
+   zero code change. The `transform` evidence lines settle the question from the
+   post-restart log — no guessing. (TODO.md #14.)
+2. **Instruction tension** — AGENTS.md plan-state pre-commit update vs the task's "do NOT
+   touch `handover_planner.md`": worker updated the stamp + one status bullet only, folded
+   into this single commit (no separate plan-state commit). Maintenance to keep in the same
+   lane, the task governs this run. (TODO.md #15.)
+3. Gauge-line visibility (the DoD half below) can only be proven after restart — and only
+   if an identifier arrives (see #1).
 
-## DoD note
-The patch goes **LIVE at the next opencode START** — this running session keeps the old
-(in-memory v1) copy, which is also why the BEFORE-record and v2 evidence above came from
-the v1 writer. **No restart performed here**, none permitted.
+## Effective-at-next-restart (note)
 
-## Log reset / tree hygiene
-Probe file + scratch dir deleted; `.opencode/plugin.log` deleted (gitignored anyway) —
-the live v1 writer will recreate it mid-stream; left in its recreated state, still ignored.
+The patch goes **LIVE at the next opencode START** — this running session keeps the
+in-memory v1.1 copy; no restart performed here, none permitted. The v1.1 filter already
+quieted the live log (verified: the co-appended lines in this run's probe window carry no
+delta lines).
 
-## TODO.md entries appended
-- **#12** — task spec's "exactly 5 lines" off-by-one (payload list ⇒ 4 lines); invariant
-  for v2 tasks: "one line per unskipped payload".
-- **#13** — `handover.ts` line-1 header still self-labels "v1" (cosmetic, deliberate per
-  the minimal-patch mandate).
+## DoD for next session (planner's record)
 
-## Files changed / commit
-- `.opencode/plugin/handover.ts` — the patch (2 sites).
-- `.opencode/handover_task.md` — planner's v1.1 rewrite of the task file (was still the v1
-  spec in the tree) — committed with the handover, per the task's file list.
-- this summary, `TODO.md` (append-only #12/#13).
-- **Left untouched / not staged:** `opencode.jsonc` (pre-existing uncommitted planner-side
-  permission tweak, NOT mine and outside the commit list) and `.opencode/handover_planner.md`.
+One real delegation where the mirror write happened **BY THE PLUGIN** (that cycle's task
+spec drops the "worker writes the summary" line — the plugin owns the file) + the gauge
+line visible in the planner context. Both prove against a fresh quiet post-restart
+(v1.1-filtered) log — with identifier-availability caveats as in flag #1.
 
-Commit: subject `Filter message.part.delta from handover plugin log (v1.1)`, one short
-body line each for: v1.1 probe verified (7/7, 4-line invariant, TODO #12) · v2 evidence
-captured (task tool.before + plugin.added x45) · pytest 434 baseline unchanged.
+## TODO.md appended
+
+- **#14** — transform payload exposes no agent identifier: line omitted + payload
+  evidence-logged; follow-up (alternative planner-only signal) is a planner call.
+- **#15** — AGENTS.md plan-state pre-commit vs task "do not touch handover_planner.md" —
+  worker resolution recorded; maintenance to keep the lane consistent.
+
+## Files / commit
+
+- `.opencode/plugin/handover.ts` — v2 (ownership hooks + transform evidence logging; v1/
+  v1.1 log behavior byte-for-byte kept).
+- `.opencode/handover_task_to_planner.md` — this summary.
+- `.opencode/handover_task.md` — the v2 task file (as written by the planner — committed
+  with the handover, per the file list).
+- `TODO.md` (#14/#15 append-only), `.opencode/handover_planner.md` (stamp + one status
+  bullet — see #15).
+- **Left untouched / not staged:** `opencode.jsonc` (pre-existing maintainer dirty edit —
+  explicitly out of scope), `.opencode/plugin.log` (gitignored; probe evidence consumed),
+  `v2probe.mjs` (deleted before commit — v1/v1.1 hygiene).
+
+Commit subject: `Add handover plugin v2: task gate, summary mirror, ctxgauge injection`.
