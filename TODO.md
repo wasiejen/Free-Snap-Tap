@@ -240,3 +240,33 @@ now permanent at `.opencode/plugin/probes/handover_probe.mjs` with the exact run
 command + pinned executable in its header — future plugin task specs run it, never
 rebuild it (exception: plugin hook-surface change). Also resolves #19 (stale v2
 comments rewritten per the v2.2 'both' decision; comment-only edit, 23/23 both sides).
+
+## 21. `ctxgauge/peek.py` crashes with TypeError on a fresh session (2026-09-08)
+
+First gauge run of the v2.2 worker-proof worker session failed with
+`TypeError: cannot unpack non-iterable NoneType object`: it crashes when the newest
+session has no *finished* assistant message yet (fresh subagent start — the in-flight
+message carries no `"finish"` field, so the `like '%"finish"%'` query matches nothing
+and `fetchone()` returns `None`). Second run (after the first turn persisted) works.
+Also written against the old opencode.db schema: `session.model` is now a JSON column
+(`{"id":"Qwen3.8-27B-IQ3KT-120K_MTP",...}` on opencode 1.18.29); the 120K-window regex
+happens to work on the raw JSON (it finds `-120K` in the id) but matches by accident.
+Guard the `None` row and parse the model id explicitly — or point it at `session_message`/
+v2 schema.
+
+## 22. v2.2 worker-proof task spec: plugin log path wrong (2026-09-08)
+
+`.opencode/handover_task.md` (phase 6 worker proof) points at `.opencode/plugin/plugin.log`;
+the log actually lives at `.opencode/plugin.log` (the `plugin/` directory holds only
+`handover.ts` + `probes/`). Doc-only mismatch — measured against the real path.
+
+## 23. v2.2 worker-side proof result: `ctx:` line NOT FOUND in worker prompt (2026-09-08)
+
+The worker subagent session's system prompt carried NO `ctx: CTX=…` item (searched the
+full prompt: worker role text, env block, AGENTS.md instructions, skills list — absent),
+while `plugin.log` shows 23 LIVE `kind=transform` entries for that session
+(`ses_f7d9e3249ffebZTCKtnsEL4YHn`, created 18:57:22.872Z, transforms 18:57:22.984Z →
+19:01:26.857Z). So the hook fired for the worker session but the line never surfaced
+to the worker model — either `onSystemTransform` does not apply to subagent model
+invocations, or the injected line is not carried to them. Untouched per task (measurement
+only). Maintainer call: investigate the transform scope or accept workers are lineless.
