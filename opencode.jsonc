@@ -18,8 +18,8 @@
         "Qwen3.8-27B-IQ3KP-UC-100K": {
           "name": "Qwen3.8-27B-IQ3KP-UC"
         },
-        "Qwen3.8-27B-IQ4KT-35K-MLP": {
-          "name": "Qwen3.8-27B-IQ4KT-MLP"
+        "Qwen3.8-27B-IQ4KT-35K-MTP": {
+          "name": "Qwen3.8-27B-IQ4KT-MTP"
         },
         "Qwen3.8-27B-IQ4KT-100K": {
           "name": "Qwen3.8-27B-IQ4KT"
@@ -50,21 +50,18 @@
       "temperature": 1.0,
       "prompt": "{file:./.opencode/prompt_agent_planner.md}",
       "permission": {
-      "edit": {
-        "*": "deny",
-        "TODO.md": "allow",
-        "AGENTS.md": "allow",
-        ".opencode/**": "allow"
-      },
-      "bash": "allow",
-      "webfetch": "allow"
-      // "permission": {
-      //   "edit": "allow",
-      //   "bash": {
-      //     "*": "deny",
-      //     "git status *": "allow",
-      //     "git log *": "allow"
-      //   }
+        "external_directory": {
+          "/tmp/**": "allow"
+        },
+        "edit": {
+          "*": "deny",
+          "TODO.md": "allow",
+          "AGENTS.md": "allow",
+          ".opencode/**": "allow",
+          "/tmp/**": "allow"
+        },
+        "bash": "allow",
+        "webfetch": "allow"
       }
     },
 
@@ -76,7 +73,14 @@
       "temperature": 0.2,
       // "steps": 15,
       "permission": {
-        "edit": "allow",
+        "edit": {
+          "*": "allow",
+          "AGENTS.md": "deny",
+          ".opencode/prompt_**": "deny",
+          ".opencode/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny",
+        },
         "bash": "allow",
         "webfetch": "allow"
       },
@@ -90,7 +94,14 @@
       "temperature": 1.0,
       // "steps": 15,
       "permission": {
-        "edit": "allow",
+        "edit": {
+          "*": "allow",
+          "AGENTS.md": "deny",
+          ".opencode/prompt_**": "deny",
+          ".opencode/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny",
+        },
         "bash": "allow",
         "webfetch": "allow"
       },
@@ -104,7 +115,14 @@
       "temperature": 1.0,
       // "steps": 15,
       "permission": {
-        "edit": "allow",
+        "edit": {
+          "*": "allow",
+          "AGENTS.md": "deny",
+          ".opencode/prompt_**": "deny",
+          ".opencode/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny",
+        },
         "bash": "allow",
         "webfetch": "allow"
       },
