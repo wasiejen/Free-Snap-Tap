@@ -101,32 +101,6 @@ Remaining maintainer calls (NOT agent work): reclassify 117 + 302–303 in `COVE
 (`TODO.md` #4/#6); empty-macro suppress comment (#7); `TODO.md` #1 (general vk resolution)
 and #2 (the original 6 lint findings).
 
-## Discrepancies (check of 2026-09-08 — append to `TODO.md` at next commit time)
-
-1. **Triage misclassification: `fst_manager.py` lines 116–117 (`check_constraint_fulfillment`,
-   class A "None result → pass") are unreachable.** `constraint_evaluation` maps `None` →
-   `True` (`fst_manager.py:691`) before returning, and no other branch returns `None` — the
-   `pass` body (line 117) can never execute. It is dead code (class C), not testable-A. The
-   triage's 2098/2217 (94.6 %) ceiling is therefore 2097/2217 ≈ 94.6 % — same rounded
-   number, but line 117 will remain uncovered in every run. Recorded in the `2007698`
-   commit message at discovery; `COVERAGE_TRIAGE.md` is read-only here, reclassifying 117 to
-   C is the maintainer's call — ask him, don't edit the plan file.
-2. **Lint baseline regressed 6 → 8 at `ca61a26`** (DoD says "exactly 6"): 2×F401
-   (`SimpleNamespace` unused) in `test_control_actions.py` / `test_facade_wiring.py`, plus a
-   3rd in the untracked WIP file. Fix = delete the three import lines (Next steps 1-2) —
-   restores the 6-finding baseline.
-3. **C-class lines covered as by-products** (as the triage anticipated): `fst_keyboard`
-   795/799/804 (via a `DEBUG2` flip in `d94af46`) and `fst_manager` 341 (via a `DEBUG3` flip
-   in `99b5e37`). They were C but no longer miss — expected remaining C: `fst_manager` 85,
-   `fst_keyboard` 26, `fst_data_types` 4, plus `fst_overlay` 589 (offscreen-by-design `exec_`).
-   Expected state confirmed by the `fffea8b` coverage run.
-4. **Found 2026-09-08 (`fffea8b`): `fst_keyboard` 302–303 are unreachable dead code** —
-   triage classed them A (recipe `w : +e`): `convert_key_string_group` only ever appends
-   `Key_Event`s, so line 297 (`not isinstance(new_trigger_group[0], Key)`) is always true and
-   the line-295 block is entered only via a `Key` replacement — which makes line 301 false,
-   so 302–303 can never run. `TODO.md` #6. Also found: the empty-macro comment at 707
-   contradicts the behavior (`alias_fired` suppresses the trigger anyway) — `TODO.md` #7.
-
 ## Rules
 - **Tests only.** New test files in `tests/` (or extend existing ones). Do NOT change source
   modules. If a test exposes a bug: do NOT fix it — record it and ASK.
@@ -142,7 +116,7 @@ and #2 (the original 6 lint findings).
   out-of-range numeric strings, the dead code blocks — leave them; they are maintainer calls.
 - `FSTconfig.txt` / `FSTconfig_test.txt`, README/WIKI/`SPEC_FEATURES.md`, `AGENTS.md`,
    `COVERAGE_TRIAGE.md` (the plan — if it proves wrong, ASK) — never edit.
-- `TODO.md`: append-only (per-commit discrepancies, see post-commit routine) — never
+- `TODO.md`: append-only (per-commit discrepancies, see commit routine) — never
   rewrite existing entries.
 - Never commit coverage artifacts: `.coverage` is gitignored, `coverage.json` is NOT —
   keep it local only (ask before adding a `.gitignore` entry).
@@ -150,17 +124,21 @@ and #2 (the original 6 lint findings).
   on `opencode_test`; do NOT push. Follow the `AGENTS.md` **Git conventions**: if a commit
    spans multiple themes, add up to ~3 short body lines, one per theme (bug fixed / idea
    implemented / change integrated) — the commit message is your own future work log.
-- **Post-commit routine (after EVERY commit):**
+- **Commit routine (BEFORE EVERY commit, no exceptions):** NAP and `TODO.md` updates
+  go into the same commit as the work — an interrupted agent resumes from a committed
+  NAP.
   1. Update this file (NAP) with current progress — done / next task(s) / current
-     baselines (test count, lint count, coverage) / HEAD commit — so an interrupted
-     agent can resume from here with relatively current data.
-  2. Append every discrepancy found at commit time (doc/code mismatch, suspected bug,
+     baselines (test count, lint count, coverage) / the change set about to be
+     committed (describe subject + files; the hash only exists after committing).
+  2. Append every discrepancy found during the work (doc/code mismatch, suspected bug,
      stale baseline) to `TODO.md` as a new numbered entry — append only, never
      rewrite existing entries.
-  3. Run `& .\.venv\Scripts\python.exe ..\ctxgauge\peek.py` from the repo root and judge
-     whether the remaining context is still enough for the next tasks. **If not:**
-     finish this file with all open tasks written down, stop at a clean point, and
-     inform the user — never start new work.
+  3. Commit code changes + this file + `TODO.md` together in that single commit.
+  4. **Post-commit context check:** run `& .\.venv\Scripts\python.exe ..\ctxgauge\peek.py`
+     from the repo root and judge whether the remaining context is still enough for the
+     next tasks. **If not:** finish this file with all open tasks written down (that
+     update rides in the NEXT commit), stop at a clean point, and inform the user —
+     never start new work.
 
 ## Definition of done
 - `& .\.venv\Scripts\python.exe -m pytest -q` fully green (test count may grow).
