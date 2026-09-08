@@ -270,3 +270,19 @@ while `plugin.log` shows 23 LIVE `kind=transform` entries for that session
 to the worker model — either `onSystemTransform` does not apply to subagent model
 invocations, or the injected line is not carried to them. Untouched per task (measurement
 only). Maintainer call: investigate the transform scope or accept workers are lineless.
+
+## 24. Fixed: `ctxgauge/peek.py` fresh-session crash + model-id parsing (TODO #21, code side closed) (2026-09-08)
+
+Planner direct fix (work-mode call: small meta-file fixes are the planner's). `peek.py` now
+falls back to the latest FINISHED message overall when the newest session has none yet
+(`fetchone() -> None`), and prints `CTX=0 (0%) REM=<window>` if no finished message exists at
+all; the model id is parsed from the `session.model` JSON `id` field instead of the
+coincidental raw-JSON regex match. TODO #21's v2-schema-migration note stays open for when it
+actually breaks.
+
+## 25. opencode.jsonc: planner edit-permission scratchpad pattern still `/tmp/**` on win32 (2026-09-08)
+
+`0bd75bf` moved the `external_directory` allow + the `references.scratchpad` path to
+`C:\Users\Wasiejen\AppData\Local\Temp\opencode`, but the planner agent's
+`permission.edit` allow pattern is still `/tmp/**` — write attempts to the scratchpad are
+denied on win32. Update the pattern to the same Windows path.
