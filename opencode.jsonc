@@ -1,0 +1,114 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "disabled_providers": [],
+  "provider": {
+    "llama-swap": {
+      "name": "llama-swap-v2",
+      "npm": "@ai-sdk/openai-compatible",
+      "options": {
+        "baseURL": "http://192.168.178.20:8033/v1"
+      },
+      "models": {
+        "Qwen3.8-27B-IQ3KT-120K_MTP": {
+          "name": "Qwen3.8-27B-IQ3KT-MTP"
+        },
+        "Qwen3.8-27B-IQ3KT-210K": {
+          "name": "Qwen3.8-27B-IQ3KT"
+        },
+        "Qwen3.8-27B-IQ3KP-UC-100K": {
+          "name": "Qwen3.8-27B-IQ3KP-UC"
+        },
+        "Qwen3.8-27B-IQ4KT-35K-MLP": {
+          "name": "Qwen3.8-27B-IQ4KT-MLP"
+        },
+        "Qwen3.8-27B-IQ4KT-100K": {
+          "name": "Qwen3.8-27B-IQ4KT"
+        },
+        "Gemma4-12B-Q4KM-UC-256K": {
+          "name": "Gemma4-12B-Q4KM-UC"
+        },
+        "Gemma4-12B-Q4KXL-MTP-256K": {
+          "name": "Gemma4-12B-Q4KXL-MTP"
+        },
+        "CPU-Qwen3-0.6B": {
+          "name": "CPU-Qwen3-0.6B"
+        },
+        "CPU-Gemma4-E2B": {
+          "name": "CPU-Gemma4-E2B"
+        },
+        "CPU-Qwen3.5-4B": {
+          "name": "CPU-Qwen3.5-4B"
+        }
+      }
+    }
+  },
+  "agent": {
+    "planner_120k_mtp": {
+      "description": "very intelligent, fast, 120k context",
+      "mode": "primary",
+      "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
+      "temperature": 1.0,
+      "prompt": "{file:./.opencode/prompt_agent_planner.md}",
+      "permission": {
+      "edit": {
+        "*": "deny",
+        "TODO.md": "allow",
+        "AGENTS.md": "allow",
+        ".opencode/**": "allow"
+      },
+      "bash": "allow",
+      "webfetch": "allow"
+      // "permission": {
+      //   "edit": "allow",
+      //   "bash": {
+      //     "*": "deny",
+      //     "git status *": "allow",
+      //     "git log *": "allow"
+      //   }
+      }
+    },
+
+    "worker_gemma_256k_mtp": {
+      "description": "moderately intelligent, very very fast, 256K context window - needs concrete instructions, best for webfetch, big file reads, big writes",
+      "mode": "all",
+      "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-256K",
+      "prompt": "{file:./.opencode/prompt_agent_task.md}",
+      "temperature": 0.2,
+      // "steps": 15,
+      "permission": {
+        "edit": "allow",
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
+    },
+    "worker_120K_mtp": {
+      "description": "very intelligent, fast, 120k context",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
+      "prompt": "{file:./.opencode/prompt_agent_task.md}",
+      "temperature": 1.0,
+      // "steps": 15,
+      "permission": {
+        "edit": "allow",
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
+    },
+    "worker_210K": {
+      "description": "very intelligent, slow, big 210k context - for very long and complex tasks",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-IQ3KT-210K",
+      "prompt": "{file:./.opencode/prompt_agent_task.md}",
+      "temperature": 1.0,
+      // "steps": 15,
+      "permission": {
+        "edit": "allow",
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
+    },
+  }
+}
