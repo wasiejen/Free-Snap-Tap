@@ -1,86 +1,121 @@
-# EXECUTIVE SUMMARY — Phase 6 / Tier 1 — handover plugin v1 (LOG ONLY)
+# EXECUTIVE SUMMARY — Phase 6 / Tier 1 — plugin v1.1: filter the token-stream flood
 
-## Files changed
-- `.opencode/plugin/handover.ts` (new, 113 lines) — log-only plugin v1: default-export
-  `Plugin` function (`satisfies Plugin`, types from `@opencode-ai/plugin`), registers
-  exactly `{ event, "tool.execute.before", "tool.execute.after" }`; one compact JSON
-  line per hook call to `.opencode/plugin.log`; stringified fields capped at 500 chars
-  (`…` suffix) with a whole-line ladder `[500, 150, 60]` that degrades big fields — then
-  drops them — until the line is ≤ 2000 chars and still valid JSON. All fs ops wrapped
-  (lazy `appendFileSync`, best-effort, hooks can never throw/reject). No tool-output
-  mutation, no behavior change.
-- `.opencode/.gitignore` — appended `plugin.log` (existing entries kept).
-- `.opencode/handover_task.md`, this file — task spec + this summary (commit routine).
-- NO FST code/test changes, NO `opencode.jsonc` changes, NO TODO.md append (no
-  discrepancies found), NO `.opencode/handover_planner.md` changes (planner-owned).
+## Official BEFORE-record (live log, measured by this worker 2026-09-08 ~14:24Z)
+`.opencode/plugin.log` kept growing during the scan (this very model stream is still the
+v1 in-memory plugin's writer — see DoD note), so the numbers below are at scan completion
+and are the official before-record; they should trend ~same with time (vs planner
+snapshot: 7,733 lines / 2.48 MB):
+- **12,916 lines / 4,178,996 bytes** · 0 unparseable lines · max line length 1,450 chars
+- kind Counter: `event` **12,891**, `tool.before` 14, `tool.after` 11
+- event-type Counter: `message.part.delta` **12,585 (≈ 97.4 % of lines)** ·
+  `message.part.updated` 128 · `message.updated` 55 · `plugin.added` 45 ·
+  `session.status` 28 · `session.updated` 18 · `session.diff` 14 ·
+  `file.watcher.updated` 10 · `file.edited` 3 · `catalog.updated` 2 ·
+  `reference.updated` 1 · `integration.updated` 1 · `session.created` 1
+- tool hooks by tool (before+after): `read` 10 · `write` 7 · `bash` 7 · `task` 1
+→ ~97 % of lines are delta; the patch removes them at the source.
 
-## Verification
-- **Runner**: no `node`/`bun`/`npx` on PATH (checked PATH, user/machine env, common
-  install dirs). Ran the probe offline via the OpenCode Desktop Electron binary with
-  `ELECTRON_RUN_AS_NODE=1` → **Node v24.15.0** (type stripping flag-free on v24 —
-  the closest equivalent to `node --experimental-strip-types` in the task's ladder, no
-  downloads).
-- **Probe result**: throwaway `.opencode/probe_handover.mjs` (deleted after run)
-  imported the plugin default export, asserted it is a function, called it with a
-  minimal fake `PluginInput` and got the hook set **`{ "event", "tool.execute.after",
-  "tool.execute.before" }` (sorted)** — exactly the 3 v1 hooks. Invoked each with
-  task-shaped payloads (3000-char prompt/properties to stress truncation); all calls
-  resolved without throwing; `.opencode/plugin.log` ended with 3 lines, each
-  `JSON.parse`-able, lengths **635 / 652 / 783** (all ≤ 2000). Probe file + log deleted
-  before commit (log is gitignored anyway).
-- **Test baseline**: `pytest -q` → **434 passed**, 13 warnings — untouched green
-  baseline confirmed (commit adds no FST code).
-- Probe-run side note (not a discrepancy): un-bundled `.ts` import emitted Node's
-  `MODULE_TYPELESS_PACKAGE_JSON` warning (`.opencode/package.json` has no `"type"`);
-  cosmetic, opencode bundles plugins at start, expect none.
-
-## What the payloads actually expose (vs node_modules v1.18.29 — recorded for v1)
-- `tool.execute.before`: input `{ tool, sessionID, callID }` — **args are on `output`**,
-  not input (that's where the plugin reads them). No `agent` field anywhere in the
-  tool payloads — agent attribution comes from `event` payloads (message info carries
-  `agent`) or from correlating `sessionID` + `callID` across lines.
-- `tool.execute.after`: input `{ tool, sessionID, callID, args }`; output
-  `{ title, output, metadata }`.
-- `event`: `{ event: { type, properties } }`; session extracted from
-  `properties.sessionID` or `properties.info.sessionID`, agent from `properties.agent`
-  or `properties.info.agent` (message events). Log lines: `ts, kind, type?, session?,
-  agent?, call?, tool?, title?, <big fields: args|properties|output|metadata>`.
-- Line formats proven below: args arrive pre-truncated string (double-quoted), whole
-  field `cap ≤500`.
-
-## Captured v1 payload evidence (probe lines, verbatim)
+## The patch (`.opencode/plugin/handover.ts`, 2 sites, diff below)
+```diff
+ const DOT = "\u2026";
++const SKIP_EVENT_TYPES = new Set(["message.part.delta"]);
+ …
+ async function onEvent(input: { event?: unknown }): Promise<void> {
+   try {
+     const ev = (input?.event ?? {}) as Record<string, unknown>;
++    const type = str(ev.type);
++    if (type && SKIP_EVENT_TYPES.has(type)) return;
+     const props = (ev.properties ?? {}) as Record<string, unknown>;
 ```
-{"ts":"2026-09-08T14:05:34.383Z","kind":"tool.before","tool":"task","session":"probe-session-1","call":"probe-call-1","args":"{\"subagent_type\":\"worker\",\"prompt\":\"execute the task in the working repo. xxxx…(500 x, ellipsed)"}
-{"ts":"2026-09-08T14:05:34.383Z","kind":"event","type":"message.updated","session":"probe-session-1","agent":"planner","properties":"{\"sessionID\":\"probe-session-1\",\"info\":{\"role\":\"assistant\",\"agent\":\"planner\",\"tokens\":\"xxx…(459 x, ellipsed)"}
-{"ts":"2026-09-08T14:05:34.386Z","kind":"tool.after","tool":"task","session":"probe-session-1","call":"probe-call-1","title":"worker: v1 probe","args":"{\"subagent_type\":\"worker\",\"prompt\":\"execute the task in the working repo.\"}","output":"\"EXECUTIVE SUMMARY xx…(390 x, ellipsed)","metadata":"{\"duration\":1234}"}
+Untouched, as specced: hook set, JSON line format (no new fields), truncation ladder
+[500/150/60] + 2000 cap, safety guards, log path/gitignore. (Header comment still reads
+"v1" — deliberate, TODO.md #13.)
+
+## Offline probe
+Runner = v1 recipe unchanged: `%LOCALAPPDATA%\Programs\@opencode-aidesktop\OpenCode.exe`
++ `ELECTRON_RUN_AS_NODE=1` → **Node v24.15.0**, no downloads, same cosmetic
+`MODULE_TYPELESS_PACKAGE_JSON` warning as v1 (probe deleted, log reset afterwards).
+- **One deviation, flagged:** the probe wrote to a scratch `tmpdir` `.opencode/plugin.log`
+  (fresh `mkdtemp` + `.opencode` subdir) instead of the repo log. Reason: the running
+  opencode session still holds the pre-patch plugin in memory and streams delta lines into
+  the repo log in parallel — an in-repo "exactly N lines" assertion would race it. The
+  patched plugin's behavior was fully exercised; the scratch log is its sole writer.
+- **Task spec off-by-one, recorded as TODO.md #12:** "exactly 5 lines" vs its own payload
+  list — deltas x3 skipped ⇒ 4 lines (message.updated 1 + plugin.added 1 + tool.before 1 +
+  tool.after 1). The probe asserts the correct invariant: 4 lines, zero
+  `message.part.delta` lines, 1 line per unskipped payload.
+- **Result: PROBE OK, 7/7 checks PASS** — default export is a function; hook set exactly
+  `{event, tool.execute.before, tool.execute.after}`; exactly 4 lines; no delta line
+  survives; all lines ≤ 2000 chars; all `JSON.parse`-able; kinds 2×event / 1×tool.before /
+  1×tool.after. Log lines (verbatim):
 ```
-(lines shown abbreviated only where 3000-char `x`-runs repeat; actual lengths 635/652/783,
-all fields genuinely parse-able at the plugin, full repeats were elided here for brevity)
+{"ts":"2026-09-08T14:26:59.396Z","kind":"event","type":"message.updated","session":"probe-session-1","agent":"planner","properties":"{\"sessionID\":\"probe-session-1\",\"info\":{\"role\":\"assistant\",\"agent\":\"planner\"}}"}
+{"ts":"2026-09-08T14:26:59.397Z","kind":"event","type":"plugin.added","properties":"{\"id\":\"agent\"}"}
+{"ts":"2026-09-08T14:26:59.397Z","kind":"tool.before","tool":"task","session":"probe-session-1","call":"probe-call-1","args":"{\"subagent_type\":\"worker\",\"prompt\":\"v1.1 probe\",\"description\":\"Tier 1 v1.1: delta filter\"}"}
+{"ts":"2026-09-08T14:26:59.397Z","kind":"tool.after","tool":"task","session":"probe-session-1","call":"probe-call-1","title":"worker: v1.1 probe","output":"\"EXECUTIVE SUMMARY ...\"","metadata":"{\"duration\":42}"}
+```
 
-## DoD status — NOT complete in this session (by design)
-v1's full DoD ("plugin.log shows a full planner→worker cycle; opencode start unaffected")
-is completed in the **NEXT session after the maintainer restarts opencode**. No planner
-session restart or config change happened here (task forbade it).
+## pytest
+`& .\.venv\Scripts\python.exe -m pytest -q` → **434 passed, 13 warnings** (identical
+baseline; no FST code touched — tree green).
 
-### Post-restart checklist (what to look for in the real log)
-1. **Task call args shape** — a `tool.before` line with `tool:"task"`: does `args`
-   carry `subagent_type`, `prompt`, `description`/`task` fields (this probe proves the
-   log path works; real args are the payload question). Note args come from the `before`
-   `output` object — if a real `task` call shows empty/missing `args`, check whether
-   opencode passes args differently.
-2. **Worker-final-message arrival** — after a real planner→worker round-trip the log
-   should show `tool.after` `tool:"task"` with the worker's final message in `output`
-   (and `title`), i.e. delegation is observable end-to-end.
-3. **Session IDs** — planner and worker should appear under the same `sessionID`;
-   record both the live format (`ses-…` prefix?) and whether `event` lines carry
-   `agent` (planner/worker) — v1 correlates sessions by `sessionID` only.
-4. **Flag anything**: hook ordering surprises (e.g. `before` logging before `event`
-   `message.updated` for the same tool call), `event` payload volume/noise (how many
-   `message.part.updated`-style lines per turn — consider filtering in v2), and any
-   opencode-start delay/errors attributable to the plugin (escape hatches
-   `OPENCODE_DISABLE_DEFAULT_PLUGINS` / `OPENCODE_PURE` noted in the task file).
+## v2 evidence (live `plugin.log`, read before reset)
+- **This delegation — `tool:before/after`, `task`, v1.1 live-cycle evidence.** The
+  `tool.before` line (log line 11973 of 12,916; verbatim):
+```
+{"ts":"2026-09-08T14:20:53.409Z","kind":"tool.before","tool":"task","session":"ses_f7eb89fa1ffexpkMmpLNw4dRbH","call":"P6sRew7hVYZteQh8eEFr4xqQQ8DgpTFQ","args":"{\"description\":\"Tier 1 v1.1: delta filter\",\"prompt\":\"Read .opencode/handover_task.md and execute exactly it — a full implementation task (patch, verify offline-probe style per AGENTS.md facts: Windows PowerShell shell, .venv, no node/bun on PATH, the Electron RUN_AS_NODE recipe is in .opencode/handover_task_to_planner.md from the v1 summary). Also read .opencode/handover_task_to_planner.md FIRST for the v1 payload findings and probe recipe. Write the EXECUTIVE SUMMARY and commit per the routine…"}
+```
+  Findings: task-tool args are `{description, prompt}` (no `subagent_type` — that was a v1
+  probe-fabrication artifact, the live payload does NOT carry it). Session-ID live format:
+  `ses_f7eb89fa1ffexpkMmpLNw4dRbH`; callID = opaque base64-ish string. The matching
+  `tool.after` for this very delegation is written by the in-memory plugin **at
+  delegation end** — it lands in the live log AFTER this summary text (it contains the
+  worker's final message as `output`), so v2 should verify it on its first log read; that
+  closes v1 post-restart checklist #2 (worker final-message arrives). Note the pre-deletion
+  repo log (reset for the commit) contained only the `before` line: 1 `task` line in
+  `tools` Counter.
+- **`plugin.added` × 45 — all fire at session start, one line each** (14:13:04.247 →
+  14:13:04.305Z; 200 ms burst = provider/model catalog registration, not repeats).
+  Each carries exactly one property — the built-in plugin `id`. Two full verbatim lines:
+```
+{"ts":"2026-09-08T14:13:04.247Z","kind":"event","type":"plugin.added","properties":"{\"id\":\"core/config-reference\"}"}
+{"ts":"2026-09-08T14:13:04.248Z","kind":"event","type":"plugin.added","properties":"{\"id\":\"agent\"}"}
+```
+  Breakdown: 8 core/config plugins (`core/config-reference`, `agent`, `command`, `skill`,
+  `models-dev`, `config-agent`, `config-command`, `config-skill`) + 33 provider ids
+  (`alibaba` … `zenmux`, incl. `anthropic`, `openai`, `google-vertex`) + 4 (`dynamic-provider`,
+  `config-plugin`, `config-provider`, `variant`). Tiny (100–120 B/line) → not a v2 filter
+  candidate; the 45 count = provider-catalog size at start.
 
-## Discrepancies
-None found against `@opencode-ai/plugin` v1.18.29 types (hook signatures, `PluginInput`,
-export shape all as expected) → no TODO.md append. Skill-doc summary is consistent with
-the node_modules types.
+## v2 ideas (recorded here only — no code)
+- Rotation / size cap / per-type volume cap — still v2. Expected effect of v1.1: log line
+  volume drops ~97 % (12,916 → ~331 lines in the same window); remaining per-chunk events
+  are `message.part.updated` (128) / `message.updated` (55) — collapse or filter if growth
+  still bothers (bytes-per-hour check).
+
+## DoD note
+The patch goes **LIVE at the next opencode START** — this running session keeps the old
+(in-memory v1) copy, which is also why the BEFORE-record and v2 evidence above came from
+the v1 writer. **No restart performed here**, none permitted.
+
+## Log reset / tree hygiene
+Probe file + scratch dir deleted; `.opencode/plugin.log` deleted (gitignored anyway) —
+the live v1 writer will recreate it mid-stream; left in its recreated state, still ignored.
+
+## TODO.md entries appended
+- **#12** — task spec's "exactly 5 lines" off-by-one (payload list ⇒ 4 lines); invariant
+  for v2 tasks: "one line per unskipped payload".
+- **#13** — `handover.ts` line-1 header still self-labels "v1" (cosmetic, deliberate per
+  the minimal-patch mandate).
+
+## Files changed / commit
+- `.opencode/plugin/handover.ts` — the patch (2 sites).
+- `.opencode/handover_task.md` — planner's v1.1 rewrite of the task file (was still the v1
+  spec in the tree) — committed with the handover, per the task's file list.
+- this summary, `TODO.md` (append-only #12/#13).
+- **Left untouched / not staged:** `opencode.jsonc` (pre-existing uncommitted planner-side
+  permission tweak, NOT mine and outside the commit list) and `.opencode/handover_planner.md`.
+
+Commit: subject `Filter message.part.delta from handover plugin log (v1.1)`, one short
+body line each for: v1.1 probe verified (7/7, 4-line invariant, TODO #12) · v2 evidence
+captured (task tool.before + plugin.added x45) · pytest 434 baseline unchanged.

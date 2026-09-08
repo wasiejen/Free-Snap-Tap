@@ -7,6 +7,7 @@ import { join } from "node:path";
 const LINE_CAP = 2000;
 const CAPS = [500, 150, 60];
 const DOT = "\u2026";
+const SKIP_EVENT_TYPES = new Set(["message.part.delta"]);
 
 let dir: string | undefined;
 
@@ -60,6 +61,8 @@ function append(line: string): void {
 async function onEvent(input: { event?: unknown }): Promise<void> {
   try {
     const ev = (input?.event ?? {}) as Record<string, unknown>;
+    const type = str(ev.type);
+    if (type && SKIP_EVENT_TYPES.has(type)) return;
     const props = (ev.properties ?? {}) as Record<string, unknown>;
     const info = (props.info ?? {}) as Record<string, unknown>;
     append(

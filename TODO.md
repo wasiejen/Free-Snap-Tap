@@ -109,7 +109,7 @@ reenabled, that is the call.
    (`SimpleNamespace` unused) in `test_control_actions.py` / `test_facade_wiring.py`, plus a
    3rd in the untracked WIP file. Fix = delete the three import lines (Next steps 1-2) —
    restores the 6-finding baseline.
-3. **C-class lines covered as by-products** (as the triage anticipated): `fst_keyboard`
+  3. **C-class lines covered as by-products** (as the triage anticipated): `fst_keyboard`
    795/799/804 (via a `DEBUG2` flip in `d94af46`) and `fst_manager` 341 (via a `DEBUG3` flip
    in `99b5e37`). They were C but no longer miss — expected remaining C: `fst_manager` 85,
    `fst_keyboard` 26, `fst_data_types` 4, plus `fst_overlay` 589 (offscreen-by-design `exec_`).
@@ -120,3 +120,19 @@ reenabled, that is the call.
    the line-295 block is entered only via a `Key` replacement — which makes line 301 false,
    so 302–303 can never run. `TODO.md` #6. Also found: the empty-macro comment at 707
    contradicts the behavior (`alias_fired` suppresses the trigger anyway) — `TODO.md` #7.
+
+## 12. v1.1 task spec "exactly 5 lines" is off-by-one against its own payload list (2026-09-08)
+
+`.opencode/handover_task.md` (v1.1) asks the probe log to "end with exactly 5 lines" from the
+payloads `message.part.delta` x3, `message.updated` x1, `plugin.added` x1, `tool.before` x1,
+`tool.after` x1 — with the delta filter that deterministically yields **4** log lines. The
+offline probe therefore asserts 4 lines plus all-synthesized-absence. Off-by-one on the
+spec side, not the filter; the invariant to reuse in v2 tasks is "one line per unskipped
+payload", not a hard-coded count.
+
+## 13. `.opencode/plugin/handover.ts` header still self-labelled "v1" (2026-09-08)
+
+After the v1.1 delta-filter patch the line-1 header comment still reads "Handover plugin v1
+— log-only observer" while the commit subject is v1.1. Left verbatim because the patch was
+deliberately minimal ("that is the ONLY behavioral change"). Cosmetic; update the label —
+and re-check the "log-only" tag as behaviour accumulates in v2 — whenever.
