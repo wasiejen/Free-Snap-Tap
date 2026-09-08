@@ -67,7 +67,6 @@ const SKIP_EVENT_TYPES = new Set([
 // v2 — handover ownership
 const HANDOVER_SPEC_PATH = ".opencode/handover_task.md";
 const GAUGE_TIMEOUT_MS = 3000;
-const GAUGE_CMD = ".venv/Scripts/python.exe .opencode/ctxgauge/peek.py";
 
 // BunShell is not re-exported by @opencode-ai/plugin (type is internal to dist/shell), so
 // structure-type only the minimal slice v2 calls: cwd(...) → shell, shell(cmd) → promise with

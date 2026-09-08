@@ -48,18 +48,39 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
    + `session.idle` (the steady-state noise); keep `message.removed`/`session.*` as signal.
 - FST code untouched: **434 passed, ruff 6** — reconfirmed live at commit `6004486`
   (worker proof cycle).
+- **v2.2.1 delivered (`23b06ed`)** — gauge-failure evidence logging: `kind:"gauge"` line per
+  failed readout (reasons `shell-missing` | `timeout` | `no-ctx-output` (+`preview` ≤ 120 —
+  also carries spawn-error text, the vocabulary's spawn-gap recorded #27) | `system-not-array`);
+  success path byte-identical, SKIP-SET untouched. Probe before 23/23 → after 28/28 (S4 4→9
+  shapes); FST baselines held (434 / ruff 6, worker re-verified). Planner direct fix in the
+  same cycle: unused `GAUGE_CMD` const removed (#28, default-approved cleanup) — probe
+  re-verified 28/28 by the planner. Worker's FIRST cycle under the relaxed prompts — flag:
+  spec framing neutral-to-helpful, nothing obstructed (helped/harmed watch = OK so far).
+- **MAINTAINER DECISION REVIEW (this session):** three standing rules codified in the PLANNER
+  PROMPT (`74f6f02`): (1) default-approval — obvious non-FST-behavior / docs / cleanup changes
+  need no call, just do; (2) decision bundling — max 2-3 items per message, each with a short
+  recommendation; (3) TODO ownership — planner organizes; entries land only when the work
+  cannot happen now (call needed / blocked / awaiting data). #15 call: workers do not touch
+  the plan file (worker-prompt clause + deny scope @ `6523406`) — TODO #26 closed #15 + #25.
 
 ## Live status
-- Task 1 (Tier 1): plugin-side DONE and proven LIVE (hook fires every turn, every session);
-  the "both" injection is **NOT FOUND in worker AND planner prompts** (TODO #23). Root-cause
-  cycle IN FLIGHT = v2.2.1 evidence-log + probe extension (worker task) — ONE opencode start
-  after it is read: which readout-branch silently failed (or opencode drops the mutation).
+- Task 1 (Tier 1): plugin-side DONE, LIVE-proven v2.2 **and** v2.2.1 evidence logging
+  (`23b06ed`); the "both" injection is still **NOT FOUND in worker AND planner prompts**
+  (TODO #23). Root cause = the next opencode START is the read itself: that segment's
+  `kind:"gauge"` lines name the branch — spawn error (preview carries the error text) /
+  timeout / non-`CTX=` output (preview shows the raw, incl. python traceback) /
+  system-not-array / NONE at all AND line still missing → opencode-level transform-drop,
+  escalate. (TODO #27 holds this exact call for after the start.)
 - Task 2 (Tier 2 — custom `handover` tool, compaction hooks, resume aid, permission
   auto-approval): NOT STARTED — starts after the root-cause cycle resolves (the branch it
   lands on changes what Tier 2 builds).
 
 ## MAINTAINER CALLS (open — in order)
-1. ~~RESTART opencode once~~ — DONE (the 18:26:38Z start).
+1. **opencode RESTART — the proof start** (TODO #27). One action: it (a) is the read of the
+   root cause for the missing `ctx:` line, (b) activates his own `6523406` config
+   (worker deny scopes incl. `handover_planner.md`, Looprunner off, planner edit:allow +
+   bash + webfetch) and the codified prompts (`74f6f02`). Takes effect at next opencode
+   start; this live process still runs the start-time config.
 2. **Worker stop-line rule — draft pending approval** (append to `prompt_agent_task.md`; the
    new prompt already ends the summary with the self-gauge, so only the explicit rule text is
    new): "Stop line (REM ≤ 15k or ≥ 85 %, whichever first): do NOT start new work. Finish the
@@ -67,29 +88,35 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
    immediately and end with the EXECUTIVE SUMMARY ending on the verbatim `CTX=… REM=… —
    stop-line reached` self-gauge. The planner decides continuation; working past the line is
    a rule violation." — approve / amend / drop.
-3. **v1.3 skip-set extension — propose with the segment's final numbers** (tally in Current
+3. **v1.3 skip-set extension — proposed with the segment's final numbers** (tally in Current
    state): skip `file.watcher.updated` + `file.edited` + `session.idle` (steady-state noise:
    58/12/20 of the 115 event lines this start); KEEP `message.removed` + `session.*` as
-   signal. Approve / amend.
+   signal. Approve / amend. Land on disk AFTER the proof start so that segment stays v2.2.1-only;
+   the following start then measures the v1.3 profile (TODO #17 pattern — decide with data).
 4. ~~Looprunner~~ — maintainer: ignored (not running, not working as intended); he also
    commented it out in the live `opencode.jsonc` (config-edit bullet above).
+5. **Deferred FST behavior calls** (post-plugin, bundles of 2-3 — see Maintainer's rules):
+   #11 contradiction prevention (off-by-design vs re-enable), #8 `ap`/`ar` semantics,
+   #7 empty-macro comment vs behavior, #6+#4 dead-code deletion, #9 except-harden, #1 vk-error
+   surfacing (channel call). Default-approved meta/docs work is NOT here — it just gets done.
 
 ## NEXT STEPS
-1. **STOPPED at the line (89 % / 13 k REM mid-orientation) — v2.2.1 spec WRITTEN, NOT
-   FIRED.** Resume = delegate `worker_120K_mtp` (standard prompt; spec = current
-   `.opencode/handover_task.md`) — ideally AFTER the maintainer's opencode start: the live
-   config edit (bullet above) needs one start anyway.
-2. Worker returns → verify commit + baselines + probe before/after, integrate, bookkeeping
-   commit. THEN ask for the one opencode start (the root-cause read needs it).
-3. After the start: read `kind:"gauge"` lines + a worker's ctx-quote → root cause = {spawn/
-   shell problem, 3000 ms timeout, non-CTX output (preview says which — peek.py output
-   visible there), system-not-array, ok+injected (→ #23 false alarm), or zero gauge lines
-   AND line still missing → opencode-level transform-drop, escalate}.
-4. Then: **Tier 2 scoping from the LIVE shapes** — written proposal; Tier-2 code waits for
+1. Worker v2.2.1 returned (`23b06ed`), verified (commit on branch, tree clean apart from
+   the mirror + the maintainer's untracked research note `.opencode/plugin/context meter via
+   plugin hook.md` — left alone deliberately; NOT committed, not deleted — his call if he
+   wants it versioned). Bookkeeping commit = this file + GAUGE_CMD removal + mirror.
+2. **MAINTAINER: opencode RESTART** (the proof start, MAINTAINER CALL 1). Nothing else
+   needed from him this cycle; calls 2 (stop-line draft) and 3 (v1.3) are ASKED IN CHAT now.
+3. After his start: read the start segment's `kind:"gauge"` lines + scan MY prompt for a
+   `ctx:` item → root-cause branch per Live status Task 1 → close/advance TODO #23/#27.
+4. v1.3 approval → spec the one-line-per-type SKIP-SET worker task → worker → the FOLLOWING
+   start measures the v1.3 profile (TODO #17 pattern).
+5. TODO hygiene (planner-owned, default-approved): dedupe the `260908-0951` copied block
+   (its 1→#4 dup, 2→#5 resolved, 3=coverage-state record kept as #4 context, 4→#6+#7),
+   close #14 (superseded by #18 'both'), #13 header-label refresh when `handover.ts` is
+   next touched, #21 v2-schema note stays parked.
+6. Then: **Tier 2 scoping from the LIVE shapes** — written proposal; Tier-2 code waits for
    a Tier-2 spec.
-5. Bookkeeping hygiene: the mirror file (`.opencode/handover_task_to_planner.md`) is the
-   worker's in its cycle; if still dirty at my bookkeeping moment, commit it with the
-   plan-state (stable by then).
 
 ## Context budget
 Per AGENTS.md: `& .\.venv\Scripts\python.exe .opencode\ctxgauge\peek.py` (from repo root).
