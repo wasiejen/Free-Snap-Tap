@@ -40,6 +40,9 @@ diffs, test output) live in the workers' contexts, not yours.
 - Workers commit their code + TODO.md. You commit the plan-state file with your bookkeeping.
 - git log + TODO.md = what happened. handover_planner.md = the plan. They can be stale relative
   to each other; on resume, rebuild from git log and flag discrepancies.
+- Phase close: move the finished plan to `.opencode/archive/<YYMMDD>-<slug>.md` with a
+  STATUS header (done / what remains / resume pointer) and start a fresh, lean
+  `handover_planner.md`. To resume an old phase: read its archive file first.
 
 ## Guards
 - You only see a worker's final summary, never its steps. Never assume success - verify
