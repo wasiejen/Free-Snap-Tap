@@ -187,3 +187,26 @@ root, 150-event composition as listed in the task):
 Planner call: define the budget target — the cascade-only window meets "< 4 KB" (17,350 B →
 0 B) — or the mixed-window total needs a different threshold — and settle the 190 vs 150
 event count.
+
+Resolved (planner, 2026-09-08, same day): budget target = **cascade window 0 B** (met);
+the "< 4 KB mixed-window total" was spec arithmetic, not a code target — no code change
+from it. See #17 for the cycle measurement.
+
+## 17. plugin.log: delegation-cycle events from CHILD sessions flow through; `file.*` types not in the v1.2 skip set (2026-09-08)
+
+Cycle measurement under the OLD profile (v1.1 + v2, live until the v1.2 start), this
+post-restart session: the v1.2 delegation cycle (planner's own calls + 1 worker
+delegation, worker ≈ `worker_120K_mtp`) grew the log to **1036 lines / 571 KB in 5 min
+(≈0.9 KB/s sustained — the maintainer's "rapid growth" complaint, quantified)**.
+Breakdown by source session: the worker (CHILD) session contributed **573 lines ≈ 47 %**
+— every event fired inside a delegation lands in the same plugin.log. Newly SEEN event
+types in that window that are NOT in the v1.2 skip set (v1.2 therefore does not silence
+them): `file.watcher.updated` ×41, `file.edited` ×7 (both with empty/minimal
+`properties`), `session.idle` ×1 (a distinct event type — NOT covered by the v1.2 skip of
+`session.status`). Evidence: the pre-v1.2-start lines of `.opencode/plugin.log` (scratch,
+gitignored — the per-type × per-source tally survives as this entry until the maintainer
+wipes the log). Post-start follow-up: the next planner session measures the v1.2 profile
+and decides **v1.3** = silence the residual `file.*` cascade + `session.idle` (expect it
+as the next-biggest chunk; it is one line per type in the skip set — decide with data, do
+not pre-empt). Also record if measured growth under the old profile shows file.watcher as
+the single biggest residual contributor.

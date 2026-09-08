@@ -1,118 +1,73 @@
 # HANDOVER PLANNER — Phase 6: opencode planner/worker workflow (Tier 1 + Tier 2)
 
-FIRST read `AGENTS.md` (orientation, conventions, commit routine — do NOT edit
-AGENTS.md directly: edit a copy, the maintainer replaces), `TODO.md`, and
-`.opencode/prompt_agent_planner.md` (process rules for the planner/worker split).
+FIRST read `AGENTS.md` (orientation, conventions, commit routine — do NOT edit AGENTS.md
+directly), `TODO.md` (#14/#16/#17 carry the plugin evidence), and
+`.opencode/prompt_agent_planner.md` (process rules).
 
 House rule: when something is unclear, ASK EARLY.
 
-## Current state (2026-09-08, checked against HEAD `65dcebf` + uncommitted worker v2 edits —
-the same edits ship in this handover's commit; stamp = last clean commit the planner
-reviewed, see worker status bullet below)
-- Tier 0 (planner/worker prompts + handover layout + scoped planner edit
-  permission) is DONE: `e9da3ef` (layout + prompts + `opencode.jsonc`), `9e9c8b6`
-  (docs adapted to the two-party commit routine + archive protocol), `fe06faf`
-  (archive + this plan).
-- FST code baselines unchanged since Phase 5: **434 passed**, ruff **6 findings**,
-  coverage per `archive/260908-phase5-coverage.md` (Phase 5 = DONE, ceiling reached).
-- NOTE: the old stamp said `9e9c8b6` — it lagged `fe06faf` by one commit
-  (planner session 2026-09-08); no content discrepancy.
+## Current state (2026-09-08, HEAD `f3063be`)
+Session resuming: two handoff-interrupt recoveries on 2026-09-08 (context limit).
+Rebuilt from git log + old NAP `fa8aacc` + this session's live log evidence:
+
+- **v1.2 (log-growth fix) LANDED `f3063be`** — skip set now 10 event types (v1.1's
+  `message.part.delta` + the 9 cascading UPDATE types measured at 63 % of steady-state
+  bytes); writer byte-identical; v2 regression 19/19 + new probe scenarios pass,
+  434 passed / ruff 6. **GOES LIVE AT THE NEXT OPENCODE START.**
+- **v2 summary mirror PROVEN plugin-owned (proof ① done this session):** the v1.2
+  task file explicitly instructed the worker to write its summary to
+  `handover_task_to_planner_worker.md` only and NOT touch the canonical file; the worker
+  recorded + verified its SHA256 `41E6CE80…70F` unchanged at commit; after the task end the
+  plugin overwrote the canonical file with opencode's RAW task-result payload — it carries
+  the `<task id=… state=…><task_result>…</task_result></task>` wrapper (no truncation
+  trailer). **Expect that wrapper in the canonical file from now on** — the worker's own
+  copy (no wrapper) is the `_worker.md` file for this cycle.
+- **Proof protocol ②+③ CLOSED by this session's live-log evidence** (the old-profile log
+  up to the v1.2 start — quantified in TODO #17): `transform` payload = `{sessionID,
+  model:{…}}` — **no agent identifier** (45 evidence lines, kinds transform recorded). So
+  the `ctx:` gauge line did NOT arrive in planner context — v2's gate never matched (it was
+  written to omit-when-unclear by design: never inject-for-all). `warn` lines: none (spec
+  file present → pre-flight correctly silent ✓). task `tool.before`/`tool.after` captured ✓.
+- **Found + archived the interrupted session's uncommitted artifact:** a FULL spec for
+  **plugin v2.1 — graph-based session discrimination** (was `handover_task.md`, uncommitted
+  when that session died at the context limit). Now at
+  `.opencode/archive/260908-v21-session-graph-spec.md`. Design: a `childSessions` set
+  (registered from every `task` `tool.execute.after` `metadata.sessionId` + every
+  `session.created` event) becomes the transform gate — inject ONLY root (planner) sessions,
+  the agent-prefix check stays as a zero-cost secondary guard; ≤1 leaked gauge line per
+  child is a known residual. Adopting v2.1 = TODO #14 closed structurally + gauge lines in
+  PLANNER context (completes the Tier 1 DoD) + Tier 2 builds on v2.1's state; rejecting it
+  = injection dropped-by-design (recorded), Tier 2 builds on v2 only. → **MAINTAINER CALL
+  1 below.**
+- FST code untouched: **434 passed**, ruff **6**, coverage per `archive/260908-phase5-*.md`.
 
 ## Live status (2026-09-08)
-- **Task 1 (Tier 1 plugin) — v1 + v1.1 DONE, live DoD COMPLETE**:
-  - v1 static `924c2b0`; live DoD closed by the v1.1 delegation cycle (call
-    `P6sRew7hVYZteQh8eEFr4xqQQ8DgpTF`) — all 4 post-restart checklist items
-    answered from `plugin.log` (see v2-evidence section below).
-  - v1.1 flood filter **`773e1ae`** — `SKIP_EVENT_TYPES =
-    {"message.part.delta"}` (98% of live lines/bytes were token-stream deltas;
-    maintainer flagged the growth at ~10 min in). Probe 7/7, 434 passed, TODO
-    #12 (my spec off-by-one, worker-caught) + #13 (v1 label, cosmetic) appended.
-    **Effective at next opencode START** — current session still streams deltas
-    into the log (expected; log is scratch + gitignored, deletable anytime).
-  - **Task 1 v2 (ownership) — worker-landed 2026-09-08 (handover task):** task gate +
-    pre-flight warn + summary mirror + ctxgauge injection; offline probe 19/19, 434
-    unchanged; TODO #14 (design flag: transform payload exposes no agent identifier → line
-    omitted + payload evidence-logged as kind `transform`) + #15 (instruction tension)
-    appended. Details + verbatim evidence: `.opencode/handover_task_to_planner.md`.
-    PLANNER-VERIFIED at `2a4996c` (git + EXECUTIVE SUMMARY agree). Lanes
-    note (TODO #15): the pre-commit plan-state routine overrides "worker must
-    not touch the NAP" — worker may stamp + add ONE status line in its own
-    commit; substantive planning stays with the planner.
-  - Task 2 (Tier 2) — UNLOCKED (v1 proven in use). v2 spec landed `65dcebf`; v2 worker
-    delegated 2026-09-08 — DoD verification cycle next (below).
-- **v2 payload map (v1 evidence — design inputs, all observed live)**:
-  - task args at `before`/`after` = **`{description, prompt}` — no `subagent_type`**
-    in hook payloads (v1 probe's `subagent_type` was fabrication) → v2
-    `before-task` validation cannot read the worker choice from args; worker
-    attribution only via `event` payloads (`agent`, e.g. `planner_120k_mtp`).
-  - `after` metadata = `{parentSessionId, sessionId, model:{providerID,modelID},
-    truncated}` — **worker session id reachable**; output field carries the
-    worker final message (v2's deterministic mirror source).
-  - `plugin.added` ×45 = one burst at session start (provider-catalog
-    registration), not repeats — not a filter candidate.
-  - `experimental.chat.system.transform` payload shape NOT yet probed — v2
-    worker must read it in `.opencode/node_modules` + probe offline.
-- **MAINTAINER**: restart opencode ONCE to activate v1.1 + v2 together
-  (proof: quiet log + `transform` evidence lines + `warn` shape); commit or
-  revert your `opencode.jsonc` edit (+`/tmp/**` planner scope — uncommitted,
-  untouched here); AGENTS.md dirt resolved by your `d2de01b`.
-- **NEXT SESSION (post-restart) — v2 proof protocol:** ① delegate a small
-  handover task whose spec OMITS the "worker writes the summary" line →
-  `handover_task_to_planner.md` must be written BY THE PLUGIN (mirror DoD);
-  ② check whether the `ctx:` gauge line appears in MY system context (if not,
-  the `transform` evidence lines in the log show why — TODO #14); ③ scan the
-  fresh log: `transform` lines settle the agent-identifier question, `warn`
-  lines prove the pre-flight; ④ THEN start Tier 2 (custom handover tool,
-  compaction hooks, resume aid, permission auto-approval) — it builds on the
-  v2 live shapes, not guesses.
+- **Task 1 (Tier 1 plugin):** v1 `924c2b0` + v1.1 `773e1ae` + v2 `2a4996c` done & LIVE-
+  PROVEN (mirror ✓ this session, pre-flight ✓, transform evidence ✓); v1.2 `f3063be`
+  offline-verified, **live proof pending one start**; v2.1 SPEC ARCHIVED — maintainer call 1.
+- **Growth diagnosis (the maintainer's complaint — solved on paper, live check pending):**
+  old-profile log measured ≈0.9 KB/s sustained (571 KB in 5 min over the delegation cycle);
+  `message.part.updated` 43 % + `message.updated` 20 % + `session.updated` 9 % cascade (v1.2
+  skips all of it); worker-session events ≈ 47 % of a delegation-cycle log; residual
+  unfiltered types `file.watcher.updated` (×41) / `file.edited` (×7) / `session.idle` (×1)
+  seen live → **v1.3 candidate after post-start measurement (TODO #17)** — decide with data.
+- **Task 2 (Tier 2):** NOT STARTED — wait for call 1: builds on v2.1 (graph state) if
+  adopted, on v2 only if rejected (then ctx-injection = dropped by design; the Tier 2 item
+  list is unchanged — custom `handover` tool, compaction hooks, resume aid, permission
+  auto-approval).
 
-## Task 1 — Tier 1: thin handover plugin
-Goal: move handover mechanics from model discipline to deterministic code.
-Plugin = `.opencode/plugin/handover.ts` — auto-discovered; `@opencode-ai/plugin`
-types already in `.opencode/node_modules`; Bun loads the `.ts` directly (no build
-step); **restart opencode after every edit**.
-
-v1 — LOG ONLY (build this first, nothing else):
-- hooks `event` + `tool.execute.before` + `tool.execute.after`; append one JSON
-  line per event to `.opencode/plugin.log`; guard all fs work — never throw out
-  of a hook.
-- run ONE real planner→worker cycle; inspect the payload shapes: the `task` call
-  args (subagent_type, prompt, sessionID), how the worker's final message arrives
-  as the task result, session IDs.
-- v1 done = `plugin.log` shows a full cycle; opencode start unaffected.
-
-v2 — OWNERSHIP (only after v1 has seen real payload shapes):
-- before `task`: verify `.opencode/handover_task.md` exists + non-empty (log a
-  warning otherwise).
-- after `task`: overwrite `.opencode/handover_task_to_planner.md` from the
-  worker's final message (deterministic mirror; the worker prompt keeps writing
-  it itself until the mirror is proven, then drop the worker line).
-- ctxgauge injection: append the measured context (`ctxgauge/peek.py` via the `$`
-  BunShell) to the planner's system prompt via `experimental.chat.system
-  .transform` — check the payload first for how to detect the planner agent, to
-  keep the peek cost off worker calls.
-- v2 done = one cycle where the summary file was written BY THE PLUGIN + the
-  gauge line visible in the planner context.
-
-Rules: the delegation itself stays the built-in `task` tool — the plugin
-observes and owns files, it never drives the delegation. `plugin.log` is
-gitignored (add the `.opencode/.gitignore` entry). `node_modules` stays local.
-
-## Task 2 — Tier 2: orchestration (ENTER ONLY after Tier 1 v2 is proven in use)
-- custom `handover` tool (`tool: {...}` hook): one planner call writes the task
-  file + records the delegation — less model bookkeeping.
-- `experimental.session.compacting` / `autocontinue`: force
-  `handover_planner.md` current before the planner's compaction continues.
-- resume aid on session start: surface the latest `handover_task_to_planner.md`
-  + `git log -3` to a fresh planner.
-- `permission.ask` auto-approval for the planner's scoped file set.
-- Rationale: it builds on event shapes — don't guess them, wait for the v1/v2
-  logs.
-
-## Open maintainer calls (carried over — NOT agent work)
-`TODO.md` #4/#6 (reclassify 117 + 302–303 in `COVERAGE_TRIAGE.md`), #7
-(empty-macro comment), #1 (vk resolution) + #2 (the 6 lint findings).
+## MAINTAINER CALLS (open — answer in order)
+1. **v2.1: adopt or reject?** (spec archived + summary note at Current-state).
+2. **RESTART opencode** — activates v1.2. Live proof to expect: new-session log contains
+   ONLY `session.created`, `transform`, `warn`, `tool.before/after` (+ unseen types); growth
+   collapses from ≈0.9 KB/s. If v2.1 was adopted AND delegated before the restart, it lands
+   in the same start.
+3. Post-start session measures the v1.2 profile → **v1.3 call** (silence the `file.*`
+   residual — likely top residual after this).
+4. Carried-over maintainer calls: TODO #4/#6 (coverage triage 117 + 302–303), #7 (empty-
+   macro comment), #1 (vk resolution), #2 (the 6 lint findings).
 
 ## Context budget
-Per `AGENTS.md` §Context budget: `.opencode\ctxgauge\peek.py`; stop line REM ≤
-15k or ≥ 85 % — wrap up BEFORE the line (writing this file needs ~10–15k).
+Per `AGENTS.md` §Context budget: `.opencode\ctxgauge\peek.py`; stop line REM ≤ 15k or
+≥ 85 % — wrap up BEFORE the line. Note: until v2.1 lands the planner receives no auto-`ctx:`
+  gauge lines in-system — always self-run the peek (that is exactly the #14 gap).
