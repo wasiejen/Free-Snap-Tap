@@ -17,13 +17,27 @@ House rule: when something is unclear, ASK EARLY.
   (planner session 2026-09-08); no content discrepancy.
 
 ## Live status (2026-09-08)
-- **Task 1 (Tier 1 plugin) — v1 in flight**: spec in `handover_task.md`,
-  `worker_120K_mtp` delegated 2026-09-08 (static-probe scope only). Live
-  validation (one real planner→worker cycle + payload inspection, the v1 DoD)
-  runs in a **post-opencode-restart** session — plugins are NOT hot-reloaded
-  (confirmed via `customize-opencode` skill: loaded once at start).
+- **Task 1 (Tier 1 plugin) — v1 static DONE, live DoD pending**: worker
+  (`worker_120K_mtp`) landed `.opencode/plugin/handover.ts` (113 lines, hooks
+  `event` / `tool.execute.before` / `tool.execute.after`, JSON lines ≤2000 chars,
+  gitignored `plugin.log`) at **`924c2b0`**; probe-verified offline (Electron
+  `RUN_AS_NODE=1` → Node 24.15 — **no node/bun/npx on PATH here**; the offline
+  node route is the reusable trick for any future TS probe). 434 passed.
+  Payload findings recorded in `handover_task_to_planner.md`: args arrive on the
+  `before` hook's `output`, `after` input has `{tool,sessionID,callID,args}` /
+  output `{title,output,metadata}`, `event` = `{type,properties}` (session/agent
+  from `properties(.info)`).
+- **v1 FULL DoD (next session, post-restart)** — one real planner→worker cycle,
+  then read `plugin.log` against the checklist in `handover_task_to_planner.md`
+  (task args shape, worker final message in `after.output`, sessionID
+  correlation, hook-order/event-noise flags, startup health).
 - Task 2 (Tier 2) — gated on v1 in-use proven, waiting.
-- **MAINTAINER: restart opencode after the worker lands so v2-session planning sees plugin log shape.**
+- **MAINTAINER**: restart opencode (plugin loads at start only — NOT hot-reloaded);
+  next session does the live cycle. Also: **pre-existing dirty `AGENTS.md` in
+  worktree** (mtime 15:44, before `924c2b0`; +`archive/` in the `.opencode/`
+  module-map line) — left uncommitted per the copy-and-replace rule; maintainer:
+  apply via your normal replacement, or tell us to revert the file. Not done by
+  this planner/worker.
 
 ## Task 1 — Tier 1: thin handover plugin
 Goal: move handover mechanics from model discipline to deterministic code.
