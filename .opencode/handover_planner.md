@@ -25,6 +25,11 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
   procedure (worker deviates and notes it). Prompts updated at `b8ea40b` — note THIS session
   still runs the old planner text. This cycle's task is the first under the new worker text —
   watch the worker summary for whether the freedom helps or harms (flag for the maintainer).
+- **Mid-cycle maintainer config edit (live `opencode.jsonc`, uncommitted):** Looprunner
+  COMMENTED OUT (his "ignore" call implemented by him); my planner `permission` now
+  `edit:"allow"` + bash allow + webfetch allow (work-mode call implemented by him; the old
+  `edit` deny-map with the `/tmp/**` pattern is gone — TODO #25 moot pending his commit).
+  Takes effect at the next opencode start; my live process still runs the start-time config.
 - **Maintainer config change at `0bd75bf` (after the previous NAP):** `opencode.jsonc` gained
   a `Looprunner` primary agent (Gemma 4-12B, all permissions denied, prompt = "start the
   planner repeatedly"), worker temperatures now 0.3 (120K) / 0.5 (210K), scratchpad
@@ -66,19 +71,23 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
    state): skip `file.watcher.updated` + `file.edited` + `session.idle` (steady-state noise:
    58/12/20 of the 115 event lines this start); KEEP `message.removed` + `session.*` as
    signal. Approve / amend.
-4. ~~Looprunner during delegations~~ — maintainer: ignored (not running, not working as
-   intended).
+4. ~~Looprunner~~ — maintainer: ignored (not running, not working as intended); he also
+   commented it out in the live `opencode.jsonc` (config-edit bullet above).
 
 ## NEXT STEPS
-1. v2.2.1 worker returns → verify commit + baselines + probe before/after, integrate,
-   bookkeeping commit. THEN ask the maintainer for the one opencode start.
-2. After the start: read `kind:"gauge"` lines + a worker's ctx-quote → root cause = {spawn/
+1. **STOPPED at the line (89 % / 13 k REM mid-orientation) — v2.2.1 spec WRITTEN, NOT
+   FIRED.** Resume = delegate `worker_120K_mtp` (standard prompt; spec = current
+   `.opencode/handover_task.md`) — ideally AFTER the maintainer's opencode start: the live
+   config edit (bullet above) needs one start anyway.
+2. Worker returns → verify commit + baselines + probe before/after, integrate, bookkeeping
+   commit. THEN ask for the one opencode start (the root-cause read needs it).
+3. After the start: read `kind:"gauge"` lines + a worker's ctx-quote → root cause = {spawn/
    shell problem, 3000 ms timeout, non-CTX output (preview says which — peek.py output
    visible there), system-not-array, ok+injected (→ #23 false alarm), or zero gauge lines
    AND line still missing → opencode-level transform-drop, escalate}.
-3. Then: **Tier 2 scoping from the LIVE shapes** — written proposal, decisions are the
-   maintainer's; no Tier-2 code before a Tier-2 spec exists.
-4. Bookkeeping hygiene: the mirror file (`.opencode/handover_task_to_planner.md`) is the
+4. Then: **Tier 2 scoping from the LIVE shapes** — written proposal; Tier-2 code waits for
+   a Tier-2 spec.
+5. Bookkeeping hygiene: the mirror file (`.opencode/handover_task_to_planner.md`) is the
    worker's in its cycle; if still dirty at my bookkeeping moment, commit it with the
    plan-state (stable by then).
 
