@@ -4,6 +4,9 @@ Context for working on this repo. Written so a fresh agent can start with minima
 exploration. If something here conflicts with the code, the code wins — but flag the
 discrepancy.
 
+## Editing this file
+- Do not edit `AGENTS.md` directly — edit a copy and the maintainer will replace it.
+
 ## What this is
 A Windows-only snap-tapping / rebind / macro tool. It hooks keyboard (and mouse) input
 via pynput's low-level win32 filter, suppresses the original events, and re-emits
@@ -27,17 +30,22 @@ macOS not supported.
   Goal: `git log` must stay readable as a small work summary on its own.
 
 ## Commit routine (BEFORE EVERY commit, no exceptions)
-NAP and `TODO.md` updates happen **before** committing and go **into the same
-commit** — so an interrupted agent can resume from a committed NAP with relatively
-current data, without re-exploring.
-1. **Update `NEXT_AGENT_PROMPT.md` (NAP) with current progress** — what is done, the
-   next task(s), current baselines (test count, lint count, coverage) and what is
-   about to be committed (subject + file set; the hash only exists after committing).
-2. **Append every discrepancy found during the work to `TODO.md`** — doc/code
+Plan state (`.opencode/handover_planner.md`, the NAP) and `TODO.md` updates happen
+**before** committing — so an interrupted agent can resume from a committed state with
+relatively current data, without re-exploring. In the planner/worker split the commits
+are two-party:
+1. **The worker** commits its code + `TODO.md` + the task's handover files
+   (`.opencode/handover_task.md`, `.opencode/handover_task_to_planner.md`) in one
+   commit. `git log` + `TODO.md` is the durable record of what happened.
+2. **The planner** updates `.opencode/handover_planner.md` — what is done, the next
+   task(s), current baselines (test count, lint count, coverage) and what is about to
+   be committed (subject + file set; the hash only exists after committing) — and
+   commits that plan-state file with its bookkeeping. A single agent doing both roles
+   commits everything (code + `TODO.md` + the state file) in one commit.
+3. **Append every discrepancy found during the work to `TODO.md`** — doc/code
    mismatches, suspected bugs, stale baselines — as a new numbered entry in
    `TODO.md` style (`## <n>. <summary> (<date>)`). Append only, never rewrite
    existing entries.
-3. **Commit code changes + NAP + `TODO.md` together** in that single commit.
 4. **Post-commit context check** — see `## Context budget` below.
 
 ## Run / test
@@ -49,8 +57,8 @@ current data, without re-exploring.
 
 ## Context budget (NAP threshold)
 - Check between logical chunks (before heavy steps) AND after every commit (step 4 of
-  the commit routine): `& .\.venv\Scripts\python.exe ..\ctxgauge\peek.py` (from the repo
-  root, read-only) → `CTX=n (p%)`.
+  the commit routine): `& .\.venv\Scripts\python.exe .opencode\ctxgauge\peek.py` (from
+  the repo root, read-only) → `CTX=n (p%) REM=m`.
 - **Line:** stop working when ≤ 15k tokens remain **or** 85% used — whichever comes first. Writing the NAP needs another ~10k (simple tasks) to ~15k (complex: thinking + lookups), so wrap up BEFORE the line.
 - **Not enough context left** (at the line, or a check says the next tasks will not fit):
   write all open tasks into the NAP (the update rides in the NEXT commit), stop at a
@@ -83,6 +91,12 @@ file. README/WIKI have some stale examples — trust the convention above.
 - `playground/` — maintainer's personal live bug probes (raw win32 mouse filter, live overlay/toast
   flow against a dummy FST). Not part of the test suite (`pytest.ini` `testpaths = tests`); never
   import them from package code, and exclude from EXE packaging. Run directly from the repo root.
+- `.opencode/` — opencode meta files (not FST code): `prompt_agent_planner.md` /
+  `prompt_agent_task.md` (agent prompts), `handover_planner.md` (planner state/continuation
+  file, the NAP), `handover_task.md` (current task spec), `handover_task_to_planner.md`
+  (worker's latest EXECUTIVE SUMMARY), `ctxgauge/peek.py` (context gauge).
+- `opencode.jsonc` (repo root) — opencode config: llama-swap provider + model list, planner
+  (primary) and worker agents (subagents), scoped permissions.
 
 ## Data flow
 config file → `Config_Manager.load_config` (parse to dict + arg lines + group lines) →
@@ -95,7 +109,7 @@ sends events with delays. Focus change re-runs `update_args_and_groups`.
 ## Test conventions
 - Tests live in `tests/`: pure unit scope + offscreen GUI (pytest-qt 4.5.0, `QT_QPA_PLATFORM=offscreen` pinned in `tests/conftest.py`). No real keyboard, no real time, no Windows APIs.
 - Desired-but-not-yet-true behavior goes into a dedicated **xfail** file (the original `tests/test_known_issues.py` is fully resolved/accepted and no longer exists — recreate the pattern if needed). When a fix lands, move the test into a normal file and keep it green.
-- Suite size is a moving baseline — see `NEXT_AGENT_PROMPT.md` for the live number (as of `fffea8b` 2026-09-08: **434 passed, 0 xfailed**).
+- Suite size is a moving baseline — see `.opencode/handover_planner.md` for the live number (as of `fffea8b` 2026-09-08: **434 passed, 0 xfailed**).
 
 ## Maintainer decisions on the original known-issues (060926)
 - **#1 shared `constraints=[0,0]` default** — accepted; delays are never mutated individually. Removed from xfail.
@@ -107,13 +121,13 @@ sends events with delays. Focus change re-runs `update_args_and_groups`.
 
 ## Current work (phase-scoped — kept out of this file)
 Phase plans, the progress log, current baselines and the rules of the current handoff
-live in **`NEXT_AGENT_PROMPT.md`** (rewritten per handoff — read it first when you get one).
-The maintainer calls this file **`NAP.md`** (**N**ext **A**gent **P**rompt) — if the user
-says "NAP" or "write a NAP", they mean NEXT_AGENT_PROMPT.md.
+live in **`.opencode/handover_planner.md`** (rewritten per handoff — read it first when you get one).
+The maintainer calls this file the **NAP** (**N**ext **A**gent **P**rompt) — if the user
+says "NAP" or "write a NAP", they mean `.opencode/handover_planner.md`.
 Durable maintainer TODOs live in **`TODO.md`**.
 **AGENTS.md holds stable facts and conventions only — never phase progress.** If a note
 needs to survive across phases, it belongs here only if it is a permanent convention or
-gotcha; otherwise it goes to `NEXT_AGENT_PROMPT.md`.
+gotcha; otherwise it goes to `.opencode/handover_planner.md`.
 
 ## Gotchas
 - `Config_Manager.load_config` opens `self._file_name` directly — point it at a `tmp_path` fixture or monkeypatch `_open_config_file`.

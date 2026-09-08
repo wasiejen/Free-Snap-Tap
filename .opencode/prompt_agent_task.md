@@ -18,8 +18,9 @@ in TODO.md (append only) and flag it in your summary. Stop at a clean point.
 
 ## Before you stop (commit routine - mandatory)
 1. TODO.md updated with every discrepancy found (append only, never rewrite existing entries).
-2. Commit code + TODO.md together. Message: one-line imperative subject; up to ~3 short body
-   lines if the commit spans several themes. Do NOT push.
+2. Commit code + TODO.md + the task's handover files (.opencode/handover_task.md,
+   .opencode/handover_task_to_planner.md) together. Message: one-line imperative
+   subject; up to ~3 short body lines if the commit spans several themes. Do NOT push.
 
 ## Your final message - the handover to the planner
 Write the EXECUTIVE SUMMARY to .opencode/handover_task_to_planner.md (the maintainer-visible
