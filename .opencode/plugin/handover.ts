@@ -4,6 +4,11 @@
 // v1.1 log (kept verbatim): `event`, `tool.execute.before`, `tool.execute.after` append one
 // capped JSON line to .opencode/plugin.log (delta filter + truncation ladder unchanged).
 //
+// v1.2 (growth fix): the skip set now covers the cascading UPDATE event types (measured 63% of
+// steady-state log bytes); session.created, transform, warn, tool.before/after remain logged, and
+// UNSEEN event types remain logged — the skip list is opt-out only (shape learning for new
+// opencode event types is preserved).
+//
 // v2 additions (all best-effort; no hook ever throws out into a delegation, and v2 behavior is
 // restricted to handover delegations — a `task` call whose `args.prompt` contains
 // ".opencode/handover_task.md"):
@@ -29,7 +34,19 @@ import { join } from "node:path";
 const LINE_CAP = 2000;
 const CAPS = [500, 150, 60];
 const DOT = "\u2026";
-const SKIP_EVENT_TYPES = new Set(["message.part.delta"]);
+const SKIP_EVENT_TYPES = new Set([
+  "message.part.delta", // v1.1
+  // v1.2 — the cascading UPDATE event types (log-growth fix); see the v1.2 header note
+  "message.part.updated",
+  "message.updated",
+  "session.updated",
+  "session.status",
+  "session.diff",
+  "plugin.added",
+  "catalog.updated",
+  "reference.updated",
+  "integration.updated",
+]);
 
 // v2 — handover ownership
 const HANDOVER_SPEC_PATH = ".opencode/handover_task.md";

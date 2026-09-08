@@ -167,3 +167,23 @@ v2 implementation resolved it: worker updated the stamp + one status bullet unde
 commit — bookkeeping stays the planner's). If the maintainer meant "never, under no worker",
 this entry is the correction point — decide which instruction wins and make it explicit, the
 conflict recurs with every delegated handover.
+
+## 16. v1.2 byte-budget spec arithmetic mismatch + literal "< 4 KB" mixed-window budget infeasible (2026-09-08)
+
+The v1.2 task file's byte-budget scenario is self-inconsistent: it says "feed 190 events
+(10 per each of the 10 skipped types + 10 per each of 5 retained types …)" — the described
+composition is **150** events (100 + 50), and `message.part.delta` appears in **both** the
+skip set (v1.1 filter) and the task's own "retained" list. Additionally, "assert total log
+bytes for this scenario < 4 KB" is infeasible as a mixed-window total: the 40 retained lines
+that MUST be logged floor at ≈ 4.8 KB of JSON chrome alone (measured: 7,980 B retained window
+byte-identical before/after the edit) — the check failed against the UNCHANGED v2 code as well
+(25,330 B BEFORE mixed window). Worker measured (Electron Node 24.15.0 probe, temp sandbox
+root, 150-event composition as listed in the task):
+- BEFORE (v2 code): cascade window 17,350 B (90 lines — the residual growth bug) + retained
+  7,980 B = 25,330 B mixed.
+- AFTER (v1.2): cascade window **0 B** (all 100 cascade events skipped) + retained 7,980 B
+  (writer byte-identical) = 7,980 B mixed.
+
+Planner call: define the budget target — the cascade-only window meets "< 4 KB" (17,350 B →
+0 B) — or the mixed-window total needs a different threshold — and settle the 190 vs 150
+event count.
