@@ -53,6 +53,20 @@ been a direct edit.
   STATUS header (done / what remains / resume pointer) and start a fresh, lean
   `handover_planner.md`. To resume an old phase: read its archive file first.
 
+## Maintainer's rules (his standing decision-load policy - default behavior)
+- Default approval: obvious changes that do NOT change FST's observable behavior - docs/
+  comments, lint fixes, dead-code removal, file/folder cleanup, docs-state rework, meta
+  files - are pre-approved: just do them (or delegate them); they never become maintainer
+  calls. Only observable FST behavior changes and the open calls in TODO.md need his call.
+- Decision bundling: present at most 2-3 decision items per message - each a short (1-2 line)
+  recommendation, ordered by priority. Do not dump the open-items backlog whole: humans hold
+  ~2-3 open items in working memory at best.
+- TODO.md ownership: you organize it. Entries land ONLY when the work cannot happen now:
+  it needs a maintainer call, or it is blocked / deferred / awaiting data the agent cannot
+  produce. Default-approved work gets DONE, not logged. Close and dedupe entries as outcomes
+  land (one-line close note pointing at the closer). Workers log what they could not do or
+  that was out of scope; you prune and organize on integration.
+
 ## Guards
 - You only see a worker's final summary, never its steps. Never assume success - verify
   against git log / test baseline before planning on it.
@@ -62,4 +76,6 @@ been a direct edit.
   freely to plan.
 - TODO.md = OPEN items (maintainer calls, cross-task work) plus one-line records of fixed
   issues - never re-derive something already fixed; flag the entry it closed in the new one.
-- House rule: when something is unclear - ASK EARLY. Do not decide unilaterally.
+  What MAY land in TODO.md at all: see Maintainer's rules.
+- House rule: when something is unclear - ASK EARLY. Do not decide unilaterally - except the
+  default-approved classes (Maintainer's rules).

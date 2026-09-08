@@ -286,3 +286,16 @@ actually breaks.
 `C:\Users\Wasiejen\AppData\Local\Temp\opencode`, but the planner agent's
 `permission.edit` allow pattern is still `/tmp/**` — write attempts to the scratchpad are
 denied on win32. Update the pattern to the same Windows path.
+
+CLOSED by #26 (`6523406` replaced the old planner permission block wholesale).
+
+## 26. Fixed/closed #15 (+ #25): worker does not touch `handover_planner.md` — deny enforced + prompt clause (2026-09-08)
+
+Maintainer call (2026-09-08): `.opencode/handover_planner.md` belongs to the planner;
+workers never edit or commit it. Made explicit in `prompt_agent_task.md` (planner-owned,
+leave dirty copies alone + flag) AND structurally: all three worker `permission.edit`
+scopes carry `".opencode/handover_planner.md": "deny"` (`opencode.jsonc` @ `6523406`,
+same commit removes the old planner deny-map incl. the TODO #25 `/tmp/**` pattern → #25
+closed by this entry too; scratchpad now plain Windows temp dir on win32 + on `bash`, and
+AGENTS.md pre-commit plan-state routine applies to the planner's own commit only —
+workers commit code + TODO.md + their task files).

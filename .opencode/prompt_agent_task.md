@@ -25,6 +25,9 @@ the task's files): FIX it, verify it, and record it in TODO.md as a short one-li
 (c) issues the task deliberately says NOT to touch.
 TODO.md is the record of OPEN items plus one-line fix records - not a dump of every
 observation you could have fixed on the way.
+You do NOT touch .opencode/handover_planner.md - the plan state belongs to the planner
+(decided maintainer call 2026-09-08; deny permission is also in force for this file). If it
+appears dirty in the working tree, leave it alone and flag it in your summary.
 
 ## Before you stop (commit routine - mandatory)
 1. TODO.md updated with every discrepancy found (append only, never rewrite existing entries).
