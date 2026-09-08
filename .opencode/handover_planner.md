@@ -34,6 +34,10 @@ reviewed, see worker status bullet below)
     unchanged; TODO #14 (design flag: transform payload exposes no agent identifier → line
     omitted + payload evidence-logged as kind `transform`) + #15 (instruction tension)
     appended. Details + verbatim evidence: `.opencode/handover_task_to_planner.md`.
+    PLANNER-VERIFIED at `2a4996c` (git + EXECUTIVE SUMMARY agree). Lanes
+    note (TODO #15): the pre-commit plan-state routine overrides "worker must
+    not touch the NAP" — worker may stamp + add ONE status line in its own
+    commit; substantive planning stays with the planner.
   - Task 2 (Tier 2) — UNLOCKED (v1 proven in use). v2 spec landed `65dcebf`; v2 worker
     delegated 2026-09-08 — DoD verification cycle next (below).
 - **v2 payload map (v1 evidence — design inputs, all observed live)**:
@@ -48,10 +52,19 @@ reviewed, see worker status bullet below)
     registration), not repeats — not a filter candidate.
   - `experimental.chat.system.transform` payload shape NOT yet probed — v2
     worker must read it in `.opencode/node_modules` + probe offline.
-- **MAINTAINER**: restart opencode to activate v1.1 (the live log's quiet
-  growth then proves it); `opencode.jsonc` has a DIRTY edit from your side
-  (+`/tmp/**` allow for the planner edit scope — uncommitted, untouched here,
-  needs your commit or revert); AGENTS.md dirt resolved by your `d2de01b`.
+- **MAINTAINER**: restart opencode ONCE to activate v1.1 + v2 together
+  (proof: quiet log + `transform` evidence lines + `warn` shape); commit or
+  revert your `opencode.jsonc` edit (+`/tmp/**` planner scope — uncommitted,
+  untouched here); AGENTS.md dirt resolved by your `d2de01b`.
+- **NEXT SESSION (post-restart) — v2 proof protocol:** ① delegate a small
+  handover task whose spec OMITS the "worker writes the summary" line →
+  `handover_task_to_planner.md` must be written BY THE PLUGIN (mirror DoD);
+  ② check whether the `ctx:` gauge line appears in MY system context (if not,
+  the `transform` evidence lines in the log show why — TODO #14); ③ scan the
+  fresh log: `transform` lines settle the agent-identifier question, `warn`
+  lines prove the pre-flight; ④ THEN start Tier 2 (custom handover tool,
+  compaction hooks, resume aid, permission auto-approval) — it builds on the
+  v2 live shapes, not guesses.
 
 ## Task 1 — Tier 1: thin handover plugin
 Goal: move handover mechanics from model discipline to deterministic code.
