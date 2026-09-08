@@ -6,12 +6,24 @@ AGENTS.md directly: edit a copy, the maintainer replaces), `TODO.md`, and
 
 House rule: when something is unclear, ASK EARLY.
 
-## Current state (2026-09-08, checked against HEAD `9e9c8b6`)
+## Current state (2026-09-08, checked against HEAD `fe06faf`)
 - Tier 0 (planner/worker prompts + handover layout + scoped planner edit
   permission) is DONE: `e9da3ef` (layout + prompts + `opencode.jsonc`), `9e9c8b6`
-  (docs adapted to the two-party commit routine + archive protocol).
+  (docs adapted to the two-party commit routine + archive protocol), `fe06faf`
+  (archive + this plan).
 - FST code baselines unchanged since Phase 5: **434 passed**, ruff **6 findings**,
   coverage per `archive/260908-phase5-coverage.md` (Phase 5 = DONE, ceiling reached).
+- NOTE: the old stamp said `9e9c8b6` — it lagged `fe06faf` by one commit
+  (planner session 2026-09-08); no content discrepancy.
+
+## Live status (2026-09-08)
+- **Task 1 (Tier 1 plugin) — v1 in flight**: spec in `handover_task.md`,
+  `worker_120K_mtp` delegated 2026-09-08 (static-probe scope only). Live
+  validation (one real planner→worker cycle + payload inspection, the v1 DoD)
+  runs in a **post-opencode-restart** session — plugins are NOT hot-reloaded
+  (confirmed via `customize-opencode` skill: loaded once at start).
+- Task 2 (Tier 2) — gated on v1 in-use proven, waiting.
+- **MAINTAINER: restart opencode after the worker lands so v2-session planning sees plugin log shape.**
 
 ## Task 1 — Tier 1: thin handover plugin
 Goal: move handover mechanics from model discipline to deterministic code.
