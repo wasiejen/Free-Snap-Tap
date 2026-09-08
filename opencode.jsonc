@@ -49,18 +49,18 @@
       }
     },
   "agent": {
-    "Looprunner": {
-      "description": "simple loop runner for the planner agent",
-      "mode": "primary",
-      "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-256K",
-      "temperature": 0.1,
-      "prompt": "Ignore the AGENTS.md. Your only job is to start the Planner Agent 'planner_120k_mtp' repeatedly. Do nothing else. Do not start a worker type agent.",
-      "permission": {
-        "edit": "deny",
-        "bash": "deny",
-        "webfetch": "deny"
-      }
-    },
+    // "Looprunner": {
+    //   "description": "simple loop runner for the planner agent",
+    //   "mode": "primary",
+    //   "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-256K",
+    //   "temperature": 0.1,
+    //   "prompt": "Ignore the AGENTS.md. Your only job is to start the Planner Agent 'planner_120k_mtp' repeatedly. Do nothing else. Do not start a worker type agent.",
+    //   "permission": {
+    //     "edit": "deny",
+    //     "bash": "deny",
+    //     "webfetch": "deny"
+    //   }
+    // },
     "planner_120k_mtp": {
       "description": "very intelligent, fast, 120k context, plans tasks and delegates to sub-agents",
       "mode": "primary",
@@ -68,21 +68,11 @@
       "temperature": 1.0,
       "prompt": "{file:./.opencode/prompt_agent_planner.md}",
       "permission": {
-        "external_directory": {
-          "C:\\Users\\Wasiejen\\AppData\\Local\\Temp\\opencode": "allow"
-        },
-        "edit": {
-          "*": "deny",
-          "TODO.md": "allow",
-          "AGENTS.md": "allow",
-          ".opencode/**": "allow",
-          "/tmp/**": "allow"
-        },
+        "edit": "allow",
         "bash": "allow",
         "webfetch": "allow"
       }
     },
-
     "worker_gemma_256k_mtp": {
       "description": "moderately intelligent, very very fast, 256K context window - needs concrete instructions, best for webfetch, big file reads, big writes",
       "mode": "all",
