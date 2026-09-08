@@ -59,3 +59,39 @@ The comment says an empty key group is ignored and does "not supress the trigger
 `alias_fired = True` (line 697) is set before the empty check, so the trigger key IS
 suppressed (`_listener.suppress_event`, verified by `test_empty_macro_sequence_no_playback`).
 Either the comment or the behavior is stale — your call.
+
+## 8. `ap`/`ar` "all keys (incl simulated)" state is not a union — last-write-wins shared dict (2026-09-08)
+
+`ap(...)` is documented as "press of all keys (incl simulated)" (`fst_manager.py` 253–256),
+but `set_real_key_press_state` (1611–1614) and `set_simulated_key_press_state` (1622–1625)
+both write the shared `_all_key_press_states_dict` last-write-wins — a release from either
+side clears the `all` state even if the other side's press is still active, so `ap` may not
+behave as "real OR simulated". Found during the interrupted Phase-5 run (it explains the
+1630–1632 KeyError coverage gap; the run noted it only as a test-design remark). Also
+asymmetric: `set_real_key_press_state` lacks the `vk_code > 0` guard the other two setters
+have. Confirm intended semantics (or fix).
+
+## 9. Repeat-constraint excepts too narrow for malformed `repeat_thread_dict` entries (2026-09-08)
+
+`toggle_repeat` (327), `is_repeat_active` (340), `reset_repeat` (350) catch
+`(KeyError, AttributeError)`, `stop_all_repeat` (365) only `AttributeError` — but unpacking
+an entry that is not a 2-tuple raises `ValueError`, which is uncaught and would propagate
+out of `constraint_evaluation`. Noted during the interrupted Phase-5 run while writing the
+coverage test for 365–366. Low severity: entries are only written by `start_repeat` (301)
+as 2-tuples `[task, handle]`. Decide whether to harden the excepts or leave as-is.
+
+## 10. `fst_overlay.py` 549: deprecated `QMouseEvent.globalPos()` (2026-09-08)
+
+Every `pytest -q` run emits the `DeprecationWarning: 'QMouseEvent.globalPos() const'` from
+`fst_overlay.py:549` (12-warning baseline noted in the Phase-5 run). Replace with the Qt6
+API (`event.position()` / `globalPosition()`) — cosmetic, no behavior change; same spirit
+as `TODO.md` #2.
+
+## 11. General contradiction prevention still disabled (XXX 241016-1101, `fst_keyboard.py` 791) (2026-09-08)
+
+`###XXX 241016-1101 general contradiction prevention disabled to test` — the 793–803
+contradiction block of `_win32_event_filter` no longer suppresses (`to_be_suppressed` is
+not set), and the Phase-5 tests (`tests/test_filter_simulated.py`) now pin that
+non-suppression. Clarify + document as final decision: if it stays off, reword the
+XXX/"to test" comment so it reads as an intentional decision; if it was meant to be
+reenabled, that is the call.
