@@ -6,7 +6,7 @@ AGENTS.md directly: edit a copy, the maintainer replaces), `TODO.md`, and
 
 House rule: when something is unclear, ASK EARLY.
 
-## Current state (2026-09-08, checked against HEAD `fe06faf`)
+## Current state (2026-09-08, checked against HEAD `773e1ae`)
 - Tier 0 (planner/worker prompts + handover layout + scoped planner edit
   permission) is DONE: `e9da3ef` (layout + prompts + `opencode.jsonc`), `9e9c8b6`
   (docs adapted to the two-party commit routine + archive protocol), `fe06faf`
@@ -17,27 +17,34 @@ House rule: when something is unclear, ASK EARLY.
   (planner session 2026-09-08); no content discrepancy.
 
 ## Live status (2026-09-08)
-- **Task 1 (Tier 1 plugin) — v1 static DONE, live DoD pending**: worker
-  (`worker_120K_mtp`) landed `.opencode/plugin/handover.ts` (113 lines, hooks
-  `event` / `tool.execute.before` / `tool.execute.after`, JSON lines ≤2000 chars,
-  gitignored `plugin.log`) at **`924c2b0`**; probe-verified offline (Electron
-  `RUN_AS_NODE=1` → Node 24.15 — **no node/bun/npx on PATH here**; the offline
-  node route is the reusable trick for any future TS probe). 434 passed.
-  Payload findings recorded in `handover_task_to_planner.md`: args arrive on the
-  `before` hook's `output`, `after` input has `{tool,sessionID,callID,args}` /
-  output `{title,output,metadata}`, `event` = `{type,properties}` (session/agent
-  from `properties(.info)`).
-- **v1 FULL DoD (next session, post-restart)** — one real planner→worker cycle,
-  then read `plugin.log` against the checklist in `handover_task_to_planner.md`
-  (task args shape, worker final message in `after.output`, sessionID
-  correlation, hook-order/event-noise flags, startup health).
-- Task 2 (Tier 2) — gated on v1 in-use proven, waiting.
-- **MAINTAINER**: restart opencode (plugin loads at start only — NOT hot-reloaded);
-  next session does the live cycle. Also: **pre-existing dirty `AGENTS.md` in
-  worktree** (mtime 15:44, before `924c2b0`; +`archive/` in the `.opencode/`
-  module-map line) — left uncommitted per the copy-and-replace rule; maintainer:
-  apply via your normal replacement, or tell us to revert the file. Not done by
-  this planner/worker.
+- **Task 1 (Tier 1 plugin) — v1 + v1.1 DONE, live DoD COMPLETE**:
+  - v1 static `924c2b0`; live DoD closed by the v1.1 delegation cycle (call
+    `P6sRew7hVYZteQh8eEFr4xqQQ8DgpTF`) — all 4 post-restart checklist items
+    answered from `plugin.log` (see v2-evidence section below).
+  - v1.1 flood filter **`773e1ae`** — `SKIP_EVENT_TYPES =
+    {"message.part.delta"}` (98% of live lines/bytes were token-stream deltas;
+    maintainer flagged the growth at ~10 min in). Probe 7/7, 434 passed, TODO
+    #12 (my spec off-by-one, worker-caught) + #13 (v1 label, cosmetic) appended.
+    **Effective at next opencode START** — current session still streams deltas
+    into the log (expected; log is scratch + gitignored, deletable anytime).
+  - Task 2 (Tier 2) — UNLOCKED (v1 proven in use). Next: v2 ownership spec +
+    delegation (below).
+- **v2 payload map (v1 evidence — design inputs, all observed live)**:
+  - task args at `before`/`after` = **`{description, prompt}` — no `subagent_type`**
+    in hook payloads (v1 probe's `subagent_type` was fabrication) → v2
+    `before-task` validation cannot read the worker choice from args; worker
+    attribution only via `event` payloads (`agent`, e.g. `planner_120k_mtp`).
+  - `after` metadata = `{parentSessionId, sessionId, model:{providerID,modelID},
+    truncated}` — **worker session id reachable**; output field carries the
+    worker final message (v2's deterministic mirror source).
+  - `plugin.added` ×45 = one burst at session start (provider-catalog
+    registration), not repeats — not a filter candidate.
+  - `experimental.chat.system.transform` payload shape NOT yet probed — v2
+    worker must read it in `.opencode/node_modules` + probe offline.
+- **MAINTAINER**: restart opencode to activate v1.1 (the live log's quiet
+  growth then proves it); `opencode.jsonc` has a DIRTY edit from your side
+  (+`/tmp/**` allow for the planner edit scope — uncommitted, untouched here,
+  needs your commit or revert); AGENTS.md dirt resolved by your `d2de01b`.
 
 ## Task 1 — Tier 1: thin handover plugin
 Goal: move handover mechanics from model discipline to deterministic code.
