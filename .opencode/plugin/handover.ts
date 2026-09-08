@@ -21,11 +21,13 @@
 //   - `experimental.chat.system.transform`: the raw payload is evidence-logged (kind
 //     "transform") so the LIVE shape is visible from the post-restart plugin.log — the SDK
 //     types (1.18.29) declare the input as `{sessionID?, model}` with no agent identifier, so
-//     the line is omitted unless the payload exposes one whose value starts with "planner".
-//     On match: one line "ctx: <peek.py output>" is appended to `output.system`, the gauge
-//     runs through the PluginInput shell ($) with a bounded wait — if the shell is absent, the
-//     line is omitted. Planner-only, decided call, never second-guess: inject-for-all would
-//     be wrong, hence this design-flag + payload capture. See TODO.md #14.
+//     v2's planner-only gate (line omitted unless the payload exposes one whose value starts
+//     with "planner"; "Planner-only, decided call, never second-guess: inject-for-all would
+//     be wrong") is void since the maintainer "both" call 2026-09-08 — injection now runs on
+//     EVERY transform, planner and worker sessions (TODO.md #18). One line "ctx: <peek.py
+//     output>" is appended to `output.system`, the gauge runs through the PluginInput shell
+//     ($) with a bounded wait — if the shell is absent, the line is omitted. See TODO.md #14
+//     (evidence-log rationale + the now-overridden v2 design record).
 //
 // v2.2 (maintainer "both" call, 2026-09-08): the transform hook now injects on EVERY transform —
 // planner AND worker sessions — the agent-prefix gate is removed. The live payload carries no
@@ -261,8 +263,10 @@ async function gaugeReadout(): Promise<string | undefined> {
 
 // v2 — ctxgauge injection. The payload is evidence-logged FIRST (kind "transform") so the
 // post-restart log shows exactly what opencode exposes at this call site. The SDK types
-// declare no agent identifier — if none arrives, the line is omitted (planner-only, decided
-// call, never inject-for-all). See TODO.md #14.
+// declare no agent identifier — v2's planner-only gate was overridden by the maintainer "both"
+// call 2026-09-08 (TODO.md #18): injection now runs on EVERY transform, planner and worker
+// sessions. The line is omitted only when the gauge does not resolve (shell absent or no
+// CTX= output). See TODO.md #14 (evidence-log rationale + the now-overridden v2 design record).
 async function onSystemTransform(
   input: { sessionID?: string; agent?: string; model?: unknown },
   output: { system?: unknown },

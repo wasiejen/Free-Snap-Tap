@@ -1,85 +1,62 @@
-# TASK — Phase 6 / Tier 1 — plugin v2.2: ctxgauge injection for ALL sessions ("both")
+# TASK — Phase 6 / Tier 1 — v2.2.1: persist the offline probe harness + stale v2 comments
 
-FIRST read `AGENTS.md`, `.opencode/handover_task_to_planner.md` (the v1.2 worker's
-EXECUTIVE SUMMARY — carries the offline Electron `RUN_AS_NODE=1` Node 24 probe
-recipe), `.opencode/plugin/handover.ts` (current code = v1.2 skip set + v2
-ownership), and `.opencode/archive/260908-v21-session-graph-spec.md` READ-ONLY
-(context only — that design is SUPERSEDED by the decision in this spec, NOT an
-instruction).
+FIRST read `AGENTS.md`, `.opencode/handover_task_to_planner.md` (v2.2 EXECUTIVE
+SUMMARY — the offline Electron probe recipe + the #19 comment finding), then
+`.opencode/plugin/handover.ts` (the current, final code).
 
-## Decision context (record in your summary as the change rationale)
-Maintainer call 2026-09-08: the ctxgauge line should reach WORKERS too, not only the
-planner — long thinking worker runs need an early near-limit reminder. Current live
-behavior (v2 + v1.2): `onSystemTransform` evidence-logs every transform, then the gate
-`str(input?.agent)?.startsWith("planner")` — which can NEVER match, because the live
-payload carries no agent identifier (evidence: 60+ `kind:"transform"` lines in this
-session's log, all shaped `{sessionID, model:{…}}` — read the live log
-`.opencode/plugin.log` read-only, transform lines, to confirm shape). So injection
-currently reaches NOBODY. The "both" decision is the formal override of v2's
-planner-only design note — the transform hook now injects on EVERY transform
-(planner + all child/worker sessions). Consequences (keep as notes, not code):
-- no `childSessions` graph needed (v2.1 unneeded — the archived spec is void as code),
-- every session pays one bounded peek spawn per LLM call (≤3 s, detached, best-effort),
-- `peek.py` has no session-id input (reads the most recently updated session's last
-  FINISHED message from opencode's sqlite DB) — an injected number can be another
-  session's (adjacent-stale); accepted — this is a reminder, not a control.
+## Why (maintainer feedback — the context economy is part of the task)
+The previous two offline runs rebuilt the probe from scratch each time, and one worker
+burned ≈10 minutes and a large context slice hunting for the Electron/`node.exe`
+executable before the probe even started. Decision: the probe is now PERMANENT repo
+tooling — committed, re-run, never rebuilt (except when the plugin's hook surface
+changes).
 
-## The change (decided — implement exactly this; v1/v1.2/v2 behavior otherwise byte-for-byte)
-1. In `onSystemTransform` (`.opencode/plugin/handover.ts`): remove the agent-prefix
-   gate — delete the two lines
-   `const agent = str(input?.agent); if (!agent || !agent.toLowerCase().startsWith(PLANNER_AGENT_PREFIX)) return;`
-   so the flow is: evidence-log (unchanged) → `gaugeReadout()` → append
-   `ctx: <line>` to `output.system` when the line resolved and `system` is an array
-   (existing mechanics unchanged).
-2. Delete the now-unused `PLANNER_AGENT_PREFIX` constant.
-3. Update the file-header comment block: one v2.2 line — injection now targets ALL
-   sessions (maintainer "both" call 2026-09-08; the payload still carries no agent
-   identifier — the gate was dead code; the stale-adjacent caveat is accepted).
-4. NOTHING else changes: skip set, pre-flight warn, summary mirror, `gaugeReadout`
-   (shell guard, 3 s bound, no child_process), evidence line shape.
+## A. Persistent probe harness — `.opencode/plugin/probes/handover_probe.mjs`
+Build it ONCE this cycle — from your v2.2-cycle probe recipe (it is summarized in
+`.opencode/handover_task_to_planner.md`; scratch is deleted and git holds none — so:
+full S1–S3 byte-for-byte suite + S4 four transform shapes + S5 line hygiene, 23/23,
+temp sandbox root, `before`/`after` modes, zero co-appended live lines, real
+handover files untouched). Requirements for the persisted file:
+1. Header comment = the complete recipe: the EXACT run command, the pinned opencode
+   Electron executable path (`%LOCALAPPDATA%\Programs\@opencode-aidesktop\OpenCode.exe`
+   — DO NOT search for it; that hunt cost a prior cycle ≈10 min; if the path is ever
+   wrong, report it as a discrepancy, do not re-hunt), `ELECTRON_RUN_AS_NODE=1`,
+   Node 24 via the Electron binary, and the expected output summary.
+2. One file, self-contained, re-runnable from the repo root: `node --experimental-...`
+   variants are NOT acceptable — only the pinned Electron-Node recipe.
+3. After building: run it against the CURRENT code → record 23/23 as the BEFORE
+   baseline in the summary.
 
-## Verification (offline, same Electron `RUN_AS_NODE=1` Node 24 recipe)
-- **Regression:** re-run the v2 probe suite scenarios **S1–S3** byte-for-byte (file:
-  `git show 2a4996c:.opencode/handover_task.md`) — unchanged expectations.
-- **S4 (transform scenarios) — expectations SUPERSEDED by this task:** re-run S4 with
-  the new expectations:
-  1. transform with the LIVE payload shape (no `agent` field, fake shell present
-     returning `CTX=12345 (10%) REM=100000`) → exactly ONE `ctx: CTX=12345 (10%)
-     REM=100000` appended to `output.system`, evidence line logged.
-  2. transform with a WORKER-shaped agent (`agent: "worker_120K_mtp"`) + shell →
-     appended too (the "both" semantics — if the field ever comes back, no gate).
-  3. transform, shell present but `CTX=` line absent (e.g. shell returns junk) →
-     omitted, no throw, evidence line still logged.
-  4. transform, no shell (`input.$` absent) → omitted, no throw, evidence line
-     logged.
-- **Post-start live verification (planner record):** record this instruction at the
-  bottom of the summary, verbatim: "LIVE PROOF PENDING START: the post-restart planner
-  session must confirm (a) the `ctx:` line is visible in the PLANNER system context, and
-  (b) a delegated worker's summary reports its own `ctx:` line verbatim if present — the
-  delegation spec must ask the worker: quote your `ctx:` line if you see one in your
-  system context."
-- `& .\.venv\Scripts\python.exe -m pytest -q` → **434 passed**;
-  `& .\.venv\Scripts\ruff.exe check --select F .` → **6 findings**.
+## B. Stale v2 comments (TODO #19) — COMMENT-ONLY edit in `handover.ts`
+Update EXACTLY the two stale v2 comment passages (header v2 bullet: "Planner-only,
+decided call, never second-guess: inject-for-all would be wrong … See TODO.md #14." and
+the comment above `onSystemTransform` with the same "planner-only / never inject-for-all"
+framing) to say: injection now runs on EVERY transform (maintainer "both" call
+2026-09-08, TODO.md #18); keep the evidence-logging sentence and the `#14` pointer in
+both places. No executable line may change. `git diff` must show comments only — paste
+the stat into the summary.
 
-## Summary + commit (NORMAL flow — no deviation this cycle: your summary goes to the
-canonical `.opencode/handover_task_to_planner.md` per the standing prompt AND the
-plugin mirrors it — both writing the same content is expected)
-- Append TODO.md entry **#18** (append-only) with exactly this content (number the
-  entry 18 — it must be the next free number; do NOT touch other entries):
-  "18. ctxgauge injection: maintainer 'both' decision — gate removed (v2.2) (2026-09-08)
+## Verification order (strict — the persisted probe is also B's evidence)
+1. A: harness built + committed-path; run on current code → **23/23** (baseline).
+2. B: comment edit.
+3. Re-run the SAME persisted harness → **23/23** (comments must not change behavior).
+4. `& .\.venv\Scripts\python.exe -m pytest -q` → **434 passed**;
+   `& .\.venv\Scripts\ruff.exe check --select F .` → **6 findings**.
 
-  Decision 2026-09-08: inject the `ctx:` gauge line for ALL sessions (planner + workers);
-  this is the formal override of the v2 'planner-only, never inject-for-all' design note
-  and supersedes the v2.1 root-only session-graph spec (archived at
-  `.opencode/archive/260908-v21-session-graph-spec.md` — now void as code). Accepted
-  caveat (on record, from planner measurement): `peek.py` takes no session id — it reads
-  the most recently updated session's last FINISHED message from opencode's sqlite DB, so
-  an injected number can be another session's (adjacent-stale); accepted — the line is a
-  reminder, not a control. Companion call (SEPARATE, maintainer): add a stop-line rule to
-  `prompt_agent_task.md` so workers act on the line — not in v2.2, not decided."
+## Summary + commit (normal flow — summary → `.opencode/handover_task_to_planner.md`)
+- TODO.md: append **#20** (next free number; append-only):
+  "20. Persistent offline probe + exact executable pinned (2026-09-08)
+
+  Offline Electron probes used to be scratch: rebuild from memory + re-discovering the
+  Electron executable cost a full cycle ≈10 min + a large context slice. The harness is
+  now permanent at `.opencode/plugin/probes/handover_probe.mjs` with the exact run
+  command + pinned executable in its header — future plugin task specs run it, never
+  rebuild it (exception: plugin hook-surface change). Also resolves #19 (stale v2
+  comments rewritten per the v2.2 'both' decision; comment-only edit, 23/23 both sides)."
 - Commit per AGENTS.md: `.opencode/plugin/handover.ts`,
-  `.opencode/handover_task.md`,
-  `.opencode/handover_task_to_planner.md`, `TODO.md`. NOT: NAP,
-  `opencode.jsonc`, `AGENTS.md`, playground files, `plugin.log`. Subject one-liner:
-  `Handover plugin v2.2: inject ctxgauge for all sessions (planner + workers)`.
-- Do NOT restart/reconfigure opencode.
+  `.opencode/plugin/probes/handover_probe.mjs`, `.opencode/handover_task.md`,
+  `.opencode/handover_task_to_planner.md`, `TODO.md`. NOT: NAP, `opencode.jsonc`,
+  `AGENTS.md`, playground, `plugin.log`. Subject one-liner:
+  `Persist handover plugin probe harness and fix stale v2 comments (#19/#20)`.
+- Do NOT restart/reconfigure opencode. Do NOT add or rename hook entries or behavior
+  — the plugin code stays v2.2 final + comment-only edits.

@@ -231,3 +231,12 @@ inject for all). See TODO.md #14" — contradicted by the v2.2 change (the gate 
 the file-header v2.2 note states the override). Left verbatim because the task mandated
 exactly four edits (minimal-diff, same pattern as #13). Rewire it (or leave as
 historical record) — worker did not touch it.
+
+## 20. Persistent offline probe + exact executable pinned (2026-09-08)
+
+Offline Electron probes used to be scratch: rebuild from memory + re-discovering the
+Electron executable cost a full cycle ≈10 min + a large context slice. The harness is
+now permanent at `.opencode/plugin/probes/handover_probe.mjs` with the exact run
+command + pinned executable in its header — future plugin task specs run it, never
+rebuild it (exception: plugin hook-surface change). Also resolves #19 (stale v2
+comments rewritten per the v2.2 'both' decision; comment-only edit, 23/23 both sides).
