@@ -26,6 +26,13 @@
 //     runs through the PluginInput shell ($) with a bounded wait — if the shell is absent, the
 //     line is omitted. Planner-only, decided call, never second-guess: inject-for-all would
 //     be wrong, hence this design-flag + payload capture. See TODO.md #14.
+//
+// v2.2 (maintainer "both" call, 2026-09-08): the transform hook now injects on EVERY transform —
+// planner AND worker sessions — the agent-prefix gate is removed. The live payload carries no
+// agent identifier (evidence: 60+ kind:"transform" lines in this cycle's log, all shaped
+// `{sessionID, model:{…}}`) — the gate was dead code that reached nobody. Accepted caveat
+// (TODO.md #18): `peek.py` takes no session id, so the injected number can be another session's
+// (adjacent-stale) — the line is a reminder, not a control.
 
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
@@ -50,7 +57,6 @@ const SKIP_EVENT_TYPES = new Set([
 
 // v2 — handover ownership
 const HANDOVER_SPEC_PATH = ".opencode/handover_task.md";
-const PLANNER_AGENT_PREFIX = "planner";
 const GAUGE_TIMEOUT_MS = 3000;
 const GAUGE_CMD = ".venv/Scripts/python.exe .opencode/ctxgauge/peek.py";
 
@@ -263,8 +269,6 @@ async function onSystemTransform(
 ): Promise<void> {
   try {
     append(buildLine("transform", { session: str(input?.sessionID), agent: str(input?.agent) }, { payload: input }));
-    const agent = str(input?.agent);
-    if (!agent || !agent.toLowerCase().startsWith(PLANNER_AGENT_PREFIX)) return;
     const line = await gaugeReadout();
     if (line && Array.isArray(output?.system)) output.system.push(`ctx: ${line}`);
   } catch {

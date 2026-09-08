@@ -210,3 +210,24 @@ and decides **v1.3** = silence the residual `file.*` cascade + `session.idle` (e
 as the next-biggest chunk; it is one line per type in the skip set — decide with data, do
 not pre-empt). Also record if measured growth under the old profile shows file.watcher as
 the single biggest residual contributor.
+
+## 18. ctxgauge injection: maintainer 'both' decision — gate removed (v2.2) (2026-09-08)
+
+Decision 2026-09-08: inject the `ctx:` gauge line for ALL sessions (planner + workers);
+this is the formal override of the v2 'planner-only, never inject-for-all' design note
+and supersedes the v2.1 root-only session-graph spec (archived at
+`.opencode/archive/260908-v21-session-graph-spec.md` — now void as code). Accepted
+caveat (on record, from planner measurement): `peek.py` takes no session id — it reads
+the most recently updated session's last FINISHED message from opencode's sqlite DB, so
+an injected number can be another session's (adjacent-stale); accepted — the line is a
+reminder, not a control. Companion call (SEPARATE, maintainer): add a stop-line rule to
+`prompt_agent_task.md` so workers act on the line — not in v2.2, not decided.
+
+## 19. `handover.ts` v2.2: inline comment above `onSystemTransform` now stale — left verbatim (minimal-diff spec) (2026-09-08)
+
+The comment block directly above `onSystemTransform` (the v2 "ctxgauge injection" note)
+still reads "if none arrives, the line is omitted (planner-only, decided call, never
+inject for all). See TODO.md #14" — contradicted by the v2.2 change (the gate is removed;
+the file-header v2.2 note states the override). Left verbatim because the task mandated
+exactly four edits (minimal-diff, same pattern as #13). Rewire it (or leave as
+historical record) — worker did not touch it.
