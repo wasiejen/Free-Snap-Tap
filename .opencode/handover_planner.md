@@ -13,7 +13,12 @@ Rebuilt from git log + old NAP `fa8aacc` + this session's live log evidence:
 - **v1.2 (log-growth fix) LANDED `f3063be`** — skip set now 10 event types (v1.1's
   `message.part.delta` + the 9 cascading UPDATE types measured at 63 % of steady-state
   bytes); writer byte-identical; v2 regression 19/19 + new probe scenarios pass,
-  434 passed / ruff 6. **GOES LIVE AT THE NEXT OPENCODE START.**
+  434 passed / ruff 6. **LIVE since the 2026-09-08 restart** — verified: post-restart log
+  segment = 25 lines / 14 KB so far, ZERO cascade lines; `transform` fires exactly once per
+  LLM turn (5 lines / 5 turns — evidence for the injection-timing question); residual
+  `file.watcher.updated` ×7 + `file.edited` ×2 in an idle cycle. **Growth solved in code
+  form; worker-cycle volume re-measure on the first post-restart delegation (v1.3 data
+  call stays, see MAINTAINER item 4).**
 - **v2 summary mirror PROVEN plugin-owned (proof ① done this session):** the v1.2
   task file explicitly instructed the worker to write its summary to
   `handover_task_to_planner_worker.md` only and NOT touch the canonical file; the worker
@@ -58,12 +63,21 @@ Rebuilt from git log + old NAP `fa8aacc` + this session's live log evidence:
 
 ## MAINTAINER CALLS (open — answer in order)
 1. **v2.1: adopt or reject?** (spec archived + summary note at Current-state).
-2. **RESTART opencode** — activates v1.2. Live proof to expect: new-session log contains
-   ONLY `session.created`, `transform`, `warn`, `tool.before/after` (+ unseen types); growth
-   collapses from ≈0.9 KB/s. If v2.1 was adopted AND delegated before the restart, it lands
-   in the same start.
-3. Post-start session measures the v1.2 profile → **v1.3 call** (silence the `file.*`
-   residual — likely top residual after this).
+   NEW OPTION floated by the maintainer 2026-09-08: inject the gauge into WORKER sessions
+   too ("to both"). That SIMPLIFIES the gate beyond v2.1: drop the root-only/agent gate
+   entirely — inject on every transform (planner + child), no `childSessions` graph needed
+   (less state = less code = less risk). Cost: one `peek.py` spawn per LLM call in every
+   session (bounded 3 s, detached best-effort). Caveat on record: `peek.py` has NO session
+   input — it reads the MOST-RECENTLY-UPDATED session's last FINISHED message
+   (`~/.local/share/opencode/opencode.db`, read-only) — so a transform can carry another
+   session's stale number (worst case: wrong-but-adjacent reminder, never a crash).
+   Companion call: worker prompt has NO stop-line rule — `ctx:` is raw info to workers
+   unless `prompt_agent_task.md` gets a "stop and hand back at ≤15k REM or ≥85 %" line
+   (process file — maintainer's call; planner can draft).
+2. ~~RESTART opencode~~ — **DONE 2026-09-08** — v1.2 live & verified (see Current state).
+3. Post-start measurement of the v1.2 profile → **v1.3 call** (silence the `file.*`
+   residual — 7 watcher + 2 edited lines in this planner-only cycle so far; decide with the
+   first post-start delegation-cycle data, see Current-state verification bullet).
 4. Carried-over maintainer calls: TODO #4/#6 (coverage triage 117 + 302–303), #7 (empty-
    macro comment), #1 (vk resolution), #2 (the 6 lint findings).
 
