@@ -1,7 +1,8 @@
 // =============================================================================
-// Persistent offline probe for .opencode/plugin/handover.ts (v2.2 final code).
-// Built 2026-09-08 (v2.2.1, TODO.md #20). PERMANENT repo tooling: RE-RUN, never
-// rebuild — exception: the plugin's hook surface changes.
+// Persistent offline probe for .opencode/plugin/handover.ts (v2.2.1 gauge-evidence
+// code). Built 2026-09-08 (TODO.md #20), S4 extended the same day for the v2.2.1
+// gauge-failure evidence logging. PERMANENT repo tooling: RE-RUN, never rebuild —
+// exception: the plugin's hook surface changes.
 //
 // EXACT RUN COMMAND (from the repo root, PowerShell 7 — this IS the run command,
 // do not rediscover anything):
@@ -35,13 +36,29 @@
 //   S2 non-handover delegations invisible (no warn, no mirror write, no throw)
 //   S3 summary mirror (verbatim OVERWRITE / exact TRUNCATED trailer / empty
 //      output → untouched; exactly 3 tool.after log lines)
-//   S4 transform injection — v2.2 injects on EVERY transform — 4 shapes:
+//   S4 transform injection — v2.2 injects on EVERY transform; v2.2.1 adds the
+//      kind:"gauge" evidence line per failed readout — 9 shapes:
 //      (1) LIVE shape {sessionID, model:{…}} (no agent) + good shell → exactly
-//          ONE `ctx: CTX=12345 (10%) REM=100000` line appended, prior items kept
-//      (2) agent:"worker_120K_mtp" + shell → appended (no gate)
-//      (3) junk shell (resolves without a CTX= prefix) → omitted, no throw
-//      (4) no shell ($ undefined) → omitted, no throw
-//      Each shape logs exactly one kind:"transform" evidence line (4 total).
+//          ONE `ctx: CTX=12345 (10%) REM=100000` line appended, prior items kept,
+//          ZERO gauge lines
+//      (2) agent:"worker_120K_mtp" + shell → appended (no gate), zero gauge lines
+//      (3) junk shell (resolves without a CTX= prefix) → omitted, no throw + ONE
+//          gauge line {reason:no-ctx-output, preview:"no gauge output", session:t3}
+//      (4) no shell ($ undefined) → omitted, no throw + ONE gauge line
+//          {reason:shell-missing, session:t4} (no preview)
+//      (5) timeout shell (text() rejects with the withTimeout "gauge timeout"
+//          sentinel) → omitted, no throw + ONE gauge line {reason:timeout,
+//          session:t5} (no preview)
+//      (6) spawn-failure shell (text() rejects with a foreign error) → omitted,
+//          no throw + ONE gauge line {reason:no-ctx-output, preview:error text
+//          capped at 120 chars, session:t6}
+//      (7) empty-output shell (resolves "") → omitted, no throw + ONE gauge line
+//          {reason:no-ctx-output, session:t7} (no preview)
+//      (8) ok readout + output.system a STRING (not an array) → system untouched +
+//          ONE gauge line {reason:system-not-array, session:t8} (no preview)
+//      (9) ok readout + no `system` key → output untouched + ONE gauge line
+//          {reason:system-not-array, session:t9} (no preview)
+//      Each of the 9 shapes logs exactly one kind:"transform" evidence line (9 total).
 //   S5 hygiene: every sandbox plugin.log line is JSON.parse-able, <=2000 chars,
 //      has an ISO ts + a string kind; exact kind tallies; the real handover
 //      files byte-identical to pre-run and zero CO-APPENDED live lines (the real
@@ -51,13 +68,16 @@
 //      of the sandbox); zero new/changed files outside the sandbox
 //      (.opencode listing + git status, before vs after).
 //
-// EXPECTED OUTPUT SUMMARY — BEFORE and AFTER run identically 23/23 PASS (the
-// v2.2.1 edit is comment-only, so behavior must be byte-identical both sides —
-// any S4 drift between the two runs IS the finding):
-//   S1=5 S2=4 S3=5 S4=4 S5=5  →  "PROBE handover (mode=<mode>): 23/23 PASS",
-//   exit code 0. Anything else = behavior drift or broken environment — read
-//   the failures, do not "fix" the plugin for the probe. On failure the
-//   sandbox root is KEPT (printed) for forensics.
+// EXPECTED OUTPUT SUMMARY — the v2.2.1 gauge-evidence edit CHANGES behavior
+// (the new kind:"gauge" lines), so the probe was extended the same day and the
+// expectations now match the NEW code:
+//   S1=5 S2=4 S3=5 S4=9 S5=5  →  "PROBE handover (mode=<mode>): 28/28 PASS",
+//   exit code 0. Pre-edit baseline (recorded 2026-09-08): the OLD 23-check probe
+//   passed 23/23 against the unchanged v2.2 plugin (`before` mode) — the ok-shape
+//   injections are asserted byte-identically on both sides. Anything else than
+//   28/28 with THIS file = behavior drift or broken environment — read the
+//   failures, do not "fix" the plugin for the probe. On failure the sandbox root
+//   is KEPT (printed) for forensics.
 // =============================================================================
 
 import { execFileSync } from "node:child_process";
@@ -91,7 +111,15 @@ const ORIGINAL_SPEC =
 const STALE_SENTINEL = "STALE MIRROR SENTINEL — must be OVERWRITTEN, not appended to.\n";
 const GAUGE_GOOD = "CTX=12345 (10%) REM=100000\n";
 const GAUGE_JUNK = "no gauge output\n";
+const GAUGE_EMPTY = "";
 const CTX_EXPECTED = `ctx: CTX=12345 (10%) REM=100000`;
+// v2.2.1 — the foreign (non-timeout) rejection = a synthetic BunShell spawn failure. The
+// error text (String(e) = "Error: " + message) exceeds 120 chars, so the gauge line
+// exercises the 120-cap (cap: first 119 chars + U+2026) AND the omit-when-empty is
+// untouched (non-empty here).
+const SPAWN_ERR = new Error(`spawn ENOENT: .venv/Scripts/python.exe ${"x".repeat(122)}`);
+const cap120 = (s) => (s.length <= 120 ? s : s.slice(0, 119) + "\u2026");
+const SPAWN_PREVIEW = cap120(String(SPAWN_ERR));
 const M_A = "VERBATIM worker summary line one\nline two\n";
 const M_B_OUTPUT = "TRUNCATED BODY\n";
 const M_B_EXPECTED = `${M_B_OUTPUT}\n\n[TRUNCATED by opencode tool_output cap — see plugin.log call d2]`;
@@ -152,16 +180,34 @@ const linesOfKind = (k) => logLines().filter((l) => {
     return false;
   }
 });
+// v2.2.1 — the LAST kind:"gauge" line, but only when the total count matches exactly
+// (the S4 failure shapes assert their evidence line field-by-field)
+const lastGauge = (expectTotal) => {
+  const g = linesOfKind("gauge");
+  if (g.length !== expectTotal) return null;
+  try {
+    return JSON.parse(g[g.length - 1]);
+  } catch {
+    return null;
+  }
+};
 const readMirror = () => readFileSync(SB_MIRROR, "utf8");
 
 // fake BunShell: shell.cwd(d) → self; shell(cmd) → { nothrow() → self, text() → Promise<fixed> }
-const makeShell = (textResult) => {
-  const shell = (..._a) => ({ nothrow() { return this; }, text() { return Promise.resolve(textResult); } });
+// v2.2.1 — text() may REJECT (rejectError) to simulate the timeout sentinel / a spawn failure
+const makeShell = (textResult, rejectError) => {
+  const shell = (..._a) => ({
+    nothrow() { return this; },
+    text() { return rejectError ? Promise.reject(rejectError) : Promise.resolve(textResult); },
+  });
   shell.cwd = () => shell;
   return shell;
 };
 const goodShell = makeShell(GAUGE_GOOD);
 const junkShell = makeShell(GAUGE_JUNK);
+const emptyShell = makeShell(GAUGE_EMPTY);
+const timeoutShell = makeShell(null, new Error("gauge timeout"));
+const spawnShell = makeShell(null, SPAWN_ERR);
 
 // the plugin, loaded from the REAL repo path (Node 24 strips the TS types)
 const plugin = (await import(pathToFileURL(PLUGIN_TS).href)).default;
@@ -259,9 +305,10 @@ const afterFeed = (hooks, sess, call, inArgs, out) =>
   // 14 — final mirror state byte-exact (the transform section below only appends log lines)
   check("14", "S3", "final mirror state byte-identical to S3b content", readMirror() === M_B_EXPECTED, readMirror());
 
-  // ------------------------------------------------------------------ S4 transform — v2.2: inject on EVERY transform
+  // ------------------------------------------------------------------ S4 transform — v2.2: inject on EVERY transform; v2.2.1: the failed
+  // readout / uninjected-ok cases log exactly ONE kind:"gauge" line, the ok+injected ones none
 
-  // 15 — LIVE shape (no agent field) + good shell: exactly ONE ctx: line appended, prior items intact
+  // 15 — LIVE shape (no agent field) + good shell: exactly ONE ctx: line appended, prior items intact, ZERO gauge lines
   const h1 = await plugin({ directory: SANDBOX, $: goodShell });
   {
     const system = ["SYS A", "SYS B"];
@@ -269,13 +316,13 @@ const afterFeed = (hooks, sess, call, inArgs, out) =>
     check(
       "15",
       "S4",
-      "LIVE shape (no agent, good shell): exactly one ctx: line appended, prior items verbatim",
-      Array.isArray(system) && system.length === 3 && system[0] === "SYS A" && system[1] === "SYS B" && system[2] === CTX_EXPECTED,
-      JSON.stringify(system),
+      "LIVE shape (no agent, good shell): exactly one ctx: line appended, prior items verbatim, zero gauge lines",
+      Array.isArray(system) && system.length === 3 && system[0] === "SYS A" && system[1] === "SYS B" && system[2] === CTX_EXPECTED && linesOfKind("gauge").length === 0,
+      JSON.stringify({ system, gauge: linesOfKind("gauge") }),
     );
   }
 
-  // 16 — worker agent field: no gate — appended (the evidence line carries the agent)
+  // 16 — worker agent field: no gate — appended (the evidence line carries the agent), zero gauge lines
   {
     const system = ["SYS C"];
     await h1["experimental.chat.system.transform"]({ sessionID: "t2", agent: "worker_120K_mtp", model: { id: "m-27B" } }, { system });
@@ -284,13 +331,13 @@ const afterFeed = (hooks, sess, call, inArgs, out) =>
     check(
       "16",
       "S4",
-      'agent:"worker_120K_mtp" + shell: ctx: appended (no gate), evidence line carries agent',
-      system.length === 2 && system[1] === CTX_EXPECTED && ev2.agent === "worker_120K_mtp",
+      'agent:"worker_120K_mtp" + shell: ctx: appended (no gate), evidence line carries agent, zero gauge lines',
+      system.length === 2 && system[1] === CTX_EXPECTED && ev2.agent === "worker_120K_mtp" && linesOfKind("gauge").length === 0,
       JSON.stringify({ system, ev2 }),
     );
   }
 
-  // 17 — junk shell (resolves without a CTX= prefix): omitted, no throw
+  // 17 — junk shell (resolves without a CTX= prefix): omitted, no throw + ONE gauge line {no-ctx-output, preview}
   {
     const h3 = await plugin({ directory: SANDBOX, $: junkShell });
     const system = ["SYS D"];
@@ -300,10 +347,17 @@ const afterFeed = (hooks, sess, call, inArgs, out) =>
     } catch {
       threw = true;
     }
-    check("17", "S4", "junk shell (no CTX=): ctx omitted, no throw, system unchanged", !threw && system.length === 1 && system[0] === "SYS D", JSON.stringify(system));
+    const g = lastGauge(1);
+    check(
+      "17",
+      "S4",
+      "junk shell (no CTX=): ctx omitted, no throw, system unchanged + gauge {no-ctx-output, preview:'no gauge output', session:t3}",
+      !threw && system.length === 1 && system[0] === "SYS D" && g != null && g.kind === "gauge" && g.reason === "no-ctx-output" && g.preview === "no gauge output" && g.session === "t3",
+      JSON.stringify({ system, g }),
+    );
   }
 
-  // 18 — no shell ($ undefined): omitted, no throw
+  // 18 — no shell ($ undefined): omitted, no throw + ONE gauge line {shell-missing, no preview}
   {
     const h4 = await plugin({ directory: SANDBOX, $: undefined });
     const system = ["SYS E"];
@@ -313,12 +367,123 @@ const afterFeed = (hooks, sess, call, inArgs, out) =>
     } catch {
       threw = true;
     }
-    check("18", "S4", "no shell: ctx omitted, no throw, system unchanged", !threw && system.length === 1 && system[0] === "SYS E", JSON.stringify(system));
+    const g = lastGauge(2);
+    check(
+      "18",
+      "S4",
+      "no shell: ctx omitted, no throw, system unchanged + gauge {shell-missing, session:t4, no preview}",
+      !threw && system.length === 1 && system[0] === "SYS E" && g != null && g.kind === "gauge" && g.reason === "shell-missing" && g.session === "t4" && !("preview" in g),
+      JSON.stringify({ system, g }),
+    );
+  }
+
+  // 19 — timeout shell (text() rejects with the withTimeout "gauge timeout" sentinel): omitted, no throw
+  //      + ONE gauge line {timeout, no preview} — a non-settling (real 3000 ms) shell is not
+  //      probed: the sentinel rejection is the same mapping branch, deterministically
+  {
+    const h5 = await plugin({ directory: SANDBOX, $: timeoutShell });
+    const system = ["SYS F"];
+    let threw = false;
+    try {
+      await h5["experimental.chat.system.transform"]({ sessionID: "t5", model: { id: "m-27B" } }, { system });
+    } catch {
+      threw = true;
+    }
+    const g = lastGauge(3);
+    check(
+      "19",
+      "S4",
+      "timeout sentinel rejection: ctx omitted, no throw, system unchanged + gauge {timeout, session:t5, no preview}",
+      !threw && system.length === 1 && system[0] === "SYS F" && g != null && g.kind === "gauge" && g.reason === "timeout" && g.session === "t5" && !("preview" in g),
+      JSON.stringify({ system, g }),
+    );
+  }
+
+  // 20 — spawn-failure shell (foreign rejection): omitted, no throw + ONE gauge line {no-ctx-output, preview = error text capped 120}
+  {
+    const h6 = await plugin({ directory: SANDBOX, $: spawnShell });
+    const system = ["SYS G"];
+    let threw = false;
+    try {
+      await h6["experimental.chat.system.transform"]({ sessionID: "t6", model: { id: "m-27B" } }, { system });
+    } catch {
+      threw = true;
+    }
+    const g = lastGauge(4);
+    check(
+      "20",
+      "S4",
+      "foreign spawn-error rejection: ctx omitted, no throw, system unchanged + gauge {no-ctx-output, preview=error text capped 120, session:t6}",
+      !threw && system.length === 1 && system[0] === "SYS G" && g != null && g.kind === "gauge" && g.reason === "no-ctx-output" && g.session === "t6" && g.preview === SPAWN_PREVIEW && g.preview.length === 120,
+      JSON.stringify({ system, g }),
+    );
+  }
+
+  // 21 — empty-output shell (resolves ""): omitted, no throw + ONE gauge line {no-ctx-output, no preview}
+  {
+    const h7 = await plugin({ directory: SANDBOX, $: emptyShell });
+    const system = ["SYS H"];
+    let threw = false;
+    try {
+      await h7["experimental.chat.system.transform"]({ sessionID: "t7", model: { id: "m-27B" } }, { system });
+    } catch {
+      threw = true;
+    }
+    const g = lastGauge(5);
+    check(
+      "21",
+      "S4",
+      "empty-output shell: ctx omitted, no throw, system unchanged + gauge {no-ctx-output, session:t7, no preview}",
+      !threw && system.length === 1 && system[0] === "SYS H" && g != null && g.kind === "gauge" && g.reason === "no-ctx-output" && g.session === "t7" && !("preview" in g),
+      JSON.stringify({ system, g }),
+    );
+  }
+
+  // 22 — ok readout + output.system a STRING (not an array): system NOT pushed (untouched) + ONE gauge line {system-not-array}
+  //      — FRESH plugin instance per shape below: the module-level shell global is whatever the
+  //      LAST plugin() call configured, so an older hook instance would resolve the wrong shell
+  {
+    const h8 = await plugin({ directory: SANDBOX, $: goodShell });
+    const out = { system: "SYS NOT AN ARRAY" };
+    let threw = false;
+    try {
+      await h8["experimental.chat.system.transform"]({ sessionID: "t8", model: { id: "m-27B" } }, out);
+    } catch {
+      threw = true;
+    }
+    const g = lastGauge(6);
+    check(
+      "22",
+      "S4",
+      "ok readout + string system: system NOT pushed, untouched + gauge {system-not-array, session:t8, no preview}",
+      !threw && out.system === "SYS NOT AN ARRAY" && g != null && g.kind === "gauge" && g.reason === "system-not-array" && g.session === "t8" && !("preview" in g),
+      JSON.stringify({ out, g }),
+    );
+  }
+
+  // 23 — ok readout + NO `system` key: output untouched + ONE gauge line {system-not-array}
+  {
+    const h9 = await plugin({ directory: SANDBOX, $: goodShell });
+    const out = {};
+    let threw = false;
+    try {
+      await h9["experimental.chat.system.transform"]({ sessionID: "t9", model: { id: "m-27B" } }, out);
+    } catch {
+      threw = true;
+    }
+    const g = lastGauge(7);
+    check(
+      "23",
+      "S4",
+      "ok readout + no system key: output untouched + gauge {system-not-array, session:t9, no preview}",
+      !threw && Object.keys(out).length === 0 && g != null && g.kind === "gauge" && g.reason === "system-not-array" && g.session === "t9" && !("preview" in g),
+      JSON.stringify({ out, g }),
+    );
   }
 
   // ------------------------------------------------------------------ S5 hygiene
 
-  // 19 — every sandbox plugin.log line parses as JSON (no stray/blank/garbled lines)
+  // 24 — every sandbox plugin.log line parses as JSON (no stray/blank/garbled lines)
   {
     const bad = logLines().filter((l) => {
       try {
@@ -328,10 +493,10 @@ const afterFeed = (hooks, sess, call, inArgs, out) =>
         return true;
       }
     });
-    check("19", "S5", "every sandbox plugin.log line is JSON.parse-able", bad.length === 0, bad.slice(0, 3).join(" | "));
+    check("24", "S5", "every sandbox plugin.log line is JSON.parse-able", bad.length === 0, bad.slice(0, 3).join(" | "));
   }
 
-  // 20 — every line <= 2000 chars with an ISO ts + a string kind
+  // 25 — every line <= 2000 chars with an ISO ts + a string kind
   {
     const bad = logLines().filter((l) => {
       if (l.length > 2000) return true;
@@ -342,25 +507,26 @@ const afterFeed = (hooks, sess, call, inArgs, out) =>
         return true;
       }
     });
-    check("20", "S5", "every line <= 2000 chars, ISO ts + string kind", bad.length === 0, bad.slice(0, 3).join(" | "));
+    check("25", "S5", "every line <= 2000 chars, ISO ts + string kind", bad.length === 0, bad.slice(0, 3).join(" | "));
   }
 
-  // 21 — exact kind tallies (no stray event lines either)
+  // 26 — exact kind tallies (no stray event lines either) — v2.2.1: transform==9 (9 S4 shapes),
+  //      gauge==7 (the 7 failure/uninjected shapes; the 2 ok shapes log none)
   {
     const tally = (k) => linesOfKind(k).length;
     check(
-      "21",
+      "26",
       "S5",
-      "kind tallies exact: warn==2, tool.before==6, tool.after==3, transform==4, event==0",
-      tally("warn") === 2 && tally("tool.before") === 6 && tally("tool.after") === 3 && tally("transform") === 4 && tally("event") === 0,
-      `warn=${tally("warn")} tool.before=${tally("tool.before")} tool.after=${tally("tool.after")} transform=${tally("transform")} event=${tally("event")}`,
+      "kind tallies exact: warn==2, tool.before==6, tool.after==3, transform==9, gauge==7, event==0",
+      tally("warn") === 2 && tally("tool.before") === 6 && tally("tool.after") === 3 && tally("transform") === 9 && tally("gauge") === 7 && tally("event") === 0,
+      `warn=${tally("warn")} tool.before=${tally("tool.before")} tool.after=${tally("tool.after")} transform=${tally("transform")} gauge=${tally("gauge")} event=${tally("event")}`,
     );
   }
 
-  // 22 — zero co-appended LIVE lines: the real handover files must be byte-identical, and the
+  // 27 — zero co-appended LIVE lines: the real handover files must be byte-identical, and the
   //      real plugin.log must only GROW. The LIVE session's own plugin legitimately appends its
   //      own tool lines while this probe runs inside a bash invocation — those are not probe
-  //      writes. The probe's fingerprint is its synthetic ids (s1–s4/c1–c6/d1–d3/t1–t4): if any
+  //      writes. The probe's fingerprint is its synthetic ids (s1–s4/c1–c6/d1–d3/t1–t9): if any
   //      appended real-log line carries one, the probe wrote out of the sandbox.
   {
     const POST = snapshotReal();
@@ -369,10 +535,10 @@ const afterFeed = (hooks, sess, call, inArgs, out) =>
     const postLog = POST["plugin.log"] ?? "";
     const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
     const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
-    const FINGERPRINT = ["s1", "s2", "s3", "s4", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4"];
+    const FINGERPRINT = ["s1", "s2", "s3", "s4", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9"];
     const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`)));
     check(
-      "22",
+      "27",
       "S5",
       "zero co-appended live lines: handover files byte-identical; plugin.log append-only; no probe-id lines in the appended tail",
       handoverDiff.length === 0 && monotonic && !probeWroteLive,
@@ -380,11 +546,11 @@ const afterFeed = (hooks, sess, call, inArgs, out) =>
     );
   }
 
-  // 23 — zero writes outside the sandbox: .opencode listing + git status unchanged
+  // 28 — zero writes outside the sandbox: .opencode listing + git status unchanged
   {
     const listingDiff = listOpencode().filter((p) => !PRE_OP_LISTING.includes(p));
     const gitChanged = gitStatus() !== PRE_GIT_STATUS;
-    check("23", "S5", "sandbox isolation: .opencode listing + git status unchanged (no new/changed files outside sandbox)", listingDiff.length === 0 && !gitChanged, `new: ${listingDiff.join(", ")}; gitChanged=${gitChanged}`);
+    check("28", "S5", "sandbox isolation: .opencode listing + git status unchanged (no new/changed files outside sandbox)", listingDiff.length === 0 && !gitChanged, `new: ${listingDiff.join(", ")}; gitChanged=${gitChanged}`);
   }
 }
 

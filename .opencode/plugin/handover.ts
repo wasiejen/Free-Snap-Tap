@@ -35,6 +35,13 @@
 // `{sessionID, model:{…}}`) — the gate was dead code that reached nobody. Accepted caveat
 // (TODO.md #18): `peek.py` takes no session id, so the injected number can be another session's
 // (adjacent-stale) — the line is a reminder, not a control.
+//
+// v2.2.1 (2026-09-08): evidence-log the gauge-readout FAILURE — v2 left every readout-failure
+// branch silent by design (TODO.md #23), so the silent branch was undecidable from the log: one
+// opencode start can now identify it. One kind:"gauge" line per failed readout (reason
+// shell-missing | timeout | no-ctx-output | system-not-array, session id included; no-ctx-output
+// carries a `preview` = raw output or error text, trimmed and capped 120 chars, omitted when
+// empty) — NO line on the ok+injected path (the happy path must not add log volume).
 
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
@@ -244,20 +251,49 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
   });
 }
 
+// v2.2.1 — the readout outcome is classifiable instead of a silent `undefined` for every
+// failure mode (v2, TODO.md #23): shell-missing = the PluginInput shell is absent;
+// timeout = the bounded wait fired (withTimeout's "gauge timeout" rejection); no-ctx-output =
+// the raw output did not start with "CTX=" (includes empty — the preview is omitted then) or
+// the command promise rejected with a foreign error (e.g. a BunShell spawn failure — the error
+// text rides the preview: it is the only evidence slot in the stable 4-reason vocabulary, and
+// it is what makes the spawn/suspect-(a) branch distinguishable in the log from non-CTX=
+// output). ok-but-uninjectable (output.system not an array) is reported by onSystemTransform
+// as system-not-array.
+type GaugeReadout =
+  | { ok: true; line: string }
+  | { ok: false; reason: "shell-missing" | "timeout" | "no-ctx-output"; preview?: string };
+
+// v2.2.1 — raw-output evidence for the gauge line: trimmed, capped at 120 chars (the
+// buildLine ladder is [500,150,60] — 120 lands unchanged), omitted (undefined) when empty.
+function gaugePreviewOf(raw: string): string | undefined {
+  const t = raw.trim();
+  return t === "" ? undefined : cap(t, 120);
+}
+
 // v2 — ctxgauge readout via the PluginInput shell. Detached best effort: bounded wait, no
-// child_process fallback, any failure → undefined (line omitted). The tag call is a static
-// tagged template — exactly the declared BunShell call shape.
-async function gaugeReadout(): Promise<string | undefined> {
-  if (typeof shell !== "function") return undefined;
+// child_process fallback. The tag call is a static tagged template — exactly the declared
+// BunShell call shape. v2.2.1: the failure outcome is reported (see GaugeReadout).
+async function gaugeReadout(): Promise<GaugeReadout> {
+  if (typeof shell !== "function") return { ok: false, reason: "shell-missing" };
   try {
     const text = await withTimeout(
       shell.cwd(dir ?? "")(`.venv/Scripts/python.exe .opencode/ctxgauge/peek.py`).nothrow().text(),
       GAUGE_TIMEOUT_MS,
     );
     const line = (typeof text === "string" ? text : "").trim();
-    return line.startsWith("CTX=") ? line : undefined;
-  } catch {
-    return undefined;
+    if (line.startsWith("CTX=")) return { ok: true, line };
+    const preview = gaugePreviewOf(line);
+    return preview === undefined
+      ? { ok: false, reason: "no-ctx-output" }
+      : { ok: false, reason: "no-ctx-output", preview };
+  } catch (e) {
+    if (e instanceof Error && e.message === "gauge timeout") return { ok: false, reason: "timeout" };
+    // foreign rejection (spawn-failure class): classifiable no-ctx-output, error text as preview
+    const preview = gaugePreviewOf(String(e));
+    return preview === undefined
+      ? { ok: false, reason: "no-ctx-output" }
+      : { ok: false, reason: "no-ctx-output", preview };
   }
 }
 
@@ -265,16 +301,28 @@ async function gaugeReadout(): Promise<string | undefined> {
 // post-restart log shows exactly what opencode exposes at this call site. The SDK types
 // declare no agent identifier — v2's planner-only gate was overridden by the maintainer "both"
 // call 2026-09-08 (TODO.md #18): injection now runs on EVERY transform, planner and worker
-// sessions. The line is omitted only when the gauge does not resolve (shell absent or no
-// CTX= output). See TODO.md #14 (evidence-log rationale + the now-overridden v2 design record).
+// sessions (v2.2). v2.2.1: the readout-failure / ok-but-uninjected cases log exactly ONE
+// kind:"gauge" line (reason shell-missing | timeout | no-ctx-output [+ preview] |
+// system-not-array, session id included — one buildLine call, the existing scalar pattern);
+// the ok+injected path stays silent (no log growth). That one start resolves the silent
+// branch (TODO.md #23). See TODO.md #14 (evidence-log rationale + the now-overridden v2
+// design record).
 async function onSystemTransform(
   input: { sessionID?: string; agent?: string; model?: unknown },
   output: { system?: unknown },
 ): Promise<void> {
   try {
     append(buildLine("transform", { session: str(input?.sessionID), agent: str(input?.agent) }, { payload: input }));
-    const line = await gaugeReadout();
-    if (line && Array.isArray(output?.system)) output.system.push(`ctx: ${line}`);
+    const readout = await gaugeReadout();
+    if (readout.ok) {
+      if (Array.isArray(output?.system)) {
+        output.system.push(`ctx: ${readout.line}`);
+      } else {
+        append(buildLine("gauge", { reason: "system-not-array", session: str(input?.sessionID) }, {}));
+      }
+    } else {
+      append(buildLine("gauge", { reason: readout.reason, session: str(input?.sessionID), preview: readout.preview }, {}));
+    }
   } catch {
     // never throw
   }

@@ -299,3 +299,29 @@ same commit removes the old planner deny-map incl. the TODO #25 `/tmp/**` patter
 closed by this entry too; scratchpad now plain Windows temp dir on win32 + on `bash`, and
 AGENTS.md pre-commit plan-state routine applies to the planner's own commit only —
 workers commit code + TODO.md + their task files).
+
+## 27. v2.2.1 gauge-failure evidence log landed — follow-up = one opencode start (2026-09-08)
+
+Worker delivered per its handover spec ("gauge-failure evidence logging"):
+`handover.ts onSystemTransform` appends ONE `kind:"gauge"` line per failed readout or per
+ok-but-uninjectable readout (`output.system` not an array); the ok+injected path stays
+silent. Stable reason vocabulary: `shell-missing` | `timeout` | `no-ctx-output` (carries
+`preview` = raw output or error text, trimmed ≤ 120 chars, omitted when empty) |
+`system-not-array`; session id included. In-scope judgment: a BunShell SPAWN failure (the
+task's branch-(a) suspect — relative path + cwd) surfaces as `no-ctx-output` with the
+ERROR TEXT in `preview` — the fixed 4-reason vocabulary has no spawn reason and `preview`
+is the only evidence field; spawn failures stay distinguishable in the log from non-`CTX=`
+output by the preview content. Probe extended 23 → 28 checks (S4 = 9 shapes; tallies now
+include gauge==7): pre-run old probe vs v2.2 = 23/23 PASS, post-run new probe vs v2.2.1 =
+28/28 PASS. **OPEN follow-up (planner, after ONE opencode start):** read the
+`kind:"gauge"` lines in `.opencode/plugin.log` → identify the #23 silent-failure branch
+(spawn error / timeout / non-`CTX=` output / `system-not-array`, or ok+injected ⇒ #23
+false alarm ⇒ escalate to transform-drop).
+
+## 28. `handover.ts`: `GAUGE_CMD` constant declared but unused (v2 leftover) (2026-09-08)
+
+`.opencode/plugin/handover.ts` line 63 declares `GAUGE_CMD = ".venv/Scripts/python.exe
+.opencode/ctxgauge/peek.py"`, but `gaugeReadout` calls the same literal inline — the
+constant is dead (pre-existing since the v2 readout; the v2.2.1 cycle left it verbatim per
+the minimal-diff hard limit). Wire the constant into the readout or delete it — cosmetic,
+maintainer's call.

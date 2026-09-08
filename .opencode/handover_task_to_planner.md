@@ -1,65 +1,80 @@
-<task id="ses_f7d9e3249ffebZTCKtnsEL4YHn" state="completed">
-<task_result>
-Tree clean, commit in place, post-commit gauge: **CTX=46354 (38%) REM=73646** — well above the stop line. Task complete. My handover summary:
+# EXECUTIVE SUMMARY — Phase 6 / Tier 1 — v2.2.1: gauge-failure evidence logging (+ probe extension)
 
-# EXECUTIVE SUMMARY — Phase 6 / Tier 1 — v2.2 worker-side live proof (the "both" call)
+Worker `worker_120K_mtp`, first run under the relaxed prompts. Deliverable met: after ONE
+opencode start, the silent-failure branch is identifiable from `.opencode/plugin.log` alone.
+Commit: `add v2.2.1 gauge-failure evidence logging (kind:"gauge") to handover.ts` — hash
+visible via `git log -1` (the worker commit carries no post-hoc hash of itself); files:
+`.opencode/plugin/handover.ts`, `.opencode/plugin/probes/handover_probe.mjs`, `TODO.md`
+(#27–#28 appended), this task pair (spec + mirror).
 
-Measurement run only — zero FST code, zero plugin/log edits. Commit:
-`v2.2 worker-side proof: worker quotes its ctx line` (hash `6004486`; files:
-`.opencode/handover_task.md`, `.opencode/handover_task_to_planner.md`, `TODO.md`
-#21–#23 appended). Working tree clean after commit.
+## Changes
 
-## ctx: line (verbatim)
+- **`.opencode/plugin/handover.ts`** — `gaugeReadout` now returns a classifiable outcome
+  (`GaugeReadout` union + a small `gaugePreviewOf` cap-helper, new v2.2.1 file-header
+  note, in-code comments): ok+injected path stays **byte-identical** (`output.system.push`
+  line unchanged, `transform` evidence line unchanged); on failure / ok-but-`system`-not-an-
+  array it appends ONE `kind:"gauge"` line (one `buildLine` call, existing scalar pattern,
+  session id included). Reason vocabulary: `shell-missing` | `timeout` (the withTimeout
+  `"gauge timeout"` sentinel) | `no-ctx-output` (`preview` = raw output — includes
+  empty/traceback — or the ERROR text of a foreign rejection such as a BunShell spawn
+  failure, trimmed, ≤ 120 chars via cap, omitted when empty) | `system-not-array`.
+- **`.opencode/plugin/probes/handover_probe.mjs`** — S4 extended 4 → 9 shapes: the 2 ok
+  shapes keep asserting byte-identical injection AND now assert zero `gauge` lines; junk/
+  no-shell shapes assert their `gauge` line field-by-field; new synthetic shapes:
+  timeout sentinel rejection, foreign spawn-error rejection (exercises the 120-cap),
+  empty output (no preview), ok-readout + string system, ok-readout + missing `system` key.
+  S5 renumbered, tallies now include `gauge==7`; probe-fingerprint extended t5–t9; header
+  expected-summary updated. S1/S3 hygiene logic unchanged.
 
-ctx: line NOT FOUND
+## Verification (all measured, not claimed)
 
-Scanned this worker session's FULL system prompt — worker role definition (Code
-Execution Engine text, init/work-loop/commit-routine sections), the `<env>` block, the
-`scratchpad` reference, the complete `AGENTS.md` instructions block, the skills list:
-**no item beginning with `ctx: CTX=`** — zero occurrences (the only `CTX=` strings in
-prompt territory are inside the AGENTS.md context-budget prose and in gauge outputs I
-generated during this run). Per task: NOT FOUND is a valid, reportable outcome — not
-hunted, not "fixed".
+- **Probe BEFORE** (old 23-check probe vs unchanged v2.2 plugin, `before` mode):
+  **23/23 PASS**, exit 0.
+- **Probe AFTER** (new 28-check probe vs v2.2.1 plugin, `after` mode): **28/28 PASS**,
+  exit 0. Section totals: S1=5 S2=4 S3=5 S4=9 S5=5.
+- **`pytest -q`** → **434 passed, 13 warnings** — matches baseline.
+- **`ruff check --select F .`** → **6 findings** — matches baseline (list = TODO #2,
+  unchanged).
+- **Facts re-verified before relying on them**: `.opencode/plugin.log` (the real path —
+  the spec's #22 note stands) showed 0 `gauge` lines and — since it append-live during this
+  cycle — **166** `kind:"transform"` lines at my measurement (the spec's "104" was the
+  planner's 395-line-segment tally; the log grew while the spec sat un-fired).
 
-## Baselines (measured, strict order)
+## Diff stat — `gaugeReadout`/`onSystemTransform` region (hard-limit check)
 
-- `pytest -q` → **434 passed, 13 warnings** — matches expected 434/13 baseline. **PASS.**
-- `ruff check --select F .` → **6 findings** — matches expected 6 (TODO #2 list):
-  2× F541 `free_snap_tap.py` (150, 159); 2× F401 (`fst_manager.py:8` `threading.Event`,
-  `fst_overlay.py:7` `QSizePolicy`); 2× F841 (`fst_overlay.py:412` `cube_distance_down`,
-  `playground/pynput_mouse_probe.py:140` `key_event_time`). **PASS.**
+`git diff --numstat`: handover.ts **+59/−11**. Of that, +7 = the new file-header v2.2.1
+note → the gaugeReadout/onSystemTransform region (incl. the adjacent in-code comments) =
+**+52/−11**: the −11 are the old silent-failure branches (2 signature/shell-check lines,
+1 ok-branch return, catch with `return undefined` ×2 incl. `} catch {`, 1 old comment pair,
+2 lines in the old injection if) and the +52 are the `GaugeReadout` type (3) +
+`gaugePreviewOf` (5) + rewritten failure branches + the two `gauge` append lines +
+comment updates. Success path: `output.system.push(...)` byte-identical; zero change in any
+other hook (SKIP-SET untouched — the v1.3 call stays the maintainer's).
 
-## Newest transform report (`.opencode/plugin/plugin.log`, NOT modified)
+## TODO.md recorded
 
-- Path note: the log lives at **`.opencode/plugin.log`**, not `.opencode/plugin/plugin.log`
-  as the task spec states (`.opencode/plugin/` holds only `handover.ts` + `probes/`).
-  Recorded as TODO #22; measured against the real path.
-- 314 lines at measurement, 0 unparsable, 84 `"kind":"transform"` lines across 7 sessions.
-- **Newest transform line: ts=`2026-09-08T19:01:26.857Z`, session=`ses_f7d9e3249ffebZTCKtnsEL4YHn`**
-  — this worker session (created `18:57:22.872Z`, newest session in the log). **Expectation
-  met.** Transform lines carrying that session id at that moment: **23**
-  (span `18:57:22.984Z` → `19:01:26.857Z`).
-- Post-note: the log is append-live — every one of my subsequent turns emitted its own
-  transforms, so a seconds-later re-count gave 35 lines, newest `19:05:08.349Z`
-  (global newest transform still mine). Snapshot reported above is the Step-3 one.
+- **#27** — v2.2.1 delivered; OPEN follow-up (planner): after ONE opencode start read the
+  `kind:"gauge"` lines → the #23 branch (spawn error / timeout / non-`CTX=` output /
+  `system-not-array`, or ok+injected ⇒ #23 false alarm ⇒ escalate to transform-drop).
+- **#28** — new discrepancy found on the way: `GAUGE_CMD` (handover.ts line 63) declared
+  but unused since the v2 readout uses the literal inline; left verbatim per the minimal-
+  diff hard limit — wire or delete, cosmetic.
 
-**Bottom line:** the v2.2 hook fired LIVE for this worker session (23+ transforms logged),
-yet the worker's own system prompt carries no `ctx:` line — the worker-side half of the
-"both" call does not surface. Logged as TODO #23 (maintainer call: transform scope for
-subagent invocations, or accept workers lineless).
+## Not done (deliberate)
 
-## Notes & record
+- No SKIP-SET change (v1.3 is a separate maintainer call), no other hook touched.
+- No opencode restart/reconfigure — the proof start is the planner's to ask for (spec step
+  + #27 follow-up).
+- The `no-ctx-output` mapping of spawn-failure rejections (error text in `preview`) is an
+  in-scope judgment under the fixed 4-reason vocabulary — flag: the vocabulary has no
+  spawn reason; `preview` is the only evidence field, and a spawn failure remains
+  distinguishable by the error-text preview.
 
-- `TODO.md` appended: **#21** `ctxgauge/peek.py` crashes with `TypeError` when the newest
-  session has no *finished* assistant message yet (hit on this run's first gauge call —
-  my session's first turn was still in flight; second call fine) + stale-schema note
-  (`session.model` is now a JSON column on opencode 1.18.29; the 120K window regex finds
-  `-120K` in the raw JSON by coincidence) · **#22** task-spec log path mismatch ·
-  **#23** the NOT FOUND result itself.
-- Not done (by design): no FST code, no plugin/log changes, NOT FOUND investigated exactly
-  zero times beyond reading my own prompt; the post-commit mirror overwrite of this file
-  is the planner's to book.
+## Spec-friction flag (asked for, one line)
 
-Context at stop: 32% used / 80691 tokens remaining
-</task_result>
-</task>
+Neutral-to-helpful: the goal + hard limits + definition of pass gave exactly the room
+needed (the spawn-error→`no-ctx-output.preview` mapping had to be judged inside the fixed
+vocabulary — the spec's "deviate, note it" framing made that safe), nothing obstructed.
+
+Post-run self-gauge for record (context line check pending planner). The plugin
+overwrite of this mirror file at delegation end is the planner's to book.
