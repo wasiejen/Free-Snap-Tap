@@ -2,7 +2,7 @@
 
 Free-form running tally: what I did, ideas I had, bugs I tracked. Not an
 authoritative record — the change record is `git log`, the live backlog is
-`TODO.md`, agent-facing rules are `AGENTS.md` / `NEXT_AGENT_PROMPT.md`.
+`TODO.md`, agent-facing rules are `AGENTS.md` / `.opencode/handover_planner.md`.
 May be stale; nothing here is required to be maintained.
 
 260907-2229:
