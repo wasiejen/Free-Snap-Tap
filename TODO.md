@@ -95,3 +95,28 @@ not set), and the Phase-5 tests (`tests/test_filter_simulated.py`) now pin that
 non-suppression. Clarify + document as final decision: if it stays off, reword the
 XXX/"to test" comment so it reads as an intentional decision; if it was meant to be
 reenabled, that is the call.
+
+## 260908-0951 copied from NAP - to be sorted in and dedubled:
+1. **Triage misclassification: `fst_manager.py` lines 116–117 (`check_constraint_fulfillment`,
+   class A "None result → pass") are unreachable.** `constraint_evaluation` maps `None` →
+   `True` (`fst_manager.py:691`) before returning, and no other branch returns `None` — the
+   `pass` body (line 117) can never execute. It is dead code (class C), not testable-A. The
+   triage's 2098/2217 (94.6 %) ceiling is therefore 2097/2217 ≈ 94.6 % — same rounded
+   number, but line 117 will remain uncovered in every run. Recorded in the `2007698`
+   commit message at discovery; `COVERAGE_TRIAGE.md` is read-only here, reclassifying 117 to
+   C is the maintainer's call — ask him, don't edit the plan file.
+2. **Lint baseline regressed 6 → 8 at `ca61a26`** (DoD says "exactly 6"): 2×F401
+   (`SimpleNamespace` unused) in `test_control_actions.py` / `test_facade_wiring.py`, plus a
+   3rd in the untracked WIP file. Fix = delete the three import lines (Next steps 1-2) —
+   restores the 6-finding baseline.
+3. **C-class lines covered as by-products** (as the triage anticipated): `fst_keyboard`
+   795/799/804 (via a `DEBUG2` flip in `d94af46`) and `fst_manager` 341 (via a `DEBUG3` flip
+   in `99b5e37`). They were C but no longer miss — expected remaining C: `fst_manager` 85,
+   `fst_keyboard` 26, `fst_data_types` 4, plus `fst_overlay` 589 (offscreen-by-design `exec_`).
+   Expected state confirmed by the `fffea8b` coverage run.
+4. **Found 2026-09-08 (`fffea8b`): `fst_keyboard` 302–303 are unreachable dead code** —
+   triage classed them A (recipe `w : +e`): `convert_key_string_group` only ever appends
+   `Key_Event`s, so line 297 (`not isinstance(new_trigger_group[0], Key)`) is always true and
+   the line-295 block is entered only via a `Key` replacement — which makes line 301 false,
+   so 302–303 can never run. `TODO.md` #6. Also found: the empty-macro comment at 707
+   contradicts the behavior (`alias_fired` suppresses the trigger anyway) — `TODO.md` #7.

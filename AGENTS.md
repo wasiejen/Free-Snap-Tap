@@ -15,6 +15,9 @@ macOS not supported.
 - The agent runs on **Windows** with a **PowerShell (pwsh)** shell. **Heredocs do not
   exist in PowerShell** — `<<EOF` / `cat > file <<EOF` will NOT parse; never emit them.
   Write multi-line content with the file tools (or `Set-Content`), then edit the file.
+- Python **3.12** (CI-pinned; CI runs on `windows-latest`).
+- **House rule:** when something is unclear, ASK EARLY — do not decide unilaterally
+  or spend a long time exploring an ambiguity.
 
 ## Git conventions
 - Commit message: one-line subject (imperative) naming the main change. If the commit
@@ -23,19 +26,19 @@ macOS not supported.
   Multi-theme commits are fine, never split commits just for message style.
   Goal: `git log` must stay readable as a small work summary on its own.
 
-## Post-commit routine (after EVERY commit, no exceptions)
+## Commit routine (BEFORE EVERY commit, no exceptions)
+NAP and `TODO.md` updates happen **before** committing and go **into the same
+commit** — so an interrupted agent can resume from a committed NAP with relatively
+current data, without re-exploring.
 1. **Update `NEXT_AGENT_PROMPT.md` (NAP) with current progress** — what is done, the
-   next task(s), current baselines (test count, lint count, coverage) and the HEAD
-   commit. Goal: an agent that was interrupted can resume from the NAP with
-   relatively current data, without re-exploring.
-2. **Append every discrepancy found at commit time to `TODO.md`** — doc/code
-   mismatches, suspected bugs, stale baselines, anything the code contradicts the
-   docs — as a new numbered entry in `TODO.md` style (`## <n>. <summary> (<date>)`).
-   Append only, never rewrite existing entries.
-3. **Context check:** run `& .\.venv\Scripts\python.exe ..\ctxgauge\peek.py` (from the
-   repo root) and judge whether the remaining context is still enough for the next
-   tasks. **If not:** finish the NAP with all open tasks written down, stop at a
-   clean point, and inform the user — never start new work.
+   next task(s), current baselines (test count, lint count, coverage) and what is
+   about to be committed (subject + file set; the hash only exists after committing).
+2. **Append every discrepancy found during the work to `TODO.md`** — doc/code
+   mismatches, suspected bugs, stale baselines — as a new numbered entry in
+   `TODO.md` style (`## <n>. <summary> (<date>)`). Append only, never rewrite
+   existing entries.
+3. **Commit code changes + NAP + `TODO.md` together** in that single commit.
+4. **Post-commit context check** — see `## Context budget` below.
 
 ## Run / test
 - venv with all deps: `.venv` (do NOT reinstall from scratch; `requirements.txt` is runtime, `requirements-dev.txt` adds test tooling, `requirements-build.txt` is executable-packaging only (Nuitka/PyInstaller) — CI installs runtime+dev only).
@@ -45,11 +48,13 @@ macOS not supported.
 - **Never run the live listeners in tests.** Always mock pynput controllers (mocked-`FakeFST` pattern in `tests/conftest.py`).
 
 ## Context budget (NAP threshold)
-- Check usage between logical chunks (before heavy steps): `& .\.venv\Scripts\python.exe ..\ctxgauge\peek.py` → `CTX=n (p%)` (read-only, run from repo root).
+- Check between logical chunks (before heavy steps) AND after every commit (step 4 of
+  the commit routine): `& .\.venv\Scripts\python.exe ..\ctxgauge\peek.py` (from the repo
+  root, read-only) → `CTX=n (p%)`.
 - **Line:** stop working when ≤ 15k tokens remain **or** 85% used — whichever comes first. Writing the NAP needs another ~10k (simple tasks) to ~15k (complex: thinking + lookups), so wrap up BEFORE the line.
-- At the line (or whenever a post-commit check says the remaining context is not
-  enough for the next tasks): stop at a clean point, write all open tasks into the
-  NAP, and **inform the user** — never start new work.
+- **Not enough context left** (at the line, or a check says the next tasks will not fit):
+  write all open tasks into the NAP (the update rides in the NEXT commit), stop at a
+  clean point, and **inform the user** — never start new work.
 - With the gauge result, give an **estimate of the tokens still needed to finish the current plan** (rough budgets: file read/inspect ≈ 1–3k per call; heavy edits / a big test run ≈ 3–8k each; small reply turn ≈ 0.3k; NAP writing ≈ 10–15k). Report estimate vs remaining window, so the user can decide to switch to the same model's larger-context variant (slower, no MTP) and finish the task.
 
 ## Sign convention (IMPORTANT — used everywhere)
@@ -89,8 +94,8 @@ sends events with delays. Focus change re-runs `update_args_and_groups`.
 
 ## Test conventions
 - Tests live in `tests/`: pure unit scope + offscreen GUI (pytest-qt 4.5.0, `QT_QPA_PLATFORM=offscreen` pinned in `tests/conftest.py`). No real keyboard, no real time, no Windows APIs.
-- `tests/test_known_issues.py` = **xfail** file for desired-but-not-yet-true behavior. When fixed, move the test into a normal file and keep it green. A test removed from there was reviewed and **accepted as-is**.
-- Current status: **313 passed, 0 xfailed**.
+- Desired-but-not-yet-true behavior goes into a dedicated **xfail** file (the original `tests/test_known_issues.py` is fully resolved/accepted and no longer exists — recreate the pattern if needed). When a fix lands, move the test into a normal file and keep it green.
+- Suite size is a moving baseline — see `NEXT_AGENT_PROMPT.md` for the live number (as of `fffea8b` 2026-09-08: **434 passed, 0 xfailed**).
 
 ## Maintainer decisions on the original known-issues (060926)
 - **#1 shared `constraints=[0,0]` default** — accepted; delays are never mutated individually. Removed from xfail.
