@@ -1,7 +1,11 @@
+<task id="ses_f7d9e3249ffebZTCKtnsEL4YHn" state="completed">
+<task_result>
+Tree clean, commit in place, post-commit gauge: **CTX=46354 (38%) REM=73646** — well above the stop line. Task complete. My handover summary:
+
 # EXECUTIVE SUMMARY — Phase 6 / Tier 1 — v2.2 worker-side live proof (the "both" call)
 
 Measurement run only — zero FST code, zero plugin/log edits. Commit:
-`v2.2 worker-side proof: worker quotes its ctx line` (hash in chat record; files:
+`v2.2 worker-side proof: worker quotes its ctx line` (hash `6004486`; files:
 `.opencode/handover_task.md`, `.opencode/handover_task_to_planner.md`, `TODO.md`
 #21–#23 appended). Working tree clean after commit.
 
@@ -52,8 +56,10 @@ subagent invocations, or accept workers lineless).
   (`session.model` is now a JSON column on opencode 1.18.29; the 120K window regex finds
   `-120K` in the raw JSON by coincidence) · **#22** task-spec log path mismatch ·
   **#23** the NOT FOUND result itself.
-- Not done (by design): no FST code, no plugin/log changes, NOT FIND investigated exactly
+- Not done (by design): no FST code, no plugin/log changes, NOT FOUND investigated exactly
   zero times beyond reading my own prompt; the post-commit mirror overwrite of this file
   is the planner's to book.
 
 Context at stop: 32% used / 80691 tokens remaining
+</task_result>
+</task>
