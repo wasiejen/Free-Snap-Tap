@@ -370,5 +370,33 @@ opencode now runs as the terminal/CLI, with a full system Node.js on PATH
 4. **OPEN: one more opencode RESTART (the v2.2.2 proof start)** — expect ZERO new
    `kind:"gauge"` failure lines for the ok shapes (readouts now ok ⇒ the injected
    `ctx: CTX=… REM=…` items should be visible in planner AND worker prompts; the old
-   worker-proof delegation can quote the line). Also measures the v1.3 log profile.
-   FST code is NOT part of any of this (434 passed / ruff 6 untouched).
+    worker-proof delegation can quote the line). Also measures the v1.3 log profile.
+    FST code is NOT part of any of this (434 passed / ruff 6 untouched).
+
+## 30. Replace the peek.py shell-out with an in-plugin `node:sqlite` read (maintainer task, 2026-09-09)
+
+Integrate the context-gauge lookup directly into `.opencode/plugin/handover.ts` using
+Node.js's built-in `node:sqlite` (probe node here v24.19.0, system CLI host — confirm the
+module is exposed there; it was absent in the electron host's older node) instead of the
+`$`-tagged-template shell-out to `.venv/Scripts/python.exe .opencode/ctxgauge/peek.py`
+(currently `handover.ts` ≈line 301). When landed:
+1. the need for `peek.py` is OVER — delete `.opencode/ctxgauge/` (or keep the file only if
+   the maintainer prefers it as a standalone CLI fallback — his call).
+2. Purge the peek.py usage references in the agent-facing docs: `AGENTS.md` (context-budget
+   section + module map — edit a COPY per AGENTS.md's own rule, maintainer replaces the file)
+   + `prompt_agent_planner.md` + `prompt_agent_task.md`.
+3. **Beyond those, de-peeking ripples into:** the v1.3 skip-set landing (TODO #29.3 — it is
+   still gated on the proof start, so landing de-peek first re-baselines the gauge's host;
+   probe's S4 fake-shell gauge shapes must be rebuilt per the TODO #20 exception) — so de-peek
+   landing and the v1.3 start measurement should be planned as one cycle, not two.
+4. The gauge's sqlite access replaces peek.py's old-schema fragility (TODO #21/#24: v2-schema
+   migration was parked) — write the read against the CURRENT opencode.db schema (`session` /
+   message token JSON, model id from `session.model`'s `id`) and guard the fresh-session case
+   the same way peek.py does (no finished message ⇒ `CTX=0`, never throw into the transform).
+
+Carried-over maintainer note, UNVERIFIED, from the 2026-09-09 dirty `peek.py` diff (now
+committed with this entry): "should total not be the most current total token number? output
+should be the generated tokens for the last message so it should be substract output from
+total" — i.e. `total - output` may already be the right readout, or the token JSON may mean
+something different. CHECK BEFORE wiring the same arithmetic into handover.ts; record the
+verified meaning of the token fields in the entry when done.

@@ -20,6 +20,8 @@ try:
 except json.JSONDecodeError:
     mid = model or ""
 t = json.loads(data).get("tokens", {})
+# TODO maintainer: should total not be the most current total token number? output should be the generated tokens for the last message
+# so it should ne substract output from total. please check!
 ctx = t.get("total", 0) - t.get("output", 0)
 m = re.search(r"-(\d+(?:\.\d+)?)(K|M)(?![0-9])", mid)
 win = int(m.group(1) + ("000" if m.group(2) == "K" else "000000")) if m else 120000

@@ -9,6 +9,9 @@
         "baseURL": "http://192.168.178.20:8033/v1"
       },
       "models": {
+        "Qwen3.8-27B-IQ3KT-120K_MTP:chat": {
+          "name": "Qwen3.8-27B-IQ3KT-MTP:chat"
+        },
         "Qwen3.8-27B-IQ3KT-120K_MTP": {
           "name": "Qwen3.8-27B-IQ3KT-MTP"
         },
@@ -52,7 +55,7 @@
     "planner_120k_mtp": {
       "description": "very intelligent, fast, 120k context, plans tasks and delegates to sub-agents",
       "mode": "primary",
-      "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
+      "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP:chat",
       "temperature": 1.0,
       "prompt": "{file:./.opencode/prompt_agent_planner.md}",
       "permission": {

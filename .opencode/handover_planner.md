@@ -3,7 +3,20 @@
 FIRST read `AGENTS.md` (orientation, conventions, commit routine — do NOT edit AGENTS.md
 directly), `TODO.md`, and this file. House rule: when something is unclear, ASK EARLY.
 
-## Current state (2026-09-09 — v2.2.2 fix + approved landings committed)
+## Current state (2026-09-09 — v2.2.2 fix + approved landings committed; de-peek TODO #30 logged)
+
+- **Maintainer work landed (this cycle, committed with the #30 TODO):** `opencode.jsonc` adds
+  model `…120K_MTP:chat` + planner agent switched to it — NOTE: that model may be the one the
+  CURRENT planner session itself runs on; the `:chat` endpoint is unverified live (flagged to
+  the maintainer at hand-off — confirm a start resolves + calls the model before assuming).
+  `peek.py` gained his TODO comment (total/output arithmetic question) — carried into TODO
+  #30 as UNVERIFIED note; the answer must be checked BEFORE handover.ts inherits the
+  `total − output` read.
+- **NEW TODO #30 (maintainer task):** replace the peek.py shell-out in `handover.ts` with an
+  in-plugin `node:sqlite` read; on landing: delete `.opencode/ctxgauge/`, purge peek.py
+  references (AGENTS.md copy + both prompt_*.md), re-build probe S4 fake-shell shapes (TODO
+  #20 exception), and plan landing + v1.3 proof-start measurement as ONE cycle (the v1.3
+  skip-set of #29.3 re-baselines the gauge host).
 - **ROOT CAUSE FOUND (proof-start read is DONE — TODO #23/#27 closed):** the missing `ctx:`
   line was a gauge READOUT failure, not a transform-scope issue. The plugin.log start segment
   (no 40k-message marker in this retained file; era-phase identified per the worker log ids in
@@ -48,6 +61,9 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
    surfacing (channel call). Default-approved meta/docs work is NOT here — it just gets done.
 
 ## NEXT STEPS
+0. TODO #30 (de-peek / node:sqlite gauge) is LOGGED, not started — needs a task spec like
+   every other plugin-surface change (probe rebuild + spec); do NOT start it before steps
+   1–2, its landing re-baselines the v1.3 gauge host.
 1. After his start: read the start segment's `kind:"gauge"` lines + scan MY prompt for a
    `ctx:` item (the planner-side injection was never observed live — check the env/system
    block on resume) → if ok: worker-proof delegation (one turn, quote the line) → then
