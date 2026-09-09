@@ -26,6 +26,7 @@ May be stale; nothing here is required to be maintained.
 
   
 # OPEN
+## lets change the model for planner and default worker to q4_120k, slower but much more stable and precise
 
 ## check correctness of quantization making "in head" calculation of models unreliable
 
