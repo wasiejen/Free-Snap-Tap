@@ -23,6 +23,8 @@ available on Linux; macOS not supported.
   emit them. Write multi-line content with the file tools (or `Set-Content`),
   then edit the file.
 - Python **3.12** (CI-pinned; CI runs on `windows-latest`).
+- **Environment Variable FST** is the repo root "C:\Users\Wasiejen\Projects\OpenCodeProjects\Free-Snap-Tap\Free-Snap-Tap" 
+  - use it. e.g. Powershell: ${env:FST}
 
 ## Safety limits (repo-specific)
 - **Never run the live listeners in tests.** Always mock pynput controllers
@@ -117,7 +119,7 @@ hits the filter: update state (press states + timings) → check rebinds
 - Suite size is a moving baseline — see `.opencode/handover_planner.md` for the
   current expected count. Do not hard-code test-count assumptions here.
 
-## Worker roster (referenced by the planner)
+## Worker roster
 - `worker_120K_mtp` (DEFAULT — same model as the planner, no reload cost):
   normal edits, tests.
 - `worker_gemma_256k_mtp`: fast-throughput, high-volume reads/writes, big files,
@@ -125,7 +127,7 @@ hits the filter: update state (press states + timings) → check rebinds
 - `worker_210K`: slow, big context — very long or deeply complex single tasks
   only.
 
-## Handover file paths (referenced from AGENTS.md)
+## Handover file paths
 - Plan-state file (planner-owned): `.opencode/handover_planner.md` — the
   maintainer calls this the **NAP** (**N**ext **A**gent **P**rompt). If the user
   says "NAP" or "write a NAP", they mean this file. Rewritten per handoff — read

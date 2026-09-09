@@ -59,7 +59,11 @@
       "temperature": 1.0,
       "prompt": "{file:./.opencode/prompt_agent_planner.md}",
       "permission": {
-        "edit": "allow",
+        "edit": {
+          "*": "allow",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
         "bash": "allow",
         "webfetch": "allow"
       }
@@ -73,7 +77,9 @@
       // "steps": 15,
       "permission": {
         "edit": {
-          "*": "allow",
+          "*": "reject",
+          ".*": "allow",
+          "%TEMP%/opencode/" : "allow",
           "AGENTS.md": "deny",
           ".opencode/prompt_**": "deny",
           ".opencode/handover_planner.md": "deny",
@@ -94,7 +100,9 @@
       // "steps": 15,
       "permission": {
         "edit": {
-          "*": "allow",
+          "*": "reject",
+          ".*": "allow",
+          "%TEMP%/opencode/" : "allow",
           "AGENTS.md": "deny",
           ".opencode/prompt_**": "deny",
           ".opencode/handover_planner.md": "deny",
@@ -115,7 +123,9 @@
       // "steps": 15,
       "permission": {
         "edit": {
-          "*": "allow",
+          "*": "reject",
+          ".*": "allow",
+          "%TEMP%/opencode/" : "allow",
           "AGENTS.md": "deny",
           ".opencode/prompt_**": "deny",
           ".opencode/handover_planner.md": "deny",

@@ -59,7 +59,7 @@ signal it should have been a direct edit.
   and inform the user. A fresh session resumes from the file. You cannot clear
   your own context — resumption is the file + the next session.
 
-## agent_feedback.md
+## agent_feedback.md (in .\.opencode\)
 - Optional, only when material friction affected the work AND your main
   orchestration step is done AND token budget allows. Append **without reading
   prior entries below the divider** — your report must be your own independent

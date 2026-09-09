@@ -67,7 +67,7 @@ message the same summary:
 Keep it tight — the planner reads it into context. Then stop. No new work, no
 planning, no delegation.
 
-## agent_feedback.md
+## agent_feedback.md (in .\.opencode\)
 - Optional, only when material friction affected the work AND your task is
   complete AND token budget allows. Append **without reading prior entries below
   the divider** — your report must be your own independent signal, not influenced
