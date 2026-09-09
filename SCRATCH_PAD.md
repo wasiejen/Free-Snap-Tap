@@ -14,7 +14,7 @@ May be stale; nothing here is required to be maintained.
 ## WIP: needs testing: a lot of permission requests for .opencode/* 
   - why? is it not allowed? - see following point
     - generally deny these request automatically for the workers? how?
-## WIP: allow removal of old TODO.md entries are remove the denial of it
+## DONE: allow removal of old TODO.md entries are remove the denial of it
   - the code is the source of truth and the history lives in git - there is not need to keep that here
   - currently: Close or condense solved/stale items with a one-line close note pointing at the
     closer (commit/entry); delete only exact duplicates after preserving the
@@ -23,7 +23,12 @@ May be stale; nothing here is required to be maintained.
     
 
 # OPEN
-
+## adapt peek to handle unknown models by only displaying the current context and not % and REM
+## add slots to the handover files
+## how to make sure the agents do not read the old feedback and append blindly?
+  - agent_feedback_instruct.md as a seperate file to read and
+  - "<<END>>" special string that the agent can replace directly 
+  - and has to end it with the same special string
 ## context gauge injection on worker start reports the data from the planner first
   - lets include an ignore context gauge info on worker start in the prompt_of the worker
 
