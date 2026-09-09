@@ -1,57 +1,52 @@
-# TASK — Phase 6 / Tier 1 — v2.2.1: gauge-failure evidence logging (+ probe extension)
+# TASK — v2.2.2 proof turn: worker-side `ctx:` quote + plugin.log segment tally (2026-09-09)
 
-FIRST read `AGENTS.md`. Then: `.opencode/plugin/handover.ts` (current final code — read it
-fully; your SUGGESTED scope below, not exhaustive — the probe file too).
+EVIDENCE-ONLY, read-only turn: no code edits, no commits (nothing to commit; the planner
+updates the plan state). Two proofs + one measurement.
 
-## Why (measured facts — re-verify before you rely on any number)
-v2.2's `onSystemTransform` fires on EVERY live turn (104 `kind:"transform"` lines in the
-current `.opencode/plugin.log` start segment — the log is at `.opencode/plugin.log`, NOT
-`plugin/plugin.log`; TODO #22), yet NO `ctx:` line surfaces in worker or planner prompts
-(TODO #23). The readout failure branches are silent by design (best-effort, no logging) —
-so the root cause is currently undecidable from here: (a) BunShell spawn problem
-(relative path `.venv/Scripts/python.exe .opencode/ctxgauge/peek.py` + `cwd(dir)`), (b) the
-3000 ms `GAUGE_TIMEOUT_MS`, (c) non-`CTX=` output (e.g. a python traceback — the TODO #21
-class, already fixed at `b8ea40b`), (d) opencode not applying the transform mutation.
-DELIVERABLE: one opencode start after your change identifies the branch from the log alone.
+## 1. Worker-side proof (v2.2 protocol)
 
-## Goal — what "pass" means
-1. `handover.ts`: `onSystemTransform` appends ONE `kind:"gauge"` log line when the readout
-   is NOT ok, or when ok-but-not-injected (`output.system` not an array); NO line on the
-   ok+injected path (happy path must not add log volume). Reason vocabulary (stable, one
-   of): `shell-missing` | `timeout` | `no-ctx-output` (raw output did not start with
-   `CTX=` — includes empty/traceback — carry a `preview` field: raw output trimmed ≤ 120
-   chars, omitted when empty) | `system-not-array`. Line = your one call of `buildLine`
-   (existing scalar pattern), session id included.
-2. Offline probe `.opencode/plugin/probes/handover_probe.mjs` (permanent tooling — the
-   run recipe + expected summary are in its header): extend the S4 transform shapes so the
-   failure shapes each assert their new `gauge` line + reason (the current shapes cover
-   no-shell / junk-shell; add synthetic shapes where needed) — the OK shapes keep asserting
-   injection byte-identically and NO `gauge` line. Update the header's expected-output
-   summary to match (recipe integrity is a maintained property of the file — do the math:
-   current expectation 23/23 per the v2.2.1 worker summary; report before/after totals).
-3. Repo baselines unchanged: `pytest -q` → 434 passed (13 warnings);
-   `ruff check --select F .` → 6 findings.
+Your own system prompt should carry an injected line of the form
+`ctx: CTX=<n> (<p>%) REM=<m>` (injected by `.opencode/plugin/handover.ts` v2.2.2 — the
+maintainer's "inject for ALL sessions" decision, TODO.md #18; the readout is a tagged-
+template `input.$` call).
+ACTION: locate that item in your own system block and QUOTE IT VERBATIM in your summary.
+If it is absent, report `ctx: item ABSENT` — that is the finding, not a failure to retry.
 
-## Hard limits
-- No behavior change beyond the evidence log: v2.2 injection semantics on the success path
-  stay byte-identical (diff stat for the `gaugeReadout`/`onSystemTransform` region in the
-  summary — paste it).
-- NO SKIP-SET change (v1.3 is a separate maintainer call), no other hook touched.
-- Do not restart/reconfigure opencode.
+## 2. plugin.log segment tally
 
-## Suggested procedure (deviate, note the deviation in the summary)
-1. Implement (1). 2. Run probe BEFORE (`before` mode per the header — expect the current
-   all-pass), apply, run AFTER (all pass incl. the new expectations). 3. Baselines.
-4. Commit: plugin file(s) + probe + this spec + the handover summary. TODO.md: one-line
-   records for anything you fixed on the way; leave maintainer-level items OPEN (do not
-   invent entries for things you did not find).
+File: `.opencode/plugin.log` — retained (append-only) across opencode starts.
+- First: total line count of the file (PowerShell, e.g. `(Get-Content .opencode\plugin.log
+  | Measure-Object -Line).Count` — beware CRLF/blank-line nuance; report the count you used).
+- The segment base = **1269** lines (recorded in the planner's NAP footer at the last NAP
+  write, before this opencode start). Segment = lines 1270..EOF. If the file has fewer than
+  1270 lines, read the whole file and say so.
+- Tally, for the segment ONLY:
+  a) every `kind:"gauge"` line: COUNT + the RAW lines (they are the v2.2.1 failure evidence
+     logger; expected ZERO for a v2.2.2 ok+injected readout — any present line carries a
+     `reason` value from the vocabulary `shell-missing | timeout | no-ctx-output |
+     system-not-array`).
+  b) the log is JSON-ish one event per line. Get the event-name string: it sits under a key
+     shaped `name":"..."` per line (read a few sample lines to confirm the exact shape —
+     do NOT guess the whole grammar from memory). Tally every event-name value that appears
+     in the segment, with counts, largest first. ALSO compute separately how many lines
+     carry each of the three NOW-EXPECTED-SILENT types `file.watcher.updated`,
+     `file.edited`, `session.idle` (v1.3 skip set, TODO.md #29.3 — expect 0 each in the
+     segment).
+- Baseline context (planner's, from TODO.md #27 data): old-profile cycle grew the log
+  ≈ 0.9 KB/s with the three noise types as the biggest chunk; v1.3 should cut ~79% of the
+  event lines. Judge the ratio from YOUR tally against the baseline line, don't re-derive
+  the baseline.
 
-## Definition of pass
-- Probe before all-pass AND after all-pass with the new `gauge` expectations (both totals
-  in the summary).
-- `pytest -q` 434 / ruff 6.
-- One commit, working tree clean after it (the mirror overwrite is the planner's to book).
+## Pass / return
 
-## Worker: `worker_120K_mtp`
-First run under the relaxed prompts (`prompt_agent_task.md` @ `b8ea40b`). One line in the
-summary on how the freedom/spec-friction felt (helped / hindered / neutral) — flag only.
+Return the standard EXECUTIVE SUMMARY with, in order:
+1. the verbatim `ctx:` item (or the ABSENT finding),
+2. segment line count + the raw `kind:"gauge"` lines (or the count 0),
+3. the event-name tally (largest first) + the three-silent-types check,
+4. the two open judgment flags this session asks to confirm or rule out, EACH a 2-liner in
+   the summary: (i) does the segment profile match the v1.3 expectation (≈79 % event-line
+   cut), or do any previously-expected-SKIP-LESS lines persist / unexpected NEW lines show up,
+   and what should change for them to skip them in handover.ts next?; (ii) the v2.2.2 proof —
+   if the segment is clean and both agents (this one, planner's observed 28557/23%) carry
+   the `ctx:` item, then the proof start is satisfied and only the git close of the cycle
+   remains.

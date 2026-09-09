@@ -46,6 +46,9 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
   restart): read that start's `kind:"gauge"` lines (expect ZERO new failures) + the `ctx:`
   items should surface in planner AND worker prompts — proof delegation: one worker turn that
   quotes its `ctx: CTX=…` item verbatim (v2.2 worker-proof protocol, now expected to pass).
+- **Planner-side injection OBSERVED LIVE (this session):** the current session's system block
+  carries `ctx: CTX=28557 (23%) REM=91443` — the "never observed live" question (Live status /
+  Context budget below) closes YES. The line reflects this start running the v2.2.2 handover.ts.
 - Task 2 (Tier 2 — custom `handover` tool, compaction hooks, resume aid, permission
   auto-approval): NOT STARTED — scoping from the live shapes (written proposal); Tier-2 code
   waits for a Tier-2 spec.
@@ -64,10 +67,11 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
 0. TODO #30 (de-peek / node:sqlite gauge) is LOGGED, not started — needs a task spec like
    every other plugin-surface change (probe rebuild + spec); do NOT start it before steps
    1–2, its landing re-baselines the v1.3 gauge host.
-1. After his start: read the start segment's `kind:"gauge"` lines + scan MY prompt for a
-   `ctx:` item (the planner-side injection was never observed live — check the env/system
-   block on resume) → if ok: worker-proof delegation (one turn, quote the line) → then
-   archive/close TODO #29 item 4 (the OPEN restart note) + close the cycle in git.
+1. [HALVED, this session — planner-side half DONE: the `ctx:` item IS in my prompt
+    (observed 2026-09-09)]. Remainder (delegable to one worker turn): read the post-base
+    segment's `kind:"gauge"` lines (expect ZERO) + the worker-proof: the worker quotes its
+    own `ctx:` line verbatim → then archive/close TODO #29 item 4 (the OPEN restart note) +
+    close the cycle in git.
 2. Log-growth measurement (v1.3 profile): the plugin.log is RETAINED across starts (append,
    no truncate — confirmed live; no 40k-message marker exists in this file, so the old
    marker-based segment rule does not work on this host) — base = the line count recorded in
