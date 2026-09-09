@@ -6,7 +6,10 @@ discrepancy.
 
 ## Editing this file
 - Do not edit `AGENTS.md` directly — edit a copy and the maintainer will replace it.
-
+- 
+## Loop prevention - important
+- Do not read large logs directly - sample it and use your tools to analyse it - the danger of looping is to big when read directly and trying to reason on such huge amount of similar repeated data.
+- 
 ## What this is
 A Windows-only snap-tapping / rebind / macro tool. It hooks keyboard (and mouse) input
 via pynput's low-level win32 filter, suppresses the original events, and re-emits
