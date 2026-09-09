@@ -42,6 +42,17 @@
 // shell-missing | timeout | no-ctx-output | system-not-array, session id included; no-ctx-output
 // carries a `preview` = raw output or error text, trimmed and capped 120 chars, omitted when
 // empty) — NO line on the ok+injected path (the happy path must not add log volume).
+//
+// v2.2.2 (2026-09-09): the 09-09 proof start root-caused the missing ctx: line (TODO.md #23/#27
+// closed by its gauge lines): under the electron opencode the PluginInput $ was absent
+// (shell-missing); under the terminal/CLI opencode the $ IS a live BunShell that REJECTS a plain
+// function call with a string command — the cwd-bound shell must be called as a TAGGED TEMPLATE.
+// The gaugeReadout call shape changed accordingly (evidence preview in this cycle's
+// .opencode/plugin.log start segment, reason no-ctx-output).
+//
+// v1.3 (2026-09-09): maintainer-approved extension of the log-event SKIP-SET (TODO.md #17): the
+// three steady-state noise types measured in the 09-09 start segment (file.watcher.updated +
+// file.edited + session.idle); message.removed and the session.* types remain logged as signal.
 
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
@@ -51,6 +62,11 @@ const LINE_CAP = 2000;
 const CAPS = [500, 150, 60];
 const DOT = "\u2026";
 const SKIP_EVENT_TYPES = new Set([
+  // v1.3 (09-09, maintainer-approved) — the three steady-state noise types of the 09-09 start
+  // segment; keep message.removed / session.* logged as signal (TODO.md #17)
+  "file.watcher.updated",
+  "file.edited",
+  "session.idle",
   "message.part.delta", // v1.1
   // v1.2 — the cascading UPDATE event types (log-growth fix); see the v1.2 header note
   "message.part.updated",
@@ -69,14 +85,15 @@ const HANDOVER_SPEC_PATH = ".opencode/handover_task.md";
 const GAUGE_TIMEOUT_MS = 3000;
 
 // BunShell is not re-exported by @opencode-ai/plugin (type is internal to dist/shell), so
-// structure-type only the minimal slice v2 calls: cwd(...) → shell, shell(cmd) → promise with
-// nothrow().text().
+// structure-type only the minimal slice v2.2.2 calls: the LIVE shell (terminal/CLI opencode,
+// 09-09 start evidence) is a tagged template — shell\`cmd\` → promise with nothrow().text() —
+// a plain function call with a string command is rejected by it (see the v2.2.2 header note).
 type ShellPromiseLike = {
   nothrow(): ShellPromiseLike;
   text(): Promise<string>;
 };
 type ShellLike = {
-  (command: string): ShellPromiseLike;
+  (strings: TemplateStringsArray): ShellPromiseLike;
   cwd(d: string): ShellLike;
 };
 
@@ -277,7 +294,11 @@ async function gaugeReadout(): Promise<GaugeReadout> {
   if (typeof shell !== "function") return { ok: false, reason: "shell-missing" };
   try {
     const text = await withTimeout(
-      shell.cwd(dir ?? "")(`.venv/Scripts/python.exe .opencode/ctxgauge/peek.py`).nothrow().text(),
+      // v2.2.2 — TAGGED TEMPLATE, not a function call: the live BunShell (terminal/CLI opencode)
+      // rejects `shell.cwd(d)(cmdString)` with "Please use '$' as a tagged template function"
+      // (09-09 start-segment evidence, preview reason no-ctx-output). Static single command —
+      // keep it a literal; interpolated parts would be parsed by the shell.
+      shell.cwd(dir ?? "")`.venv/Scripts/python.exe .opencode/ctxgauge/peek.py`.nothrow().text(),
       GAUGE_TIMEOUT_MS,
     );
     const line = (typeof text === "string" ? text : "").trim();

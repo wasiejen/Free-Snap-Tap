@@ -137,6 +137,9 @@ After the v1.1 delta-filter patch the line-1 header comment still reads "Handove
 deliberately minimal ("that is the ONLY behavioral change"). Cosmetic; update the label —
 and re-check the "log-only" tag as behaviour accumulates in v2 — whenever.
 
+CLOSED (planner, 2026-09-09): the v2/v2.2 header rewrite already replaced the v1 label; this
+commit lands the v2.2.2 + v1.3 header notes in the same file.
+
 ## 14. ctxgauge injection: `experimental.chat.system.transform` exposes no agent identifier — line omitted, evidence-logged (2026-09-08)
 
 v2 (Phase 6 / Tier 1, deliverable 4) implemented the transform hook with the pre-set
@@ -271,6 +274,15 @@ to the worker model — either `onSystemTransform` does not apply to subagent mo
 invocations, or the injected line is not carried to them. Untouched per task (measurement
 only). Maintainer call: investigate the transform scope or accept workers are lineless.
 
+CLOSED (planner, 2026-09-09, data: the 09-09 opencode start segment's `kind:"gauge"`
+evidence lines): not a transform-scope issue — the gauge READOUT was failing every time.
+Start segment: 23× `shell-missing` (electron-era segments — `PluginInput.$` absent there)
++ 47× `no-ctx-output`, preview `Error: Please use '$' as a tagged template function: ...`
+(terminal/CLI era — the v2 function-call command shape `shell.cwd(d)(string)` is rejected by
+the live BunShell, which wants a tagged template). Root cause = the gauge call shape, not the
+transform hook. Fixed v2.2.2 (tagged-template call) — see #29. Remaining: one opencode start
+with zero new gauge-failure lines + the `ctx:` item visible in the agents' prompts.
+
 ## 24. Fixed: `ctxgauge/peek.py` fresh-session crash + model-id parsing (TODO #21, code side closed) (2026-09-08)
 
 Planner direct fix (work-mode call: small meta-file fixes are the planner's). `peek.py` now
@@ -318,6 +330,10 @@ include gauge==7): pre-run old probe vs v2.2 = 23/23 PASS, post-run new probe vs
 (spawn error / timeout / non-`CTX=` output / `system-not-array`, or ok+injected ⇒ #23
 false alarm ⇒ escalate to transform-drop).
 
+CLOSED (planner, 2026-09-09): the one opencode start happened (the 09-09 terminal/CLI
+start); its `kind:"gauge"` lines named the branch — no-ctx-output + BunShell
+tagged-template error preview (plus the earlier shell-missing era). See #23/#29.
+
 ## 28. `handover.ts`: `GAUGE_CMD` constant declared but unused (v2 leftover) (2026-09-08)
 
 `.opencode/plugin/handover.ts` line 63 declares `GAUGE_CMD = ".venv/Scripts/python.exe
@@ -325,3 +341,34 @@ false alarm ⇒ escalate to transform-drop).
 constant is dead (pre-existing since the v2 readout; the v2.2.1 cycle left it verbatim per
 the minimal-diff hard limit). Wire the constant into the readout or delete it — cosmetic,
 maintainer's call.
+
+CLOSED (planner, 2026-09-09): GAUGE_CMD was already removed in the b8ea40b cycle
+(default-approved cleanup; the current file carries no GAUGE_CMD constant — verified against
+the live file, probe 28/28). Entry left open by oversight in that cycle.
+
+## 29. Environment change: opencode Electron → terminal/CLI + full system Node.js; BunShell `input.$` is the gauge host (2026-09-09)
+
+Maintainer switch (announced 2026-09-09): the Electron `opencode.exe` install is GONE —
+opencode now runs as the terminal/CLI, with a full system Node.js on PATH
+(v24.19.0 + npm 12.0.2 measured). Consequences, evidence-based from this session:
+
+1. **The plugin input `$` IS a live BunShell under the new host — but tagged-template only.**
+   `shell.cwd(d)(commandString)` is rejected with `Error: Please use '$' as a tagged template
+   function: $`cmd arg1 arg2`` — exactly the 09-09 start segment's 47 `no-ctx-output` preview
+   lines. This IS the v2 ctx: missing line (closed TODO.md #23 + #27): the v2 readout used a
+   plain function call; the live host (unlike the electron host that simply LACKED `input.$`,
+   giving the 23 `shell-missing` lines) wants the command as a tagged template.
+2. **Fixed v2.2.2 (this commit):** the `ShellLike` call shape + `gaugeReadout` now use the
+   tagged-template form `` shell.cwd(dir ?? "")`<cmd>` ``; the probe's fake BunShell mirrors
+   the live rejection (a regression to the string-call form now FAILS the probe's S4 ok-shapes
+   instead of passing silently). Probe run command switched from the pinned electron exe to
+   system `node` (node >= 24 does the same native TS type-stripping).
+3. **Landed maintainer approvals (2026-09-09):** worker stop-line rule appended to
+   `prompt_agent_task.md`; v1.3 skip-set extension landed in handover.ts
+   (`file.watcher.updated` + `file.edited` + `session.idle`; `message.removed`/`session.*`
+   stay logged as signal — the v1.3 log-growth measurement rides the NEXT start).
+4. **OPEN: one more opencode RESTART (the v2.2.2 proof start)** — expect ZERO new
+   `kind:"gauge"` failure lines for the ok shapes (readouts now ok ⇒ the injected
+   `ctx: CTX=… REM=…` items should be visible in planner AND worker prompts; the old
+   worker-proof delegation can quote the line). Also measures the v1.3 log profile.
+   FST code is NOT part of any of this (434 passed / ruff 6 untouched).

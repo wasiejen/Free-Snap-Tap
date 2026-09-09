@@ -29,6 +29,17 @@ You do NOT touch .opencode/handover_planner.md - the plan state belongs to the p
 (decided maintainer call 2026-09-08; deny permission is also in force for this file). If it
 appears dirty in the working tree, leave it alone and flag it in your summary.
 
+## Stop line (context budget - self-gauge)
+Self-gauge any time you need the number: run `& .\.venv\Scripts\python.exe
+.opencode\ctxgauge\peek.py` from the repo root (read-only) - it answers `CTX=… (…%) REM=…`.
+The injected `ctx:` system-prompt item is the same number from your session's last finished
+message - treat it as a reminder, the self-gauge is the source of truth.
+**Stop line = REM ≤ 15k or ≥ 85 %, whichever first.** Do NOT start new work at the line.
+Finish the current step only if it is small and completes before the line - otherwise stop
+immediately and end with the EXECUTIVE SUMMARY, its last line the verbatim self-gauge:
+`CTX=… REM=… — stop-line reached`. The planner decides continuation; working past the line
+is a rule violation.
+
 ## Before you stop (commit routine - mandatory)
 1. TODO.md updated with every discrepancy found (append only, never rewrite existing entries).
 2. Commit code + TODO.md + the task's handover files (.opencode/handover_task.md,

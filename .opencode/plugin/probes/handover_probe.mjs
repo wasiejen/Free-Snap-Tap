@@ -6,9 +6,12 @@
 //
 // EXACT RUN COMMAND (from the repo root, PowerShell 7 — this IS the run command,
 // do not rediscover anything):
-//     $env:ELECTRON_RUN_AS_NODE="1"
-//     & "$env:LOCALAPPDATA\Programs\@opencode-aidesktop\OpenCode.exe" .opencode\plugin\probes\handover_probe.mjs before
+//     node .opencode\plugin\probes\handover_probe.mjs before
 // (`after` instead of `before` after an edit; default mode = "before")
+//
+// 09-09: the old pinned-electron run command ($env:ELECTRON_RUN_AS_NODE=1 + OpenCode.exe) is
+// VOID — the maintainer removed the Electron install (opencode now = terminal/CLI with system
+// Node.js on PATH; TODO.md #29). Plain `node` (24+) does the same native TS type-stripping.
 //
 // WHY THAT COMMAND — DO NOT HUNT FOR EXECUTABLES (the hunt cost a prior cycle
 // ~10 min and a large context slice):
@@ -96,12 +99,11 @@ if (MODE !== "before" && MODE !== "after") {
   console.error(`bad mode ${JSON.stringify(MODE)} (expected "before" | "after")`);
   process.exit(2);
 }
-const EXE = path.join(process.env.LOCALAPPDATA ?? "", "Programs", "@opencode-aidesktop", "OpenCode.exe");
-if (!existsSync(EXE)) {
-  console.error(`Pinned opencode Electron executable missing: ${EXE}`);
-  console.error("Do NOT re-hunt — record the discrepancy in TODO.md + summary (see header).");
-  process.exit(2);
-}
+// 09-09: the pinned-electron executable (header run-command v2) is gone with the Electron
+// install — the probe now runs under plain system `node` (header run-command). No executable
+// check to do; the probe only ever starts when that shell invoked a Node >= 23.6 process that
+// does the TS type-stripping. If it ever crashes on TS syntax under that runner, record it —
+// do NOT re-hunt for executables.
 
 // --------------------------------------------------------------- fixed payloads
 
@@ -193,13 +195,22 @@ const lastGauge = (expectTotal) => {
 };
 const readMirror = () => readFileSync(SB_MIRROR, "utf8");
 
-// fake BunShell: shell.cwd(d) → self; shell(cmd) → { nothrow() → self, text() → Promise<fixed> }
-// v2.2.1 — text() may REJECT (rejectError) to simulate the timeout sentinel / a spawn failure
+// fake BunShell, TAGGED-TEMPLATE-ONLY — mirrors the LIVE BunShell (terminal/CLI opencode) as
+// evidence-logged in the 09-09 start segment: `shell.cwd(d)`cmd`` → { nothrow() → self,
+// text() → Promise<fixed> }; a plain function call with a string command is REJECTED with the
+// live error text, so a regression of the plugin's call shape (v2.2.2) fails the S4 ok-shapes
+// (they assert zero gauge lines; the rejection surfaces as a no-ctx-output gauge line).
+// v2.2.1 — text() may REJECT (rejectError) to simulate the timeout sentinel / a spawn failure.
 const makeShell = (textResult, rejectError) => {
-  const shell = (..._a) => ({
-    nothrow() { return this; },
-    text() { return rejectError ? Promise.reject(rejectError) : Promise.resolve(textResult); },
-  });
+  const shell = (strings) => {
+    if (!Array.isArray(strings) || !Array.isArray(strings.raw)) {
+      throw new Error("Please use '$' as a tagged template function: $`cmd arg1 arg2`");
+    }
+    return {
+      nothrow() { return this; },
+      text() { return rejectError ? Promise.reject(rejectError) : Promise.resolve(textResult); },
+    };
+  };
   shell.cwd = () => shell;
   return shell;
 };
