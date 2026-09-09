@@ -446,3 +446,38 @@ firing before the first LLM build (unproven; self-peek covers precision regardle
 TODO #30 (node:sqlite gauge) still applies later — it replaces the peek shell-out per fire;
 carry over its arithmetic caveat (verify total/output token-field meaning BEFORE wiring the
 same arithmetic in).
+
+## 32. v2.4 part-schema SchemaError fixed = v2.4.1 + v2.5 auto-nudge ladder spec (2026-09-10)
+
+**v2.4.1 fix (LIVE, `.opencode/plugin/handover_v2.4.ts`):** v2.4's first live fire (05:12Z)
+hit `Session.updatePart` schema validation — the appended part id `text-ctx-…` (must start
+`prt`) and an EMPTY messageID (must start `msg`). Root cause of #2 proven from the plugin's
+OWN `plugin.log` chatmsg lines (scoped 2-line reads, per-maintenance need; the standing
+constraint holds — that dig-iteration rule stays as in NAP/this entry, but one scoped evidence
+read on explicit user report is not a dig): the LIVE `chat.message` input carries ONLY
+`{sessionID, agent, model}` — `messageID` does not exist at this hook — so the old code always
+pushed `""`. v2.4.1: part id `prt-ctx-<randomUUID>`; messageID primary source =
+`output.message.id` (`UserMessage.id`, types.gen.d.ts:40), `input.messageID` kept as fallback
+for future opencode versions; no valid id → NO push + one `gauge` line (new reason
+`invalid-messageID`); the `chatmsg` evidence line gained `midSource: input|output.message|none`.
+Verified offline (`bun run` probe, 3 cases: valid push / input-fallback / missing-id-skip —
+all OK) and live: maintainer restart showed `ctx: CTX=…` on user messages with ZERO new
+SchemaError lines in opencode.log (log mtime pre-dated the messages — clean).
+
+**v2.5 auto-nudge ladder spec (maintainer-approved, 2026-09-10):** the chat.message ctx line
+only covers USER messages — an unsupervised agent gets no context signal mid-run and can walk
+blindly into its context limit. Approved design: plugin fires nudges from an in-flight hook
+(`tool.execute.after`), rate-limited gauge readouts, via
+`client.session.promptAsync({path:{id: sessionID}, body:{parts:[{type:"text", synthetic:true,
+text:"ctx-gauge: …"}]}})` (fire-and-forget; `synthetic` ⇒ not rendered as the maintainer's
+message in the TUI; queues as the next turn when the session goes idle). Ladder per session,
+condition = pct or REM, whichever first, max ONE nudge per rung per session (≤4 total):
+**50 %** (generic — mind the context) → **70 % / REM ≤ 30k** → **80 % / REM ≤ 20 k**
+(shortly before the NAP 85% line — wind-down option) → **90 % / REM ≤ 10 k** (critical —
+commit + write the NAP now). Same-agent-every (planner AND all workers — the plugin is
+agent-independent). The chat.message ctx line STAYS (saves a self-peek when the user
+messages). OPEN ISSUE (maintainer call before build): `peek.py` reads only the MOST-RECENTLY-
+UPDATED session (TODO #18 caveat) — a nudge is an ACTION, not a reminder, so the readout's
+session must be targetable: extend the gauge with the session id (new peek output line) or a
+per-session readout — decide target scope (one live read vs full-session scan per gauge hit).
+

@@ -69,9 +69,17 @@
 // in the prompt is ever touched (the cacheable prefix stays byte-stable). Evidence log stays per
 // fire (kind "chatmsg"; the v2 "transform" kind is historical); gauge-failure lines unchanged
 // (v2.2.1 vocabulary + one new reason parts-not-array).
+//
+// v2.4.1 (2026-09-10): the 10-09 05:12 live fire hit the Session.updatePart schema wall —
+// part.id must start with `prt`, part.messageID with `msg` (the pushed messageID was "": the
+// LIVE input of the chat.message hook carries no messageID at all — own plugin.log chatmsg
+// evidence). v2.4.1: part id `prt-ctx-<uuid>`; messageID taken from output.message.id
+// (UserMessage.id) with input.messageID as fallback; invalid id → skip + one gauge line
+// (reason invalid-messageID) instead of an invalid push.
 
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 
 const LINE_CAP = 2000;
@@ -342,15 +350,33 @@ async function gaugeReadout(): Promise<GaugeReadout> {
 // (content is final the moment this hook runs). v2.2.1: readout-failure / uninjected cases log
 // exactly ONE kind:"gauge" line (vocabulary + the new parts-not-array reason, session id
 // included); the ok+injected path stays silent (no log growth).
+//
+// v2.4.1 (2026-09-10): the 10-09 05:12 live fire failed Session.updatePart schema validation —
+// "Expected a string starting with prt at [part][id]" and "starting with msg at [messageID]".
+// Root cause (proven, not guessed): (a) the part id used the `text-ctx-` prefix — the id must
+// start with `prt`; (b) input.messageID does NOT exist at this hook — the LIVE chatmsg payload
+// lines (this file's own plugin.log evidence, 10-09 05:11/05:12) carry ONLY sessionID/agent/
+// model — so messageID was pushed as "" and failed the `msg` prefix. The valid id is
+// output.message.id (UserMessage.id, types.gen.d.ts:40) — it is the PRIMARY source; input
+// messageID remains a fallback if a future opencode version fills it. Skip (log reason
+// invalid-messageID, never throw, no invalid push) when no valid msg-prefix id resolves;
+// randomUUID-based part id keeps starts-with-prt and collision-free.
 async function onChatMessage(
   input: { sessionID?: string; agent?: string; model?: unknown; messageID?: string },
   output: { message?: unknown; parts?: unknown },
 ): Promise<void> {
   try {
+    const midFromOutput = (output?.message as { id?: unknown } | undefined)?.id;
+    const mid = str(input?.messageID) ?? (typeof midFromOutput === "string" ? midFromOutput : undefined);
     append(
       buildLine(
         "chatmsg",
-        { session: str(input?.sessionID), agent: str(input?.agent), message: str(input?.messageID) },
+        {
+          session: str(input?.sessionID),
+          agent: str(input?.agent),
+          message: mid,
+          midSource: str(input?.messageID) ? "input" : typeof midFromOutput === "string" && mid !== undefined ? "output.message" : "none",
+        },
         { payload: input },
       ),
     );
@@ -361,9 +387,12 @@ async function onChatMessage(
         return;
       }
       const sid = str(input?.sessionID) ?? "";
-      const mid = str(input?.messageID) ?? "";
+      if (!mid || !mid.startsWith("msg") || !sid) {
+        append(buildLine("gauge", { reason: "invalid-messageID", session: sid, message: mid ?? "" }, {}));
+        return;
+      }
       (output.parts as unknown[]).push({
-        id: `text-ctx-${Date.now()}`,
+        id: `prt-ctx-${randomUUID()}`,
         sessionID: sid,
         messageID: mid,
         type: "text",

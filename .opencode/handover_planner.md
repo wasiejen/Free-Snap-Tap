@@ -65,6 +65,34 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
   NO session-start system item — first-turn coverage depends on chat.message firing before the
   first LLM build (unproven timing; self-peek covers precision regardless).
 
+## v2.4.1 LIVE + v2.5 NUDGE LADDER spec (2026-09-10 — supersedes the v2.4 LIVE block above)
+
+- **v2.4's first live fire was a schema error, now fixed (v2.4.1):** `Session.updatePart`
+  rejected the pushed part — id `text-ctx-…` (must start `prt`) + EMPTY messageID (must start
+  `msg`). Root cause (scoped evidence: this cycle's `chatmsg` lines in plugin.log, 2-line reads
+  only — the standing no-dig constraint stays intact, see #32): the LIVE `chat.message` input
+  has NO `messageID` — it carries only `{sessionID, agent, model}`. v2.4.1 (LIVE at
+  `.opencode/plugin/handover_v2.4.ts`; the old buggy `handover.ts` top-level copy is deleted,
+  file renamed by the maintainer's deactivate-restart flow): part id `prt-ctx-<randomUUID>`;
+  messageID from `output.message.id` (primary) / `input.messageID` (fallback); invalid id →
+  skip + `gauge` line `invalid-messageID`; `chatmsg` evidence extended with `midSource`.
+- **Proven live-clean by maintainer restart 2026-09-10:** user messages carry the `ctx: CTX=…`
+  line (visible in the maintainer's TUI), opencode.log shows ZERO new SchemaError lines after
+  the fix (log mtime 07:39 local pre-dates the 07:40 messages — nothing new written).
+  Proof-start requirement satisfied → this NAP replaces NEXT-STEPS 5.
+- **v2.5 auto-nudge ladder — APPROVED by maintainer call 2026-09-10 (see #32):** unsupervised
+  agents get no mid-run context signal (chat.message covers user messages only). Design:
+  nudges fired from `tool.execute.after` (in-flight), rate-limited gauge readouts, via
+  `client.session.promptAsync(...)` with a `synthetic: true` text part (queues as the next
+  turn at session idle; TUI never renders it as the maintainer's message). Per-session ladder,
+  condition pct OR REM whichever first, ≤1 nudge per rung per session: **50 %** (generic) →
+  **70 % / ≤30k** → **80 % / ≤20k** (shortly before the 85 % NAP line — wind-down option) →
+  **90 % / ≤10k** (critical — commit + NAP now). ALL agents (planner + workers — plugin is
+  agent-independent). The chat.message ctx line STAYS.
+- **OPEN before v2.5 build (maintainer call 4):** the gauge reads only the MOST-RECENTLY-
+  UPDATED session (TODO #18) — a nudge is an action, so its readout must name a session:
+  extend the gauge output with the session id, or read per session. See MAINTAINER CALLS.
+
 ## Live status
 - Task 1 (Tier 1): DONE + root-caused + **PROOF START SATISFIED** (planner AND worker ctx:
   present — TODO.md #23/#27/#29-item-4 all closed). No further work owed by Tier 1. The v1.3
@@ -84,6 +112,16 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
    here — it just gets done.
 3. **TODO #30 de-peek (node:sqlite)** — plan as one cycle (re-baselines the gauge host + the
    v1.3 profile); NOT started; do not start before call-2 batches unless requested.
+4. **v2.5 nudge target scope** — the gauge reads only the newest-updated session (TODO #18
+   caveat; accepted for DISPLAY, not for an action). The nudge must target a session, so
+   decide: (a) gauge extended to carry its readout session's id (`SESSION=` line, one read =
+   newest session, nudges that session only — cheap, but a quiet worker behind an active
+   planner is never read), or (b) per-session readout (one line per session with a finished
+   message — every agent watched, heavier read). My lean: (a) — cheapest read, and it tracks the currently-active session (the one actually
+   burning context right now); a quiet worker behind an active planner is the accepted blind
+   spot (workers self-peek per their prompts — the same #18 caveat, now scoped to an action).
+   (b) removes the blind spot but reads every session per gauge hit. Call it before I build
+   v2.5 (or tell me to start (a) as-is — it is one extra parse branch, not a flag).
 
 ## NEXT STEPS
 1. [DONE, this session] v2.2.2 worker proof — worker quoted its own ctx: line verbatim (FOUND
@@ -93,12 +131,16 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
 3. Tier 2 scoping from the LIVE shapes — written proposal; Tier-2 code waits for a Tier-2 spec.
 4. TODO #30 de-peek (node:sqlite gauge) — LOGGED, not started; one cycle (with the v1.3
    start-measurement).
-5. [ACTION — right after the v2.4 restart] v2.4 PROOF START: maintainer restarts opencode
-   (v2.4 file live top-level; v2.3 copy + context-meter stay OFF — their child-folder
-   deactivation IS the deactivation). After ≥2 user messages, confirm from my OWN prompt: a
-   `ctx: CTX=...` chunk appended INSIDE the just-received user message, advancing turn over
-   turn — and report back the observed numbers (vs my own peek) before planning any Tier 2
-   context hooking (de-peek TODO #30 then re-baselines on the per-fire call cost).
+5. [DONE, 2026-09-10] v2.4 proof start + SchemaError repair (v2.4.1) — live-clean by
+   maintainer restart (see the v2.4.1 block above); offline probe 3/3 cases + zero new
+   SchemaError lines.
+6. [ACTION] **Build v2.5 auto-nudge ladder** (approved spec in the v2.4.1 block + TODO #32):
+   `tool.execute.after`-gated `promptAsync` synthetic nudges, ladder 50 % → 70 %/30k →
+   80 %/20k → 90 %/10k, per-session ladder, rate-limited readouts, `kind:"nudge"` evidence
+   lines (silent otherwise — the log-growth discipline from the v1.x skip set applies).
+   BLOCKED ON MAINTAINER CALL 4 (nudge target scope a/b) — start on the call, or (a) if told
+   to. Probe: extend the bun probe (fake client + fake shell), then one maintainer restart +
+   a forced high-readout scenario to watch the first nudge land.
 
 ## Context budget
 Per AGENTS.md: `& .\.venv\Scripts\python.exe .opencode\ctxgauge\peek.py` (from repo root); stop
