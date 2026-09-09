@@ -530,7 +530,7 @@ class StatusOverlay(QWidget):
     # --- Mouse drag and menu events ---
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            self._drag_offset = event.globalPos() - self.frameGeometry().topLeft()
+            self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
             self.screen_changed = False
             self.counter = 10
         event.accept()
@@ -544,7 +544,7 @@ class StatusOverlay(QWidget):
     def mouseMoveEvent(self, event):
         if hasattr(self, '_drag_offset') and self._drag_offset is not None:
             # Calculate new top-left so the widget's center is under the mouse
-            global_pos = event.globalPos()
+            global_pos = event.globalPosition().toPoint()
             new_center_x = global_pos.x()
             new_center_y = global_pos.y()
             new_left = new_center_x - self.x_size // 2
@@ -584,7 +584,7 @@ class StatusOverlay(QWidget):
         event.accept()
 
     def contextMenuEvent(self, event):
-        self.context_menu.exec_(event.globalPos())
+        self.context_menu.exec_(event.globalPosition().toPoint())
 
     # --- Menu Actions ---
     def toggle_pause(self):
