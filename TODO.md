@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #33, new
-entries start at #34 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #35, new
+entries start at #36 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -195,8 +195,20 @@ reenabled, that is the call.
   doc references purged (AGENTS.md via the hand-over copy); token semantics recorded here.
 - **Scope:** `.opencode/plugin/handover_v2.4.ts` (readout ≈301), `.opencode/ctxgauge/`,
   `prompt_agent_planner.md`, `prompt_agent_task.md`, the AGENTS.md copy.
-- **Status:** APPROVED (maintainer call this cycle) — planned as ONE cycle, scheduled
-  AFTER #33.
+- **Token semantics — VERIFIED (record per this cycle's task fact 3, closes the
+  carry-over caveat above):** `total = input + output + cache.read` holds EXACTLY across all
+  recent step rows → `ctx = total − output` = the exact prompt size at the latest finished
+  step = current context at that moment (measured 2026-09-10; the implemented read-out is built on this).
+- **Status:** LANDING IN PROGRESS (2026-09-10, build T1) — core landed: shared gauge
+  `ctxgauge/gauge.mjs` (ONE implementation) + self-peek CLI `ctxgauge/peek.mjs` + peek.py
+  DELETED (verified live: `SESSION=ses_… CTX=…` line, exit 0); NOT landed: the plugin wiring
+  (v2.5 header + native gauge + session-gated match-only post — `handover_v2.4.ts` still
+  shells out; peek.py deleted → a maintainer restart before the plugin lands loses the ctx:
+  line silently — the old code degrades to a no-ctx-output gauge line, never throws), the
+  probe rebuild, the doc purge (see #34), and the v1.3 log-profile re-baseline (maintainer
+  call 1, default SKIP). Worker stopped at the context stop-line (estimate ~45-50 k needed
+  vs ~14 k remaining — see #35); continuation basis: task file `.opencode/handover_task.md`
+  (unchanged) + this cycle's commits. Do NOT close — both tail items remain open.
 
 ## 33. v2.5 auto-nudge ladder build (folded in: the former TOP-of-file note) — STATUS: APPROVED — NEXT BUILD
 
@@ -227,9 +239,60 @@ reenabled, that is the call.
   nudge land; no NEW gauge-failure reasons (the silent path stays silent);
   `kind:"nudge"` evidence lines only.
 - **Status:** APPROVED — NEXT BUILD (not a maintainer call — all pre-build calls resolved).
+- **Read-mechanic half (built by T1): NOT landed (2026-09-10)** — T1 stopped at the context
+  stop-line (#35): the session-gated readout is designed, and its read form + the honest
+  unknown-window / notAvailable forms + `SESSION=<sid>` carry landed in the committed shared
+  core (`ctxgauge/gauge.mjs`); the PLUGIN wiring (v2.5 match-only post) is NOT landed — the
+  live plugin is unchanged (its old shell readout now points at the deleted peek file → a
+  restart before v2.5 lands yields kind:gauge no-ctx-output failure lines — no ctx: line for
+  agents, never a throw). The ladder
+  (T2) remains pending as scheduled — it now also waits on the #30-core plugin wiring.
+  - **Discrepancy (2026-09-09, shell-doc lab):** self-peek `node .opencode\ctxgauge\peek.mjs`
+    reports the wrong window — `CTX=58271 (582%) REM=-47771` on this 120k-window session
+    (window read ≈10.5k; pct/REM both nonsense, negative REM). The plugin's `chat.message`
+    ctx line computed the SAME session correctly at the same time (`CTX=24187 (20%) REM=95813`
+    ⇒ 120k window). Shared gauge core / peek window read needs a fix before self-peek
+    numbers are trusted; the true readout here was ≈`CTX=58271 (~49%) REM≈62k`.
 
 ## Closed entries
 
 Moved to `todo_records.md` on 2026-09-10 — one-line records, IDs 2, 5, 10, 12, 13, 14, 15,
 16, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32 (+ the 260908-0951 dedup block).
 All those IDs stay reserved — see the numbering rule in the header.
+
+## 34. Stale `peek.py` documentation refs + worker prompt permission block (2026-09-10, build T1)
+
+- **Problem / evidence:** peek.py was deleted in the T1 cycle, but documentation/permissions leave no usable single line: `agents_repo.md` line ~139 ("Context gauge: run `& .\.venv\Scripts\python.exe .opencode\ctxgauge\peek.py`" + module map line ~97) is maintainer-owned; the root `AGENTS.md` is per its own rule + opencode.jsonc read-only for workers (denies `AGENTS.md`); `.opencode/prompt_agent_planner.md` + `prompt_agent_task.md` — the self-peek line there still points to `agents_repo.md` (old python command) — and the opencode.jsonc worker permission denies `.opencode/prompt_**`, so the T1 pre-approved self-peek edit could NOT be made by the worker; remaining non-doc references also found but unchanged: `playground/outline_rework_prompts.md` (four peek refs in maintainer-rework draft), `SCRATCH_PAD.md` (WIP note), `deactivated/handover.ts` (frozen dead copy — removal is maintainer call), `handover_planner.md` (planner-owned).
+- **Outcome (goal):** a single self-peek line `node .opencode\ctxgauge\peek.mjs` (readout `SESSION=… CTX=… (…) REM=…`) in the four maintainer-side agent documents (`prompt_agent_planner.md`, `prompt_agent_task.md`, `agents_repo.md`, root `AGENTS.md`); maintainer decides fate of the residual references listed above (update or leave as historical).
+- **Acceptance:** no live agent-facing doc references peek.py; prompt self-peek line = node CLI (the wording of the `ctx:` nudge description keeps mentioning the `SESSION=…` prefix); the residual list is either updated or explicitly left.
+- **Scope:** the files named above.
+- **Status:** OPEN — maintainer call + planner execution (worker blocked by the `.opencode/prompt_**` deny in opencode.jsonc — opencode.jsonc itself is NOT pre-approved for T1 either).
+
+## 35. T1 de-peek build IN PROGRESS — read mechanic not landed; continue on a bigger window (2026-09-10)
+
+- **Problem / evidence:** T1 build (task file `.opencode/handover_task.md`) stopped at the
+  context stop-line: self-gauge read at stop time `CTX=106441 (87%)` (≈14 k left vs. ≈45–50 k
+  estimated for the remainder). Landed + committed: shared gauge core (`ctxgauge/gauge.mjs`)
+  + self-peek CLI (`ctxgauge/peek.mjs`, verified live against the real DB) + peek.py
+  deletion + suite 434/434. NOT landed (spec DoD pending): the v2.5 plugin wiring in
+  `handover_v2.4.ts` (native gauge import + session-gated match-only post + `sess` evidence
+  field + db-error vocabulary + header block + dead shell mechanism deletion), the probe
+  rebuild (currently pointing at the deleted `handover.ts` — stale; S4/S6 shapes per spec),
+  the doc purge (#34), the v1.3 log-profile rebaseline (call 1, default SKIP).
+- **Outcome (goal):** T1 completed per spec (probe `PROBE handover: N/N PASS`, suite 434/434,
+  `peek.mjs` prints the `SESSION=…` line — this one already holds — plugin lands the gated read, #30/#33 tail updates, commit).
+- **Acceptance:** task file DoD items 1–5 all true.
+- **Suggested scope:** `.opencode/plugin/handover_v2.4.ts`, `.opencode/plugin/probes/handover_probe.mjs`, doc files in #34, `TODO.md`.
+- **Status:** OPEN — planner: continuation needs a fresh window ≥ ~50 k (210K-class worker
+  `worker_210K`, or the same spec at lower model-context start point); task file unchanged — it IS the continuation spec.
+
+## 36. (closed 2026-09-09) `agents_repo.md` `Environment & shell` — wrong/stale lines (lab-verified, fixed)
+
+One-line record: the section (previously 48 lines) was validated in fresh-worker
+first-shot batteries (T1–T10, pwsh + git-bash) and compacted 48→24 lines; round 2
+ended 10/10 first-shot. Corrected/verified facts now in the section: `ConvertTo-Path`
+does NOT exist in pwsh 7.6 (the old text suggested it — guaranteed first-shot failure);
+`$env:NO_COLOR='1'` does NOT suppress ANSI codes in table output; env var `FST` value
+carries a trailing `\`; bare `python` on PATH = 3.14.3 without repo deps (fake-starts,
+then import-fails — always venv exe); scalar listing recipe needs `-File`; `pwd -W`
+prints forward slashes. Status: closed — section committed as tested.

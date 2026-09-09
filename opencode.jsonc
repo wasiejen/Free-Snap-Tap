@@ -55,7 +55,7 @@
     "planner_120k_mtp": {
       "description": "very intelligent, fast, 120k context, plans tasks and delegates to sub-agents",
       "mode": "primary",
-      "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP:chat",
+      "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
       "temperature": 1.0,
       "prompt": "{file:./.opencode/prompt_agent_planner.md}",
       "permission": {
@@ -119,7 +119,7 @@
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ3KT-210K",
       "prompt": "{file:./.opencode/prompt_agent_task.md}",
-      "temperature": 0.5,
+      "temperature": 0.3,
       // "steps": 15,
       "permission": {
         "edit": {
@@ -136,6 +136,100 @@
         "webfetch": "allow"
       },
       "color": "accent"
+    },
+    "agent_Q3_210K": {
+      "description": "very intelligent, slow, big 210k context - for very long and complex tasks, no worker prompt",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-IQ3KT-210K",
+      "prompt": "",
+      "temperature": 1.0,
+      // "steps": 15,
+      "permission": {
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          "AGENTS.md": "deny",
+          "agents_repo.md": "deny",
+          ".opencode/prompt_**": "deny",
+          ".opencode/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny",
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "#ff6b6b"
+    },
+
+
+    "agent_Q3_120K_mtp": {
+      "description": "very intelligent, fast, 120k context, no worker prompt",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
+      "prompt": "",
+      "temperature": 1.0,
+      // "steps": 15,
+      "permission": {
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          "AGENTS.md": "deny",
+          "agents_repo.md": "deny",
+          ".opencode/prompt_**": "deny",
+          ".opencode/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny",
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "#ff6b6b"
+    },
+    "agent_Q4_100K": {
+      "description": "very intelligent, moderately fast, 100k context, , no worker prompt, higher precision due to 4bit Quant",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
+      "prompt": "",
+      "temperature": 1.0,
+      // "steps": 15,
+      "permission": {
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          "AGENTS.md": "deny",
+          "agents_repo.md": "deny",
+          ".opencode/prompt_**": "deny",
+          ".opencode/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny",
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "#ff6b6b"
+    },
+    "agent_Q4_35K_MTP": {
+      "description": "very intelligent, fast, very small 35k context, , no worker prompt, higher precision due to 4bit Quant",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
+      "prompt": "",
+      "temperature": 1.0,
+      // "steps": 15,
+      "permission": {
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          "AGENTS.md": "deny",
+          "agents_repo.md": "deny",
+          ".opencode/prompt_**": "deny",
+          ".opencode/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny",
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "#ff6b6b"
     },
   }
 }

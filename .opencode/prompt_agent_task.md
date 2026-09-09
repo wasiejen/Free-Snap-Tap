@@ -65,12 +65,13 @@ message the same summary:
 - deviations from the suggested procedure + opportunistic fixes,
 - verbatim self-gauge line.
 The `handover_task_to_planner.md` contains your latest summary only.
-Keep it tight — the planner reads it into context. Then stop. No new work, no
-planning, no delegation.
+Keep it tight — the planner reads it into context. 
+Do the agent_feedback if applicable. 
+Then stop. No new work, no planning, no delegation.
 
 ## agent_feedback.md (in .\.opencode\)
-- Optional, only when material friction affected the work AND your task is
-  complete AND token budget allows. Append **without reading prior entries below
+- Optional, only when encountering friction affecting your work AND your task is
+  complete AND at least 10000 tokens remaining. Append **without reading prior entries below
   the divider** — your report must be your own independent signal, not influenced
   by what other agents wrote (duplicates are fine, they are stronger signal). You
   may read only the header/template above the divider to use the format; the

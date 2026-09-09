@@ -14,28 +14,49 @@ May be stale; nothing here is required to be maintained.
 ## WIP: needs testing: a lot of permission requests for .opencode/* 
   - why? is it not allowed? - see following point
     - generally deny these request automatically for the workers? how?
-## DONE: allow removal of old TODO.md entries are remove the denial of it
-  - the code is the source of truth and the history lives in git - there is not need to keep that here
-  - currently: Close or condense solved/stale items with a one-line close note pointing at the
-    closer (commit/entry); delete only exact duplicates after preserving the
-    surviving entry. (Addendum:) Move to todo_records.md when closed.
-  - new proposal: Git is the histoy, if the item is solved via a fix and documented via a commit it can be moved to todo_record.md. if it is solved as side-effect of other fixes/commits then remove and document with one-liner via a commit (batch multiple instances if possible - keep single one-liner until next big clean)
-    
+## WIP: added bash to path - quote: "PowerShell quoting is annoying with % and such"
+  - is there a way to offer the agent a better shell?
+  - WIP: now need to inform the agents in agents_repo about the change/option
+## WIP: adapt peek to handle unknown models by only displaying the current context and not % and REM
+## WIP:context gauge injection on worker start reports the data from the planner first
+  - lets include an ignore context gauge info on worker start in the prompt_of the worker
+## WIP: needs compaction: ! Important ! 
+  - When the model observes a compaction in its session immediately stop working on task - this supersedes the close up routine. write a brief summary directly as a return to if you are a worker. do not write any files! corruption of context highly likely. end session as fast as possible while delivering a brief summery.
 
+
+  
 # OPEN
-## adapt peek to handle unknown models by only displaying the current context and not % and REM
+
+## check correctness of quantization making "in head" calculation of models unreliable
+
+## clarify the planner role to clarify with maintainer 
+  - the planner is the only one who can directly interact with the user, use it to get info instead of trying to find an answer and burning your context window
+  - when used <|alone|> mode - no maintainer is available - so do only things that can be done without feedback and do not start requests
+  - 
 ## add slots to the handover files
-## how to make sure the agents do not read the old feedback and append blindly?
+
+## MAYBE STALE: how to make sure the agents do not read the old feedback and append blindly?
   - agent_feedback_instruct.md as a seperate file to read and
   - "<<END>>" special string that the agent can replace directly 
   - and has to end it with the same special string
-## context gauge injection on worker start reports the data from the planner first
-  - lets include an ignore context gauge info on worker start in the prompt_of the worker
+  - 
+## how to enable a subagent to ask for clarification?
+  - via messenger app plugin?
 
-## similar - likely same cause - delaying receiving of user messages - likely causes by context gauge plugin
+
+  
+# OPEN similar - likely same cause
+
+## delaying receiving of user messages - likely causes by context gauge plugin
+- just wrong session_id ctx displayer - should be fixed with checking session_id
+- 
 ### first ctx (starting prompt) after planner start was around 28000 token. that is huge. why? was the message send later and thus included the read files instructions?
+
 ### Strange behavior: agent acts as if my messages come later - even mentioning that actions they have done based on it are done before the message arrived.
   - quote: "... reconciling the #33/Call-4 items that are still stale (the curation worker ran before your ruling arrived):"
+
+
+
 
 # IDEAS/Random:
 
@@ -45,9 +66,25 @@ May be stale; nothing here is required to be maintained.
   - interesting idea how a group with different personas would work on a project
   - maybe with self-reinforcement by feedback from the agents about the others
     - they can not comment about themselfes but only about other personas and this feedback would then influence their persona prompt in limited ways. so over time clear roles and preferences would be established and a hiearchy of how works in what ways with whom best or prefered.
-    
-# DONE
 
+
+# Tabled
+## mobile messsenger integration in opencode?
+  - needed? not yet but for future interesting
+
+# DONE
+## DONE resolve agents.md
+- The agent runs on **Windows** with a **PowerShell (pwsh)** shell. **Heredocs do
+  not exist in PowerShell** — `<<EOF` / `cat > file <<EOF` will NOT parse; never
+  emit them. Write multi-line content with the file tools (or `Set-Content`),
+  then edit the file.
+- You have **access to bash** via git bash (no full linux kernel) - use it freely instead of pwsh
+## DONE: allow removal of old TODO.md entries are remove the denial of it
+  - the code is the source of truth and the history lives in git - there is not need to keep that here
+  - currently: Close or condense solved/stale items with a one-line close note pointing at the
+    closer (commit/entry); delete only exact duplicates after preserving the
+    surviving entry. (Addendum:) Move to todo_records.md when closed.
+  - new proposal: Git is the histoy, if the item is solved via a fix and documented via a commit it can be moved to todo_record.md. if it is solved as side-effect of other fixes/commits then remove and document with one-liner via a commit (batch multiple instances if possible - keep single one-liner until next big clean)
 ## DONE - clean up of TODO needed!
   - there are too many status updates on what was done in it. makes it big and encourages the worker to write in the same style and thus reporting everything there.
 ## DONE - thematic grouping remain + unique ID: maybe remove thematic grouping of todo and instead just have a running unique numbering for easier referencing?
