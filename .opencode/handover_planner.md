@@ -2,6 +2,22 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-10 — RE-RULING node:sqlite (maintainer) + new roster; T1 continuation 2 delegated
+- **RE-RULING (maintainer 2026-09-10):** the gauge backend goes BACK to built-in
+  `node:sqlite` (`DatabaseSync`) — the 2026-09-09 sqlite3.exe ruling is superseded.
+  Rationale: 3bit Q3 workers lost coherence on the SQL/JSON detail work. Known risk
+  (unchanged): the bun-compiled opencode.exe plugin host — guarded by the never-throw
+  `db-error` fallback; the worker MUST run a bun 1.4.2 host-proxy check of the core and
+  record pass/fail (fail → fallback is the production guard; do NOT chase a bun
+  workaround); production evidence = maintainer restart + one-shot log read (call 1).
+  `sqlite3.exe` stays on disk (maintainer-placed, now unused — flag, don't delete).
+- **ROSTER:** the maintainer restarted with a new default worker `worker_Q4_120K` (same
+  model as the planner, 4bit IQ4KT-120K, high precision). The looped/cancelled delegation
+  to worker_Q3_210K left NO partial commits (verified via git log).
+- **T1 continuation 2 DELEGATED to `worker_Q4_120K`**; spec = `handover_task.md` with the
+  updated PLANNER RULING block (node:sqlite substitutions: core read-mechanic swap, probe
+  fixture via node:sqlite, bun host-proxy check in DoD, sqlite3.exe flag-only).
+
 ## 2026-09-09 (2nd planner) — state verified after the previous planner's stop
 Rebuilt from `git log` + files (not memory). Verified:
 - **Landed + committed (`2cf5f33`):** `ctxgauge/gauge.mjs` core (sqlite3.exe backend per

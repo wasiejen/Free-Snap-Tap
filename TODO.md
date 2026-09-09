@@ -207,6 +207,14 @@ reenabled, that is the call.
   under node v24.19.0 + bun 1.4.2; the worker's digit corruption (multiplier `105` →
   `100`/`1000`) fixed; window rule = trailing `<N>K` × 1000 exactly, last marker wins
   (maintainer-confirmed).
+- **Backend RE-RULING (2026-09-10, maintainer):** the sqlite3.exe spawn backend is
+  SUPERSEDED — back to built-in `node:sqlite` (`DatabaseSync`; node v24.19.0 flag-free per
+  fact 1 of the task spec). Rationale: the 3bit Q3 workers lost coherence on the SQL/JSON
+  detail work; the build now runs on the 4bit same-model worker `worker_Q4_120K`
+  (maintainer restart with the new roster). The bun-compiled opencode.exe host risk is
+  guarded by the never-throw `db-error` fallback; the worker records a bun 1.4.2 host-proxy
+  check; production evidence = maintainer restart + one-shot log read (call 1).
+  `sqlite3.exe` stays on disk (maintainer-placed, now unused — do not delete).
 - **Status:** LANDING IN PROGRESS (2026-09-10, build T1) — core landed: shared gauge
   `ctxgauge/gauge.mjs` (ONE implementation, sqlite3.exe backend per the ruling above) +
   self-peek CLI `ctxgauge/peek.mjs` (verified live: `SESSION=ses_… CTX=… (NN%) REM=…` sane
@@ -301,6 +309,9 @@ All those IDs stay reserved — see the numbering rule in the header.
   verified live, corruption fixed; task file now carries a PLANNER RULING block). Remaining
   continuation scope: plugin wiring (session-gated match-only post) + probe rebuild +
   suite/ruff + peek.py deletion + #30/#35 status lines — per the ruling block + DoD.
+  2026-09-10: backend RE-RULING (node:sqlite, see #30) — the committed core's sqlite3.exe
+  read mechanic is re-implemented in continuation 2; the 3bit 210K delegation looped
+  (no partial commits, verified via git log); re-delegated to `worker_Q4_120K`.
 
 ## 36. (closed 2026-09-09) `agents_repo.md` `Environment & shell` — wrong/stale lines (lab-verified, fixed)
 

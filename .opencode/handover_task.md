@@ -1,19 +1,30 @@
 # TASK T1 — Native session-gated context gauge (de-peek core) + unknown-model readouts
 
-## PLANNER RULING 2026-09-09 (continuation — supersedes the node:sqlite parts of this spec)
+## PLANNER RULING 2026-09-10 (continuation 2 — RE-RULING: back to node:sqlite; supersedes the
+2026-09-09 sqlite3.exe block)
 
-1. **SQLite access = `sqlite3.exe` (maintainer ruling):** the plugin host (opencode.exe, a
-   bun-compiled binary) cannot rely on `node:sqlite` — the T1 worker could not solve a sqlite
-   call via node modules there. The maintainer placed SQLite 3.53.4 (64-bit, JSON1) at
-   `.opencode/plugin/tools/sqlite3.exe`. The shared core (`ctxgauge/gauge.mjs`) is ALREADY
-   rewritten on that backend and committed: spawn with an ARGS ARRAY (no shell),
-   `file:<db>?mode=ro` URI arg, NO PRAGMA in the call (its result echo pollutes stdout —
-   measured), marker SQL rows `M|sid|model|total|output` / `S|sid` (json_extract in SQL —
-   the `data` JSON is never fetched), one retry on busy/locked, 2500 ms timeout, never
-   throws (kinds: ok / no-total / db-error). Verified live under BOTH node v24.19.0 and
-   bun 1.4.2 (identical lines) + 14/14 parseWindow/parseModelId unit checks. The plugin
-   ONLY imports the core (`readGauge` is async; `formatGauge(r)` = the one readout string)
-   — no new read mechanic in the plugin.
+1. **SQLite access = built-in `node:sqlite` (`DatabaseSync`) (maintainer re-ruling
+   2026-09-10):** the 2026-09-09 sqlite3.exe spawn backend is superseded. Rationale: the
+   3bit Q3 workers lost coherence on the SQL/JSON detail work; the build now runs on the
+   4bit same-model worker. Verified ground (unchanged from fact 1): node v24.19.0 (the
+   probe/peek host) has flag-free `node:sqlite`. The bun-compiled opencode.exe plugin host
+   remains the KNOWN RISK (the original hang-up) — therefore the worker MUST (a) run the
+   core under system bun 1.4.2 as a host proxy and record pass/fail in the summary, and
+   (b) keep the never-throw contract: ANY failure (incl. missing/unsupported `node:sqlite`
+   in the host) → kind `db-error`, silent fallback, NO exception into the hook. Production
+   evidence = the maintainer restart + the one-shot log read (call 1). `sqlite3.exe`
+   (`.opencode/plugin/tools/`) STAYS ON DISK — maintainer-placed tool, now unused by the
+   core; do NOT delete, flag it in the summary.
+   Core contract stays: `readGauge(dbPath?)` async (dbPath default = fact-2 path,
+   injectable for probe fixtures), result ≥ `{sid, modelId, ctx, total, window, ok}`,
+   kinds ok / no-total / db-error, `formatGauge(r)` = the ONE readout line; busy handling
+   = API-way (PRAGMA busy_timeout via exec or one retry on busy — worker's call; ~2500 ms
+   budget; never throw). The marker-SQL rows (`M|sid|model|total|output` / `S|sid`,
+   json_extract in SQL — the `data` JSON is never fetched) are portable to `prepare()` —
+   keep them if convenient; a direct structured query is fine if the result shape holds.
+   The window rule + parseWindow/parseModelId (14 unit checks) are UNCHANGED. The
+   committed core (`ctxgauge/gauge.mjs`, sqlite3.exe spawn version) is the STARTING POINT
+   — replace only the read mechanic, keep the parser + readout forms byte-identical.
 2. **Window rule (maintainer-confirmed):** a llama-swap model name's trailing `<N>K` →
    N×1000, `<N>M` → N×10⁶ EXACTLY (`-120K_MTP` → 120000, `_210K` → 210000); `-MTP` is a
    speed note only; the LAST matching marker wins; no match ⇒ UNKNOWN window (never a
@@ -23,12 +34,17 @@
    is still the live v2.4.1 plugin's readout. Delete it in THIS build's commit, together
    with the plugin wiring (the new plugin never needs it; the old one needs it until the
    maintainer restart).
-4. **Probe fixture:** build the temp fixture DB with the same sqlite3.exe (CREATE TABLE
-   session/message + INSERT rows, opencode-like schema per fact 2) — NO python, NO
-   node:sqlite anywhere in the probe.
+4. **Probe fixture:** build the temp fixture DB with `node:sqlite` `DatabaseSync`
+   (CREATE TABLE session/message + INSERT rows, opencode-like schema per fact 2) — NO
+   python, NO sqlite3.exe, NO live DB anywhere in the probe.
 5. **Remaining DoD for the continuation worker:** 1 (probe rebuilt + green), 2 (no
-   python/`$`/python.exe refs in plugin + probe), 3 (peek.py deleted + `peek.mjs` live
-   line re-verified), 4 (suite 434/434 + ruff F=0), 5 (TODO #30/#35 status lines). The
+   python/`$`/python.exe refs in plugin + probe; the core's sqlite3.exe spawn code is
+   GONE — only the node:sqlite path remains in the code), 3 (peek.py deleted + `peek.mjs`
+   live line re-verified), 4 (suite 434/434 + ruff F=0), 5 (TODO #30/#35 status lines),
+   NEW (bun host proxy): the core is green under node v24.19.0 AND the worker runs a
+   bun 1.4.2 import+read check of the core and records pass/fail (fail → the db-error
+   silent fallback is the production guard; record it in the summary + TODO line — do
+   NOT chase a bun workaround). The
    plugin wiring itself: import the core, session-gated MATCH-ONLY post (sid ===
    input.sessionID, mismatch silent + no log), post any valid form (incl. unknown-window
    and CTX=notAvailable), `sess` field on the chatmsg evidence line, gauge-failure
@@ -197,8 +213,9 @@ long as it is ONE implementation imported by both the plugin and the CLI)
   purge class); dead-code removal of the shell machinery; `peek.py` deletion (explicitly
   approved by the maintainer this session); probe rebuild; TODO.md appends.
 - NOT pre-approved (stop and flag): any FST python change; `opencode.jsonc`; `agents_repo.md`;
-  `AGENTS.md` root; reading/analyzing `plugin.log` (log-CONTENT; the S5 byte-identity
-  snapshots are the existing exception); any change to the v2.4.1 part-schema mechanics
+`AGENTS.md` root; deleting `.opencode/plugin/tools/sqlite3.exe` (maintainer-placed, now
+   unused — flag only); reading/analyzing `plugin.log` (log-CONTENT; the S5 byte-identity
+   snapshots are the existing exception); any change to the v2.4.1 part-schema mechanics
   (id/messageID handling) beyond what's specified; anything observable beyond the specified
   readout/post changes (e.g. a second log file, env vars, config keys).
 - If a shape surprise hits you (the live DB differs from fact 2/3 in a way that breaks the
@@ -208,8 +225,10 @@ long as it is ONE implementation imported by both the plugin and the CLI)
 
 ## Worker
 
-`worker_120K_mtp` (same-model default — this is delicate plugin code; the 256k fast worker is
-not for this). Write the EXECUTIVE SUMMARY to `.opencode/handover_task_to_planner.md` (the
+`worker_Q4_120K` (same model as the planner, 4bit IQ4KT-120K — higher precision for the
+delicate SQL/JSON work; the maintainer's default worker for this session, 2026-09-10
+re-ruling; the earlier 3bit 210K delegation looped and left no commits). Write the
+EXECUTIVE SUMMARY to `.opencode/handover_task_to_planner.md` (the
 plugin also mirrors it from your final message — either path lands it) covering: what changed,
 probe result (exact N/N), the live `peek.mjs` output line, measured suite, TODO entries added,
 and what was deliberately not done. Commit per the AGENTS.md routine (code + TODO + handover
