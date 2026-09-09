@@ -228,9 +228,11 @@ long as it is ONE implementation imported by both the plugin and the CLI)
 `worker_Q4_120K` (same model as the planner, 4bit IQ4KT-120K — higher precision for the
 delicate SQL/JSON work; the maintainer's default worker for this session, 2026-09-10
 re-ruling; the earlier 3bit 210K delegation looped and left no commits). Write the
-EXECUTIVE SUMMARY to `.opencode/handover_task_to_planner.md` (the
-plugin also mirrors it from your final message — either path lands it) covering: what changed,
-probe result (exact N/N), the live `peek.mjs` output line, measured suite, TODO entries added,
-and what was deliberately not done. Commit per the AGENTS.md routine (code + TODO + handover
-mirror in one commit; message: one-line imperative subject, e.g. `Native session-gated
-context gauge (de-peek) + unknown-model readouts`).
+EXECUTIVE SUMMARY to `.opencode/handover_task_to_planner.md` (OVERWRITE — your latest
+summary only) covering: what changed, probe result (exact N/N), the live `peek.mjs`
+output line, measured suite, TODO entries added, and what was deliberately not done.
+**Handover contract (2026-09-10):** the summary FILE is the primary channel — your
+final message must be SHORT (a one-line pointer to the file). Do NOT repeat the
+summary as the final message (the repeated-final-message loop cost a cycle).
+Commit per the AGENTS.md routine (code + TODO + the summary file in one commit;
+message: one-line imperative subject).

@@ -39,9 +39,9 @@ deviate and note it in your summary.
   dirty in the working tree, leave it alone and flag it in your summary.
 
 ## Stop line (context budget)
-Self-gauge any time: run the gauge (command in `agents_repo.md`, read-only) →
-`CTX=… (…%) REM=…`. The injected `ctx:` nudge is a reminder; the self-gauge is
-source of truth.
+Self-gauge any time: `node .opencode\ctxgauge\peek.mjs` (repo root, read-only) →
+`SESSION=… CTX=… (…%) REM=…`. The injected `ctx:` nudge (carries the `SESSION=…`
+prefix) is a reminder; the self-gauge is source of truth.
 **Stop line = `REM ≤ 15k` or `≥ 85%`, whichever first.** Do NOT start new work
 past the line. Finish the current step only if small and completes before the
 line — otherwise stop immediately and end with your summary, its last line the

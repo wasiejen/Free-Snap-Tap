@@ -279,7 +279,14 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Outcome (goal):** a single self-peek line `node .opencode\ctxgauge\peek.mjs` (readout `SESSION=… CTX=… (…) REM=…`) in the four maintainer-side agent documents (`prompt_agent_planner.md`, `prompt_agent_task.md`, `agents_repo.md`, root `AGENTS.md`); maintainer decides fate of the residual references listed above (update or leave as historical).
 - **Acceptance:** no live agent-facing doc references peek.py; prompt self-peek line = node CLI (the wording of the `ctx:` nudge description keeps mentioning the `SESSION=…` prefix); the residual list is either updated or explicitly left.
 - **Scope:** the files named above.
-- **Status:** OPEN — maintainer call + planner execution (worker blocked by the `.opencode/prompt_**` deny in opencode.jsonc — opencode.jsonc itself is NOT pre-approved for T1 either).
+- **Status:** prompt-file self-peek lines DONE (planner execution, 2026-09-10 bookkeeping
+  commit — `prompt_agent_planner.md` + `prompt_agent_task.md` now self-peek via
+  `node .opencode\ctxgauge\peek.mjs` with the `SESSION=…` wording; the worker was blocked
+  by the `.opencode/prompt_**` deny). REMAINING = maintainer call: the `agents_repo.md`
+  gauge line (~164) + module-map line (~97) (maintainer-owned), and the residual refs
+  (frozen `deactivated/handover.ts` copy, `playground/outline_rework_prompts.md` draft,
+  historical files — recommendation: update the agents_repo.md line, leave the rest
+  historical).
 
 ## 35. T1 de-peek build IN PROGRESS — read mechanic not landed; continue on a bigger window (2026-09-10)
 

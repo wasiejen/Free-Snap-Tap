@@ -57,8 +57,9 @@ signal it should have been a direct edit.
   recommendation, ordered by priority.
 
 ## Context budget
-- Check between logical chunks and after every worker returns (gauge command in
-  `agents_repo.md`). Stop line: `REM ≤ 15k` or `≥ 85%`, whichever first.
+- Check between logical chunks and after every worker returns: self-gauge
+  `node .opencode\ctxgauge\peek.mjs` (repo root, read-only) → `SESSION=… CTX=… (…%)
+  REM=…`. Stop line: `REM ≤ 15k` or `≥ 85%`, whichever first.
 - At the line: make the plan-state file current, finish the commit routine, do the agent_feedback if contraints 
   fulfilled. Then STOP and inform the user. A fresh session resumes from the file. You cannot clear
   your own context — resumption is the file + the next session.
