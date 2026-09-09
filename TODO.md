@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #35, new
-entries start at #36 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #36, new
+entries start at #37 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -215,19 +215,13 @@ reenabled, that is the call.
   guarded by the never-throw `db-error` fallback; the worker records a bun 1.4.2 host-proxy
   check; production evidence = maintainer restart + one-shot log read (call 1).
   `sqlite3.exe` stays on disk (maintainer-placed, now unused — do not delete).
-- **Status:** LANDING IN PROGRESS (2026-09-10, build T1) — core landed: shared gauge
-  `ctxgauge/gauge.mjs` (ONE implementation, sqlite3.exe backend per the ruling above) +
-  self-peek CLI `ctxgauge/peek.mjs` (verified live: `SESSION=ses_… CTX=… (NN%) REM=…` sane
-  on a 100k-window session, exit 0) + peek.py NOT deleted (the earlier "DELETED" claim was
-  wrong — it is on disk and remains the live v2.4.1 readout; deleted in the continuation
-  commit alongside the wiring, see #35); NOT landed: the plugin wiring
-  (v2.5 header + native gauge + session-gated match-only post — `handover_v2.4.ts` still
-  shells out; peek.py deleted → a maintainer restart before the plugin lands loses the ctx:
-  line silently — the old code degrades to a no-ctx-output gauge line, never throws), the
-  probe rebuild, the doc purge (see #34), and the v1.3 log-profile re-baseline (maintainer
-  call 1, default SKIP). Worker stopped at the context stop-line (estimate ~45-50 k needed
-  vs ~14 k remaining — see #35); continuation basis: task file `.opencode/handover_task.md`
-  (unchanged) + this cycle's commits. Do NOT close — both tail items remain open.
+- **Status:** LANDING (2026-09-10, continuation 2 — node:sqlite re-ruling) —
+  plugin wiring + probe + node:sqlite core landed this cycle — log-profile
+  re-baseline pending maintainer restart + one-shot log read (call 1, default
+  SKIP). bun 1.4.2 host-proxy check: PASS (core import + `readGauge()` green
+  under system bun, kind=ok on the live db). The build scope is complete (core
+  node:sqlite-only, v2.5 plugin wiring + probe 33/33, peek.py deleted); do NOT
+  close — the log-profile tail + #34 residual doc refs remain open.
 
 ## 33. v2.5 auto-nudge ladder build (folded in: the former TOP-of-file note) — STATUS: APPROVED — NEXT BUILD
 
@@ -302,8 +296,9 @@ All those IDs stay reserved — see the numbering rule in the header.
   `peek.mjs` prints the `SESSION=…` line — this one already holds — plugin lands the gated read, #30/#33 tail updates, commit).
 - **Acceptance:** task file DoD items 1–5 all true.
 - **Suggested scope:** `.opencode/plugin/handover_v2.4.ts`, `.opencode/plugin/probes/handover_probe.mjs`, doc files in #34, `TODO.md`.
-- **Status:** OPEN — planner: continuation needs a fresh window ≥ ~50 k (210K-class worker
-  `worker_210K`, or the same spec at lower model-context start point). 2026-09-09 update:
+- **Status:** OPEN — the T1 build scope itself is COMPLETE (2026-09-10, continuation 2 —
+  see the status tail below); remaining tail = the v1.3 log-profile re-baseline + #34
+  residual doc refs. 2026-09-09 update:
   the sqlite-via-node:sqlite problem is SOLVED per maintainer ruling — the core
   (`ctxgauge/gauge.mjs` + `peek.mjs`) landed on the sqlite3.exe backend (planner-direct,
   verified live, corruption fixed; task file now carries a PLANNER RULING block). Remaining
@@ -312,6 +307,10 @@ All those IDs stay reserved — see the numbering rule in the header.
   2026-09-10: backend RE-RULING (node:sqlite, see #30) — the committed core's sqlite3.exe
   read mechanic is re-implemented in continuation 2; the 3bit 210K delegation looped
   (no partial commits, verified via git log); re-delegated to `worker_Q4_120K`.
+  **2026-09-10 (continuation 2 — LANDED):** node:sqlite core + v2.5 plugin wiring +
+  probe rebuild (33/33) + suite 434/434 + ruff F=0 + peek.py deletion committed;
+  remaining tail = the v1.3 log-profile re-baseline (maintainer call 1) + #34
+  residual doc refs (planner/maintainer-owned).
 
 ## 36. (closed 2026-09-09) `agents_repo.md` `Environment & shell` — wrong/stale lines (lab-verified, fixed)
 

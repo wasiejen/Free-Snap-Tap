@@ -3,29 +3,30 @@
 // imported by BOTH the handover plugin (chat.message injection,
 // .opencode/plugin/handover_v2.4.ts) and the self-peek CLI (peek.mjs).
 //
-// READ BACKEND — sqlite3.exe (MAINTAINER RULING 2026-09-09, supersedes the
-// original node:sqlite design): the plugin host (opencode.exe, a compiled
-// bun binary) cannot rely on node:sqlite — the T1 worker could not solve a
-// working sqlite call via node modules in that host. The maintainer placed
-// SQLite 3.53.4 (64-bit, JSON1 built in) at `.opencode/plugin/tools/sqlite3.exe`
-// (next to the plugin). The gauge spawns it with an ARGS ARRAY (no shell —
-// no quoting surface): verified working under BOTH node v24.19.0 (the CLI /
-// probe host) and bun 1.4.2 (the closest host stand-in for opencode.exe),
-// 2026-09-09 (spawn probe, args array, timeout 3000, live db read ok).
+// READ BACKEND — built-in `node:sqlite` (MAINTAINER RE-RULING 2026-09-10,
+// supersedes the 2026-09-09 spawn-CLI backend block): `node:sqlite`
+// (`DatabaseSync`) is flag-free on node v24.19.0 (the CLI / probe host,
+// verified). The module is imported DYNAMICALLY inside readGauge — the
+// bun-compiled opencode.exe plugin host is the KNOWN RISK (it may lack
+// `node:sqlite`): a missing/unsupported module never breaks the plugin
+// import, it just maps to kind "db-error" (the production guard — the
+// bun 1.4.2 host-proxy check + the maintainer's restart + one-shot log read
+// are the production evidence).
 //
-// The CLI argument is the DB as a READ-ONLY URI (`file:<path>/?mode=ro`) —
-// no journal write while opencode writes concurrently. NO PRAGMA in the
-// call: `PRAGMA busy_timeout = N;` ECHOES `N` as a stdout line and pollutes
-// the marker parse (measured 2026-09-09). Concurrency resilience = one retry
-// on a busy/locked error (read-only SELECTs).
+// The DB is opened READ-ONLY (`{ readOnly: true }`) — no journal write while
+// opencode writes concurrently. Concurrency resilience (the ~2500 ms budget,
+// never throw): `PRAGMA busy_timeout = 2500` via exec (the API way) + ONE
+// retry on a busy/locked error. Any hard failure (missing file, missing
+// module, lock that beats both) returns kind:"db-error" with a capped error
+// preview — the gauge NEVER throws into a hook.
 //
-// MARKER SQL (the ONLY query; two statements, marker-prefixed rows — an
-// empty first result simply omits the M row, so the output is never
-// ambiguous):
-//   M|<sid>|<model-json>|<tokens.total>|<tokens.output>   (0 or 1 row)
-//   S|<newest-session-id>                                  (0 or 1 row)
-// total/output come from json_extract (JSON1) — the message `data` JSON is
-// NEVER fetched or JS-parsed. NULL (missing tokens) → the no-total readout.
+// QUERIES (json_extract in SQL — the message `data` JSON is never fetched or
+// JS-parsed; both are single-row `prepare().get()` reads):
+//   1. newest session:  SELECT id FROM session ORDER BY time_updated DESC LIMIT 1
+//   2. finished step:   the newest session's latest message row whose `data`
+//      carries the `"finish"` marker (json_extract of tokens.total/output;
+//      the in-flight step has no "finish" field, user rows no tokens at all)
+// NULL total (no finished step / empty tokens) → the no-total readout.
 //
 // TOKEN SEMANTICS (verified 2026-09-10 across all recent step rows — TODO #30):
 // total = input + output + cache.read holds EXACTLY ⇒ ctx = total − output =
@@ -40,7 +41,7 @@
 // (multi-token prediction), NOT extra capacity. The LAST matching marker
 // wins (real ids carry no other K/M markers; `IQ4KT` never matches — no
 // dash/underscore precedes its 4). No match ⇒ window UNKNOWN — NEVER a
-// hardcoded guess (the retired peek.py `12050`-style fallback is the bug
+// hardcoded guess (the retired python peek CLI `12050`-style fallback is the bug
 // being removed: a real model such as CPU-Qwen3-0.6B must never read as a
 // guessed window).
 //
@@ -57,45 +58,27 @@
 // the id of the session the read came from (sid). The plugin posts its part
 // ONLY when sid === the hook's sessionID — a mismatch never posts, and logs
 // no line either (a normal multi-session state, not a failure). NOTE the
-// deliberate difference to the retired peek.py: there is NO fallback to the
+// deliberate difference to the retired python peek CLI: there is NO fallback to the
 // newest finished message of ANOTHER session (that fallback WAS the feed bug).
 // =============================================================================
 
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import os from "node:os";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
-import { existsSync } from "node:fs";
+import { join } from "node:path";
 
-const execFileAsync = promisify(execFile);
-const READ_TIMEOUT_MS = 2500;
-const MAX_BUFFER = 1024 * 1024;
-
-const THIS_DIR = dirname(fileURLToPath(import.meta.url));
-// The maintainer-placed CLI, resolved RELATIVE TO THIS FILE (stable for the
-// CLI cwd and the plugin import alike): .opencode/ctxgauge → ../plugin/tools
-export const DEFAULT_EXE_PATH = join(THIS_DIR, "..", "plugin", "tools", "sqlite3.exe");
+const BUSY_TIMEOUT_MS = 2500;
 
 // The opencode.db location (fact-2 of the T1 spec, planner-verified).
 export const DEFAULT_DB_PATH = join(os.homedir(), ".local", "share", "opencode", "opencode.db");
 
-// One process-wide current db/exe path — the overrides let the probe point
+// One process-wide current db path — the override lets the probe point
 // the plugin and the CLI at a temp fixture db without any file editing.
 // readGauge(p) accepts an explicit db path too (the probe's direct gauge calls).
 let dbPath = DEFAULT_DB_PATH;
-let exePath = DEFAULT_EXE_PATH;
 export function setDbPath(p) {
   dbPath = p;
 }
 export function getDbPath() {
   return dbPath;
-}
-export function setExePath(p) {
-  exePath = p;
-}
-export function getExePath() {
-  return exePath;
 }
 
 // Model id -> window. The ONLY parser — LAST marker wins, no fallback (see
@@ -145,75 +128,72 @@ export function formatGauge(r) {
   return `SESSION=${r.sid ?? "unknown"} ${out}`;
 }
 
-// The MARKER SQL — the only query (see the header). The finish marker is
-// `%"finish"%` inside the SQL literal (double quotes — no SQL escaping needed).
-const GAUGE_SQL =
-  "SELECT 'M', s.id, s.model, json_extract(m.data, '$.tokens.total'), json_extract(m.data, '$.tokens.output') " +
+// The two single-row reads (see the header). json_extract never fetches the
+// `data` JSON into JS; a missing/NULL token field reads as null.
+const SQL_NEWEST_SESSION = "SELECT id FROM session ORDER BY time_updated DESC LIMIT 1";
+const SQL_FINISHED_STEP =
+  "SELECT s.id AS sid, s.model AS model, " +
+  "json_extract(m.data, '$.tokens.total') AS total, " +
+  "json_extract(m.data, '$.tokens.output') AS output " +
   "FROM message m JOIN session s ON s.id = m.session_id " +
   "WHERE s.id = (SELECT id FROM session ORDER BY time_updated DESC LIMIT 1) " +
-  "AND m.data LIKE '%\"finish\"%' ORDER BY m.time_created DESC LIMIT 1; " +
-  "SELECT 'S', id FROM session ORDER BY time_updated DESC LIMIT 1;";
+  'AND m.data LIKE \'%"finish"%\' ORDER BY m.time_created DESC LIMIT 1';
 
-function uriRo(p) {
-  return `file:${p.replace(/\\/g, "/")}?mode=ro`;
-}
-
-async function runOnce(exe, dbArg) {
-  const res = await execFileAsync(exe, [dbArg, GAUGE_SQL], {
-    timeout: READ_TIMEOUT_MS,
-    maxBuffer: MAX_BUFFER,
-  });
-  return String(res.stdout);
+function attemptRead(DatabaseSync, p) {
+  let db;
+  try {
+    db = new DatabaseSync(p, { readOnly: true });
+    db.exec(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS};`);
+    const newest = db.prepare(SQL_NEWEST_SESSION).get();
+    const step = db.prepare(SQL_FINISHED_STEP).get();
+    return { newest, step };
+  } finally {
+    try {
+      db?.close();
+    } catch {
+      // best effort — the read outcome has already been captured
+    }
+  }
 }
 
 // Reads the db (never throws — a hard failure returns kind:"db-error").
-// busy/locked errors are retried ONCE; anything else fails fast (no point
-// retrying a CANTOPEN / missing exe).
+// Dynamic import: a host WITHOUT `node:sqlite` (the bun-compiled opencode.exe
+// risk) gets db-error instead of a broken module import.
 export async function readGauge(dbPathOverride) {
   const p = dbPathOverride ?? dbPath;
-  if (!existsSync(exePath)) {
-    return { ok: false, kind: "db-error", sid: "unknown", modelId: "", error: `exe-missing ${exePath}` };
-  }
-  const dbArg = uriRo(p);
-  let stdout;
+  let DatabaseSync;
   try {
-    stdout = await runOnce(exePath, dbArg);
+    DatabaseSync = (await import("node:sqlite")).DatabaseSync;
   } catch (e) {
-    if (/busy|locked/i.test(String(e))) {
-      // busy/locked on the first attempt (opencode writes concurrently): retry ONCE.
+    return { ok: false, kind: "db-error", sid: "unknown", modelId: "", error: `sqlite-module ${String(e).slice(0, 120)}` };
+  }
+  if (typeof DatabaseSync !== "function") {
+    return { ok: false, kind: "db-error", sid: "unknown", modelId: "", error: "sqlite-missing" };
+  }
+  let newest, step;
+  try {
+    ({ newest, step } = attemptRead(DatabaseSync, p));
+  } catch (e) {
+    if (/busy|locked/i.test(String(e?.message ?? e))) {
+      // busy/locked on the first attempt (opencode writes concurrently) and
+      // the busy_timeout budget exhausted: retry ONCE before giving up.
       try {
-        stdout = await runOnce(exePath, dbArg);
+        ({ newest, step } = attemptRead(DatabaseSync, p));
       } catch (e2) {
-        return { ok: false, kind: "db-error", sid: "unknown", modelId: "", error: String(e2).slice(0, 120) };
+        return { ok: false, kind: "db-error", sid: "unknown", modelId: "", error: String(e2?.message ?? e2).slice(0, 120) };
       }
     } else {
-      return { ok: false, kind: "db-error", sid: "unknown", modelId: "", error: String(e).slice(0, 120) };
+      return { ok: false, kind: "db-error", sid: "unknown", modelId: "", error: String(e?.message ?? e).slice(0, 120) };
     }
   }
-  // Parse the marker rows (M row absent = no finished step in the newest session).
-  let sid = "unknown";
-  let modelId = "";
-  let total = Number.NaN;
-  let output = Number.NaN;
-  for (const line of stdout.split(/\r?\n/)) {
-    if (line.startsWith("S|")) {
-      sid = line.slice(2);
-    } else if (line.startsWith("M|")) {
-      const parts = line.slice(2).split("|");
-      // sid | model... | total | output  — total/output are the LAST two fields
-      // (a model id containing '|' is then still safe).
-      if (parts.length >= 4) {
-        sid = parts[0];
-        modelId = parseModelId(parts.slice(1, parts.length - 2).join("|"));
-        total = Number(parts[parts.length - 2]);
-        output = Number(parts[parts.length - 1]);
-      }
-    }
-  }
+  const rawSid = newest?.id;
+  const sid = typeof rawSid === "string" && rawSid !== "" ? rawSid : "unknown";
+  const total = step?.total == null ? Number.NaN : Number(step.total);
   if (Number.isNaN(total)) {
-    return { ok: false, kind: "no-total", sid, modelId };
+    return { ok: false, kind: "no-total", sid, modelId: step ? parseModelId(step.model) : "" };
   }
-  if (Number.isNaN(output)) output = 0;
+  const output = step.output == null || Number.isNaN(Number(step.output)) ? 0 : Number(step.output);
+  const modelId = parseModelId(step.model);
   return {
     ok: true,
     kind: "ok",

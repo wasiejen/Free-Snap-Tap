@@ -1,32 +1,33 @@
 // =============================================================================
-// Persistent offline probe for .opencode/plugin/handover.ts (v2.2.1 gauge-evidence
-// code). Built 2026-09-08 (TODO.md #20), S4 extended the same day for the v2.2.1
-// gauge-failure evidence logging. PERMANENT repo tooling: RE-RUN, never rebuild —
-// exception: the plugin's hook surface changes.
+// Persistent offline probe for .opencode/plugin/handover_v2.4.ts (v2.5 — the
+// de-peek build: native session-gated context gauge on node:sqlite, TODO.md
+// #30/#35). REBUILT 2026-09-10 (continuation 2): the pre-rebuild probe
+// (v2.2.1 era) targeted the DELETED handover.ts, the retired
+// experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
+// all void with the shell gauge. PERMANENT repo tooling: RE-RUN, never rebuild
+// — exception: the plugin's hook surface changes.
 //
-// EXACT RUN COMMAND (from the repo root, PowerShell 7 — this IS the run command,
-// do not rediscover anything):
-//     node .opencode\plugin\probes\handover_probe.mjs before
-// (`after` instead of `before` after an edit; default mode = "before")
+// EXACT RUN COMMAND (from the repo root, PowerShell 7 — this IS the run
+// command, do not rediscover anything):
+//     node .opencode\plugin\probes\handover_probe.mjs
 //
-// 09-09: the old pinned-electron run command ($env:ELECTRON_RUN_AS_NODE=1 + OpenCode.exe) is
-// VOID — the maintainer removed the Electron install (opencode now = terminal/CLI with system
-// Node.js on PATH; TODO.md #29). Plain `node` (24+) does the same native TS type-stripping.
-//
-// WHY THAT COMMAND — DO NOT HUNT FOR EXECUTABLES (the hunt cost a prior cycle
-// ~10 min and a large context slice):
-//   - pinned opencode Electron executable:
-//       %LOCALAPPDATA%\Programs\@opencode-aidesktop\OpenCode.exe
-//     DO NOT search for it. If the path is ever wrong, report it as a
-//     discrepancy (TODO.md + summary) — do not re-hunt.
-//   - ELECTRON_RUN_AS_NODE=1 makes the Electron binary behave as plain Node.js.
-//     It IS Node 24.15.0 (verified: process.version) — new enough for native
-//     TypeScript type stripping, so this probe `import()`s the .ts plugin
-//     directly: no compile step, no --experimental-* flags, no bun, no system
-//     node. One `MODULE_TYPELESS_PACKAGE_JSON` warning on stderr is expected
-//     and harmless — `.opencode/package.json` has no "type" field and must not
-//     gain one (that would change the plugin's module context).
-//   - One file, self-contained, re-runnable from the repo root.
+// WHY THAT COMMAND:
+//   - the probe runs under plain system `node` (v24.19.0 on this host — the
+//     Node 24+ line): native TypeScript type-stripping (the .ts plugin is
+//     imported directly, no compile step, no flags, no bun) AND flag-free
+//     built-in `node:sqlite` (the probe BUILDS its temp fixture DBs with
+//     DatabaseSync — NO python, NO sqlite3.exe, NO live DB anywhere in the
+//     probe). One MODULE_TYPELESS_PACKAGE_JSON warning on stderr is expected
+//     and harmless (`.opencode/package.json` has no "type" field and must not
+//     gain one — that would change the plugin's module context).
+//   - the gauge's source in EVERY S4/S6 shape is a temp fixture sqlite DB
+//     built by this probe itself (opencode-like schema per the T1 spec fact 2:
+//     `session`(id, time_updated, model JSON) + `message`(session_id,
+//     time_created, data JSON with tokens+finish)) in the sandbox, pointed at
+//     via the core's setDbPath / readGauge(path) — the core and the plugin
+//     share ONE module instance (same resolved file), so the plugin's
+//     chat.message read hits the same fixture.
+//   - one file, self-contained, re-runnable from the repo root.
 //
 // WHAT IT RUNS:
 //   The plugin is initialized with directory=<temp sandbox root> (os.tmpdir,
@@ -34,53 +35,56 @@
 //   .opencode/handover_task.md spec (non-empty sentinel), mirror file pre-filled
 //   with STALE content, empty plugin.log. The real .opencode/ files are NEVER
 //   touched (S5 verifies byte-identity + zero writes outside the sandbox).
-//   S1 pre-flight warn (spec present → no warn; renamed away → exactly ONE
-//      byte-exact warn + byte-exact restore; emptied → exactly one warn)
-//   S2 non-handover delegations invisible (no warn, no mirror write, no throw)
-//   S3 summary mirror (verbatim OVERWRITE / exact TRUNCATED trailer / empty
-//      output → untouched; exactly 3 tool.after log lines)
-//   S4 transform injection — v2.2 injects on EVERY transform; v2.2.1 adds the
-//      kind:"gauge" evidence line per failed readout — 9 shapes:
-//      (1) LIVE shape {sessionID, model:{…}} (no agent) + good shell → exactly
-//          ONE `ctx: CTX=12345 (10%) REM=100000` line appended, prior items kept,
-//          ZERO gauge lines
-//      (2) agent:"worker_120K_mtp" + shell → appended (no gate), zero gauge lines
-//      (3) junk shell (resolves without a CTX= prefix) → omitted, no throw + ONE
-//          gauge line {reason:no-ctx-output, preview:"no gauge output", session:t3}
-//      (4) no shell ($ undefined) → omitted, no throw + ONE gauge line
-//          {reason:shell-missing, session:t4} (no preview)
-//      (5) timeout shell (text() rejects with the withTimeout "gauge timeout"
-//          sentinel) → omitted, no throw + ONE gauge line {reason:timeout,
-//          session:t5} (no preview)
-//      (6) spawn-failure shell (text() rejects with a foreign error) → omitted,
-//          no throw + ONE gauge line {reason:no-ctx-output, preview:error text
-//          capped at 120 chars, session:t6}
-//      (7) empty-output shell (resolves "") → omitted, no throw + ONE gauge line
-//          {reason:no-ctx-output, session:t7} (no preview)
-//      (8) ok readout + output.system a STRING (not an array) → system untouched +
-//          ONE gauge line {reason:system-not-array, session:t8} (no preview)
-//      (9) ok readout + no `system` key → output untouched + ONE gauge line
-//          {reason:system-not-array, session:t9} (no preview)
-//      Each of the 9 shapes logs exactly one kind:"transform" evidence line (9 total).
-//   S5 hygiene: every sandbox plugin.log line is JSON.parse-able, <=2000 chars,
-//      has an ISO ts + a string kind; exact kind tallies; the real handover
-//      files byte-identical to pre-run and zero CO-APPENDED live lines (the real
-//      plugin.log may only grow — the LIVE session's own plugin legitimately
-//      appends its own lines while the probe runs inside a bash invocation; a
-//      line carrying a probe fingerprint id s*/c*/d*/t* = the probe wrote out
-//      of the sandbox); zero new/changed files outside the sandbox
-//      (.opencode listing + git status, before vs after).
+//   S1 pre-flight warn (3): spec present → no warn; renamed away → exactly ONE
+//      byte-exact warn + byte-exact restore; emptied → exactly one new warn +
+//      byte-exact restore
+//   S2 non-handover delegations invisible (4): task w/o spec in prompt;
+//      non-task tool w/ spec-ish prompt; task w/ missing args (no throw);
+//      cumulative tally
+//   S3 summary mirror (5): verbatim OVERWRITE / exact TRUNCATED trailer / empty
+//      output → untouched; exactly 3 tool.after log lines; final mirror state
+//   S4 chat.message shapes (8) — v2.5 native gauge, session-gated match-only
+//      post (the v2.2.1 fake-shell shapes are GONE):
+//      (t1) ok-match: the posted part is BYTE-EXACT
+//          `ctx: SESSION=ses_fx_ok CTX=10000 (3%) REM=246000` (id prt-ctx-,
+//          messageID from output.message.id, sessionID echo, prior part kept)
+//          + chatmsg evidence carries sess=ses_fx_ok + ZERO gauge lines
+//      (t2) unknown-window match: `ctx: SESSION=ses_fx_unk CTX=50` posted
+//          (honest own-session result — information, not error)
+//      (t3) notAvailable match: `ctx: SESSION=ses_fx_empty CTX=notAvailable`
+//          posted
+//      (t4) mismatch-silent: sid ses_fx_ok vs sessionID ses_other → NO post,
+//          NO gauge line (the per-fire chatmsg evidence line is still logged —
+//          with the sess field — a mismatch is a normal multi-session state)
+//      (t5) db-error: missing fixture db → no throw, no post + ONE gauge line
+//          {reason:db-error, session, preview = the core's own error text
+//          capped 120} byte-exact
+//      (t6) parts-not-array: match + parts not an array → no throw + ONE gauge
+//          line {reason:parts-not-array, session}
+//      (t7) invalid-messageID: match + a non-msg message id → no throw + ONE
+//          gauge line {reason:invalid-messageID, session, message}
+//      (t8) no-throw: hook called with empty {} / {} → resolves
+//   S6 gauge core shapes (8) — direct core calls against the fixtures:
+//      known-window byte-exact + field values / unknown-window byte-exact /
+//      notAvailable byte-exact / missing-db db-error (no throw,
+//      formatGauge = `SESSION=unknown CTX=notAvailable`) / SESSION= prefix on
+//      every readout / parseWindow cases (256K, 210K, 1.5M, 120K_MTP, no-match,
+//      non-string) / parseModelId (JSON id / plain / malformed / empty) /
+//      setDbPath+getDbPath global plumbing with explicit-path override
+//   S5 hygiene (5): every sandbox plugin.log line is JSON.parse-able; <=2000
+//      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
+//      tool.before==6, tool.after==3, chatmsg==8, gauge==3, event==0); the
+//      real handover files byte-identical to pre-run and zero CO-APPENDED live
+//      lines (the real plugin.log may only grow — a line carrying a probe
+//      fingerprint id s*/c*/d*/t*/ses_fx_*/ses_other = the probe wrote out of
+//      the sandbox); zero new/changed files outside the sandbox (.opencode
+//      listing + git status, before vs after).
 //
-// EXPECTED OUTPUT SUMMARY — the v2.2.1 gauge-evidence edit CHANGES behavior
-// (the new kind:"gauge" lines), so the probe was extended the same day and the
-// expectations now match the NEW code:
-//   S1=5 S2=4 S3=5 S4=9 S5=5  →  "PROBE handover (mode=<mode>): 28/28 PASS",
-//   exit code 0. Pre-edit baseline (recorded 2026-09-08): the OLD 23-check probe
-//   passed 23/23 against the unchanged v2.2 plugin (`before` mode) — the ok-shape
-//   injections are asserted byte-identically on both sides. Anything else than
-//   28/28 with THIS file = behavior drift or broken environment — read the
-//   failures, do not "fix" the plugin for the probe. On failure the sandbox root
-//   is KEPT (printed) for forensics.
+// EXPECTED OUTPUT:
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S5=5  →  "PROBE handover: 33/33 PASS", exit
+//   code 0. Anything else with THIS file = behavior drift or broken
+//   environment — read the failures, do not "fix" the plugin for the probe.
+//   On failure the sandbox root is KEPT (printed) for forensics.
 // =============================================================================
 
 import { execFileSync } from "node:child_process";
@@ -88,22 +92,11 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSy
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-
-// ------------------------------------------------------------------ args/env
+import { DatabaseSync } from "node:sqlite";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..", "..", "..");
-const PLUGIN_TS = path.join(REPO_ROOT, ".opencode", "plugin", "handover.ts");
-const MODE = process.argv[2] ?? "before";
-if (MODE !== "before" && MODE !== "after") {
-  console.error(`bad mode ${JSON.stringify(MODE)} (expected "before" | "after")`);
-  process.exit(2);
-}
-// 09-09: the pinned-electron executable (header run-command v2) is gone with the Electron
-// install — the probe now runs under plain system `node` (header run-command). No executable
-// check to do; the probe only ever starts when that shell invoked a Node >= 23.6 process that
-// does the TS type-stripping. If it ever crashes on TS syntax under that runner, record it —
-// do NOT re-hunt for executables.
+const PLUGIN_TS = path.join(REPO_ROOT, ".opencode", "plugin", "handover_v2.4.ts");
 
 // --------------------------------------------------------------- fixed payloads
 
@@ -111,20 +104,14 @@ const HOV_PROMPT = "Read .opencode/handover_task.md and execute it EXACTLY.";
 const ORIGINAL_SPEC =
   "# PROBE DUMMY SPEC\n\nsentinel — NOT the real spec file (the real one lives at <repo root>/.opencode/handover_task.md).\n";
 const STALE_SENTINEL = "STALE MIRROR SENTINEL — must be OVERWRITTEN, not appended to.\n";
-const GAUGE_GOOD = "CTX=12345 (10%) REM=100000\n";
-const GAUGE_JUNK = "no gauge output\n";
-const GAUGE_EMPTY = "";
-const CTX_EXPECTED = `ctx: CTX=12345 (10%) REM=100000`;
-// v2.2.1 — the foreign (non-timeout) rejection = a synthetic BunShell spawn failure. The
-// error text (String(e) = "Error: " + message) exceeds 120 chars, so the gauge line
-// exercises the 120-cap (cap: first 119 chars + U+2026) AND the omit-when-empty is
-// untouched (non-empty here).
-const SPAWN_ERR = new Error(`spawn ENOENT: .venv/Scripts/python.exe ${"x".repeat(122)}`);
-const cap120 = (s) => (s.length <= 120 ? s : s.slice(0, 119) + "\u2026");
-const SPAWN_PREVIEW = cap120(String(SPAWN_ERR));
 const M_A = "VERBATIM worker summary line one\nline two\n";
 const M_B_OUTPUT = "TRUNCATED BODY\n";
 const M_B_EXPECTED = `${M_B_OUTPUT}\n\n[TRUNCATED by opencode tool_output cap — see plugin.log call d2]`;
+// v2.5 S4 expected posted text (byte-exact, straight from the core's readout forms)
+const CTX_OK = "ctx: SESSION=ses_fx_ok CTX=10000 (3%) REM=246000";
+const CTX_UNKNOWN = "ctx: SESSION=ses_fx_unk CTX=50";
+const CTX_UNAVAILABLE = "ctx: SESSION=ses_fx_empty CTX=notAvailable";
+const cap120 = (s) => (s.length <= 120 ? s : s.slice(0, 119) + "\u2026");
 
 // ------------------------------------------------------------------ real files
 
@@ -163,7 +150,7 @@ const check = (id, section, label, cond, detail = "") => {
 };
 
 // temp sandbox root — the plugin is initialized with directory=SANDBOX, so every
-// fs write it performs lands here, never in the repo.
+// fs write it performs lands here, never in the repo. The fixture DBs live here too.
 const SANDBOX = mkdtempSync(path.join(os.tmpdir(), "fst_handover_probe_"));
 const SB_SPEC = path.join(SANDBOX, ".opencode", "handover_task.md");
 const SB_MIRROR = path.join(SANDBOX, ".opencode", "handover_task_to_planner.md");
@@ -182,403 +169,498 @@ const linesOfKind = (k) => logLines().filter((l) => {
     return false;
   }
 });
-// v2.2.1 — the LAST kind:"gauge" line, but only when the total count matches exactly
-// (the S4 failure shapes assert their evidence line field-by-field)
-const lastGauge = (expectTotal) => {
-  const g = linesOfKind("gauge");
-  if (g.length !== expectTotal) return null;
-  try {
-    return JSON.parse(g[g.length - 1]);
-  } catch {
-    return null;
-  }
-};
 const readMirror = () => readFileSync(SB_MIRROR, "utf8");
 
-// fake BunShell, TAGGED-TEMPLATE-ONLY — mirrors the LIVE BunShell (terminal/CLI opencode) as
-// evidence-logged in the 09-09 start segment: `shell.cwd(d)`cmd`` → { nothrow() → self,
-// text() → Promise<fixed> }; a plain function call with a string command is REJECTED with the
-// live error text, so a regression of the plugin's call shape (v2.2.2) fails the S4 ok-shapes
-// (they assert zero gauge lines; the rejection surfaces as a no-ctx-output gauge line).
-// v2.2.1 — text() may REJECT (rejectError) to simulate the timeout sentinel / a spawn failure.
-const makeShell = (textResult, rejectError) => {
-  const shell = (strings) => {
-    if (!Array.isArray(strings) || !Array.isArray(strings.raw)) {
-      throw new Error("Please use '$' as a tagged template function: $`cmd arg1 arg2`");
-    }
-    return {
-      nothrow() { return this; },
-      text() { return rejectError ? Promise.reject(rejectError) : Promise.resolve(textResult); },
-    };
-  };
-  shell.cwd = () => shell;
-  return shell;
-};
-const goodShell = makeShell(GAUGE_GOOD);
-const junkShell = makeShell(GAUGE_JUNK);
-const emptyShell = makeShell(GAUGE_EMPTY);
-const timeoutShell = makeShell(null, new Error("gauge timeout"));
-const spawnShell = makeShell(null, SPAWN_ERR);
+// ------------------------------------------------------- fixture DBs (node:sqlite)
+//
+// opencode-like schema per the T1 spec fact 2: `session`(id TEXT, time_updated
+// INTEGER ms, model TEXT = JSON {"id":...}) + `message`(session_id TEXT,
+// time_created INTEGER ms, data TEXT = JSON). NO python, NO sqlite3.exe, NO
+// live DB. The gauge's finish marker is the `"finish"` field inside data JSON
+// (the in-flight step carries none; user rows carry no tokens at all).
+const FIN_OK = JSON.stringify({
+  role: "assistant",
+  finish: "stop",
+  tokens: { total: 12345, input: 10001, output: 2345, reasoning: 0, cache: { write: 0, read: 0 } },
+});
+const FIN_UNKNOWN = JSON.stringify({
+  role: "assistant",
+  finish: "stop",
+  tokens: { total: 50, input: 50, output: 0, reasoning: 0, cache: { write: 0, read: 0 } },
+});
+const INFLIGHT = JSON.stringify({ role: "assistant", tokens: { total: 0, input: 0, output: 0 } });
+const USER_ROW = JSON.stringify({ role: "user", parts: [] });
+
+function buildFixtureDb(p, sessions) {
+  const db = new DatabaseSync(p);
+  db.exec("CREATE TABLE session (id TEXT PRIMARY KEY, time_updated INTEGER, model TEXT); CREATE TABLE message (session_id TEXT, time_created INTEGER, data TEXT);");
+  const insS = db.prepare("INSERT INTO session (id, time_updated, model) VALUES (?, ?, ?)");
+  const insM = db.prepare("INSERT INTO message (session_id, time_created, data) VALUES (?, ?, ?)");
+  for (const s of sessions) {
+    insS.run(s.id, s.time_updated, s.model);
+    for (const m of s.messages ?? []) insM.run(s.id, m.time_created, m.data);
+  }
+  db.close();
+}
+const FX_OK = path.join(SANDBOX, "fx_ok.db");
+buildFixtureDb(FX_OK, [
+  { id: "ses_fx_ok", time_updated: 3000, model: JSON.stringify({ id: "probe-model-256K_MTP", providerID: "fx" }),
+    messages: [ { time_created: 200, data: FIN_OK }, { time_created: 100, data: USER_ROW } ] },
+  { id: "ses_fx_old", time_updated: 1000, model: JSON.stringify({ id: "probe-model-120K_MTP", providerID: "fx" }),
+    messages: [ { time_created: 50, data: FIN_OK } ] },
+]);
+const FX_UNKNOWN = path.join(SANDBOX, "fx_unknown.db");
+buildFixtureDb(FX_UNKNOWN, [
+  { id: "ses_fx_unk", time_updated: 3000, model: JSON.stringify({ id: "CPU-Qwen3-0.6B", providerID: "fx" }),
+    messages: [ { time_created: 10, data: FIN_UNKNOWN } ] },
+]);
+const FX_NOTAL = path.join(SANDBOX, "fx_notal.db");
+buildFixtureDb(FX_NOTAL, [
+  { id: "ses_fx_empty", time_updated: 3000, model: JSON.stringify({ id: "probe-model-120K_MTP", providerID: "fx" }),
+    messages: [ { time_created: 20, data: INFLIGHT } ] },
+]);
+const MISSING_DB = path.join(SANDBOX, "missing_fx.db"); // never created — the db-error shape
+
+// the core — SAME module instance the plugin imports (same resolved file), so
+// setDbPath below steers the plugin's chat.message read to the fixtures.
+const { readGauge, formatGauge, parseWindow, parseModelId, setDbPath, getDbPath } =
+  await import(new URL("../../ctxgauge/gauge.mjs", import.meta.url).href);
 
 // the plugin, loaded from the REAL repo path (Node 24 strips the TS types)
 const plugin = (await import(pathToFileURL(PLUGIN_TS).href)).default;
+const hooks = await plugin({ directory: SANDBOX });
 const HOV_ARGS = { prompt: HOV_PROMPT };
-const beforeFeed = (hooks, sess, call, tool, inArgs, outArgs) =>
+const beforeFeed = (sess, call, tool, inArgs, outArgs) =>
   hooks["tool.execute.before"]({ tool, sessionID: sess, callID: call, args: inArgs }, { args: outArgs });
-const afterFeed = (hooks, sess, call, inArgs, out) =>
+const afterFeed = (sess, call, inArgs, out) =>
   hooks["tool.execute.after"]({ tool: "task", sessionID: sess, callID: call, args: inArgs }, out);
+const chatFeed = (input, output) => hooks["chat.message"](input, output);
 
-// ------------------------------------------------------------------ S1 pre-flight
+// ------------------------------------------------------------------ S1 pre-flight (3)
 
+// 01 — spec present + handover delegation → no warn, one tool.before (c1)
+await beforeFeed("s1", "c1", "task", HOV_ARGS, HOV_ARGS);
+check(
+  "01",
+  "S1",
+  "spec present: handover before → zero warn lines, tool.before logged (c1)",
+  linesOfKind("warn").length === 0 && linesOfKind("tool.before").some((l) => l.includes('"call":"c1"')),
+  `warn=${linesOfKind("warn").length} tool.before=${linesOfKind("tool.before").length}`,
+);
+
+// 02 — spec renamed away → exactly ONE warn line, byte-exact fields + byte-exact restore
 {
-  const hooks = await plugin({ directory: SANDBOX, $: goodShell });
-
-  // 1 — spec present + handover delegation → no warn, one tool.before (c1)
-  await beforeFeed(hooks, "s1", "c1", "task", HOV_ARGS, HOV_ARGS);
-  check(
-    "01",
-    "S1",
-    "spec present: handover before → zero warn lines, tool.before logged (c1)",
-    linesOfKind("warn").length === 0 && linesOfKind("tool.before").some((l) => l.includes('"call":"c1"')),
-    `warn=${linesOfKind("warn").length} tool.before=${linesOfKind("tool.before").length}`,
-  );
-
-  // 2 — spec renamed away → exactly ONE warn line, byte-exact fields
   const SPEC_BAK = SB_SPEC + ".bak";
   renameSync(SB_SPEC, SPEC_BAK);
-  await beforeFeed(hooks, "s1", "c2", "task", HOV_ARGS, HOV_ARGS);
+  await beforeFeed("s1", "c2", "task", HOV_ARGS, HOV_ARGS);
+  renameSync(SPEC_BAK, SB_SPEC);
   const warns = linesOfKind("warn");
   const w2 = warns.length === 1 ? (() => { try { return JSON.parse(warns[0]); } catch { return {}; } })() : {};
   check(
     "02",
     "S1",
-    "spec renamed away: exactly one warn, {kind:warn, reason, call:c2, session:s1} byte-exact",
-    warns.length === 1 && w2.kind === "warn" && w2.reason === "handover-task-file-missing-or-empty" && w2.call === "c2" && w2.session === "s1",
-    warns.join(" | "),
+    "spec renamed away: exactly one byte-exact warn + spec restored byte-exact",
+    warns.length === 1 && w2.kind === "warn" && w2.reason === "handover-task-file-missing-or-empty" && w2.call === "c2" && w2.session === "s1" && readFileSync(SB_SPEC, "utf8") === ORIGINAL_SPEC,
+    warns.join(" | ") + ` restore=${readFileSync(SB_SPEC, "utf8") === ORIGINAL_SPEC}`,
   );
-  renameSync(SPEC_BAK, SB_SPEC);
+}
 
-  // 3 — byte-exact restore
-  check("03", "S1", "spec restored byte-exact after rename phase", readFileSync(SB_SPEC, "utf8") === ORIGINAL_SPEC, readFileSync(SB_SPEC, "utf8"));
-
-  // 4 — emptied spec → exactly one NEW warn line (total 2, call c3)
+// 03 — emptied spec → exactly one NEW warn line (total 2, call c3) + byte-exact restore
+{
   writeFileSync(SB_SPEC, "");
-  await beforeFeed(hooks, "s1", "c3", "task", HOV_ARGS, HOV_ARGS);
+  await beforeFeed("s1", "c3", "task", HOV_ARGS, HOV_ARGS);
   const warns3 = linesOfKind("warn");
   const w3 = (() => { try { return JSON.parse(warns3[1] ?? ""); } catch { return {}; } })();
-  check("04", "S1", "empty spec: exactly one new warn line (total 2, call c3)", warns3.length === 2 && w3.call === "c3", warns3.join(" | "));
   writeFileSync(SB_SPEC, ORIGINAL_SPEC);
+  check(
+    "03",
+    "S1",
+    "empty spec: exactly one new warn line (total 2, call c3) + spec restored byte-exact",
+    warns3.length === 2 && w3.call === "c3" && w3.session === "s1" && readFileSync(SB_SPEC, "utf8") === ORIGINAL_SPEC,
+    warns3.join(" | "),
+  );
+}
 
-  // 5 — byte-exact restore again
-  check("05", "S1", "spec restored byte-exact after empty phase", readFileSync(SB_SPEC, "utf8") === ORIGINAL_SPEC, readFileSync(SB_SPEC, "utf8"));
+// ------------------------------------------------------------------ S2 non-handover invisible (4)
 
-  // ------------------------------------------------------------------ S2 non-handover invisible
-
-  // 6 — task, non-handover prompt (gate: no spec path in the prompt)
+// 04 — task, non-handover prompt (gate: no spec path in the prompt)
+{
   const P2 = { prompt: "explore the code (no handover spec in prompt)" };
-  await beforeFeed(hooks, "s2", "c4", "task", P2, P2);
-  check("06", "S2", "task w/o spec in prompt: no new warn, mirror untouched", linesOfKind("warn").length === 2 && readMirror() === STALE_SENTINEL, `warn=${linesOfKind("warn").length}`);
+  await beforeFeed("s2", "c4", "task", P2, P2);
+  check("04", "S2", "task w/o spec in prompt: no new warn, mirror untouched", linesOfKind("warn").length === 2 && readMirror() === STALE_SENTINEL, `warn=${linesOfKind("warn").length}`);
+}
 
-  // 7 — non-task tool carrying the handover-ish prompt (tool gate comes first)
+// 05 — non-task tool carrying the handover-ish prompt (tool gate comes first)
+{
   const P3 = { command: "echo hi", prompt: HOV_PROMPT };
-  await beforeFeed(hooks, "s2", "c5", "bash", P3, P3);
-  check("07", "S2", "non-task tool (bash) w/ spec-ish prompt: invisible (no warn, mirror untouched)", linesOfKind("warn").length === 2 && readMirror() === STALE_SENTINEL, `warn=${linesOfKind("warn").length}`);
+  await beforeFeed("s2", "c5", "bash", P3, P3);
+  check("05", "S2", "non-task tool (bash) w/ spec-ish prompt: invisible (no warn, mirror untouched)", linesOfKind("warn").length === 2 && readMirror() === STALE_SENTINEL, `warn=${linesOfKind("warn").length}`);
+}
 
-  // 8 — task with NO args at all (the hook must not throw)
+// 06 — task with NO args at all (the hook must not throw)
+{
   let threw = false;
   try {
     await hooks["tool.execute.before"]({ tool: "task", sessionID: "s2", callID: "c6" }, {});
   } catch {
     threw = true;
   }
-  check("08", "S2", "task w/ missing args: resolves (no throw), invisible", !threw && linesOfKind("warn").length === 2 && readMirror() === STALE_SENTINEL, `threw=${threw} warn=${linesOfKind("warn").length}`);
+  check("06", "S2", "task w/ missing args: resolves (no throw), invisible", !threw && linesOfKind("warn").length === 2 && readMirror() === STALE_SENTINEL, `threw=${threw} warn=${linesOfKind("warn").length}`);
+}
 
-  // 9 — cumulative tally after S1–S2
-  check("09", "S2", "cumulative after S1–S2: warn==2, tool.before==6", linesOfKind("warn").length === 2 && linesOfKind("tool.before").length === 6, `warn=${linesOfKind("warn").length} tool.before=${linesOfKind("tool.before").length}`);
+// 07 — cumulative tally after S1–S2
+check("07", "S2", "cumulative after S1–S2: warn==2, tool.before==6", linesOfKind("warn").length === 2 && linesOfKind("tool.before").length === 6, `warn=${linesOfKind("warn").length} tool.before=${linesOfKind("tool.before").length}`);
 
-  // ------------------------------------------------------------------ S3 mirror — EXACTLY three after feeds
+// ------------------------------------------------------------------ S3 mirror (5)
 
-  // 10 — verbatim OVERWRITE (the STALE sentinel is replaced byte-for-byte)
-  await afterFeed(hooks, "s3", "d1", HOV_ARGS, { title: "worker final", output: M_A, metadata: {} });
-  check("10", "S3", "handover after (no meta): mirror OVERWRITTEN byte-exact verbatim (sentinel replaced)", readMirror() === M_A, readMirror());
+// 08 — verbatim OVERWRITE (the STALE sentinel is replaced byte-for-byte)
+await afterFeed("s3", "d1", HOV_ARGS, { title: "worker final", output: M_A, metadata: {} });
+check("08", "S3", "handover after (no meta): mirror OVERWRITTEN byte-exact verbatim (sentinel replaced)", readMirror() === M_A, readMirror());
 
-  // 11 — exact TRUNCATED trailer with the call id embedded
-  await afterFeed(hooks, "s3", "d2", HOV_ARGS, { title: "worker final", output: M_B_OUTPUT, metadata: { truncated: true } });
-  check("11", "S3", "handover after (truncated:true): mirror == output + exact trailer (call d2)", readMirror() === M_B_EXPECTED, readMirror());
+// 09 — exact TRUNCATED trailer with the call id embedded
+await afterFeed("s3", "d2", HOV_ARGS, { title: "worker final", output: M_B_OUTPUT, metadata: { truncated: true } });
+check("09", "S3", "handover after (truncated:true): mirror == output + exact trailer (call d2)", readMirror() === M_B_EXPECTED, readMirror());
 
-  // 12 — empty output → untouched
-  await afterFeed(hooks, "s3", "d3", HOV_ARGS, { title: "worker final", output: "", metadata: {} });
-  check("12", "S3", "handover after (empty output): mirror untouched (byte == S3b state)", readMirror() === M_B_EXPECTED, readMirror());
+// 10 — empty output → untouched
+await afterFeed("s3", "d3", HOV_ARGS, { title: "worker final", output: "", metadata: {} });
+check("10", "S3", "handover after (empty output): mirror untouched (byte == S3b state)", readMirror() === M_B_EXPECTED, readMirror());
 
-  // 13 — exactly three tool.after log lines in this phase
-  check("13", "S3", "mirror phase logged exactly 3 tool.after lines (d1..d3)", linesOfKind("tool.after").length === 3, `tool.after=${linesOfKind("tool.after").length}`);
+// 11 — exactly three tool.after log lines in this phase
+check("11", "S3", "mirror phase logged exactly 3 tool.after lines (d1..d3)", linesOfKind("tool.after").length === 3, `tool.after=${linesOfKind("tool.after").length}`);
 
-  // 14 — final mirror state byte-exact (the transform section below only appends log lines)
-  check("14", "S3", "final mirror state byte-identical to S3b content", readMirror() === M_B_EXPECTED, readMirror());
+// 12 — final mirror state byte-exact
+check("12", "S3", "final mirror state byte-identical to S3b content", readMirror() === M_B_EXPECTED, readMirror());
 
-  // ------------------------------------------------------------------ S4 transform — v2.2: inject on EVERY transform; v2.2.1: the failed
-  // readout / uninjected-ok cases log exactly ONE kind:"gauge" line, the ok+injected ones none
+// ------------------------------------------------------------------ S4 chat.message shapes (8) — v2.5 native gauge
 
-  // 15 — LIVE shape (no agent field) + good shell: exactly ONE ctx: line appended, prior items intact, ZERO gauge lines
-  const h1 = await plugin({ directory: SANDBOX, $: goodShell });
-  {
-    const system = ["SYS A", "SYS B"];
-    await h1["experimental.chat.system.transform"]({ sessionID: "t1", model: { id: "m-27B" } }, { system });
-    check(
-      "15",
-      "S4",
-      "LIVE shape (no agent, good shell): exactly one ctx: line appended, prior items verbatim, zero gauge lines",
-      Array.isArray(system) && system.length === 3 && system[0] === "SYS A" && system[1] === "SYS B" && system[2] === CTX_EXPECTED && linesOfKind("gauge").length === 0,
-      JSON.stringify({ system, gauge: linesOfKind("gauge") }),
-    );
+// 13 — ok-match: the posted part is BYTE-EXACT, prior part kept, chatmsg evidence
+//      carries sess, ZERO gauge lines
+{
+  setDbPath(FX_OK);
+  const parts = [{ id: "prt-orig-1", sessionID: "ses_fx_ok", messageID: "msg_t1", type: "text", text: "orig" }];
+  let threw = false;
+  try {
+    await chatFeed({ sessionID: "ses_fx_ok", agent: "worker_q4_120k", model: { id: "probe-model-256K_MTP" } }, { message: { id: "msg_t1" }, parts });
+  } catch {
+    threw = true;
   }
+  const p1 = parts[1];
+  const evs = linesOfKind("chatmsg");
+  const ev1 = (() => { try { return JSON.parse(evs[0] ?? ""); } catch { return {}; } })();
+  check(
+    "13",
+    "S4",
+    "ok-match: posted part byte-exact `ctx: SESSION=ses_fx_ok CTX=10000 (3%) REM=246000` (prt-ctx-, msg echo, prior kept), sess evidence, zero gauge lines",
+    !threw && parts.length === 2 && p1 && typeof p1.id === "string" && p1.id.startsWith("prt-ctx-") && p1.sessionID === "ses_fx_ok" && p1.messageID === "msg_t1" && p1.type === "text" && p1.text === CTX_OK && parts[0].text === "orig" && evs.length === 1 && ev1.sess === "ses_fx_ok" && ev1.session === "ses_fx_ok" && ev1.agent === "worker_q4_120k" && ev1.message === "msg_t1" && linesOfKind("gauge").length === 0,
+    JSON.stringify({ threw, parts, ev1, gauge: linesOfKind("gauge") }),
+  );
+}
 
-  // 16 — worker agent field: no gate — appended (the evidence line carries the agent), zero gauge lines
-  {
-    const system = ["SYS C"];
-    await h1["experimental.chat.system.transform"]({ sessionID: "t2", agent: "worker_120K_mtp", model: { id: "m-27B" } }, { system });
-    const evs = linesOfKind("transform");
-    const ev2 = (() => { try { return JSON.parse(evs[1] ?? ""); } catch { return {}; } })();
-    check(
-      "16",
-      "S4",
-      'agent:"worker_120K_mtp" + shell: ctx: appended (no gate), evidence line carries agent, zero gauge lines',
-      system.length === 2 && system[1] === CTX_EXPECTED && ev2.agent === "worker_120K_mtp" && linesOfKind("gauge").length === 0,
-      JSON.stringify({ system, ev2 }),
-    );
+// 14 — unknown-window match: `CTX=<ctx>` only (no guessed pct/REM) — posted
+{
+  setDbPath(FX_UNKNOWN);
+  const parts = [];
+  await chatFeed({ sessionID: "ses_fx_unk" }, { message: { id: "msg_t2" }, parts });
+  check(
+    "14",
+    "S4",
+    "unknown-window match: posted byte-exact `ctx: SESSION=ses_fx_unk CTX=50`, zero gauge lines",
+    parts.length === 1 && parts[0].text === CTX_UNKNOWN && parts[0].messageID === "msg_t2" && linesOfKind("gauge").length === 0,
+    JSON.stringify({ parts, gauge: linesOfKind("gauge") }),
+  );
+}
+
+// 15 — notAvailable match: the honest no-total form posts too
+{
+  setDbPath(FX_NOTAL);
+  const parts = [];
+  await chatFeed({ sessionID: "ses_fx_empty" }, { message: { id: "msg_t3" }, parts });
+  check(
+    "15",
+    "S4",
+    "notAvailable match: posted byte-exact `ctx: SESSION=ses_fx_empty CTX=notAvailable`, zero gauge lines",
+    parts.length === 1 && parts[0].text === CTX_UNAVAILABLE && parts[0].messageID === "msg_t3" && linesOfKind("gauge").length === 0,
+    JSON.stringify({ parts, gauge: linesOfKind("gauge") }),
+  );
+}
+
+// 16 — mismatch-silent: sid ses_fx_ok vs sessionID ses_other → NO post, NO gauge
+//      line (the per-fire chatmsg evidence is still logged — with the sess field)
+{
+  setDbPath(FX_OK);
+  const parts = [];
+  let threw = false;
+  try {
+    await chatFeed({ sessionID: "ses_other" }, { message: { id: "msg_t4" }, parts });
+  } catch {
+    threw = true;
   }
+  const evs = linesOfKind("chatmsg");
+  const ev4 = (() => { try { return JSON.parse(evs[3] ?? ""); } catch { return {}; } })();
+  check(
+    "16",
+    "S4",
+    "mismatch (ses_fx_ok vs ses_other): NO post, NO gauge line; chatmsg evidence logged with sess=ses_fx_ok",
+    !threw && parts.length === 0 && linesOfKind("gauge").length === 0 && evs.length === 4 && ev4.session === "ses_other" && ev4.sess === "ses_fx_ok",
+    JSON.stringify({ threw, parts, ev4, gauge: linesOfKind("gauge") }),
+  );
+}
 
-  // 17 — junk shell (resolves without a CTX= prefix): omitted, no throw + ONE gauge line {no-ctx-output, preview}
-  {
-    const h3 = await plugin({ directory: SANDBOX, $: junkShell });
-    const system = ["SYS D"];
-    let threw = false;
+// 17 — db-error: the read failed (missing fixture db) → no throw, no post + ONE gauge
+//      line {reason:db-error, session, preview = the core's own error text capped 120}
+{
+  const badRes = await readGauge(MISSING_DB);
+  const badPreview = badRes.error ? cap120(String(badRes.error).trim()) : undefined;
+  setDbPath(MISSING_DB);
+  const parts = [];
+  let threw = false;
+  try {
+    await chatFeed({ sessionID: "ses_fx_ok" }, { message: { id: "msg_t5" }, parts });
+  } catch {
+    threw = true;
+  }
+  const g = (() => { const gs = linesOfKind("gauge"); return gs.length === 1 ? JSON.parse(gs[0]) : {}; })();
+  check(
+    "17",
+    "S4",
+    "db-error (missing db): no throw, no post + gauge line {reason:db-error, session:ses_fx_ok, preview=core error capped 120} byte-exact",
+    !threw && parts.length === 0 && g.kind === "gauge" && g.reason === "db-error" && g.session === "ses_fx_ok" && g.preview === badPreview,
+    JSON.stringify({ threw, parts, g, expectedPreview: badPreview, coreResult: badRes }),
+  );
+}
+
+// 18 — parts-not-array: match + parts not an array → no throw + ONE gauge line
+{
+  setDbPath(FX_OK);
+  let threw = false;
+  try {
+    await chatFeed({ sessionID: "ses_fx_ok" }, { message: { id: "msg_t6" }, parts: "not-an-array" });
+  } catch {
+    threw = true;
+  }
+  const gs = linesOfKind("gauge");
+  const g = (() => { try { return JSON.parse(gs[1] ?? ""); } catch { return {}; } })();
+  check(
+    "18",
+    "S4",
+    "parts-not-array: no throw, no post + gauge line {reason:parts-not-array, session:ses_fx_ok} byte-exact",
+    !threw && g.kind === "gauge" && g.reason === "parts-not-array" && g.session === "ses_fx_ok" && !("preview" in g) && gs.length === 2,
+    JSON.stringify({ threw, gs }),
+  );
+}
+
+// 19 — invalid-messageID: match + a non-msg message id → no throw + ONE gauge line
+{
+  setDbPath(FX_OK);
+  let threw = false;
+  try {
+    await chatFeed({ sessionID: "ses_fx_ok" }, { message: { id: "badid" }, parts: [] });
+  } catch {
+    threw = true;
+  }
+  const gs = linesOfKind("gauge");
+  const g = (() => { try { return JSON.parse(gs[2] ?? ""); } catch { return {}; } })();
+  check(
+    "19",
+    "S4",
+    "invalid-messageID: no throw, no post + gauge line {reason:invalid-messageID, session:ses_fx_ok, message:badid} byte-exact",
+    !threw && g.kind === "gauge" && g.reason === "invalid-messageID" && g.session === "ses_fx_ok" && g.message === "badid" && gs.length === 3,
+    JSON.stringify({ threw, gs }),
+  );
+}
+
+// 20 — no-throw guarantee: the hook called with empty input/output → resolves
+{
+  setDbPath(FX_OK);
+  let threw = false;
+  try {
+    await chatFeed({}, {});
+  } catch {
+    threw = true;
+  }
+  check("20", "S4", "hook with empty {} / {}: resolves (no throw)", !threw, `threw=${threw}`);
+}
+
+// ------------------------------------------------------------------ S6 gauge core shapes (8)
+
+// 21 — known-window: byte-exact readout + the structured fields
+{
+  const r = await readGauge(FX_OK);
+  check(
+    "21",
+    "S6",
+    "known-window: formatGauge byte-exact + kind ok + sid/modelId/total/output/ctx/window fields",
+    formatGauge(r) === "SESSION=ses_fx_ok CTX=10000 (3%) REM=246000" && r.ok === true && r.kind === "ok" && r.sid === "ses_fx_ok" && r.modelId === "probe-model-256K_MTP" && r.total === 12345 && r.output === 2345 && r.ctx === 10000 && r.window === 256000,
+    JSON.stringify(r),
+  );
+}
+
+// 22 — unknown-window: `CTX=<ctx>` only (no guessed pct/REM), window undefined
+{
+  const r = await readGauge(FX_UNKNOWN);
+  check(
+    "22",
+    "S6",
+    "unknown-window (no K/M marker in model id): formatGauge byte-exact, ok, window undefined",
+    formatGauge(r) === "SESSION=ses_fx_unk CTX=50" && r.ok === true && r.kind === "ok" && r.ctx === 50 && r.window === undefined,
+    JSON.stringify(r),
+  );
+}
+
+// 23 — notAvailable: no finished step in the newest session → no-total
+{
+  const r = await readGauge(FX_NOTAL);
+  check(
+    "23",
+    "S6",
+    "notAvailable (no finished step): formatGauge byte-exact, kind no-total, sid carried, modelId empty (no step row)",
+    formatGauge(r) === "SESSION=ses_fx_empty CTX=notAvailable" && r.ok === false && r.kind === "no-total" && r.sid === "ses_fx_empty" && r.modelId === "",
+    JSON.stringify(r),
+  );
+}
+
+// 24 — missing db: db-error (no throw), formatGauge = SESSION=unknown CTX=notAvailable
+{
+  const r = await readGauge(MISSING_DB);
+  check(
+    "24",
+    "S6",
+    "missing db: kind db-error, no throw, sid unknown, non-empty error, formatGauge byte-exact",
+    r.ok === false && r.kind === "db-error" && r.sid === "unknown" && r.modelId === "" && typeof r.error === "string" && r.error !== "" && formatGauge(r) === "SESSION=unknown CTX=notAvailable",
+    JSON.stringify(r),
+  );
+}
+
+// 25 — SESSION= prefix: every readout form is prefixed with the read session id
+{
+  const lines = [formatGauge(await readGauge(FX_OK)), formatGauge(await readGauge(FX_UNKNOWN)), formatGauge(await readGauge(FX_NOTAL)), formatGauge(await readGauge(MISSING_DB))];
+  check(
+    "25",
+    "S6",
+    "SESSION= prefix on every readout form (known / unknown / notAvailable / db-error)",
+    lines.every((l) => l.startsWith("SESSION=")),
+    lines.join(" | "),
+  );
+}
+
+// 26 — parseWindow cases: the ONLY parser (last marker wins, no fallback)
+check(
+  "26",
+  "S6",
+  "parseWindow: 256K → 256000, 210K → 210000, 1.5M → 1500000, 120K_MTP → 120000, no-match → undefined, non-string → undefined",
+  parseWindow("probe-model-256K") === 256000 && parseWindow("x-210K") === 210000 && parseWindow("x-1.5M") === 1500000 && parseWindow("probe-model-120K_MTP") === 120000 && parseWindow("CPU-Qwen3-0.6B") === undefined && parseWindow(undefined) === undefined && parseWindow("IQ4KT") === undefined,
+  JSON.stringify({ a: parseWindow("probe-model-256K"), b: parseWindow("x-210K"), c: parseWindow("x-1.5M"), d: parseWindow("probe-model-120K_MTP"), e: parseWindow("CPU-Qwen3-0.6B"), f: parseWindow(undefined), g: parseWindow("IQ4KT") }),
+);
+
+// 27 — parseModelId: session.model column JSON {"id":...} / plain id / malformed / empty
+check(
+  "27",
+  "S6",
+  "parseModelId: JSON id, plain id, malformed JSON → '', empty → ''",
+  parseModelId('{"id":"a-120K"}') === "a-120K" && parseModelId("plain-id") === "plain-id" && parseModelId("{bad json") === "" && parseModelId("") === "" && parseModelId(undefined) === "",
+  JSON.stringify({ a: parseModelId('{"id":"a-120K"}'), b: parseModelId("plain-id"), c: parseModelId("{bad json"), d: parseModelId(""), e: parseModelId(undefined) }),
+);
+
+// 28 — setDbPath/getDbPath global plumbing + explicit-path override wins
+{
+  setDbPath(FX_UNKNOWN);
+  const viaGlobal = await readGauge();
+  const viaOverride = await readGauge(FX_OK);
+  const pass = getDbPath() === FX_UNKNOWN && viaGlobal.sid === "ses_fx_unk" && viaOverride.sid === "ses_fx_ok";
+  setDbPath(FX_OK);
+  check(
+    "28",
+    "S6",
+    "setDbPath/getDbPath steer the global read; readGauge(path) override wins",
+    pass,
+    JSON.stringify({ getDbPath: getDbPath(), viaGlobal: viaGlobal.sid, viaOverride: viaOverride.sid }),
+  );
+}
+
+// ------------------------------------------------------------------ S5 hygiene (5)
+
+// 29 — every sandbox plugin.log line parses as JSON (no stray/blank/garbled lines)
+{
+  const bad = logLines().filter((l) => {
     try {
-      await h3["experimental.chat.system.transform"]({ sessionID: "t3", model: { id: "m-27B" } }, { system });
+      JSON.parse(l);
+      return false;
     } catch {
-      threw = true;
+      return true;
     }
-    const g = lastGauge(1);
-    check(
-      "17",
-      "S4",
-      "junk shell (no CTX=): ctx omitted, no throw, system unchanged + gauge {no-ctx-output, preview:'no gauge output', session:t3}",
-      !threw && system.length === 1 && system[0] === "SYS D" && g != null && g.kind === "gauge" && g.reason === "no-ctx-output" && g.preview === "no gauge output" && g.session === "t3",
-      JSON.stringify({ system, g }),
-    );
-  }
+  });
+  check("29", "S5", "every sandbox plugin.log line is JSON.parse-able", bad.length === 0, bad.slice(0, 3).join(" | "));
+}
 
-  // 18 — no shell ($ undefined): omitted, no throw + ONE gauge line {shell-missing, no preview}
-  {
-    const h4 = await plugin({ directory: SANDBOX, $: undefined });
-    const system = ["SYS E"];
-    let threw = false;
+// 30 — every line <= 2000 chars with an ISO ts + a string kind
+{
+  const bad = logLines().filter((l) => {
+    if (l.length > 2000) return true;
     try {
-      await h4["experimental.chat.system.transform"]({ sessionID: "t4", model: { id: "m-27B" } }, { system });
+      const o = JSON.parse(l);
+      return typeof o.ts !== "string" || Number.isNaN(Date.parse(o.ts)) || typeof o.kind !== "string";
     } catch {
-      threw = true;
+      return true;
     }
-    const g = lastGauge(2);
-    check(
-      "18",
-      "S4",
-      "no shell: ctx omitted, no throw, system unchanged + gauge {shell-missing, session:t4, no preview}",
-      !threw && system.length === 1 && system[0] === "SYS E" && g != null && g.kind === "gauge" && g.reason === "shell-missing" && g.session === "t4" && !("preview" in g),
-      JSON.stringify({ system, g }),
-    );
-  }
+  });
+  check("30", "S5", "every line <= 2000 chars, ISO ts + string kind", bad.length === 0, bad.slice(0, 3).join(" | "));
+}
 
-  // 19 — timeout shell (text() rejects with the withTimeout "gauge timeout" sentinel): omitted, no throw
-  //      + ONE gauge line {timeout, no preview} — a non-settling (real 3000 ms) shell is not
-  //      probed: the sentinel rejection is the same mapping branch, deterministically
-  {
-    const h5 = await plugin({ directory: SANDBOX, $: timeoutShell });
-    const system = ["SYS F"];
-    let threw = false;
-    try {
-      await h5["experimental.chat.system.transform"]({ sessionID: "t5", model: { id: "m-27B" } }, { system });
-    } catch {
-      threw = true;
-    }
-    const g = lastGauge(3);
-    check(
-      "19",
-      "S4",
-      "timeout sentinel rejection: ctx omitted, no throw, system unchanged + gauge {timeout, session:t5, no preview}",
-      !threw && system.length === 1 && system[0] === "SYS F" && g != null && g.kind === "gauge" && g.reason === "timeout" && g.session === "t5" && !("preview" in g),
-      JSON.stringify({ system, g }),
-    );
-  }
+// 31 — exact kind tallies (no stray lines either): warn==2 (S1), tool.before==6
+//      (S1 3 + S2 3), tool.after==3 (S3), chatmsg==8 (the 8 S4 fires — per fire,
+//      mismatch included), gauge==3 (db-error + parts-not-array + invalid-messageID),
+//      event==0
+{
+  const tally = (k) => linesOfKind(k).length;
+  check(
+    "31",
+    "S5",
+    "kind tallies exact: warn==2, tool.before==6, tool.after==3, chatmsg==8, gauge==3, event==0",
+    tally("warn") === 2 && tally("tool.before") === 6 && tally("tool.after") === 3 && tally("chatmsg") === 8 && tally("gauge") === 3 && tally("event") === 0,
+    `warn=${tally("warn")} tool.before=${tally("tool.before")} tool.after=${tally("tool.after")} chatmsg=${tally("chatmsg")} gauge=${tally("gauge")} event=${tally("event")}`,
+  );
+}
 
-  // 20 — spawn-failure shell (foreign rejection): omitted, no throw + ONE gauge line {no-ctx-output, preview = error text capped 120}
-  {
-    const h6 = await plugin({ directory: SANDBOX, $: spawnShell });
-    const system = ["SYS G"];
-    let threw = false;
-    try {
-      await h6["experimental.chat.system.transform"]({ sessionID: "t6", model: { id: "m-27B" } }, { system });
-    } catch {
-      threw = true;
-    }
-    const g = lastGauge(4);
-    check(
-      "20",
-      "S4",
-      "foreign spawn-error rejection: ctx omitted, no throw, system unchanged + gauge {no-ctx-output, preview=error text capped 120, session:t6}",
-      !threw && system.length === 1 && system[0] === "SYS G" && g != null && g.kind === "gauge" && g.reason === "no-ctx-output" && g.session === "t6" && g.preview === SPAWN_PREVIEW && g.preview.length === 120,
-      JSON.stringify({ system, g }),
-    );
-  }
+// 32 — zero co-appended LIVE lines: the real handover files must be byte-identical, and the
+//      real plugin.log must only GROW. The LIVE session's own plugin legitimately appends its
+//      own lines while this probe runs — those are not probe writes. The probe's fingerprint
+//      is its synthetic ids (s1–s3/c1–c6/d1–d3/t1–t8/ses_fx_*/ses_other): if any appended
+//      real-log line carries one, the probe wrote out of the sandbox.
+{
+  const POST = snapshotReal();
+  const handoverDiff = REAL_FILES.filter((f) => f !== "plugin.log" && (PRE_REAL[f] ?? null) !== (POST[f] ?? null));
+  const preLog = PRE_REAL["plugin.log"] ?? "";
+  const postLog = POST["plugin.log"] ?? "";
+  const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
+  const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
+  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other"];
+  const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`) || l.includes(`"sess":"${fid}"`)));
+  check(
+    "32",
+    "S5",
+    "zero co-appended live lines: handover files byte-identical; plugin.log append-only; no probe-id lines in the appended tail",
+    handoverDiff.length === 0 && monotonic && !probeWroteLive,
+    `handoverDiff=${handoverDiff.join(",")} monotonic=${monotonic} probeWroteLive=${probeWroteLive}`,
+  );
+}
 
-  // 21 — empty-output shell (resolves ""): omitted, no throw + ONE gauge line {no-ctx-output, no preview}
-  {
-    const h7 = await plugin({ directory: SANDBOX, $: emptyShell });
-    const system = ["SYS H"];
-    let threw = false;
-    try {
-      await h7["experimental.chat.system.transform"]({ sessionID: "t7", model: { id: "m-27B" } }, { system });
-    } catch {
-      threw = true;
-    }
-    const g = lastGauge(5);
-    check(
-      "21",
-      "S4",
-      "empty-output shell: ctx omitted, no throw, system unchanged + gauge {no-ctx-output, session:t7, no preview}",
-      !threw && system.length === 1 && system[0] === "SYS H" && g != null && g.kind === "gauge" && g.reason === "no-ctx-output" && g.session === "t7" && !("preview" in g),
-      JSON.stringify({ system, g }),
-    );
-  }
-
-  // 22 — ok readout + output.system a STRING (not an array): system NOT pushed (untouched) + ONE gauge line {system-not-array}
-  //      — FRESH plugin instance per shape below: the module-level shell global is whatever the
-  //      LAST plugin() call configured, so an older hook instance would resolve the wrong shell
-  {
-    const h8 = await plugin({ directory: SANDBOX, $: goodShell });
-    const out = { system: "SYS NOT AN ARRAY" };
-    let threw = false;
-    try {
-      await h8["experimental.chat.system.transform"]({ sessionID: "t8", model: { id: "m-27B" } }, out);
-    } catch {
-      threw = true;
-    }
-    const g = lastGauge(6);
-    check(
-      "22",
-      "S4",
-      "ok readout + string system: system NOT pushed, untouched + gauge {system-not-array, session:t8, no preview}",
-      !threw && out.system === "SYS NOT AN ARRAY" && g != null && g.kind === "gauge" && g.reason === "system-not-array" && g.session === "t8" && !("preview" in g),
-      JSON.stringify({ out, g }),
-    );
-  }
-
-  // 23 — ok readout + NO `system` key: output untouched + ONE gauge line {system-not-array}
-  {
-    const h9 = await plugin({ directory: SANDBOX, $: goodShell });
-    const out = {};
-    let threw = false;
-    try {
-      await h9["experimental.chat.system.transform"]({ sessionID: "t9", model: { id: "m-27B" } }, out);
-    } catch {
-      threw = true;
-    }
-    const g = lastGauge(7);
-    check(
-      "23",
-      "S4",
-      "ok readout + no system key: output untouched + gauge {system-not-array, session:t9, no preview}",
-      !threw && Object.keys(out).length === 0 && g != null && g.kind === "gauge" && g.reason === "system-not-array" && g.session === "t9" && !("preview" in g),
-      JSON.stringify({ out, g }),
-    );
-  }
-
-  // ------------------------------------------------------------------ S5 hygiene
-
-  // 24 — every sandbox plugin.log line parses as JSON (no stray/blank/garbled lines)
-  {
-    const bad = logLines().filter((l) => {
-      try {
-        JSON.parse(l);
-        return false;
-      } catch {
-        return true;
-      }
-    });
-    check("24", "S5", "every sandbox plugin.log line is JSON.parse-able", bad.length === 0, bad.slice(0, 3).join(" | "));
-  }
-
-  // 25 — every line <= 2000 chars with an ISO ts + a string kind
-  {
-    const bad = logLines().filter((l) => {
-      if (l.length > 2000) return true;
-      try {
-        const o = JSON.parse(l);
-        return typeof o.ts !== "string" || Number.isNaN(Date.parse(o.ts)) || typeof o.kind !== "string";
-      } catch {
-        return true;
-      }
-    });
-    check("25", "S5", "every line <= 2000 chars, ISO ts + string kind", bad.length === 0, bad.slice(0, 3).join(" | "));
-  }
-
-  // 26 — exact kind tallies (no stray event lines either) — v2.2.1: transform==9 (9 S4 shapes),
-  //      gauge==7 (the 7 failure/uninjected shapes; the 2 ok shapes log none)
-  {
-    const tally = (k) => linesOfKind(k).length;
-    check(
-      "26",
-      "S5",
-      "kind tallies exact: warn==2, tool.before==6, tool.after==3, transform==9, gauge==7, event==0",
-      tally("warn") === 2 && tally("tool.before") === 6 && tally("tool.after") === 3 && tally("transform") === 9 && tally("gauge") === 7 && tally("event") === 0,
-      `warn=${tally("warn")} tool.before=${tally("tool.before")} tool.after=${tally("tool.after")} transform=${tally("transform")} gauge=${tally("gauge")} event=${tally("event")}`,
-    );
-  }
-
-  // 27 — zero co-appended LIVE lines: the real handover files must be byte-identical, and the
-  //      real plugin.log must only GROW. The LIVE session's own plugin legitimately appends its
-  //      own tool lines while this probe runs inside a bash invocation — those are not probe
-  //      writes. The probe's fingerprint is its synthetic ids (s1–s4/c1–c6/d1–d3/t1–t9): if any
-  //      appended real-log line carries one, the probe wrote out of the sandbox.
-  {
-    const POST = snapshotReal();
-    const handoverDiff = REAL_FILES.filter((f) => f !== "plugin.log" && (PRE_REAL[f] ?? null) !== (POST[f] ?? null));
-    const preLog = PRE_REAL["plugin.log"] ?? "";
-    const postLog = POST["plugin.log"] ?? "";
-    const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
-    const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
-    const FINGERPRINT = ["s1", "s2", "s3", "s4", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "t9"];
-    const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`)));
-    check(
-      "27",
-      "S5",
-      "zero co-appended live lines: handover files byte-identical; plugin.log append-only; no probe-id lines in the appended tail",
-      handoverDiff.length === 0 && monotonic && !probeWroteLive,
-      `handoverDiff=${handoverDiff.join(",")} monotonic=${monotonic} probeWroteLive=${probeWroteLive}`,
-    );
-  }
-
-  // 28 — zero writes outside the sandbox: .opencode listing + git status unchanged
-  {
-    const listingDiff = listOpencode().filter((p) => !PRE_OP_LISTING.includes(p));
-    const gitChanged = gitStatus() !== PRE_GIT_STATUS;
-    check("28", "S5", "sandbox isolation: .opencode listing + git status unchanged (no new/changed files outside sandbox)", listingDiff.length === 0 && !gitChanged, `new: ${listingDiff.join(", ")}; gitChanged=${gitChanged}`);
-  }
+// 33 — zero writes outside the sandbox: .opencode listing + git status unchanged
+{
+  const listingDiff = listOpencode().filter((p) => !PRE_OP_LISTING.includes(p));
+  const gitChanged = gitStatus() !== PRE_GIT_STATUS;
+  check("33", "S5", "sandbox isolation: .opencode listing + git status unchanged (no new/changed files outside sandbox)", listingDiff.length === 0 && !gitChanged, `new: ${listingDiff.join(", ")}; gitChanged=${gitChanged}`);
 }
 
 // ------------------------------------------------------------------ summary
 
-const bySection = {};
-for (const r of results) bySection[r.section] = (bySection[r.section] ?? 0) + (r.ok ? 1 : 0);
-const perSection = (Object.keys(bySection)).map((s) => `${s}=${bySection[s]}`).join(" ");
 const total = results.length;
 const okCount = results.filter((r) => r.ok).length;
-console.log(`\nsections: ${perSection}  total=${okCount}/${total}`);
 if (okCount === total) {
   rmSync(SANDBOX, { recursive: true, force: true });
-  console.log(`PROBE handover (mode=${MODE}): ${total}/${total} PASS`);
+  console.log(`PROBE handover: ${total}/${total} PASS`);
   process.exit(0);
 } else {
-  console.log(`PROBE handover (mode=${MODE}): FAILED — ${total - okCount} check(s) failed; sandbox kept at ${SANDBOX}`);
+  console.log(`PROBE handover: FAILED — ${total - okCount} check(s) failed; sandbox kept at ${SANDBOX}`);
   for (const r of results.filter((x) => !x.ok)) console.log(`  FAIL [${r.id}] ${r.label} — ${r.detail}`);
   process.exit(1);
 }

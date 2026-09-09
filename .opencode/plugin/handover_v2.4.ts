@@ -24,16 +24,16 @@
 //     v2's planner-only gate (line omitted unless the payload exposes one whose value starts
 //     with "planner"; "Planner-only, decided call, never second-guess: inject-for-all would
 //     be wrong") is void since the maintainer "both" call 2026-09-08 — injection now runs on
-//     EVERY transform, planner and worker sessions (TODO.md #18). One line "ctx: <peek.py
+//     EVERY transform, planner and worker sessions (TODO.md #18). One line "ctx: <gauge
 //     output>" is appended to `output.system`, the gauge runs through the PluginInput shell
-//     ($) with a bounded wait — if the shell is absent, the line is omitted. See TODO.md #14
+//     with a bounded wait — if the shell is absent, the line is omitted. See TODO.md #14
 //     (evidence-log rationale + the now-overridden v2 design record).
 //
 // v2.2 (maintainer "both" call, 2026-09-08): the transform hook now injects on EVERY transform —
 // planner AND worker sessions — the agent-prefix gate is removed. The live payload carries no
 // agent identifier (evidence: 60+ kind:"transform" lines in this cycle's log, all shaped
 // `{sessionID, model:{…}}`) — the gate was dead code that reached nobody. Accepted caveat
-// (TODO.md #18): `peek.py` takes no session id, so the injected number can be another session's
+// (TODO.md #18): the retired python peek CLI takes no session id, so the injected number can be another session's
 // (adjacent-stale) — the line is a reminder, not a control.
 //
 // v2.2.1 (2026-09-08): evidence-log the gauge-readout FAILURE — v2 left every readout-failure
@@ -70,6 +70,24 @@
 // fire (kind "chatmsg"; the v2 "transform" kind is historical); gauge-failure lines unchanged
 // (v2.2.1 vocabulary + one new reason parts-not-array).
 //
+// v2.5 (2026-09-10, de-peek core, TODO.md #30): the ctx readout leaves the shell. The
+// BunShell machinery (GAUGE_TIMEOUT_MS, ShellLike, withTimeout, gaugePreviewOf, the
+// tagged-template gauge call) is DELETED — the readout is the shared gauge core
+// (../ctxgauge/gauge.mjs, built-in node:sqlite, read-only, never-throw: kind "db-error"
+// is the silent production fallback if the bun-compiled host lacks the module), ONE
+// implementation with the self-peek CLI (the retired python peek CLI deleted).
+// SESSION-GATED MATCH-ONLY POST
+// (the #32 cross-session feed): the core's result carries the sid of the session it read
+// — the part is pushed ONLY when sid === input.sessionID; a mismatch returns SILENTLY
+// (no post, no gauge line — a normal multi-session state, not a failure). On a match ANY
+// valid readout form is posted (known window / unknown-window `CTX=<ctx>` /
+// `CTX=notAvailable`) — an honest own-session result is information, not error. The
+// kind:"chatmsg" evidence line stays per fire and GAINS a `sess` field (the read session
+// id, so a post and its source sit side by side in the log). Gauge-failure vocabulary:
+// db-error (capped preview — the read failed even after busy_timeout + one retry) + the
+// unchanged parts-not-array / invalid-messageID; the shell-era reasons (shell-missing /
+// timeout / no-ctx-output / system-not-array) are GONE.
+//
 // v2.4.1 (2026-09-10): the 10-09 05:12 live fire hit the Session.updatePart schema wall —
 // part.id must start with `prt`, part.messageID with `msg` (the pushed messageID was "": the
 // LIVE input of the chat.message hook carries no messageID at all — own plugin.log chatmsg
@@ -81,6 +99,11 @@ import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
+// v2.5 — the native context gauge core (de-peek, TODO.md #30): ONE implementation
+// shared with the self-peek CLI (../ctxgauge/peek.mjs). Reads the opencode db via
+// built-in node:sqlite (read-only, busy_timeout + one retry, NEVER throws — the
+// db-error kind is the fallback; see the v2.5 header block).
+import { readGauge, formatGauge } from "../ctxgauge/gauge.mjs";
 
 const LINE_CAP = 2000;
 const CAPS = [500, 150, 60];
@@ -106,23 +129,12 @@ const SKIP_EVENT_TYPES = new Set([
 
 // v2 — handover ownership
 const HANDOVER_SPEC_PATH = ".opencode/handover_task.md";
-const GAUGE_TIMEOUT_MS = 3000;
 
-// BunShell is not re-exported by @opencode-ai/plugin (type is internal to dist/shell), so
-// structure-type only the minimal slice v2.2.2 calls: the LIVE shell (terminal/CLI opencode,
-// 09-09 start evidence) is a tagged template — shell\`cmd\` → promise with nothrow().text() —
-// a plain function call with a string command is rejected by it (see the v2.2.2 header note).
-type ShellPromiseLike = {
-  nothrow(): ShellPromiseLike;
-  text(): Promise<string>;
-};
-type ShellLike = {
-  (strings: TemplateStringsArray): ShellPromiseLike;
-  cwd(d: string): ShellLike;
-};
+// v2.5 — the $/BunShell machinery (ShellPromiseLike/ShellLike, the `shell` global,
+// GAUGE_TIMEOUT_MS, withTimeout, GaugeReadout, gaugePreviewOf, gaugeReadout) is DELETED
+// with the shell gauge — the native gauge core needs no host capability.
 
 let dir: string | undefined;
-let shell: ShellLike | undefined;
 
 function specPath(): string {
   return join(dir ?? "", HANDOVER_SPEC_PATH);
@@ -275,71 +287,8 @@ async function mirrorSummary(
   }
 }
 
-function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const t = setTimeout(() => reject(new Error("gauge timeout")), ms);
-    p.then(
-      (v) => {
-        clearTimeout(t);
-        resolve(v);
-      },
-      (e) => {
-        clearTimeout(t);
-        reject(e);
-      },
-    );
-  });
-}
-
-// v2.2.1 — the readout outcome is classifiable instead of a silent `undefined` for every
-// failure mode (v2, TODO.md #23): shell-missing = the PluginInput shell is absent;
-// timeout = the bounded wait fired (withTimeout's "gauge timeout" rejection); no-ctx-output =
-// the raw output did not start with "CTX=" (includes empty — the preview is omitted then) or
-// the command promise rejected with a foreign error (e.g. a BunShell spawn failure — the error
-// text rides the preview: it is the only evidence slot in the stable 4-reason vocabulary, and
-// it is what makes the spawn/suspect-(a) branch distinguishable in the log from non-CTX=
-// output). ok-but-uninjectable (output.system not an array) is reported by onSystemTransform
-// as system-not-array.
-type GaugeReadout =
-  | { ok: true; line: string }
-  | { ok: false; reason: "shell-missing" | "timeout" | "no-ctx-output"; preview?: string };
-
-// v2.2.1 — raw-output evidence for the gauge line: trimmed, capped at 120 chars (the
-// buildLine ladder is [500,150,60] — 120 lands unchanged), omitted (undefined) when empty.
-function gaugePreviewOf(raw: string): string | undefined {
-  const t = raw.trim();
-  return t === "" ? undefined : cap(t, 120);
-}
-
-// v2 — ctxgauge readout via the PluginInput shell. Detached best effort: bounded wait, no
-// child_process fallback. The tag call is a static tagged template — exactly the declared
-// BunShell call shape. v2.2.1: the failure outcome is reported (see GaugeReadout).
-async function gaugeReadout(): Promise<GaugeReadout> {
-  if (typeof shell !== "function") return { ok: false, reason: "shell-missing" };
-  try {
-    const text = await withTimeout(
-      // v2.2.2 — TAGGED TEMPLATE, not a function call: the live BunShell (terminal/CLI opencode)
-      // rejects `shell.cwd(d)(cmdString)` with "Please use '$' as a tagged template function"
-      // (09-09 start-segment evidence, preview reason no-ctx-output). Static single command —
-      // keep it a literal; interpolated parts would be parsed by the shell.
-      shell.cwd(dir ?? "")`.venv/Scripts/python.exe .opencode/ctxgauge/peek.py`.nothrow().text(),
-      GAUGE_TIMEOUT_MS,
-    );
-    const line = (typeof text === "string" ? text : "").trim();
-    if (line.startsWith("CTX=")) return { ok: true, line };
-    const preview = gaugePreviewOf(line);
-    return preview === undefined
-      ? { ok: false, reason: "no-ctx-output" }
-      : { ok: false, reason: "no-ctx-output", preview };
-  } catch (e) {
-    if (e instanceof Error && e.message === "gauge timeout") return { ok: false, reason: "timeout" };
-    // foreign rejection (spawn-failure class): classifiable no-ctx-output, error text as preview
-    const preview = gaugePreviewOf(String(e));
-    return preview === undefined
-      ? { ok: false, reason: "no-ctx-output" }
-      : { ok: false, reason: "no-ctx-output", preview };
-  }
-}
+// v2.5 — the shell-era gaugeReadout (GaugeReadout + withTimeout + gaugePreviewOf) is DELETED
+// (v2.5 header block) — the native gauge core replaces it and never throws.
 
 // v2.4 — per-message context injection (the only channel the cache allows: append to the newest
 // message, never mutate anything in front of it). Evidence-logged FIRST (kind "chatmsg") so the
@@ -361,6 +310,10 @@ async function gaugeReadout(): Promise<GaugeReadout> {
 // messageID remains a fallback if a future opencode version fills it. Skip (log reason
 // invalid-messageID, never throw, no invalid push) when no valid msg-prefix id resolves;
 // randomUUID-based part id keeps starts-with-prt and collision-free.
+//
+// v2.5 (2026-09-10, de-peek): the readout is the native gauge core (no shell) and the post is
+// SESSION-GATED MATCH-ONLY — see the v2.5 header block at the top for the full change (native
+// read, match-only post, `sess` evidence field, db-error failure vocabulary).
 async function onChatMessage(
   input: { sessionID?: string; agent?: string; model?: unknown; messageID?: string },
   output: { message?: unknown; parts?: unknown },
@@ -368,6 +321,11 @@ async function onChatMessage(
   try {
     const midFromOutput = (output?.message as { id?: unknown } | undefined)?.id;
     const mid = str(input?.messageID) ?? (typeof midFromOutput === "string" ? midFromOutput : undefined);
+    // v2.5 — the native read (never throws: the db-error kind IS the fallback). The chatmsg
+    // evidence line stays per fire and GAINS `sess` (the read session id, so a post and its
+    // source sit side by side in the log).
+    const g = await readGauge();
+    const line = formatGauge(g);
     append(
       buildLine(
         "chatmsg",
@@ -376,31 +334,45 @@ async function onChatMessage(
           agent: str(input?.agent),
           message: mid,
           midSource: str(input?.messageID) ? "input" : typeof midFromOutput === "string" && mid !== undefined ? "output.message" : "none",
+          sess: g.sid,
         },
         { payload: input },
       ),
     );
-    const readout = await gaugeReadout();
-    if (readout.ok) {
-      if (!Array.isArray(output?.parts)) {
-        append(buildLine("gauge", { reason: "parts-not-array", session: str(input?.sessionID) }, {}));
-        return;
-      }
-      const sid = str(input?.sessionID) ?? "";
-      if (!mid || !mid.startsWith("msg") || !sid) {
-        append(buildLine("gauge", { reason: "invalid-messageID", session: sid, message: mid ?? "" }, {}));
-        return;
-      }
-      (output.parts as unknown[]).push({
-        id: `prt-ctx-${randomUUID()}`,
-        sessionID: sid,
-        messageID: mid,
-        type: "text",
-        text: `ctx: ${readout.line}`,
-      });
-    } else {
-      append(buildLine("gauge", { reason: readout.reason, session: str(input?.sessionID), preview: readout.preview }, {}));
+    if (g.kind === "db-error") {
+      // v2.5 — the read failed even after busy_timeout + one retry: one evidence line with a
+      // capped preview (the old preview-field contract), no post.
+      const err = typeof g.error === "string" ? g.error.trim() : "";
+      append(
+        buildLine(
+          "gauge",
+          { reason: "db-error", session: str(input?.sessionID), preview: err === "" ? undefined : cap(err, 120) },
+          {},
+        ),
+      );
+      return;
     }
+    // v2.5 — MATCH-ONLY post (the #32 cross-session feed): a mismatch is a NORMAL multi-session
+    // state — no post, no log (silence where silent); on equality ANY valid form posts
+    // (known-window / unknown-window / notAvailable — an honest own-session result is
+    // information, not error).
+    if (g.sid !== input?.sessionID) return;
+    if (!Array.isArray(output?.parts)) {
+      append(buildLine("gauge", { reason: "parts-not-array", session: str(input?.sessionID) }, {}));
+      return;
+    }
+    const sid = str(input?.sessionID) ?? "";
+    if (!mid || !mid.startsWith("msg") || !sid) {
+      append(buildLine("gauge", { reason: "invalid-messageID", session: sid, message: mid ?? "" }, {}));
+      return;
+    }
+    (output.parts as unknown[]).push({
+      id: `prt-ctx-${randomUUID()}`,
+      sessionID: sid,
+      messageID: mid,
+      type: "text",
+      text: `ctx: ${line}`,
+    });
   } catch {
     // never throw
   }
@@ -446,9 +418,8 @@ async function onToolAfter(
 
 export default (async (input: PluginInput) => {
   dir = str(input?.directory);
-  // BunShell arrives at runtime (PluginInput.$) but is not re-exported by the package — cast
-  // through unknown; only the structural slice above is ever used.
-  shell = (input?.$ ?? undefined) as unknown as ShellLike | undefined;
+  // v2.5 — the PluginInput.$ (BunShell) is no longer read: the native gauge core
+  // needs no host capability (v2.5 header block).
   return {
     event: onEvent,
     "tool.execute.before": onToolBefore,

@@ -1,6 +1,6 @@
 // Self-peek CLI (de-peek — TODO.md #30/#35). Thin: the shared gauge core
 // (gauge.mjs) does the read — this file prints ONE line. No python, no shell
-// (the gauge core spawns the maintainer-placed sqlite3.exe with an args array).
+// (the gauge core reads via built-in node:sqlite, read-only).
 //
 // Self-peek for agents (repo root):  node .opencode\ctxgauge\peek.mjs
 //   ->  SESSION=ses_... CTX=61351 (61%) REM=38649     (window known)
