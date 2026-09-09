@@ -373,6 +373,18 @@ opencode now runs as the terminal/CLI, with a full system Node.js on PATH
     worker-proof delegation can quote the line). Also measures the v1.3 log profile.
     FST code is NOT part of any of this (434 passed / ruff 6 untouched).
 
+CLOSED (planner, 2026-09-09 — proof start performed): the worker one-shot quoted its own
+prompt verbatim — `ctx: CTX=43423 (36%) REM=76577` — and the planner's own prompt carried
+`ctx: CTX=13837 (12%) REM=106163`: injection proven on both sides with NO plugin.log read
+(a failed readout injects nothing — line presence entails readout-ok). The zero-new-gauge-
+failure + v1.3-profile half is UNMEASURED: maintainer constraint (2026-09-09, standing) —
+do NOT parse/work on plugin.log; the v2.x digs on that file LOOPED (maintainer counted
+4-5 repetitions) and the reading stays a one-shot MAINTAINER CALL (NAP). Fire scope
+confirmed by the maintainer the same day: the transform fires at session creation / first
+round ONLY — no per-turn re-fire — and a worker's number = the planner session's
+last-updated snapshot (the #18 caveat, behaviorally confirmed — the worker's 43423 equals
+the planner's own peek at worker-creation).
+
 ## 30. Replace the peek.py shell-out with an in-plugin `node:sqlite` read (maintainer task, 2026-09-09)
 
 Integrate the context-gauge lookup directly into `.opencode/plugin/handover.ts` using
