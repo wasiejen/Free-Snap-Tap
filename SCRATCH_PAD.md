@@ -5,6 +5,37 @@ authoritative record — the change record is `git log`, the live backlog is
 `TODO.md`, agent-facing rules are `AGENTS.md` / `.opencode/handover_planner.md`.
 May be stale; nothing here is required to be maintained.
 
+260909-1512:
+
+# WIP
+- WIP - referenced .opencode\ as base path in agents (small vialation of seperation): handover file reference unlear. define directly with path
+  - quote: "The git log references "handover v2.4.1" and "NAP: v2.2.2", and also has the context "plan state file", "task spec file", "worker summary file"."
+- WIP: needs testing: a lot of permission requests for .opencode/* 
+  - why? is it not allowed? - see following point
+    - generally deny these request automatically for the workers? how?
+
+# OPEN
+- context gauge injection on worker start reports the data from the planner first
+  - lets include an ignore context gauge info on worker start in the prompt_of the worker
+- first ctx (starting prompt) after planner start was around 28000 token. that is huge. why? was the message send later and thus included the read files instructions?
+- clean up of TODO needed!
+  - there are too many status updates on what was done in it. makes it big and encourages the worker to write in the same style and thus reporting everything there.
+
+# DONE
+- DONE - remove access to the .git and .github folders for the planner - more a distant precaution than necessary
+- DONE - via Path: agents prone to use (Users\Users) in paths
+  - mention it somewehre to guard 
+  - or use a PATH alias and set these for the models to use?
+    - saves tokens and reduces errors without much instruction
+- DONE resolve issues with line ending codes
+  - might be my editor ZED which always changes them and thus colliing with github preference of CRLF over LF
+    - {
+      "line_ending": "prefer_crlf"
+      }
+    - ensure_final_newline_on_save Default: true
+- DONE pin agent_feedback.md file per path
+
+
 260907-2229:
 
 ideas
