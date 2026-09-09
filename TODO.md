@@ -199,9 +199,20 @@ reenabled, that is the call.
   carry-over caveat above):** `total = input + output + cache.read` holds EXACTLY across all
   recent step rows → `ctx = total − output` = the exact prompt size at the latest finished
   step = current context at that moment (measured 2026-09-10; the implemented read-out is built on this).
+- **Backend ruling (2026-09-09, maintainer):** the node:sqlite design is SUPERSEDED — the
+  plugin host (opencode.exe, a bun-compiled binary) cannot be trusted with node:sqlite (the
+  T1 worker could not solve a sqlite call via node modules there). The core now spawns the
+  maintainer-placed `.opencode/plugin/tools/sqlite3.exe` (args array, `file:…?mode=ro`,
+  marker SQL `M|…`/`S|…`, no PRAGMA in the call — its echo pollutes stdout). Verified live
+  under node v24.19.0 + bun 1.4.2; the worker's digit corruption (multiplier `105` →
+  `100`/`1000`) fixed; window rule = trailing `<N>K` × 1000 exactly, last marker wins
+  (maintainer-confirmed).
 - **Status:** LANDING IN PROGRESS (2026-09-10, build T1) — core landed: shared gauge
-  `ctxgauge/gauge.mjs` (ONE implementation) + self-peek CLI `ctxgauge/peek.mjs` + peek.py
-  DELETED (verified live: `SESSION=ses_… CTX=…` line, exit 0); NOT landed: the plugin wiring
+  `ctxgauge/gauge.mjs` (ONE implementation, sqlite3.exe backend per the ruling above) +
+  self-peek CLI `ctxgauge/peek.mjs` (verified live: `SESSION=ses_… CTX=… (NN%) REM=…` sane
+  on a 100k-window session, exit 0) + peek.py NOT deleted (the earlier "DELETED" claim was
+  wrong — it is on disk and remains the live v2.4.1 readout; deleted in the continuation
+  commit alongside the wiring, see #35); NOT landed: the plugin wiring
   (v2.5 header + native gauge + session-gated match-only post — `handover_v2.4.ts` still
   shells out; peek.py deleted → a maintainer restart before the plugin lands loses the ctx:
   line silently — the old code degrades to a no-ctx-output gauge line, never throws), the
@@ -284,7 +295,12 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Acceptance:** task file DoD items 1–5 all true.
 - **Suggested scope:** `.opencode/plugin/handover_v2.4.ts`, `.opencode/plugin/probes/handover_probe.mjs`, doc files in #34, `TODO.md`.
 - **Status:** OPEN — planner: continuation needs a fresh window ≥ ~50 k (210K-class worker
-  `worker_210K`, or the same spec at lower model-context start point); task file unchanged — it IS the continuation spec.
+  `worker_210K`, or the same spec at lower model-context start point). 2026-09-09 update:
+  the sqlite-via-node:sqlite problem is SOLVED per maintainer ruling — the core
+  (`ctxgauge/gauge.mjs` + `peek.mjs`) landed on the sqlite3.exe backend (planner-direct,
+  verified live, corruption fixed; task file now carries a PLANNER RULING block). Remaining
+  continuation scope: plugin wiring (session-gated match-only post) + probe rebuild +
+  suite/ruff + peek.py deletion + #30/#35 status lines — per the ruling block + DoD.
 
 ## 36. (closed 2026-09-09) `agents_repo.md` `Environment & shell` — wrong/stale lines (lab-verified, fixed)
 

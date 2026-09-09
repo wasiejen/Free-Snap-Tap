@@ -1,79 +1,217 @@
-# TASK — curate TODO.md to goal-oriented entries (maintainer priority, 2026-09-10)
+# TASK T1 — Native session-gated context gauge (de-peek core) + unknown-model readouts
 
-Read `AGENTS.md` (TODO.md entry contract + curation rules + approval boundaries),
-`agents_repo.md`, and the NAP (`.opencode/handover_planner.md`) first — the NAP gives you the
-live status of many entries (closed items, the maintainer calls, what's queued next).
+## PLANNER RULING 2026-09-09 (continuation — supersedes the node:sqlite parts of this spec)
 
-## Goal
-TODO.md is 487 lines of accumulated cycle history. Curation target: a compact,
-goal-oriented file where **every remaining entry is self-contained enough to be delegated
-by ID alone** (contract: title / problem+evidence / desired outcome — goal not steps /
-acceptance criteria / suggested scope / status + decision-needed flag), organized thematically.
+1. **SQLite access = `sqlite3.exe` (maintainer ruling):** the plugin host (opencode.exe, a
+   bun-compiled binary) cannot rely on `node:sqlite` — the T1 worker could not solve a sqlite
+   call via node modules there. The maintainer placed SQLite 3.53.4 (64-bit, JSON1) at
+   `.opencode/plugin/tools/sqlite3.exe`. The shared core (`ctxgauge/gauge.mjs`) is ALREADY
+   rewritten on that backend and committed: spawn with an ARGS ARRAY (no shell),
+   `file:<db>?mode=ro` URI arg, NO PRAGMA in the call (its result echo pollutes stdout —
+   measured), marker SQL rows `M|sid|model|total|output` / `S|sid` (json_extract in SQL —
+   the `data` JSON is never fetched), one retry on busy/locked, 2500 ms timeout, never
+   throws (kinds: ok / no-total / db-error). Verified live under BOTH node v24.19.0 and
+   bun 1.4.2 (identical lines) + 14/14 parseWindow/parseModelId unit checks. The plugin
+   ONLY imports the core (`readGauge` is async; `formatGauge(r)` = the one readout string)
+   — no new read mechanic in the plugin.
+2. **Window rule (maintainer-confirmed):** a llama-swap model name's trailing `<N>K` →
+   N×1000, `<N>M` → N×10⁶ EXACTLY (`-120K_MTP` → 120000, `_210K` → 210000); `-MTP` is a
+   speed note only; the LAST matching marker wins; no match ⇒ UNKNOWN window (never a
+   hardcoded guess). The worker's gauge.mjs digit corruption (`105`/`105*105` lost in
+   compression) is fixed in the committed core.
+3. **peek.py state:** it EXISTS on disk (the earlier TODO #30 "DELETED" line was wrong) and
+   is still the live v2.4.1 plugin's readout. Delete it in THIS build's commit, together
+   with the plugin wiring (the new plugin never needs it; the old one needs it until the
+   maintainer restart).
+4. **Probe fixture:** build the temp fixture DB with the same sqlite3.exe (CREATE TABLE
+   session/message + INSERT rows, opencode-like schema per fact 2) — NO python, NO
+   node:sqlite anywhere in the probe.
+5. **Remaining DoD for the continuation worker:** 1 (probe rebuilt + green), 2 (no
+   python/`$`/python.exe refs in plugin + probe), 3 (peek.py deleted + `peek.mjs` live
+   line re-verified), 4 (suite 434/434 + ruff F=0), 5 (TODO #30/#35 status lines). The
+   plugin wiring itself: import the core, session-gated MATCH-ONLY post (sid ===
+   input.sessionID, mismatch silent + no log), post any valid form (incl. unknown-window
+   and CTX=notAvailable), `sess` field on the chatmsg evidence line, gauge-failure
+   vocabulary `db-error` (+preview) / `parts-not-array` / `invalid-messageID`, REMOVE the
+   dead `$`/ShellLike/GAUGE_TIMEOUT/withTimeout/gaugePreviewOf machinery, v2.5 header block.
 
-## Operations
-1. **Close (condense to a one-line close record)**: entries whose resolution already lives in
-   this file — pattern is `## N. ... ` followed somewhere by `CLOSED ...` / `Fixed ...` /
-   `Resolved ...` (planner/maintainer notes) and duplicates: the block after the `## 260908-0951
-   copied from NAP` header is verbatim duplicate content of numbered entries. Closed records =
-   exactly one line: `## N. <title> — CLOSED (<closer/commit/date>) — <one-clause what>`.
-   Known close candidates (verify against the file, don't trust this list): 12, 13, 15, 16, 21
-   (code half closed by #24 — leave the v2-schema note as a pointer into #30), 22, 23, 24, 25,
-   26, 27, 28, 29, 31, 32 (root-cause record), and all `260908-0951` sub-items after dedup.
-   A close line must point at the closer (commit hash where one exists, else date + who).
-2. **Rewrite open entries in place (keep their #id)**: 1, 3, 4, 6, 7, 8, 9, 10 (CLOSE now —
-   fixed inline `ea3d920`: 3×`globalPos()` → `globalPosition().toPoint()`, 434/434, warning
-   gone 13→1; verify by grepping for `globalPos` before closing), 11 (status: maintainer holds —
-   pin `XXX 241016-1101` at `fst_keyboard.py` ≈791 is his find-marker, decision waits on his
-   live test — mark it as HOLDING/DECISION and leave content verbatim), 30 (status: APPROVED by
-   maintainer call this cycle — plan as ONE cycle: node:sqlite gauge landing + peek.py removal
-   + doc purge + v1.3 log-profile re-baseline; see the #30 carry-over arithmetic caveat — keep
-   it).
-3. **New entry #33 — v2.5 auto-nudge ladder build**: fold in the maintainer notes currently at
-   the very TOP of TODO.md (lines 1–6, "addition to plugin tool.message ctx gauge reply" + the
-   <5K note — that block becomes entry #33 and is removed from the top). Contract form, content:
-   per-agent nudge ladder fired from `tool.execute.after` (plugin is agent-independent), rungs
-   50 % (generic) → 70 %/REM 30 k → 80 %/20 k → 90 %/10 k — pct OR REM whichever first, ≤1 nudge
-   per rung per session — plus a FINAL 5 k rung whose text is the verbatim self-gauge
-   `CTX=… REM=… — stop-line reached` requesting further approval; delivered via
-   `client.session.promptAsync` synthetic text part; evidence `kind:"nudge"` lines, silent
-   otherwise. Full design lives in the NAP (v2.4.1/v2.5 blocks + `## Live status`); point there
-   from the entry. Status: APPROVED — next build.
-4. **Structure**: group thematically (e.g. FST behavior decisions / plugin & gauge / docs &
-   misc) or keep numeric order — your call — but add one section at the very top:
-   `## Maintainer calls (open, in order)` — the open decision items in priority order, each
-   one line pointing to its #entry: (1) #33 v2.5 build is NOT a call — approved; (2) #11 held on
-   maintainer's live test (XXX 241016-1101 pin); (3) the deferred FST behavior batch: #1, #7, #8,
-   #9, #4, #6 (post-plugin); (4) #30 approved, scheduled after #33.
-5. **Hard invariants:**
-   - NEVER silently delete open/unresolved content — every original numbered entry (1–32) and
-     both top notes must appear in the change log you produce (below), with outcome
-     CLOSED | DEDUP-INTO | KEPT.
-   - Entry IDs 1–33 never reused, only entries are created as #33 — no other new entries.
-   - Decision-needed statuses must survive verbatim in meaning (an open maintainer call may
-     not be silently dropped into a close record).
-   - Target ≤ 300 lines from 487 — NEVER at the cost of an invariant above.
-   - ONLY TODO.md + your summary file are touched. No code, no plugin, no handover_planner.md,
-     no AGENTS.md/agents_repo.md, no tests to run (say so in the summary).
+FIRST read `AGENTS.md`, `agents_repo.md`, this file, and `TODO.md` #30/#33.
+Repo root = `$env:FST`. This task touches the **opencode plugin + its probe + agent-prompt
+docs only** — NO FST python code, NO `opencode.jsonc`, NO `agents_repo.md` (maintainer-owned —
+flag the stale `peek.py` line in your summary instead).
+
+## Goal (definition of the delivered outcome)
+
+Replace the `peek.py` python shell-out with a native in-plugin `node:sqlite` gauge so the
+context readout is (1) **session-sensitive** — the readout carries the id of the session it
+read (`SESSION=<sid>`), and the `chat.message` reminder posts ONLY when that id equals the
+current session id (mismatch ⇒ no post, silent — never feed another session's numbers into
+this one); (2) **honest about unknown models** — when the model id yields no context window,
+no percentage and no REM are guessed; (3) one implementation shared by the plugin and the
+self-peek CLI (`peek.py` deleted).
+
+Builds the read-mechanic half of TODO #33 (approved nudge build, maintainer lean (a)) + the
+core of TODO #30 (de-peek; approved for THIS cycle, folded in per maintainer ruling).
+The #33 nudge ladder itself lands in T2 on top of this — do NOT build it here.
+
+## VERIFIED facts (measured 2026-09-10 by the planner — treat as evidence, not memory)
+
+1. **Runtime/host:** the probe runs under system `node` v24.19.0 with native TS type-stripping
+   (existing probe header documents this). `node:sqlite` (`DatabaseSync`) works there flag-free
+   — verified by direct import. The gauge will therefore never use `$` / the shell again.
+2. **DB:** `C:/Users/Wasiejen/.local/share/opencode/opencode.db`, opened read-only
+   (`?mode=ro` / `readOnly: true`). Schema facts verified by read-only queries:
+   - `session`: at least `id TEXT`, `time_updated INTEGER` (ms epoch), `model TEXT` = JSON
+     `{"id":"...","providerID":"...","variant":"default"?}`.
+   - `message`: at least `session_id TEXT`, `time_created INTEGER` (ms epoch), `data TEXT` =
+     JSON. There is **NO `role` column** — `role` is a field inside `data` JSON.
+   - Finished assistant steps carry `data.finish` (e.g. `tool-calls`, `stop`) and
+     `data.tokens { total, input, output, reasoning, cache{ write, read } }`;
+     the in-flight step's row has empty/absent tokens and NO `"finish"` field in `data`
+     (the LIKE filter below therefore excludes it); user-message rows carry **no token
+     fields at all** (verified across 30 recent user rows).
+   - peek's read: newest session by `time_updated`; within it the latest row
+     (`time_created desc`) whose `data` contains `"finish"` (peek.py's LIKE
+     ` '%"finish"%' ` equivalent) = the gauge's message; the same SQL is verified stable
+     while opencode writes concurrently (read-only + `PRAGMA busy_timeout=2000`; retry
+     once on a busy/locked error before giving up — the read must never throw into a hook).
+3. **Token semantics (resolves the #30 carry-over caveat + peek.py's in-code maintainer TODO):**
+   across all 11 recent step rows, `total = input + output + cache.read` holds EXACTLY, so
+   `ctx = total - output = input + cache.read` = exact prompt size at that step = current
+   context at that moment. Record the verified meaning in TODO.md #30 when you close its
+   evidence items.
+4. **Model id → window (the ONLY parser, keep it, drop the fallback):** peek.py's regex
+   `-(\d+(?:\.\d+)?)(K|M)(?![0-9])` on the model id from `session.model` JSON `id`
+   (e.g. `Qwen3.8-27B-IQ3KT-120K_MTP:chat` → 120000). The hardcoded `120000` fallback in
+   peek.py is the bug being removed — no match ⇒ window UNKNOWN (real model `CPU-Qwen3-0.6B`
+   never gets treated as 120k).
+5. **The cross-session feed is real (live-reproduced this run):** at my turn start the
+   injected line said `CTX=106686 (88%)` (read off whatever session was newest-updated — the
+   worker's), while my own true context was ~71k (the same query now reads `CTX=61300 (51%)`).
+   The fix under build is exactly the `SESSION=` + match-only post.
+6. **Live plugin file:** `.opencode/plugin/handover_v2.4.ts` (top-level of `.opencode/plugin/`;
+   the loader is non-recursive — subfolder files inert; verified working under that name in the
+   maintainer restart cycle v2.4/v2.4.1). Edit it in place; add a `v2.5` header block above
+   `v2.4.1` (or replace the top history per your judgement — keep the file the single live
+   plugin file; no new top-level plugin files).
+7. **Stale probe:** `.opencode/plugin/probes/handover_probe.mjs` points at the deleted
+   `handover.ts` and exercises the retired `experimental.chat.system.transform` + fake-`$`-shell
+   S4 shapes — it must be rebuilt (see DoD). S1 (preflight)/S2 (gates)/S3 (mirror)/S5 (hygiene)
+   behavior is UNCHANGED by this task and those shapes carry over (adapted); S4 (the 9 fake-shell
+   transform shapes) is replaced by chat.message + native-gauge shapes.
+8. **Constraint:** never parse/work on the LIVE `.opencode/plugin.log` (standing maintainer
+   constraint). The probe's S5 hygiene byte-snapshot comparison of the real file (pre/post
+   identity + append-only check) is the existing accepted pattern — keep it exactly that and
+   no log-content analysis.
+
+## Behavior spec
+
+### Gauge core (new file, e.g. `.opencode/plugin/gauge.mjs` — your call on the name/split as
+long as it is ONE implementation imported by both the plugin and the CLI)
+
+- `readGauge(dbPath?) → result` — reads the DB per facts 2/3/4 (dbPath default = fact-2 path;
+  injectable so the probe points it at a temp fixture DB). Returns a structured result carrying
+  at least: `sid` (the session id it read), `modelId`, `ctx`, `total`, `window` (number|undefined),
+  `ok` (whether a token total was found at all).
+- Readout forms — the ONE string format used by the CLI, by the plugin's injected text, and by
+  T2's nudge text. Given a finished-message read `total−output` = ctx:
+  - window known:      `CTX=<ctx> (<pct>%) REM=<window−ctx>`   (pct = integer `ctx*100//window`;
+    byte-identical to today's middle of the line — e.g. `CTX=61300 (51%) REM=58700`)
+  - window unknown:    `CTX=<ctx>` — nothing else (no guessed pct/REM)
+  - no total found (no finished step in the newest session, empty tokens, missing model, DB
+    empty — the #21 fresh-session class): `CTX=notAvailable` — informative, verbatim string,
+    so a model calling the CLI does not get a silent/zero confusion.
+  - The readout line is prefixed with `SESSION=<sid>` (the session the read came from) — the
+    CLI prints it; the plugin injects it (a post only happens for the matching session, so the
+    agent always sees the id of its own number — control-safety evidence).
+
+### `chat.message` hook (v2.4.1 mechanics stay — part id `prt-ctx-<uuid>`, messageID from
+`output.message.id` primary / `input.messageID` fallback, `parts` array push, the existing
+`invalid-messageID` / `parts-not-array` skip-and-log branches) — CHANGED ONLY in:
+
+- the readout is the native gauge (no shell, no `GAUGE_TIMEOUT_MS`, no `withTimeout`,
+  the whole `$`/ShellLike machinery goes with it — dead code removal, pre-approved class);
+- **match-only post:** if `readGauge().sid !== input.sessionID` ⇒ return silently (NO post,
+  NO log line — a mismatch is a normal multi-session state, not a failure; the v1.x
+  log-growth discipline applies: silence where silent). Only post on equality; then post ANY
+  valid form — including the `unknown-window` line and `CTX=notAvailable` (posting an honest
+  own-session result is information, not error);
+- the `kind:"chatmsg"` evidence line stays per fire (it already carries `session`/`agent`/
+  `message`) — ADD one small field for the read session id (e.g. `sess`) so a post and its
+  source are visible side by side in the log evidence;
+- failure lines `kind:"gauge"`: the old shell-era reasons (`shell-missing`, `timeout`,
+  `no-ctx-output`) are GONE; the surviving/new vocabulary is: `db-error` (the read failed
+  even after the busy-timeout + one retry — carry a capped preview like the old `preview`
+  field), plus the unchanged `parts-not-array` and `invalid-messageID`. Nothing else logs.
+
+### CLI (new `.opencode/ctxgauge/peek.mjs`, deleting `.opencode/ctxgauge/peek.py`)
+
+- Thin: import the shared gauge, `readGauge()`, print `format` → the ONE stdout line, e.g.
+  `SESSION=ses_… CTX=61300 (51%) REM=58700`. Exit 0 always (the agent consumes the line);
+  an unreadable DB prints `SESSION=unknown CTX=notAvailable` (still informative, never a
+  stack trace to stderr in place of a line — stderr may carry the error text as an addition).
+- Self-peek command for agents becomes: `node .opencode\ctxgauge\peek.mjs` (repo root).
+
+### Docs (the #30 doc purge, scoped)
+
+- `prompt_agent_planner.md` + `prompt_agent_task.md`: the self-peek command line(s) change
+  from the python `peek.py` invocation to `node .opencode\ctxgauge\peek.mjs`; the wording of
+  the `ctx:` nudge description stays accurate (it now carries `SESSION=… CTX=…`). Edit
+  only those lines — the prompts are otherwise maintainer-owned.
+- Grep the repo docs for `peek.py` and purge/update every remaining reference EXCEPT:
+  `agents_repo.md` (maintainer-owned — flag it in your summary + TODO note), `TODO.md`
+  entries (historical — the #30/#33 entries themselves), `handover_planner.md` (planner-owned
+  — the planner updates it), and git history. If the only `AGENTS.md` that exists is the
+  repo root (read-only per its own editing rule), flag it for the maintainer rather than
+  editing it.
 
 ## Definition of done
-1. `git diff --stat` (before commit) shows exactly `TODO.md` + `.opencode/handover_task_to_planner.md`.
-2. Line count 487 → ≤ 300 (report both).
-3. Every remaining numbered entry has the six contract fields (title / evidence / outcome /
-   acceptance / scope / status).
-4. `## Maintainer calls (open, in order)` section present at top.
-5. Committed: `docs: curate TODO.md to goal-oriented entries` (TODO.md + summary file).
+
+1. **Probe rebuilt and green:** `node .opencode\plugin\probes\handover_probe.mjs` (exact
+   command in the rebuilt probe's own header, run from repo root) → `PROBE handover: N/N PASS`,
+   exit 0. The rebuilt probe keeps the sandboxed-init design (directory=temp sandbox, real
+   `.opencode` files byte-identity S5 hygiene, zero writes outside the sandbox) and covers at
+   least: S1 preflight (3), S2 gates (4), S3 mirror (5), the new S4 = chat.message shapes
+   (ok-match inject byte-exact / mismatch-silent / no-throw guarantees + gauge failure-line
+   byte-exact per new vocabulary), the new S6 = gauge core shapes (known-window / unknown-
+   window / notAvailable / `SESSION=` prefix / model-id parser cases incl. no-match and
+   `256K`), S5 hygiene (5). A temp fixture sqlite DB (built by the probe itself, opencode-like
+   schema per fact 2) is the gauge's source — NO live DB, NO python anywhere in the probe.
+2. **No python on the gauge path:** zero references to `peek.py` / `$` / `python.exe` in the
+   plugin code or probe (git-greppable).
+3. **Files:** `peek.py` deleted; `peek.mjs` works: `node .opencode\ctxgauge\peek.mjs` from
+   repo root prints the `SESSION=…` line against the live DB (read-only) — verify it live in
+   the run and paste the exact line in your summary.
+4. **Suite green:** `& .\.venv\Scripts\python.exe -m pytest -q` = 434/434 (the plugin task
+   touches no FST python — the suite is the no-regression proof; same 13-warning profile).
+5. **TODO.md:** #30 gets the verified token-semantic one-liner (fact 3) + status line updated
+   to "core landed this cycle — log-profile re-baseline pending maintainer restart + one-shot
+   log read (call 1, default SKIP)"; #33 gets one line noting the read-mechanic half landed
+   (ladder pending T2). Do NOT close #30 or #33 (both remain open for their tail items).
+   Append discrepancies (stale docs you find but can't fix in scope, e.g. `agents_repo.md`)
+   as new numbered entries starting at #34.
 
 ## Approval boundary
-Pre-approved (meta-file curation, zero behavior change). If you find an entry whose status you
-cannot determine from the file + NAP, KEEP it fully intact and flag it in the summary — do not
-guess-close.
 
-## Return
-EXECUTIVE SUMMARY to `.opencode/handover_task_to_planner.md`: before/after line counts, the
-FULL change log (every entry 1–32 + the two top notes → outcome), what was deliberately not
-closed and why, and the guard below.
-**Guard:** this file currently holds the previous task's summary (including the maintainer's
-format-test header at its top). If the working-tree file differs from `git HEAD` (uncommitted
-maintainer content — check with `git status .opencode/handover_task_to_planner.md` before you
-write), preserve that uncommitted content VERBATIM at the very top of the file, above your new
-summary.
+- Pre-approved (just do it): all code/meta edits named here (approved build #33/#30 + docs
+  purge class); dead-code removal of the shell machinery; `peek.py` deletion (explicitly
+  approved by the maintainer this session); probe rebuild; TODO.md appends.
+- NOT pre-approved (stop and flag): any FST python change; `opencode.jsonc`; `agents_repo.md`;
+  `AGENTS.md` root; reading/analyzing `plugin.log` (log-CONTENT; the S5 byte-identity
+  snapshots are the existing exception); any change to the v2.4.1 part-schema mechanics
+  (id/messageID handling) beyond what's specified; anything observable beyond the specified
+  readout/post changes (e.g. a second log file, env vars, config keys).
+- If a shape surprise hits you (the live DB differs from fact 2/3 in a way that breaks the
+  read, node:sqlite behaves differently than verified, the opencode DB has concurrent-write
+  locks that beat the busy-timeout+retry) — implement the safest silent-fallback, record it
+  in the summary + TODO, and keep the suite green. Never let the gauge throw into a hook.
+
+## Worker
+
+`worker_120K_mtp` (same-model default — this is delicate plugin code; the 256k fast worker is
+not for this). Write the EXECUTIVE SUMMARY to `.opencode/handover_task_to_planner.md` (the
+plugin also mirrors it from your final message — either path lands it) covering: what changed,
+probe result (exact N/N), the live `peek.mjs` output line, measured suite, TODO entries added,
+and what was deliberately not done. Commit per the AGENTS.md routine (code + TODO + handover
+mirror in one commit; message: one-line imperative subject, e.g. `Native session-gated
+context gauge (de-peek) + unknown-model readouts`).

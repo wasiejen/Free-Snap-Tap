@@ -188,7 +188,7 @@
     "agent_Q4_100K": {
       "description": "very intelligent, moderately fast, 100k context, , no worker prompt, higher precision due to 4bit Quant",
       "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
+      "model": "llama-swap/Qwen3.8-27B-IQ4KT-100K",
       "prompt": "",
       "temperature": 1.0,
       // "steps": 15,
@@ -211,7 +211,7 @@
     "agent_Q4_35K_MTP": {
       "description": "very intelligent, fast, very small 35k context, , no worker prompt, higher precision due to 4bit Quant",
       "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
+      "model": "llama-swap/Qwen3.8-27B-IQ4KT-35K",
       "prompt": "",
       "temperature": 1.0,
       // "steps": 15,
