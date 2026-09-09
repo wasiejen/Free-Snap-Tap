@@ -4,3 +4,5 @@ package.json
 package-lock.json
 bun.lock
 plugin.log
+/plugins/context-meter/**
+/plugins/context-meter.ts

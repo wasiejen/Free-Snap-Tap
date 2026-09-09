@@ -94,8 +94,7 @@ file. README/WIKI have some stale examples — trust the convention above.
 - `.opencode/` — opencode meta files (not FST code): `prompt_agent_planner.md` /
   `prompt_agent_task.md` (agent prompts), `handover_planner.md` (planner state/continuation
   file, the NAP), `handover_task.md` (current task spec), `handover_task_to_planner.md`
-  (worker's latest EXECUTIVE SUMMARY), `archive/` (finished-phase planner files),
-  `ctxgauge/peek.py` (context gauge).
+  (worker's latest EXECUTIVE SUMMARY), `ctxgauge/peek.py` (context gauge).
 - `opencode.jsonc` (repo root) — opencode config: llama-swap provider + model list, planner
   (primary) and worker agents (subagents), scoped permissions.
 
