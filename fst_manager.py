@@ -5,7 +5,6 @@ last updated: 250724-1434
 
 
 from pynput import keyboard, mouse
-from threading import Event # to play aliases without interfering with keyboard listener
 from os import system, startfile # to use clearing of CLI for better menu usage and opening config file
 import sys # to get start arguments
 import msvcrt # to flush input stream
