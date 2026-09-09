@@ -36,6 +36,35 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
   is LOGGED, not started — its landing re-baselines the gauge host + the v1.3 profile, so
   plan landing + the v1.3 start-measurement as ONE cycle, not two.
 
+## 09-10 correction + v2.4 LIVE (supersedes the 09-09 single-fire reading — same evidence, wrong target)
+
+- **ROOT CAUSE (maintainer 09-10, cache discipline):** `experimental.chat.system.transform`
+  fires on EVERY LLM BUILD — proven by context-meter.log (per-turn fires, seconds apart in
+  live sessions). v2's `output.system.push()` and v2.3's per-build system/prompt mutations
+  therefore changed the prompt on EVERY build = prompt-cache invalidation every turn — the
+  slowdown / looping / "corruption" the maintainer observed was a CACHE problem, not a
+  hook-problem: **the "only session-start fire" reading (09-09 proof-start claim above, then
+  maintained) was a misread — the trigger always worked; the injection targeted the wrong
+  place (the system prompt, which the cache forbids mutating).**
+- v2.3 (this cycle's edit) REJECTED before a single restart — same root cause. The maintainer
+  line-421 experiment (`chat.message` key on the transform body) proves the hook KEY in the
+  returned object IS the trigger — the callback body must match the hook's payload shape
+  (transform body on a chat.message payload = no-op, not a drop-in).
+- **v2.4 LIVE (`.opencode/plugin/handover.ts`, restored top-level from the deactivated copy):**
+  trigger = `chat.message` (maintainer-tested: fires EVERY message turn); target = the
+  JUST-RECEIVED LAST MESSAGE — append-only: one NEW TextPart (`ctx: <peek line>`, SDK TextPart
+  shape) pushed onto `output.parts`; NEVER touches the system array or any existing part →
+  the cacheable prefix stays byte-stable. Evidence log: per-fire kind `chatmsg`; gauge-failure
+  vocabulary unchanged + new reason `parts-not-array`. Loader NON-RECURSIVE (context-meter's
+  log froze when its .ts moved into a child folder; deactivated/ + probes/ child files stay
+  inert) ⇒ the plugin file must live TOP-LEVEL.
+- TODO.md #31: root-cause + design record (same facts as here).
+- PROOF START pending (maintainer restart — do not start until run): fresh opencode start →
+  next user message carries a `ctx: CTX=...` chunk appended INSIDE the just-received user
+  message; number advances turn over turn; speed sane (no more cache invalidation). v2.4 has
+  NO session-start system item — first-turn coverage depends on chat.message firing before the
+  first LLM build (unproven timing; self-peek covers precision regardless).
+
 ## Live status
 - Task 1 (Tier 1): DONE + root-caused + **PROOF START SATISFIED** (planner AND worker ctx:
   present — TODO.md #23/#27/#29-item-4 all closed). No further work owed by Tier 1. The v1.3
@@ -64,13 +93,20 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
 3. Tier 2 scoping from the LIVE shapes — written proposal; Tier-2 code waits for a Tier-2 spec.
 4. TODO #30 de-peek (node:sqlite gauge) — LOGGED, not started; one cycle (with the v1.3
    start-measurement).
+5. [ACTION — right after the v2.4 restart] v2.4 PROOF START: maintainer restarts opencode
+   (v2.4 file live top-level; v2.3 copy + context-meter stay OFF — their child-folder
+   deactivation IS the deactivation). After ≥2 user messages, confirm from my OWN prompt: a
+   `ctx: CTX=...` chunk appended INSIDE the just-received user message, advancing turn over
+   turn — and report back the observed numbers (vs my own peek) before planning any Tier 2
+   context hooking (de-peek TODO #30 then re-baselines on the per-fire call cost).
 
 ## Context budget
 Per AGENTS.md: `& .\.venv\Scripts\python.exe .opencode\ctxgauge\peek.py` (from repo root); stop
-line REM ≤ 15 k or ≥ 85 %. The injected `ctx:` item now arrives at EVERY session start (planner
-+ worker) — and NOWHERE ELSE (no per-turn re-fire — maintainer-confirmed), so self-peek is the
-precise-fallback — use it to decide, not the injected reminder snapshot (drifts with peek.py's
-DB read; the injected number and peek's are two moments apart).
+line REM ≤ 15 k or ≥ 85 % (see the 09-10 correction block above — v2.4 state). v2.4: the `ctx:`
+reminder arrives APPENDED to the last-received message per turn (chat.message — the 09-09
+"session-start only" line was the misread); reminder-not-control unchanged (TODO #18) —
+self-peek remains the precise fallback (drifts with peek.py's DB read; the injected number and
+peek's are two moments apart).
 
 ## Log base (measurement)
 plugin.log line count at LAST measurement = **1269** — STALE and UNUPDATED on purpose:

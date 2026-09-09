@@ -54,21 +54,14 @@
 // three steady-state noise types measured in the 09-09 start segment (file.watcher.updated +
 // file.edited + session.idle); message.removed and the session.* types remain logged as signal.
 //
-// v2.3 (2026-09-10, REJECTED before any restart — root cause found by the maintainer 09-10): the
-// transform hook fires on EVERY LLM build (context-meter.log: per-turn fires, seconds apart) — so
-// v2's output.system.push() and v2.3's system/prompt mutations changed the prompt on EVERY build
-// = prompt-cache invalidation every turn (the slowdown + looping the maintainer observed). The
-// trigger was never the problem; mutating anything in front of the newest message is. v2.3 died
-// in deactivated/.
-//
-// v2.4 (2026-09-10, LIVE — maintainer direction after the cache root cause): per-message injection
-// with CACHE DISCIPLINE. Trigger = chat.message (maintainer-tested: fires EVERY message turn; the
-// key in the returned hooks object IS the trigger — the callback body must match that hook's
-// payload shape). Target = the JUST-RECEIVED LAST MESSAGE: append-only, one text part
-// (`ctx: <peek line>`) pushed onto output.parts — no existing part, no system item, nothing earlier
-// in the prompt is ever touched (the cacheable prefix stays byte-stable). Evidence log stays per
-// fire (kind "chatmsg"; the v2 "transform" kind is historical); gauge-failure lines unchanged
-// (v2.2.1 vocabulary + one new reason parts-not-array).
+// v2.3 (2026-09-10): PER-CALL CONTEXT INJECTION, maintainer goal 2026-09-10 — the ctx line
+// rides EVERY message the agent receives, not just the session-start system block. Two
+// per-call channels: (1) output.system — idempotent single-line replace-or-append (fresh-array
+// per call ⇒ append = today's behavior; persistent array ⇒ replace = no dupes); (2)
+// output.prompt — the context-meter.ts pattern (user-accepted working reference plugin:
+// fires per message AND lands — its own log is the evidence). Evidence: the 09-09 single-fire
+// observation (proof start) is superseded — the transform hook demonstrably fires per message
+// on THIS instance.
 
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
@@ -333,45 +326,46 @@ async function gaugeReadout(): Promise<GaugeReadout> {
   }
 }
 
-// v2.4 — per-message context injection (the only channel the cache allows: append to the newest
-// message, never mutate anything in front of it). Evidence-logged FIRST (kind "chatmsg") so the
-// LIVE chat.message payload is visible in the post-restart plugin.log — the SDK types
-// (dist/gen/types.gen.d.ts) declare input {sessionID, agent?, model?, messageID?, variant?} and
-// output {message: UserMessage, parts: Part[]}. The appended part is a NEW TextPart (SDK shape
-// id/sessionID/messageID/type/text — types.gen.d.ts:142); existing parts are never edited
-// (content is final the moment this hook runs). v2.2.1: readout-failure / uninjected cases log
-// exactly ONE kind:"gauge" line (vocabulary + the new parts-not-array reason, session id
-// included); the ok+injected path stays silent (no log growth).
-async function onChatMessage(
-  input: { sessionID?: string; agent?: string; model?: unknown; messageID?: string },
-  output: { message?: unknown; parts?: unknown },
-): Promise<void> {
+// v2 — ctxgauge injection. The payload is evidence-logged FIRST (kind "transform") so the
+// post-restart log shows exactly what opencode exposes at this call site. The SDK types
+// declare no agent identifier — v2's planner-only gate was overridden by the maintainer "both"
+// call 2026-09-08 (TODO.md #18): injection now runs on EVERY transform, planner and worker
+// sessions (v2.2). v2.2.1: the readout-failure / ok-but-uninjected cases log exactly ONE
+// kind:"gauge" line (reason shell-missing | timeout | no-ctx-output [+ preview] |
+// system-not-array, session id included — one buildLine call, the existing scalar pattern);
+// the ok+injected path stays silent (no log growth). That one start resolves the silent
+// branch (TODO.md #23). See TODO.md #14 (evidence-log rationale + the now-overridden v2
+// design record).
+async function onSystemTransform(
+  input: { sessionID?: string; agent?: string; model?: unknown },
+  output: { system?: unknown; prompt?: unknown },
+): Promise<any> {
   try {
-    append(
-      buildLine(
-        "chatmsg",
-        { session: str(input?.sessionID), agent: str(input?.agent), message: str(input?.messageID) },
-        { payload: input },
-      ),
-    );
+    append(buildLine("transform", { session: str(input?.sessionID), agent: str(input?.agent) }, { payload: input }));
     const readout = await gaugeReadout();
     if (readout.ok) {
-      if (!Array.isArray(output?.parts)) {
-        append(buildLine("gauge", { reason: "parts-not-array", session: str(input?.sessionID) }, {}));
-        return;
+      const item = `ctx: ${readout.line}`;
+      if (Array.isArray(output?.system)) {
+        // v2.3 — single-line replace-or-append: idempotent under a fresh array per call
+        // (no ctx: line ⇒ append = today's behavior) and under a persistent array
+        // (ctx: line present ⇒ replace ⇒ no duplicates).
+        const sys = output.system as unknown[];
+        const i = sys.findIndex((s) => typeof s === "string" && s.startsWith("ctx: "));
+        if (i >= 0) sys[i] = item;
+        else sys.push(item);
+      } else {
+        append(buildLine("gauge", { reason: "system-not-array", session: str(input?.sessionID) }, {}));
       }
-      const sid = str(input?.sessionID) ?? "";
-      const mid = str(input?.messageID) ?? "";
-      (output.parts as unknown[]).push({
-        id: `text-ctx-${Date.now()}`,
-        sessionID: sid,
-        messageID: mid,
-        type: "text",
-        text: `ctx: ${readout.line}`,
-      });
-    } else {
-      append(buildLine("gauge", { reason: readout.reason, session: str(input?.sessionID), preview: readout.preview }, {}));
+      // v2.3 — per-call prompt channel, the context-meter.ts pattern (the user-accepted
+      // working reference plugin — it lands per message). Trailing self-strip hedges the
+      // persistent-prompt-object case (never our own line twice); foreign prompt content
+      // and other plugins' markers are untouched.
+      const cur = typeof output?.prompt === "string" ? output.prompt : "";
+      const base = cur.replace(/\s*ctx: CTX=[^\n]*$/u, "");
+      return { ...output, prompt: base + item + "\n" };
     }
+    append(buildLine("gauge", { reason: readout.reason, session: str(input?.sessionID), preview: readout.preview }, {}));
+    return output;
   } catch {
     // never throw
   }
@@ -424,6 +418,6 @@ export default (async (input: PluginInput) => {
     event: onEvent,
     "tool.execute.before": onToolBefore,
     "tool.execute.after": onToolAfter,
-    "chat.message": onChatMessage,
+    "chat.message": onSystemTransform
   };
 }) satisfies Plugin;

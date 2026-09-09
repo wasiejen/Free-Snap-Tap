@@ -412,3 +412,37 @@ should be the generated tokens for the last message so it should be substract ou
 total" — i.e. `total - output` may already be the right readout, or the token JSON may mean
 something different. CHECK BEFORE wiring the same arithmetic into handover.ts; record the
 verified meaning of the token fields in the entry when done.
+
+## 31. handover.ts v2.4 — per-message context injection via chat.message, CACHE-safe append to last message only (2026-09-10)
+
+Root cause (maintainer 09-10, cache discipline): `experimental.chat.system.transform` fires on
+EVERY LLM BUILD (evidence: context-meter.log per-turn fires, seconds apart). v2's
+`output.system.push()` and v2.3's system/prompt mutations therefore changed the prompt on
+every build = prompt-cache invalidation every turn — the slowdown / looping / "corruption"
+the maintainer observed. The 09-09 "only session-start fire" proof reading was a misread:
+the trigger was never the problem — v2 aimed the injection at the wrong place (system prompt).
+
+v2.4 (LIVE): hook KEY in the returned object is the trigger — maintainer line-421 swap
+proves it; callback body must match the hook's payload shape. Registered `chat.message`
+(maintainer-tested: fires EVERY message turn); handler pushes ONE NEW text part
+({id, sessionID, messageID, type:"text", text:"ctx: <peek line>"} — SDK TextPart shape,
+types.gen.d.ts:142) onto output.parts = append-only to the just-received LAST message.
+NEVER touches the system array nor any existing part (cacheable prefix stays byte-stable).
+Gauge machinery reused unchanged (tagged-template BunShell call, 3 s bound); failure
+evidence unchanged + new reason `parts-not-array`; new evidence kind `chatmsg` (per fire,
+plugin.log — no parsing; standing constraint unchanged).
+
+Loader proven NON-RECURSIVE (context-meter's log froze once its .ts moved into a child
+folder) ⇒ plugin must live TOP-LEVEL at `.opencode/plugin/handover.ts`; deactivated/
+probes/ child files stay inert. Build verified: `bun build .opencode/plugin/handover.ts`
+= clean bundle, no syntax/resolve errors.
+
+PROOF START pending (maintainer restart — do not start until run): fresh opencode start →
+next user message carries a `ctx: CTX=...` chunk appended INSIDE the just-received user
+message; number advances turn over turn; speed sane (cache no longer invalidated). No
+session-start system item any more in v2.4 — first-turn coverage depends on chat.message
+firing before the first LLM build (unproven; self-peek covers precision regardless).
+
+TODO #30 (node:sqlite gauge) still applies later — it replaces the peek shell-out per fire;
+carry over its arithmetic caveat (verify total/output token-field meaning BEFORE wiring the
+same arithmetic in).
