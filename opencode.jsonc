@@ -52,7 +52,7 @@
       }
     },
   "agent": {
-    "planner_120k_mtp": {
+    "planner_Q3_120k_mtp": {
       "description": "very intelligent, fast, 120k context, plans tasks and delegates to sub-agents",
       "mode": "primary",
       "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
@@ -91,7 +91,7 @@
       },
       "color": "accent"
     },
-    "worker_120K_mtp": {
+    "worker_Q3_120K_mtp": {
       "description": "very intelligent, fast, 120k context",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
@@ -114,7 +114,7 @@
       },
       "color": "accent"
     },
-    "worker_210K": {
+    "worker_Q3_210K": {
       "description": "very intelligent, slow, big 210k context - for very long and complex tasks",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ3KT-210K",

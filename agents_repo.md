@@ -145,11 +145,11 @@ hits the filter: update state (press states + timings) → check rebinds
   current expected count. Do not hard-code test-count assumptions here.
 
 ## Worker roster
-- `worker_120K_mtp` (DEFAULT — same model as the planner, no reload cost):
+- `worker_Q3_120K_mtp` (DEFAULT — same model as the planner, no reload cost):
   normal edits, tests.
 - `worker_gemma_256k_mtp`: fast-throughput, high-volume reads/writes, big files,
   webfetch. Needs concrete instructions.
-- `worker_210K`: slow, big context — very long or deeply complex single tasks
+- `worker_Q3_210K`: slow, big context — very long or deeply complex single tasks
   only.
 
 ## Handover file paths
