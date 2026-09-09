@@ -1,5 +1,10 @@
 # TODO — maintainer's open items
 
+- addition to plugin tool.message ctx gauge reply:
+  -  connected to system prompt part last line the verbatim self-gauge: `CTX=… REM=… — stop-line reached`. Working past the line is a rule violation; the planner decides continuation.
+  - at less than 5k tokens this message will be nudged 
+
+
 ## 1. General vk resolution: unknown keys must surface to the user (tabled 2026-09-06)
 
 Wherever a key string is resolved to a vk_code (`convert_to_vk_code` and all its call
@@ -480,4 +485,3 @@ messages). OPEN ISSUE (maintainer call before build): `peek.py` reads only the M
 UPDATED session (TODO #18 caveat) — a nudge is an ACTION, not a reminder, so the readout's
 session must be targetable: extend the gauge with the session id (new peek output line) or a
 per-session readout — decide target scope (one live read vs full-session scan per gauge hit).
-
