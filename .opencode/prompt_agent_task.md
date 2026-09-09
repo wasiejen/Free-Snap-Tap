@@ -59,7 +59,7 @@ Write your executive summary to the worker-summary file and make your final
 message the same summary:
 - what changed (files + why, one line each),
 - measured verification (test count, lint count — run them, don't claim),
-- commit hash,
+- commit hashes of adjcent/autonomous fixes in this session,
 - `TODO.md` entries recorded,
 - anything deliberately NOT done (maintainer calls),
 - deviations from the suggested procedure + opportunistic fixes,

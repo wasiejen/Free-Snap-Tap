@@ -77,10 +77,10 @@
       // "steps": 15,
       "permission": {
         "edit": {
-          "*": "reject",
-          ".*": "allow",
-          "%TEMP%/opencode/" : "allow",
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
+          "agents_repo.md": "deny",
           ".opencode/prompt_**": "deny",
           ".opencode/handover_planner.md": "deny",
           ".git/**": "deny",
@@ -100,10 +100,10 @@
       // "steps": 15,
       "permission": {
         "edit": {
-          "*": "reject",
-          ".*": "allow",
-          "%TEMP%/opencode/" : "allow",
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
+          "agents_repo.md": "deny",
           ".opencode/prompt_**": "deny",
           ".opencode/handover_planner.md": "deny",
           ".git/**": "deny",
@@ -123,10 +123,10 @@
       // "steps": 15,
       "permission": {
         "edit": {
-          "*": "reject",
-          ".*": "allow",
-          "%TEMP%/opencode/" : "allow",
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
+          "agents_repo.md": "deny",
           ".opencode/prompt_**": "deny",
           ".opencode/handover_planner.md": "deny",
           ".git/**": "deny",
