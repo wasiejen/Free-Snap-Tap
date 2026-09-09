@@ -8,32 +8,56 @@ May be stale; nothing here is required to be maintained.
 260909-1512:
 
 # WIP
-- WIP - referenced .opencode\ as base path in agents (small vialation of seperation): handover file reference unlear. define directly with path
+
+## WIP - referenced .opencode\ as base path in agents (small vialation of seperation): handover file reference unlear. define directly with path
   - quote: "The git log references "handover v2.4.1" and "NAP: v2.2.2", and also has the context "plan state file", "task spec file", "worker summary file"."
-- WIP: needs testing: a lot of permission requests for .opencode/* 
+## WIP: needs testing: a lot of permission requests for .opencode/* 
   - why? is it not allowed? - see following point
     - generally deny these request automatically for the workers? how?
+## WIP: allow removal of old TODO.md entries are remove the denial of it
+  - the code is the source of truth and the history lives in git - there is not need to keep that here
+  - currently: Close or condense solved/stale items with a one-line close note pointing at the
+    closer (commit/entry); delete only exact duplicates after preserving the
+    surviving entry. (Addendum:) Move to todo_records.md when closed.
+  - new proposal: Git is the histoy, if the item is solved via a fix and documented via a commit it can be moved to todo_record.md. if it is solved as side-effect of other fixes/commits then remove and document with one-liner via a commit (batch multiple instances if possible - keep single one-liner until next big clean)
+    
 
 # OPEN
-- context gauge injection on worker start reports the data from the planner first
-  - lets include an ignore context gauge info on worker start in the prompt_of the worker
-- first ctx (starting prompt) after planner start was around 28000 token. that is huge. why? was the message send later and thus included the read files instructions?
-- clean up of TODO needed!
-  - there are too many status updates on what was done in it. makes it big and encourages the worker to write in the same style and thus reporting everything there.
 
+## context gauge injection on worker start reports the data from the planner first
+  - lets include an ignore context gauge info on worker start in the prompt_of the worker
+
+## similar - likely same cause - delaying receiving of user messages - likely causes by context gauge plugin
+### first ctx (starting prompt) after planner start was around 28000 token. that is huge. why? was the message send later and thus included the read files instructions?
+### Strange behavior: agent acts as if my messages come later - even mentioning that actions they have done based on it are done before the message arrived.
+  - quote: "... reconciling the #33/Call-4 items that are still stale (the curation worker ran before your ruling arrived):"
+
+# IDEAS/Random:
+
+## what would happen if I create multiple personas for workers. like anna, joe, bruce, jill, ... that have some lines  of bckground (expierence, preferences, credentials) and behavior and are dissimilar in some ways, e.g. temperament, consciutiousness, creativity (temp value of model), funny, jumpy, lazy ...
+  - normally not desirable, but it can have advantages to let them scan the repo or the task with so different viewpoints on the same problem
+  - this would intoduce more dynamic workflows
+  - interesting idea how a group with different personas would work on a project
+  - maybe with self-reinforcement by feedback from the agents about the others
+    - they can not comment about themselfes but only about other personas and this feedback would then influence their persona prompt in limited ways. so over time clear roles and preferences would be established and a hiearchy of how works in what ways with whom best or prefered.
+    
 # DONE
-- DONE - remove access to the .git and .github folders for the planner - more a distant precaution than necessary
-- DONE - via Path: agents prone to use (Users\Users) in paths
+
+## DONE - clean up of TODO needed!
+  - there are too many status updates on what was done in it. makes it big and encourages the worker to write in the same style and thus reporting everything there.
+## DONE - thematic grouping remain + unique ID: maybe remove thematic grouping of todo and instead just have a running unique numbering for easier referencing?
+## DONE - remove access to the .git and .github folders for the planner - more a distant precaution than necessary
+## DONE - via Path: agents prone to use (Users\Users) in paths
   - mention it somewehre to guard 
   - or use a PATH alias and set these for the models to use?
     - saves tokens and reduces errors without much instruction
-- DONE resolve issues with line ending codes
+## DONE resolve issues with line ending codes
   - might be my editor ZED which always changes them and thus colliing with github preference of CRLF over LF
     - {
       "line_ending": "prefer_crlf"
       }
     - ensure_final_newline_on_save Default: true
-- DONE pin agent_feedback.md file per path
+## DONE pin agent_feedback.md file per path
 
 
 260907-2229:

@@ -45,9 +45,7 @@ signal it should have been a direct edit.
 
 ## TODO.md curation (yours)
 - Organize entries thematically/context-wise as workers and you append them.
-- Close or condense solved/stale items with a one-line close note pointing at the
-  closer (commit/entry); delete only exact duplicates after preserving the
-  surviving entry.
+- Close or condense solved/stale items with a one-line close note pointing at the closer (commit/entry); delete only exact duplicates after preserving the surviving entry. Move to todo_records.md when closed.
 - Never silently delete open/unresolved content.
 - Present open maintainer decisions bundled: at most 2–3 per message, each a short
   recommendation, ordered by priority.

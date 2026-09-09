@@ -55,7 +55,7 @@ Two-party split:
   can decide to switch to a larger-context variant if available.
 
 ## TODO.md entry contract
-A `TODO.md` entry must be self-contained enough to be delegated **by ID** (a
+A `TODO.md` entry must be self-contained enough to be delegated **by unique ID** (a
 handoff like "fix #24, #30, #6" must be executable from the entry alone).
 Minimum fields:
 - title / problem + evidence
@@ -65,7 +65,7 @@ Minimum fields:
 - status / decision-needed flag
 Bare-ID handoffs are allowed only when the referenced entries are self-contained;
 otherwise the planner enriches the task spec with the missing goal + definition
-of done before delegating.
+of done before delegating. Closed entries live in todo_records.md.
 
 ## Push policy
 - Agents never push. Only the maintainer pushes. The planner may note in its
