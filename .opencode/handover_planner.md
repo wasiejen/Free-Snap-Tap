@@ -60,6 +60,15 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
 - **#10 closed inline (`ea3d920`):** 3× `QMouseEvent.globalPos()` →
   `globalPosition().toPoint()` (StatusOverlay: drag-offset / drag-move / context-menu exec);
   434/434; deprecation warning gone (suite 13 → 1 warnings).
+- **TODO records split (planner direct):** the `## Closed` block moved verbatim to
+  `todo_records.md` (24 lines, ~6 k chars off TODO.md — now 235); header carries the
+  numbering rule (IDs unique + NEVER reused; reserved set now VISIBLE in
+  `todo_records.md`) + the closed-entries pointer. Also reconciled in-file while there:
+  calls item 3 (call-4) + #33's pre-build block marked RESOLVED per the ruling above —
+  #33 has NO open pre-build item left. MAINTAINER INTENDS a prompt addendum
+  ("move to todo_records.md when closed") — RECOMMEND placing it in the AGENTS.md
+  contract (worker-visible) too, so worker-driven curation moves records the same way;
+  his prompt-planner edit then needs only to name the file.
 - **TODO.md curated (`51ca20d`): 487 → 252 lines.** New layout: numbering header →
   `## Maintainer calls (open, in order)` → thematic open entries in contract form
   (FST decisions #1/#7/#8/#9/#4/#6/#11; docs #3; plugin & gauge #17/#30 + **new #33 = v2.5

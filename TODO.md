@@ -1,6 +1,8 @@
 # TODO — maintainer's open items
 
-Numbering: IDs 1–32 and #33 are used and never reused — new entries start at #34.
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #33, new
+entries start at #34 (closed IDs stay reserved in `todo_records.md`).
+Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
 ## Maintainer calls (open, in order)
@@ -11,10 +13,11 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
    requested → #17 (NAP MAINTAINER CALL 1).
 2. **#11 contradiction prevention** — held on the maintainer's LIVE test: the `XXX 241016-1101`
    pin at `fst_keyboard.py` ≈791 is his find-marker — do not touch → #11.
-3. **v2.5 nudge target scope — BEFORE the build** — the gauge reads only the MOST-RECENTLY-
-   UPDATED session (#18 caveat); a nudge is an action, so its readout must name a session:
-   (a) gauge output carries its session id (NAP lean) or (b) per-session readout → #32 / #33
-   (NAP MAINTAINER CALL 4).
+3. **v2.5 nudge target scope — RESOLVED 2026-09-10 (maintainer ruling):** the readout must
+   reach EVERY acting session — blind spots unacceptable for an action (the #18
+   most-recently-updated-session caveat stays acceptable for reminder text only); read
+   mechanic (session id in the readout vs per-session readout) = build worker's call under
+   that invariant → #33.
 4. **Deferred FST behavior batch** (post-plugin; present ≤3 per message): #1 vk-error
    surfacing, #7 empty-macro comment vs behavior, #8 ap/ar semantics, #9 except-harden,
    #4 + #6 dead-code deletion.
@@ -212,41 +215,21 @@ reenabled, that is the call.
   text part (fire-and-forget; queues as the next turn at idle; the TUI never renders it
   as the maintainer's message). Evidence: `kind:"nudge"` log lines — SILENT otherwise
   (the v1.x skip-set log-growth discipline applies). The chat.message ctx line STAYS.
-- **OPEN pre-build call:** the gauge reads only the MOST-RECENTLY-UPDATED session (#18
-  caveat) — a nudge is an action, so its readout must name a session: (a) gauge output
-  carries its session id (NAP lean) vs (b) per-session readout — MAINTAINER CALL (section
-  above, item 3) BEFORE build.
+- **Target-scope pre-build call — RESOLVED 2026-09-10 (maintainer ruling):** the readout
+  must reach EVERY acting session (blind spot unacceptable for an action — the #18
+  most-recently-updated-session caveat stays acceptable for reminder text only); the read
+  mechanic (session id carried in the readout vs a per-session read) is the build worker's
+  call under that invariant.
 - **Full design:** NAP `## v2.4.1 LIVE + v2.5 NUDGE LADDER spec` + `## Live status` blocks
   (09-10); #32 holds the root-cause record.
 - **Acceptance:** the ladder fires per rung (probe: extend the bun probe — fake client +
   fake shell); one maintainer restart + a forced high-readout scenario shows the first
   nudge land; no NEW gauge-failure reasons (the silent path stays silent);
   `kind:"nudge"` evidence lines only.
-- **Status:** APPROVED — NEXT BUILD (not a maintainer call — the item-3 target-scope call
-  is the only open item before it).
+- **Status:** APPROVED — NEXT BUILD (not a maintainer call — all pre-build calls resolved).
 
-## Closed (one-line records — resolution lives in the file / git log)
+## Closed entries
 
-## 2. Fix the 6 ruff `F` findings — CLOSED (worker, `cdbbdcd`, 2026-09-10) — all six F sites removed (incl. the cascaded dead `cube_distance`); ruff F 6→0; pytest 434→434, 13 warnings same profile.
-## 5. Lint baseline 6 → 8 at `ca61a26` — CLOSED (`0025a57`, 2026-09-08) — the three unused `SimpleNamespace` imports removed — the 6-finding baseline restored (later → 0 via #2).
-## 10. deprecated `QMouseEvent.globalPos()` — CLOSED (inline fix `ea3d920`) — 3× `globalPos()` → `globalPosition().toPoint()`; pytest 434/434; warnings 13→1 (verified 2026-09-10 by grep: no `globalPos(` call left in the code).
-## 12. v1.1 task spec "exactly 5 lines" off-by-one — CLOSED (planner record, 2026-09-08) — the off-by-one was on the spec side (the filter deterministically yields 4); the reusable invariant = "one line per unskipped payload" — used by the v2 tasks.
-## 13. `handover.ts` header self-labelled "v1" — CLOSED (planner, 2026-09-09) — the v2/v2.2 header rewrite replaced the v1 label; the v2.2.2 + v1.3 header notes landed in the same file.
-## 14. transform hook exposes no agent identifier — CLOSED (superseded, 2026-09-08) — the open "choose a planner-only signal" call is moot: the maintainer's 'both' decision (#18) formally overrode "never inject for all" (v2.2 removed the gate); v2.4 targets the just-received last message (ALL agents) — no planner-only signal is needed any more.
-## 15. AGENTS.md plan-state routine vs "workers never touch handover_planner.md" — CLOSED (maintainer call → #26, 2026-09-08) — workers never edit or commit the plan-state file (prompt clause + `permission.edit` deny); the pre-commit routine applies to the planner's own commit only.
-## 16. v1.2 byte-budget arithmetic (190 vs 150, "< 4 KB" infeasible) — CLOSED (planner, 2026-09-08) — budget target = cascade window 0 B (met); the mixed-window total was spec arithmetic, not a code target; the event count settled by cycle measurement.
-## 18. ctxgauge 'both' decision — inject ALL sessions (v2.2 gate removed) — CLOSED (maintainer decision, 2026-09-08) — the formal override of the planner-only design; the companion worker stop-line rule landed 2026-09-09 (#29 item 3); the accepted caveat (gauge = most-recently-updated session only) carries on in #17/#30/#31/#32/#33.
-## 19. stale inline comment above `onSystemTransform` — CLOSED (#20, 2026-09-08) — comment rewired per the v2.2 'both' decision (comment-only edit, probe 23/23 both sides).
-## 20. persistent offline probe + exact executable pinned — CLOSED (2026-09-08) — the probe is permanent at `.opencode/plugin/probes/handover_probe.mjs` (run it, never rebuild — exception: a hook-surface change); the exe pin was superseded 2026-09-09 by system `node` (the electron host is gone — #29).
-## 21. `ctxgauge/peek.py` fresh-session TypeError crash — CLOSED (code side #24, 2026-09-08) — the `None`-row guard + explicit model-id parse; the v2-schema-migration note rides into #30 (write against the CURRENT schema).
-## 22. worker-proof task spec pointed at `.opencode/plugin/log` — CLOSED (2026-09-08) — doc-only mismatch measured against the real path (`.opencode/plugin.log`); the task file is per-cycle and already superseded.
-## 23. worker prompt carried NO `ctx:` line — CLOSED (planner, 2026-09-09, `kind:"gauge"` evidence) — not a transform-scope issue: the gauge READOUT was failing (23× `shell-missing` + 47× `no-ctx-output` — the v2 call shape rejected by the live BunShell); the root cause (the call shape) fixed in v2.2.2 (#29); the 09-10 cache-discipline correction (#31) superseded the "session-start-only" reading.
-## 24. `peek.py` crash fix + model-id parse (code side of #21) — CLOSED (planner direct fix, 2026-09-08) — fallback to the latest FINISHED message overall + `CTX=0 (0%) REM=<window>` guard; model id from `session.model`'s JSON `id` field.
-## 25. `opencode.jsonc` planner edit-permission pattern still `/tmp/**` — CLOSED (#26, `6523406`, 2026-09-08) — the old planner permission block replaced wholesale (Windows temp path).
-## 26. workers denied on `handover_planner.md` + prompt clause — CLOSED (maintainer call, 2026-09-08, `6523406`) — `permission.edit` deny on all three worker scopes + the prompt clause; closed #15 + #25 with it.
-## 27. v2.2.1 gauge-failure evidence log — CLOSED (planner, 2026-09-09) — the evidence log landed (4-reason vocabulary + `preview`, probe 28/28); the follow-up single opencode start named the branch (`no-ctx-output` + tagged-template preview) → #23/#29.
-## 28. `GAUGE_CMD` constant declared but unused — CLOSED (already removed in the `b8ea40b` cycle, 2026-09-09) — verified against the live file (no such constant; probe 28/28) — the entry had been left open by oversight.
-## 29. Electron → terminal/CLI + system Node; BunShell `input.$` gauge host — CLOSED (planner, 2026-09-09 — proof start performed) — worker + planner prompts carry `ctx:` (43423/36 % + 13837/12 %) with NO plugin.log read; the v1.3-profile measurement is deferred by the no-log constraint → #17; the fire-scope reading was corrected 09-10 (EVERY LLM build — #31).
-## 31. v2.4 per-message injection via `chat.message` (cache-safe append to the last message only) — CLOSED (design + root-cause record, 2026-09-10) — root cause: `experimental.chat.system.transform` fires on EVERY LLM build = prompt-cache invalidation (the 09-09 "session-start-only" reading was a misread); v2.4 = append-only ctx TextPart onto the just-received last message — full record: NAP 09-10 correction + v2.4 blocks; the live fix continued as #32 (v2.4.1).
-## 32. v2.4 part-schema SchemaError = v2.4.1 + v2.5 nudge ladder spec — CLOSED (maintainer restart live-clean, 2026-09-10) — the root cause + design record: the LIVE `chat.message` input carries only `{sessionID, agent, model}` (no `messageID` — proven from the plugin's OWN scoped evidence reads); the v2.5 nudge ladder spec → #33; the target-scope pre-build call lives at section item 3 (NOT dropped).
-## 260908-0951 (NAP-copied dedup block) — DEDUP (2026-09-08) — item 1 (116–117 unreachable) → #4; item 2 (lint 6→8 at `ca61a26`) → #5; item 3 (C-class lines covered as by-products — expected state confirmed) → record only (no open work); item 4 (302–303 unreachable + 707 empty-macro contradiction) → #6 + #7.
+Moved to `todo_records.md` on 2026-09-10 — one-line records, IDs 2, 5, 10, 12, 13, 14, 15,
+16, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32 (+ the 260908-0951 dedup block).
+All those IDs stay reserved — see the numbering rule in the header.
