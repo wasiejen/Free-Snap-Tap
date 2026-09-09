@@ -54,9 +54,8 @@ a rule violation; the planner decides continuation.
    out-of-scope fixes get their own commit(s). Message: one-line imperative subject;
    up to ~3 short body lines if multi-theme. **Do NOT push.**
 
-## Your final message — handover to the planner
-Write your executive summary to the worker-summary file and make your final
-message the same summary:
+## Handover to the planner
+Write your executive summary to the worker-summary file:
 - what changed (files + why, one line each),
 - measured verification (test count, lint count — run them, don't claim),
 - commit hashes of adjcent/autonomous fixes in this session,

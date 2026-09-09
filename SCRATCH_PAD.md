@@ -18,8 +18,7 @@ May be stale; nothing here is required to be maintained.
   - is there a way to offer the agent a better shell?
   - WIP: now need to inform the agents in agents_repo about the change/option
 ## WIP: adapt peek to handle unknown models by only displaying the current context and not % and REM
-## WIP:context gauge injection on worker start reports the data from the planner first
-  - lets include an ignore context gauge info on worker start in the prompt_of the worker
+
 ## WIP: needs compaction: ! Important ! 
   - When the model observes a compaction in its session immediately stop working on task - this supersedes the close up routine. write a brief summary directly as a return to if you are a worker. do not write any files! corruption of context highly likely. end session as fast as possible while delivering a brief summery.
 
@@ -46,9 +45,11 @@ May be stale; nothing here is required to be maintained.
 
 
   
-# OPEN similar - likely same cause
+# OPEN similar - likely same cause - context gauge/nudge mechanism
 
-## delaying receiving of user messages - likely causes by context gauge plugin
+### WIP:context gauge injection on worker start reports the data from the planner first
+  - lets include an ignore context gauge info on worker start in the prompt_of the worker
+### delaying receiving of user messages - likely causes by context gauge plugin
 - just wrong session_id ctx displayer - should be fixed with checking session_id
 - 
 ### first ctx (starting prompt) after planner start was around 28000 token. that is huge. why? was the message send later and thus included the read files instructions?
