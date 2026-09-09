@@ -1,54 +1,79 @@
-# TASK — clear the 6 ruff `F` findings (TODO.md #2) (2026-09-10)
+# TASK — curate TODO.md to goal-oriented entries (maintainer priority, 2026-09-10)
 
-Read `AGENTS.md` + `agents_repo.md` first. Lint-cleanup task, **cosmetic only, zero
-behavior change**.
+Read `AGENTS.md` (TODO.md entry contract + curation rules + approval boundaries),
+`agents_repo.md`, and the NAP (`.opencode/handover_planner.md`) first — the NAP gives you the
+live status of many entries (closed items, the maintainer calls, what's queued next).
 
 ## Goal
-Make the FST lint baseline zero: `& .\.venv\Scripts\ruff.exe check --select F .` currently
-reports exactly **6 findings** (planner-measured this morning) and must end at **0**.
+TODO.md is 487 lines of accumulated cycle history. Curation target: a compact,
+goal-oriented file where **every remaining entry is self-contained enough to be delegated
+by ID alone** (contract: title / problem+evidence / desired outcome — goal not steps /
+acceptance criteria / suggested scope / status + decision-needed flag), organized thematically.
 
-## The 6 findings (verified against the live code today)
-1. `free_snap_tap.py:150` — F541 f-string without placeholders: `logger.info(f"--- FST startet ---")` → drop the `f`.
-2. `free_snap_tap.py:159` — F541 f-string without placeholders: `logger.info(f"--- logic gestartet ---")` → drop the `f`.
-3. `fst_manager.py:8` — F401 unused import `from threading import Event` (the comment
-   "to play aliases…" belongs to the *usage* intent — deleting the import line deletes
-   the comment too; that is fine).
-4. `fst_overlay.py:7` — F401 `QSizePolicy` imported but unused → remove it from the
-   `PySide6.QtWidgets` import list (keep the other names, same order).
-5. `fst_overlay.py:412` — F841 `cube_distance_down = cube_distance + spacing` assigned,
-   never read → delete the line. **Do NOT** "fix" it by using it anywhere — dead stays dead.
-6. `playground/pynput_mouse_probe.py:140` — F841 `key_event_time = data.time` unused →
-   delete the line.
+## Operations
+1. **Close (condense to a one-line close record)**: entries whose resolution already lives in
+   this file — pattern is `## N. ... ` followed somewhere by `CLOSED ...` / `Fixed ...` /
+   `Resolved ...` (planner/maintainer notes) and duplicates: the block after the `## 260908-0951
+   copied from NAP` header is verbatim duplicate content of numbered entries. Closed records =
+   exactly one line: `## N. <title> — CLOSED (<closer/commit/date>) — <one-clause what>`.
+   Known close candidates (verify against the file, don't trust this list): 12, 13, 15, 16, 21
+   (code half closed by #24 — leave the v2-schema note as a pointer into #30), 22, 23, 24, 25,
+   26, 27, 28, 29, 31, 32 (root-cause record), and all `260908-0951` sub-items after dedup.
+   A close line must point at the closer (commit hash where one exists, else date + who).
+2. **Rewrite open entries in place (keep their #id)**: 1, 3, 4, 6, 7, 8, 9, 10 (CLOSE now —
+   fixed inline `ea3d920`: 3×`globalPos()` → `globalPosition().toPoint()`, 434/434, warning
+   gone 13→1; verify by grepping for `globalPos` before closing), 11 (status: maintainer holds —
+   pin `XXX 241016-1101` at `fst_keyboard.py` ≈791 is his find-marker, decision waits on his
+   live test — mark it as HOLDING/DECISION and leave content verbatim), 30 (status: APPROVED by
+   maintainer call this cycle — plan as ONE cycle: node:sqlite gauge landing + peek.py removal
+   + doc purge + v1.3 log-profile re-baseline; see the #30 carry-over arithmetic caveat — keep
+   it).
+3. **New entry #33 — v2.5 auto-nudge ladder build**: fold in the maintainer notes currently at
+   the very TOP of TODO.md (lines 1–6, "addition to plugin tool.message ctx gauge reply" + the
+   <5K note — that block becomes entry #33 and is removed from the top). Contract form, content:
+   per-agent nudge ladder fired from `tool.execute.after` (plugin is agent-independent), rungs
+   50 % (generic) → 70 %/REM 30 k → 80 %/20 k → 90 %/10 k — pct OR REM whichever first, ≤1 nudge
+   per rung per session — plus a FINAL 5 k rung whose text is the verbatim self-gauge
+   `CTX=… REM=… — stop-line reached` requesting further approval; delivered via
+   `client.session.promptAsync` synthetic text part; evidence `kind:"nudge"` lines, silent
+   otherwise. Full design lives in the NAP (v2.4.1/v2.5 blocks + `## Live status`); point there
+   from the entry. Status: APPROVED — next build.
+4. **Structure**: group thematically (e.g. FST behavior decisions / plugin & gauge / docs &
+   misc) or keep numeric order — your call — but add one section at the very top:
+   `## Maintainer calls (open, in order)` — the open decision items in priority order, each
+   one line pointing to its #entry: (1) #33 v2.5 build is NOT a call — approved; (2) #11 held on
+   maintainer's live test (XXX 241016-1101 pin); (3) the deferred FST behavior batch: #1, #7, #8,
+   #9, #4, #6 (post-plugin); (4) #30 approved, scheduled after #33.
+5. **Hard invariants:**
+   - NEVER silently delete open/unresolved content — every original numbered entry (1–32) and
+     both top notes must appear in the change log you produce (below), with outcome
+     CLOSED | DEDUP-INTO | KEPT.
+   - Entry IDs 1–33 never reused, only entries are created as #33 — no other new entries.
+   - Decision-needed statuses must survive verbatim in meaning (an open maintainer call may
+     not be silently dropped into a close record).
+   - Target ≤ 300 lines from 487 — NEVER at the cost of an invariant above.
+   - ONLY TODO.md + your summary file are touched. No code, no plugin, no handover_planner.md,
+     no AGENTS.md/agents_repo.md, no tests to run (say so in the summary).
 
-## Definition of done (what "pass" means)
-1. `& .\.venv\Scripts\ruff.exe check --select F .` → clean (exit 0, zero findings).
-2. `& .\.venv\Scripts\python.exe -m pytest -q` → **all green** (measure and report your
-   before-run count; the after-run count must equal it — record both in the summary).
-3. Diff scope = only the 6 finding sites in the 3+1 files listed above. No reformatting,
-   no drive-by fixes, no other lint categories.
+## Definition of done
+1. `git diff --stat` (before commit) shows exactly `TODO.md` + `.opencode/handover_task_to_planner.md`.
+2. Line count 487 → ≤ 300 (report both).
+3. Every remaining numbered entry has the six contract fields (title / evidence / outcome /
+   acceptance / scope / status).
+4. `## Maintainer calls (open, in order)` section present at top.
+5. Committed: `docs: curate TODO.md to goal-oriented entries` (TODO.md + summary file).
 
 ## Approval boundary
-Pre-approved class (lint fixes / dead-code removal, no observable behavior change).
-Do **NOT** touch: `handover_planner.md`, `AGENTS.md`, `agents_repo.md`, the plugin
-(`.opencode/plugin/`), tests, `FSTconfig.txt`/`FSTconfig_test.txt`, anything else in the
-repo. If a site turns out NOT to be purely cosmetic (a symbol turns out referenced),
-STOP that site, keep the rest, and flag it in the summary — do not force it.
-
-## Suggested scope (non-binding)
-`free_snap_tap.py`, `fst_manager.py`, `fst_overlay.py`, `playground/pynput_mouse_probe.py`.
-
-## Verification commands (from repo root)
-- `& .\.venv\Scripts\ruff.exe check --select F .`
-- `& .\.venv\Scripts\python.exe -m pytest -q`
-
-## Commit routine
-One commit covering: the code changes + the `TODO.md` entry #2 marked CLOSED with the
-commit hash + this task's worker summary file. Do NOT touch `.opencode/handover_task.md`
-(it is planner-owned). Commit subject: one-line imperative, e.g.
-`fix: clear the 6 ruff F findings (TODO #2)`.
+Pre-approved (meta-file curation, zero behavior change). If you find an entry whose status you
+cannot determine from the file + NAP, KEEP it fully intact and flag it in the summary — do not
+guess-close.
 
 ## Return
-Write the EXECUTIVE SUMMARY to `.opencode/handover_task_to_planner.md` (changes made per
-file, ruff findings before/after, pytest count before/after, commit hash, anything flagged
-as non-cosmetic, what was deliberately not done). The file you return ends that work —
-this is a first test of the new worker prompt, so keep the summary tight and factual.
+EXECUTIVE SUMMARY to `.opencode/handover_task_to_planner.md`: before/after line counts, the
+FULL change log (every entry 1–32 + the two top notes → outcome), what was deliberately not
+closed and why, and the guard below.
+**Guard:** this file currently holds the previous task's summary (including the maintainer's
+format-test header at its top). If the working-tree file differs from `git HEAD` (uncommitted
+maintainer content — check with `git status .opencode/handover_task_to_planner.md` before you
+write), preserve that uncommitted content VERBATIM at the very top of the file, above your new
+summary.

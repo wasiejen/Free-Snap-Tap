@@ -27,10 +27,50 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
   (`.opencode/agent_feedback.md`, added by `ff86d9b`); the worker looked at the repo root
   because BOTH prompt templates reference it without a path. Fix: name the full path in
   both prompts.
-- `SCRATCH_PAD.md` dirty (+25 lines, maintainer scratch) — worker correctly left it
-  uncommitted; it is not part of any agent commit.
-- Open MAINTAINER CALLS unchanged (1–4 in the block below); next action stays **build v2.5**
-  on call 4 (lean: option a) or on instruction.
+- `SCRATCH_PAD.md` dirty (maintainer scratch) — workers correctly leave it uncommitted; it
+  is not part of any agent commit.
+- Maintainer prompt-test edits landed `707fadd` + `d916e28` (agent_feedback.md path pin in
+  both prompts, hash-comment fix, opencode.jsonc permission/path/line-end fixes) + an
+  uncommitted format test in the worker-summary file — the curation worker's guard preserved
+  that uncommitted block verbatim (worked as specified).
+
+## 2026-09-10 — maintainer rulings (all four calls answered) + TODO curation landed
+
+- **Call 4 RESOLVED:** (a) approved as the cheap readout mechanic — BUT the intent is that
+  the nudge reaches **each agent**: fired from `tool.execute.after`, rungs **50 %** (generic
+  info) → **70 % / REM 30 k** → **80 % / 20 k** → **90 % / 10 k** (pct OR REM, whichever first,
+  ≤1 per rung per session) → **FINAL 5 k rung**, text = the verbatim self-gauge
+  `CTX=… REM=… — stop-line reached`, requesting further approval. Design consequence: the
+  nudge READ must be able to target the session that is acting (blind spot of the
+  single-newest-session readout is not acceptable for an ACTION — display reads stay
+  single-read, reminder-not-control caveat accepted). Exact mechanic (session-id readout vs
+  per-session read) = build-worker's call under the invariant "every acting session can be
+  read at its own nudge point."
+- **Call 2:** #11 held — maintainer tests it live first; the existing `XXX 241016-1101` pin
+  at `fst_keyboard.py` ≈791 is his find-marker — do NOT reword or touch until his decision.
+  Remaining FST batch stays post-plugin (#1, #7, #8, #9, #4+#6).
+- **Call 1:** maintainer asked what it means — answered in-session: it is the one scoped
+  ONE-SHOT READ of the retained `plugin.log` segment (expect the three now-silent types at 0
+  + ≈79 % line cut) — NOT the standing no-parse rule (that stays). Default remains: SKIP.
+  Alternative floated by him — deactivating the plugin entirely when no longer needed — is
+  parked for AFTER v2.5 + #33/#30 have landed and proven (the evidence channel still lives
+  there).
+- **Call 3 APPROVED:** #30 de-peek (node:sqlite gauge in handover.ts) — ONE cycle: landing +
+  peek.py removal + doc purge + v1.3 log-profile re-baseline. Scheduled AFTER #33 (v2.5).
+- **#10 closed inline (`ea3d920`):** 3× `QMouseEvent.globalPos()` →
+  `globalPosition().toPoint()` (StatusOverlay: drag-offset / drag-move / context-menu exec);
+  434/434; deprecation warning gone (suite 13 → 1 warnings).
+- **TODO.md curated (`51ca20d`): 487 → 252 lines.** New layout: numbering header →
+  `## Maintainer calls (open, in order)` → thematic open entries in contract form
+  (FST decisions #1/#7/#8/#9/#4/#6/#11; docs #3; plugin & gauge #17/#30 + **new #33 = v2.5
+  nudge ladder build**) → 21 one-line close records. Worker flags (in its summary): kept
+  #17 + the then-open call-4 item as live calls despite the spec's omission — CORRECT per
+  the no-silent-drop rule; closed beyond the candidate list with in-file evidence
+  (#2/#5/#14/#18/#19/#20/#22). NOTE: the calls-section item 3 (call-4 scope) is now
+  RESOLVED by this rulings block — it is superseded, not re-asked; the #33 entry + this
+  block are the build spec.
+
+## MAINTAINER CALLS (state 2026-09-10 — ALL RESOLVED by the rulings block above; text kept as history)
 
 ## Current state (2026-09-09 — v2.2.2 PROOF START SATISFIED: worker + planner both carry the ctx: line)
 
@@ -163,13 +203,18 @@ directly), `TODO.md`, and this file. House rule: when something is unclear, ASK 
 5. [DONE, 2026-09-10] v2.4 proof start + SchemaError repair (v2.4.1) — live-clean by
    maintainer restart (see the v2.4.1 block above); offline probe 3/3 cases + zero new
    SchemaError lines.
-6. [ACTION] **Build v2.5 auto-nudge ladder** (approved spec in the v2.4.1 block + TODO #32):
-   `tool.execute.after`-gated `promptAsync` synthetic nudges, ladder 50 % → 70 %/30k →
-   80 %/20k → 90 %/10k, per-session ladder, rate-limited readouts, `kind:"nudge"` evidence
-   lines (silent otherwise — the log-growth discipline from the v1.x skip set applies).
-   BLOCKED ON MAINTAINER CALL 4 (nudge target scope a/b) — start on the call, or (a) if told
-   to. Probe: extend the bun probe (fake client + fake shell), then one maintainer restart +
-   a forced high-readout scenario to watch the first nudge land.
+6. [NOW — UNBLOCKED 09-10] **Build v2.5 auto-nudge ladder = TODO #33** (rulings block + v2.4.1
+   block + TODO #33 = the spec): `tool.execute.after`-gated `promptAsync` synthetic nudges,
+   per-session ladder 50 % → 70 %/30k → 80 %/20k → 90 %/10k → **final 5 k rung, text `CTX=…
+   REM=… — stop-line reached`** requesting approval, read must reach EVERY acting session,
+   rate-limited readouts, `kind:"nudge"` evidence lines (silent otherwise — the log-growth
+   discipline from the v1.x skip set applies). Probe: extend the bun probe (fake client +
+   fake shell), then one maintainer restart + a forced high-readout scenario to watch the
+   first nudge land.
+7. [AFTER #33] **#30 de-peek cycle (APPROVED, one cycle):** node:sqlite gauge in
+   handover.ts + peek.py removal + doc purge + v1.3 log-profile re-baseline (Call 1's
+   one-shot read folds into this cycle's measurement if the maintainer wants it — default
+   still skip).
 
 ## Context budget
 Per AGENTS.md: `& .\.venv\Scripts\python.exe .opencode\ctxgauge\peek.py` (from repo root); stop
