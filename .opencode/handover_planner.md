@@ -3,6 +3,35 @@
 FIRST read `AGENTS.md` (orientation, conventions, commit routine — do NOT edit AGENTS.md
 directly), `TODO.md`, and this file. House rule: when something is unclear, ASK EARLY.
 
+## Cycle start 2026-09-10 — first planner session under the new prompts (ff86d9b)
+
+- The new agent-prompt reorg is LIVE (planner prompt + `prompt_agent_task.md` + `AGENTS.md`
+  split into repo-agnostic / `agents_repo.md` + `.opencode/agent_feedback.md` optional
+  friction file — all `ff86d9b`). THIS session is the planner side of the first test; the
+  worker side was tested by delegating TODO #2 (see below).
+- **TODO #2 CLOSED (`cdbbdcd`, verified by planner):** ruff F baseline is now **0 findings**;
+  suite **434→434** (13 warnings, same profile — the `globalPos` refs at TODO #10 shifted
+  535/549 → 535/547 by the deleted lines, baseline intact). Lint baseline home = this file:
+  **ruff F = 0 (2026-09-10)**.
+- **Worker flags from the first prompt-test cycle** (spec-template fixes, each a one-liner
+  for the maintainer; recorded 2026-09-10):
+  a) *Self-hash chicken-egg:* the spec asked TODO #2 "CLOSED with the commit hash" inside
+  the same commit — impossible (a commit can't contain its own hash). Worker resolved per
+  repo precedent (#13/#28): closed in-tree with a self-reference, hash known from `git log`.
+  Template fix: say so explicitly (or mandate the two-commit variant).
+  b) *DoD tension:* goal (0 findings) vs suggested scope (the 6 sites) conflicted when the
+  instructed deletion cascaded (`fst_overlay.py`: removing `cube_distance_down` also deaded
+  `cube_distance`; diff was 7 lines). Worker resolved goal-first — correct. Template fix:
+  make explicit the goal (clean baseline) outranks the site list.
+  c) *`agent_feedback.md` path:* worker reported the file "doesn't exist" — it does
+  (`.opencode/agent_feedback.md`, added by `ff86d9b`); the worker looked at the repo root
+  because BOTH prompt templates reference it without a path. Fix: name the full path in
+  both prompts.
+- `SCRATCH_PAD.md` dirty (+25 lines, maintainer scratch) — worker correctly left it
+  uncommitted; it is not part of any agent commit.
+- Open MAINTAINER CALLS unchanged (1–4 in the block below); next action stays **build v2.5**
+  on call 4 (lean: option a) or on instruction.
+
 ## Current state (2026-09-09 — v2.2.2 PROOF START SATISFIED: worker + planner both carry the ctx: line)
 
 - **Proof start (the v2.2.2 opencode restart) is SATISFIED by PROMPT EVIDENCE — no log read
