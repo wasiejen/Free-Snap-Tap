@@ -25,6 +25,13 @@ clean up the f-strings) — none may change program behavior. Keep the suite gre
 List: free_snap_tap 2×F541 (f-strings), fst_manager F401 (`threading.Event` import),
 fst_overlay F401 (`QSizePolicy`) + F841 (`cube_distance_down`), playground/pynput_mouse_probe F841.
 
+CLOSED (worker, 2026-09-10): all six sites removed in the commit carrying this note
+(self-hash not recordable in-tree — chicken-egg; see `git log` / worker summary). Cascade:
+the instructed delete of #5 left `cube_distance` dead too (its only live reader was the
+removed `cube_distance_down` assignment; all other references are commented-out painter
+lines), so that line went in the same commit — spec's "dead stays dead". Verified:
+`ruff check --select F .` 6→0 clean (exit 0); pytest 434→434 passed, 13 warnings unchanged.
+
 ## 3. Rework README and WIKI to the current state of the code (2026-09-06)
 
 Full gap matrix + decisions made 2026-09-06 in `SPEC_FEATURES.md` sections 2–4.

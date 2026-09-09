@@ -4,7 +4,7 @@ last updated: 250724-1434
 '''
 
 import sys
-from PySide6.QtWidgets import QSizePolicy, QWidget, QApplication, QMenu, QSystemTrayIcon, QLabel, QVBoxLayout, QFrame
+from PySide6.QtWidgets import QWidget, QApplication, QMenu, QSystemTrayIcon, QLabel, QVBoxLayout, QFrame
 from PySide6.QtCore import QObject, Qt, qInstallMessageHandler, Signal, QTimer
 from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont
 
@@ -408,8 +408,6 @@ class CrosshairOverlay(QWidget):
         spacing = 1
         outer_radius = (self.crosshair_size - padding) // 2
         inner_radius = outer_radius // 2 + spacing
-        cube_distance = self.crosshair_size // 20 + spacing
-        cube_distance_down = cube_distance + spacing
         
         shadow_pen = QPen(QColor(0,0,0))
         shadow = 2

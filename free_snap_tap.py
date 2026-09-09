@@ -147,7 +147,7 @@ class MainLogic:
 
 
 if __name__ == "__main__":
-    logger.info(f"--- FST startet ---")
+    logger.info("--- FST startet ---")
 
     set_console_visibility(False)  # Hide console window at startup
 
@@ -156,7 +156,7 @@ if __name__ == "__main__":
     fst_keyboard.update_args_and_groups(startup=True)
 
     logic = MainLogic(fst_keyboard)
-    logger.info(f"--- logic gestartet ---")
+    logger.info("--- logic gestartet ---")
     # waiting for the rest of the program to finish loading
     sleep(0.5)
 

@@ -137,7 +137,6 @@ def mouse_win32_event_filter(msg, data):
 
 
     vk_code = get_mouse_vk_code()
-    key_event_time = data.time
     is_keydown = is_press(msg)
 
     print(f"{vk_code} : {is_keydown}")
