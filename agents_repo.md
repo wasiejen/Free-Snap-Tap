@@ -18,13 +18,38 @@ flagged by anti-cheat. **Windows only** — pynput selective suppression is not
 available on Linux; macOS not supported.
 
 ## Environment & shell
-- The agent runs on **Windows** with a **PowerShell (pwsh)** shell. **Heredocs do
-  not exist in PowerShell** — `<<EOF` / `cat > file <<EOF` will NOT parse; never
-  emit them. Write multi-line content with the file tools (or `Set-Content`),
-  then edit the file.
-- Python **3.12** (CI-pinned; CI runs on `windows-latest`).
-- **Environment Variable FST** is the repo root "C:\Users\Wasiejen\Projects\OpenCodeProjects\Free-Snap-Tap\Free-Snap-Tap" 
-  - use it. e.g. Powershell: ${env:FST}
+The `bash` tool = **PowerShell (pwsh 7.6)** — NOT git-bash. Default = pwsh
+(pytest/ruff/git, exe invocation, scalar values); git-bash only for true unix
+pipes / grep / heredocs.
+- NEVER unix idioms at pwsh level: `ls -la`, `uname`, `grep x f`, `cat > f <<EOF`,
+  GNU flags. Aliases `ls`/`rm`/`cp`/`mv` are cmdlets (their flags fail);
+  `<<EOF` never parses — here-strings are the only heredoc.
+- **Invoke**: `& "path with spaces\exe" args`; chain `a && b` (7+), `;` ignores
+  status; FS/cmdlets/params case-insensitive.
+- **Vars**: `$v='x'`; `"$v"` interpolates; single quotes verbatim; `"don''t"`.
+- **Output**: prefer scalars — `$PWD`, `(Get-Item x).Name`,
+  `Get-ChildItem <dir> -File -Name` (`-File`: files only, without it `-Name`
+  also lists dirs). Table output (default `gci`, bare `Get-Location`) bakes
+  ANSI codes into captured text — `$env:NO_COLOR='1'` won't stop it.
+- **Writes**: file tools only — no `>` / `Set-Content` except stdin piping.
+- **Timeout**: tool default 120s — pass `timeout` (ms) for heavy ops.
+- **Python**: bare `python` on PATH = 3.14, NO repo deps (fake-starts, then
+  import-fails). Always `& .\.venv\Scripts\python.exe` (same for `ruff.exe`).
+- **Env var**: `FST` = repo root **with trailing `\`** — `${env:FST}tests`
+  composes.
+- **git-bash**: `bash -c 'uname -a; ls -la'` (single quotes safe in pwsh;
+  `bash.exe` on PATH); heredoc = pipe a QUOTED here-string —
+  `@'
+    cat <<EOF
+    body
+    EOF
+  '@ | bash`
+  NEVER use EXPANDABLE `@"..."@` for bash scripts — pwsh expands `$var` FIRST,
+  silently emptying bash vars. Inherits cwd (`workdir` applies).
+- **Paths from bash**: its `pwd` prints `/c/Users/...` — NEVER paste into pwsh.
+  Windows form: `bash -c 'pwd -W'` — it prints **slashes** (`C:/Users/x`, valid
+  Windows path; don't expect `C:\`); or translate `/c/Users/x` → `C:\Users\x`;
+  pwsh 7.6 has no `ConvertTo-Path`.
 
 ## Safety limits (repo-specific)
 - **Never run the live listeners in tests.** Always mock pynput controllers
