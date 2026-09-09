@@ -64,6 +64,7 @@ message the same summary:
 - anything deliberately NOT done (maintainer calls),
 - deviations from the suggested procedure + opportunistic fixes,
 - verbatim self-gauge line.
+The `handover_task_to_planner.md` contains your latest summary only.
 Keep it tight — the planner reads it into context. Then stop. No new work, no
 planning, no delegation.
 
