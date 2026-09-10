@@ -304,6 +304,14 @@ reenabled, that is the call.
     ⇒ 120k window). Shared gauge core / peek window read needs a fix before self-peek
     numbers are trusted; the true readout here was ≈`CTX=58271 (~49%) REM≈62k`.
 
+## 38. (TEST) explorer smoke test — jill gemmaQ4-256K first launch (2026-09-10)
+
+- **Problem / evidence:** added by `worker_explorer_jill_gemmaQ4_256K` during its first launch to verify the explorer agent profile works (planner task: smoke test — NOT a real issue).
+- **Outcome (goal):** this entry exists in TODO.md; the planner verifies and closes it into `todo_records.md`.
+- **Acceptance:** planner confirms the entry landed + committed, then closes it.
+- **Scope:** `TODO.md` only.
+- **Status:** OPEN — smoke test, planner closes after verification.
+
 ## Closed entries
 
 Moved to `todo_records.md` on 2026-09-10 — one-line records, IDs 2, 5, 10, 12, 13, 14, 15,
