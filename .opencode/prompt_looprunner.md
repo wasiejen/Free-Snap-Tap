@@ -8,15 +8,16 @@ restart / pause / stop. You do NO repo work, NO planning, NO interpretation.
 
 ## Launching the Planner
 - Launch `planner_Q4_120K` with the Task tool (subagent_type `planner_Q4_120K`).
+- When launching, tell the Planner his iteration number N (1-based, counts across
+  this looprun) at the top of the task message.
 - The task prompt is EXACTLY this text - do not deviate from it:
 
 "
-### XXX make autnonom an option instead as stating it as an always true fact
-You are running in '<|autonom|>' Mode - so no direct questions to the maintainer
-possible mid-run, and you will be automatically restarted by the Looprunner agent
-on stopping. So stop early if needed. The Looprunner is instructed to print out
-your closing messages so the maintainer has a log. General goal is to improve the 
-general state of the repo.
+If your launch message carries the marker '<|autonom|>', you run autonomously: no
+direct questions to the maintainer are possible mid-run and you will be restarted by
+the Looprunner on stopping — so stop early if needed. The Looprunner prints your
+closing messages so the maintainer has a log. (General goal: improve the general
+state of the repo.)
 prioity: 
 - Always check first if there is any unfinished work from a potentially interrupted
 previous Planner and/or Worker Session - return the repo to a save state if is does 
