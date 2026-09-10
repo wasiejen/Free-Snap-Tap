@@ -39,6 +39,23 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   the raw `<task_result>` dump after the worker's commit — restored to the
   committed summary; flag for the maintainer (the result channel and the
   handover file collide on the same path).
+- **Audit 3a LANDED + planner-verified (`66d2cd6`):** explorer
+  `worker_explorer_Q3_120K_mtp` via the Task tool (strict tests/-only spec).
+  Findings: **TODO #42** (multi-notch wheel-delta gap — planner-verified against
+  `fst_keyboard.py:457/459` equality gates; lead (b) confirmed) + **TODO #43**
+  (`kb_env` fixture copy-pasted across 6 files with drifted helpers —
+  planner-verified: `kb_env` in exactly 6 files, per-file `build`/`down`
+  variants). Leads (a) → #41 evidence byte-accurate, (c) → #1 pin confirmed —
+  both left untouched (no duplicates). Hot-path gap map: all 7 targets
+  exercised; zero xfail; only 2 intentional live-config skips. Verification:
+  pytest 434/434 + ruff F=0 (planner re-ran). The explorer's final gauge line
+  (108697/90%) cross-checked via the NEW per-session read: real last-step
+  = 109403 (91%) — genuine (the ~706 offset = its own final summary
+  generation), not a fabrication. Honest deviations recorded: 16/24 test
+  files not read end-to-end (budget 82%) mitigated by a suite-wide pattern
+  sweep + the hot-path grep map — a follow-up skim of those 16 is cheap
+  insurance (fold into 3b or a later run); its spec line counts were stale
+  (miscounted) but the two-pass rule held.
 - TODO housekeeping: numbering header bumped to "start at #42"; #39 closed;
   #40 endpoint-cap call reduced to a low-priority config rename (the maintainer
   swapped the explorer to Q3 — the 256K-named gemma endpoint is no longer used
@@ -171,25 +188,29 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
    evidence lines in `.opencode/plugin.log` + a nudge reaching a high-context
    session; the maintainer's "observe the nudge mechanism" task covers this).
 3. **Finish the audit (standing goal) — SPLIT scope, one small session each
-   (3a IN PROGRESS in session 4 — explorer `worker_explorer_Q3_120K_mtp` via the
-   Task tool, spec = tests/ smell check only, strict scope per the maintainer's
-   context caution; IDs from #42; VERIFY its work — the Q3 explorer is fast but
-   less stable):**
-   (a) `tests/` smell check ONLY (xfails/pins/dup helpers/gaps in the filter paths —
-   spec v2 in `handover_task.md` is still the right shape, shrink the scope to
-   `tests/`; known leads: the plural-mock hiding at `conftest.py:69` +
-   `test_output_manager.py:534` belongs to #41; multi-notch scroll coverage gap
-   (single-notch only) was noted by the dead worker);
+   (3a DONE in session 4 — see (a); the Q3 explorer worked well under the
+   strict scope + gauge discipline; ALWAYS verify its work — the Q3 explorer is
+   fast but less stable):**
+  (a) ~~`tests/` smell check ONLY~~ — **DONE (session 4, `66d2cd6`):** #42 + #43
+       landed, leads (a)/(c) confirmed + extended-into #41/#1 only, hot-path gap
+       map complete, verification green. Residual: a skim pass over the 16 test
+       files the explorer budget-skipped (cheap insurance — fold into 3b).
    (b) the `apply_focus_groups` focus-dict access + the CONSTANTS
-   control-combination candidates the dead worker was checking when it died.
-   Worker choice: `worker_Q4_120K` via CLI (Task tool is depth-blocked — see the
-   session-3 mechanic note); instruct: checkpoint EVERY verified finding to TODO.md
-   IMMEDIATELY (IDs from #42), gauge-check every ~2 reads.
+    control-combination candidates the dead worker was checking when it died.
+    Worker choice: the explorer (`worker_explorer_Q3_120K_mtp`) or
+    `worker_Q4_120K` via the **Task tool** (the session-3 CLI mechanic is
+    DEPRECATED — subagent_depth 2 works); strict scope: hot-path windows only,
+    findings checkpointed to TODO.md IMMEDIATELY (IDs from **#44**), gauge-check
+    every ~2 reads.
 4. **Maintainer calls accumulated (bundle ≤3):** #41 fix approval (recommended:
-   singular call at `fst_manager.py:578` + 2 test refs); #40 endpoint-cap fact
-   (128k endpoint behind the "256K" agent name — rename/config/scope rule);
-   `subagent_depth: 2` suggestion (Task tool depth-blocked for the planner, see
-   session-3 mechanic note — closing message carries it too).
+    singular call at `fst_manager.py:578` + 2 test refs); #40 endpoint-cap
+    residual (reduced: rename/remove the 128k-capped "256K"-named gemma agent —
+    LOW priority, the explorer no longer uses it); `subagent_depth: 2` is
+    **APPLIED** (session 4 — the Task tool works; the CLI mechanic is
+    DEPRECATED). New post-build observation duty: after the next restart,
+    confirm the first `kind:"nudge"` evidence line in `.opencode/plugin.log`
+    (the #30/#31 production evidence — the maintainer's own nudge-observation
+    task covers it).
 5. #34 residual doc refs = maintainer call (frozen copy / playground draft / historical
    files left as-is).
 6. Delegation sizing lessons: (a) the 27B Q4 worker needs >40 min for a build of this
@@ -199,12 +220,21 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
    audit scope per session AND require immediate findings checkpointing (both session-3
    worker runs died/were lost; #40 + this block carry the evidence).
 - Note (session 3): **#39 APPLIED** (maintainer applied the v2 proposal — prompt +
-  permissions verified); smoke-test cycle = this loop; close #39 once the first
-  restart-after-action-line runs clean. The audit goal now lives in NEXT item 3 (SPLIT
-  scope).
+   permissions verified); smoke-test cycle = this loop. **#39 CLOSED in session 4**
+   (clean restart verified). The audit goal lives in NEXT item 3 (SPLIT scope).
+ - Session-4 delegation lessons: (a) the **Task tool result channel OVERWRITES
+   `handover_task_to_planner.md`** with the raw `<task_result>` dump AFTER the
+   worker's commit — restore the committed summary with `git checkout --` after
+   every Task-tool run (happened twice: #33 worker + 3a explorer); (b) the
+   per-session gauge read (`readGauge(path, sessionID)`) makes a worker's final
+   gauge line CROSS-CHECKABLE from the planner (used on the 3a run — the claimed
+   line was genuine).
 
 ## Standing
-- Suite 434/434, ruff F=0 (post-#37 baseline: the probe is now 45/45).
+- Suite 434/434, ruff F=0. Probe baseline is now **52/52** (post-#33 v2.6 nudge
+  ladder, session 4 `70434c8`: the original 45 baseline checks intact + the new
+  S8 ladder checks; the retired check-id accounts for the id-max 53 / count-52
+  arithmetic slip in the worker's summary).
 - `opencode.jsonc` shows uncommitted in every session BY DESIGN (maintainer iterates
   the agent config live) — never stage/commit it, never flag it as a discrepancy.
   NOTE: maintainer commit `86077bc` ("Looprunner and explorer agent creating and
