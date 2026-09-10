@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #44, new
-entries start at #45 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #46, new
+entries start at #47 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -169,6 +169,73 @@ reenabled, that is the call.
   diff; suite unaffected.
 - **Scope:** `README.md`, the WIKI pages, `SPEC_FEATURES.md` (source of the decisions).
 - **Status:** OPEN — default-approved docs work (NOT a maintainer call — just gets done).
+- **Status tail:** LANDED (2026-09-10) — all 15 fix-list items reworded per the
+  2026-09-06 decisions, each verified against the current code before rewording (per-item
+  evidence in `.opencode/handover_task_to_planner.md`): §2.1 WIKI [Tap_Groups]
+  "key_event notation ... interpreted as Keys" → plain key strings only, a `|` delay or
+  sign raises at group init (`fst_keyboard.py:273-281`); §2.2 README #5 per-key delays in
+  Tap Groups → only global `-tapdelay=`/`-nodelay` apply; §2.3 WIKI sequence `|(name)`
+  "interrupts the currently played key sequence" → counter reset only, in-flight playback
+  NOT interrupted (`fst_keyboard.py:996-1012`, interrupt call commented out); §2.4 WIKI
+  status indicator "only default argument" → usable per-focus (`fst_manager.py:928-933,
+  1424-1430`, overlay polls `fst_overlay.py:153-158`), the GUI-loop start is the
+  default-only part (`free_snap_tap.py:172-203`); §2.5 WIKI crosshair "only works if
+  Status Indicator is used" → GUI loop also starts with `-tray_icon` alone and the tray
+  menu toggles the crosshair (`fst_overlay.py:340`); §4 #5 WIKI "played async ... own
+  thread" → asyncio tasks, interruptible/non-blocking (`fst_keyboard.py:851-868`); §4 #6
+  `|(name)` documented per-type in WIKI [Macros] / [Macro_Sequences] / [Reset of
+  Sequences and Interrupt of Macro] (macro name interrupts started playback, sequence
+  name resets counter only, unknown name silent no-op — `fst_manager.py:643-693`); §4 #7
+  `|reset('name')` on a non-sequence prints "No Macro Sequence ... reset failed" and is a
+  no-op (`fst_keyboard.py:1012`) — documented; §4 #9 `dc()` sign carries no meaning +
+  9999 sentinel — documented (`fst_manager.py:275-288`); §4 #10 `p()` evaluated after the
+  current event updated real state, sign ignored — documented (`fst_keyboard.py:611`,
+  `fst_manager.py:244-246`); §4 #11 invocations work at trigger/constraint placement too,
+  left-to-right short-circuit — documented (`fst_manager.py:103-104`,
+  `fst_keyboard.py:561`); §4 #12 README title "Macros (Aliases)" → "Macros, Aliases",
+  "Python 3.6 or higher" → "Python 3.12" (venv 3.12.9), typos "Repetiton" / "interrupt
+  inself" fixed, README `|(!)` comment reasoning fixed to left-to-right short-circuit
+  (observable "original key not suppressed" claim kept — matches code), README V1.1.3 →
+  V1.2.0 (WIKI header already 1.2.0; the WIKI "updated to V1.1.3" section markers kept
+  as history); §4 #13 a None/empty ke has NO default delay (pure timing marker) —
+  "###XXX up for debate" note removed (`fst_manager.py:134-138`); §4 #14 rebind matched
+  but replacement constraints fail → original suppressed + nothing sent, pass-through
+  pattern `a|(p("shift")) : b`, signed key on right side of a Key rebind reinterpreted as
+  a plain Key (`fst_keyboard.py:295-304, 649-658`), keys inside `p(...)`-style evals must
+  be quoted strings — documented; §4 #15 case-sensitive substring focus matching —
+  ALREADY documented in WIKI (the "focus app name" bullet), verified against
+  `fst_tasks.py:96`, no change needed. Gate measured: `pytest -q` = 434 passed,
+  `ruff check --select F .` = 0 findings, `git diff` scope = allowed files only.
+  ANOMALY: WIKI.md was untracked (`wiki.md` entry in .gitignore, removed outside this
+  task — the .gitignore edit is NOT committed here); WIKI.md added as a new tracked
+  file in the commit. One pre-existing order-dependent flake
+  (`test_crossover_not_taken_on_low_roll`) failed once in the first full run — green on
+  re-run and in isolation, code untouched by this task.
+  RESIDUAL: §3 undocumented-features documentation (variable system,
+  typing/toast/mouse/clipboard/file invocations, extra start args, numpad debug combos)
+  remains a separate, larger docs task — candidate for a new entry. Entry NOT closed.
+
+## 46. Flaky test: `test_crossover_not_taken_on_low_roll` — timing/order-dependent (2026-09-10)
+
+- **Problem / evidence:** during the #3 docs rework the first full `pytest -q` run
+  failed exactly ONE test, `tests/test_output_manager.py::TestCrossover::test_crossover_not_taken_on_low_roll`
+  (433 passed, 1 failed); the immediate re-run of the FULL suite was green (434 passed)
+  and the test passes in isolation. The test monkeypatches `randint` (probability roll
+  `0` → no crossover; delay roll `5` ms), fires `send_keys_for_tap_group`, then asserts
+  the exact release/press order after a fixed `await asyncio.sleep(0.02)` — i.e. it
+  races the 5 ms `asyncio.sleep` inside the scheduled coroutine against a 20 ms wall-clock
+  window, which can be lost on a loaded machine or when scheduling is delayed by
+  preceding tests. Docs-only task, no code touched — pre-existing instability.
+- **Outcome (goal):** the crossover tests are deterministic — no dependence on
+  wall-clock timing or test order.
+- **Acceptance:** the test passes under repeated full-suite runs (e.g. 10 consecutive
+  `pytest -q`) without flaking; no behavior change in `send_keys_for_tap_group`.
+- **Scope (non-exhaustive):** `tests/test_output_manager.py::TestCrossover` (replace the
+  fixed `asyncio.sleep(0.02)` with an event-driven wait — e.g. poll the mock's
+  `method_calls` until both calls are recorded, bounded by a timeout); `fst_manager.py`
+  only if a deterministic seam is added for the scheduled task.
+- **Status:** OPEN — pre-approved (test-only, no observable behavior change); found
+  during #3 (2026-09-10).
 
 ## 45. (closed 2026-09-10) Doc errors found adjacent to the #3 rework: WIKI invocation "evaluate to False" claim, WIKI `+a, +b` rebind notation, README "he first" (2026-09-10)
 

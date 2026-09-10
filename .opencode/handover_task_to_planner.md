@@ -1,88 +1,98 @@
-# Worker summary — #43: consolidate the kb_env fixtures + shared helpers into ONE location
+# Worker summary — TODO #3: README + WIKI rework to current code state (2026-09-10)
 
-## What changed
-- **NEW `tests/kb_helpers.py`** — plain functions `build`, `down`, `up`,
-  `hold_keys`, `mock_control_handlers`, each a byte-identical move of the current
-  implementations (the three `build` copies were already identical; only
-  `unittest.mock.MagicMock` needed importing for `mock_control_handlers`).
-- **`tests/conftest.py`** — added `from fst_keyboard import FST_Keyboard` (same
-  `noqa: E402` style as the neighboring imports) and the THREE fixture variants,
-  each a verbatim body move with a docstring recording its shape:
-  - `kb_env_ns` (shape A): yields `SimpleNamespace(kb, kb_mock, mouse_mock)`,
-    `_listener` mocked, arg flags pre-set `WIN32_FILTER_PAUSED/ACT_DELAY/
-    ACT_CROSSOVER=False`, NO `_mouse_listener`. Was in
-    `test_filter_behavior.py` + `test_extraction_filter_edges.py`.
-  - `kb_env_mouse` (shape B): yields the raw `keyboard`, `_listener` AND
-    `_mouse_listener` mocked, same three arg flags pre-set. Was in
-    `test_filter_simulated.py`.
-  - `kb_env_plain` (shape C): yields the raw `keyboard`, `_listener` +
-    `_mouse_listener` mocked, NO arg flags. Was in `test_control_actions.py`,
-    `test_macro_playback_kbd.py`, `test_facade_wiring.py`.
-  - Untouched, as required: `FakeFST`, `restore_constants`, `fake_fst`,
-    `mock_pynput_controllers`.
-- **The six test files** — deleted the local `def kb_env` + local helper copies
-  (`build`/`down`/`up`/`hold_keys`/`mock_control_handlers` per file), re-bound
-  every test signature + body reference to the new conftest fixture name
-  (`kb_env` → `kb_env_ns` / `kb_env_mouse` / `kb_env_plain`), and removed the
-  imports the local fixture had made necessary (per file: `pytest` —
-  test_filter_simulated + test_control_actions; `FST_Keyboard` — test_filter_
-  simulated, test_control_actions, test_macro_playback_kbd, test_facade_wiring;
-  `MagicMock` — test_macro_playback_kbd, test_facade_wiring; `SimpleNamespace` —
-  test_extraction_filter_edges). `tests/test_facade_wiring.py::facade_kb`
-  (a fixture, kept in the file) now takes `kb_env_plain`.
+Worker: worker_Q4_120K (docs task per `.opencode/handover_task.md`)
 
-## Shape chosen + why
-Spec design 1+2 exactly: helpers in `tests/kb_helpers.py`, fixtures in conftest.
-Sibling import `from kb_helpers import ...` works WITHOUT any sys.path tweak:
-`tests/` has no `__init__.py` and pytest.ini sets no import mode, so pytest's
-default **prepend** mode inserts `tests/` on `sys.path` when each test module is
-imported (verified by a green full-suite run). No conftest sys.path change was
-needed. Fixture names taken from the spec's suggestion (`kb_env_ns` /
-`kb_env_mouse` / `kb_env_plain`).
+## Executive summary
+Docs-only rework of `README.md` + `WIKI.md` covering all 15 decided items of
+`SPEC_FEATURES.md` §2 (5) + §4 (10). Every item was verified against the current
+code BEFORE rewording — no reword contradicts its recorded decision. No code,
+no tests, no `SPEC_FEATURES.md` changes. WIKI.md enters git as a NEW tracked
+file (it was gitignored/untracked until the `wiki.md` ignore line was removed
+outside this task).
 
-## Verification (measured, verbatim)
-- Pre-change baseline: `pytest -q` → `434 passed, 1 warning in 2.08s`;
-  `ruff check --select F .` → `All checks passed!` (0 findings).
-- Post-change: `& .\.venv\Scripts\python.exe -m pytest -q` →
-  **`434 passed, 1 warning in 2.05s`** — same count, same single warning (the
-  known #10 awaited-coro `RuntimeWarning` in
-  `test_extraction_filter_edges.py::TestFilterEdges::
-  test_mouse_rebind_schedule_error_is_logged`), zero failed/skipped changes.
-- `& .\.venv\Scripts\ruff.exe check --select F .` → **`All checks passed!`** (F = 0).
-- DoD grep: no `def kb_env`, `def build`, `def down`, `def up`, `def hold_keys`,
-  `def mock_control_handlers` remains in any of the six files (script-verified:
-  per-file new-name occurrence count = original `kb_env` count − 1, i.e. exactly
-  the deleted `def kb_env(` line; no stray rename tokens).
-- `git diff --stat` touches ONLY: `tests/conftest.py`, `tests/kb_helpers.py`
-  (new), the six test files (+ `TODO.md` + this summary in the commit).
+## Per-item verification (code evidence)
+- §2.1 WIKI [Tap_Groups]: key strings only — a sign or `|` delay in a tap-group
+  key raises at group init (`fst_keyboard.py:273-281`, `convert_to_vk_code`
+  `:142-153`).
+- §2.2 README feature #5: per-key delays valid in Macros only; Tap_Groups use the
+  global `-tapdelay=` / `-nodelay` (`fst_manager.py:718-755`, ACT_* delays).
+- §2.3 WIKI sequence `|(name)`: counter reset only — the in-flight playback
+  interrupt call is commented out (`fst_keyboard.py:996-1012`).
+- §2.4 WIKI status indicator: usable per-focus; only the GUI-loop START is
+  default-arg-only (`fst_manager.py:928-933, 1424-1430`, `fst_keyboard.py:1024`,
+  overlay poll `fst_overlay.py:153-158`, GUI loop start `free_snap_tap.py:172-203`).
+- §2.5 WIKI crosshair: GUI loop also starts with `-tray_icon` alone; tray menu
+  "Toggle Crosshair" (`fst_overlay.py:340`).
+- §4 #5 WIKI [Macros]: playback via asyncio tasks — interruptible, non-blocking
+  (`fst_keyboard.py:851-868`).
+- §4 #6 `|(name)` documented per type: macro name → interrupts started playback;
+  sequence name → resets counter only; unknown name → silent no-op True
+  (`fst_manager.py:643-693`).
+- §4 #7 `|reset('name')` on a non-sequence: prints "No Macro Sequence ... reset
+  failed", no-op (`fst_keyboard.py:1012`).
+- §4 #9 `dc()`: sign carries no meaning; 9999 sentinel for "not pressed"
+  (`fst_manager.py:275-288`).
+- §4 #10 `p()`: evaluated after the current event updated real state; sign
+  ignored (`fst_keyboard.py:611`, `fst_manager.py:244-246`).
+- §4 #11 invocations valid at trigger/constraint placement too; suffixes checked
+  left to right, stop at first False (`fst_manager.py:103-104`,
+  `fst_keyboard.py:561`).
+- §4 #12 README: title "Macros (Aliases)" → "Macros, Aliases"; "Python 3.6 or
+  higher" → "Python 3.12" (venv = 3.12.9); typos fixed; V1.1.3 → V1.2.0 (WIKI
+  header already 1.2.0; WIKI per-section "updated to V1.1.3" markers kept as
+  history); the `|(!)` example comment's reasoning reworded to the left-to-right
+  short-circuit (the observable "original key not suppressed" claim kept —
+  matches code).
+- §4 #13 WIKI: a None/empty ke has NO default delay (pure timing marker)
+  (`fst_manager.py:134-138`); the "###XXX up for debate" note removed.
+- §4 #14 WIKI/README: rebind matched but replacement constraints fail → original
+  suppressed + nothing sent (pass-through pattern `a|(p("shift")) : b`); a signed
+  key on the replacement side of a Key rebind is reinterpreted as a plain Key
+  (`fst_keyboard.py:295-304, 649-658`); keys inside `p(...)`-style evals must be
+  quoted strings.
+- §4 #15 case-sensitive substring focus matching — ALREADY documented in WIKI
+  ("focus app name" bullet), verified against `fst_tasks.py:96`; no change
+  needed.
 
-## Commit
-Code + `TODO.md` (#43 status tail, entry NOT closed — the documented-preference
-note stays the maintainer's) + this summary file, one commit. No push.
-HASH: `1fd669c` — "Consolidate kb_env fixtures + helpers into conftest + kb_helpers (#43)"
-(10 files changed, 379 insertions(+), 440 deletions(-)).
+## Adjacent fixes (committed separately, per AGENTS.md)
+- Commit `fcc3add` (before this one): TODO #45 — WIKI [Suffixes] invocation
+  description corrected (invocations always True; suffixed key_event still
+  played), WIKI [Rebinds] example `+a, +b` → `+a : +b`, README "he first" →
+  "the first". The WIKI part rides along in WIKI.md's first commit (it was
+  untracked). Both WIKI fixes verified present in the committed WIKI.md copy
+  (lines 209-230, 102).
 
-## Deliberately NOT done
-- Did NOT close TODO #43 (spec: status tail only; the MAINTAINER NOTE on
-  per-file-fixture preference stays open for the maintainer's call).
-- Did NOT unify the three fixture shapes into one (the variants' differences —
-  SimpleNamespace vs. raw yield, `_mouse_listener`, arg-flag pre-sets — are
-  preserved verbatim; that unification is the maintainer's documented-preference
-  territory per #43's MAINTAINER NOTE).
-- No production code touched (tests-only, per the hard rules).
+## Measured verification (gate)
+- `& .\.venv\Scripts\python.exe -m pytest -q` → **434 passed**, 1 warning
+- `& .\.venv\Scripts\ruff.exe check --select F .` → **All checks passed** (F=0)
+- `git diff --stat` scope → only allowed files (`README.md`, `TODO.md` modified;
+  `WIKI.md` new untracked file). The pre-existing `.gitignore` change (removed
+  `wiki.md` line, made outside this task) was NOT staged.
 
-## Deviations / notes
-- None from the suggested design. One mechanical note: per-file whole-word
-  renames were done as a two-stage token replacement to keep the edit exact;
-  in `test_facade_wiring.py` the already-renamed `facade_kb(kb_env_plain, ...)`
-  parameter contains `kb_env` as a substring — caught and corrected, final
-  state verified by the occurrence-count script above.
-- Local helpers `base_events`, `kb_msg_data`, `mouse_msg_data` are NOT in the
-  spec's helper list and stay in their files (single-use or file-specific).
+## Commits
+- `fcc3add` — adjacent doc errors (TODO #45), already in log.
+- This task's commit (contains README.md, WIKI.md, TODO.md, this file) — see
+  git log; hash reported in the worker's final message.
 
-## TODO entries recorded
-- Appended the #43 status tail (LANDED 2026-09-10 + shape + verification
-  numbers). No new TODO entries — the refactor surfaced no new discrepancies.
+## TODO entries
+- #3: status tail appended (per-item LANDED evidence, gate, anomaly, residual).
+  Entry NOT closed — residual §3 docs remain.
+- #46: NEW — flaky `test_crossover_not_taken_on_low_roll` (timing-dependent),
+  pre-approved test-only fix, OPEN.
+- #45: closed earlier (adjacent fixes, commit fcc3add).
 
-## Final gauge (verbatim — actually run)
-SESSION=ses_f75cdf7d4ffeHi0ELJg1EZeqsY CTX=71353 (59%) REM=48647
+## Anomalies / deviations
+- WIKI.md was untracked: `.gitignore` had a `wiki.md` entry removed outside this
+  task. WIKI.md is added as a new tracked file; the `.gitignore` edit itself is
+  NOT staged (left for the maintainer).
+- Flaky test failed once in the first full-suite run (434 passed on re-run + in
+  isolation). Pre-existing, order/timing-dependent, code untouched — recorded as
+  TODO #46.
+
+## Deliberately not done
+- Residual §3 documentation (variable system, typing/toast/mouse/clipboard/file
+  invocations, extra start args, numpad debug combos) — separate, larger docs
+  task (candidate for a new TODO entry; maintainer's call on scheduling).
+- `.gitignore` change — pre-existing, not part of this task, left uncommitted.
+- Closing #3 — kept OPEN per the residual above.
+- Fixing the flaky test — out of scope for a docs-only task (recorded as #46).
