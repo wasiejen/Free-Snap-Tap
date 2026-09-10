@@ -145,12 +145,25 @@ hits the filter: update state (press states + timings) → check rebinds
   current expected count. Do not hard-code test-count assumptions here.
 
 ## Worker roster
-- `worker_Q3_120K_mtp` (DEFAULT — same model as the planner, no reload cost):
-  normal edits, tests.
+Delegate targets from `opencode.jsonc` (mode `all` — the maintainer edits that
+file live, so verify the roster THERE, never trust this section or memory):
+- `worker_Q4_120K` (DEFAULT — same model as `planner_Q4_120K`, no reload cost,
+  high precision, 4bit): normal edits, builds, tests.
+- `worker_Q3_120K_mtp`: fast 120k, medium precision (3bit) — edits/tests when
+  throughput beats precision.
 - `worker_gemma_256k_mtp`: fast-throughput, high-volume reads/writes, big files,
-  webfetch. Needs concrete instructions.
-- `worker_Q3_210K`: slow, big context — very long or deeply complex single tasks
-  only.
+  webfetch (256k window). Needs concrete instructions.
+- `worker_Q3_210K`: slow, big 210k context — very long or deeply complex single
+  tasks only.
+- `worker_explorer_jill_gemma_256K_mtp` (explorer mode, `prompt_agent_explorer.md`):
+  repo exploration/audit → findings appended to TODO.md. Edit allow-list is
+  TODO.md / `.opencode/handover_task_to_planner.md` / scratchpad only — no code fixes. 
+  Fast but weak on detail: ALWAYS check its work.
+- Raw no-prompt variants `agent_Q3_210K` / `agent_Q3_120K_mtp` / `agent_Q4_120K` /
+  `agent_Q4_40K_MTP`: same models WITHOUT the worker prompt (ad-hoc, no handover
+  protocol).
+- `looprunner_Q4_120k` + `planner_*` entries are NOT workers (primary/planner
+  roles).
 
 ## Handover file paths
 - Plan-state file (planner-owned): `.opencode/handover_planner.md` — the
