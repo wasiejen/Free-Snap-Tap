@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #46, new
-entries start at #47 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #47, new
+entries start at #48 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -211,9 +211,24 @@ reenabled, that is the call.
   file in the commit. One pre-existing order-dependent flake
   (`test_crossover_not_taken_on_low_roll`) failed once in the first full run — green on
   re-run and in isolation, code untouched by this task.
-  RESIDUAL: §3 undocumented-features documentation (variable system,
-  typing/toast/mouse/clipboard/file invocations, extra start args, numpad debug combos)
-  remains a separate, larger docs task — candidate for a new entry. Entry NOT closed.
+  RESIDUAL: §3 undocumented-features documentation → new entry #47; maintainer
+   APPROVED it 260910-1252 ("approved"). Entry NOT closed.
+
+## 47. Docs: §3 undocumented features (variable system, invocations, extra start args, numpad debug combos) (2026-09-10, from the #3 residual)
+
+- **Problem / evidence:** the #3 rework closed the §2+§4 gap items; the §3 scope
+  (SPEC_FEATURES.md §3) remains undocumented: the variable system, typing/toast/mouse/
+  clipboard/file invocations, extra start args, numpad debug combos.
+- **Outcome (goal):** README/WIKI document the §3 features at the same quality bar as
+  the §2/§4 rework (every claim code-verified before rewording, per the #3 method).
+- **Acceptance:** all §3 features documented in README/WIKI; docs-only diff; suite
+  unaffected (434+ passing, ruff F=0).
+- **Scope (non-exhaustive):** `README.md`, `WIKI.md`, `SPEC_FEATURES.md` (decisions
+  source); `fst_manager.py` / `fst_keyboard.py` / `free_snap_tap.py` (read-only
+  verification).
+- **Status:** OPEN — APPROVED (maintainer 260910-1252); docs-only, not a maintainer
+  call. Delegation-ready — scheduled for looprun 2 iteration 2 (the iteration-1
+  approved-fix batch takes the delegation lane first).
 
 ## 46. Flaky test: `test_crossover_not_taken_on_low_roll` — timing/order-dependent (2026-09-10)
 
@@ -235,7 +250,7 @@ reenabled, that is the call.
   `method_calls` until both calls are recorded, bounded by a timeout); `fst_manager.py`
   only if a deterministic seam is added for the scheduled task.
 - **Status:** OPEN — pre-approved (test-only, no observable behavior change); found
-  during #3 (2026-09-10).
+   during #3 (2026-09-10). Delegated (looprun 2, iteration 1, approved-fix batch).
 
 ## 45. (closed 2026-09-10) Doc errors found adjacent to the #3 rework: WIKI invocation "evaluate to False" claim, WIKI `+a, +b` rebind notation, README "he first" (2026-09-10)
 
@@ -293,7 +308,13 @@ One-line record: fixed in the adjacent commit of the #3 docs rework — WIKI [Su
    **2026-09-10 (session 4):** the maintainer swapped the explorer to
    `worker_explorer_Q3_120K_mtp` — the 128k-capped "256K"-named gemma endpoint is no
    longer used for exploration; the call is reduced to renaming/removing that agent
-   config (low priority).
+    config (low priority).
+    **2026-09-10 (260910, maintainer) — CLOSED:** the maintainer removed the gemma
+    agent option ("switched explorer to Q3_120_MTP") — verified in the live
+    `opencode.jsonc`: no agent references the gemma models (the provider `models`
+    entries remain — cosmetic, maintainer's live config). If the Q3 explorer fails
+    too often, a proposal for Q4 (or Q3_210K if context-bound, not stability) may
+    be made.
 
 ## 41. Production bug: `remove_all_toasts()` control function calls a nonexistent attribute (plural/singular mismatch) (2026-09-10)
 
@@ -323,9 +344,8 @@ One-line record: fixed in the adjacent commit of the #3 docs rework — WIKI [Su
   playground) and update the two test references — one-line fix + two test refs.
   Alternative (set a plural alias in `FST_Keyboard.__init__`) is worse: two names
   for one thing.
-- **Status:** OPEN — maintainer call (fixing the AttributeError changes observable
-  behavior; the archived triage also marked it "for the maintainer"). Fix is
-  recommended and mechanical if approved.
+- **Status:** OPEN — maintainer APPROVED (260910 ruling: "sounds ok ... approved").
+   Delegated (looprun 2, iteration 1, approved-fix batch).
 
 ## Loop & coordination (open)
 
@@ -535,8 +555,11 @@ One-line record: fixed in the adjacent commit of the #3 docs rework — WIKI [Su
   `handover_v2.4.ts` (per-session read mechanic, rungs 50/70/80/90/5k, dedup per rung,
   `promptAsync` synthetic-part delivery fire-and-forget, `kind:"nudge"` evidence only,
   silent otherwise); probe extended with S8 (checks 46-53) → 52/52 PASS, exit 0; suite
-  434/434 + ruff F=0. Production evidence (a forced high-readout nudge after a
-  maintainer restart) PENDING.
+   434/434 + ruff F=0. **2026-09-10 (looprun 2, iteration 1) — PRODUCTION EVIDENCE
+   LANDED:** the 50% rung nudge fired in this planner session (readout CTX=64687
+   (53%), genuine per-session read; the nudge text reached the session as the next
+   message; 70%/80% rungs also observed). The #30/#31/#33 production-evidence tail
+   is COMPLETE; only the v1.3 log-profile rebaseline (call 1, default SKIP) remains.
 - **Read-mechanic half (built by T1): NOT landed (2026-09-10)** — T1 stopped at the context
   stop-line (#35): the session-gated readout is designed, and its read form + the honest
   unknown-window / notAvailable forms + `SESSION=<sid>` carry landed in the committed shared
@@ -575,7 +598,9 @@ CLOSED — all agent-facing docs now self-peek via `node .opencode\ctxgauge\peek
 worker was blocked by the `.opencode/prompt_**` deny) + `agents_repo.md` gauge line
 (~164) and module-map line (~122) (explicit maintainer instruction, 2026-09-10).
 Residual refs (frozen `deactivated/handover.ts` copy, `playground/outline_rework_prompts.md`
-draft, historical files/records) = LEFT AS HISTORICAL (maintainer call, same instruction).
+draft, historical files/records) = LEFT AS HISTORICAL. **2026-09-10 (260910, maintainer):**
+"#34 is stale and closed? why ask for decision?" — the residual refs stay historical, NO
+call needed (the NAP call bundle drops the #34 residual).
 
 ## 35. T1 de-peek build IN PROGRESS — read mechanic not landed; continue on a bigger window (2026-09-10)
 
@@ -655,10 +680,13 @@ prints forward slashes. Status: closed — section committed as tested.
 - **Scope (non-exhaustive):** `tests/test_filter_behavior.py` (`TestMouseWin32Filter`,
   ≈371-430); `fst_keyboard.py` ≈451-478 + ≈503-514 (read-only verification);
   `fst_manager.py` ≈703-709 (scroll sign mapping — context for acceptance only).
-- **Status:** OPEN — NEW (Audit 3a exploration; entries verified from lead (b),
-  independently re-derived). MAINTAINER CALL if the fix changes the gating
-  behavior (aggregation vs. single-unit vs. documented drop); if the maintainer
-  rules current equality gating intended, pin that decision explicitly.
+- **Status:** OPEN — maintainer APPROVED the mask/shift semantics (260910 ruling:
+   the direction info sits on bits 16/17 of `mouseData`; "we have to apply a binary
+   mask or shift it to recognise it when any other bit is 1" — approved). Multi-notch
+   wheel event = SAME phase as single-notch (magnitude NOT aggregated). ADDITIONAL
+   RULING: any other place comparing a single bit in a series of status bits
+   (packed-word equality checks) = REPORT BACK, implicitly approved. Delegated
+   (looprun 2, iteration 1, approved-fix batch).
 
 ## 43. `kb_env` fixture + `build()`/`down()` helpers are copy-pasted (drifted) across 6 test files — no shared conftest location (2026-09-10, Audit 3a)
 
@@ -693,11 +721,12 @@ prints forward slashes. Status: closed — section committed as tested.
   each file's existing tests byte-identical to before the move (they pass as
   before).
 - **Scope (non-exhaustive):** `tests/conftest.py`, the six files above.
-- **Status:** OPEN — test-suite hygiene, pre-approved class (no observable
-  behavior change — pure test refactoring); the `kb_env` variants' DIFFERENCES
-  (SimpleNamespace vs. raw yield) must be preserved or each file migrated
-  deliberately. MAINTAINER NOTE: if the maintainer prefers per-file fixtures for
-  independence, close this with a "documented preference" note instead.
+- **Status:** CLOSED (2026-09-10) — maintainer general ruling 260910: "everything
+   pertaining testing is your job and as long as it does not change program behavior
+   no maintainer involvement needed" — the consolidation LANDED + verified (status
+   tail); the documented-preference call resolved in favor of the consolidation.
+   One-line record: shared fixtures in `tests/conftest.py` + helpers in
+   `tests/kb_helpers.py` (`1fd669c`).
 - **Status tail:** LANDED (2026-09-10) — the three drifted shape-classes moved
   VERBATIM into `tests/conftest.py` as `kb_env_ns` (shape A, SimpleNamespace
   yield + arg flags pre-set) / `kb_env_mouse` (shape B, raw yield +
@@ -756,7 +785,10 @@ prints forward slashes. Status: closed — section committed as tested.
   `fst_overlay.py` 210-214/590-591 (guard site choice — a central fix in the
   two accessors makes these untouched); tests: `test_control_actions.py`,
   `test_focus_task.py`, `test_cli_menu.py`.
-- **Status:** OPEN — MAINTAINER CALL for the chosen fallback (silent-default vs.
-  surfaced error — the #1 user-visible-error solution should cover the surfaced
-  variant). Overlaps: none of the open entries cover this path (#1 is vk
-  resolution; #8 is the state-dict handling; this is the focus-dict lookup).
+- **Status:** OPEN — maintainer GENERAL RULING (260910): uncaught errors must be
+   caught; FST_config/userconfig-based errors must be caught + signaled to the user
+   with helpful info for finding the error in their config (custom
+   configErrorException welcomed, "open for suggestion"). Concrete design proposed
+   in `.opencode/proposals/P08_configerror-design.md` — the degrade-to-defaults
+   fallback needs his final yes (approval via the proposals channel). Overlaps: #1
+   (vk resolution) shares the surfaced-error solution.

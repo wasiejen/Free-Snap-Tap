@@ -1,104 +1,95 @@
-# TASK — #3: README + WIKI rework to the current state of the code (decided items only)
+# TASK — approved-fix batch: #41 callback parity + #42 wheel-gating + #46 flaky crossover test
 
-FIRST read `AGENTS.md`, `agents_repo.md`, this file, TODO.md entry #3, and
-`SPEC_FEATURES.md` in full (it is the decisions source — sections 2 and 4 carry
-the 2026-09-06 maintainer decisions you are implementing).
+FIRST read `AGENTS.md`, `agents_repo.md`, this file, and TODO.md entries #41, #42,
+#46 (the maintainer rulings are recorded in their status lines).
 Repo root = the directory containing `agents_repo.md`.
 
 ## Goal
-`README.md` and `WIKI.md` state the current code behavior: every item in
-`SPEC_FEATURES.md` §2 (documented-but-wrong) and §4 (decided discrepancies) is
-fixed in the docs per the recorded 2026-09-06 decisions. Docs-only work —
-**no code, no tests, no behavior change.**
+Land the three maintainer-approved fixes (260910 rulings) in ONE atomic change, each
+verified against the current code before editing.
 
-## The fix list (each = one doc change, verified against the code before you write it)
-§2 — documented but NOT implemented (reword the docs to what the code does):
-1. WIKI `[Tap_Groups]`: "key_event notation `-a, -d` will be interpreted as Keys"
-   is FALSE — tap groups accept plain key strings only (a `|` delay or sign in a
-   tap-group entry raises at group init).
-2. README #5: per-key delays in Tap Groups is FALSE — only the global
-   `-tapdelay=` / `-nodelay` start args affect tap groups.
-3. WIKI `|(name)` on a macro *sequence*: the in-flight playback is NOT
-   interrupted — the invocation only resets the sequence counter.
-4. WIKI "status indicator can only be used as default argument, not in a focus
-   group" is FALSE — per-focus `<arg>-status_indicator` is parsed and applied;
-   what is genuinely default-only is the GUI *loop* starting at startup (or
-   `-tray_icon`).
-5. WIKI "crosshair only works if Status Indicator is used" is FALSE — the GUI
-   loop also starts with `-tray_icon` alone, and the tray menu toggles the
-   crosshair.
+## Items
 
-§4 — discrepancies with recorded decisions (document per the decision):
-- #5: WIKI "macros played in its own thread" → they are asyncio tasks now
-  (interruptible, non-blocking).
-- #6: `|(name)` semantics differ by type — macro name interrupts started
-  playback (no reset); sequence name resets the counter (no interrupt of
-  in-flight playback); unknown name is a silent no-op. Document per-type.
-- #7: `|reset('name')` on a non-sequence name prints
-  "No Macro Sequence ... reset failed" and does nothing else — keep + document.
-- #9: `dc()` ignores the sign of its key argument — document that the sign
-  carries no meaning (interval between same-phase events; 9999 sentinel when no
-  previous events).
-- #10: `p()` is evaluated AFTER the current event already updated the real
-  press state (so `+ke|(p('ke'))` is always False, `-ke|(p('ke'))` always
-  True) and ignores the sign of its argument — document both.
-- #11: invocations work at trigger/constraint placement too (not only
-  replacement key / macro groups), left-to-right with short-circuit — document.
-- #12: README/WIKI hygiene — title mixing "Macros (Aliases)" where the code
-  treats them separately; "Python 3.6 or higher" → the venv is 3.12 (state
-  "Python 3.12" per the repo venv fact); typos "Repetiton" / "repetition will
-  interrupt inself"; the README comment claiming the original key is NOT
-  suppressed after `|(!)` (keep the observable claim if it matches the code,
-  fix the reasoning); online-Wiki links/version refs V1.1.3 → V1.2.0.
-- #13: a `None`/empty ke has NO default delay (pure timing marker unless given
-  explicit delays) — remove the "###XXX still up for debate" note.
-- #14: when a rebind is matched but the *replacement's* constraints fail, the
-  ORIGINAL key is suppressed and nothing is sent (document + the pass-through
-  pattern `a|(p("shift")) : b` for users who want the original to pass); a
-  signed key on the RIGHT side of a Key rebind (`a : -b`) is reinterpreted as a
-  plain Key (press+release pair); keys inside `p(...)`-style evals must be
-  quoted strings.
-- #15: focus matching is a case-SENSITIVE substring match — document.
+### 1. TODO #41 — `remove_all_toasts` plural/singular AttributeError (APPROVED)
+- `fst_manager.py` ≈578 (`remove_all_toasts`, the control-function family) calls
+  `self._fst.remove_all_callbacks()` (PLURAL); production `FST_Keyboard` only has
+  the SINGULAR `remove_all_callback` (`fst_keyboard.py` ≈64, assigned at
+  `free_snap_tap.py` ≈193).
+- Fix: call the SINGULAR at the one production site. Update the two test
+  references to the singular name: the FakeFST `remove_all_callbacks = MagicMock()`
+  in `tests/conftest.py` ≈69 and the assertion in `tests/test_output_manager.py`
+  ≈534.
+- Add a drift-guard test that fails if the control function's attribute name ever
+  drifts from the production `FST_Keyboard` attribute (e.g. drive the
+  `remove_all_toasts()` control function against a stand-in FST exposing ONLY the
+  singular attribute, and assert it works).
 
-## Rules
-- **Code is ground truth.** SPEC_FEATURES.md line numbers are as of 2026-09-06
-  and have drifted — for every fix, verify the claim against the CURRENT code
-  (grep / targeted window reads) before rewriting the doc line. If the code no
-  longer matches the recorded decision, STOP that item, flag it in the summary,
-  and leave the doc as-is (do not decide).
-- **Sign convention (mandatory in any example you write):** `-key` = key
-  pressed, `+key` = key released, `^key` = toggle (per `agents_repo.md`).
-- Docs-only diff: `README.md` + `WIKI.md` (plus TODO.md status tail + the
-  handover files). `SPEC_FEATURES.md` is READ-ONLY for you (it is the decisions
-  record). No production code, no tests.
-- Keep the edits minimal and in-place — reword the wrong passages, do not
-  rewrite whole sections for style. §3 items (features implemented but
-  undocumented, e.g. the variable system, typing/toast/mouse/clipboard invocations)
-  are OUT OF SCOPE for this task — do not add new feature sections.
-- Preserve the docs' existing structure/heading style; fix content, not layout.
+### 2. TODO #42 — multi-notch wheel gating (APPROVED: mask/shift semantics)
+- `fst_keyboard.py` ≈456-460 (`mouse_win32_event_filter`, inner `is_press()`)
+  returns True/False ONLY on EXACT equality with the single-notch `mouseData`
+  constants 4287102976 (down, delta −120) / 7864320 (up, delta +120); any other
+  wheel delta falls through to implicit None → release-phase-only.
+- Maintainer ruling: the direction info sits on bits 16/17 of `mouseData`
+  (log2(65536)=16, log2(131072)=17); the fix = a MASK/SHIFT so the direction is
+  recognized regardless of the other bits. Approved observable semantics: a
+  multi-notch wheel event produces the SAME phase as single-notch (magnitude is
+  NOT aggregated).
+- Implement the minimal correct bit test. BEFORE writing code or tests: verify
+  your mask/shift against BOTH existing single-notch constants (a short node
+  script is fine) and record the exact expression in your summary.
+- Tests: in `tests/test_filter_behavior.py::TestMouseWin32Filter`, add
+  multi-notch events — 2-notch up `mouseData=15728640` (delta +240) and 2-notch
+  down `mouseData=4279238656` (delta −240) — asserting the press-phase outcome;
+  the existing single-notch tests stay green.
+- REPORT BACK (part of the ruling): grep the repo for other equality comparisons
+  against packed multi-bit status words / single-bit-in-a-series checks
+  (candidates: `mouseData`, `lParam`, packed vk values in `fst_keyboard.py` /
+  `fst_manager.py`). If you find any, add a TODO.md entry (next free ID, #48) with
+  the evidence — the maintainer implicitly approved fixing them. If none, say so
+  in the summary.
 
-## Definition of done + verification
-1. Every §2 item (1-5 above) and every §4 item (#5,#6,#7,#9,#10,#11,#12,#13,
-   #14,#15) is fixed in the docs per its recorded decision, each verified
-   against the current code (list the verification per item in the summary).
-2. `git diff --stat` touches ONLY `README.md`, `WIKI.md`, `TODO.md`, the
-   handover files.
-3. Gate green: `& .\.venv\Scripts\python.exe -m pytest -q` → 434 passed (unchanged);
-   `& .\.venv\Scripts\ruff.exe check --select F .` → F = 0.
-4. TODO.md #3 gets a status tail: LANDED (date) + per-item one-liner (which doc
-   line changed) + residual note: "§3 undocumented-features documentation
-   (variable system, typing/toast/mouse/clipboard/file invocations, extra start
-   args, numpad debug combos) remains a separate, larger docs task — candidate
-   for a new entry". Entry NOT closed (the residual keeps it open).
+### 3. TODO #46 — deterministic crossover test (PRE-APPROVED, test-only)
+- `tests/test_output_manager.py::TestCrossover::test_crossover_not_taken_on_low_roll`
+  races a fixed `await asyncio.sleep(0.02)` against the 5 ms scheduled sleep
+  inside the coroutine.
+- Fix: replace the fixed sleep with an event-driven bounded wait (poll the mock's
+  `method_calls` until both calls are recorded, or `asyncio.wait_for` the
+  scheduled task, bounded by a timeout). Do NOT change production
+  `send_keys_for_tap_group`.
+- Verify: 10 consecutive FULL `pytest -q` runs green (that is the acceptance).
 
-## Commit (per AGENTS.md)
-Commit docs + TODO.md + `.opencode/handover_task_to_planner.md` (your EXECUTIVE
-SUMMARY — write it there AND return it as your final message: per-item
-verification, measured gate output, commit hash, deviations, deliberately-not-done).
-End with your verbatim self-gauge line (`node .opencode\ctxgauge\peek.mjs`).
+## Definition of done
+1. `& .\.venv\Scripts\python.exe -m pytest -q` green (434 + your new tests; report
+   the exact count), 10 consecutive full runs without a flake on the #46 test.
+2. `& .\.venv\Scripts\ruff.exe check --select F .` = 0 findings.
+3. `git diff` scope = `fst_manager.py`, `fst_keyboard.py`, `tests/conftest.py`,
+   `tests/test_output_manager.py`, `tests/test_filter_behavior.py`, `TODO.md`,
+   `.opencode/handover_task_to_planner.md` ONLY.
+4. TODO.md: append a status tail to #41, #42, #46 (LANDED + commit hash + the
+   measured verification); a new #48 entry IF bit-comparison sites were found.
+5. ONE commit (code + TODO.md + your summary file), message per the AGENTS.md
+   style, before your final message.
 
-## Context discipline
-All three docs are small (≤ 326 lines) — full reads are fine. Code reads:
-targeted windows only (grep first, offset/limit). Gauge-check between the WIKI
-pass and the README pass; at REM ≤ 20k finish the commit routine and stop at a
-clean committed point, listing the residual items in the summary.
+## Approval boundary
+- All three fixes are maintainer-approved (260910). Do not change observable
+  behavior beyond the approved semantics above. If a fix turns out to require a
+  behavior change beyond the ruling: STOP that item, record why in the summary,
+  land the rest.
+- Test-only + docs/TODO: pre-approved.
+- NEVER run the live listeners (mock the pynput controllers — `tests/conftest.py`
+  pattern).
+
+## Protocol (you are the RAW agent — no worker prompt; this section is the protocol)
+- You are the worker for this task. The planner verifies your summary against
+  `git log` + the test baseline — it cannot see your steps.
+- Checkpoint: after each item lands, run the gate and append its status tail to
+  TODO.md (a dead session must lose at most one item).
+- Write your EXECUTIVE SUMMARY to `.opencode/handover_task_to_planner.md`
+  (overwrite it): what changed per item, measured verification (exact counts),
+  commit hash, TODO entries touched, the #42 mask/shift expression, the #42
+  report-back result, what you deliberately did NOT do.
+- Your FINAL MESSAGE must be SHORT: a pointer to the summary file + the VERBATIM
+  output of `node .opencode\ctxgauge\peek.mjs` as the last line. (The summary
+  file is the single summary channel — do not repeat it.)
+- Stop line: REM ≤ 15k or ≥ 85 % → make the handover current at a clean committed
+  point and stop; a fresh session resumes from TODO.md + your summary.

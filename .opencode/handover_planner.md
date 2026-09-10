@@ -2,6 +2,59 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-10 (looprun 2, iteration 1) — maintainer rulings applied + proposals channel + nudge production evidence
+- **Start state:** clean tree (top `9c8b964`), no interrupted work. Maintainer
+  ACTIVE: `handover_maintainer.md` (untracked, his scratch — never commit it)
+  carries the 260910 rulings + a NEW CHANNEL: **proposals are now his preferred
+  feedback channel** (check `proposals/` subfolders at session start).
+- **NUDGE LADDER PRODUCTION EVIDENCE LANDED (his observation task):** the 50 %
+  rung fired this session (readout CTX=64687 (53 %), genuine per-session read;
+  text reached the session as the next message); 70 % + 80 % observed too.
+  #30/#31/#33 production tail COMPLETE (TODO #30 status line).
+- **Proposals channel LANDED (explicit @planner requests):** `.opencode/proposals/`
+  + README (convention: one idea per file `P<NN>_<title>.md`; maintainer MOVES
+  files into `approved/` / `commented/` / `rejected/`; moved = decided) + 9
+  proposals from the `agent_feedback.md` sweep (read, UNCHANGED per his order):
+  P01 `limit.context` declaration (worker-prompt request died at its FIRST
+  request — no window declared), P02 disable the plugin SUMMARY MIRROR
+  (verified root cause of the 4 handover-file collisions — it is the plugin's
+  `mirrorSummary` in `handover_v2.4.ts` ≈296-314, NOT the task-tool result
+  channel; his "what is the plugin doing" question is answered in
+  `.opencode/plugin_rundown.md`), P03 audit checkpoint rule, P04 agents_repo
+  deny list, P05 replaceAll semantics doc, P06 real-host DoD rule, P07 autorun
+  archive + session-summary channel (his archive idea — structure + reasoning +
+  pasteable prompt snippets), P08 configErrorException design (#44 — his "good
+  place for a concrete proposal"), P09 reword `<|autonom|>` as an option (the
+  XXX note in `prompt_looprunner.md` L14-16).
+- **Rulings applied to TODO.md (recorded in the entry status lines):** #41 fix
+  APPROVED → delegated; #42 APPROVED mask/shift semantics (direction bits 16/17
+  of `mouseData`; multi-notch = SAME phase as single-notch; other
+  single-bit-in-a-series comparisons = report back, implicitly approved) →
+  delegated; #43 CLOSED (testing-is-our-job ruling); #40 CLOSED (gemma agent
+  option removed — verified live `opencode.jsonc`: no agent references the gemma
+  models; the provider `models` entries remain, cosmetic); #34 no call needed;
+  #3 §3 docs APPROVED → new entry **#47** (delegation-ready); #46 delegated;
+  #4 general ruling recorded → P08.
+- **Delegation:** the approved-fix batch (#41+#42+#46) spec is in
+  `handover_task.md`; launched via the RAW `agent_Q4_120K` (the worker-prompt
+  variant dies at its first request — P01) + compact protocol repeated in the
+  launch message.
+- **NEXT (iteration 2, in order):**
+  1. If the batch was in flight at interruption: VERIFY it — pytest (10× for the
+     #46 flake), ruff F=0, `git diff` scope = the allowed files, spot-check the
+     #42 mask/shift expression against BOTH single-notch constants + the #41
+     name parity + TODO tails; then the NAP tail + bookkeeping commit.
+  2. Check `.opencode/proposals/{approved,commented}/` for maintainer moves —
+     approved proposals = tasks (P02/P03/P04/P06/P07/P09 are doc/config-only).
+  3. Delegate #47 (§3 docs, APPROVED) — same raw-agent mechanic; docs-only.
+  4. Remaining maintainer calls: the behavior batch (#1/#7/#8/#9/#4+#6), the
+     P08 degrade-to-defaults yes, #30 log-profile rebaseline (call 1, default
+     SKIP). Nothing else open.
+- **Standing lessons (carry):** after EVERY Task-tool run, if the tree shows
+  `handover_task_to_planner.md` modified → `git checkout --` it (the mirror
+  clobbers it — P02 pending); raw `agent_Q4_120K` + compact message = standard
+  delegation for scope-heavy work (P01 pending).
+
 ## 2026-09-10 (autonomous session 5) — #43 LANDED + verified (kb_env consolidation)
 - **No interrupted work at start:** clean tree, top commit `46c8b39` (s4 bookkeeping),
   NAP current. Maintainer asleep (`<|autonom|>` run) — no new maintainer message
