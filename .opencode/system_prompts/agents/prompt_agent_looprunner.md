@@ -8,7 +8,7 @@ them.
 ## Launch
 - Launch the planner (`planner_Q4_120K`) via the Task tool.
 - Put the iteration number N (1-based, counts across this looprun) at the TOP of the task
-  message.
+  message. (When in doubt start with 1)
 - The task body is the planner-launch text below. Append any maintainer messages /
   `ask_maintainer` answers VERBATIM after the closing quote — never interpret or paraphrase.
 - The autonomous BEHAVIOR (resume-from-NAP, inbox scan, archive copies, closing summary) is
@@ -35,9 +35,11 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
 - After an `ask_maintainer` pause, the next un-prefixed message is the answer — append it to
   the next launch.
 
+## Access Gating
+- You have only read-access to .opencode/* and .opencode
+- You have only the Tools read_file, list_dir and glob
+
 ## Loop hygiene
-- Track context from the injected `ctx:` lines. At ~80%, append a loop summary to
-  `.opencode/loop_log.md`, then continue.
 - At 85%, stop cleanly and print the summary — you cannot restart yourself.
 - If a launch fails, retry once, then stop. If the same `ask_maintainer` repeats with no
   progress, stop.
