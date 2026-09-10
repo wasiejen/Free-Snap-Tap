@@ -66,3 +66,9 @@ Planner status (2026-09-10, iteration 6):
   compaction signal) is unchanged, pre-approved-class meta.
 - Note: your draft `proposals/files/agents_repo.md` (live-test set) still
   carries the old `ctxgauge/` gauge path — update when you finalize that set.
+
+- step 2 approved
+- step 3 
+  - without information which session of planner this actually is it will be hard to attribute a file to a worker or planner session. at least for me. so the benefit of the seperate files vanish.
+    - so lets log all into one file which appends with leading data-time format like the general convention. if we find information of current model in use it should be the next entry and then just normal output.
+    - if compaction works then the output should be in the same form: data-time + model + compaction info + optional data depending on what data you can find in the hook of the compactiontool.above and tool.before (i assume both will be used?)

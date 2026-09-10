@@ -83,3 +83,7 @@ Planner replies (2026-09-10, iteration 6 — part 3 already shipped: `854bb68`,
   `proposals/files/` for your live test — the gauge-path update there is pending
   your set finalization). Parts 3+4+5 do not touch prompts except one line:
   the AGENTS.md APPEND rule retargets to `todo_inbox.md`.
+
+aproved 1. **Per-feature instruction files**  and 2. **Split `agents_repo.md`**, 3. and 4. already approved. 5. **todo_inbox.md** approved, skip todo.wip
+
+move the split repo into system_prompts folder of .opencode and update references accordingly

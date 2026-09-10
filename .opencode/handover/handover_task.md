@@ -1,92 +1,177 @@
-# TASK — TODO.md split: closed entries → todo_records.md (split proposal, part 3)
+# TASK — prompt/repo split build (approved parts 1+2+5) + session-id rules (inbox 260910-2147)
 
-FIRST read `AGENTS.md`, `agents_repo.md`, and this file. The source proposal is
-`.opencode/proposals/commented/260910_prompt-and-todo-split.md` (it moved to
-`commented/` after the maintainer added design questions — the maintainer's
-launch message confirms part 3 still stands as specified; your task is **part 3
-only**, pre-approved class: meta/file cleanup). Parts 1+2 are NOT yours.
-NOTE (2026-09-10, planner path fix): the handover files now live in
-`.opencode/handover/` — your summary file is
-`.opencode/handover/handover_task_to_planner.md` (NOT `.opencode/handover_task_to_planner.md`;
-that path no longer exists).
+FIRST read `AGENTS.md`, `agents_repo.md`, and this file. The design of record is
+`.opencode/proposals/approved/260910_prompt-and-todo-split.md` — read it in full
+(proposal + maintainer comments + planner replies + the approval line at the bottom).
+This spec is the binding refinement of that design.
 
-## Goal
-Slim `TODO.md` (≈890 lines): every unambiguously closed entry moves its FULL TEXT
-to `todo_records.md`; `TODO.md` keeps a one-line stub per moved entry. Open
-entries stay, byte-identical (section relocations excepted). No FST code, no
-behavior change.
+## What is approved (quote, maintainer)
+"aproved 1. Per-feature instruction files and 2. Split agents_repo.md, 3. and 4.
+already approved. 5. todo_inbox.md approved, skip todo.wip" + "move the split repo
+into system_prompts folder of .opencode and update references accordingly".
+Parts 1, 2, 5 are yours. Part 4 (NAP trim) is the planner's own bookkeeping — NOT
+yours. This is meta-only work: no FST code, no behavior change, no plugin.
 
-## State at HEAD (2026-09-10 — verify against the live files)
-- `TODO.md` sections: "Maintainer calls (open, in order)" (a numbered list — NOT
-  entry blocks), "FST behavior decisions (open…)", "Docs & misc (open)", "Loop &
-  coordination (open)", "Plugin & gauge (open)", and "Closed entries" (a dumping
-  section mixing closed and one misfiled open entry).
-- `todo_records.md` exists (≈35 lines): flat one-line records, format
-  `## N. Title — CLOSED (…) — one-line result`. KEEP its existing lines as-is;
-  only APPEND.
-- Numbering header in TODO.md: new entries start at #49 — you add NO entries.
+## Session-id rules (maintainer inbox 260910-2147 — both points are yours)
+Original wording:
+- planner prompt: "change that the folder for autonom archive storage should include
+  the session_id to restore it in case of interruption. (the loop only gets the
+  session id if the planner finished succesfull)" — "or maybe just add a
+  <session_id>.md to the folder. the name is the info. easier and not so messy
+  folder names" → **option 2 is chosen** (marker file, not folder rename).
+- loop prompt: "mention where to find all the session_id when in doubt".
 
-## Decision table (planner pre-rulings — apply exactly)
-- **MOVE (closed):** #47, #45, #39, #37, #38, #34, #36, #43, #44
-  - #47 and #38 already have one-line records in `todo_records.md` — keep those
-    lines and ALSO append the full text (duplicated heading is acceptable).
-- **LEAVE OPEN (no text change):** #1, #7, #8, #9, #4, #6, #11, #17, #30, #3
-- **YOU JUDGE (report each decision + one-line evidence in the summary):**
-  #46, #41, #42, #40, #35
-  - Rule: an entry is closed ONLY if its goal/acceptance is fully met AND the
-    entry contains no open sub-work or maintainer call. A "LANDED" status tail
-    does NOT close an entry whose scope is broader than what LANDED (e.g. a
-    standing docs rework) — leave it open and say why.
-- **Misfiled open entry:** #48 (open, sitting under "Closed entries") → move its
-  block to "FST behavior decisions (open — maintainer calls unless noted)" (it is
-  the #42 report-back, implicitly approved). If the "Closed entries" section
-  holds nothing after all moves, delete the heading; if anything open remains
-  there, rename the section to make the mismatch visible and report it.
+## Current state (verify against the live files)
+- Live prompts: `.opencode/system_prompts/agents/prompt_agent_{planner,task,
+  explorer,looprunner}.md` (50 / 35 / 37 / 43 lines). `opencode.jsonc` points at
+  them — do NOT touch `opencode.jsonc` (maintainer's live file).
+- Root `agents_repo.md` (224 lines) sections, in order: What this is /
+  Environment & shell / Safety limits (repo-specific) / Run / test / Sign
+  convention (IMPORTANT) / Module map (repo root) / Data flow / Test conventions /
+  Worker roster / Handover file paths / Gotchas / Phase-scoped work.
+- Stale no-slash paths in the live planner prompt: line 13
+  `.opencode/handover_planner.md` and line 39 `.opencode/handover_task.md` — the
+  handover files live in `.opencode/handover/`. Fix both.
+- `proposals/files/` = the maintainer's draft test set (AGENTS.md, agents_repo.md,
+  the 4 prompts, prompt-refactor-design.md). READ-ONLY, with ONE exception below.
+- Root `AGENTS.md` is agent-read-only ("Do not edit this file directly — edit a
+  copy; the maintainer replaces it").
+- The gauge lives in `.opencode/plugin/scripts/` (peek.mjs / gauge.mjs) — already
+  correct in the repo map; keep it.
 
-## Stub format (TODO.md, one line replacing the whole entry block)
-`## N. (closed <YYYY-MM-DD>, see todo_records.md) — <original title>`
-Date = the closure date stated inside the entry (else 2026-09-10).
+## The build
 
-## Moving format (todo_records.md, appended at the END of the file)
-Per moved entry, one block:
-- heading line: `## N. Title (closed <date>, full text moved from TODO.md)` —
-  the original title, date as in the stub.
-- then the entry's ORIGINAL BODY verbatim (everything that followed the original
-  `## N.` heading line in TODO.md, unmodified).
+### 1. Split `agents_repo.md` (part 2) — parts go to `.opencode/system_prompts/repo/`
+Create 4 files (the naming scheme from the proposal):
+- `repo_map.md` — What this is, Sign convention, Module map, Data flow, Worker
+  roster, Phase-scoped work.
+- `repo_commands.md` — Environment & shell, Run / test.
+- `repo_testgate.md` — Safety limits (repo-specific), Test conventions.
+- `repo_gotchas.md` — Gotchas.
+The mapping above is a suggestion — you may move a section if the fit is
+manifestly better (e.g. "Safety limits" is test-adjacent), but report the final
+mapping as a table in your summary. Rules:
+- Every section's FACTS stay verbatim (reorganization yes, rewriting no, no new
+  facts). Keep each part's own header line naming the part.
+- Root `agents_repo.md` becomes a THIN INDEX (≤ ~35 lines): a 1–2 line "what this
+  is" (so the AGENTS.md pointer still lands), the maintainership rule, and one
+  line per part with a "read when …" trigger (e.g. `repo_commands.md — read when
+  running shells, tests, gates, or the gauge`). AGENTS.md (read-only) references
+  `agents_repo.md` by name, so the root file MUST stay the entry point.
+- "Update references accordingly": fix the live prompts' repo-map references so
+  they stay true (e.g. planner "roster in `agents_repo.md`" → point at the
+  `repo_map.md` part or keep the index — your call, keep it minimal). Do NOT
+  touch `proposals/files/*` for this.
 
-## Scope
-- `TODO.md` + `todo_records.md` (the ONLY repo files you edit) +
-  `.opencode/handover/handover_task_to_planner.md` (your executive summary).
-- The "Maintainer calls (open, in order)" list: DO NOT EDIT (even if a line
-  references a now-closed entry — report stale refs in the summary instead).
-- Meta files (`agents_repo.md`, prompts, proposals, NAP) READ-ONLY — flag in the
-  summary if anything looked off.
+### 2. Per-feature readmes (part 1) — `.opencode/system_prompts/`, each ≤ 50 lines
+- `agent_readme_proposals.md` — the proposal channel: folder flow (draft at
+  `proposals/` root → maintainer comments in place → file moved to
+  `proposals/commented/` → planner revises (replies appended in-file,
+  "Planner replies (…)") → back to `proposals/` root → maintainer approval →
+  `proposals/approved/` → after landing, `proposals/implemented/` with a planner
+  verdict note; `proposals/rejected/` for rejections); what a proposal contains
+  (problem / design / acceptance / status); the maintainer inbox channel
+  (`proposals/maintainer/inbox_planner/`, `inbox_worker/` — handle then move to
+  `maintainer/done/` with a `---` + `replier:` block; NEVER edit the maintainer's
+  text); the feedback folder `proposals/maintainer/feedback/`.
+- `agent_readme_todo.md` — the TODO system: entry contract (AGENTS.md
+  §TODO-contract, by reference); planner curation rules (close/condense with
+  one-line records; full text of closed entries → `todo_records.md`; IDs unique,
+  never reused, next ID in the TODO.md header line; never delete open content);
+  **the inbox flow: worker/explorer APPEND raw findings to `todo_inbox.md`**
+  (loose format, no numbering, dated + role-tagged; NO curation, NO renumbering);
+  the planner curates inbox → `TODO.md` and assigns the stable IDs at curation
+  time, then trims the inbox; bare-ID handoffs reference curated IDs only.
+- `agent_readme_loop.md` — the loop protocol (planner-owned static file; the
+  looprunner reads it when driving autonomously): iteration semantics (N is
+  given at the top of the launch message, counts across the looprun); the
+  action-line vocabulary lives in AGENTS.md §Interaction-contract (reference,
+  don't restate); the autorun archive convention (below — includes the session
+  marker); closing summary + exactly one `action:` line; interrupt handling
+  (rebuild from committed state: git log + NAP + TODO, never from memory);
+  `.opencode/loop_log.md` is the looprunner's own file.
+
+### 3. Prompt index (part 1) — all 4 live prompts
+Add an "Instruction index" section to each of `prompt_agent_{planner,task,
+explorer,looprunner}.md`: one line per relevant readme
+(`<file> — read when <explicit trigger>`). The looprunner's line: read
+`agent_readme_loop.md` when driving the loop (autonomous launch). The task and
+explorer prompts also carry the inbox rule from §5 below. Keep everything else
+in the prompts unchanged.
+
+### 4. Session marker in the planner prompt (2147, option 2)
+In `prompt_agent_planner.md`'s autonomous-mode section, replace the "Autorun
+archive" bullet with: create `.opencode/archive/autorun-<YYMMDD-HHmm>/` if
+missing; when creating the folder, write ONE marker file
+`.opencode/archive/autorun-<YYMMDD-HHmm>/<session_id>.md` into it — the session
+id is the `SESSION=` field of the injected `ctx:` launch line (e.g.
+`ses_f72e…`); the marker content is minimal (launch time, iteration N, role);
+the FILE NAME is the info (restores which session owns the archive after an
+interruption; the looprunner only ever sees the id if the planner finished).
+Keep the existing spec/summary copy lines (`plan<N>_ho_task.md` etc.).
+
+### 5. todo_inbox.md (part 5)
+- Create `todo_inbox.md` at the repo root: a short header (≤ ~15 lines) stating
+  what it is (raw findings inbox for worker/explorer), the loose format (dated,
+  role-tagged blocks, no numbering), who writes (worker/explorer per the APPEND
+  rule) and who curates (planner → `TODO.md` with stable IDs, then trims the
+  inbox).
+- Add ONE line to the worker prompt (`prompt_agent_task.md`) and the explorer
+  prompt (`prompt_agent_explorer.md`): findings you cannot confidently fix or
+  that are out of scope go to `todo_inbox.md` (loose, unnumbered) — NOT
+  `TODO.md`; the planner assigns IDs at curation.
+- The root `AGENTS.md` APPEND rule still says "to `TODO.md`" — you may not
+  change the root file; apply that one-line retarget to the COPY
+  `proposals/files/AGENTS.md` (the "APPEND … to TODO.md as a new numbered
+  entry" line → point worker/explorer findings at `todo_inbox.md`), so the
+  maintainer can replace it. Report it as a queued maintainer swap in your
+  summary.
+
+### 6. Session-id lookup in the looprunner prompt (2147)
+Add ONE line to `prompt_agent_looprunner.md` (Launch or Loop hygiene section):
+where to find session ids when in doubt — the `SESSION=` field of the injected
+`ctx:` lines; the autorun archive folder holds one `<session_id>.md` marker per
+planner session. (A plain-text session log will be added later by the
+compaction-detection task — do not reference it yet.)
+
+## Boundaries
+- You may edit: the root `agents_repo.md` (explicitly tasked by the maintainer's
+  approval line), the 4 live prompts, the new `system_prompts/repo/` +
+  `system_prompts/agent_readme_*.md` files, `todo_inbox.md`,
+  `proposals/files/AGENTS.md` (the one line), your summary file.
+- NEVER touch: `opencode.jsonc`, the rest of `proposals/files/*`, root
+  `AGENTS.md`, `TODO.md`, `todo_records.md`, the plugin, FST code, tests, the
+  NAP.
+- The live-prompt edits ARE committed in your task commit (this task is the
+  explicit go; they are not the maintainer's in-progress drafts).
 
 ## Definition of done
-1. Every MOVE-list entry: full text appended to `todo_records.md`; TODO.md holds
-   ONLY its one-line stub. Grep-verifiable: the entry's title appears exactly
-   twice (stub + records) and no full body remains in TODO.md.
-2. Open entries byte-identical (except #48's section move); the maintainer-calls
-   list unmodified.
-3. Summary lists: each moved entry; each judged entry (#46/#41/#42/#40/#35) with
-   decision + one-line evidence; any stale refs / oddities found.
-4. Commit scope (`git show --stat`): exactly `TODO.md` + `todo_records.md` +
-   `handover_task_to_planner.md`.
-5. ONE commit, green, subject e.g.
-   "TODO split part 3: closed entries → todo_records.md, stubs in TODO.md".
-   No gate run needed (meta-only) — but NEVER commit red.
-6. Final gauge line VERBATIM from `node .opencode\plugin\scripts\peek.mjs` at the
-   end
-   of the summary.
+1. Section→part mapping table in the summary; every one of the 12 original
+   sections' facts verbatim in exactly one part (spot-check 3 distinctive
+   strings per part with grep and report).
+2. Root `agents_repo.md` ≤ 35 lines, index form, entry point intact.
+3. The 3 readmes exist, each ≤ 50 lines; index lines present in all 4 prompts;
+   planner prompt: marker rule + both stale paths fixed; looprunner: session-id
+   line; task+explorer: inbox rule.
+4. `todo_inbox.md` exists; `proposals/files/AGENTS.md` one line retargeted.
+5. Stale-path grep over the 4 live prompts + root index: no `.opencode/handover_
+   <name>.md` (no-slash) form remains.
+6. Gate (meta-only — must be unchanged): `& .\.venv\Scripts\python.exe -m pytest
+   -q` = 448 passed + 1 known warning (#10); `& .\.venv\Scripts\ruff.exe check
+   --select F .` = 0 findings.
+7. ONE green commit; `git show --stat` scope = exactly the files in Boundaries
+   that you actually changed + the summary file. NEVER stage `opencode.jsonc`.
+8. Summary file: mapping table, verbatim spot-checks, queued-maintainer-swap
+   note, deviations, final gauge line VERBATIM from
+   `node .opencode\plugin\scripts\peek.mjs`.
 
 ## Protocol
-- pwsh for git/gauge; file tools for all writes (no `>` redirection).
-- Read `TODO.md` fully BEFORE editing; when moving blocks, match exact original
-  strings (the edit tool), re-grep after each move to confirm the body is gone.
-- NEVER silently delete open/unresolved content — when unsure, LEAVE the entry
-  and report the doubt.
-- NEVER stage `opencode.jsonc` (modified by design — leave it in the tree).
-- Stop line: `REM ≤ 15k` or usage `≥ 85 %` → stop at a clean committed point and
-  finish the summary. Check the gauge between chunks (this task is read-heavy —
-  the 890-line file plus per-move greps add up).
-- NEVER parallel-edit the same file (sequential edits only).
+- pwsh (NOT git-bash idioms); file tools for writes; gauge between chunks
+  (read-heavy task: 224-line source file + 4 prompts + 3 readmes).
+- Stop line: `REM ≤ 15k` or `≥ 85%` → stop at a clean committed point, finish
+  the summary.
+- When moving sections, copy verbatim via read+write of the new files first,
+  then rewrite the root index; verify with grep that no section body remains in
+  the root file.
+- Handover files live in `.opencode/handover/` — your summary is
+  `.opencode/handover/handover_task_to_planner.md`.
