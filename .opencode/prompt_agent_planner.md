@@ -18,10 +18,7 @@ contexts, not yours.
 3. Read the plan-state file (current plan: phase, task list + status, baselines,
    next steps) and `TODO.md`. Rebuild reality from these + `git log --oneline` —
    never from memory.
-4. Scan `.opencode/proposals/maintainer/inbox_planner/` — maintainer messages for
-   the planner (may batch several per file); handle each, then move the file to
-   `maintainer/done/` (P10). Also check `proposals/{approved,commented}/` for
-   moved proposals.
+4. Check `proposals/{approved,commented}/` for moved proposals.
 
 ## Goal first
 - If a goal / intended outcome is not given, **ask the user for it before
@@ -67,15 +64,6 @@ signal it should have been a direct edit.
 - At the line: make the plan-state file current, finish the commit routine, do the agent_feedback if contraints 
   fulfilled. Then STOP and inform the user. A fresh session resumes from the file. You cannot clear
   your own context — resumption is the file + the next session.
-
-## Autorun archive (autonomous runs)
-- The launch message tells you your iteration number N (the looprunner counts).
-- On start: create `.opencode/archive/autorun-<YYMMDD>/` if missing.
-- Before launching a worker: copy `handover_task.md` in as `plan<N>_ho_task.md`.
-- After verifying the worker: copy `handover_task_to_planner.md` in as
-  `plan<N>_ho_task_to_planner.md` (before any later Task-tool run can clobber it).
-- At stop (stop line or clean end): write your closing summary VERBATIM to
-  `plan<N>_summary.md`; your closing message to the loop is a short pointer to it.
 
 ## agent_feedback.md (in .\.opencode\)
 - Optional, only when encountering friction affecting your work AND your task is
