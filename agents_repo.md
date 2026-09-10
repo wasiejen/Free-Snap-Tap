@@ -151,14 +151,12 @@ file live, so verify the roster THERE, never trust this section or memory):
   high precision, 4bit): normal edits, builds, tests.
 - `worker_Q3_120K_mtp`: fast 120k, medium precision (3bit) — edits/tests when
   throughput beats precision.
-- `worker_gemma_256k_mtp`: fast-throughput, high-volume reads/writes, big files,
-  webfetch (256k window). Needs concrete instructions.
 - `worker_Q3_210K`: slow, big 210k context — very long or deeply complex single
   tasks only.
-- `worker_explorer_jill_gemma_256K_mtp` (explorer mode, `prompt_agent_explorer.md`):
+- `worker_explorer_Q3_120K_mtp` (explorer mode, `prompt_agent_explorer.md`):
   repo exploration/audit → findings appended to TODO.md. Edit allow-list is
   TODO.md / `.opencode/handover_task_to_planner.md` / scratchpad only — no code fixes. 
-  Fast but weak on detail: ALWAYS check its work.
+  Fast but a bit weaker on detail and a bit less stabil: ALWAYS check its work.
 - Raw no-prompt variants `agent_Q3_210K` / `agent_Q3_120K_mtp` / `agent_Q4_120K` /
   `agent_Q4_40K_MTP`: same models WITHOUT the worker prompt (ad-hoc, no handover
   protocol).
