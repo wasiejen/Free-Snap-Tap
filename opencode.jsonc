@@ -11,7 +11,8 @@
     // how close to the defined limit is allowed, default 20000
     // there seems to be no option to set buffer per model like the limit
     // might hack it via defining another limit then the modell actuall has
-    "buffer": 0,
+  // buffer : 0 not working == deactivated -> default?
+    "buffer": 2000,
   },
 
   "provider": {
@@ -94,10 +95,10 @@
         },
         "CPU-Qwen3.5-4B": {
           "name": "CPU-Qwen3.5-4B",
-          // "limit": {
-          // "context":
-          // "output": 32000,
-          // }
+           "limit": {
+            "context": 16384,
+            "output": 16384,
+           }
         }
       }
     }
@@ -110,6 +111,26 @@
     },
   "subagent_depth": 2,
   "agent": {
+    "clean looprunner_dump": {
+      "description": "very simple looprunner without agents.py and limited contextsize and limited intelligence",
+      "mode": "primary",
+      "model": "llama-swap/CPU-Qwen3.5-4B",
+      "temperature": 0.1,
+      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_looprunner.md}",
+      "permission": {
+        "task": "allow",
+        "edit": {
+        ".opencode/prompt_looprunner.md": "allow",
+        ".opencode/loop_log.md": "allow",
+          },
+        "bash": "deny",
+        "webfetch": "deny"
+      },
+      "options": {
+        "load_project_docs": false,
+        "load_agents_md": false
+      }
+    },
     "looprunner_Q4_120k": {
       "description": "Just restarts the Planner in autnomous mode, same model als planner_Q4_120K for fast switching",
       "mode": "primary",
