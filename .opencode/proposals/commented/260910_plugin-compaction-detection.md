@@ -40,3 +40,11 @@ change.
 
 **Status:** awaiting maintainer approval (step 1 is pre-approved-class meta,
 2-3 need approval as observable behavior — the nudge text IS observable).
+
+comment
+- add to the plugin a writeout function that creates in .opencode/temp/session_context/ files for each session id named via session_id for now and appends its lasted output to the appropiate session_id
+  - future compaction warning should also be put there
+  - (so i can track this behavior)
+260910-1954.md in inbox 
+- move the gauge and peek mjs script into plugin/scripts/folder and update references
+  - you are allowed to update alle prompt files that might be connected to it to change in place

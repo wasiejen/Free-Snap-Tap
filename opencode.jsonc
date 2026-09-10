@@ -1,6 +1,19 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "disabled_providers": [],
+  // needs to be tested
+  "compaction": {
+    "auto": true,
+    "keep": {
+      // how much of the original prompt to keep, default 15000
+      "tokens": 50000,
+    },
+    // how close to the defined limit is allowed, default 20000
+    // there seems to be no option to set buffer per model like the limit
+    // might hack it via defining another limit then the modell actuall has
+    "buffer": 20000,
+  },
+
   "provider": {
     "llama-swap": {
       "name": "llama-swap-v2",
@@ -10,37 +23,81 @@
       },
       "models": {
         "Qwen3.8-27B-IQ3KT-120K_MTP:chat": {
-          "name": "Qwen3.8-27B-IQ3KT-MTP:chat"
+          "name": "Qwen3.8-27B-IQ3KT-MTP:chat",
+          "limit": {
+            "context": 120000,
+            "output": 120000, // 131072 normally but adapted to contextsize
+          }
         },
         "Qwen3.8-27B-IQ3KT-120K_MTP": {
-          "name": "Qwen3.8-27B-IQ3KT-MTP"
+          "name": "Qwen3.8-27B-IQ3KT-MTP",
+          "limit": {
+            "context": 120000,
+            "output": 120000,
+          }
         },
         "Qwen3.8-27B-IQ3KT-210K": {
-          "name": "Qwen3.8-27B-IQ3KT"
+          "name": "Qwen3.8-27B-IQ3KT",
+          "limit": {
+            "context": 210000,
+            "output": 131072,
+          }
         },
         "Qwen3.8-27B-IQ3KP-UC-100K": {
-          "name": "Qwen3.8-27B-IQ3KP-UC"
+          "name": "Qwen3.8-27B-IQ3KP-UC",
+          "limit": {
+            "context": 100000,
+            "output": 10000,
+          }
         },
         "Qwen3.8-27B-IQ4KT-50K-MTP": {
-          "name": "Qwen3.8-27B-IQ4KT-MTP"
+          "name": "Qwen3.8-27B-IQ4KT-MTP",
+          "limit": {
+            "context": 50000,
+            "output": 50000,
+          }
         },
         "Qwen3.8-27B-IQ4KT-120K": {
-          "name": "Qwen3.8-27B-IQ4KT"
+          "name": "Qwen3.8-27B-IQ4KT",
+          "limit": {
+            "context": 120000,
+            "output": 120000,
+          }
         },
         "Gemma4-12B-Q4KM-UC-256K": {
-          "name": "Gemma4-12B-Q4KM-UC"
+          "name": "Gemma4-12B-Q4KM-UC",
+          "limit": {
+            "context": 131072,
+            "output": 131072,
+          }
         },
         "Gemma4-12B-Q4KXL-MTP-256K": {
-          "name": "Gemma4-12B-Q4KXL-MTP"
+          "name": "Gemma4-12B-Q4KXL-MTP",
+          "limit": {
+            "context": 131072,
+            "output": 131072,
+          }
         },
         "CPU-Qwen3-0.6B": {
-          "name": "CPU-Qwen3-0.6B"
+          "name": "CPU-Qwen3-0.6B",
+          // "limit": {
+          // "context":
+          // "output": 32000,
+          // }
         },
         "CPU-Gemma4-E2B": {
-          "name": "CPU-Gemma4-E2B"
+          "name": "CPU-Gemma4-E2B",
+          // "limit": {
+          // "context":
+          // "output": 32000,
+          // }
         },
         "CPU-Qwen3.5-4B": {
-          "name": "CPU-Qwen3.5-4B"
+          "name": "CPU-Qwen3.5-4B",
+          // "limit": {
+          // "context":
+          // "output": 32000,
+          // }
         }
       }
     }
@@ -58,7 +115,7 @@
       "mode": "primary",
       "model": "llama-swap/Qwen3.8-27B-IQ4KT-120K",
       "temperature": 0.1,
-      "prompt": "{file:./.opencode/prompt_looprunner.md}",
+      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_looprunner.md}",
       "permission": {
         "task": "allow",
         "edit": {
@@ -75,7 +132,7 @@
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
       "temperature": 1.0,
-      "prompt": "{file:./.opencode/prompt_agent_planner.md}",
+      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_planner.md}",
       "permission": {
         "edit": {
           "*": "allow",
@@ -90,7 +147,7 @@
       "description": "half prefill, very intelligent, moderately fast, 120k context, plans tasks and delegates to sub-agents, higher precision and higher stability due to 4bit Quant",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ4KT-120K",
-      "prompt": "{file:./.opencode/prompt_agent_planner.md}",
+      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_planner.md}",
       "temperature": 1.0,
       // "steps": 15,
       "permission": {
@@ -110,7 +167,7 @@
       "description": "intelligent, fast generation, 120K context window, to be used to explore code base - to be checked",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
-      "prompt": "{file:./.opencode/prompt_agent_explorer.md}",
+      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_explorer.md}",
       "temperature": 1.0,
       // "steps": 15,
       "permission": {
@@ -130,7 +187,7 @@
     //   "description": "moderately intelligent, very very fast, 256K context window - needs concrete instructions, best for webfetch, big file reads, big writes",
     //   "mode": "all",
     //   "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
-    //   "prompt": "{file:./.opencode/prompt_agent_task.md}",
+    //   "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_task.md}",
     //   "temperature": 0.2,
     //   // "steps": 15,
     //   "permission": {
@@ -157,7 +214,7 @@
       "description": "intelligent, fast, 120k context, medium precision due to 3bit Quant",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
-      "prompt": "{file:./.opencode/prompt_agent_task.md}",
+      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_task.md}",
       "temperature": 0.3,
       // "steps": 15,
       "permission": {
@@ -181,7 +238,7 @@
       "description": "half prefill, very intelligent, moderately fast, 120k context, higher precision and higher stability due to 4bit Quant",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ4KT-120K",
-      "prompt": "{file:./.opencode/prompt_agent_task.md}",
+      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_task.md}",
       "temperature": 1.0,
       // "steps": 15,
       "permission": {
@@ -207,7 +264,7 @@
       "description": "intelligent, slow, big 210k context - for very long and complex tasks, medium precision due to 3bit Quant",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ3KT-210K",
-      "prompt": "{file:./.opencode/prompt_agent_task.md}",
+      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_task.md}",
       "temperature": 0.3,
       // "steps": 15,
       "permission": {

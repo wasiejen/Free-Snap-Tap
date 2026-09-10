@@ -52,3 +52,9 @@ only the repo- and feature-level knowledge moves.
 **Status:** awaiting maintainer approval. Part 3 + 4 are pre-approved-class
 (file cleanup / meta) and could ship first; parts 1 + 2 touch the live prompt
 (your file) → your edit or explicit go.
+
+comment:
+- add an todo_inbox.md - so worker agents do not write into the large file (your take on it?)
+- add a todo_wip.md - there stays everything that is actually worked on. (might be not needed depending on)
+- I see no mention of a further todo split into topics related todos? what is your take on this?
+- would need to include the changes to the prompts
