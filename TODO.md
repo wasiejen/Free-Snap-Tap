@@ -273,20 +273,14 @@ Moved to `todo_records.md` on 2026-09-10 — one-line records, IDs 2, 5, 10, 12,
 16, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32 (+ the 260908-0951 dedup block).
 All those IDs stay reserved — see the numbering rule in the header.
 
-## 34. Stale `peek.py` documentation refs + worker prompt permission block (2026-09-10, build T1)
+## 34. (closed 2026-09-10) Stale `peek.py` documentation refs + worker prompt permission block
 
-- **Problem / evidence:** peek.py was deleted in the T1 cycle, but documentation/permissions leave no usable single line: `agents_repo.md` line ~139 ("Context gauge: run `& .\.venv\Scripts\python.exe .opencode\ctxgauge\peek.py`" + module map line ~97) is maintainer-owned; the root `AGENTS.md` is per its own rule + opencode.jsonc read-only for workers (denies `AGENTS.md`); `.opencode/prompt_agent_planner.md` + `prompt_agent_task.md` — the self-peek line there still points to `agents_repo.md` (old python command) — and the opencode.jsonc worker permission denies `.opencode/prompt_**`, so the T1 pre-approved self-peek edit could NOT be made by the worker; remaining non-doc references also found but unchanged: `playground/outline_rework_prompts.md` (four peek refs in maintainer-rework draft), `SCRATCH_PAD.md` (WIP note), `deactivated/handover.ts` (frozen dead copy — removal is maintainer call), `handover_planner.md` (planner-owned).
-- **Outcome (goal):** a single self-peek line `node .opencode\ctxgauge\peek.mjs` (readout `SESSION=… CTX=… (…) REM=…`) in the four maintainer-side agent documents (`prompt_agent_planner.md`, `prompt_agent_task.md`, `agents_repo.md`, root `AGENTS.md`); maintainer decides fate of the residual references listed above (update or leave as historical).
-- **Acceptance:** no live agent-facing doc references peek.py; prompt self-peek line = node CLI (the wording of the `ctx:` nudge description keeps mentioning the `SESSION=…` prefix); the residual list is either updated or explicitly left.
-- **Scope:** the files named above.
-- **Status:** prompt-file self-peek lines DONE (planner execution, 2026-09-10 bookkeeping
-  commit — `prompt_agent_planner.md` + `prompt_agent_task.md` now self-peek via
-  `node .opencode\ctxgauge\peek.mjs` with the `SESSION=…` wording; the worker was blocked
-  by the `.opencode/prompt_**` deny). REMAINING = maintainer call: the `agents_repo.md`
-  gauge line (~164) + module-map line (~97) (maintainer-owned), and the residual refs
-  (frozen `deactivated/handover.ts` copy, `playground/outline_rework_prompts.md` draft,
-  historical files — recommendation: update the agents_repo.md line, leave the rest
-  historical).
+CLOSED — all agent-facing docs now self-peek via `node .opencode\ctxgauge\peek.mjs`
+(readout `SESSION=… CTX=… (…) REM=…`): prompt files (`a235886`, planner execution — the
+worker was blocked by the `.opencode/prompt_**` deny) + `agents_repo.md` gauge line
+(~164) and module-map line (~122) (explicit maintainer instruction, 2026-09-10).
+Residual refs (frozen `deactivated/handover.ts` copy, `playground/outline_rework_prompts.md`
+draft, historical files/records) = LEFT AS HISTORICAL (maintainer call, same instruction).
 
 ## 35. T1 de-peek build IN PROGRESS — read mechanic not landed; continue on a bigger window (2026-09-10)
 

@@ -52,3 +52,49 @@ appending your own entry.
 - **Cost:** extra spec line + a worker status-check branch per task that could otherwise run the default; this cycle the guard worked (content preserved), but the ambiguity is visible in the spec.
 - **Suggested change:** settle one rule: `handover_task_to_planner.md` = latest summary only (older ones live in git); maintainer format experiments go in a separate scratch file so the worker contract never faces a dirty shared slot.
 #### resolved by including "The `handover_task_to_planner.md` contains your latest summary only."
+### Stale cross-session `ctx:` injection at session start — planner 2026-09-10
+- **Friction:** the `ctx:` line injected at my session start reported the PREVIOUS
+  planner's dying session (`CTX=99291 (99%) REM=709`) while my true context
+  was `CTX=25273 (21%)` (verified via self-gauge) — the v2.4.1 most-recently-updated
+  session read fed another session's numbers into mine at exactly the moment the
+  context-budget decision matters most.
+- **Cost:** a verification round-trip to re-establish ground truth + doubt about every
+  subsequent injected number for the rest of the session; the injected value is
+  "source of truth" per the prompts, so a stale value silently corrupts the stop-line
+  math.
+- **Suggested change:** session-gated match-only post (the v2.5 design — landed
+  `313e83b`, live after restart); until then treat the injected `ctx:` as reminder-only
+  and self-gauge for budget decisions.
+
+### agents_repo.md gauge command pointed at a deleted CLI mid-convention — planner 2026-09-10
+- **Friction:** AGENTS.md's post-commit context check says "run the context gauge
+  (command + path in `agents_repo.md`)" — that line still invoked the deleted
+  `peek.py` python CLI, so the documented commit routine pointed at a dead command
+  (the doc purge lagged the code deletion by a whole cycle, tracked as #34).
+- **Cost:** a workaround lookup + the convention being silently unusable for any agent
+  following the commit routine verbatim; the same stale pointer sat in the module map.
+- **Suggested change:** when a tool is deleted, sweep the convention pointers in the
+  SAME commit (agents_repo.md + prompts) — done 2026-09-10 (#34 closed); keep the gauge
+  line in agents_repo.md as the single source for the command.
+
+### "final message = same summary" instruction looped the worker — planner 2026-09-10
+- **Friction:** the worker prompt required the executive summary to be written to the
+  handover file AND repeated as the final message; the worker repeated the final message
+  multiple times (loop) and had to be stopped by the maintainer — after it had already
+  committed its full scope.
+- **Cost:** a lost delegation slot + maintainer intervention; the work itself was safe
+  (committed pre-loop) but the loop ate the worker's remaining context.
+- **Suggested change:** handover FILE as the single summary channel; final message =
+  short pointer only (maintainer already removed the duplication, `52eb0aa`; the
+  task-spec Worker section now says the same).
+
+### Stale roster line in the task spec (minor) — planner 2026-09-10
+- **Friction:** the spec's "Worker" section named `worker_120K_mtp` while the NAP + TODO
+  named a 210K worker, and the final delegatee was a third agent (`worker_Q4_120K` after
+  the maintainer restart) — the line went stale across two re-rulings and had to be
+  overridden every cycle.
+- **Cost:** small: a contradiction to resolve at each delegation + a worker told to
+  ignore its own spec line.
+- **Suggested change:** keep the spec's Worker line as "the planner's roster choice is
+  the delegatee" + one rationale sentence; the NAP is the authoritative roster record.
+
