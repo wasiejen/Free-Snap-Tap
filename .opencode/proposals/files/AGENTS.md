@@ -115,7 +115,7 @@ agent can resume from a committed state without re-exploring. Two-party split:
    open/unresolved content.
 4. **Post-commit context check** — see Context budget.
 - Commit green, commit often, never commit red. Handover files ride along.
-- Handover files live in `.\.opencode\`.
+- Handover files live in `.\.opencode\handover`.
 
 ## Context budget (stop line)
 - Check between logical chunks and after every commit (step 4): run the context gauge

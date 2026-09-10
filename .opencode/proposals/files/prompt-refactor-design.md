@@ -175,11 +175,12 @@ contract.
   Embedded launch text trimmed to the mechanical minimum; autonomous behavior removed (now in
   the planner). Loop hygiene (ctx at 80%/85%, launch-fail retry, no-progress stop) kept.
 
-## 9. `agents_repo.md` — targeted trims only (not a full rewrite)
+## 9. `agents_repo.md` — targeted trims (full drop-in file in this folder)
 
 `agents_repo.md` is ~250 lines of single-sourced repo facts (module map, data flow, test
 conventions, gotchas, env/shell) — high value, no duplication, so **leave the facts verbatim**.
-Documented trims (apply by hand, low risk):
+The full trimmed file is in this folder (`agents_repo.md`) — a drop-in replacement;
+only two sections changed, everything else reproduced verbatim:
 - "Worker roster" duplicates `opencode.jsonc` and already says "verify the roster THERE, never
   trust this section" → reduce to a pointer + model/quantization notes only.
 - "Handover file paths" now overlaps the AGENTS.md interaction-contract table → keep only the
