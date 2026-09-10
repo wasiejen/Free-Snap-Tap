@@ -3,7 +3,7 @@
 // No python (the gauge core reads READ-ONLY via its backend chain:
 // node:sqlite → bun:sqlite → spawn sqlite3.exe — see the gauge header).
 //
-// Self-peek for agents (repo root):  node .opencode\ctxgauge\peek.mjs
+// Self-peek for agents (repo root):  node .opencode\plugin\scripts\peek.mjs
 //   ->  SESSION=ses_... CTX=61351 (61%) REM=38649     (window known)
 //   ->  SESSION=ses_... CTX=18050                     (window unknown)
 //   ->  SESSION=ses_... CTX=notAvailable              (no total / unreadable db)

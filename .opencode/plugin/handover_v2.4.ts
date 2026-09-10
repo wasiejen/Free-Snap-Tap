@@ -72,7 +72,7 @@
 // v2.5 (2026-09-10, de-peek core, TODO.md #30): the ctx readout leaves the shell. The
 // BunShell machinery (GAUGE_TIMEOUT_MS, ShellLike, withTimeout, gaugePreviewOf, the
 // tagged-template gauge call) is DELETED — the readout is the shared gauge core
-// (../ctxgauge/gauge.mjs, built-in node:sqlite, read-only, never-throw: kind "db-error"
+// (./scripts/gauge.mjs, built-in node:sqlite, read-only, never-throw: kind "db-error"
 // is the silent production fallback if the bun-compiled host lacks the module), ONE
 // implementation with the self-peek CLI (the retired python peek CLI deleted).
 // SESSION-GATED MATCH-ONLY POST
@@ -135,10 +135,10 @@ import { appendFileSync, readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 // v2.5 — the native context gauge core (de-peek, TODO.md #30): ONE implementation
-// shared with the self-peek CLI (../ctxgauge/peek.mjs). Reads the opencode db via
+// shared with the self-peek CLI (./scripts/peek.mjs). Reads the opencode db via
 // built-in node:sqlite (read-only, busy_timeout + one retry, NEVER throws — the
 // db-error kind is the fallback; see the v2.5 header block).
-import { readGauge, formatGauge } from "../ctxgauge/gauge.mjs";
+import { readGauge, formatGauge } from "./scripts/gauge.mjs";
 
 const LINE_CAP = 2000;
 const CAPS = [500, 150, 60];

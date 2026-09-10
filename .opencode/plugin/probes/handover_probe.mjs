@@ -273,7 +273,7 @@ const MISSING_DB = path.join(SANDBOX, "missing_fx.db"); // never created — the
 // the core — SAME module instance the plugin imports (same resolved file), so
 // setDbPath below steers the plugin's chat.message read to the fixtures.
 const { readGauge, formatGauge, parseWindow, parseModelId, setDbPath, getDbPath, setBackends, getBackends, DEFAULT_BACKENDS, setImportForTest, clearImportForTest, importAttemptsForTest } =
-  await import(new URL("../../ctxgauge/gauge.mjs", import.meta.url).href);
+  await import(new URL("../scripts/gauge.mjs", import.meta.url).href);
 
 // the plugin, loaded from the REAL repo path (Node 24 strips the TS types)
 const plugin = (await import(pathToFileURL(PLUGIN_TS).href)).default;

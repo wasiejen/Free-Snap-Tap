@@ -115,11 +115,14 @@ config file. README/WIKI have some stale examples — trust the convention above
   suite (`pytest.ini` `testpaths = tests`); never import them from package code,
   and exclude from EXE packaging. If the maintainer explicitly requests a live
   probe, run these directly from the repo root; otherwise do not execute them.
-- `.opencode/` — opencode meta files (not FST code): `prompt_agent_planner.md` /
-  `prompt_agent_task.md` (agent prompts), `handover_planner.md` (planner
+- `.opencode/` — opencode meta files (not FST code):
+  `system_prompts/agents/prompt_agent_*.md` (live agent prompts; draft copies in
+  `proposals/files/`), `handover/` — `handover_planner.md` (planner
   state/continuation file, the NAP), `handover_task.md` (current task spec),
-  `handover_task_to_planner.md` (worker's latest EXECUTIVE SUMMARY),
-  `ctxgauge/peek.mjs` (context gauge — node, node:sqlite).
+  `handover_task_to_planner.md` (worker's latest EXECUTIVE SUMMARY).
+- `plugin/scripts/` — the context gauge (`peek.mjs` self-peek CLI + `gauge.mjs`
+  core, node:sqlite) — moved out of the old `ctxgauge/` dir (2026-09-10, per the
+  compaction-detection proposal comment).
 - `opencode.jsonc` (repo root) — opencode config: llama-swap provider + model
   list, planner (primary) and worker agents (subagents), scoped permissions.
 
@@ -163,13 +166,14 @@ faster/weaker):
 ## Handover file paths
 Channel semantics (who writes/reads, canonicality) live in the `AGENTS.md`
 interaction-contract table — this section keeps only the concrete repo facts:
-- The plan-state file `.opencode/handover_planner.md` is what the maintainer
-  calls the **NAP** (**N**ext **A**gent **P**rompt) — "NAP"/"write a NAP" means
-  this file. Phase close moves it to `.opencode/archive/<YYMMDD>-<slug>.md` with
-  a STATUS header.
-- Context gauge (self-gauge): run `node .opencode\ctxgauge\peek.mjs` from the
-  repo root, read-only → `SESSION=… CTX=n (p%) REM=m` (window unknown → `CTX=n`
-  only; no finished step → `CTX=notAvailable`).
+- The plan-state file `.opencode/handover/handover_planner.md` is what the
+  maintainer calls the **NAP** (**N**ext **A**gent **P**rompt) — "NAP"/"write a
+  NAP" means this file. Phase close moves it to
+  `.opencode/archive/<YYMMDD>-<slug>.md` with a STATUS header. All handover
+  files live in `.opencode/handover/`.
+- Context gauge (self-gauge): run `node .opencode\plugin\scripts\peek.mjs` from
+  the repo root, read-only → `SESSION=… CTX=n (p%) REM=m` (window unknown →
+  `CTX=n` only; no finished step → `CTX=notAvailable`).
 - Durable maintainer TODOs: `TODO.md`.
 
 ## Gotchas

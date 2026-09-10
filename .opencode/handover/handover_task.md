@@ -1,8 +1,14 @@
 # TASK — TODO.md split: closed entries → todo_records.md (split proposal, part 3)
 
 FIRST read `AGENTS.md`, `agents_repo.md`, and this file. The source proposal is
-`.opencode/proposals/260910_prompt-and-todo-split.md` — you are executing **part 3
-only** (pre-approved class: meta/file cleanup). Parts 1+2 are NOT yours.
+`.opencode/proposals/commented/260910_prompt-and-todo-split.md` (it moved to
+`commented/` after the maintainer added design questions — the maintainer's
+launch message confirms part 3 still stands as specified; your task is **part 3
+only**, pre-approved class: meta/file cleanup). Parts 1+2 are NOT yours.
+NOTE (2026-09-10, planner path fix): the handover files now live in
+`.opencode/handover/` — your summary file is
+`.opencode/handover/handover_task_to_planner.md` (NOT `.opencode/handover_task_to_planner.md`;
+that path no longer exists).
 
 ## Goal
 Slim `TODO.md` (≈890 lines): every unambiguously closed entry moves its FULL TEXT
@@ -50,7 +56,7 @@ Per moved entry, one block:
 
 ## Scope
 - `TODO.md` + `todo_records.md` (the ONLY repo files you edit) +
-  `.opencode/handover_task_to_planner.md` (your executive summary).
+  `.opencode/handover/handover_task_to_planner.md` (your executive summary).
 - The "Maintainer calls (open, in order)" list: DO NOT EDIT (even if a line
   references a now-closed entry — report stale refs in the summary instead).
 - Meta files (`agents_repo.md`, prompts, proposals, NAP) READ-ONLY — flag in the
@@ -69,7 +75,8 @@ Per moved entry, one block:
 5. ONE commit, green, subject e.g.
    "TODO split part 3: closed entries → todo_records.md, stubs in TODO.md".
    No gate run needed (meta-only) — but NEVER commit red.
-6. Final gauge line VERBATIM from `node .opencode\ctxgauge\peek.mjs` at the end
+6. Final gauge line VERBATIM from `node .opencode\plugin\scripts\peek.mjs` at the
+   end
    of the summary.
 
 ## Protocol

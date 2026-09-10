@@ -144,9 +144,9 @@ const THIS_DIR = dirname(fileURLToPath(import.meta.url));
 // The opencode.db location (fact-2 of the T1 spec, planner-verified).
 export const DEFAULT_DB_PATH = join(os.homedir(), ".local", "share", "opencode", "opencode.db");
 // The maintainer-placed SQLite CLI, resolved RELATIVE TO THIS FILE (stable
-// for the CLI cwd and the plugin import alike): .opencode/ctxgauge →
-// ../plugin/tools. NEVER deleted or moved (maintainer-placed, TODO #30/#37).
-export const DEFAULT_EXE_PATH = join(THIS_DIR, "..", "plugin", "tools", "sqlite3.exe");
+// for the CLI cwd and the plugin import alike): .opencode/plugin/scripts →
+// ../tools. NEVER deleted or moved (maintainer-placed, TODO #30/#37).
+export const DEFAULT_EXE_PATH = join(THIS_DIR, "..", "tools", "sqlite3.exe");
 // The backend chain, in selection order (see the READ BACKEND CHAIN header).
 export const DEFAULT_BACKENDS = Object.freeze(["node:sqlite", "bun:sqlite", "spawn-sqlite3"]);
 
