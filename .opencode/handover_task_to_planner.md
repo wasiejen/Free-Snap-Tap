@@ -70,7 +70,8 @@ DoD 4 (commit hash in the status tails/summary) vs DoD 5 (ONE commit) are
 mutually exclusive — a commit cannot carry its own hash. Per the AGENTS.md
 commit-routine split: the code + tests + TODO/summary land as the main commit,
 and the hash backfill into the tails/summary rides a second bookkeeping-only
-commit. Main commit hash: <MAIN> (bookkeeping commit: <BOOK>).
+commit. Main commit hash: `bdab550` (code+tests+TODO+summary); the bookkeeping
+commit carrying this backfill is the next commit in `git log`.
 
 ## Deliberately NOT done
 - #48 fixes NOT implemented (report-back only — the ruling approves fixing them
