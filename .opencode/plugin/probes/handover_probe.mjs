@@ -104,17 +104,32 @@
 //           not re-tried (attempts +1 total)
 //      (39) hook restore: getBackends() back to the default chain order,
 //           setDbPath/getDbPath plumbing intact, read byte-identical
+//   S8 nudge ladder (8) — the v2.6 auto-nudge ladder (TODO #30/#33, the
+//      APPROVED design of record), fired from tool.execute.after with a
+//      PER-SESSION read against the fx_lad.db fixture (window 120K — one
+//      session per rung + two delivery-failure sessions); the plugin is
+//      re-initialized with a FAKE client that records every promptAsync
+//      call; evidence = kind:"nudge" lines only (silent on every non-fire):
+//      (46) below the first rung (49%) → SILENT (no line, no call)
+//      (47-51) rungs 1-5 each fire EXACTLY ONCE: byte-exact nudge line
+//          {session, rung, readout} + promptAsync payload
+//          {path:{id}, body:{parts:[{type:"text", synthetic:true, text =
+//          readout + " — " + rung instruction}]}}
+//      (52) per-rung dedup: a second fire at the same rung posts NOTHING
+//      (53) delivery failures evidence-logged (delivery-threw /
+//          delivery-rejected, preview capped) — never thrown
 //   S5 hygiene (5): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
-//      tool.before==6, tool.after==3, chatmsg==8, gauge==3, event==0); the
+//      tool.before==6, tool.after==12, chatmsg==8, gauge==3, event==0,
+//      nudge==9); the
 //      real handover files byte-identical to pre-run and zero CO-APPENDED live
 //      lines (the real plugin.log may only grow — a line carrying a probe
-//      fingerprint id s*/c*/d*/t*/ses_fx_*/ses_other = the probe wrote out of
+//      fingerprint id s*/c*/d*/t*/e1–e9/ses_fx_*/ses_other/ses_lad_* = the probe wrote out of
 //      the sandbox); zero new/changed files outside the sandbox (.opencode
 //      listing + git status, before vs after).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S5=5  →  "PROBE handover: 45/45 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S5=5  →  "PROBE handover: 52/52 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -821,6 +836,152 @@ const MOCK_LOG = [];
   );
 }
 
+// ------------------------------------------------------------------ S8 nudge ladder (8)
+//
+// The v2.6 auto-nudge ladder (TODO #30/#33 — the APPROVED design of record):
+// fired from tool.execute.after with a PER-SESSION read (the payload's session
+// id must exist in the fixture db — fx_lad.db, window 120K, one session per
+// rung + two delivery-failure sessions). The plugin is RE-INITIALIZED with a
+// fake client (module-level swap; the original hooks object stays valid) that
+// records every promptAsync call. Evidence = kind:"nudge" lines ONLY —
+// SILENT on every non-fire.
+const LAD_ROW = (sid, ctx) => ({
+  id: sid,
+  time_updated: 3000,
+  model: JSON.stringify({ id: "probe-model-120K_MTP", providerID: "fx" }),
+  messages: [
+    {
+      time_created: 20,
+      data: JSON.stringify({
+        role: "assistant",
+        finish: "stop",
+        // total = input + output + cache.read(0); ctx = total - output (the verified token semantics)
+        tokens: { total: ctx + 101, input: ctx, output: 101, reasoning: 0, cache: { write: 0, read: 0 } },
+      }),
+    },
+  ],
+});
+const FX_LAD = path.join(SANDBOX, "fx_lad.db");
+buildFixtureDb(FX_LAD, [
+  LAD_ROW("ses_lad_0", 59_901), // 49% — below the first rung
+  LAD_ROW("ses_lad_1", 61_001), // 50% — rung 1
+  LAD_ROW("ses_lad_2", 84_001), // 70% — rung 2
+  LAD_ROW("ses_lad_3", 96_001), // 80% — rung 3
+  LAD_ROW("ses_lad_4", 108_001), // 90% — rung 4
+  LAD_ROW("ses_lad_5", 116_001), // REM 3999 < 5k — rung 5
+  LAD_ROW("ses_lad_6", 96_001), // rung 3 — the delivery-threw shape
+  LAD_ROW("ses_lad_7", 96_001), // rung 3 — the delivery-rejected shape
+]);
+const LAD_RO = {
+  ses_lad_1: "SESSION=ses_lad_1 CTX=61001 (50%) REM=58999",
+  ses_lad_2: "SESSION=ses_lad_2 CTX=84001 (70%) REM=35999",
+  ses_lad_3: "SESSION=ses_lad_3 CTX=96001 (80%) REM=23999",
+  ses_lad_4: "SESSION=ses_lad_4 CTX=108001 (90%) REM=11999",
+  ses_lad_5: "SESSION=ses_lad_5 CTX=116001 (96%) REM=3999",
+};
+setDbPath(FX_LAD);
+const nudged = [];
+const fakeClient = {
+  session: {
+    promptAsync: (options) => {
+      nudged.push(options);
+      return Promise.resolve({ ok: true });
+    },
+  },
+};
+await plugin({ directory: SANDBOX, client: fakeClient });
+const nudgeLines = () => linesOfKind("nudge").map((l) => JSON.parse(l));
+const afterLad = (sid, call) => afterFeed(sid, call, {}, { output: "x" });
+
+// 46 — below the first rung (49% / REM 60k): SILENT — no nudge line, no promptAsync call
+{
+  await afterLad("ses_lad_0", "e1");
+  check(
+    "46",
+    "S8",
+    "below the first rung (49%): SILENT — no nudge line, no promptAsync call",
+    nudgeLines().length === 0 && nudged.length === 0,
+    `nudge=${nudgeLines().length} calls=${nudged.length}`,
+  );
+}
+
+// 47-51 — rungs 1-5: each fires EXACTLY ONCE with the byte-exact evidence line
+//      {session, rung, readout} and the byte-shape promptAsync payload
+//      (path.id = the session, ONE synthetic text part, text = readout + " — "
+//      + the rung instruction)
+{
+  const RUNGS = [
+    ["47", "ses_lad_1", "1", "e2", "context watch"],
+    ["48", "ses_lad_2", "2", "e3", "context high"],
+    ["49", "ses_lad_3", "3", "e4", "wind-down"],
+    ["50", "ses_lad_4", "4", "e5", "CRITICAL"],
+    ["51", "ses_lad_5", "5", "e6", "stop line reached"],
+  ];
+  for (const [id, sid, rung, call, marker] of RUNGS) {
+    const nBefore = nudgeLines().length;
+    const cBefore = nudged.length;
+    await afterLad(sid, call);
+    const nl = nudgeLines().slice(nBefore);
+    const o = nl.length === 1 ? nl[0] : {};
+    const c = nudged.length === cBefore + 1 ? nudged[cBefore] : null;
+    const p0 = c?.body?.parts?.[0];
+    const ro = LAD_RO[sid];
+    const payloadOk =
+      c?.path?.id === sid &&
+      Array.isArray(c?.body?.parts) &&
+      c.body.parts.length === 1 &&
+      p0?.type === "text" &&
+      p0?.synthetic === true &&
+      typeof p0?.text === "string" &&
+      p0.text.startsWith(`${ro} \u2014 `) &&
+      p0.text.includes(marker);
+    check(
+      id,
+      "S8",
+      `rung ${rung} fires exactly once: byte-exact nudge line {session,rung,readout} + promptAsync payload (synthetic text part, marker "${marker}")`,
+      nl.length === 1 && o.session === sid && o.rung === rung && o.readout === ro && payloadOk,
+      JSON.stringify({ nl: nl.length, o, c }).slice(0, 400),
+    );
+  }
+}
+
+// 52 — per-rung dedup: a second tool fire at the same (already fired) rung
+//      posts NOTHING — no nudge line, no promptAsync call
+{
+  const nBefore = nudgeLines().length;
+  const cBefore = nudged.length;
+  await afterLad("ses_lad_1", "e7");
+  check(
+    "52",
+    "S8",
+    "per-rung dedup: second fire at an already-fired rung posts nothing (no line, no call)",
+    nudgeLines().length === nBefore && nudged.length === cBefore,
+    `nudge=${nudgeLines().length - nBefore} calls=${nudged.length - cBefore}`,
+  );
+}
+
+// 53 — delivery failures are EVIDENCE-LOGGED, never thrown: a sync throw in
+//      promptAsync → kind nudge reason delivery-threw; a rejected promise →
+//      reason delivery-rejected; both carry session/rung/preview (capped)
+{
+  await plugin({ directory: SANDBOX, client: { session: { promptAsync: () => { throw new Error("boom-threw"); } } } });
+  await afterLad("ses_lad_6", "e8");
+  const lt = nudgeLines().filter((o) => o.session === "ses_lad_6" && o.reason);
+  await plugin({ directory: SANDBOX, client: { session: { promptAsync: () => Promise.reject(new Error("boom-rejected")) } } });
+  await afterLad("ses_lad_7", "e9");
+  await new Promise((r) => setTimeout(r, 25)); // the .catch evidence line is async (microtask)
+  const lr = nudgeLines().filter((o) => o.session === "ses_lad_7" && o.reason);
+  check(
+    "53",
+    "S8",
+    "delivery failures evidence-logged (delivery-threw + delivery-rejected, rung 3, preview capped), never thrown",
+    lt.length === 1 && lt[0].reason === "delivery-threw" && lt[0].rung === "3" && String(lt[0].preview ?? "").includes("boom-threw") &&
+      lr.length === 1 && lr[0].reason === "delivery-rejected" && lr[0].rung === "3" && String(lr[0].preview ?? "").includes("boom-rejected"),
+    JSON.stringify({ lt, lr }),
+  );
+  await plugin({ directory: SANDBOX, client: fakeClient }); // restore the recording client
+}
+
 // ------------------------------------------------------------------ S5 hygiene (5)
 
 // 40 — every sandbox plugin.log line parses as JSON (no stray/blank/garbled lines)
@@ -851,17 +1012,18 @@ const MOCK_LOG = [];
 }
 
 // 42 — exact kind tallies (no stray lines either): warn==2 (S1), tool.before==6
-//      (S1 3 + S2 3), tool.after==3 (S3), chatmsg==8 (the 8 S4 fires — per fire,
-//      mismatch included), gauge==3 (db-error + parts-not-array + invalid-messageID),
-//      event==0
+//      (S1 3 + S2 3), tool.after==12 (S3 3 + S8 9), chatmsg==8 (the 8 S4 fires —
+//      per fire, mismatch included), gauge==3 (db-error + parts-not-array +
+//      invalid-messageID), event==0, nudge==9 (S8: the 5 rung fires + the 2
+//      delivery-failure sessions × {fire line + failure line} = 5 + 4)
 {
   const tally = (k) => linesOfKind(k).length;
   check(
     "42",
     "S5",
-    "kind tallies exact: warn==2, tool.before==6, tool.after==3, chatmsg==8, gauge==3, event==0",
-    tally("warn") === 2 && tally("tool.before") === 6 && tally("tool.after") === 3 && tally("chatmsg") === 8 && tally("gauge") === 3 && tally("event") === 0,
-    `warn=${tally("warn")} tool.before=${tally("tool.before")} tool.after=${tally("tool.after")} chatmsg=${tally("chatmsg")} gauge=${tally("gauge")} event=${tally("event")}`,
+    "kind tallies exact: warn==2, tool.before==6, tool.after==12, chatmsg==8, gauge==3, event==0, nudge==9",
+    tally("warn") === 2 && tally("tool.before") === 6 && tally("tool.after") === 12 && tally("chatmsg") === 8 && tally("gauge") === 3 && tally("event") === 0 && tally("nudge") === 9,
+    `warn=${tally("warn")} tool.before=${tally("tool.before")} tool.after=${tally("tool.after")} chatmsg=${tally("chatmsg")} gauge=${tally("gauge")} event=${tally("event")} nudge=${tally("nudge")}`,
   );
 }
 
@@ -877,7 +1039,7 @@ const MOCK_LOG = [];
   const postLog = POST["plugin.log"] ?? "";
   const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
   const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
-  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other"];
+  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7"];
   const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`) || l.includes(`"sess":"${fid}"`)));
   check(
     "43",

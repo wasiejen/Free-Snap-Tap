@@ -358,8 +358,12 @@ reenabled, that is the call.
   node:sqlite-only, v2.5 plugin wiring + probe 33/33, peek.py deleted); do NOT
   close — the log-profile tail + #34 residual doc refs remain open.
   **2026-09-10 (evening, production restart evidence):** the read fails under the
-  PRODUCTION bun host (`db-error`, no `node:sqlite` — Bun error format) → no ctx line
-  lands; see #37 (the bun-1.4.2 system-bun proxy check measured the wrong host).
+   PRODUCTION bun host (`db-error`, no `node:sqlite` — Bun error format) → no ctx line
+   lands; see #37 (the bun-1.4.2 system-bun proxy check measured the wrong host).
+   **2026-09-10 (T2 #33): ladder build LANDED —** per-session read (gauge.mjs optional
+   sessionID param) + the v2.6 nudge ladder in handover_v2.4.ts + probe S8 (checks
+   46-53; 52/52 PASS, exit 0) + suite 434/434 + ruff F=0; production evidence (a forced
+   high-readout nudge after a maintainer restart) PENDING.
 
 ## 37. (closed 2026-09-10) Production plugin host lacks `node:sqlite` — the ctx nudge never lands in production (2026-09-10)
 
@@ -446,7 +450,12 @@ reenabled, that is the call.
   fake shell); one maintainer restart + a forced high-readout scenario shows the first
   nudge land; no NEW gauge-failure reasons (the silent path stays silent);
   `kind:"nudge"` evidence lines only.
-- **Status:** APPROVED — NEXT BUILD (not a maintainer call — all pre-build calls resolved).
+- **Status:** LANDED (2026-09-10, T2 #33) — the v2.6 ladder is in
+  `handover_v2.4.ts` (per-session read mechanic, rungs 50/70/80/90/5k, dedup per rung,
+  `promptAsync` synthetic-part delivery fire-and-forget, `kind:"nudge"` evidence only,
+  silent otherwise); probe extended with S8 (checks 46-53) → 52/52 PASS, exit 0; suite
+  434/434 + ruff F=0. Production evidence (a forced high-readout nudge after a
+  maintainer restart) PENDING.
 - **Read-mechanic half (built by T1): NOT landed (2026-09-10)** — T1 stopped at the context
   stop-line (#35): the session-gated readout is designed, and its read form + the honest
   unknown-window / notAvailable forms + `SESSION=<sid>` carry landed in the committed shared

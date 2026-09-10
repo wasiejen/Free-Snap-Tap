@@ -94,6 +94,32 @@
 // evidence). v2.4.1: part id `prt-ctx-<uuid>`; messageID taken from output.message.id
 // (UserMessage.id) with input.messageID as fallback; invalid id → skip + one gauge line
 // (reason invalid-messageID) instead of an invalid push.
+//
+// v2.6 (2026-09-10, auto-nudge ladder — TODO #30/#33, the APPROVED design of record): EVERY
+// acting session gets staged mid-run context warnings BEFORE its stop line (85% / REM<=15k).
+// Fire point = tool.execute.after (agent-independent — planner + workers + all agents).
+// READ-MECHANIC CHOICE (recorded ruling under the #30 invariant — "the readout must reach
+// EVERY acting session; blind spots are unacceptable for an ACTION"): PER-SESSION READ via
+// the core's optional sessionID parameter on readGauge (the gauge.mjs v2.6 block). The
+// chatmsg-style match-only gate would blind-spot concurrent sessions (when session A's tool
+// completes, the newest-updated session is often session B) — rejected.
+// Rungs (condition = pct OR REM, whichever hits first; the HIGHEST rung met fires; dedup =
+// at most ONE nudge per rung per session, in-memory `nudgeFired` map keyed by session id):
+//   1: pct >= 50 (context watch) | 2: pct >= 70 or REM <= 30k | 3: pct >= 80 or REM <= 20k
+//   (wind-down — commit routine, prep the NAP) | 4: pct >= 90 or REM <= 10k (critical —
+//   commit + write the NAP NOW) | 5: REM < 5k (stop line — the nudge carries the VERBATIM
+//   gauge readout + "stop line reached: further work needs planner approval").
+// Unknown window (no pct/REM) and no-total/db-error reads NEVER fire — SILENT (the
+// chat.message gauge lines stay the failure channel; no NEW gauge-failure reasons).
+// Delivery: client.session.promptAsync({ path: { id }, body: { parts: [{ type: "text",
+// text, synthetic: true }] } }) — the SDK's SessionPromptAsyncData takes ONE options
+// object (the design sketch's (sessionID, {parts}) two-arg shape is NOT the SDK signature;
+// the .d.ts wins — hard rule #3). FIRE-AND-FORGET: never awaited in the hook; rejections
+// and sync-throws are caught and evidence-logged (kind nudge, reason delivery-*). The
+// synthetic part queues as the next turn at idle and must NOT render as the maintainer's
+// message in the TUI.
+// Evidence: kind:"nudge" lines ONLY ({session, rung, readout}); otherwise SILENT (no line
+// for a non-fire — v1.x log-growth discipline). The chat.message ctx: line STAYS UNCHANGED.
 
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
@@ -287,6 +313,122 @@ async function mirrorSummary(
   }
 }
 
+// v2.6 — the auto-nudge ladder (the v2.6 header block is the design of record): fire point
+// tool.execute.after, PER-SESSION read (the blind-spot-free mechanic), kind:"nudge"
+// evidence lines only, promptAsync fire-and-forget delivery.
+
+// The minimal client surface the ladder needs (SDK: PluginInput.client is the generated
+// opencode client; only session.promptAsync is used — kept structural so this file imports
+// no SDK runtime and the probe can fake it; the .d.ts signature is the source of truth).
+type PromptAsyncClient = {
+  session?: {
+    promptAsync?: (options: {
+      path: { id: string };
+      body: { parts: Array<{ type: string; text: string; synthetic?: boolean }> };
+    }) => Promise<unknown> | unknown;
+  };
+};
+
+let client: PromptAsyncClient | undefined;
+
+// Per-session rung state: sessionID -> the rungs already fired for it (dedup: at most one
+// nudge per rung per session; the map lives for the plugin process lifetime — bounded by
+// the number of sessions, negligible).
+const nudgeFired = new Map<string, Set<number>>();
+
+// The HIGHEST rung met by a readout (0 = none). pct/REM exist only for a known window
+// (kind ok) — unknown window / no-total / db-error never fire (the stop line is defined in
+// pct/REM; an honest no-signal read is not a signal).
+function computeRung(g: { ok?: boolean; kind?: string; ctx?: number; window?: number }): number {
+  if (g.kind !== "ok" || g.ok !== true) return 0;
+  const w = g.window;
+  if (w == null || w <= 0) return 0;
+  const ctx = g.ctx ?? 0;
+  const pct = Math.floor((ctx * 100) / w); // the exact formatGauge pct formula
+  const rem = w - ctx;
+  if (rem < 5000) return 5;
+  if (pct >= 90 || rem <= 10_000) return 4;
+  if (pct >= 80 || rem <= 20_000) return 3;
+  if (pct >= 70 || rem <= 30_000) return 2;
+  if (pct >= 50) return 1;
+  return 0;
+}
+
+// One line per rung — the VERBATIM gauge readout (formatGauge) + the rung's instruction
+// (short and actionable — the design leaves the per-rung text to the build).
+function nudgeText(rung: number, readout: string): string {
+  switch (rung) {
+    case 1:
+      return `${readout} — context watch: past 50% of the context window; gauge-check between steps and keep new work small.`;
+    case 2:
+      return `${readout} — context high: wrap the current step, start the commit routine, begin the handover summary.`;
+    case 3:
+      return `${readout} — wind-down, just before the stop line: run the commit routine now, write the handover summary + TODO.md, prep the NAP.`;
+    case 4:
+      return `${readout} — CRITICAL: commit + write the handover summary NOW; do not start new work.`;
+    case 5:
+      return `${readout} — stop line reached: further work needs planner approval (working past the line is a rule violation); write the handover summary and stop.`;
+    default:
+      return readout;
+  }
+}
+
+// Fire-and-forget delivery — NEVER awaited in the hook (the tool must not block on it);
+// a missing client (probe without a fake) is a no-op — the nudge line is the record.
+// Rejections and sync-throws are caught and evidence-logged (kind nudge, delivery-*).
+function deliverNudge(sid: string, rung: number, text: string): void {
+  try {
+    const ns = client?.session;
+    const fn = ns?.promptAsync;
+    if (typeof fn !== "function") return;
+    const p = fn.call(ns, { path: { id: sid }, body: { parts: [{ type: "text", text, synthetic: true }] } });
+    if (p && typeof (p as Promise<unknown>).catch === "function") {
+      (p as Promise<unknown>).catch((e) => {
+        append(
+          buildLine(
+            "nudge",
+            { session: sid, rung: String(rung), reason: "delivery-rejected", preview: cap(String((e as { message?: unknown })?.message ?? e), 120) },
+            {},
+          ),
+        );
+      });
+    }
+  } catch (e) {
+    append(
+      buildLine(
+        "nudge",
+        { session: sid, rung: String(rung), reason: "delivery-threw", preview: cap(String((e as { message?: unknown })?.message ?? e), 120) },
+        {},
+      ),
+    );
+  }
+}
+
+// The ladder, run on EVERY tool.execute.after (agent-independent). NEVER throws; SILENT on
+// every non-fire (missing session id, no-total/db-error read, below the first rung, an
+// already-fired rung — no log line, the v1.x log-growth discipline).
+async function nudgeLadder(sessionID: string | undefined): Promise<void> {
+  try {
+    const sid = str(sessionID);
+    if (!sid) return;
+    const g = await readGauge(undefined, sid);
+    const rung = computeRung(g);
+    if (rung < 1) return;
+    let fired = nudgeFired.get(sid);
+    if (fired?.has(rung)) return;
+    if (!fired) {
+      fired = new Set<number>();
+      nudgeFired.set(sid, fired);
+    }
+    fired.add(rung);
+    const readout = formatGauge(g);
+    append(buildLine("nudge", { session: sid, rung: String(rung), readout }, {}));
+    deliverNudge(sid, rung, nudgeText(rung, readout));
+  } catch {
+    // never throw out of the hook
+  }
+}
+
 // v2.5 — the shell-era gaugeReadout (GaugeReadout + withTimeout + gaugePreviewOf) is DELETED
 // (v2.5 header block) — the native gauge core replaces it and never throws.
 
@@ -414,12 +556,17 @@ async function onToolAfter(
     // never throw
   }
   await mirrorSummary(input, output);
+  // v2.6 — the auto-nudge ladder (every session, every tool — agent-independent).
+  await nudgeLadder(input?.sessionID);
 }
 
 export default (async (input: PluginInput) => {
   dir = str(input?.directory);
   // v2.5 — the PluginInput.$ (BunShell) is no longer read: the native gauge core
   // needs no host capability (v2.5 header block).
+  // v2.6 — the client (SDK: PluginInput.client) feeds the ladder's fire-and-forget
+  // promptAsync delivery; absent (probe w/o fake) → delivery is a silent no-op.
+  client = (input?.client ?? undefined) as unknown as PromptAsyncClient | undefined;
   return {
     event: onEvent,
     "tool.execute.before": onToolBefore,

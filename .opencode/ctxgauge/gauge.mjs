@@ -83,6 +83,16 @@
 //      the in-flight step has no "finish" field, user rows no tokens at all)
 // NULL total (no finished step / empty tokens) → the no-total readout.
 //
+// PER-SESSION READ (2026-09-10, TODO #30/#33 — the v2.6 nudge ladder):
+// readGauge(dbPath, sessionID) with a NON-EMPTY sessionID reads THAT session
+// instead of the newest-updated one (same two single-row reads, the session
+// row looked up by id, the finished step scoped to that session; the spawn
+// backend's marker SQL embeds the id with single-quote escaping). The
+// newest-session default (no/empty sessionID) is BYTE-IDENTICAL — the same
+// SQL strings, same order, same shapes. Result shapes are UNCHANGED; a
+// non-existent session reads as no-total (sid "unknown" — the read came from
+// no session row).
+//
 // TOKEN SEMANTICS (verified 2026-09-10 across all recent step rows — TODO #30):
 // total = input + output + cache.read holds EXACTLY ⇒ ctx = total − output =
 // the exact prompt size at the latest FINISHED step of the newest session =
@@ -268,6 +278,29 @@ const GAUGE_SQL_MARKER =
   "AND m.data LIKE '%\"finish\"%' ORDER BY m.time_created DESC LIMIT 1; " +
   "SELECT 'S', id FROM session ORDER BY time_updated DESC LIMIT 1;";
 
+// v2.6 — the PER-SESSION query forms (the ladder's blind-spot-free read; see
+// the header block). Same column list and LIKE marker as the newest-session
+// forms; the session is pinned by id (in-process: bound parameter; spawn:
+// literal with single-quote escaping — opencode session ids are `ses_…`, the
+// escape is belt-and-braces, not a quoting surface for user input).
+const SQL_SESSION_BY_ID = "SELECT id FROM session WHERE id = ?";
+const SQL_FINISHED_STEP_SESSION =
+  "SELECT s.id AS sid, s.model AS model, " +
+  "json_extract(m.data, '$.tokens.total') AS total, " +
+  "json_extract(m.data, '$.tokens.output') AS output " +
+  "FROM message m JOIN session s ON s.id = m.session_id " +
+  "WHERE s.id = ? " +
+  'AND m.data LIKE \'%"finish"%\' ORDER BY m.time_created DESC LIMIT 1';
+const sqlMarkerForSession = (sid) => {
+  const q = `'${String(sid).replace(/'/g, "''")}'`;
+  return (
+    "SELECT 'M', s.id, s.model, json_extract(m.data, '$.tokens.total'), json_extract(m.data, '$.tokens.output') " +
+    "FROM message m JOIN session s ON s.id = m.session_id " +
+    `WHERE s.id = ${q} AND m.data LIKE '%"finish"%' ORDER BY m.time_created DESC LIMIT 1; ` +
+    `SELECT 'S', ${q};`
+  );
+};
+
 // ---------------------------------------------------------------------------
 // The backends — each returns the SAME raw shape:
 //   { sid: string|undefined, model: string|null, total: number|null, output: number|null }
@@ -275,15 +308,21 @@ const GAUGE_SQL_MARKER =
 
 // In-process helper shared by backends 1+2: open (READ-ONLY), the busy_timeout
 // PRAGMA via the API, the two single-row reads, ONE retry on busy/locked,
-// best-effort close.
-function readApiDb(openFn) {
+// best-effort close. `target` (v2.6): the per-session read — when set, the
+// session row is looked up by id and the finished step is scoped to it;
+// unset keeps the newest-session SQL byte-identical.
+function readApiDb(openFn, target) {
   const attempt = () => {
     let db;
     try {
       db = openFn();
       db.exec(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS};`);
-      const newest = db.prepare(SQL_NEWEST_SESSION).get();
-      const step = db.prepare(SQL_FINISHED_STEP).get();
+      const newest =
+        target != null ? db.prepare(SQL_SESSION_BY_ID).get(target) : db.prepare(SQL_NEWEST_SESSION).get();
+      const step =
+        target != null
+          ? db.prepare(SQL_FINISHED_STEP_SESSION).get(target)
+          : db.prepare(SQL_FINISHED_STEP).get();
       return {
         sid: typeof newest?.id === "string" && newest.id !== "" ? newest.id : undefined,
         model: step != null && typeof step.model === "string" ? step.model : null,
@@ -312,18 +351,18 @@ function readApiDb(openFn) {
 
 // Backend 1 — node:sqlite (DatabaseSync, readOnly). Flag-free on the system
 // node v24.19.0; also exposed by the SYSTEM bun 1.4.2 (NOT the opencode host).
-async function readNodeSqlite(p) {
+async function readNodeSqlite(p, target) {
   const mod = await importModule("node:sqlite");
   const DatabaseSync = mod?.DatabaseSync;
   if (typeof DatabaseSync !== "function") throw new Error("DatabaseSync export missing");
-  return readApiDb(() => new DatabaseSync(p, { readOnly: true }));
+  return readApiDb(() => new DatabaseSync(p, { readOnly: true }), target);
 }
 
 // Backend 2 — bun:sqlite (the native bun module). API facts verified on the
 // system bun 1.4.2 — see the READ BACKEND CHAIN header (the spec's
 // `{ create: false, readWrite: false }` sketch was WRONG for bun 1.4.2:
 // the option is `readonly`, unknown options are rejected).
-async function readBunSqlite(p) {
+async function readBunSqlite(p, target) {
   const mod = await importModule("bun:sqlite");
   const Database = mod?.Database ?? (typeof mod?.default === "function" ? mod.default : mod?.default?.Database);
   if (typeof Database !== "function") throw new Error("Database export missing");
@@ -338,7 +377,7 @@ async function readBunSqlite(p) {
       throw e;
     }
   };
-  return readApiDb(open);
+  return readApiDb(open, target);
 }
 
 // Backend 3 — spawn-sqlite3 (the v1.x discipline, recovered from git
@@ -352,11 +391,11 @@ const parseMarkerNumber = (v) => {
   const n = Number(v);
   return Number.isNaN(n) ? null : n;
 };
-async function readSpawnSqlite3(p) {
+async function readSpawnSqlite3(p, target) {
   if (!existsSync(DEFAULT_EXE_PATH)) throw new Error(`exe-missing ${DEFAULT_EXE_PATH}`);
   let res;
   try {
-    res = await execFileAsync(DEFAULT_EXE_PATH, [uriRo(p), GAUGE_SQL_MARKER], {
+    res = await execFileAsync(DEFAULT_EXE_PATH, [uriRo(p), target != null ? sqlMarkerForSession(target) : GAUGE_SQL_MARKER], {
       timeout: SPAWN_TIMEOUT_MS, // hard KILL — a stuck child becomes a db-error, never a hang
       maxBuffer: MAX_BUFFER,
       encoding: "utf8",
@@ -430,8 +469,12 @@ function gaugeFromRaw(raw) {
 // FIRST SUCCESS wins and is cached for the rest of the process. Every
 // backend failure is collected; if ALL fail, the result names the DEEPEST
 // failing backend (the last in the chain — the production last resort).
-export async function readGauge(dbPathOverride) {
+// v2.6: an optional non-empty sessionID switches the read to THAT session
+// (the per-session SQL forms above); no/empty keeps the newest-session
+// default byte-identical.
+export async function readGauge(dbPathOverride, sessionID) {
   const p = dbPathOverride ?? dbPath;
+  const target = typeof sessionID === "string" && sessionID !== "" ? sessionID : undefined;
   const failures = [];
   for (const name of orderedBackendsFor(p)) {
     const impl = BACKENDS[name];
@@ -440,7 +483,7 @@ export async function readGauge(dbPathOverride) {
       continue;
     }
     try {
-      const raw = await impl(p);
+      const raw = await impl(p, target);
       backendCache.set(p, name);
       return gaugeFromRaw(raw);
     } catch (e) {
