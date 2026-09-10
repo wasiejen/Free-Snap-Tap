@@ -1,105 +1,99 @@
-# Worker summary — Audit 3a: test-suite smell check (tests/ only, findings only)
+# Worker summary — Audit 3b: focus-dict + control-combination hot windows + 3a residual skim
 
-## Findings (written to `TODO.md` immediately after verification, per DoD-2)
-- **#42 — Multi-notch scroll-wheel events (delta ≠ ±120) are untested across all
-  layers.** Production pins the wheel phase on single-notch EQUALITY:
-  `fst_keyboard.py` `is_press()` (≈456-460) returns True/False only for
-  `mouseData == 4287102976` (down, delta −120) / `7864320` (up, +120); any other
-  delta (240, 360, …) → implicit `None` → falsy `is_keydown` into
-  `_win32_event_filter` (≈505-510). The suite pins exactly those two constants
-  (`tests/test_filter_behavior.py:402-410`, constants echoed verbatim from
-  production source); repo-wide grep found NO other wheel `mouseData` in
-  `tests/`. Output-side `scroll_up/down/right/left(n)` IS tested with arbitrary
-  magnitudes (`test_output_manager.py` `test_scroll_constraints` ≈594-601) —
-  but that never reaches the filter with multi-notch payloads. Concrete test
-  constants computed + verified: 2-notch up `15728640`, 2-notch down
-  `4279238656`. MAINTAINER CALL if the fix changes gating semantics.
-- **#43 — `kb_env` fixture + `build()`/`down()` helpers copy-pasted with DRIFT
-  across 6 files**, three shape-classes: (A) SimpleNamespace yield + arg flags,
-  no `_mouse_listener` (filter_behavior 27-41, extraction_filter_edges 26-40);
-  (B) raw yield + arg flags + `_mouse_listener` (filter_simulated 23-38);
-  (C) raw yield + `_mouse_listener`, NO arg flags (control_actions 17-29,
-  macro_playback_kbd 18-30, facade_wiring 15-27). A `WIN32_FILTER_PAUSED`-state
-  divergence already exists silently across variants; fixes apply 6×. Test-
-  refactoring class (pre-approved); each file migrated deliberately.
+## Findings (TODO.md — written to disk immediately after verification)
+- **NEW #44 — Stale/unknown focus name → uncaught KeyError** in
+  `apply_focus_groups` (`fst_keyboard.py:386`) / `apply_start_args_by_focus_name`
+  (`:1021`): both index `multi_focus_dict[focus_name]` unguarded, and the latter
+  reloads the config (`:1018` → dict replaced wholesale, `fst_manager.py:1560-1563`)
+  BEFORE the lookup. Uncaught propagation paths verified: win32 hot path
+  (`check_control_actions` 925 → `control_toggle_pause` 975-976 — no try/except in
+  `_win32_event_filter`), GUI (`fst_overlay.py:210-214` / `:590-591`), CLI menu
+  option 2 (`fst_manager.py:1875-1876`). Only `Focus_Task` catches it
+  (`fst_tasks.py:106-109`, tested at `test_focus_task.py:214-226`). MAINTAINER CALL
+  for the fallback semantics (default groups vs. surfaced error per #1's design).
+- **EXTENDED #1 (not a new entry — overlap rule):** `check_for_combination`
+  (`fst_keyboard.py:906-912`, hot path `:627`) is a new implicit-None
+  consumer site: an unresolvable combo string → `None` vk silently inserted into
+  `_real_key_press_states_dict` AND `_all_key_press_states_dict`
+  (`fst_manager.py:1604-1609` — `set_real_key_press_state` writes `_all` unguarded).
+  Latent today: all four combo keys (alt/end/delete/page_down) verified resolvable
+  in `vk_codes_dict`.
 
-## Leads disposition (verified, not re-derived)
-- (a) plural-mock hiding (#41): `tests/conftest.py:69` + `test_output_manager.py:534`
-  EXACTLY as stated in #41 (both use the plural `remove_all_callbacks`; production
-  `fst_keyboard.py:64` + `free_snap_tap.py:193` are singular; `fst_manager.py:578`
-  calls the plural). #41 evidence accurate — left untouched, no duplicate.
-- (b) multi-notch scroll: CONFIRMED as a real gap → NEW entry #42.
-- (c) `test_extraction_filter_edges.py` ≈61-64 pins the implicit-None
-  `convert_to_vk_code` ('300' → None, comment "suspected bug #2") — matches #1's
-  evidence; left untouched, no duplicate.
+## Production windows covered (targeted reads, all spec windows + adjacency)
+fst_keyboard.py: 375-434 · 505-536 · 543-670 (incl. hot windows ≈626, ≈915-930) ·
+958-1032 (incl. ≈976-985 + `apply_start_args_by_focus_name`) | fst_manager.py:
+1453-1572 (Focus_Group_Manager) · 1250-1320 (CONTROLS_ENABLED 1257/1306) ·
+1320-1456 (`apply_start_arguments`, 1373 `-nocontrols`) · 1604-1643 (state getters) ·
+1860-1917 (menu reload 1875-1876 + control-text gating 1898-1912) | fst_tasks.py
+60-145 (`FOCUS_APP_NAME` assignments 102/124 + the only try/except caller).
+Adjacency verified: CONSTANTS combo defs (41-43) + `free_snap_tap.py` STOPPED loop
+(115) + `convert` call-site grep (no other guarded lookups anywhere: grep `in ...
+multi_focus_dict` / `.get(` on the dict found nothing in prod).
 
-## Hot-path coverage map (grepped `tests/` + symbol locations only in prod)
-All 7 targets exercised by tests: `keyboard_win32_event_filter`
-(filter_simulated 58-80 + the mocked entry elsewhere); `mouse_win32_event_filter`
-(filter_behavior `TestMouseWin32Filter` + `TestMouseToMouseRebind`);
-`initialize_groups_from_presorted_lines` (3 files via the `build()` helper);
-`apply_focus_groups` / `update_args_and_groups` (facade_wiring + focus_task);
-`constraint_evaluation` (output_manager, ~60 call sites); `execute_key_event`
-(output_manager `TestExecuteKeyEventDelays` + macro_playback_kbd error path).
-Only systemic coverage defect found on hot path: wheel-delta magnitude (#42).
-
-## Files fully read (2 of the two >400-line files in two passes each, per spec)
-conftest.py · test_output_manager.py · test_filter_behavior.py ·
-test_extraction_filter_edges.py · test_filter_simulated.py ·
-test_control_actions.py · test_macro_playback_kbd.py · test_facade_wiring.py
-(+ `pytest.ini`, 2 lines). Prod: grep/symbol + three ≤40-line windows only
-(`fst_keyboard.py` 423-462/463-502/503-542, `fst_manager.py` 703-742).
-NOT fully read (budget — see Deviations): argument_manager, big_config,
-cli_menu, config_parse, console_helpers, crosshair, data_types,
-focus_group_manager, focus_task, gui_manager, gui_smoke, input_state_manager,
-macro_repeat_task, save_file_handler, status_overlay, tray_icon.
-
-## Verification (measured, verbatim)
-- `& .\.venv\Scripts\python.exe -m pytest -q` → `434 passed, 1 warning in 1.98s` (baseline 434/434 ✓)
-- `& .\.venv\Scripts\ruff.exe check --select F .` → `All checks passed!`
+## Test skim (the 16 files 3a budget-skipped)
+FULL READ (5, chosen windows-first): test_focus_task (264) · test_focus_group_manager
+(182) · test_argument_manager (250) · test_input_state_manager (191) ·
+test_cli_menu (183). Result: clean — no pinned-suspicious behavior, no stale
+comments, no coverage holes vs. windows (1)/(2) beyond what #43/#42/#41/#1/#9
+already record (`reset_states_dicts` resets `_all` too — 1792-1796 verified;
+`-hide_cmd_window` prefix `[:16]` correct + pinned at test:236).
+STRUCTURAL COVERAGE (remaining 11: big_config, config_parse, console_helpers,
+crosshair, data_types, gui_manager, gui_smoke, macro_repeat_task,
+save_file_handler, status_overlay, tray_icon): full def/class map per file +
+smell sweep (`TODO|FIXME|XXX|HACK|workaround|deprecated|legacy|noqa` in all
+`tests/*` = ZERO hits) + windows-symbol greps (`FOCUS_APP_NAME`,
+`control_toggle_pause`, `CONTROLS_ENABLED`, `multi_focus_dict`) + helper-dup
+check (`def kb_env|build|down|up|hold_keys|mock_control_handlers` in test files =
+EXACTLY the six #43 files — no duplication from the skim remainder). Their window-
+adjacent tests assert only mock-delegation wiring (e.g. `test_cli_menu.py:75-76`),
+confirming the #44 gap: no test exercises an absent focus name anywhere.
 
 ## Not TODO-ified (and why)
-- Broad `pytest.raises(Exception)` without `match=` in edges/filter files — style
-  (passes and asserts correct behavior), not a concrete defect.
-- Output_manager's local `convert()` (test_output_manager.py:28-32) + conftest's
-  `convert_to_vk_code` both duplicate production vk resolution — the CONFT one's
-  "same semantics" copy is #1's companion (drift risk if #1's fix lands); the
-  test-local `convert()` is harmless test isolation. Not promoted beyond #1/#43.
-- `conftest.mock_pynput_controllers` (≈59-92) duplicates the 4-line controller
-  mock repeated inside each local `om_env`/`kb_env` — covered conceptually by
-  #43; low signal for a standalone entry.
-- `test_release_delegates_to_managers` (facade_wiring ≈101-103) asserts
-  `output_manager.variables == {}` after `release_all_currently_pressed_…` —
-  low-confidence observation (possible surprising coupling) that needs a
-  production read to verify; NOT a concrete defect per rule 6, not chased
-  (budget).
-- The two `pytest.skip('… not present')` guards (big_config:14, config_parse:99) —
-  intentional, config is repo-pinned (`FSTconfig_test.txt` present → suite ran
-  with 0 skips).
-- GUI cluster (gui_manager/gui_smoke/status_overlay/crosshair/tray_icon) not fully
-  read — offscreen GUI is not among the 7 hot-path targets; the suite-wide smell
-  sweep (xfail/skip/TODO/XXX/FIXME/HACK/workaround/legacy/deprecated/noqa across
-  ALL of `tests/`) found nothing there beyond the already-covered hits.
-- Zero `xfail` anywhere in the suite (consistent with the repo convention); no
-  `skip` beyond the two guarded ones.
+- `check_for_combination` empty-list vacuous truth (returns True for `[]`) — the
+  three CONSTANTS combos are non-empty today and never reassigned empty: unreachable
+  = #6-class dead-path, not a concrete defect.
+- `control_exit_program`'s commented-out `exit()` (fst_keyboard.py:969-970) — program
+  exit IS reached via the `STOPPED` flag (free_snap_tap.py:115 loop) and menu option 4
+  (`fst_manager.py:1892` `exit()`, pinned by `test_cli_menu.py:110-116`); name/behavior
+  consistent; the commented line is maintainer live-test state (same class as #11's
+  XXX pin — not a clear defect).
+- `-crossover` out-of-range message says `0<prob<=100` but code accepts 0
+  (`0 <= probability <= 100`, fst_manager.py:1409) — message-only; `=0` behavior is
+  pinned by test_argument_manager.py:78-79; cosmetic.
+- GUI Toggle Pause reachable while CONTROLS_ENABLED=False (fst_overlay 210-214/590-591) —
+  plausibly intentional (GUI as the ALT+DEL alternative); semantics call, not a defect.
+- `reset_global_variable_changes` deliberately does not reset
+  WIN32_FILTER_PAUSED/MANUAL_PAUSED/STOPPED/PRINT_VK_CODES (runtime state; pattern
+  documented by the 1285-1286 comment); start-arg flags are re-applied per focus change.
+- Performance (rule 6, not TODO): full `load_config()` file read on every
+  `update_focus_groups()` call (per focus change AND every resume), plus combo vk
+  conversion re-parsing each string entry per key event.
+- `Focus_Group_Manager.default_start_arguments`/`default_group_lines` property
+  comments claim "Return a copy to prevent external modification" but return the live
+  list (fst_manager.py:1497/1506) — no production caller mutates them (only list
+  concatenation at fst_keyboard.py:389/1024); comment-only hazard.
 
-## Deviations (every rule bent/broken — honesty > appearance)
-1. Spec's line counts stale (output_manager 577 → measured 704; filter_behavior
-   473 → 572); read them in two passes anyway (352+352 / 350+224) — compliant.
-2. 16 of 24 test files were not read end-to-end: hit the 85 %-approach budget
-   with REM ~20.9k (measured mid-audit, CTX 99086/82%) and cut new reads;
-   mitigation = suite-wide smell sweep + hot-path gap grep (findings #42/#43 are
-   from the fully-read set; the sweep surfaced no unverified smells in the
-   remainder). A follow-up pass over the 16 files is cheap insurance — flagged.
-3. `TODO.md` re-read before commit done as a TARGETED grep (`^## 4[23]\.` →
-   541/582 + line excerpts) instead of a 620-line full read — equivalent
-   evidence, budget rule.
-4. Zero code edits (findings only) — no rule bent there.
+## Deviations (every rule bent — honesty > appearance)
+1. Skimmed 16 files: 5 full reads, 11 structurally-covered only — the 85% stop line
+   hit mid-run (measured CTX 102091 (85%) after the full reads); full-read targets were
+   windows-first. Mitigation: zero-hit smell sweep + exact def-map + windows-symbol
+   greps over all 16 (documented above); no unverified smell survived the sweep.
+2. TODO re-read before commit done as the TARGETED `rg "^## 1\. |^## 4[234]\." TODO.md`
+   (DoD-2 permits) — #1/#42/#43/#44 headers confirmed on disk.
+3. Zero code edits (findings only — edit allow-list respected: `TODO.md` only).
+4. Self-correction inside #44: initial overlay refs (`587-605`) replaced by
+   grep-verified `210-214`/`590-591` before commit.
+
+## Verification (measured, verbatim)
+- `& .\.venv\Scripts\python.exe -m pytest -q` → `434 passed, 1 warning in 2.14s`
+  (baseline 434/434 ✓ — warning = known awaited-coro logger path, test_extraction_filter_edges)
+- `& .\.venv\Scripts\ruff.exe check --select F .` → `All checks passed!` (0 findings ✓)
+- `rg "^## 1\. |^## 4[234]\." TODO.md` → `## 1.` / `## 42.` / `## 43.` / `## 44.` headers present
 
 ## Commit
-`TODO.md` (#42 + #43) + this summary committed together (no push).
-Commit subject: "Audit 3a: test-suite smell check — TODO #42/#43 (findings only)".
-HASH below: `<REPLACED by bash post-commit>`.
+`TODO.md` (new #44 + #1 evidence extension) + this summary in one commit (no push).
+Subject: "Audit 3b: focus-dict + combos hot windows + 3a skim — TODO #44, extend #1 (findings only)".
+HASH: `<filled in the follow-up commit — see git log, top commit = this run>`
 
-## Final gauge (verbatim, ACTUAL output — rule-compliant: run it, don't fabricate)
-SESSION=ses_f760da9a9ffeUToytZixByvkPk CTX=105887 (88%) REM=14113
+## Final gauge (verbatim — actually run)
+SESSION=ses_f75f08a56ffe4ji6i08BcpsWwm CTX=102091 (85%) REM=17909

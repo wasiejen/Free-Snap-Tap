@@ -44,7 +44,17 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
    out-of-range numeric key string in the config crashes group init with an
    unhelpful TypeError instead of a surfaced error. `test_extraction_filter_edges.py`
    ≈61-64 pins the implicit-None behavior (archived triage "suspected bug #2").
-- **Outcome (goal):** ONE general solution covering every vk-resolution site (not
+    **Audit 3b addition (2026-09-10):** `check_for_combination` (`fst_keyboard.py:906-912`,
+    called from the hot path at `:627` via `check_control_actions`) converts its string
+    combo entries with `convert_to_vk_code` (`:910`); a non-resolving string returns
+    implicit None and then SILENTLY poisons state instead of erroring —
+    `get_real_key_press_state(None)` catches its own KeyError
+    (`fst_manager.py:1604-1609`) and INSERTS a `None` key into BOTH
+    `_real_key_press_states_dict` AND `_all_key_press_states_dict`
+    (via `set_real_key_press_state`, 1612-1613 — this setter writes `_all` unguarded).
+    The combos resolve today (alt/end/delete/page_down all in `vk_codes_dict`,
+    verified 2026-09-10) — the defect is latent for any custom/unresolvable combo string.
+ - **Outcome (goal):** ONE general solution covering every vk-resolution site (not
   per-call-site fixes) with the user-visible error; the constraint path reuses it.
 - **Acceptance:** unknown key ⇒ user-visible error at every resolution site (never
   console-only); the constraint fail-closed path emits the same user-visible error; suite
@@ -617,3 +627,53 @@ prints forward slashes. Status: closed — section committed as tested.
   (SimpleNamespace vs. raw yield) must be preserved or each file migrated
   deliberately. MAINTAINER NOTE: if the maintainer prefers per-file fixtures for
   independence, close this with a "documented preference" note instead.
+
+## 44. Stale/unknown focus name → uncaught KeyError in `apply_focus_groups` / `apply_start_args_by_focus_name` (the config is reloaded *before* the lookup) (2026-09-10, Audit 3b)
+
+- **Problem / evidence:** `apply_focus_groups` (`fst_keyboard.py:386`) and
+  `apply_start_args_by_focus_name` (`:1021`) index
+  `self._focus_manager.multi_focus_dict[focus_name]` with NO membership guard, and
+  `apply_start_args_by_focus_name` runs `self.update_focus_groups()` (`:1018` — full
+  config reload via `load_config()` that replaces `_multi_focus_dict` wholesale,
+  `fst_manager.py:1560-1563`) BEFORE the lookup — so a focus group removed or
+  renamed in the config file between the last `Focus_Task` match and the lookup
+  makes `multi_focus_dict[FOCUS_APP_NAME]` raise. `FOCUS_APP_NAME` is only ever
+  cleared to `''` by `Focus_Task` (`fst_tasks.py:124`) or set at
+  `Focus_Group_Manager` init (`fst_manager.py:1469`) — replacing the dict does
+  NOT clear it. Uncaught
+  propagation paths (verified — no try/except between the entry point and the
+  lookup):
+  (a) win32 hot path: `check_control_actions` (`fst_keyboard.py:925`) →
+      `control_toggle_pause` (`:975-976`, passes `FOCUS_APP_NAME` twice — the same
+      name goes stale twice) — the `_win32_event_filter` body (534-967) has no
+      try/except (the filter's excepts are 644 rebind, 754 coroutine, 879 macro,
+      901 macro logger, 1011 macro-name KeyError only); an exception in the
+      callback would kill the pynput hook thread = silent listener death.
+  (b) GUI: `fst_overlay.py:210-214` / `:590-591` (StatusOverlay/TrayIcon "Toggle
+      Pause") call `control_toggle_pause` directly — unguarded.
+  (c) CLI menu option "2. Reload everything from file" (`fst_manager.py:1875-1876`)
+      — unguarded; a KeyError breaks the menu loop.
+  Only the `Focus_Task` path catches it (`fst_tasks.py:106-109`
+  `except Exception` → stays paused — and that catch is tested:
+  `test_focus_task.py:216` pins `side_effect = RuntimeError('boom')`). No test
+  anywhere covers `apply_focus_groups('…absent')` / `control_toggle_pause` with an
+  out-of-dict `FOCUS_APP_NAME` (`test_cli_menu.py` and `test_facade_wiring.py`
+  always pass names that exist in their dicts).
+- **Outcome (goal):** a missing/renamed focus group degrades to the default
+  groups (or a logged, user-visible error) instead of raising out of the hot
+  path, a GUI slot, or the menu loop — chosen semantics per maintainer call.
+- **Acceptance:** `control_toggle_pause`, the menu reload, and
+  `update_args_and_groups(name)` no longer raise KeyError for names absent from
+  the *reloaded* `multi_focus_dict`; a test for at least paths (a) and (c) pins
+  the chosen behavior (freshly-deleted focus group → resume with defaults, or the
+  decided alternative); suite green.
+- **Scope (non-exhaustive):** `fst_keyboard.py` 383-404 / 916-931 / 972-986 /
+  1016-1024; `fst_manager.py` 1875-1876 (CLI menu) + 1483-1497 (`Focus_Group_Manager`
+  dict/keys handling — if the fix clears `FOCUS_APP_NAME` on dict replacement);
+  `fst_overlay.py` 210-214/590-591 (guard site choice — a central fix in the
+  two accessors makes these untouched); tests: `test_control_actions.py`,
+  `test_focus_task.py`, `test_cli_menu.py`.
+- **Status:** OPEN — MAINTAINER CALL for the chosen fallback (silent-default vs.
+  surfaced error — the #1 user-visible-error solution should cover the surfaced
+  variant). Overlaps: none of the open entries cover this path (#1 is vk
+  resolution; #8 is the state-dict handling; this is the focus-dict lookup).
