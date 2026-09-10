@@ -35,8 +35,16 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Problem / evidence:** wherever a key string resolves to a vk_code (`convert_to_vk_code`
   + all its call sites) it should raise AND be communicated to the user — important
   feedback; today many paths fail silently or only print to console. State-shorthand
-  constraints now fail-closed on unknown keys (2026-09-06, `fst_manager.py`
-  `constraint_evaluation`) but still only print — fold into the general solution.
+   constraints now fail-closed on unknown keys (2026-09-06, `fst_manager.py`
+   `constraint_evaluation`) but still only print — fold into the general solution.
+   Verified crash path (2026-09-10, session-3 probe): `convert_to_vk_code('300')` /
+   `('256')` return an implicit `None` (the numeric branch swallows the KeyError when
+   `key_int` is out of range — `fst_keyboard.py:146-150`), and the following
+   `if vk_code <= 0:` in `extract_data_from_key` (`fst_keyboard.py:224`) then raises
+   `TypeError: '<=' not supported between instances of 'NoneType' and 'int'` — an
+   out-of-range numeric key string in the config crashes group init with an
+   unhelpful TypeError instead of a surfaced error. `test_extraction_filter_edges.py`
+   ≈61-64 pins the implicit-None behavior (archived triage "suspected bug #2").
 - **Outcome (goal):** ONE general solution covering every vk-resolution site (not
   per-call-site fixes) with the user-visible error; the constraint path reuses it.
 - **Acceptance:** unknown key ⇒ user-visible error at every resolution site (never
@@ -186,9 +194,54 @@ reenabled, that is the call.
   status updated with the outcome.
 - **Scope (non-exhaustive):** `.opencode/handover_task.md` (spec v2), the agent
   config (maintainer-owned), `TODO.md`.
-- **Status:** OPEN — re-run launched by planner (session 3) on `worker_Q4_120K` via
-  CLI (spec v2 with the hard rules below). The endpoint-cap fact = MAINTAINER CALL
-  (config: 128k endpoint behind a "256K" agent name).
+- **Status:** OPEN — the `worker_Q4_120K` re-run (spec v2, CLI) also FAILED its
+  deliverables: died on `context_length_exceeded ... context shift is disabled`
+  (500) mid-audit — even with the hard chunk-read rules the scope did not fit a 120k
+  window (fst_keyboard hot path + 8 test files + pynput source verification + triage
+  archive in one session). No entries written, no commit, no summary. It also made an
+  UNAUTHORIZED edit to `agents_repo.md` (roster agent keys renamed to non-existent
+  `..._128K_mtp` — the live `opencode.jsonc` still uses the 256K keys) — REVERTED by
+  the planner. Recovered + planner-verified: the `remove_all_callbacks` production
+  bug → new TODO #41; the out-of-range numeric-vk crash path → appended to #1's
+  evidence. Candidates the worker checked and WITHDREW: Macro zero-group ValueError
+  (unreachable — config guarantees ≥1 group), dict_keys membership (fine), pynput
+  suppression semantics (consistent — the hook's return value is ignored except
+  keyboard `_convert` `False` = skip pynput callback, actual suppression is via
+  `SuppressException` only). Remaining scope: the tests/ smell check + the
+  focus-dict/combination candidates (NAP NEXT). The endpoint-cap fact = MAINTAINER
+  CALL (config: 128k endpoint behind a "256K" agent name).
+
+## 41. Production bug: `remove_all_toasts()` control function calls a nonexistent attribute (plural/singular mismatch) (2026-09-10)
+
+- **Problem / evidence (planner-verified from the dead Q4 re-run's lead, session 3):**
+  `fst_manager.py:578` (`remove_all_toasts`, the control-function family built in
+  `constraint_evaluation`) calls `self._fst.remove_all_callbacks()` (PLURAL), but
+  `FST_Keyboard` only has the SINGULAR `remove_all_callback` (`fst_keyboard.py:64`,
+  assigned `bridge.trigger_remove_all` at `free_snap_tap.py:193`; the playground
+  probe `overlay_probe.py:70` also uses the singular). No plural attribute exists
+  anywhere on a production object → calling the `remove_all_toasts()` control
+  function in production raises `AttributeError`. The test suite HIDES this:
+  `tests/conftest.py:69` (FakeFST) sets `remove_all_callbacks = MagicMock()` (plural)
+  and `tests/test_output_manager.py:534` asserts on the plural mock. Already flagged
+  in `.opencode/archive/COVERAGE_TRIAGE.md` ≈275–284 ("Suggested fix (for the
+  maintainer)") but never promoted to an open TODO.
+- **Outcome (goal):** name parity — one attribute, called the same everywhere, tests
+  matching the production name.
+- **Acceptance:** `fst_manager.py:578` + the conftest FakeFST + the test assertion
+  all use the SAME name as the production `FST_Keyboard` attribute; a test fails if
+  the names ever drift (e.g. the FakeFST attribute is asserted against
+  `FST_Keyboard.__init__`'s); suite green.
+- **Scope (non-exhaustive):** `fst_manager.py` ≈578, `fst_keyboard.py` ≈64,
+  `free_snap_tap.py` ≈193, `tests/conftest.py` ≈69, `tests/test_output_manager.py`
+  ≈534.
+- **Recommended fix (planner):** call the SINGULAR `remove_all_callback()` at
+  `fst_manager.py:578` (the production name, used by `free_snap_tap.py` + the
+  playground) and update the two test references — one-line fix + two test refs.
+  Alternative (set a plural alias in `FST_Keyboard.__init__`) is worse: two names
+  for one thing.
+- **Status:** OPEN — maintainer call (fixing the AttributeError changes observable
+  behavior; the archived triage also marked it "for the maintainer"). Fix is
+  recommended and mechanical if approved.
 
 ## Loop & coordination (open)
 

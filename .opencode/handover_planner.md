@@ -39,6 +39,19 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   rules: no >400-line full reads, entries to disk immediately, re-read TODO.md before
   commit, verbatim gauge line, perf observations not TODO-worthy; scope = the
   `fst_keyboard.py` hot path (run #1 never reached it) + `tests/` smell check).
+- **Re-run DIED too** (session 3, planner-verified): `context_length_exceeded ...
+  context shift is disabled` (500) mid-audit — the scope doesn't fit 120k even with
+  chunk reads. Recovered + verified by the planner: **TODO #41** (the
+  `remove_all_callbacks` plural/singular production bug, archived-triage orphan —
+  conftest FakeFST hides it) + the #1 crash-path evidence (`'300'`/`'256'` →
+  implicit None → TypeError at `extract_data_from_key:224`). Also: the worker made an
+  UNAUTHORIZED `agents_repo.md` edit (renamed roster keys to non-existent `..._128K_mtp`)
+  — REVERTED; flag for the worker prompt (meta files = read-only, flag in summary).
+  Sizing lesson: BOTH explorer-class runs died/failed — the audit scope must be SPLIT
+  (hot path only; tests smell check only; no third-party source verification in the
+  same session) or the worker must check the gauge often and checkpoint findings to
+  disk incrementally (the Q4 run died before writing ANYTHING — run #1's "write
+  immediately" rule worked in principle, the Q4 run simply ran out first).
 
 ## 2026-09-10 (autonomous session 2) — Looprunner-prompt optimization (maintainer task, light)
 - Maintainer task (via Looprunner): optimize `.opencode/prompt_looprunner.md` for
@@ -113,20 +126,34 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
    `kind:"nudge"` evidence only; readout must reach EVERY acting session). The probe
    is the standing 45-check base to extend. Build worker = `worker_Q4_120K` (sizing
    lesson 5 below applies).
-3. **Explorer real-exploration run (standing goal):** session 3 launched it (spec in
-   `handover_task.md`; scope = FST core `fst_manager.py` constraint/evaluation +
-   `fst_keyboard.py` filter + test-suite smell check). CHECK its findings before
-   accepting (fabricated-gauge caveat, #38); findings → TODOs from #40.
-4. #34 residual doc refs = maintainer call (frozen copy / playground draft / historical
+3. **Finish the audit (standing goal) — SPLIT scope, one small session each:**
+   (a) `tests/` smell check ONLY (xfails/pins/dup helpers/gaps in the filter paths —
+   spec v2 in `handover_task.md` is still the right shape, shrink the scope to
+   `tests/`; known leads: the plural-mock hiding at `conftest.py:69` +
+   `test_output_manager.py:534` belongs to #41; multi-notch scroll coverage gap
+   (single-notch only) was noted by the dead worker);
+   (b) the `apply_focus_groups` focus-dict access + the CONSTANTS
+   control-combination candidates the dead worker was checking when it died.
+   Worker choice: `worker_Q4_120K` via CLI (Task tool is depth-blocked — see the
+   session-3 mechanic note); instruct: checkpoint EVERY verified finding to TODO.md
+   IMMEDIATELY (IDs from #42), gauge-check every ~2 reads.
+4. **Maintainer calls accumulated (bundle ≤3):** #41 fix approval (recommended:
+   singular call at `fst_manager.py:578` + 2 test refs); #40 endpoint-cap fact
+   (128k endpoint behind the "256K" agent name — rename/config/scope rule);
+   `subagent_depth: 2` suggestion (Task tool depth-blocked for the planner, see
+   session-3 mechanic note — closing message carries it too).
+5. #34 residual doc refs = maintainer call (frozen copy / playground draft / historical
    files left as-is).
-5. Delegation sizing lesson (this session): the 27B Q4 worker needs >40 min for a
-   build of this size — either raise the CLI timeout to ~90–120 min for big builds,
-   or resume the worker session with `opencode run -s <session-id>` instead of
-   re-delegating from scratch.
-- Note (session 2): **#39 Looprunner prompt v2 = MAINTAINER CALL** (apply proposal
-  `.opencode/looprunner_prompt_proposal_planner.md` + scoped permission change +
-  smoke test) — no autonomous next step until applied. The next EXECUTABLE autonomous
-  item remains 3 (explorer real exploration run, findings → new TODOs from #40).
+6. Delegation sizing lessons: (a) the 27B Q4 worker needs >40 min for a build of this
+   size — CLI timeout ~90 min (used successfully in session 3) or resume the worker
+   session with `opencode run -s <session-id>`; (b) SESSION-3: a 120k worker CANNOT
+   hold "hot path + tests + third-party source verification" in one context — split
+   audit scope per session AND require immediate findings checkpointing (both session-3
+   worker runs died/were lost; #40 + this block carry the evidence).
+- Note (session 3): **#39 APPLIED** (maintainer applied the v2 proposal — prompt +
+  permissions verified); smoke-test cycle = this loop; close #39 once the first
+  restart-after-action-line runs clean. The audit goal now lives in NEXT item 3 (SPLIT
+  scope).
 
 ## Standing
 - Suite 434/434, ruff F=0 (post-#37 baseline: the probe is now 45/45).
@@ -137,4 +164,5 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   before it; re-verify the roster against `opencode.jsonc` if the maintainer says it
   changed again.
 - NO parsing of `.opencode/plugin.log` (call-1 one-shot only, default SKIP).
-- v2.5 plugin + the #37 core fix both activate on the NEXT maintainer restart.
+- The v2.5 plugin + #37 gauge read are LIVE in production (session-3 evidence: the
+  `ctx:` line reached the planner's own session, no db-error) — #37 CLOSED.
