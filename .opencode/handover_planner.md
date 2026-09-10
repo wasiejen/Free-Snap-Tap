@@ -17,11 +17,28 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   CTX=notAvailable` line reached this session's first message with the OWN
   session id and NO db-error → the production read + chat.message post work
   (consistent with #37 closed). The LADDER itself is what #33 builds now.
-- **T2 #33 IN PROGRESS:** spec written to `handover_task.md` (self-contained
-  design restatement — the NAP spec blocks it referenced were lost in the
-  session-3 rewrite; TODO #30 is now the design of record, flagged there).
-  Build worker = `worker_Q4_120K` via the Task tool (first real depth-2
-  delegation — also the maintainer's observation target).
+- **T2 #33 LANDED + planner-verified (`70434c8`):** spec written to
+  `handover_task.md` (self-contained design restatement — the NAP spec blocks it
+  referenced were lost in the session-3 rewrite; TODO #30 is now the design of
+  record, flagged there). Build worker = `worker_Q4_120K` via the **Task tool**
+  (first real depth-2 delegation — WORKS; also the maintainer's observation
+  target). Verified by the planner: probe **52/52 PASS exit 0** (original
+  baseline checks intact — the only probe deletions are doc comments + the S5
+  tally/fingerprint updates for the nudge lines; new S8 checks 46-53), pytest
+  **434/434**, ruff **F=0**. Read mechanic chosen by the worker: **per-session
+  read** (session id from the tool payload drives a scoped db read) over the
+  match-only gate — the gate would blind-spot concurrent sessions, unacceptable
+  for an action (the #30 invariant). Residual: production evidence = a forced
+  high-readout nudge after the next maintainer restart (TODO #30/#31 status
+  lines carry it). Minor doc slip in the worker's summary: "52 = 45 + 8"
+  arithmetic is off-by-one (check ids run to 53, one retired id) — the measured
+  `52/52 PASS` is the record. Worker discipline notes: it resumed deliverable 3
+  post-compaction under a "continue" direction, then hit the stop line during the
+  commit routine and stopped at a clean committed point (DoD 6 worked).
+  NOTE: the Task tool result ALSO overwrote `handover_task_to_planner.md` with
+  the raw `<task_result>` dump after the worker's commit — restored to the
+  committed summary; flag for the maintainer (the result channel and the
+  handover file collide on the same path).
 - TODO housekeeping: numbering header bumped to "start at #42"; #39 closed;
   #40 endpoint-cap call reduced to a low-priority config rename (the maintainer
   swapped the explorer to Q3 — the 256K-named gemma endpoint is no longer used
@@ -149,11 +166,15 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 1. ~~#37 production evidence~~ — DONE in session 3 (ctx line reached own session, no
    db-error; #37 CLOSED). Residual: v1.3 log-profile rebaseline (call 1) = maintainer
    call, default SKIP.
-2. **T2 #33 nudge ladder — IN PROGRESS (session 4):** spec in `handover_task.md`,
-   build worker = `worker_Q4_120K` launched via the Task tool. On return: verify
-   (probe exit 0 with the original 45 checks intact + new nudge checks; suite
-   434/434; ruff F=0; git log; summary's verbatim gauge line) before accepting.
-3. **Finish the audit (standing goal) — SPLIT scope, one small session each:**
+2. ~~T2 #33 nudge ladder~~ — **LANDED + verified (session 4, `70434c8`)**. Residual
+   = production evidence after a maintainer restart (observe: `kind:"nudge"`
+   evidence lines in `.opencode/plugin.log` + a nudge reaching a high-context
+   session; the maintainer's "observe the nudge mechanism" task covers this).
+3. **Finish the audit (standing goal) — SPLIT scope, one small session each
+   (3a IN PROGRESS in session 4 — explorer `worker_explorer_Q3_120K_mtp` via the
+   Task tool, spec = tests/ smell check only, strict scope per the maintainer's
+   context caution; IDs from #42; VERIFY its work — the Q3 explorer is fast but
+   less stable):**
    (a) `tests/` smell check ONLY (xfails/pins/dup helpers/gaps in the filter paths —
    spec v2 in `handover_task.md` is still the right shape, shrink the scope to
    `tests/`; known leads: the plural-mock hiding at `conftest.py:69` +
