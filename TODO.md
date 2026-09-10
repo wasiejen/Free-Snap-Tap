@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #47, new
-entries start at #48 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #48, new
+entries start at #49 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -251,6 +251,14 @@ reenabled, that is the call.
   only if a deterministic seam is added for the scheduled task.
 - **Status:** OPEN — pre-approved (test-only, no observable behavior change); found
    during #3 (2026-09-10). Delegated (looprun 2, iteration 1, approved-fix batch).
+- **Status tail:** LANDED (2026-09-10, approved-fix batch) — the fixed
+   `await asyncio.sleep(0.02)` replaced with the event-driven bounded wait
+   `TestCrossover.wait_for_calls` (polls the mock's `method_calls` until exactly
+   the expected calls are recorded; 100 × 10 ms bound; AssertionError on
+   timeout), applied to BOTH async crossover tests (the named one + its sibling
+   `test_crossover_presses_new_key_first`, same race; scope named the whole
+   class). Production `send_keys_for_tap_group` untouched. Gate: 10 consecutive
+   FULL `pytest -q` runs green (436 passed each), ruff F=0.
 
 ## 45. (closed 2026-09-10) Doc errors found adjacent to the #3 rework: WIKI invocation "evaluate to False" claim, WIKI `+a, +b` rebind notation, README "he first" (2026-09-10)
 
@@ -346,6 +354,14 @@ One-line record: fixed in the adjacent commit of the #3 docs rework — WIKI [Su
   for one thing.
 - **Status:** OPEN — maintainer APPROVED (260910 ruling: "sounds ok ... approved").
    Delegated (looprun 2, iteration 1, approved-fix batch).
+- **Status tail:** LANDED (2026-09-10, approved-fix batch) — `remove_all_toasts`
+   calls the SINGULAR `remove_all_callback()` (fst_manager.py:578); FakeFST
+   attribute (tests/conftest.py) + test assertion (tests/test_output_manager.py)
+   use the singular production name; new drift-guard
+   `test_remove_all_toasts_drift_guard` drives `remove_all_toasts()` against a
+   stand-in exposing ONLY the singular attribute — name drift raises
+   AttributeError, which the eval path does not swallow (only NameError is
+   caught, fst_manager.py:676). Gate: pytest -q = 436 passed, ruff F=0.
 
 ## Loop & coordination (open)
 
@@ -687,6 +703,51 @@ prints forward slashes. Status: closed — section committed as tested.
    RULING: any other place comparing a single bit in a series of status bits
    (packed-word equality checks) = REPORT BACK, implicitly approved. Delegated
    (looprun 2, iteration 1, approved-fix batch).
+- **Status tail:** LANDED (2026-09-10, approved-fix batch) — the wheel branch of
+   `is_press()` replaced with the mask/shift sign test
+   `bool((data.mouseData >> 16) & 0x8000)` (True = down/press, False = up/
+   release), node-verified BEFORE the edit against BOTH single-notch constants
+   (7864320 → False, 4287102976 → True) and BOTH 2-notch spec constants
+   (15728640 → False, 4279238656 → True). Bit note: bits 16/17 are NOT set in any
+   wheel constant — the delta word occupies bits 16-31, the distinguishing bit is
+   bit 31 (sign of the delta word); the approved "mask or shift, direction
+   regardless of other bits" semantics are exactly implemented (low word = key
+   state, ignored). Multi-notch = SAME phase as single-notch, magnitude NOT
+   aggregated. New test `test_multi_notch_scroll_keeps_single_notch_phase`
+   (tests/test_filter_behavior.py); single-notch tests stay green. Gate: pytest
+   -q = 436 passed, ruff F=0. REPORT BACK (ruling): packed-word equality sites
+   found → new entry #48 (implicitly approved).
+
+## 48. Packed-word equality checks in the mouse filter: X-button mouseData + LLKHF flags (2026-09-10, #42 report-back)
+
+- **Problem / evidence:** the #42 audit (ruling: report back on ANY other
+   equality comparison against a packed multi-bit status word / single-bit-in-a-
+   series check) found two production sites of the same defect class in
+   `FST_Keyboard.mouse_win32_event_filter`:
+   (a) `fst_keyboard.py:471-473` — X-button vk mapping compares
+   `data.mouseData == 65536` (x1) / `== 131072` (x2) on EXACT equality; for
+   WM_XBUTTONDOWN/UP the high word is the XBUTTON identifier and the low word
+   is the key state (ctrl/shift) — with a modifier held the low word is
+   nonzero, the equality fails, `get_mouse_vk_code()` returns None and the
+   event is suppressed via `self._mouse_listener.suppress_event()` (≈514)
+   without any rebind/tap processing (silently dropped).
+   (b) `fst_keyboard.py:49` — mouse `is_simulated_key_event` is
+   `flags == 1` on the packed LLKHF flags word; an injected event carrying any
+   other LLKHF bit (e.g. LLKHF_LOWER_IL_INJECTED 0x20) is misclassified as real
+   input. Correct bit-test pattern already in the same file: keyboard
+   `flags & 0x10` (fst_keyboard.py:520). Secondary (playground probe, not
+   production): `playground/pynput_mouse_probe.py:101, 109-125` carries the
+   same patterns. The post-#42 wheel sign test is the reference pattern.
+- **Outcome (goal):** the X-button vk mapping and the mouse simulated-check use
+   bit tests / masks instead of packed-word equality — status bits in the other
+   half of the word must not change the outcome (per the #42 ruling).
+- **Acceptance:** x1/x2 down/up with a nonzero low word (shift/ctrl state)
+   still map to vk 4/5; a flags value `1 | 0x20` is still classified simulated;
+   tests pin both; suite green.
+- **Scope (non-exhaustive):** `fst_keyboard.py` ≈49, ≈471-474; tests in
+  `tests/test_filter_behavior.py::TestMouseWin32Filter`.
+- **Status:** OPEN — implicitly approved per the #42 report-back ruling
+  (260910); delegation-ready.
 
 ## 43. `kb_env` fixture + `build()`/`down()` helpers are copy-pasted (drifted) across 6 test files — no shared conftest location (2026-09-10, Audit 3a)
 

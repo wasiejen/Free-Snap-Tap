@@ -575,7 +575,7 @@ class Output_Manager():
             return True
 
         def remove_all_toasts(immediately=0):
-            self._fst.remove_all_callbacks()
+            self._fst.remove_all_callback()
             return True
 
 

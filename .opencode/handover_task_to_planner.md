@@ -1,98 +1,80 @@
-# Worker summary — TODO #3: README + WIKI rework to current code state (2026-09-10)
+# WORKER SUMMARY — approved-fix batch #41 + #42 + #46 (260910 rulings)
 
-Worker: worker_Q4_120K (docs task per `.opencode/handover_task.md`)
+## What changed (one atomic change set)
+- **#41** `fst_manager.py:578`: `remove_all_toasts` control function now calls the
+  SINGULAR `self._fst.remove_all_callback()` (the production `FST_Keyboard`
+  attribute, `fst_keyboard.py:64`). Test refs updated to the singular:
+  `tests/conftest.py` FakeFST attribute + `tests/test_output_manager.py`
+  assertion. New drift-guard `test_remove_all_toasts_drift_guard`: drives
+  `remove_all_toasts()` against a stand-in exposing ONLY the singular attribute —
+  name drift raises AttributeError, which `constraint_evaluation` does NOT
+  swallow (its eval only catches NameError, `fst_manager.py:676`).
+- **#42** `fst_keyboard.py:456-460`: wheel `is_press()` branch replaced.
+  Exact expression: `bool((data.mouseData >> 16) & 0x8000)` → True = down/press,
+  False = up/release. Node-verified BEFORE editing against BOTH single-notch
+  constants (7864320 → False, 4287102976 → True) and BOTH 2-notch spec
+  constants (15728640 → False, 4279238656 → True; also confirmed
+  `240<<16 = 15728640`, `(65536-240)<<16 = 4279238656`).
+  Bit-note clarification of the ruling: bits 16/17 are NOT set in any wheel
+  constant — the delta word occupies bits 16-31 and the distinguishing bit is
+  bit 31 (the sign of the delta word); the approved "mask or shift, direction
+  regardless of other bits" semantics are exactly what the expression
+  implements (low word = key state, ignored). Multi-notch produces the SAME
+  phase as single-notch; magnitude NOT aggregated (approved observable
+  semantics). Non-matching deltas that previously fell through to implicit
+  None are now explicit False (falsy → same release phase; no observable
+  change). New test `test_multi_notch_scroll_keeps_single_notch_phase`
+  (`tests/test_filter_behavior.py::TestMouseWin32Filter`); single-notch tests
+  unchanged and green.
+- **#46** `tests/test_output_manager.py::TestCrossover`: the fixed
+  `await asyncio.sleep(0.02)` replaced with event-driven bounded wait
+  `wait_for_calls` (polls the mock's `method_calls` until exactly the expected
+  calls are recorded; 100 × 10 ms bound; AssertionError showing actual calls on
+  timeout). Applied to BOTH async crossover tests — the named
+  `test_crossover_not_taken_on_low_roll` and its sibling
+  `test_crossover_presses_new_key_first` (same race; the #46 scope names the
+  whole TestCrossover class). Production `send_keys_for_tap_group` untouched.
 
-## Executive summary
-Docs-only rework of `README.md` + `WIKI.md` covering all 15 decided items of
-`SPEC_FEATURES.md` §2 (5) + §4 (10). Every item was verified against the current
-code BEFORE rewording — no reword contradicts its recorded decision. No code,
-no tests, no `SPEC_FEATURES.md` changes. WIKI.md enters git as a NEW tracked
-file (it was gitignored/untracked until the `wiki.md` ignore line was removed
-outside this task).
+## Measured verification
+- `& .\.venv\Scripts\python.exe -m pytest -q` = **436 passed**, 1 warning
+  (baseline 434 + 2 new tests; the warning is the known #10 coroutine one).
+- **10 consecutive FULL `pytest -q` runs green** (the #46 acceptance) — 0 flakes.
+- `& .\.venv\Scripts\ruff.exe check --select F .` = 0 findings.
+- `git diff` scope = `fst_manager.py`, `fst_keyboard.py`, `tests/conftest.py`,
+  `tests/test_output_manager.py`, `tests/test_filter_behavior.py`, `TODO.md`,
+  this file ONLY (pre-existing maintainer dirt in
+  `.opencode/handover_maintainer.md` NOT touched, NOT committed).
 
-## Per-item verification (code evidence)
-- §2.1 WIKI [Tap_Groups]: key strings only — a sign or `|` delay in a tap-group
-  key raises at group init (`fst_keyboard.py:273-281`, `convert_to_vk_code`
-  `:142-153`).
-- §2.2 README feature #5: per-key delays valid in Macros only; Tap_Groups use the
-  global `-tapdelay=` / `-nodelay` (`fst_manager.py:718-755`, ACT_* delays).
-- §2.3 WIKI sequence `|(name)`: counter reset only — the in-flight playback
-  interrupt call is commented out (`fst_keyboard.py:996-1012`).
-- §2.4 WIKI status indicator: usable per-focus; only the GUI-loop START is
-  default-arg-only (`fst_manager.py:928-933, 1424-1430`, `fst_keyboard.py:1024`,
-  overlay poll `fst_overlay.py:153-158`, GUI loop start `free_snap_tap.py:172-203`).
-- §2.5 WIKI crosshair: GUI loop also starts with `-tray_icon` alone; tray menu
-  "Toggle Crosshair" (`fst_overlay.py:340`).
-- §4 #5 WIKI [Macros]: playback via asyncio tasks — interruptible, non-blocking
-  (`fst_keyboard.py:851-868`).
-- §4 #6 `|(name)` documented per type: macro name → interrupts started playback;
-  sequence name → resets counter only; unknown name → silent no-op True
-  (`fst_manager.py:643-693`).
-- §4 #7 `|reset('name')` on a non-sequence: prints "No Macro Sequence ... reset
-  failed", no-op (`fst_keyboard.py:1012`).
-- §4 #9 `dc()`: sign carries no meaning; 9999 sentinel for "not pressed"
-  (`fst_manager.py:275-288`).
-- §4 #10 `p()`: evaluated after the current event updated real state; sign
-  ignored (`fst_keyboard.py:611`, `fst_manager.py:244-246`).
-- §4 #11 invocations valid at trigger/constraint placement too; suffixes checked
-  left to right, stop at first False (`fst_manager.py:103-104`,
-  `fst_keyboard.py:561`).
-- §4 #12 README: title "Macros (Aliases)" → "Macros, Aliases"; "Python 3.6 or
-  higher" → "Python 3.12" (venv = 3.12.9); typos fixed; V1.1.3 → V1.2.0 (WIKI
-  header already 1.2.0; WIKI per-section "updated to V1.1.3" markers kept as
-  history); the `|(!)` example comment's reasoning reworded to the left-to-right
-  short-circuit (the observable "original key not suppressed" claim kept —
-  matches code).
-- §4 #13 WIKI: a None/empty ke has NO default delay (pure timing marker)
-  (`fst_manager.py:134-138`); the "###XXX up for debate" note removed.
-- §4 #14 WIKI/README: rebind matched but replacement constraints fail → original
-  suppressed + nothing sent (pass-through pattern `a|(p("shift")) : b`); a signed
-  key on the replacement side of a Key rebind is reinterpreted as a plain Key
-  (`fst_keyboard.py:295-304, 649-658`); keys inside `p(...)`-style evals must be
-  quoted strings.
-- §4 #15 case-sensitive substring focus matching — ALREADY documented in WIKI
-  ("focus app name" bullet), verified against `fst_tasks.py:96`; no change
-  needed.
+## #42 report-back (ruling requirement)
+Packed-word equality / single-bit-in-a-series sites FOUND → new TODO #48:
+1. `fst_keyboard.py:471-473` — X-button `mouseData == 65536/131072` exact
+   equality: low word holds key state (shift/ctrl), so with a modifier held the
+   X-button event resolves no vk and is suppressed without processing (same
+   defect class as the pre-fix wheel check).
+2. `fst_keyboard.py:49` — mouse `is_simulated_key_event` = `flags == 1` on the
+   packed LLKHF word: an injected event with any other LLKHF bit (e.g.
+   LLKHF_LOWER_IL_INJECTED 0x20) is misclassified as real input.
+Correct patterns (no action): keyboard `flags & 0x10` (`fst_keyboard.py:520`);
+control combos are string-list membership, not packed words. Secondary
+(maintainer's playground probe, not production):
+`playground/pynput_mouse_probe.py:101, 109-125` carries the same patterns.
 
-## Adjacent fixes (committed separately, per AGENTS.md)
-- Commit `fcc3add` (before this one): TODO #45 — WIKI [Suffixes] invocation
-  description corrected (invocations always True; suffixed key_event still
-  played), WIKI [Rebinds] example `+a, +b` → `+a : +b`, README "he first" →
-  "the first". The WIKI part rides along in WIKI.md's first commit (it was
-  untracked). Both WIKI fixes verified present in the committed WIKI.md copy
-  (lines 209-230, 102).
+## TODO entries touched
+- #41, #42, #46: status tails appended (LANDED + verification).
+- #48: NEW entry (evidence/outcome/acceptance/scope; implicitly approved per
+  the #42 ruling).
+- Header numbering updated (#47 → #48 used).
 
-## Measured verification (gate)
-- `& .\.venv\Scripts\python.exe -m pytest -q` → **434 passed**, 1 warning
-- `& .\.venv\Scripts\ruff.exe check --select F .` → **All checks passed** (F=0)
-- `git diff --stat` scope → only allowed files (`README.md`, `TODO.md` modified;
-  `WIKI.md` new untracked file). The pre-existing `.gitignore` change (removed
-  `wiki.md` line, made outside this task) was NOT staged.
+## Commit structure (deviation, flagged)
+DoD 4 (commit hash in the status tails/summary) vs DoD 5 (ONE commit) are
+mutually exclusive — a commit cannot carry its own hash. Per the AGENTS.md
+commit-routine split: the code + tests + TODO/summary land as the main commit,
+and the hash backfill into the tails/summary rides a second bookkeeping-only
+commit. Main commit hash: <MAIN> (bookkeeping commit: <BOOK>).
 
-## Commits
-- `fcc3add` — adjacent doc errors (TODO #45), already in log.
-- This task's commit (contains README.md, WIKI.md, TODO.md, this file) — see
-  git log; hash reported in the worker's final message.
-
-## TODO entries
-- #3: status tail appended (per-item LANDED evidence, gate, anomaly, residual).
-  Entry NOT closed — residual §3 docs remain.
-- #46: NEW — flaky `test_crossover_not_taken_on_low_roll` (timing-dependent),
-  pre-approved test-only fix, OPEN.
-- #45: closed earlier (adjacent fixes, commit fcc3add).
-
-## Anomalies / deviations
-- WIKI.md was untracked: `.gitignore` had a `wiki.md` entry removed outside this
-  task. WIKI.md is added as a new tracked file; the `.gitignore` edit itself is
-  NOT staged (left for the maintainer).
-- Flaky test failed once in the first full-suite run (434 passed on re-run + in
-  isolation). Pre-existing, order/timing-dependent, code untouched — recorded as
-  TODO #46.
-
-## Deliberately not done
-- Residual §3 documentation (variable system, typing/toast/mouse/clipboard/file
-  invocations, extra start args, numpad debug combos) — separate, larger docs
-  task (candidate for a new TODO entry; maintainer's call on scheduling).
-- `.gitignore` change — pre-existing, not part of this task, left uncommitted.
-- Closing #3 — kept OPEN per the residual above.
-- Fixing the flaky test — out of scope for a docs-only task (recorded as #46).
+## Deliberately NOT done
+- #48 fixes NOT implemented (report-back only — the ruling approves fixing them
+  but the spec scoped this task to the report; delegation-ready per #48).
+- `playground/pynput_mouse_probe.py` untouched (maintainer's live probes;
+  excluded from package/tests by convention).
+- No live/listener probes run; all pynput controllers mocked.

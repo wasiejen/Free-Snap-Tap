@@ -67,7 +67,7 @@ class FakeFST(SimpleNamespace):
         self.toast_callback = MagicMock()
         self.timer_callback = MagicMock()
         self.remove_callback = MagicMock()
-        self.remove_all_callbacks = MagicMock()
+        self.remove_all_callback = MagicMock()
         self.check_result = MagicMock()
 
 
