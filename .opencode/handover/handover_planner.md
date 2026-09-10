@@ -2,54 +2,65 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
-## 2026-09-10 (looprun 2, iteration 6) — split proposal part 3+4: part 3 delegated (P02 fresh-process proof run), part 4 = this trim
-- **Start state:** safe. Tree top `2e235cd`; the ONLY deltas are the
-  maintainer's own uncommitted meta batch + the by-design `opencode.jsonc`
-  (never stage either): M `prompt_agent_planner.md` / `prompt_looprunner.md`,
-  D `looprunner_prompt_proposal_planner.md` / `plugin_rundown.md` /
-  `proposals/files/prompt_looprunner.md` /
-  `inbox_planner/M260910-1346_nap-bloat-prompt-separation.md`, untracked inbox
-  files `260910-1818.md` + `compaction_warning.md` (inbox_planner) +
-  `compaction_warning_see_inbox_planner.md` (inbox_worker) — their REPLIES are
-  committed (`2e235cd`: done/ + feedback/); leave the files as-is. NO
-  interrupted planner/worker work.
-- **Launch-message XXX note** = the iteration-4 maintainer message re-routed a
-  THIRD time — already applied (conditional-autonom wording verified present in
-  the live `prompt_looprunner.md`, XXX note gone, `c4ad33c`). Nothing to do.
-- **Proposals channel:** NO maintainer moves — both drafts still in the
-  proposals/ root (`260910_prompt-and-todo-split.md`,
-  `260910_plugin-compaction-detection.md`); `approved/` holds only P01 (applied).
-- **Work chosen:** the split proposal's **pre-approved parts 3+4** (no maintainer
-  call needed; parts 1+2 wait on his ruling):
-  - **Part 3 (TODO split) DELEGATED** to `worker_Q4_120K` (Task tool — spec
-    committed in `handover_task.md`): MOVE = #47/#45/#39/#37/#38/#34/#36/#43/
-    #44 (full text → `todo_records.md`, one-line stubs in TODO.md); LEAVE OPEN =
-    #1/#7/#8/#9/#4/#6/#11/#17/#30/#3; WORKER JUDGES = #46/#41/#42/#40/#35;
-    misfiled-open #48 → FST-behavior section. Meta-only, commit scope = the two
-    md files + summary.
-  - **Part 4 (NAP trim) PLANNER-DIRECT** = this rewrite: all iteration blocks
-    older than the last two condensed to one line each (see the archive below).
-- **P02 FUNCTIONAL PROOF in flight:** this launch is the FIRST Task-tool run
-  after a FRESH process (PC restart + loop restart) → if
-  `handover_task_to_planner.md` is NOT clobbered after the worker's commit, the
-  P02 collision saga is CLOSED; if it IS clobbered, root cause = the task-tool
-  RESULT channel itself (opencode core) → maintainer-side fix (restore via
-  `git checkout --` either way; verdict recorded on return).
+## 2026-09-10 (looprun 2, iteration 6b — FRESH restart of the interrupted iter 6) — part 3 LANDED + verified; P02 saga CLOSED; gauge moved
+- **Start state (fresh session, maintainer restart after compaction storm):**
+  the iteration-6 launch died in compaction before the part-3 worker's first
+  tool call (no partial work; spec intact at `f6075a2`). Since then the
+  maintainer COMMITTED his meta batch (`7af23c1`/`ccda5d5`/`8feb14b`/
+  `d2ffdb9`): new live prompt set in `system_prompts/agents/` + draft copies in
+  `proposals/files/`, handover files restructured to `.opencode/handover/`,
+  BOTH proposal drafts moved to `commented/` with NEW maintainer comments,
+  autocompaction relaxed (keeps ≥60k on compaction). Tree was clean except
+  `opencode.jsonc` (by design) + an EMPTY 0-byte
+  `inbox_planner/260910-2147.md` (left untouched — flagged in the closing
+  message; not a processed read-receipt).
+- **Path repair (`0ce43b8`, planner-direct, pre-approved class):** the
+  restructure had gone stale: (a) task spec + `agents_repo.md` (module map,
+  handover section) pointed at the dead `.opencode/handover_*.md` / prompt
+  paths — fixed; (b) the maintainer's comment ask "move the gauge into
+  `plugin/scripts/`" — DONE: `ctxgauge/{gauge,peek}.mjs` →
+  `.opencode/plugin/scripts/` incl. the file-relative `DEFAULT_EXE_PATH`
+  (spawn-sqlite3 fallback — would silently break otherwise); verified: gauge
+  runs, probe **52/52**. Live prompts reference the gauge via `agents_repo.md`
+  (no direct prompt edits needed).
+- **Part 3 LANDED + planner-verified (`854bb68`, worker_Q4_120K, clean run,
+  no compaction):** 12 entries moved (the 9 pre-ruled + #46/#41/#42 judged
+  CLOSED — all three backed by the iter-2 "approved-fix batch LANDED" record);
+  #40/#35 judged OPEN (rationale in the committed summary — consistent: #40's
+  smell-check half + #35's v1.3 rebaseline remain). #48 relocated into FST
+  behavior decisions; the "Closed entries" section renamed to flag the
+  still-open #35. Independent spot-checks: scope = exactly the 3 files; stubs
+  present for all 12; distinctive body strings absent from TODO.md; open
+  entries + maintainer-calls list untouched; `todo_records.md` old content a
+  byte-identical prefix. TODO.md 891→504 lines.
+- **P02 FUNCTIONAL PROOF: PASSED — saga CLOSED.** First Task-tool run after a
+  fresh process did NOT clobber `handover_task_to_planner.md` after the
+  worker's commit (git status clean post-run). The `mirrorSummary` removal
+  (`adc9965`) works; the iter-5 8th collision was in-process staleness only.
+  Standing clobber-restore rule retired (see Standing).
+- **Commented proposals REVISED + moved back to proposals/ root (pending
+  maintainer ruling):** (1) split proposal — replied to his questions:
+  `todo_inbox.md` YES (new part 5: workers append, planner curates + assigns
+  IDs), `todo_wip.md` SKIP (NAP = single WIP source), topic split NOT YET
+  (sections suffice; revisit at ≈20 open entries), prompt changes = parts
+  1+2 (+ one AGENTS.md APPEND-rule line for part 5); (2) compaction
+  detection — gauge move noted DONE (`0ce43b8`), the `session_context/`
+  per-session writeout folded into step 2 (still approval-gated), step 1
+  probe unchanged.
+- **Bookkeeping (`<this commit>`):** `todo_records.md` header numbering line
+  fixed (#38→#48, next #49); TODO #30 scope line re-pointed to
+  `plugin/scripts/` (its only forward-looking stale path; the other
+  ctxgauge mentions are past-tense history — left as-is).
 - **NEXT (iteration 7, in order):**
-  1. VERIFY the part-3 return: `git show --stat` scope, stub/records grep, the
-     judged-entry report (#46/#41/#42/#40/#35) → settle any residual ambiguity
-     (open entries never deleted), bookkeeping commit.
-  2. P02 verdict → update Standing + (if still colliding) a maintainer call in
-     the closing message.
-  3. Maintainer calls bundle (≤3 per message, closing message): (a) rulings on
-     the two proposal drafts (split parts 1+2 = his live prompt; compaction
-     detection); (b) confirm the feedback-folder path
-     `proposals/maintainer/feedback/`; (c) the FST behavior batch (#1/#7/#8/
-     #9/#4+#6); (d) headless-toast harden-vs-docs; (e) #17 v1.3 rebaseline
-     (default SKIP).
-  4. If budget remains: light explorer pass for NEW issues (the standing audit
-     goal is substantially complete — 3a/3b done; #48 is the only open audit
-     residual and it is implicitly approved, not audited).
+  1. Maintainer rulings on the two revised proposals (split parts 1+2+5;
+     compaction-detection steps 2+3; rename to `ctx_watchdog.ts` touches
+     `opencode.jsonc` → his edit or explicit go).
+  2. The FST behavior batch is still the oldest open work (#1/#7/#8/#9/
+     #4+#6) — needs his semantics rulings before it can be built.
+  3. If green-light: light explorer pass for NEW issues (audit 3a/3b done;
+     #48 is the only open audit residual).
+- Baseline unchanged: **448 passed** / ruff F=0 (meta-only since; no code
+  touched this iteration).
 
 ## 2026-09-10 (looprun 2, iteration 5) — P02 + P08 LANDED + verified; P01 re-test PASSED; maintainer meta batch processed
 - **Start state:** clean tree (top `1ed1108`), only `opencode.jsonc` modified BY
@@ -206,12 +217,16 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   **52/52** (post-#33 ladder).
 - `opencode.jsonc` uncommitted BY DESIGN (maintainer iterates live) — never
   stage, never flag.
-- Maintainer's uncommitted meta batch (prompt edits + deletions + untracked inbox
-  files — see the iteration-6 start state) — never stage/flag; the processed
-  replies are committed.
-- After EVERY Task-tool run: if `git status` shows `handover_task_to_planner.md`
-  modified → `git checkout --` it (the P02 mirror removal only takes effect from
-  a FRESH process; the functional proof rides on iteration 6).
+- The maintainer's meta batch is now COMMITTED by him (`7af23c1`…`d2ffdb9`);
+  his live files (new prompt set, `proposals/files/` drafts, `opencode.jsonc`)
+  — never stage/flag; draft copies in `proposals/files/` may carry stale paths
+  until he finalizes the set (the gauge move is one such pending update).
+- P02 saga CLOSED (iter 6b functional proof PASSED — no clobber after a
+  fresh-process Task-tool run). If a clobber EVER recurs, restore via
+  `git checkout --` and re-open the investigation.
+- Gauge lives in `.opencode/plugin/scripts/` (self-gauge:
+  `node .opencode\plugin\scripts\peek.mjs`; the file-relative
+  `DEFAULT_EXE_PATH` inside `gauge.mjs` must be re-checked if that dir moves).
 - Delegation: Task tool (`subagent_depth` 2), default `worker_Q4_120K` (P01
   re-test PASSED — worker-prompt launches work); raw `agent_*` = fallback;
   explorer `worker_explorer_Q3_120K_mtp` (fast, less stable — ALWAYS verify its

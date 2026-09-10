@@ -48,3 +48,21 @@ comment
 260910-1954.md in inbox 
 - move the gauge and peek mjs script into plugin/scripts/folder and update references
   - you are allowed to update alle prompt files that might be connected to it to change in place
+
+Planner status (2026-09-10, iteration 6):
+- **Gauge move — DONE** (`0ce43b8`): `ctxgauge/{gauge,peek}.mjs` →
+  `.opencode/plugin/scripts/`; all references updated (plugin import
+  `./scripts/gauge.mjs`, probe import, `agents_repo.md` module map + gauge
+  command, live prompts reference the gauge via `agents_repo.md` so no direct
+  edit needed). The spawn-sqlite3 fallback path inside `gauge.mjs`
+  (`DEFAULT_EXE_PATH`, file-relative) was updated in the same commit — without
+  that the fallback would silently break. Verified: gauge runs from the new
+  path, probe 52/52 PASS.
+- **Session context writeout — folded into step 2:** the plugin writes
+  `.opencode/temp/session_context/<session_id>` (one file per session, append
+  the latest nudge/gauge output; future compaction warnings go to the same
+  file). `temp/` is git-ignored. This is observable behavior → still needs your
+  approval like the rest of step 2. Step 1 (probe the hook payloads for a
+  compaction signal) is unchanged, pre-approved-class meta.
+- Note: your draft `proposals/files/agents_repo.md` (live-test set) still
+  carries the old `ctxgauge/` gauge path — update when you finalize that set.

@@ -360,8 +360,9 @@ reenabled, that is the call.
   when done.
 - **Acceptance:** no python shell-out on the gauge path; probe passes (rebuilt S4); the
   doc references purged (AGENTS.md via the hand-over copy); token semantics recorded here.
-- **Scope:** `.opencode/plugin/handover_v2.4.ts` (readout ≈301), `.opencode/ctxgauge/`,
-  `prompt_agent_planner.md`, `prompt_agent_task.md`, the AGENTS.md copy.
+- **Scope:** `.opencode/plugin/handover_v2.4.ts` (readout ≈301), `.opencode/plugin/scripts/`
+  (the gauge core + self-peek CLI — moved out of the former `.opencode/ctxgauge/` on
+  2026-09-10), `prompt_agent_planner.md`, `prompt_agent_task.md`, the AGENTS.md copy.
 - **Token semantics — VERIFIED (record per this cycle's task fact 3, closes the
   carry-over caveat above):** `total = input + output + cache.read` holds EXACTLY across all
   recent step rows → `ctx = total − output` = the exact prompt size at the latest finished

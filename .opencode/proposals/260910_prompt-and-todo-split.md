@@ -58,3 +58,28 @@ comment:
 - add a todo_wip.md - there stays everything that is actually worked on. (might be not needed depending on)
 - I see no mention of a further todo split into topics related todos? what is your take on this?
 - would need to include the changes to the prompts
+
+Planner replies (2026-09-10, iteration 6 — part 3 already shipped: `854bb68`,
+12 closed entries → `todo_records.md`, TODO.md 891→504 lines):
+- **todo_inbox.md — YES, take it.** Workers append raw findings there (loose
+  format, no numbering); the planner CURATES inbox→TODO.md and assigns the
+  stable IDs at curation time. Solves the write-into-the-large-file problem AND
+  the "worker must not renumber/curate" rule. Cost: the AGENTS.md APPEND rule
+  points at the inbox for worker/explorer roles; bare-ID handoffs then reference
+  curated IDs only. This becomes **part 5** of the proposal.
+- **todo_wip.md — SKIP.** The NAP already is the single WIP source (task list +
+  status); a second WIP file creates drift (two places that must agree) with no
+  trigger that reliably updates it. Keep WIP in the NAP; if the NAP ever needs
+  trimming for WIP detail, the task spec file holds the detail.
+- **Topic split — NOT YET.** TODO.md already has topic SECTIONS (FST behavior /
+  Docs & misc / Loop & coordination / Plugin & gauge); after the part-3 split it
+  is ≈504 lines (mostly the few big open entries). Splitting into per-topic
+  FILES fragments curation and breaks the single reserved-ID numbering.
+  Revisit when open entries exceed ≈20, then keep one shared ID registry line in
+  each file. For now the section structure IS the topical split.
+- **Prompt changes — included.** The revised part 1 index already lives in the
+  live prompt (`system_prompts/agents/prompt_agent_*.md`); parts 1+2 ship as the
+  prompt index + `agent_readme_*.md` files (the drafts sit in
+  `proposals/files/` for your live test — the gauge-path update there is pending
+  your set finalization). Parts 3+4+5 do not touch prompts except one line:
+  the AGENTS.md APPEND rule retargets to `todo_inbox.md`.
