@@ -37,6 +37,33 @@ during their work.
 Entries below this divider. Agents: do not read below this line before
 appending your own entry.
 
+### Task-tool result channel overwrites the worker summary file — planner 2026-09-10 (session 4)
+- **Friction:** after TWO Task-tool runs (`worker_Q4_120K` #33 build + the Q3
+  explorer 3a/3b), `.opencode/handover_task_to_planner.md` was left MODIFIED in
+  the working tree with the raw `<task id=…><task_result>` dump of the
+  subagent's final message — overwriting the worker's committed executive
+  summary, AFTER the worker had already committed it.
+- **Cost:** one recovery step per run (`git checkout -- <file>`), a dirty tree
+  at the point I wanted to commit my own bookkeeping, and a real risk of
+  staging the wrong version into the planner commit.
+- **Suggested change:** the result channel should not write the handover path
+  (or the worker prompt should note that its summary file gets clobbered
+  post-commit and the committed version is canonical — the planner prompt
+  should carry the restore step as a standing post-Task-tool rule).
+
+### NAP rewrite lost design blocks that TODO entries reference — planner 2026-09-10 (session 4)
+- **Friction:** TODO #30's "Full design" pointed at NAP blocks
+  (`## v2.4.1 LIVE + v2.5 NUDGE LADDER spec` + `## Live status`) that no longer
+  existed — lost in the session-3 NAP rewrite. The design of record had to be
+  re-established from the TODO entry + re-stated in the task spec.
+- **Cost:** discovery time + an explicit discrepancy flag + a self-contained
+  spec that duplicates the TODO text.
+- **Suggested change:** when rewriting the NAP, keep (or move to
+  `.opencode/archive/`) any block that a TODO entry references by name; or
+  keep durable design specs in dedicated files (not the per-handoff NAP) and
+  have TODO entries reference those files.
+
+
 ### Task tool depth-blocked for the loop-runner-launched planner — planner 2026-09-10
 - **Friction:** the planner's `task: allow` permission is useless while the
   looprunner launches the planner via the Task tool: spawning a worker hits
