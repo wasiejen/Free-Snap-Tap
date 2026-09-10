@@ -43,15 +43,30 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   per the #42 ruling — delegation-ready).
 - **Summary-file collision — FIFTH time** (raw run too): restored `git checkout --`
   post-run (P02 pending — the plugin `mirrorSummary` is the confirmed root cause).
+- **#47 DELEGATED → PARTIAL (resume spec committed, launching this iteration):** the
+  raw `agent_Q4_120K` wrote chunk 1 (WIKI multi-focus names + multiline `:`
+  continuation) = commit `b40a1a7`, gate 436 / ruff 0, then hit its own stop line
+  (99 %) — but it code-verified ALL §3 features first and left per-feature notes in the
+  summary's `## Verified §3 facts` block. Planner restored the clobbered summary
+  (collision 6x). Four flags surfaced (all confirmed behavior, documented as-is by the
+  resume run): (1) headless toast calls (`show_message`/`show_timer`/`remove_toast`/
+  `remove_all_toasts` + the repeat-task timer toasts) raise TypeError because the
+  callbacks are None outside GUI mode — a harden = a NEW maintainer call, docs say
+  "requires GUI"; (2) `remove_toast`/`remove_all_toasts` `immediately` param is
+  ignored; (3) ALT+NUM6 numpad combo is UNASSIGNED (no branch — §3's "NUM1..NUM8" is
+  over-claimed); (4) `check(name, value)` with a non-int/non-list value → None → True.
+  Bonus: `-focusapp=` start arg prints a deprecation warning + `sys.exit(1)`.
+- **Proposals channel:** `approved/`/`commented/`/`rejected/` all hold only `.gitkeep`
+  — NO maintainer moves since iteration 1; nothing to act on there yet.
 - **NEXT (iteration 3, in order):**
-  1. Check `.opencode/proposals/{approved,commented}/` for maintainer moves — approved
-     = tasks (P02/P03/P04/P06/P07/P09 are doc/config-only; P08 = the #44
-     configErrorException design — needs the degrade-to-defaults yes).
-  2. Delegate **#47** (§3 docs, APPROVED) — same raw-agent mechanic; docs-only, low risk.
+  1. If #47's resume run landed: verify (gate + git scope + spot-check the WIKI/README
+     sections against the verified notes) and close #47.
+  2. Check `.opencode/proposals/{approved,commented}/` again for maintainer moves.
   3. Remaining maintainer calls (bundle ≤3): the FST behavior batch
      (#1/#7/#8/#9/#4+#6), the P08 degrade-to-defaults yes, the #17 v1.3 log-profile
-     rebaseline (call 1, default SKIP), and now the #48 packed-word fixes (fix
-     semantics for the X-button + LLKHF sites — implicitly approved).
+     rebaseline (call 1, default SKIP), the #48 packed-word fixes (X-button + LLKHF
+     sites — implicitly approved), and NEW: whether to harden the headless toast
+     callbacks (flag 1 above).
 - Standing lessons unchanged: raw `agent_Q4_120K` + the spec's Protocol section = the
   delegation mechanic; restore the summary file after EVERY Task-tool run.
 
