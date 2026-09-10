@@ -16,6 +16,20 @@ def type_check(expected_type):
     return decorator
 
 
+class ConfigError(Exception):
+    '''
+    a user config file failure (focus group name, key string) that
+    must be surfaced at a user-facing boundary
+    '''
+    def __init__(self, reason, context=''):
+        super().__init__(f"FST config error: {reason} ({context})")
+        self.reason = reason
+        self.context = context
+
+    def __str__(self):
+        return f"FST config error: {self.reason} ({self.context})"
+
+
 class Input_Event(ABC):
     '''
     #XXX

@@ -875,10 +875,17 @@ prints forward slashes. Status: closed — section committed as tested.
   `fst_overlay.py` 210-214/590-591 (guard site choice — a central fix in the
   two accessors makes these untouched); tests: `test_control_actions.py`,
   `test_focus_task.py`, `test_cli_menu.py`.
-- **Status:** OPEN — maintainer GENERAL RULING (260910): uncaught errors must be
-   caught; FST_config/userconfig-based errors must be caught + signaled to the user
-   with helpful info for finding the error in their config (custom
-   configErrorException welcomed, "open for suggestion"). Concrete design proposed
-   in `.opencode/proposals/P08_configerror-design.md` — the degrade-to-defaults
-   fallback needs his final yes (approval via the proposals channel). Overlaps: #1
-   (vk resolution) shares the surfaced-error solution.
+- **Status:** FIXED (P08 build, 2026-09-10) — design approved (now in
+   `.opencode/proposals/approved/P08_configerror-design.md`, degrade-to-defaults
+   included). `ConfigError` added to `fst_data_types.py`; raised at the stale focus
+   name sites (`apply_focus_groups` / `apply_start_args_by_focus_name`) and at both
+   `convert_to_vk_code` failure branches; caught at every user-facing boundary:
+   win32 hot path (`check_for_combination` warn-once + `check_control_actions`
+   degrade-to-defaults), CLI menu option 2 (print, loop continues), the 4 GUI overlay
+   handlers (toast), and top-level startup (print + exit 1). Parse blocks preserve the
+   type (except-before-generic). Acceptance met: paths (a)+(c) pinned
+   (`tests/test_config_error.py`), suite green 448 passed / ruff `--select F` clean.
+   Handoff to planner: condense/close this entry. **Overlap note for #1:** the
+   constraint `p()`/`tr()` path now catches `ConfigError` fail-closed (print +
+   `return False`) so it no longer crashes, but it still only PRINTS (console) — #1's
+   "user-visible error at the constraint path" is NOT yet met, so #1 stays OPEN.

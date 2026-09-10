@@ -10,7 +10,7 @@ import sys # to get start arguments
 import msvcrt # to flush input stream
 from random import randint # randint(3, 9))
 from time import time # sleep(0.005) = 5 ms
-from fst_data_types import Key_Event, type_check
+from fst_data_types import Key_Event, type_check, ConfigError
 from fst_tasks import Focus_Task, Macro_Repeat_Task
 import datetime
 import re #regular expression
@@ -673,6 +673,10 @@ class Output_Manager():
         else:
             try:
                 result = eval(constraint_to_evaluate)
+            except ConfigError as error:
+                print(error)
+                # unknown key in a constraint function call fails the constraint (fail-closed)
+                return False
             except NameError as error:
                 # unknown name (e.g. invocation of a macro that never played) -> silent no-op
                 if CONSTANTS.DEBUG3:
@@ -1882,9 +1886,12 @@ class CLI_menu():
             elif choice == '1':
                 startfile(self._fst.config_manager.file_name)
             elif choice == '2':
-                self._fst.arg_manager.reset_global_variable_changes()
-                self._fst.apply_start_args_by_focus_name(self._fst.focus_manager.FOCUS_APP_NAME)
-                self._fst.apply_focus_groups(self._fst.focus_manager.FOCUS_APP_NAME)
+                try:
+                    self._fst.arg_manager.reset_global_variable_changes()
+                    self._fst.apply_start_args_by_focus_name(self._fst.focus_manager.FOCUS_APP_NAME)
+                    self._fst.apply_focus_groups(self._fst.focus_manager.FOCUS_APP_NAME)
+                except ConfigError as error:
+                    print(f"[FST] {error}")
             elif choice == '3':
                 self._fst.arg_manager.PRINT_VK_CODES = True
                 break
