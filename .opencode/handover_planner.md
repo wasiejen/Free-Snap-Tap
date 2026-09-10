@@ -2,6 +2,18 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-10 (autonomous session 3) — #37 production evidence in + explorer real-exploration
+- **#37 CLOSED (planner-verified):** this session's first user message carried
+  `ctx: SESSION=ses_f76b0f74affeKJEu0HdQerFNHv CTX=notAvailable` — own session (cross-checked
+  via self-gauge `SESSION=ses_f76b0f74…`), NO db-error → the bun-host gauge read works in
+  production (backend chain `node:sqlite` → `bun:sqlite` → spawn `sqlite3.exe` is live).
+  `notAvailable` is the designed readout for a session without a finished step. TODO close
+  note + header stamped. The v1.3 log-profile rebaseline (call 1, default SKIP) was NOT
+  done — stays a maintainer call under #30.
+- Standing goal kicked off: explorer (`worker_explorer_jill_gemma_256K_mtp` — NOTE: the
+  embedded task text's `worker_explorer_jill_gemmaQ4_256K` is stale, TODO #39) real
+  exploration run; spec in `handover_task.md`; findings → TODOs from #40.
+
 ## 2026-09-10 (autonomous session 2) — Looprunner-prompt optimization (maintainer task, light)
 - Maintainer task (via Looprunner): optimize `.opencode/prompt_looprunner.md` for
   looprunner↔planner coordination — proposal only, no repo code work this round.
@@ -66,21 +78,19 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   prompt). If the next prompt does NOT carry them, the NEXT block below is the source.
 
 ## NEXT (resume order)
-1. **#37 production evidence = MAINTAINER RESTART of the opencode instance**: a
-   `ctx: SESSION=<own sid> CTX=…` line must reach the planner's own session with NO
-   db-error line (check `plugin.log` only via the standing one-shot call-1 read if
-   asked). After the evidence: close the #37 tail; the v1.3 log-profile rebaseline
-   (call 1) could fold into that same restart read (maintainer call).
-2. **T2 #33 nudge ladder** — next build, UNBLOCKED once the #37 restart evidence is
-   in (the ladder depends on the production read). Approved design lives in TODO #33
-   (rungs 50 % → 70 %/30k → 80 %/20k → 90 %/10k → final 5k; `promptAsync` synthetic;
+1. ~~#37 production evidence~~ — DONE in session 3 (ctx line reached own session, no
+   db-error; #37 CLOSED). Residual: v1.3 log-profile rebaseline (call 1) = maintainer
+   call, default SKIP.
+2. **T2 #33 nudge ladder** — next build, NOW UNBLOCKED (the #37 evidence is in — the
+   ladder depends on the production read, which works). Approved design lives in TODO
+   #33 (rungs 50 % → 70 %/30k → 80 %/20k → 90 %/10k → final 5k; `promptAsync` synthetic;
    `kind:"nudge"` evidence only; readout must reach EVERY acting session). The probe
-   is the standing 45-check base to extend.
-3. **Standing autonomous goal:** launch the explorer (`worker_explorer_jill_gemmaQ4_256K`)
-   for a REAL repo exploration run (beyond the smoke test) and CHECK its findings —
-   new TODO IDs start at #39. Verify its output numbers (fabricated-gauge caveat, #38).
-   Suggested scope for the first real run: FST core modules (`fst_manager.py`
-   constraint/evaluation paths, `fst_keyboard.py` filter) + test-suite smell check.
+   is the standing 45-check base to extend. Build worker = `worker_Q4_120K` (sizing
+   lesson 5 below applies).
+3. **Explorer real-exploration run (standing goal):** session 3 launched it (spec in
+   `handover_task.md`; scope = FST core `fst_manager.py` constraint/evaluation +
+   `fst_keyboard.py` filter + test-suite smell check). CHECK its findings before
+   accepting (fabricated-gauge caveat, #38); findings → TODOs from #40.
 4. #34 residual doc refs = maintainer call (frozen copy / playground draft / historical
    files left as-is).
 5. Delegation sizing lesson (this session): the 27B Q4 worker needs >40 min for a

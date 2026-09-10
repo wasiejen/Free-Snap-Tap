@@ -256,7 +256,7 @@ reenabled, that is the call.
   PRODUCTION bun host (`db-error`, no `node:sqlite` — Bun error format) → no ctx line
   lands; see #37 (the bun-1.4.2 system-bun proxy check measured the wrong host).
 
-## 37. Production plugin host lacks `node:sqlite` — the ctx nudge never lands in production (2026-09-10)
+## 37. (closed 2026-09-10) Production plugin host lacks `node:sqlite` — the ctx nudge never lands in production (2026-09-10)
 
 - **Problem / evidence:** the v2.5 match-only post (`313e83b`) is live after the maintainer
   restart (planner session `ses_f773b9c5…`): the `chat.message` hook FIRES for the planner's
@@ -301,6 +301,14 @@ reenabled, that is the call.
   planner finished (check-ID fix + final verifications). PRODUCTION EVIDENCE PENDING
   maintainer restart (a `ctx: SESSION=<own sid>` line must reach the planner session
   with NO db-error line). NOT closed.
+- **2026-09-10 (autonomous session 3 — production evidence in → CLOSED):** after the
+  maintainer restart, the line `ctx: SESSION=ses_f76b0f74affeKJEu0HdQerFNHv CTX=notAvailable`
+  reached the planner's own session with the first user message — NO db-error line (the
+  bun-host backend chain `node:sqlite` → `bun:sqlite` → spawn `sqlite3.exe` works in
+  production; `notAvailable` = correct readout for a session without a finished step yet,
+  cross-checked: the same session's later self-gauge read `CTX=27215 (22%)` cleanly).
+  Acceptance met → CLOSED (planner, session 3). Tail note: the v1.3 log-profile
+  rebaseline remains #30 / maintainer call 1 (default SKIP — not done autonomously).
 
 ## 33. v2.5 auto-nudge ladder build (folded in: the former TOP-of-file note) — STATUS: APPROVED — NEXT BUILD
 
