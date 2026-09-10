@@ -31,6 +31,7 @@ The task file governs WHAT (goal + definition of done); its procedure is a sugge
 ## Stop line (context budget)
 Self-gauge any time: `node .opencode\ctxgauge\peek.mjs` (repo root, read-only) → `SESSION=… CTX=… (…%) REM=…`. The injected `ctx:` nudge (carries the `SESSION=…` prefix) is a reminder; the self-gauge is source of truth.
 **Stop line = `REM ≤ 15k` or `≥ 85%`, whichever first.** Do NOT start new work past the line. Finish the current step only if small and completes before the line — otherwise stop immediately and end with your summary, its last line the verbatim self-gauge: `CTX=… REM=… — stop-line reached`. Working past the line is a rule violation; the planner decides continuation.
+**Checkpoint rule:** after EACH verified finding, write it to `TODO.md` immediately — a checkpoint is the unit of work; a dead session must lose at most one finding.
 
 ## Before you stop (commit routine — mandatory)
 1. `TODO.md` updated with every discovery and discrepancy (append new entries; planner curates).

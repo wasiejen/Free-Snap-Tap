@@ -14,3 +14,6 @@ request 500s first (see P01).
 
 **Verdict:**
 - isnt the right place the prompt for the explorer?
+- implemented 2026-09-10 (looprun 2, iter 3): agreed — applied to
+  `prompt_agent_explorer.md` (Stop-line section); `prompt_agent_task.md`
+  stays for general workers (audit/exploration tasks run on the explorer).

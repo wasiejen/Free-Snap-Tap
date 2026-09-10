@@ -48,3 +48,7 @@ progress summary, not the full log. Doc/prompt-only + a few `Copy-Item` calls.
 
 **Verdict:**
 - approved
+- implemented 2026-09-10 (looprun 2, iter 3): the planner block is live in
+  `prompt_agent_planner.md` (Autorun archive section); the looprunner line rides
+  in `files/prompt_looprunner.md` (applied on restart); the day dir
+  `.opencode/archive/autorun-260910/` starts this iteration (plan03).

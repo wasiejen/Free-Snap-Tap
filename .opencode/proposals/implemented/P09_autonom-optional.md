@@ -23,3 +23,8 @@ state of the repo.)
 autonomous launches.
 
 **Verdict:**
+- approved, use the proposal/files folder for the md file
+- implemented 2026-09-10 (looprun 2, iter 3): per the verdict, the reworded
+  prompt sits in `files/prompt_looprunner.md` (the maintainer copies it over the
+  live file on the next opencode restart); the P07 looprunner line rides in the
+  same files/ copy.

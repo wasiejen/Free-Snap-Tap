@@ -17,3 +17,9 @@ source token as a prefix, in a scratch file), record the observed behavior.
 **Impact / risk:** doc-only; removes doubt-driven overhead from every future bulk rename.
 
 **Verdict:**
+- implemented 2026-09-10 (looprun 2, iter 3): probe verified — SINGLE PASS over
+  the ORIGINAL string (no rescan of the replaced output; `kb_env`→`kb_env_ns`
+  does not cascade), SUBSTRING-matching (`kb_envx`→`kb_env_nsx`), corruption
+  ONLY when the target name already exists in the file
+  (`kb_env_ns`→`kb_env_ns_ns`, the #43 failure mode). Gotcha added to
+  `agents_repo.md`.

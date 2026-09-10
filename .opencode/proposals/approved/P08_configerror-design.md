@@ -37,3 +37,4 @@ of uncaught crashes (the approved direction per the ruling). The degrade-to-defa
 fallback is the one part that needs the maintainer's final yes.
 
 **Verdict:**
+- approved

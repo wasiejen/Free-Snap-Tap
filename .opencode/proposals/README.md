@@ -21,7 +21,22 @@ decides asynchronously.
    - `proposals/commented/` — the planner reads the comments, revises or closes it.
    - `proposals/rejected/` — done, no further action.
    - `proposals/implemented/` — moved here after implemention, to be removed by maintainer.
+   - `proposals/files/` — proposals for files that are only loaded on restart 
+    - e.g. AGENTS.md, agents-repo.md, prompt_agent_*.md, opencode.json
 3. Planner checks the subfolders at session start (approved = next task candidates).
+
+## maintainer/ — the reverse direction (maintainer→agent, P10)
+- `maintainer/inbox/` — the maintainer drops a file per message (or batches
+  several messages into ONE file — bundling is fine, naming is loose, e.g.
+  `M<YYMMDD-HHMM>_<slug>.md`; content verbatim, the `--planner:`/`--worker:`
+  prefix stays the addressing line).
+- `maintainer/done/` — the addressed agent moves a file here after handling ALL
+  messages in it (content untouched; the handling is recorded in the NAP/TODO as
+  usual). The move = processed (read-receipt).
+- Agents scan `inbox/` at session start BEFORE planning; the agent commits the
+  moves as bookkeeping (same as the approved/ moves).
+- Supersedes the retired single-file `.opencode/handover_maintainer.md`
+  (archived, 2026-09-10).
 
 ## Why "move" instead of "git change signal"
 A committed new file loses the "file changed" attention signal, but a file's

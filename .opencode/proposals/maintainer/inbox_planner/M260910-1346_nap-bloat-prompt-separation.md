@@ -1,0 +1,3 @@
+--planner: 260910-1346:
+- for future: we might need to codify a lot of the nap entries as part of your system prompt or a different prompt file so seperate the basic worker logic and the repo decision specific logic that a worker does not need to know (e.g should not be in agents_repo.md) make a proposal how to best achieve this (goal is to reduce bloat in your nap and have clear seperation of concern for the system prompt files)
+  - it could also work as a kind a Gedächtnis/memory for general quirks (though i think you already use the nap for this already :-) )

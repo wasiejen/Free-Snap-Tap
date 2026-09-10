@@ -15,3 +15,6 @@ chain).
 
 **Verdict:**
 - this is repo specific and should go into agents_repo.md
+- implemented 2026-09-10 (looprun 2, iter 3): applied per the comment — gotcha
+  in `agents_repo.md` (host-dependent capability checks probe the REAL host,
+  never a same-named system CLI).
