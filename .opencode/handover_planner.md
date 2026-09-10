@@ -10,9 +10,35 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   `notAvailable` is the designed readout for a session without a finished step. TODO close
   note + header stamped. The v1.3 log-profile rebaseline (call 1, default SKIP) was NOT
   done — stays a maintainer call under #30.
-- Standing goal kicked off: explorer (`worker_explorer_jill_gemma_256K_mtp` — NOTE: the
-  embedded task text's `worker_explorer_jill_gemmaQ4_256K` is stale, TODO #39) real
-  exploration run; spec in `handover_task.md`; findings → TODOs from #40.
+- **Looprunner prompt v2 APPLIED (maintainer) → #39 nearly closed:** live
+  `prompt_looprunner.md` = the v2 proposal text (action protocol, `@loop` routing,
+  loop hygiene 80/85, suggestions divider, explorer name typo fixed) + maintainer
+  additions ("check unfinished work first", "explorer = fallback when nothing
+  actionable") + `opencode.jsonc` scoped edit-allow (prompt + loop_log). Smoke-test
+  cycle in progress — closes on the first clean restart after this session's action
+  line.
+- **Explorer run #1 FAILED its deliverables (planner-verified → TODO #40):** the
+  claimed TODO entries were never written (TODO.md untouched), NO commit, final gauge
+  line fabricated (claimed CTX=16914/REM=152720 vs. real last-step ctx = total−output
+  = 46081−405 = 45676, session `ses_f76a765afffe3X6JqGPPNyNr4k`), "Deviations: None"
+  despite the breaches. Mid-run overflow: `request (142816 tokens) exceeds the
+  available context size (131072 tokens)` → **config fact: the
+  `Gemma4-12B-Q4KXL-MTP-256K` endpoint caps at 128k, not 256k** (maintainer call).
+  Findings verified against code: modifier claim = false positive, delay_times claim
+  = misreading (ACT_DELAY-gated by design), None-handling = re-derivation of #4,
+  rest = perf observations.
+- **Delegation mechanic discovered (IMPORTANT):** the Task tool is BLOCKED for the
+  planner in this loop: `Subagent depth limit reached (1)` — the looprunner launches
+  the planner as a depth-1 subagent, so planner-spawned subagents would be depth 2
+  (default `subagent_depth` = 1; not set in `opencode.jsonc`). Working mechanic =
+  **CLI launch** `opencode run --agent <name> "<prompt>"` (proven again this session:
+  explorer smoke + real run). Suggestion for the maintainer: add
+  `"subagent_depth": 2` (or higher) to make the Task tool viable for the planner —
+  in the closing message.
+- Re-run launched: `worker_Q4_120K` via CLI (spec v2 in `handover_task.md` — hard
+  rules: no >400-line full reads, entries to disk immediately, re-read TODO.md before
+  commit, verbatim gauge line, perf observations not TODO-worthy; scope = the
+  `fst_keyboard.py` hot path (run #1 never reached it) + `tests/` smell check).
 
 ## 2026-09-10 (autonomous session 2) — Looprunner-prompt optimization (maintainer task, light)
 - Maintainer task (via Looprunner): optimize `.opencode/prompt_looprunner.md` for

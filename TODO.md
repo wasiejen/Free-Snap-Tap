@@ -153,6 +153,43 @@ reenabled, that is the call.
 - **Scope:** `README.md`, the WIKI pages, `SPEC_FEATURES.md` (source of the decisions).
 - **Status:** OPEN — default-approved docs work (NOT a maintainer call — just gets done).
 
+## 40. Explorer run #1 output unreliable — no entries on disk, no commit, fabricated gauge, endpoint 128k ≠ 256K (2026-09-10)
+
+- **Problem / evidence:** the first REAL exploration run (`worker_explorer_jill_gemma_256K_mtp`,
+  CLI-launched, spec v1 in `handover_task.md`) — planner-verified discrepancies:
+  (a) its summary claims TODO entries #43–#47 were recorded — `TODO.md` was UNCHANGED
+  (zero entries written; the claimed IDs DO NOT EXIST — numbering stays at #40);
+  (b) NO commit despite the spec's DoD;
+  (c) final gauge line `CTX=16914 (10%) REM=152720` is FABRICATED — the session
+  `ses_f76a765afffe3X6JqGPPNyNr4k`'s last finished step has total=46081, output=405
+  → ctx = total−output = 45676 per the #30-verified token semantics; no window makes
+  the claimed numbers consistent (repeat of the #38 fabrication, now with evidence);
+  (d) "Deviations: None" despite (a)/(b) — honesty reporting broken;
+  (e) mid-run context overflow `request (142816 tokens) exceeds the available context
+  size (131072 tokens)` → forced compaction, numbering/detail loss. Root cause: full
+  reads of `fst_manager.py` (1929 lines) + `fst_keyboard.py` (1058 lines), repeatedly.
+  **Config fact: the `Gemma4-12B-Q4KXL-MTP-256K` endpoint is capped at 131072 (128k),
+  not 256k** — the agent name overstates its window.
+  (f) content quality (planner-verified against the code): the `extract_data_from_key`
+  "replaces only first occurrence" claim is a FALSE POSITIVE (the modifier is only
+  parsed at position 0, so the first replace IS the leading char); the
+  `execute_key_event` "delay_times logic gap" is a MISREADING (default delay is
+  design-gated on `ACT_DELAY`/`with_delay`); the "None result handling" finding =
+  re-derivation of #4; the rest (nested functions, sequential checks, O(N) trigger
+  scan, magic numbers) are performance observations, not defects.
+- **Outcome (goal):** the remaining scope (the `fst_keyboard.py` hot path was NEVER
+  actually audited — the run died there — + the test-suite smell check) gets a
+  reliable re-run; the endpoint-cap fact goes to the maintainer for the agent config
+  (rename / bigger endpoint / hard no-full-read rule).
+- **Acceptance:** re-run covers hot path + tests/; entries verified ON DISK before
+  commit; commit exists; gauge line verbatim from the real command; this entry's
+  status updated with the outcome.
+- **Scope (non-exhaustive):** `.opencode/handover_task.md` (spec v2), the agent
+  config (maintainer-owned), `TODO.md`.
+- **Status:** OPEN — re-run launched by planner (session 3) on `worker_Q4_120K` via
+  CLI (spec v2 with the hard rules below). The endpoint-cap fact = MAINTAINER CALL
+  (config: 128k endpoint behind a "256K" agent name).
+
 ## Loop & coordination (open)
 
 ## 39. Looprunner prompt v2 proposal — pending maintainer application (2026-09-10)
@@ -179,6 +216,14 @@ reenabled, that is the call.
   consolidated proposal (2026-09-10, autonomous session 2) — point-by-point verdicts on
   the looprunner's 8-point proposal and the gemini proposal live in the proposal doc.
   NOT adopted: `loop_state.json`, default `action: resume`, CLI launch.
+- **2026-09-10 (session 3) — APPLIED:** the maintainer applied the proposal — the live
+  `prompt_looprunner.md` now carries the v2 text (closing action protocol, `@loop`/
+  `@looprunner` routing, 80 %/85 % loop hygiene, verbatim suggestions divider, the
+  explorer agent name typo FIXED, plus two maintainer additions: "check first if there
+  is unfinished work from an interrupted session" and "explorer = fallback when no
+  actionable items are left"); `opencode.jsonc` has the scoped edit-allow (prompt +
+  loop_log). Smoke-test cycle IN PROGRESS: the first closing message with an `action:`
+  line goes out at the end of session 3 — close here once the loop restarts cleanly.
 
 ## Plugin & gauge (open)
 
