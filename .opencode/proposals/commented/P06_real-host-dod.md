@@ -14,3 +14,4 @@ chain).
 **Impact / risk:** doc-only; prevents same-named-CLI false confidence in future builds.
 
 **Verdict:**
+- this is repo specific and should go into agents_repo.md

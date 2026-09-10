@@ -13,3 +13,4 @@ request 500s first (see P01).
 **Impact / risk:** doc-only; dead sessions lose at most one finding instead of all.
 
 **Verdict:**
+- isnt the right place the prompt for the explorer?

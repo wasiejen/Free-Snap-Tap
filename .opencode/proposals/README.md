@@ -20,6 +20,7 @@ decides asynchronously.
    - `proposals/approved/` — the planner acts on it in a later session (it is a task).
    - `proposals/commented/` — the planner reads the comments, revises or closes it.
    - `proposals/rejected/` — done, no further action.
+   - `proposals/implemented/` — moved here after implemention, to be removed by maintainer.
 3. Planner checks the subfolders at session start (approved = next task candidates).
 
 ## Why "move" instead of "git change signal"

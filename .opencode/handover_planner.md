@@ -86,8 +86,23 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
      rebaseline (call 1, default SKIP), the #48 packed-word fixes (X-button + LLKHF
      sites — implicitly approved), and NEW: whether to harden the headless toast
      callbacks (flag 1 above).
+- **P01 APPLIED (maintainer approved it mid-run — moved to `proposals/approved/`):**
+  added `limit.context` to every `provider.llama-swap.models` entry in `opencode.jsonc`,
+  based on the CURRENT model list (8 GPU + 3 CPU) per his verdict, NOT the proposal's
+  stale 6-model list. Values: name-suffix KV window — `IQ3KT-120K_MTP(:chat)` 120000,
+  `IQ3KT-210K` 210000, `IQ3KP-UC-100K` 100000, `IQ4KT-50K-MTP` 50000, `IQ4KT-120K`
+  120000; the two "256K"-named Gemma endpoints = **128000** (the #40 finding: that
+  endpoint is 128k-capped — declaring 256000 would just move the 500 later). The 3 CPU
+  models carry COMMENTED-OUT `"limit"` placeholders for the maintainer to fill in (his
+  verdict). `opencode.jsonc` left UNCOMMITTED per the standing rule (the maintainer
+  reviews/commits his own live config — he will see the working-tree edit). Effect:
+  worker-prompt launches (e.g. `worker_Q4_120K`) stop 500ing at the first request —
+  compaction instead of death; the raw-`agent_Q4_120K` workaround (P01's reason for
+  being) becomes optional.
 - Standing lessons unchanged: raw `agent_Q4_120K` + the spec's Protocol section = the
-  delegation mechanic; restore the summary file after EVERY Task-tool run.
+  delegation mechanic; restore the summary file after EVERY Task-tool run. NOTE (P01
+  landing): worker-prompt variants may now be usable again — re-test `worker_Q4_120K`
+  on the next delegation before defaulting to the raw agent.
 
 ## 2026-09-10 (looprun 2, iteration 1) — maintainer rulings applied + proposals channel + nudge production evidence
 - **Start state:** clean tree (top `9c8b964`), no interrupted work. Maintainer

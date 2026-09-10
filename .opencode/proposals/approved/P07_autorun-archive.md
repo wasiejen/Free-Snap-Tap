@@ -47,3 +47,4 @@ git; the maintainer diffs the day dir to see what really happened; the NAP stays
 progress summary, not the full log. Doc/prompt-only + a few `Copy-Item` calls.
 
 **Verdict:**
+- approved

@@ -13,3 +13,4 @@ edit it directly" but the deny lists cover only `AGENTS.md` / `prompt_**` /
 through TODO.md (the documented channel). Config-only change.
 
 **Verdict:**
+- that was me the maintainer previous to removing gemma altogether. may error. does not need to be done

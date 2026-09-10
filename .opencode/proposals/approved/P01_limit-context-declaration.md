@@ -28,3 +28,5 @@ instead of death. Risk: declaring a limit ABOVE the server's real KV moves the 5
 later in the session — declare conservatively.
 
 **Verdict:**
+- base it on the current availabe models
+- add also limit entries to the cpu model, but comment them out for me to fill in later

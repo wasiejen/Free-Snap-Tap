@@ -20,3 +20,4 @@ The worker writes its own summary file — the COMMITTED version is canonical.
 baseline 52/52 drops by the number of retired mirror checks.
 
 **Verdict:**
+- approved
