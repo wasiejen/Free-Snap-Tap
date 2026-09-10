@@ -214,7 +214,7 @@ reenabled, that is the call.
   RESIDUAL: §3 undocumented-features documentation → new entry #47; maintainer
    APPROVED it 260910-1252 ("approved"). Entry NOT closed.
 
-## 47. Docs: §3 undocumented features (variable system, invocations, extra start args, numpad debug combos) (2026-09-10, from the #3 residual)
+## 47. (closed 2026-09-10) Docs: §3 undocumented features (variable system, invocations, extra start args, numpad debug combos) (2026-09-10, from the #3 residual)
 
 - **Problem / evidence:** the #3 rework closed the §2+§4 gap items; the §3 scope
   (SPEC_FEATURES.md §3) remains undocumented: the variable system, typing/toast/mouse/
@@ -251,8 +251,13 @@ reenabled, that is the call.
     0); `git diff` scope = README/WIKI/TODO/summary only. Core §3 goal MET. RESIDUAL
     (trivial, both answers code-verified in the NAP — no re-check needed): add to the WIKI
     (a) that text vars (`set_var`/`get_var`) and integer vars share the SAME
-    `Output_Manager.variables` dict (`fst_manager.py:71`), and (b) horizontal scroll sends
-    press = one notch RIGHT / release = one notch LEFT (`fst_manager.py:705-706`).
+     `Output_Manager.variables` dict (`fst_manager.py:71`), and (b) horizontal scroll sends
+     press = one notch RIGHT / release = one notch LEFT (`fst_manager.py:705-706`).
+  - **CLOSED (looprun 2, iteration 4):** both residuals applied to the WIKI from the
+    settled answers (no re-check): shared text/integer name-space line under
+    [Variable system] + the horizontal scroll direction line under [Mouse keys].
+    Gate: `pytest -q` = 436 passed, 1 known warning; `ruff check --select F .` = 0.
+    Entry closed — one-line record stays in `todo_records.md`.
 
 ## 46. Flaky test: `test_crossover_not_taken_on_low_roll` — timing/order-dependent (2026-09-10)
 

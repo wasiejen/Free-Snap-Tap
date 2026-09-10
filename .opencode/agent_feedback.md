@@ -225,3 +225,11 @@ appending your own entry.
 - **Friction:** two `edit` tool calls to the SAME file (P05 verdict note) issued as parallel/independent calls both succeeded — the second matched the pre-first-edit prefix and inserted a duplicate verdict block; caught only by re-reading the file.
 - **Cost:** one extra read + one fix-up edit (~2k tokens) late in the session (80 %+ wind-down).
 - **Suggested change:** no tool change needed — treat same-file edits as a sequential dependency (batch independent files in parallel, same-file edits one at a time); noted as a standing self-discipline rule in the NAP.
+
+### Verbatim prompt replacement: extract by anchor, verify with git diff - planner 2026-09-10 (looprun 2, iter 4)
+- **Friction:** applying the approved P09+P07 looprunner prompt replacement needed a byte-verbatim copy of a marked-up proposal file (the embedded planner text must stay EXACT; the file carries maintainer trailing spaces on specific lines). Two extraction attempts with line ranges derived from Read display output were off by one line (dropped the H1 / kept the separator blank); caught by git diff review before the commit; fixed with anchor-based awk extraction (print from the first content line after the marker to EOF).
+- **Cost:** ~3k tokens + 2 extra cycles in the 70-80
+### Verbatim prompt replacement: extract by anchor, verify with git diff - planner 2026-09-10 (looprun 2, iter 4)
+- **Friction:** applying the approved P09+P07 looprunner prompt replacement needed a byte-verbatim copy of a marked-up proposal file (the embedded planner text must stay EXACT; the file carries maintainer trailing spaces on specific lines). Two extraction attempts with line ranges derived from Read display output were off by one line (dropped the H1 / kept the separator blank); caught by git diff review before the commit; fixed with anchor-based awk extraction (print from the first content line after the marker to EOF).
+- **Cost:** ~3k tokens + 2 extra cycles in the high-usage wind-down zone.
+- **Suggested change:** for marked-up proposal files, extract from an anchor line, never from Read-displayed line numbers; verify with git diff --stat against the expected insertion/deletion count plus a Select-String spot check of marker strings before committing.
