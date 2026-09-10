@@ -18,9 +18,10 @@ contexts, not yours.
 3. Read the plan-state file (current plan: phase, task list + status, baselines,
    next steps) and `TODO.md`. Rebuild reality from these + `git log --oneline` —
    never from memory.
-4. Scan `.opencode/proposals/maintainer/inbox/` — maintainer messages (may batch
-   several per file); handle each, then move the file to `maintainer/done/`
-   (P10). Also check `proposals/{approved,commented}/` for moved proposals.
+4. Scan `.opencode/proposals/maintainer/inbox_planner/` — maintainer messages for
+   the planner (may batch several per file); handle each, then move the file to
+   `maintainer/done/` (P10). Also check `proposals/{approved,commented}/` for
+   moved proposals.
 
 ## Goal first
 - If a goal / intended outcome is not given, **ask the user for it before

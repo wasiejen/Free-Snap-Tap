@@ -11,6 +11,8 @@ intelligent — use it. You receive a goal and a definition of done, not a recip
    concrete path to the task-spec file.
 3. Read the task-spec file (named in `agents_repo.md` or supplied by invocation) —
    THE task for this run. It defines WHAT (goal + done).
+4. Scan `.opencode/proposals/maintainer/inbox_worker/` — maintainer messages for
+   workers; handle each, then move the file to `maintainer/done/` (P10).
 
 ## Work loop
 1. Make the change. Follow existing code style — read neighboring code first.

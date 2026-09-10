@@ -26,15 +26,18 @@ decides asynchronously.
 3. Planner checks the subfolders at session start (approved = next task candidates).
 
 ## maintainer/ — the reverse direction (maintainer→agent, P10)
-- `maintainer/inbox/` — the maintainer drops a file per message (or batches
-  several messages into ONE file — bundling is fine, naming is loose, e.g.
-  `M<YYMMDD-HHMM>_<slug>.md`; content verbatim, the `--planner:`/`--worker:`
-  prefix stays the addressing line).
+- The FOLDER NAME names the addressee: `maintainer/inbox_planner/` (scanned by
+  the planner) / `maintainer/inbox_worker/` (scanned by workers — e.g. when the
+  maintainer addresses a worker directly).
+- The maintainer drops a file per message (or batches several messages into ONE
+  file — bundling is fine, naming is loose, e.g. `M<YYMMDD-HHMM>_<slug>.md`;
+  content verbatim, the `--planner:`/`--worker:` prefix stays the addressing
+  line).
 - `maintainer/done/` — the addressed agent moves a file here after handling ALL
   messages in it (content untouched; the handling is recorded in the NAP/TODO as
   usual). The move = processed (read-receipt).
-- Agents scan `inbox/` at session start BEFORE planning; the agent commits the
-  moves as bookkeeping (same as the approved/ moves).
+- Agents scan their `inbox_<role>/` at session start BEFORE planning; the agent
+  commits the moves as bookkeeping (same as the approved/ moves).
 - Supersedes the retired single-file `.opencode/handover_maintainer.md`
   (archived, 2026-09-10).
 
