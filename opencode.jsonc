@@ -51,10 +51,25 @@
         "description": "Local windows temporary directory for intermediate agent outputs"
       }
     },
+
   "agent": {
+    "looprunner_Q4_120k": {
+      "description": "Just restarts the Planenr in autnomous mode, same model als planner_Q4_120K for fast switching",
+      "mode": "primary",
+      "model": "llama-swap/Qwen3.8-27B-IQ4KT-120K",
+      "temperature": 0.1,
+      "prompt": "{file:./.opencode/prompt_looprunner.md}",
+      "permission": {
+        "task": "allow",
+        "edit": "deny",
+        "bash": "deny",
+        "webfetch": "deny"
+      }
+    },
+
     "planner_Q3_120k_mtp": {
       "description": "intelligent, fast, 120k context, plans tasks and delegates to sub-agents, medium precision due to 3bit Quant",
-      "mode": "primary",
+      "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
       "temperature": 1.0,
       "prompt": "{file:./.opencode/prompt_agent_planner.md}",
@@ -70,21 +85,17 @@
     },
     "planner_Q4_120K": {
       "description": "half prefill, very intelligent, moderately fast, 120k context, plans tasks and delegates to sub-agents, higher precision and higher stability due to 4bit Quant",
-      "mode": "primary",
+      "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ4KT-120K",
       "prompt": "{file:./.opencode/prompt_agent_planner.md}",
       "temperature": 1.0,
       // "steps": 15,
       "permission": {
+        "task": "allow",
         "edit": {
           "*": "allow",
-          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
-          "AGENTS.md": "deny",
-          "agents_repo.md": "deny",
-          ".opencode/prompt_**": "deny",
-          ".opencode/handover_planner.md": "deny",
           ".git/**": "deny",
-          ".github/**": "deny",
+          ".github/**": "deny"
         },
         "bash": "allow",
         "webfetch": "allow"
@@ -92,7 +103,25 @@
       "color": "accent"
     },
 
-
+    "worker_explorer_jill_gemma_256K_mtp": {
+      "description": "moderately intelligent, very fast prefill (reading), very very fast generation, 256K context window, to be used to explore code base - but might lack in detail, so to be checked",
+      "mode": "all",
+      "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-256K",
+      "prompt": "{file:./.opencode/prompt_agent_explorer.md}",
+      "temperature": 0.6,
+      // "steps": 15,
+      "permission": {
+        "edit": {
+          "*": "deny",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          ".opencode/handover_task_to_planner.md": "allow",
+          "TODO.md": "allow",
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
+    },
 
     "worker_gemma_256k_mtp": {
       "description": "moderately intelligent, very very fast, 256K context window - needs concrete instructions, best for webfetch, big file reads, big writes",
@@ -102,6 +131,7 @@
       "temperature": 0.2,
       // "steps": 15,
       "permission": {
+        "task": "allow",
         "edit": {
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
@@ -128,6 +158,7 @@
       "temperature": 0.3,
       // "steps": 15,
       "permission": {
+        "task": "allow",
         "edit": {
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
@@ -151,6 +182,7 @@
       "temperature": 1.0,
       // "steps": 15,
       "permission": {
+        "task": "allow",
         "edit": {
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
@@ -176,6 +208,7 @@
       "temperature": 0.3,
       // "steps": 15,
       "permission": {
+        "task": "allow",
         "edit": {
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
@@ -199,6 +232,7 @@
       "temperature": 1.0,
       // "steps": 15,
       "permission": {
+        "task": "allow",
         "edit": {
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
@@ -224,6 +258,7 @@
       "temperature": 1.0,
       // "steps": 15,
       "permission": {
+        "task": "allow",
         "edit": {
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
@@ -247,6 +282,7 @@
       "temperature": 1.0,
       // "steps": 15,
       "permission": {
+        "task": "allow",
         "edit": {
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
@@ -270,6 +306,7 @@
       "temperature": 1.0,
       // "steps": 15,
       "permission": {
+        "task": "allow",
         "edit": {
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
