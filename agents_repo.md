@@ -119,7 +119,7 @@ config file. README/WIKI have some stale examples — trust the convention above
   `prompt_agent_task.md` (agent prompts), `handover_planner.md` (planner
   state/continuation file, the NAP), `handover_task.md` (current task spec),
   `handover_task_to_planner.md` (worker's latest EXECUTIVE SUMMARY),
-  `ctxgauge/peek.py` (context gauge).
+  `ctxgauge/peek.mjs` (context gauge — node, node:sqlite).
 - `opencode.jsonc` (repo root) — opencode config: llama-swap provider + model
   list, planner (primary) and worker agents (subagents), scoped permissions.
 
@@ -161,8 +161,9 @@ hits the filter: update state (press states + timings) → check rebinds
 - Task spec file (planner writes, worker reads): `.opencode/handover_task.md`.
 - Worker summary file (worker writes, planner reads):
   `.opencode/handover_task_to_planner.md` — the EXECUTIVE SUMMARY.
-- Context gauge: run `& .\.venv\Scripts\python.exe .opencode\ctxgauge\peek.py`
-  from the repo root, read-only → `CTX=n (p%) REM=m`.
+- Context gauge (self-gauge): run `node .opencode\ctxgauge\peek.mjs` from the repo
+  root, read-only → `SESSION=… CTX=n (p%) REM=m` (window unknown → `CTX=n` only;
+  no finished step → `CTX=notAvailable`).
 - Durable maintainer TODOs: `TODO.md`.
 
 ## Gotchas
