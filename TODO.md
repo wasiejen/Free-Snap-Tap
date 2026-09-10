@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #39, new
-entries start at #40 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #41, new
+entries start at #42 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -24,9 +24,8 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 5. Schedule (DECIDED — not open calls): #33 v2.5 build is NOT a maintainer call — APPROVED,
    next build; #30 de-peek APPROVED — ONE cycle (node:sqlite gauge landing + peek.py removal
    + doc purge + v1.3 log-profile re-baseline), scheduled AFTER #33.
-6. **Apply the Looprunner prompt v2 proposal** — consolidated proposal ready
-   (`.opencode/looprunner_prompt_proposal_planner.md`): prompt replacement + scoped
-   `opencode.jsonc` permission change for `looprunner_Q4_120k` + one smoke-test cycle → #39.
+6. ~~Apply the Looprunner prompt v2 proposal~~ — RESOLVED 2026-09-10: applied + smoke test
+   clean → #39 CLOSED (session 4).
 
 ## FST behavior decisions (open — maintainer calls unless noted)
 
@@ -209,7 +208,11 @@ reenabled, that is the call.
   keyboard `_convert` `False` = skip pynput callback, actual suppression is via
   `SuppressException` only). Remaining scope: the tests/ smell check + the
   focus-dict/combination candidates (NAP NEXT). The endpoint-cap fact = MAINTAINER
-  CALL (config: 128k endpoint behind a "256K" agent name).
+   CALL (config: 128k endpoint behind a "256K" agent name).
+   **2026-09-10 (session 4):** the maintainer swapped the explorer to
+   `worker_explorer_Q3_120K_mtp` — the 128k-capped "256K"-named gemma endpoint is no
+   longer used for exploration; the call is reduced to renaming/removing that agent
+   config (low priority).
 
 ## 41. Production bug: `remove_all_toasts()` control function calls a nonexistent attribute (plural/singular mismatch) (2026-09-10)
 
@@ -245,7 +248,7 @@ reenabled, that is the call.
 
 ## Loop & coordination (open)
 
-## 39. Looprunner prompt v2 proposal — pending maintainer application (2026-09-10)
+## 39. (closed 2026-09-10) Looprunner prompt v2 proposal — applied + smoke test clean (2026-09-10)
 
 - **Problem / evidence:** the current `.opencode/prompt_looprunner.md` (27 lines) is
   ambiguous in four places: no closing-action protocol (the loop always restarts until
@@ -275,8 +278,12 @@ reenabled, that is the call.
   explorer agent name typo FIXED, plus two maintainer additions: "check first if there
   is unfinished work from an interrupted session" and "explorer = fallback when no
   actionable items are left"); `opencode.jsonc` has the scoped edit-allow (prompt +
-  loop_log). Smoke-test cycle IN PROGRESS: the first closing message with an `action:`
-  line goes out at the end of session 3 — close here once the loop restarts cleanly.
+  loop_log).
+- **2026-09-10 (autonomous session 4 — CLOSED, planner-verified):** the smoke-test
+  cycle ran clean — session 3 closed with an `action: restart` line and the loop
+  restarted this session with the maintainer messages routed verbatim into the
+  prompt (routing + action protocol + NAP-edit permission all working). Acceptance
+  met → CLOSED.
 
 ## Plugin & gauge (open)
 
@@ -431,7 +438,10 @@ reenabled, that is the call.
   mechanic (session id carried in the readout vs a per-session read) is the build worker's
   call under that invariant.
 - **Full design:** NAP `## v2.4.1 LIVE + v2.5 NUDGE LADDER spec` + `## Live status` blocks
-  (09-10); #32 holds the root-cause record.
+  (09-10); #32 holds the root-cause record. **Discrepancy (2026-09-10, session 4):** those
+  NAP blocks are GONE from the live NAP (lost in the session-3 rewrite) — the approved
+  design is fully restated in this entry's Outcome block and in the session-4 task spec
+  (`.opencode/handover_task.md`); treat THAT as the design of record.
 - **Acceptance:** the ladder fires per rung (probe: extend the bun probe — fake client +
   fake shell); one maintainer restart + a forced high-readout scenario shows the first
   nudge land; no NEW gauge-failure reasons (the silent path stays silent);

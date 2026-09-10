@@ -2,6 +2,35 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-10 (autonomous session 4) — #39 closed + T2 #33 build launched (Task tool era)
+- **#39 CLOSED (planner-verified):** the smoke-test cycle ran clean — session 3
+  closed with an `action: restart` line and the loop restarted THIS session with
+  the maintainer messages routed verbatim into the prompt (routing + action
+  protocol + NAP-edit permission all working).
+- **MECHANIC CHANGE (maintainer):** `subagent_depth` raised to 2 → the planner
+  delegates via the **Task tool** (the session-3 depth-1 block is resolved); the
+  `opencode run` CLI is DEPRECATED for delegation (its streamed output pollutes
+  the planner's context). The roster in `agents_repo.md` (worker_Q4_120K default,
+  explorer now `worker_explorer_Q3_120K_mtp`) matches the live config as read
+  from the Task-tool roster.
+- **Nudge mechanism observation (maintainer task):** the `ctx: SESSION=ses_f7667fde8ffe…
+  CTX=notAvailable` line reached this session's first message with the OWN
+  session id and NO db-error → the production read + chat.message post work
+  (consistent with #37 closed). The LADDER itself is what #33 builds now.
+- **T2 #33 IN PROGRESS:** spec written to `handover_task.md` (self-contained
+  design restatement — the NAP spec blocks it referenced were lost in the
+  session-3 rewrite; TODO #30 is now the design of record, flagged there).
+  Build worker = `worker_Q4_120K` via the Task tool (first real depth-2
+  delegation — also the maintainer's observation target).
+- TODO housekeeping: numbering header bumped to "start at #42"; #39 closed;
+  #40 endpoint-cap call reduced to a low-priority config rename (the maintainer
+  swapped the explorer to Q3 — the 256K-named gemma endpoint is no longer used
+  for exploration).
+- NEXT after this block: verify #33 on return (probe + suite + git + summary),
+  commit bookkeeping, then the audit split (3a tests/ smell check via the
+  `worker_explorer_Q3_120K_mtp` Task tool with STRICT scope; 3b focus-dict/
+  combination candidates), then #34 residual docs if budget allows.
+
 ## 2026-09-10 (autonomous session 3) — #37 production evidence in + explorer real-exploration
 - **#37 CLOSED (planner-verified):** this session's first user message carried
   `ctx: SESSION=ses_f76b0f74affeKJEu0HdQerFNHv CTX=notAvailable` — own session (cross-checked
@@ -120,12 +149,10 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 1. ~~#37 production evidence~~ — DONE in session 3 (ctx line reached own session, no
    db-error; #37 CLOSED). Residual: v1.3 log-profile rebaseline (call 1) = maintainer
    call, default SKIP.
-2. **T2 #33 nudge ladder** — next build, NOW UNBLOCKED (the #37 evidence is in — the
-   ladder depends on the production read, which works). Approved design lives in TODO
-   #33 (rungs 50 % → 70 %/30k → 80 %/20k → 90 %/10k → final 5k; `promptAsync` synthetic;
-   `kind:"nudge"` evidence only; readout must reach EVERY acting session). The probe
-   is the standing 45-check base to extend. Build worker = `worker_Q4_120K` (sizing
-   lesson 5 below applies).
+2. **T2 #33 nudge ladder — IN PROGRESS (session 4):** spec in `handover_task.md`,
+   build worker = `worker_Q4_120K` launched via the Task tool. On return: verify
+   (probe exit 0 with the original 45 checks intact + new nudge checks; suite
+   434/434; ruff F=0; git log; summary's verbatim gauge line) before accepting.
 3. **Finish the audit (standing goal) — SPLIT scope, one small session each:**
    (a) `tests/` smell check ONLY (xfails/pins/dup helpers/gaps in the filter paths —
    spec v2 in `handover_task.md` is still the right shape, shrink the scope to
