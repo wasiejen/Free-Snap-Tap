@@ -2,6 +2,55 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-10 (looprun 2, iteration 3) — P10 maintainer channel + P03/P05/P06/P07/P09 applied
+- **Maintainer ACTIVE this iteration:** wrote 3 messages to
+  `handover_maintainer.md` (1333 numbered-specs OK — already in use; 1346 =
+  OPEN proposal request, NAP-bloat/prompt-separation; 1343 = files/ subfolder —
+  already landed in the README), moved **P08 + P09 into approved/** (P08 =
+  #44 config-error design, NOW delegation-ready), then LIVE-edited mid-run:
+  renamed `maintainer/inbox/` → `inbox_planner/` + message 260910-1537
+  ("make it clear by folder name who has to scan and who is addressed").
+- **P10 (the iteration's maintainer request) IMPLEMENTED + approved same run
+  (condition: bundling several messages into ONE inbox file is allowed):**
+  `proposals/maintainer/{inbox_planner,inbox_worker,done}/` (folder name =
+  addressee; done = read-receipt; agent moves after handling, never edits
+  content) + README section + planner/worker prompt scan lines.
+  `handover_maintainer.md` RETIRED → `.opencode/archive/` (he may still append
+  to the old path — if it reappears, flag + keep using the inbox). First inbox
+  message = the 1346 request (draft the prompt-separation proposal = queued).
+- **Applied (all doc/meta, committed `0540b16` + fix-up):** P09 →
+  `proposals/files/prompt_looprunner.md` (conditional `<|autonom|>` reword,
+  XXX note deleted; bundles the P07 looprunner iteration-number line —
+  maintainer copies over the live file on restart); P07 → planner block in
+  `prompt_agent_planner.md` + day-dir `.opencode/archive/autorun-260910/`
+  (plan03_summary written); P05 → probe-verified replaceAll semantics in
+  `agents_repo.md` gotchas (SINGLE PASS over the original string, NO rescan;
+  substring-matching; corrupts ONLY if the target name already exists — the
+  #43 mode; two-stage token needed only in that case); P03 → checkpoint rule
+  in `prompt_agent_explorer.md` (his steer = right place); P06 → real-host DoD
+  gotcha in `agents_repo.md`. All six moved → `implemented/` with verdict notes.
+- **NO code touched** (suite 436 / ruff 0 baseline unchanged); NO delegation
+  this iteration (stop line hit before the P02 launch — it stays queued).
+- **NEXT (iteration 4, in order):**
+  1. **P02** (approved): delete `mirrorSummary` + probe rebuild in
+     `handover_v2.4.ts` — delegation-ready; FIRST launch tries
+     `worker_Q4_120K` (the P01 re-test), raw `agent_Q4_120K` fallback; verify
+     probe + suite, then move P02 → implemented.
+  2. **#47 close:** 2 one-line WIKI clarifications (settled answers, no
+     re-check: #5 text+integer vars share `Output_Manager.variables`
+     `fst_manager.py:71`; #6 horizontal scroll press = one notch RIGHT /
+     release = LEFT `fst_manager.py:705-706`) + gate + entry close.
+  3. **P08** (approved): #44 `ConfigError` build — delegation task (the
+     degrade-to-defaults yes rides in the approval; still worth a closing-
+     message confirmation).
+  4. Draft the **1346 proposal** (NAP bloat / prompt separation of concern).
+  5. Maintainer calls bundle (≤3): FST behavior batch (#1/#7/#8/#9/#4+#6);
+     #17 v1.3 log rebaseline (call 1, default SKIP).
+- Standing lessons + new: raw/worker delegation mechanic unchanged; restore
+  `handover_task_to_planner.md` after EVERY Task-tool run; **NEVER parallel-
+  edit the same file** (P05 verdict duplicated by a racing parallel edit —
+  fixed in-run, recorded in agent_feedback).
+
 ## 2026-09-10 (looprun 2, iteration 2) — approved-fix batch #41+#42+#46 LANDED + planner-verified
 - **Start state:** clean tree (top `1a4fefa`), the batch spec committed +
   delegation-ready (iteration 1 stopped at the 89 % line BEFORE launching). No
