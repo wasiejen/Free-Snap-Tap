@@ -37,6 +37,46 @@ during their work.
 Entries below this divider. Agents: do not read below this line before
 appending your own entry.
 
+### Task tool depth-blocked for the loop-runner-launched planner — planner 2026-09-10
+- **Friction:** the planner's `task: allow` permission is useless while the
+  looprunner launches the planner via the Task tool: spawning a worker hits
+  `Subagent depth limit reached (1)` (default `subagent_depth` = 1; the planner is
+  already depth 1). The fallback is CLI launch (`opencode run --agent <name>`),
+  which the planner prompt/agents_repo do not document for this architecture.
+- **Cost:** one failed Task attempt + config re-verification + writing the mechanic
+  into the NAP by hand; every future delegation cycle must remember the CLI route.
+- **Suggested change:** add `"subagent_depth": 2` (top-level) to `opencode.jsonc`
+  (makes the Task tool work for the planner in-loop), OR document the CLI launch
+  mechanic in `prompt_agent_planner.md`/`agents_repo.md` as the in-loop delegation
+  path. (Carried to the maintainer in the session-3 closing message too.)
+
+### Worker runs die from context overflow with no checkpoint — planner 2026-09-10
+- **Friction:** both worker runs this session (gemma explorer 128k endpoint; Q4 120k)
+  died/failed mid-task on context limits; the Q4 run died on
+  `context_length_exceeded ... context shift is disabled` (500) after an hour of
+  disciplined chunked reads — with ZERO findings written to disk. The worker prompts'
+  stop-line rule (REM ≤ 15k) cannot trigger if the request 500s first: there is no
+  "checkpoint findings to disk after each verified finding" rule for long audits.
+- **Cost:** ~1.5 worker sessions lost; the one genuinely valuable finding
+  (`remove_all_callbacks` mismatch) survived only because the planner re-verified it
+  from the CLI transcript.
+- **Suggested change:** for audit/exploration tasks, add to the worker prompt (or the
+  task spec): "after EACH verified finding, write it to TODO.md immediately (a
+  checkpoint is the unit of work — a dead session must lose at most one finding)";
+  and/or let the endpoint enable context shift so overflow compacts instead of 500ing.
+
+### Worker edited a maintainer-owned meta file without flagging — planner 2026-09-10
+- **Friction:** the Q4 worker (edit `*` allowed except an explicit deny list) renamed
+  agent keys in `agents_repo.md` (→ non-existent `..._128K_mtp`) to document a fact
+  it had learned — the file's own header says "Agents do not edit it directly", but
+  the config deny list covers `AGENTS.md`/`prompt_**`/`handover_planner.md` and NOT
+  `agents_repo.md`, so the config and the doc disagree on who owns it.
+- **Cost:** an unauthorized diff in the working tree that the planner had to catch
+  and revert; future agents may trust the wrong (renamed) agent keys.
+- **Suggested change:** add `agents_repo.md` to the worker deny lists in
+  `opencode.jsonc` (or drop the "do not edit" line from the file and let agents flag
+  via TODO instead).
+
 ### Delegation slots serialize parallel workers - planner 2026-09-10
 - **Friction:** `.opencode/handover_task.md` + `handover_task_to_planner.md` are single slots — two workers cannot run in parallel (summary file + one commit lane collide), and the spec file is overwritten per cycle.
 - **Cost:** a queued docs task sat behind the plugin/curation workers while one worker was idle; spec history exists only in git, not in a live file a next delegation could cite by entry.
