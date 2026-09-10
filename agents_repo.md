@@ -145,36 +145,31 @@ hits the filter: update state (press states + timings) → check rebinds
   current expected count. Do not hard-code test-count assumptions here.
 
 ## Worker roster
-Delegate targets from `opencode.jsonc` (mode `all` — the maintainer edits that
-file live, so verify the roster THERE, never trust this section or memory):
-- `worker_Q4_120K` (DEFAULT — same model as `planner_Q4_120K`, no reload cost,
-  high precision, 4bit): normal edits, builds, tests.
-- `worker_Q3_120K_mtp`: fast 120k, medium precision (3bit) — edits/tests when
-  throughput beats precision.
-- `worker_Q3_210K`: slow, big 210k context — very long or deeply complex single
-  tasks only.
-- `worker_explorer_Q3_120K_mtp` (explorer mode, `prompt_agent_explorer.md`):
-  repo exploration/audit → findings appended to TODO.md. Edit allow-list is
-  TODO.md / `.opencode/handover_task_to_planner.md` / scratchpad only — no code fixes. 
-  Fast but a bit weaker on detail and a bit less stabil: ALWAYS check its work.
-- Raw no-prompt variants `agent_Q3_210K` / `agent_Q3_120K_mtp` / `agent_Q4_120K` /
-  `agent_Q4_40K_MTP`: same models WITHOUT the worker prompt (ad-hoc, no handover
-  protocol).
-- `looprunner_Q4_120k` + `planner_*` entries are NOT workers (primary/planner
-  roles).
+The delegate targets live in `opencode.jsonc` (mode `all`) — the maintainer edits
+that file live, so **verify the roster there, never trust this section or
+memory**. Model notes for choosing (Q4 = 4bit, higher precision; Q3 = 3bit,
+faster/weaker):
+- **Default** `worker_Q4_120K` — same model as `planner_Q4_120K`, no reload cost,
+  high precision: use for normal edits / builds / tests.
+- `worker_Q3_*` — faster, medium precision (3bit): use when throughput beats
+  precision. The large-context `…210K` variant is for very long / deeply complex
+  single tasks only.
+- `worker_explorer_*` (explorer mode, `prompt_agent_explorer.md`): audit/map →
+  findings to `TODO.md`; edit allow-list = `TODO.md` / summary / scratchpad only,
+  no code fixes. Weaker on detail — ALWAYS check its work.
+- Raw `agent_*` variants: same models WITHOUT the worker prompt (ad-hoc, no
+  handover protocol). `looprunner_*` / `planner_*` are not workers.
 
 ## Handover file paths
-- Plan-state file (planner-owned): `.opencode/handover_planner.md` — the
-  maintainer calls this the **NAP** (**N**ext **A**gent **P**rompt). If the user
-  says "NAP" or "write a NAP", they mean this file. Rewritten per handoff — read
-  it first when you get one. Phase close moves it to
-  `.opencode/archive/<YYMMDD>-<slug>.md` with a STATUS header.
-- Task spec file (planner writes, worker reads): `.opencode/handover_task.md`.
-- Worker summary file (worker writes, planner reads):
-  `.opencode/handover_task_to_planner.md` — the EXECUTIVE SUMMARY.
-- Context gauge (self-gauge): run `node .opencode\ctxgauge\peek.mjs` from the repo
-  root, read-only → `SESSION=… CTX=n (p%) REM=m` (window unknown → `CTX=n` only;
-  no finished step → `CTX=notAvailable`).
+Channel semantics (who writes/reads, canonicality) live in the `AGENTS.md`
+interaction-contract table — this section keeps only the concrete repo facts:
+- The plan-state file `.opencode/handover_planner.md` is what the maintainer
+  calls the **NAP** (**N**ext **A**gent **P**rompt) — "NAP"/"write a NAP" means
+  this file. Phase close moves it to `.opencode/archive/<YYMMDD>-<slug>.md` with
+  a STATUS header.
+- Context gauge (self-gauge): run `node .opencode\ctxgauge\peek.mjs` from the
+  repo root, read-only → `SESSION=… CTX=n (p%) REM=m` (window unknown → `CTX=n`
+  only; no finished step → `CTX=notAvailable`).
 - Durable maintainer TODOs: `TODO.md`.
 
 ## Gotchas
