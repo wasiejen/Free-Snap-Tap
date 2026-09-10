@@ -86,7 +86,13 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
      rebaseline (call 1, default SKIP), the #48 packed-word fixes (X-button + LLKHF
      sites — implicitly approved), and NEW: whether to harden the headless toast
      callbacks (flag 1 above).
-- **P01 APPLIED (maintainer approved it mid-run — moved to `proposals/approved/`):**
+- **PROPOSAL DECISION ROUND landed (maintainer moved ALL 9 mid-run; committed `8139b96`):**
+  approved: P01, P02, P05, P07 · commented: P03, P06 · rejected: P04. ONLY **P01 was
+  applied this iteration** (below) — the other approved (P02 disable the summary-mirror
+  plugin, P05 replaceAll-semantics doc, P07 auto-run archive + session-summary channel)
+  are doc/config tasks QUEUED for the next iteration; commented (P03, P06) carry the
+  maintainer's comments to read; P04 is rejected (leave the agents_repo deny-list as-is).
+- **P01 APPLIED (the one acted on this iteration):**
   added `limit.context` to every `provider.llama-swap.models` entry in `opencode.jsonc`,
   based on the CURRENT model list (8 GPU + 3 CPU) per his verdict, NOT the proposal's
   stale 6-model list. Values: name-suffix KV window — `IQ3KT-120K_MTP(:chat)` 120000,
