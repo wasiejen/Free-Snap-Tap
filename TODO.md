@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #36, new
-entries start at #37 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #37, new
+entries start at #38 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -218,10 +218,47 @@ reenabled, that is the call.
 - **Status:** LANDING (2026-09-10, continuation 2 — node:sqlite re-ruling) —
   plugin wiring + probe + node:sqlite core landed this cycle — log-profile
   re-baseline pending maintainer restart + one-shot log read (call 1, default
-  SKIP). bun 1.4.2 host-proxy check: PASS (core import + `readGauge()` green
+ SKIP). bun 1.4.2 host-proxy check: PASS (core import + `readGauge()` green
   under system bun, kind=ok on the live db). The build scope is complete (core
   node:sqlite-only, v2.5 plugin wiring + probe 33/33, peek.py deleted); do NOT
   close — the log-profile tail + #34 residual doc refs remain open.
+  **2026-09-10 (evening, production restart evidence):** the read fails under the
+  PRODUCTION bun host (`db-error`, no `node:sqlite` — Bun error format) → no ctx line
+  lands; see #37 (the bun-1.4.2 system-bun proxy check measured the wrong host).
+
+## 37. Production plugin host lacks `node:sqlite` — the ctx nudge never lands in production (2026-09-10)
+
+- **Problem / evidence:** the v2.5 match-only post (`313e83b`) is live after the maintainer
+  restart (planner session `ses_f773b9c5…`): the `chat.message` hook FIRES for the planner's
+  own session (scoped live read of `.opencode/plugin.log`, prompted by the maintainer's
+  "test the nudge mechanism" task — chatmsg line, `midSrc=input`), but the gauge read fails
+  on every fire: `kind:"gauge" reason:db-error preview:"sqlite-module ResolveMessage: No such
+  built-in module: node:sqlite"` (Bun error format = the bun-based opencode.exe host).
+  Consequence: NO `ctx:` line reaches ANY agent in production; the never-throw guard + the
+  per-fire evidence line work exactly as designed (no post, no crash, silence otherwise).
+  The worker's "bun 1.4.2 host-proxy check: PASS" (#30 status line) tested the SYSTEM bun —
+  which DOES expose node:sqlite — NOT the bun baked into opencode.exe: the proxy check
+  measured the wrong host and gave false confidence.
+- **Outcome (goal):** the gauge read succeeds under the PRODUCTION opencode.exe host, so the
+  injected ctx line (and the T2 nudge ladder, which depends on the read — #33) can actually
+  fire; one implementation, never-throw preserved.
+- **Acceptance:** after a maintainer restart, a `ctx: SESSION=<own sid> CTX=…` line reaches
+  the planner's own session (chatmsg fire with NO db-error line); probe 33/33 (extend it if
+  the core gains a second backend); no NEW gauge-failure reasons.
+- **Scope (non-exhaustive):** `.opencode/ctxgauge/gauge.mjs` backend selection (options the
+  host facts support: try `node:sqlite` → fall back to `bun:sqlite`, OR spawn the
+  maintainer-placed `.opencode/plugin/tools/sqlite3.exe` — proven live by the retired v1.x
+  backend); the plugin itself stays unchanged or minimal; probe S4/S6 fixtures if the read
+  mechanic changes.
+- **Status:** OPEN — maintainer call (which backend path for the bun host; the read must
+  work before T2 #33 can fire). The on-disk `sqlite3.exe` (#30 flag-only, do not delete) is
+  a ready-made fallback option. Next-session resume order: 1) #37 maintainer call + fix,
+  2) launch `worker_explorer_jill_gemmaQ4_256K` (standing goal; CHECK its findings — fast
+  but dumb; its edits are allow-listed to TODO.md/handover_task.md/scratchpad), 3) T2 #33
+  (blocked on #37), 4) #34 residual doc refs. Note: the NAP could NOT be updated this
+  session — `planner_Q4_120K`'s opencode.jsonc permission block denies
+  `.opencode/handover_planner.md` (copy-paste from the worker profiles; the older
+  `planner_Q3_120k_mtp` block does not have it) — flagged to the maintainer.
 
 ## 33. v2.5 auto-nudge ladder build (folded in: the former TOP-of-file note) — STATUS: APPROVED — NEXT BUILD
 
