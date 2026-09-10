@@ -12,7 +12,6 @@ free_snap_tap.spec
 test_batch.bat
 FSTconfig_test.txt
 new_features.md
-wiki.md
 *.exe
 *.dll
 *.cmd
