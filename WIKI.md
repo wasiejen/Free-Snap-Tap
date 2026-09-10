@@ -286,6 +286,9 @@ with V1.1.2 a new key_event the `None` or just empty key event can be used in co
 - focus app names can be defined in the config file via `<focus>*name of the app*`
   - everything BEFORE the first \<focus> will be seen as default start arguments and groupings and applied in general (evene outsite of focus apps) and to all following focus app groupings
   - everything following this \<focus> definition up until the next \<focus> will be applied when the focus app name given is found in the current active window
+  - multiple focus names on one line: `<focus>CS2, cs2 alt` - the names after the first comma are aliases of the same focus group: the start arguments and groups are defined under the first name and SHARED by all names, and matching ANY of the names activates that one group
+  - focus names only keep letters, numbers, spaces, `_`, `.` and `,` - any other character is stripped at parse time
+- a line that starts with `:` (leading whitespace is stripped at parse time) is joined to the previous line - so a macro sequence can be written over multiple lines for readability (see the README example with the indented `: esc, ...` continuation line)
 
 ```bash
 <arg>-status_indicator=15
