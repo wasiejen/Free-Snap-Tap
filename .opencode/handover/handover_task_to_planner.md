@@ -1,93 +1,74 @@
-# WORKER SUMMARY — P08: ConfigError surfacing (TODO #44 + the #1 family)
+# EXECUTIVE SUMMARY — TODO split part 3 (closed entries → todo_records.md)
+
+Task: `.opencode/handover/handover_task.md` (part 3 only). Meta/file cleanup, no FST
+code, no behavior change. ONE commit (the commit containing this summary; subject:
+"TODO split part 3: closed entries → todo_records.md, stubs in TODO.md" — hash
+verifiable via `git log -1`; a commit hash cannot be embedded in its own commit).
 
 ## What changed
-- `fst_data_types.py`: added `class ConfigError(Exception)` storing `.reason` +
-  `.context`; `str()` = `"FST config error: <reason> (<context>)"`. Pure data
-  module, no I/O.
-- `fst_keyboard.py`:
-  - import `ConfigError`.
-  - `convert_to_vk_code`: BOTH failure branches now raise `ConfigError` (was an
-    implicit `None` return for out-of-range numeric AND for an unresolvable
-    non-numeric string). reason = the key string does not resolve to a vk code.
-  - the 4 `initialize_groups_from_presorted_lines` parse blocks (alias/tap/rebind/
-    macro) gained `except ConfigError: <context print>; raise` BEFORE the generic
-    `except Exception` — so the type survives the re-raise instead of being
-    stripped to a bare Exception.
-  - `apply_focus_groups` (:401) + `apply_start_args_by_focus_name` (:1050): added a
-    membership guard on `multi_focus_dict[focus_name]` → raises `ConfigError`
-    (reason names the missing focus group) instead of a raw KeyError. This is the
-    #44 origin.
-  - `check_for_combination` (:928): `except ConfigError` → **warn-once** printed
-    warning (gated on a per-instance set so it is not per-keystroke spam) +
-    `return False` — the hot-path listener MUST survive.
-  - `check_control_actions` (:949): caller-side guard around `control_toggle_pause`
-    on `ConfigError` → printed error + **degrade to defaults** (clears the active
-    focus args/groups, returns to default groups) — no raise out of the hot path.
-- `fst_manager.py`:
-  - import `ConfigError`.
-  - CLI menu option 2 "Reload everything from file" (:1893): `except ConfigError` →
-    print, **menu loop continues** (no break).
-  - `constraint_evaluation` full-eval branch (:676): `except ConfigError` → print +
-    `return False` (fail-closed, mirrors the adjacent short-eval branch). This was
-    NOT in the spec's explicit catch-site list — see Deviations (it closes a latent
-    crash: a `p('zz')`/`tr('zz')` constraint with an unknown key previously raised
-    uncaught in the macro hot path).
-- `fst_overlay.py`:
-  - import `ConfigError`.
-  - 4 thin GUI overlay handlers (:212/:218/:601/:620 — `StatusOverlay`/`Tray_Icon`
-    toggle-pause + reload): `except ConfigError` → **toast** `str(error)`, no re-raise.
-- `free_snap_tap.py`: import `ConfigError`; top-level startup (:159) `except
-  ConfigError` → print + `sys.exit(1)`.
-- `tests/conftest.py`: import `ConfigError`; the `convert_to_vk_code` test helper
-  mirrors the new raise semantics (out-of-range + unresolvable → ConfigError).
-- `tests/test_extraction_filter_edges.py`: import `ConfigError`; tightened the
-  convert pins (out-of-range `'300'`/`'256'` → `pytest.raises(ConfigError)`) and the
-  tap/rebind config-exception pins to expect `ConfigError` (type survives the parse
-  re-raise).
-- `tests/test_config_error.py` (NEW, 12 tests) covering paths a–e + the constraint
-  fail-closed + the `ConfigError` definition + both focus-name raise sites.
+- `TODO.md`: 891 → 504 lines. 12 closed entries replaced by one-line stubs in place
+  (format `## N. (closed <date>, see todo_records.md) — <original title>`); the open
+  entry #48 (misfiled under "Closed entries") moved as a whole block into "FST
+  behavior decisions (open — maintainer calls unless noted)" (before "## Docs & misc
+  (open)"); the now-mismatched section renamed to
+  `## Closed entries (mismatch: contains open entry #35)` (per spec rule: something
+  open remained there — #35, judged open below).
+- `todo_records.md`: 34 → 446 lines. Existing 34 lines byte-identical (verified as
+  prefix); 12 full-text blocks appended at the end, one per moved entry, format
+  `## N. <original title> (closed <date>, full text moved from TODO.md)` + original
+  body verbatim. Append order: the planner's MOVE-list order (#47, #45, #39, #37,
+  #38, #34, #36, #43, #44) then the judged-closed (#46, #41, #42).
 
-## New test count
-Baseline **436** → **436 + 12 = 448** (the 12 new tests in
-`tests/test_config_error.py`; the conftest/edge-file changes re-pinned existing
-tests, net-zero count change).
+## Moved entries (12)
+#47, #45, #39, #37, #38, #34, #36, #43, #44 (planner pre-ruling) + #46, #41, #42
+(judged closed, below).
 
-## Measured gates
-- `& .\.venv\Scripts\python.exe -m pytest -q` = **448 passed, 1 warning** (the
-  known #10 coroutine warning — unchanged).
-- `& .\.venv\Scripts\ruff.exe check --select F .` = **0 findings** (fixed one F841
-  unused `as error` in `convert_to_vk_code`'s `except ValueError`).
+## Judged entries (decision + one-line evidence)
+- **#46 → CLOSED (moved):** the LANDED tail fully meets the acceptance — event-driven
+  bounded wait in BOTH crossover tests, 10 consecutive full `pytest -q` runs green,
+  production `send_keys_for_tap_group` untouched; scope == what LANDED.
+- **#41 → CLOSED (moved):** acceptance met — `fst_manager.py:578` + conftest FakeFST +
+  test assertion all on the singular production name, drift-guard test added, gate
+  green (436 passed / ruff F=0).
+- **#42 → CLOSED (moved):** multi-notch semantics pinned by the new
+  `test_multi_notch_scroll_keeps_single_notch_phase`, single-notch tests green, the
+  decided mask/shift semantics named in the LANDED tail; the report-back ruling became
+  the separate (still open) entry #48.
+- **#40 → LEFT OPEN:** the goal's reliable re-run + tests/ smell-check half is not
+  evidenced done — the entry itself lists "Remaining scope: the tests/ smell check +
+  the focus-dict/combination candidates"; the maintainer's "CLOSED" tail only resolves
+  the gemma agent-config sub-call.
+- **#35 → LEFT OPEN:** the T1 build scope LANDED, but the tail still carries the v1.3
+  log-profile re-baseline = open maintainer call 1 (default SKIP) — scope broader than
+  what LANDED.
 
-## Commit
-ONE commit: production + tests + TODO #44 status tail + this summary. `opencode.jsonc`
-and the maintainer's `.opencode` meta files (inbox_planner/*, prompt_*, looprunner
-deletions) left in the working tree, NOT staged. The commit hash cannot
-self-reference inside the committed file — it is reported in the worker's final
-message; this commit is HEAD after this run (subject: "P08: ConfigError surfacing
-(TODO #44) — raise at origin, catch at user-facing boundaries").
+## Oddities / stale refs found (reported per spec, NOT edited)
+- `todo_records.md` header numbering line is stale ("currently #38, next = #39";
+  reality: up to #48, next #49) — left as-is (spec: append-only for that file).
+- Maintainer-calls list: NO stale refs — all referenced entries (#17, #11, #33, #1,
+  #7, #8, #9, #4, #6, #30) are still open; item 6's #39 ref already reads CLOSED.
+- Open #35's body references the old `ctxgauge/` path (moved to `plugin/scripts/` on
+  2026-09-10) — stale path inside an open entry; left byte-identical per scope.
+- Kept the pre-existing one-line records for #38 and #47 and appended the full text
+  (spec pre-ruling; duplicated heading accepted): #38's title therefore occurs 3×
+  total (stub + kept record + new block), all other moved titles exactly 2×.
 
-## Deviations / flags
-- **Scope note (flagging, was in the approved design's spirit, not an explicit
-  catch-site):** the `constraint_evaluation` full-eval `except ConfigError` at
-  `fst_manager.py:676`. Before P08, `convert_to_vk_code` returned implicit `None`
-  here, so a `p('zz')` constraint silently mis-evaluated; after P08 it raises
-  `ConfigError`, which — without the new catch — would propagate and kill the
-  macro hot path. Added fail-closed `except ConfigError: print; return False`.
-  This PARTIALLY addresses #1's "constraint fail-closed path emits the same
-  user-visible error" — it now FAILS CLOSED (no crash) but only PRINTS (console),
-  not a user-visible toast, so #1 stays OPEN (recorded in TODO #44 status tail).
-- **No behavior change to unknown constraint NAMES** (they remain silent no-ops by
-  design, `SPEC_FEATURES.md` §4 #2) — out of scope, untouched.
-- Meta files untouched (read-only per spec).
+## Verification (scripted, machine-checked — see temp scripts if needed)
+- Open entries byte-identical: #1 #7 #8 #9 #4 #6 #11 #3 #40 #35 #17 #30 #33; file
+  header (7 lines) and the maintainer-calls section byte-identical.
+- #48 block moved verbatim into FST behavior decisions; renamed section heading
+  present; entry-id set of TODO.md unchanged (stubs keep their numbers).
+- Every moved title: exactly 2 occurrences across TODO.md + todo_records.md
+  (3 for #38, accepted); no moved entry's full body remains in TODO.md
+  (contiguous body-blob substring check per entry).
+- `todo_records.md` old content byte-identical prefix; 12 record headings present.
+- `git diff --stat`: exactly `TODO.md` + `todo_records.md` (+ this summary).
 
 ## Deliberately not done
-- Did NOT close/condense TODO #44 (planner curation) — only updated its status tail.
-- Did NOT touch the maintainer's `.opencode` inbox/prompt/looprunner meta changes.
-- Did NOT add a user-visible (toast) error to the constraint-eval path — that is #1,
-  pending the maintainer's GENERAL RULING implementation decision.
-- Functional proof (live run: a deleted/renamed focus group degrades to defaults
-  instead of killing the listener) is the PLANNER's job after this run. This commit
-  is my LAST write to this file.
+- No edits to the maintainer-calls list; no new TODO.md entries (spec: "you add NO
+  entries"); `todo_records.md` existing lines untouched; no gate run (meta-only per
+  spec); `opencode.jsonc` left in the tree (not staged).
 
-Final gauge line (verbatim, `node .opencode\ctxgauge\peek.mjs`):
-SESSION=ses_f73d1a120ffeSz7t8OUZ6N7J9z CTX=36727 (30%) REM=83273
+Final gauge (verbatim): `SESSION=ses_f731be360ffe6v9T67ufY3Bt3s CTX=2176 (1%) REM=117824`
+(note: the injected plugin nudge at the same time read CTX=84298 (70%) REM=35702 — the
+self-gauge is source of truth per AGENTS.md; both are far above the stop line).
