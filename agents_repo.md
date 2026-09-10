@@ -204,6 +204,19 @@ file live, so verify the roster THERE, never trust this section or memory):
 - NEVER call a widget's `contextMenuEvent` in tests (its `exec_` blocks the
   loop); trigger the `QAction`s of `widget.context_menu` via `.trigger()`
   instead.
+- Edit tool `replaceAll` semantics (probe-verified 2026-09-10, P05): SINGLE
+  PASS over the ORIGINAL string — the replaced output is never re-scanned
+  (rename `kb_env`→`kb_env_ns` does NOT cascade into `kb_env_ns_ns…`). It
+  still matches SUBSTRINGS inside longer tokens (`kb_envx`→`kb_env_nsx`),
+  and if the TARGET name already exists in the file, its source-name prefix
+  is corrupted in the same pass (`kb_env_ns`→`kb_env_ns_ns`) — that is the
+  only case needing the two-stage token dance or a scripted whole-file
+  substitution; otherwise a direct rename is safe in one edit (verify with a
+  grep afterward).
+- Host-dependent capability checks (built-in modules, runtime flags, bundled
+  binaries) must probe the REAL host (P06): inside the plugin/process or with
+  the bundled runtime — never a same-named system CLI (the system-bun vs.
+  opencode.exe-bun false confidence, #37).
 
 ## Phase-scoped work
 Phase plans, the progress log, current baselines, and the rules of the current
