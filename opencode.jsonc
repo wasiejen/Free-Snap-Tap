@@ -51,17 +51,20 @@
         "description": "Local windows temporary directory for intermediate agent outputs"
       }
     },
-
+  "subagent_depth": 2,
   "agent": {
     "looprunner_Q4_120k": {
-      "description": "Just restarts the Planenr in autnomous mode, same model als planner_Q4_120K for fast switching",
+      "description": "Just restarts the Planner in autnomous mode, same model als planner_Q4_120K for fast switching",
       "mode": "primary",
       "model": "llama-swap/Qwen3.8-27B-IQ4KT-120K",
       "temperature": 0.1,
       "prompt": "{file:./.opencode/prompt_looprunner.md}",
       "permission": {
         "task": "allow",
-        "edit": "deny",
+        "edit": {
+        ".opencode/prompt_looprunner.md": "allow",
+        ".opencode/loop_log.md": "allow",
+          },
         "bash": "deny",
         "webfetch": "deny"
       }
@@ -103,12 +106,12 @@
       "color": "accent"
     },
 
-    "worker_explorer_jill_gemma_256K_mtp": {
-      "description": "moderately intelligent, very fast prefill (reading), very very fast generation, 256K context window, to be used to explore code base - but might lack in detail, so to be checked",
+    "worker_explorer_Q3_120K_mtp": {
+      "description": "intelligent, fast generation, 120K context window, to be used to explore code base - to be checked",
       "mode": "all",
-      "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-256K",
+      "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
       "prompt": "{file:./.opencode/prompt_agent_explorer.md}",
-      "temperature": 0.6,
+      "temperature": 1.0,
       // "steps": 15,
       "permission": {
         "edit": {
@@ -123,30 +126,30 @@
       "color": "accent"
     },
 
-    "worker_gemma_256k_mtp": {
-      "description": "moderately intelligent, very very fast, 256K context window - needs concrete instructions, best for webfetch, big file reads, big writes",
-      "mode": "all",
-      "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-256K",
-      "prompt": "{file:./.opencode/prompt_agent_task.md}",
-      "temperature": 0.2,
-      // "steps": 15,
-      "permission": {
-        "task": "allow",
-        "edit": {
-          "*": "allow",
-          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
-          "AGENTS.md": "deny",
-          "agents_repo.md": "deny",
-          ".opencode/prompt_**": "deny",
-          ".opencode/handover_planner.md": "deny",
-          ".git/**": "deny",
-          ".github/**": "deny",
-        },
-        "bash": "allow",
-        "webfetch": "allow"
-      },
-      "color": "accent"
-    },
+    // "worker_gemma_128k_mtp": {
+    //   "description": "moderately intelligent, very very fast, 256K context window - needs concrete instructions, best for webfetch, big file reads, big writes",
+    //   "mode": "all",
+    //   "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
+    //   "prompt": "{file:./.opencode/prompt_agent_task.md}",
+    //   "temperature": 0.2,
+    //   // "steps": 15,
+    //   "permission": {
+    //     "task": "allow",
+    //     "edit": {
+    //       "*": "allow",
+    //       "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+    //       "AGENTS.md": "deny",
+    //       "agents_repo.md": "deny",
+    //       ".opencode/prompt_**": "deny",
+    //       ".opencode/handover_planner.md": "deny",
+    //       ".git/**": "deny",
+    //       ".github/**": "deny",
+    //     },
+    //     "bash": "allow",
+    //     "webfetch": "allow"
+    //   },
+    //   "color": "accent"
+    // },
 
 
 
