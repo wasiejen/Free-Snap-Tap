@@ -454,10 +454,10 @@ class FST_Keyboard():
             if msg in FST_Keyboard.MSG_MOUSE_UP:
                 return False
             if msg in FST_Keyboard.MSG_MOUSE_SCROLL:
-                if data.mouseData == 7864320: # up
-                    return False
-                if data.mouseData == 4287102976: # down
-                    return True
+                # wheel delta = high 16 bits of mouseData (signed << 16); the low
+                # word holds key state and must not matter - direction = sign bit
+                # of the delta word (multi-notch keeps the single-notch phase)
+                return bool((data.mouseData >> 16) & 0x8000)
 
         def get_mouse_vk_code():
             # mouse left

@@ -339,6 +339,16 @@ class TestCrossover:
         assert om_env.kb.press.call_count == 0
         assert om_env.kb.release.call_count == 0
 
+    @staticmethod
+    async def wait_for_calls(kb_mock, expected, tries=100, step=0.01):
+        # event-driven bounded wait: poll the mock until it has recorded exactly
+        # `expected` calls (replaces a fixed sleep racing the scheduled 5 ms task)
+        for _ in range(tries):
+            if kb_mock.method_calls == expected:
+                return
+            await asyncio.sleep(step)
+        raise AssertionError(f"expected {expected!r}, got {kb_mock.method_calls!r}")
+
     @pytest.mark.asyncio
     async def test_crossover_presses_new_key_first(self, om_env, monkeypatch):
         # probability roll 100 -> crossover; delay roll 5 ms
@@ -349,11 +359,10 @@ class TestCrossover:
         tg = self.build_switching_group()
         om_env.fst.loop = asyncio.get_running_loop()
         om_env.om.send_keys_for_tap_group(tg)
-        await asyncio.sleep(0.02)
-        assert om_env.kb.method_calls == [
+        await self.wait_for_calls(om_env.kb, [
             call.press(pynput_keyboard.KeyCode.from_vk(VK_B)),
             call.release(pynput_keyboard.KeyCode.from_vk(VK_A)),
-        ]
+        ])
 
     @pytest.mark.asyncio
     async def test_crossover_not_taken_on_low_roll(self, om_env, monkeypatch):
@@ -365,11 +374,10 @@ class TestCrossover:
         tg = self.build_switching_group()
         om_env.fst.loop = asyncio.get_running_loop()
         om_env.om.send_keys_for_tap_group(tg)
-        await asyncio.sleep(0.02)
-        assert om_env.kb.method_calls == [
+        await self.wait_for_calls(om_env.kb, [
             call.release(pynput_keyboard.KeyCode.from_vk(VK_A)),
             call.press(pynput_keyboard.KeyCode.from_vk(VK_B)),
-        ]
+        ])
 
     @pytest.mark.filterwarnings("ignore:.*never awaited.*:RuntimeWarning")
     def test_tap_group_async_scheduling_error_is_logged(self, om_env, monkeypatch):
@@ -531,7 +539,25 @@ class TestCallbackConstraints:
     def test_remove_all_toasts_routes_to_fake_fst(self, om_env):
         ke = make_ke()
         assert om_env.om.constraint_evaluation("remove_all_toasts()", ke) is True
-        om_env.fst.remove_all_callbacks.assert_called_once_with()
+        om_env.fst.remove_all_callback.assert_called_once_with()
+
+    def test_remove_all_toasts_drift_guard(self, om_env):
+        # the control function must call the SAME attribute production
+        # FST_Keyboard exposes (singular): a stand-in exposing only that name
+        # fails with AttributeError if the names ever drift apart
+        standin = SimpleNamespace(**{
+            name: value for name, value in vars(om_env.fst).items()
+            if name not in ('remove_all_callback', 'remove_all_callbacks')
+        })
+        standin.remove_all_callback = MagicMock()
+        original = om_env.om._fst
+        om_env.om._fst = standin
+        try:
+            ke = make_ke()
+            assert om_env.om.constraint_evaluation("remove_all_toasts()", ke) is True
+            standin.remove_all_callback.assert_called_once_with()
+        finally:
+            om_env.om._fst = original
 
 
 class TestFileConstraints:

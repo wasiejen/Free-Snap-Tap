@@ -366,6 +366,18 @@ class TestMouseWin32Filter:
         kb.mouse_win32_event_filter(526, mouse_msg_data(mouse_data=4287102976))  # horizontal
         kb._win32_event_filter.assert_called_with(7, 1234, True, False, True)
 
+    def test_multi_notch_scroll_keeps_single_notch_phase(self, kb_env_ns, monkeypatch):
+        # 2-notch events (delta +/-240) resolve the same phase as single-notch:
+        # direction = sign bit of the delta word, magnitude not aggregated
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        kb.mouse_win32_event_filter(522, mouse_msg_data(mouse_data=4279238656))  # vertical down, 2 notches
+        kb._win32_event_filter.assert_called_with(6, 1234, True, False, True)
+        kb.mouse_win32_event_filter(522, mouse_msg_data(mouse_data=15728640))    # vertical up, 2 notches
+        kb._win32_event_filter.assert_called_with(6, 1234, False, False, True)
+        kb.mouse_win32_event_filter(526, mouse_msg_data(mouse_data=4279238656))  # horizontal down, 2 notches
+        kb._win32_event_filter.assert_called_with(7, 1234, True, False, True)
+
     def test_simulated_flag_passthrough(self, kb_env_ns, monkeypatch):
         kb = kb_env_ns.kb
         self.patch_filter(kb, monkeypatch)
