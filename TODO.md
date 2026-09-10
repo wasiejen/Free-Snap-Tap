@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #37, new
-entries start at #38 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #39, new
+entries start at #40 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -24,6 +24,9 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 5. Schedule (DECIDED — not open calls): #33 v2.5 build is NOT a maintainer call — APPROVED,
    next build; #30 de-peek APPROVED — ONE cycle (node:sqlite gauge landing + peek.py removal
    + doc purge + v1.3 log-profile re-baseline), scheduled AFTER #33.
+6. **Apply the Looprunner prompt v2 proposal** — consolidated proposal ready
+   (`.opencode/looprunner_prompt_proposal_planner.md`): prompt replacement + scoped
+   `opencode.jsonc` permission change for `looprunner_Q4_120k` + one smoke-test cycle → #39.
 
 ## FST behavior decisions (open — maintainer calls unless noted)
 
@@ -149,6 +152,33 @@ reenabled, that is the call.
   diff; suite unaffected.
 - **Scope:** `README.md`, the WIKI pages, `SPEC_FEATURES.md` (source of the decisions).
 - **Status:** OPEN — default-approved docs work (NOT a maintainer call — just gets done).
+
+## Loop & coordination (open)
+
+## 39. Looprunner prompt v2 proposal — pending maintainer application (2026-09-10)
+
+- **Problem / evidence:** the current `.opencode/prompt_looprunner.md` (27 lines) is
+  ambiguous in four places: no closing-action protocol (the loop always restarts until
+  the runner hits 85 %), the maintainer-message routing rule ("Ignore the messages you
+  get from the user/maintainer") is imprecise, "create a summary" is due exactly at the
+  point where writing headroom is gone, and the embedded planner task text carries
+  typos — one functional: it names a NON-EXISTENT explorer agent
+  (`worker_explorer_jill_gemmaQ4_256K`; the real key is
+  `worker_explorer_jill_gemma_256K_mtp`).
+- **Outcome (goal):** the looprunner prompt coordinates the loop as a small explicit
+  state machine (restart / ask_maintainer / stop) with a verbatim console log and a
+  mechanical suggestion-capture channel.
+- **Acceptance:** the maintainer applied the consolidated proposal
+  `.opencode/looprunner_prompt_proposal_planner.md` (full replacement prompt text + the
+  scoped `opencode.jsonc` permission change for `looprunner_Q4_120k`: edit allow for
+  `.opencode/prompt_looprunner.md` + `.opencode/loop_log.md` only) and one smoke-test
+  cycle (launch → closing message → action line → restart) runs clean.
+- **Scope (non-exhaustive):** `.opencode/prompt_looprunner.md`, `opencode.jsonc`
+  (both maintainer-owned — the agents must not edit them).
+- **Status:** OPEN — MAINTAINER CALL (section above, item 6). Planner-authored
+  consolidated proposal (2026-09-10, autonomous session 2) — point-by-point verdicts on
+  the looprunner's 8-point proposal and the gemini proposal live in the proposal doc.
+  NOT adopted: `loop_state.json`, default `action: resume`, CLI launch.
 
 ## Plugin & gauge (open)
 

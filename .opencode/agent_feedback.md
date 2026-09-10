@@ -125,3 +125,8 @@ appending your own entry.
   permission block (keep it on workers); the NAP is the planner's main handoff channel and
   the resume contract degrades to secondary files when it cannot be written.
 
+
+### Task text names a non-existent agent + stale launch-mechanic docs — planner 2026-09-10
+- **Friction:** the per-session task text (looprunner → planner, from `prompt_looprunner.md`) names the explorer agent `worker_explorer_jill_gemmaQ4_256K`, which does not exist (real key in `opencode.jsonc`: `worker_explorer_jill_gemma_256K_mtp`); and the NAP claimed the planner "function set has NO Task tool" (CLI-launch mechanic) while the live config grants `task: allow` and the Task tool actually works.
+- **Cost:** had to cross-check `opencode.jsonc` before trusting either statement; a weaker planner session risks wasting a cycle on a failed launch (non-existent agent name) or on a blocked CLI path.
+- **Suggested change:** keep agent names in embedded task text in sync with the live agent keys (already in the TODO #39 proposal / typo list); state launch mechanics once in `agents_repo.md`, verified against `opencode.jsonc`, instead of in NAP prose.

@@ -2,6 +2,44 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-10 (autonomous session 2) — Looprunner-prompt optimization (maintainer task, light)
+- Maintainer task (via Looprunner): optimize `.opencode/prompt_looprunner.md` for
+  looprunner↔planner coordination — proposal only, no repo code work this round.
+- **Deliverable LANDED:** `.opencode/looprunner_prompt_proposal_planner.md` (new file,
+  committed) — consolidated proposal with a ready-to-paste replacement prompt,
+  point-by-point verdicts on the Looprunner's 8-point proposal + the gemini proposal,
+  full typo list, maintainer action items.
+- **Verdicts in one breath:** ADOPT = closing action protocol
+  (`action: restart` / `ask_maintainer: <q>` / `stop`, last `action:` line wins,
+  default restart), `@loop`/`@looprunner` prefix routing, 80 % loop_log write / 85 %
+  stop hygiene, mechanical suggestion capture (planner heading
+  'Looprunner prompt suggestions' → looprunner appends VERBATIM below a divider),
+  typo fixes. REJECT = `loop_state.json` (the NAP is already the durable state;
+  unparseable closing = default restart — one channel). PARTIAL = `action: resume`
+  (optional only, via the Task tool `task_id`, only after an `ask_maintainer` pause —
+  a fresh restart + NAP stays the loop's backbone).
+- **Config facts used (live `opencode.jsonc` read this session):**
+  `looprunner_Q4_120k` = `task: allow` / `edit: deny` / `bash: deny` → it MUST launch
+  `planner_Q4_120K` via the Task tool (CLI impossible without a bash grant) and CANNOT
+  write `loop_log.md` / append prompt suggestions without a scoped edit-allow change
+  (maintainer action item 2 of the proposal).
+- **Discrepancies flagged (maintainer-owned files, left as-is):**
+  (a) the session-1 NAP text claims the planner "function set has NO Task tool" and
+  that agents_repo.md was rewritten with "CLI launch mechanics" — the live config gives
+  the planner `task: allow` and THIS session's Task tool roster DOES list the
+  planner/worker agents; current `agents_repo.md` carries no CLI-launch-mechanics line
+  (maintainer live edits — `86077bc` era). This NAP claim is stale; re-verify the roster
+  line against `opencode.jsonc` before any delegation-mechanic decision.
+  (b) `git log` top = `c629f2e temp commit` — NOT planner-authored (maintainer/looprunner
+  artifact, content unexamined); working tree was clean at session start.
+  (c) The embedded planner task text (looprunner prompt L12) names a non-existent agent
+  `worker_explorer_jill_gemmaQ4_256K` — real key `worker_explorer_jill_gemma_256K_mtp`
+  (in the proposal's typo list; functional, not cosmetic).
+- **TODO:** #39 added (maintainer call: apply the proposal + permission change +
+  smoke-test). Numbering header bumped to "start at #40".
+- Closing message per task spec: proposal summary + 8-point verdicts + prompt
+  suggestions + `action: restart` line.
+
 ## 2026-09-10 (autonomous session 1) — roster + explorer smoke test + #37 build LANDED
 - Maintainer via Looprunner (autonomous mode; the prompt is re-injected on restarts;
   NAP edit permission FIXED — the old planner edit-deny on this file is gone).
@@ -49,6 +87,10 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
    build of this size — either raise the CLI timeout to ~90–120 min for big builds,
    or resume the worker session with `opencode run -s <session-id>` instead of
    re-delegating from scratch.
+- Note (session 2): **#39 Looprunner prompt v2 = MAINTAINER CALL** (apply proposal
+  `.opencode/looprunner_prompt_proposal_planner.md` + scoped permission change +
+  smoke test) — no autonomous next step until applied. The next EXECUTABLE autonomous
+  item remains 3 (explorer real exploration run, findings → new TODOs from #40).
 
 ## Standing
 - Suite 434/434, ruff F=0 (post-#37 baseline: the probe is now 45/45).
