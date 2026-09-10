@@ -14,10 +14,9 @@
 // ".opencode/handover_task.md"):
 //   - `tool.execute.before` (handover): pre-flight — spec file missing or empty → one warn
 //     line to plugin.log. Observation only: never blocks or mutates the delegation.
-//   - `tool.execute.after` (handover): summary mirror — OVERWRITES
+//   - `tool.execute.after` (handover): summary mirror — OVERWROTE
 //     .opencode/handover_task_to_planner.md with the worker final message from `output`
-//     VERBATIM (no log truncation ladder — that applies to plugin.log lines only).
-//     Empty `output` → file untouched. `metadata.truncated === true` → one trailer line.
+//     VERBATIM. REMOVED in v2.7 (P02) — see the v2.7 block below; historical record kept.
 //   - `experimental.chat.system.transform`: the raw payload is evidence-logged (kind
 //     "transform") so the LIVE shape is visible from the post-restart plugin.log — the SDK
 //     types (1.18.29) declare the input as `{sessionID?, model}` with no agent identifier, so
@@ -120,9 +119,19 @@
 // message in the TUI.
 // Evidence: kind:"nudge" lines ONLY ({session, rung, readout}); otherwise SILENT (no line
 // for a non-fire — v1.x log-growth discipline). The chat.message ctx: line STAYS UNCHANGED.
+//
+// v2.7 (2026-09-10, P02 — maintainer-approved in the proposals channel): the `tool.execute.after`
+// summary mirror (the after-hook write to handover_task_to_planner.md) is REMOVED. It OVERWROTE
+// .opencode/handover_task_to_planner.md with the worker's RAW final message after EVERY Task-tool
+// run — 7 confirmed collisions across sessions, each costing the planner a `git checkout --`
+// recovery. The mirror's original purpose (avoid the "write file + final message" doubling) was
+// resolved on the worker-prompt side (the worker writes its own summary file, 52eb0aa) — the
+// mirror was pure damage. The COMMITTED summary file is canonical; the plugin never touches it
+// anymore. Survivors: the `tool.execute.before` pre-flight warn, the tool.after log line, the
+// nudge ladder, and the chat.message ctx: line (the probe pins the new no-write behavior, S3).
 
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
-import { appendFileSync, readFileSync, writeFileSync } from "node:fs";
+import { appendFileSync, readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 // v2.5 — the native context gauge core (de-peek, TODO.md #30): ONE implementation
@@ -164,10 +173,6 @@ let dir: string | undefined;
 
 function specPath(): string {
   return join(dir ?? "", HANDOVER_SPEC_PATH);
-}
-
-function mirrorPath(): string {
-  return join(dir ?? "", ".opencode", "handover_task_to_planner.md");
 }
 
 function logPath(): string {
@@ -290,26 +295,6 @@ async function preflightHandover(input: ToolPayload, output: { args?: unknown })
       );
     }
     // other fs errors: swallow — observation only
-  }
-}
-
-// v2 — summary mirror: the plugin OWNS handover_task_to_planner.md. Verbatim worker final
-// message, full text — no ladder/truncation. Best-effort fs.
-async function mirrorSummary(
-  input: ToolPayload,
-  output: { title?: unknown; output?: unknown; metadata?: unknown },
-): Promise<void> {
-  try {
-    if (!isHandoverTask(input?.tool, input?.args)) return;
-    const finalMessage = output?.output;
-    if (typeof finalMessage !== "string" || finalMessage.length === 0) return;
-    const truncated = (output?.metadata as { truncated?: unknown } | undefined)?.truncated === true;
-    const content = truncated
-      ? finalMessage + `\n\n[TRUNCATED by opencode tool_output cap — see plugin.log call ${str(input?.callID) ?? ""}]`
-      : finalMessage;
-    writeFileSync(mirrorPath(), content, "utf8");
-  } catch {
-    // best-effort fs — never throw out of the hook
   }
 }
 
@@ -555,7 +540,6 @@ async function onToolAfter(
   } catch {
     // never throw
   }
-  await mirrorSummary(input, output);
   // v2.6 — the auto-nudge ladder (every session, every tool — agent-independent).
   await nudgeLadder(input?.sessionID);
 }

@@ -1,78 +1,62 @@
-# WORKER SUMMARY — #47 §3 docs (FINAL — all §3 docs landed)
+# WORKER SUMMARY — P02: disable the plugin's summary mirror (mirrorSummary removal + probe rebuild)
 
-## What was added (this resume run, written from the prior run's verified notes — NO re-verification)
-WIKI.md:
-- New `####` sections under [Suffix/Function_Invocation] (after [General key control]):
-  - [Function results in general] — the bool=int=None-other result semantics of the
-    suffix evaluation (verified notes, `constraint_evaluation`).
-  - [Variable system] — integer vars `set`/`is_set`/`get`/`check`/`incr`/`decr`/`clear`/
-    `clear_all_variables`, text vars `set_var`/`get_var`, `print_all_variables` — incl.
-    the confirmed `check(name, value)` flag (non-int/non-list value → passes True) and
-    the in-memory-only note.
-  - [Typing] — `type`/`write` (releases modifiers first) + `release_modifier`.
-  - [Toasts] — `show_message`/`show_timer`/`remove_toast`/`remove_all_toasts`, documented
-    as **requires GUI mode** (headless → error) per flag 1; `immediately` param documented
-    as accepted-but-ignored (as-is) per flag 2.
-  - [Mouse control] — `scroll_up/down/right/left`, `mouse_move_abs`, `mouse_move`,
-    `mouse_get_pos` (also copies to clipboard), `mouse_save_to_var`, `mouse_move_to_var`
-    (the one that can evaluate to False).
-  - [Mouse keys] — vk 1-7 key strings (left/right/middle mouse + x1/x2 aliases,
-    scroll_vertical/scroll_horizontal), wheel-delta phase (multi-notch keeps first notch
-    phase), vertical scroll press=one notch up / release=one notch down.
-  - [Clipboard] — `copy_to_clipboard` (toast confirm) / `paste`.
-  - [File operations] — `save_into_file`/`append_to_file`/`empty_file` (+ relative path
-    → program CWD).
-  - [Misc] — `cli`/`date`/`date_time`/`get_time`/`make_backup`/`restore_backup`
-    (incl. the FileNotFoundError-without-args flag and the GUI toast part)/`clear_console`/
-    `is_repeat_active` (labeled evaluation, not invocation).
-- New `### [Numpad debug combos]` under Controls — ALT+NUM1..NUM8, only with
-  `-debug_numpad`; ALT+NUM6 documented as unassigned/reserved per flag 3.
-- [None / empty '' key event for invocations] extended — the vk-0 key strings
-  `none`/`NONE`/`_`/`reset`/`delay` (never played, suffixes still evaluated).
-- [Start Arguments] — order-of-processing note + `-delay`, `-exec_one_macro`,
-  `-debug_numpad`, `-always_active` (incl. blue default-active indicator), `-tray_icon`
-  (tray menu items), `-hide_cmd_window`, `-save_dir=`, `-backup_root_dir=`, deprecated
-  `-focusapp=` (warning + exit 1).
+## What changed
+- `.opencode/plugin/handover_v2.4.ts` (v2.7):
+  - deleted `mirrorSummary()` (was ≈L296-314) and its call site in `onToolAfter`
+  - deleted the `mirrorPath()` helper (mirror-only) and `writeFileSync` from the
+    `node:fs` import (mirror-only)
+  - header: the v2 "summary mirror" bullet marked REMOVED + a new v2.7 block
+    records the rationale (7 confirmed collisions, worker-prompt-side fix 52eb0aa,
+    proposals-channel approval). The removed symbol's name is deliberately NOT
+    spelled out in the header so the acceptance command stays 0-hit.
+  - KEPT, verified intact: the `tool.execute.before` pre-flight warning, the
+    tool.after log line, the nudge ladder, the chat.message ctx line.
+- `.opencode/plugin/probes/handover_probe.mjs`:
+  - S3 rebuilt IN PLACE (5 checks kept): 08/09/10/12 now pin the NEW behavior —
+    the mirror file stays byte-identical to the pre-filled sentinel through
+    non-empty / truncated:true / empty handover outputs; 11 (exactly 3 tool.after
+    log lines) unchanged (logging is untouched by P02).
+  - retired the unused mirror fixtures (M_A / M_B_OUTPUT / M_B_EXPECTED);
+    STALE_SENTINEL comment repurposed; WHAT-IT-RUNS header updated;
+    EXPECTED OUTPUT stays S3=5 → 52/52.
+  - Extra mirror pins found beyond S3 08/09/10/12 (REPORT, not deleted): the
+    `readMirror() === STALE_SENTINEL` conditions inside S2 checks 04/05/06
+    (collateral to the non-handover-invisibility checks). Kept — still true and
+    still meaningful (the plugin never touches the mirror at all).
+- NO TODO.md entry (per spec — the proposals channel tracks P02).
+- Meta files untouched (read-only per spec).
 
-README.md:
-- Feature list item 14 [Extra Start Arguments] — compact top-level list of the same
-  extra args + the deprecated `-focusapp=` note.
+## New probe count N
+N = 52 (unchanged): baseline 52/52 → **52/52**. Four mirror checks (S3 08/09/10/12)
+were REBUILT in place to pin the disabled behavior rather than retired — the spec
+allows "remove/rebuild", and pinning "the plugin never writes the mirror file" is
+the regression guard for P02 (a re-introduced mirror would fail S3 08/09/12).
+Retired = 0, hence N = 52 − 0 = 52.
 
-Chunk 1 (WIKI multi-focus names + multiline `:` continuation, commit `b40a1a7`) NOT
-touched — no duplication.
+## Measured gates
+- `node .opencode/plugin/probes/handover_probe.mjs` = `PROBE handover: 52/52 PASS`,
+  exit code 0 (pre-change baseline measured 52/52 in this run).
+- `& .\.venv\Scripts\python.exe -m pytest -q` = **436 passed, 1 warning** (the
+  known #10 warning) — matches the spec baseline.
+- `& .\.venv\Scripts\ruff.exe check --select F .` = **0 findings** — matches spec.
+- `Select-String -Path .opencode/plugin/handover_v2.4.ts -Pattern mirrorSummary`
+  = **no hits**.
 
-## Measured gate
-- `& .\.venv\Scripts\python.exe -m pytest -q` = **436 passed, 1 warning** (the known
-  `coroutine ... never awaited` RuntimeWarning in `test_extraction_filter_edges.py`) —
-  exact match to the expected baseline.
-- `& .\.venv\Scripts\ruff.exe check --select F .` = **0 findings** ("All checks passed!").
-- `git diff` scope = README.md, WIKI.md, TODO.md, `.opencode/handover_task_to_planner.md`
-  only (docs-only; the pre-existing `.opencode/handover_maintainer.md` modification was
-  NOT touched and NOT included in the commit).
+## Commit
+ONE commit: plugin + probe + this summary. `opencode.jsonc` left modified in the
+working tree (by design, NOT staged). The commit hash cannot self-reference inside
+the committed file — it is reported in the worker's final message; this commit is
+HEAD after this run (subject: "P02: disable the plugin's summary mirror (mirrorSummary removal + probe rebuild)").
 
-## TODO entries touched
-- #47 — appended a LANDED status tail (what was added + measured gate); chunk-1 PARTIAL
-  tail left untouched. Entry left OPEN for planner curation (no closure performed — the
-  spec asked only for the tail).
+## Deviations / flags
+- No deviations from the spec.
+- Flag (no action taken): `.opencode/plugin/deactivated/handover.ts` (deactivated
+  alternative implementation) still contains mirrorSummary/mirrorPath — removal of
+  deactivated code is a maintainer call, left untouched.
 
-## Open questions / flags
-1. Headless toast crash (toasts need GUI mode) — documented as-is; hardening the code
-   remains a maintainer call (out of scope, nothing changed).
-2. `remove_toast`/`remove_all_toasts` `immediately` param ignored — documented as-is.
-3. ALT+NUM6 unassigned — documented as reserved.
-4. `check(name, value)` non-int/non-list value → True — documented.
-5. (new, minor) The verified notes did not confirm whether text variables (`set_var`/
-   `get_var`) share the same storage dict as the integer variables — I deliberately
-   omitted any namespace claim from the docs rather than guess. If the planner wants it
-   documented, one line of code check settles it.
-6. Horizontal scroll sending direction (press = right? left?) was not in the verified
-   notes — documented only the vertical behavior (press=up, release=down), which IS
-   pinned by tests.
+## Deliberately not done
+- The functional proof (a Task-tool run no longer clobbers the summary file) is the
+  PLANNER's job after this run. This commit is my LAST write to this file.
 
-## Deliberately NOT done
-- No production code touched (`fst_manager.py` / `fst_keyboard.py` / `free_snap_tap.py` /
-  `vk_codes.py` read-only per the approval boundary).
-- §2/§4 sections, README config example, WIKI version header untouched.
-- No TODO entry closure/move to todo_records.md (planner curation).
-- `.opencode/handover_maintainer.md` (pre-existing working-copy change, not mine) left
-  in the working tree, uncommitted.
+Final gauge line (verbatim, `node .opencode\ctxgauge\peek.mjs`):
+SESSION=ses_f745161bbffehBQ5q3U8HiP8Wi CTX=70429 (58%) REM=49571

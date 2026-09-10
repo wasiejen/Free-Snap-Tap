@@ -52,8 +52,10 @@
 //   S2 non-handover delegations invisible (4): task w/o spec in prompt;
 //      non-task tool w/ spec-ish prompt; task w/ missing args (no throw);
 //      cumulative tally
-//   S3 summary mirror (5): verbatim OVERWRITE / exact TRUNCATED trailer / empty
-//      output → untouched; exactly 3 tool.after log lines; final mirror state
+//   S3 mirror DISABLED (P02, v2.7) (5): the plugin NEVER touches the mirror file —
+//      non-empty output / truncated:true / empty output all leave it byte-identical
+//      to the pre-filled sentinel; exactly 3 tool.after log lines (logging is
+//      unchanged); final mirror state == pre-filled sentinel
 //   S4 chat.message shapes (8) — v2.5 native gauge, session-gated match-only
 //      post (the v2.2.1 fake-shell shapes are GONE):
 //      (t1) ok-match: the posted part is BYTE-EXACT
@@ -151,10 +153,9 @@ const PLUGIN_TS = path.join(REPO_ROOT, ".opencode", "plugin", "handover_v2.4.ts"
 const HOV_PROMPT = "Read .opencode/handover_task.md and execute it EXACTLY.";
 const ORIGINAL_SPEC =
   "# PROBE DUMMY SPEC\n\nsentinel — NOT the real spec file (the real one lives at <repo root>/.opencode/handover_task.md).\n";
-const STALE_SENTINEL = "STALE MIRROR SENTINEL — must be OVERWRITTEN, not appended to.\n";
-const M_A = "VERBATIM worker summary line one\nline two\n";
-const M_B_OUTPUT = "TRUNCATED BODY\n";
-const M_B_EXPECTED = `${M_B_OUTPUT}\n\n[TRUNCATED by opencode tool_output cap — see plugin.log call d2]`;
+// P02 (v2.7): the mirror is DISABLED — the plugin must NEVER touch this file, so the
+// sentinel must survive the whole probe byte-for-byte.
+const STALE_SENTINEL = "STALE MIRROR SENTINEL — the plugin must NOT touch this file (mirror disabled, P02).\n";
 // v2.5 S4 expected posted text (byte-exact, straight from the core's readout forms)
 const CTX_OK = "ctx: SESSION=ses_fx_ok CTX=10000 (3%) REM=246000";
 const CTX_UNKNOWN = "ctx: SESSION=ses_fx_unk CTX=50";
@@ -359,25 +360,27 @@ check(
 // 07 — cumulative tally after S1–S2
 check("07", "S2", "cumulative after S1–S2: warn==2, tool.before==6", linesOfKind("warn").length === 2 && linesOfKind("tool.before").length === 6, `warn=${linesOfKind("warn").length} tool.before=${linesOfKind("tool.before").length}`);
 
-// ------------------------------------------------------------------ S3 mirror (5)
+// ------------------------------------------------------------------ S3 mirror DISABLED (P02, v2.7) (5)
 
-// 08 — verbatim OVERWRITE (the STALE sentinel is replaced byte-for-byte)
-await afterFeed("s3", "d1", HOV_ARGS, { title: "worker final", output: M_A, metadata: {} });
-check("08", "S3", "handover after (no meta): mirror OVERWRITTEN byte-exact verbatim (sentinel replaced)", readMirror() === M_A, readMirror());
+// 08 — non-empty handover output: the mirror file is UNTOUCHED (the after-hook mirror
+//      write is removed — the sentinel must survive byte-for-byte)
+await afterFeed("s3", "d1", HOV_ARGS, { title: "worker final", output: "VERBATIM worker summary line one\nline two\n", metadata: {} });
+check("08", "S3", "handover after (non-empty output): mirror UNTOUCHED (byte-identical to the pre-filled sentinel — mirror disabled)", readMirror() === STALE_SENTINEL, readMirror());
 
-// 09 — exact TRUNCATED trailer with the call id embedded
-await afterFeed("s3", "d2", HOV_ARGS, { title: "worker final", output: M_B_OUTPUT, metadata: { truncated: true } });
-check("09", "S3", "handover after (truncated:true): mirror == output + exact trailer (call d2)", readMirror() === M_B_EXPECTED, readMirror());
+// 09 — truncated:true: STILL untouched (no trailer is written anywhere)
+await afterFeed("s3", "d2", HOV_ARGS, { title: "worker final", output: "TRUNCATED BODY\n", metadata: { truncated: true } });
+check("09", "S3", "handover after (truncated:true): mirror still untouched (no trailer written)", readMirror() === STALE_SENTINEL, readMirror());
 
 // 10 — empty output → untouched
 await afterFeed("s3", "d3", HOV_ARGS, { title: "worker final", output: "", metadata: {} });
-check("10", "S3", "handover after (empty output): mirror untouched (byte == S3b state)", readMirror() === M_B_EXPECTED, readMirror());
+check("10", "S3", "handover after (empty output): mirror untouched", readMirror() === STALE_SENTINEL, readMirror());
 
-// 11 — exactly three tool.after log lines in this phase
+// 11 — exactly three tool.after log lines in this phase (logging is unchanged by P02)
 check("11", "S3", "mirror phase logged exactly 3 tool.after lines (d1..d3)", linesOfKind("tool.after").length === 3, `tool.after=${linesOfKind("tool.after").length}`);
 
-// 12 — final mirror state byte-exact
-check("12", "S3", "final mirror state byte-identical to S3b content", readMirror() === M_B_EXPECTED, readMirror());
+// 12 — final mirror state byte-exact: the file the plugin was initialized with is still
+//      there, byte-for-byte — the plugin never wrote it
+check("12", "S3", "final mirror state byte-identical to the pre-filled sentinel", readMirror() === STALE_SENTINEL, readMirror());
 
 // ------------------------------------------------------------------ S4 chat.message shapes (8) — v2.5 native gauge
 
