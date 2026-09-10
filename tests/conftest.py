@@ -14,6 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from fst_keyboard import FST_Keyboard  # noqa: E402
 from fst_manager import CONSTANTS  # noqa: E402
 from fst_manager import Input_State_Manager  # noqa: E402
 from vk_codes import vk_codes_dict  # noqa: E402
@@ -90,3 +91,65 @@ def mock_pynput_controllers(monkeypatch):
     """Replace pynput controllers so no real input can ever be emitted."""
     monkeypatch.setattr('pynput.keyboard.Controller', lambda: MagicMock())
     monkeypatch.setattr('pynput.mouse.Controller', lambda: MagicMock())
+
+
+@pytest.fixture
+def kb_env_ns(monkeypatch):
+    """Real FST_Keyboard with mocked pynput controllers, yielded as
+    SimpleNamespace(kb, kb_mock, mouse_mock); arg flags pre-set to the
+    filter-active state (WIN32_FILTER_PAUSED/ACT_DELAY/ACT_CROSSOVER=False);
+    _listener mocked, _mouse_listener NOT set."""
+    kb_mock = MagicMock()
+    ms_mock = MagicMock()
+    monkeypatch.setattr('pynput.keyboard.Controller', lambda: kb_mock)
+    monkeypatch.setattr('pynput.mouse.Controller', lambda: ms_mock)
+    FST_Keyboard.TIME_DIFF = None
+    FST_Keyboard.START_TIME = None
+    keyboard = FST_Keyboard()
+    keyboard._listener = MagicMock()
+    keyboard.arg_manager.WIN32_FILTER_PAUSED = False
+    keyboard.arg_manager.ACT_DELAY = False
+    keyboard.arg_manager.ACT_CROSSOVER = False
+    yield SimpleNamespace(kb=keyboard, kb_mock=kb_mock, mouse_mock=ms_mock)
+    FST_Keyboard.TIME_DIFF = None
+    FST_Keyboard.START_TIME = None
+
+
+@pytest.fixture
+def kb_env_mouse(monkeypatch):
+    """Real FST_Keyboard yielded raw; _listener AND _mouse_listener mocked;
+    arg flags pre-set to the filter-active state
+    (WIN32_FILTER_PAUSED/ACT_DELAY/ACT_CROSSOVER=False)."""
+    kb_mock = MagicMock()
+    ms_mock = MagicMock()
+    monkeypatch.setattr('pynput.keyboard.Controller', lambda: kb_mock)
+    monkeypatch.setattr('pynput.mouse.Controller', lambda: ms_mock)
+    FST_Keyboard.TIME_DIFF = None
+    FST_Keyboard.START_TIME = None
+    keyboard = FST_Keyboard()
+    keyboard._listener = MagicMock()
+    keyboard._mouse_listener = MagicMock()
+    keyboard.arg_manager.WIN32_FILTER_PAUSED = False
+    keyboard.arg_manager.ACT_DELAY = False
+    keyboard.arg_manager.ACT_CROSSOVER = False
+    yield keyboard
+    FST_Keyboard.TIME_DIFF = None
+    FST_Keyboard.START_TIME = None
+
+
+@pytest.fixture
+def kb_env_plain(monkeypatch):
+    """Real FST_Keyboard yielded raw; _listener and _mouse_listener mocked;
+    arg flags left as constructed (no pre-setting)."""
+    kb_mock = MagicMock()
+    ms_mock = MagicMock()
+    monkeypatch.setattr('pynput.keyboard.Controller', lambda: kb_mock)
+    monkeypatch.setattr('pynput.mouse.Controller', lambda: ms_mock)
+    FST_Keyboard.TIME_DIFF = None
+    FST_Keyboard.START_TIME = None
+    keyboard = FST_Keyboard()
+    keyboard._listener = MagicMock()
+    keyboard._mouse_listener = MagicMock()
+    yield keyboard
+    FST_Keyboard.TIME_DIFF = None
+    FST_Keyboard.START_TIME = None

@@ -4,32 +4,12 @@ start-arg application by focus name and the small property getters.
 The config load is stubbed so apply/update paths never open a file, and the
 pynput controllers are mocked so no real input can be emitted.
 """
-from unittest.mock import MagicMock
-
 import pytest
 
-from fst_keyboard import FST_Keyboard
-
 
 @pytest.fixture
-def kb_env(monkeypatch):
-    kb_mock = MagicMock()
-    ms_mock = MagicMock()
-    monkeypatch.setattr('pynput.keyboard.Controller', lambda: kb_mock)
-    monkeypatch.setattr('pynput.mouse.Controller', lambda: ms_mock)
-    FST_Keyboard.TIME_DIFF = None
-    FST_Keyboard.START_TIME = None
-    keyboard = FST_Keyboard()
-    keyboard._listener = MagicMock()
-    keyboard._mouse_listener = MagicMock()
-    yield keyboard
-    FST_Keyboard.TIME_DIFF = None
-    FST_Keyboard.START_TIME = None
-
-
-@pytest.fixture
-def facade_kb(kb_env, monkeypatch):
-    kb = kb_env
+def facade_kb(kb_env_plain, monkeypatch):
+    kb = kb_env_plain
     # default: an empty config so no file is opened on reload
     monkeypatch.setattr(kb.config_manager, 'load_config', lambda: ({}, [], []))
     return kb
@@ -40,11 +20,11 @@ def cs2_config():
 
 
 class TestPropertyGetters:
-    def test_output_manager_property(self, kb_env):
-        assert kb_env.output_manager is kb_env._output_manager
+    def test_output_manager_property(self, kb_env_plain):
+        assert kb_env_plain.output_manager is kb_env_plain._output_manager
 
-    def test_key_group_by_alias_property(self, kb_env):
-        assert kb_env.key_group_by_alias == kb_env._key_group_by_alias
+    def test_key_group_by_alias_property(self, kb_env_plain):
+        assert kb_env_plain.key_group_by_alias == kb_env_plain._key_group_by_alias
 
 
 class TestApplyFocusGroups:
