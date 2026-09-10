@@ -5,7 +5,7 @@ One-line records; resolution lives in the file / git log. Moved out of `TODO.md`
 from the live file).
 
 **Numbering rule:** every ID used here is RESERVED and never reused — new entries in
-`TODO.md` continue from the last used ID (currently #48, next = #49).
+`TODO.md` continue from the last used ID (currently #49, next = #50).
 
 ## 2. Fix the 6 ruff `F` findings — CLOSED (worker, `cdbbdcd`, 2026-09-10) — all six F sites removed (incl. the cascaded dead `cube_distance`); ruff F 6→0; pytest 434→434, 13 warnings same profile.
 ## 5. Lint baseline 6 → 8 at `ca61a26` — CLOSED (`0025a57`, 2026-09-08) — the three unused `SimpleNamespace` imports removed — the 6-finding baseline restored (later → 0 via #2).
@@ -443,3 +443,10 @@ prints forward slashes. Status: closed — section committed as tested.
    (tests/test_filter_behavior.py); single-notch tests stay green. Gate: pytest
    -q = 436 passed, ruff F=0. REPORT BACK (ruling): packed-word equality sites
    found → new entry #48 (implicitly approved).
+
+## 49. `handover_task.md` worktree/HEAD conflict (2026-09-10) (closed 2026-09-11)
+
+One-line record: maintainer call — the worktree held the LANDED part-3 spec (byte-identical
+to `854bb68`) while HEAD held the split-build spec (`8b4123b`); the maintainer resolved it
+directly (`b6dc3e7` "cleaned up commit mess" — restored lost updates, HEAD split-build spec
+canonical, tree clean) → closed; the split build launched per the committed spec.

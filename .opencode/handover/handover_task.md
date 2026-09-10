@@ -101,9 +101,9 @@ in the prompts unchanged.
 
 ### 4. Session marker in the planner prompt (2147, option 2)
 In `prompt_agent_planner.md`'s autonomous-mode section, replace the "Autorun
-archive" bullet with: create `.opencode/archive/autorun-<YYMMDD-HHmm>/` if
+archive" bullet with: create `.opencode/archive/autorun-<YYYY-MM-DD_HH-MM>/` if
 missing; when creating the folder, write ONE marker file
-`.opencode/archive/autorun-<YYMMDD-HHmm>/<session_id>.md` into it — the session
+`.opencode/archive/autorun-<YYYY-MM-DD_HH-MM>/<session_id>.md` into it — the session
 id is the `SESSION=` field of the injected `ctx:` launch line (e.g.
 `ses_f72e…`); the marker content is minimal (launch time, iteration N, role);
 the FILE NAME is the info (restores which session owns the archive after an
