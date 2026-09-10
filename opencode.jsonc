@@ -6,12 +6,12 @@
     "auto": true,
     "keep": {
       // how much of the original prompt to keep, default 15000
-      "tokens": 50000,
+      "tokens": 60000,
     },
     // how close to the defined limit is allowed, default 20000
     // there seems to be no option to set buffer per model like the limit
     // might hack it via defining another limit then the modell actuall has
-    "buffer": 20000,
+    "buffer": 0,
   },
 
   "provider": {
