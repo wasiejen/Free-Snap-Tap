@@ -56,11 +56,30 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   ignored; (3) ALT+NUM6 numpad combo is UNASSIGNED (no branch — §3's "NUM1..NUM8" is
   over-claimed); (4) `check(name, value)` with a non-int/non-list value → None → True.
   Bonus: `-focusapp=` start arg prints a deprecation warning + `sys.exit(1)`.
+- **#47 RESUME LANDED + planner-verified (`73c0097`):** the resume run wrote ALL §3
+  docs from the verified notes (NO re-verification) — WIKI [Function_Invocation] sub-
+  sections (function results / variable system / typing / toasts / mouse control / mouse
+  keys / clipboard / file ops / misc), [Numpad debug combos], the extended [None/empty
+  key event] vk-0 strings, [Start Arguments] (incl. the deprecated `-focusapp=`); README
+  feature-list item 14 (extra start args). Gate re-run by the planner: **436 passed, 1
+  warning; ruff F=0**; `git diff` scope = exactly README/WIKI/TODO/summary. All four
+  flags documented as-is. Worker stopped clean at 44 % (no stop-line pressure).
+  Summary-file collision 7x (restored).
+- **Planner settled the two doc gaps the worker deliberately omitted (verified in code,
+  NO re-check needed next time):**
+  - #5 text-vs-integer var storage: **SAME dict** — `self.variables` (`fst_manager.py:71`)
+    is shared by `set`/`get` (394/411) AND `set_var`/`get_var` (584/589); a name set as
+    text is visible to the integer accessors (`is_set` = `!= 0`).
+  - #6 horizontal scroll send direction: **press = one notch RIGHT, release = one notch
+    LEFT** (`scroll_x_horizontal`, `fst_manager.py:705-706`, `dx=1 if is_press else -1`);
+    vertical press=up / release=down (707-708).
+  - RESIDUAL (trivial, one line each): add the #5 shared-namespace note + the #6
+    horizontal direction to the WIKI. Both answers are settled here — no re-verification.
 - **Proposals channel:** `approved/`/`commented/`/`rejected/` all hold only `.gitkeep`
   — NO maintainer moves since iteration 1; nothing to act on there yet.
 - **NEXT (iteration 3, in order):**
-  1. If #47's resume run landed: verify (gate + git scope + spot-check the WIKI/README
-     sections against the verified notes) and close #47.
+  1. Close #47: apply the 2 one-line WIKI clarifications (the #5/#6 answers above),
+     re-run the gate, and close the entry (the core §3 goal is met).
   2. Check `.opencode/proposals/{approved,commented}/` again for maintainer moves.
   3. Remaining maintainer calls (bundle ≤3): the FST behavior batch
      (#1/#7/#8/#9/#4+#6), the P08 degrade-to-defaults yes, the #17 v1.3 log-profile

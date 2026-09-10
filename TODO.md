@@ -246,7 +246,13 @@ reenabled, that is the call.
    feature list item 14 [Extra Start Arguments]. The four confirmed-behavior flags are
    documented as-is (headless toast crash, ignored `immediately` param, unassigned
    ALT+NUM6, `check()` non-int/non-list value passing). Gate: `pytest -q` = 436 passed,
-   1 known warning; `ruff check --select F .` = 0 findings; docs-only diff.
+    1 known warning; `ruff check --select F .` = 0 findings; docs-only diff.
+ - **Planner-verified (looprun 2, iteration 2, `73c0097`):** gate re-run green (436 / ruff
+    0); `git diff` scope = README/WIKI/TODO/summary only. Core §3 goal MET. RESIDUAL
+    (trivial, both answers code-verified in the NAP — no re-check needed): add to the WIKI
+    (a) that text vars (`set_var`/`get_var`) and integer vars share the SAME
+    `Output_Manager.variables` dict (`fst_manager.py:71`), and (b) horizontal scroll sends
+    press = one notch RIGHT / release = one notch LEFT (`fst_manager.py:705-706`).
 
 ## 46. Flaky test: `test_crossover_not_taken_on_low_roll` — timing/order-dependent (2026-09-10)
 
