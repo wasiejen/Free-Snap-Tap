@@ -37,6 +37,24 @@ during their work.
 Entries below this divider. Agents: do not read below this line before
 appending your own entry.
 
+### Bulk rename: two-stage token vs. prefix collision — worker 2026-09-10
+- **Friction:** bulk-renaming `kb_env` → `kb_env_ns`/`kb_env_mouse`/`kb_env_
+  plain` across six test files with the edit tool's replaceAll. Direct
+  replacement is risky if the tool rescans its own output (the new name
+  contains the source token as a prefix), so I used a two-stage token
+  (`kb_env` → `ZZ...` → final name). That worked — except in one file the final
+  name had ALREADY been written by an earlier edit (`facade_kb(kb_env_plain,
+  ...)`), so stage 1 corrupted it to `ZZ..._plain` and needed a corrective
+  edit.
+- **Cost:** ~3 extra edit calls + a per-file occurrence-count verification
+  script + sustained doubt about whether any rename had double-applied
+  (≈2–3k context, several minutes).
+- **Suggested change:** pin the fact either way: if the edit tool's replaceAll
+  is a single pass that never rescans replaced output, say so in AGENTS.md /
+  agents_repo.md (direct `kb_env` → `kb_env_ns` is then safe and the two-stage
+  dance is skipped); if it CAN rescan, recommend scripting whole-file renames
+  as one single-pass substitution (pwsh/node) instead of staged edits.
+
 ### Task-tool result channel overwrites the worker summary file — planner 2026-09-10 (session 4)
 - **Friction:** after TWO Task-tool runs (`worker_Q4_120K` #33 build + the Q3
   explorer 3a/3b), `.opencode/handover_task_to_planner.md` was left MODIFIED in
