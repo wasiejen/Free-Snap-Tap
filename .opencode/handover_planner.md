@@ -105,5 +105,8 @@ Historical resume order of the 2nd-planner block:
   one-shot only, default SKIP). v2.5 COMMITTED (313e83b) — live after the next
   maintainer restart; until then v2.4.1 code runs in already-loaded sessions with a
   degraded (dead peek.py) readout.
+- `opencode.jsonc` shows uncommitted in (almost) every session BY DESIGN — the maintainer
+  iterates on the agent config live and commits only after testing the effect
+  (maintainer, 2026-09-10). Never stage/commit it; never flag it as a discrepancy.
 - History (v2.x, rulings, #32 root cause): TODO.md + todo_records.md + plugin file header;
   old NAP blocks superseded by this file.
