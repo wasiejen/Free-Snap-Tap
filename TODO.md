@@ -24,7 +24,10 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 5. Schedule (DECIDED — not open calls): #33 v2.5 build is NOT a maintainer call — APPROVED,
    next build; #30 de-peek APPROVED — ONE cycle (node:sqlite gauge landing + peek.py removal
    + doc purge + v1.3 log-profile re-baseline), scheduled AFTER #33.
-6. ~~Apply the Looprunner prompt v2 proposal~~ — RESOLVED 2026-09-10: applied + smoke test
+6. **`handover_task.md` worktree/HEAD conflict** — worktree holds the LANDED part-3 spec
+   (byte-identical to `854bb68`), HEAD holds the split-build spec (`8b4123b`); decide which
+   is canonical — recommendation: restore HEAD + launch the split build → #49.
+7. ~~Apply the Looprunner prompt v2 proposal~~ — RESOLVED 2026-09-10: applied + smoke test
    clean → #39 CLOSED (session 4).
 
 ## FST behavior decisions (open — maintainer calls unless noted)
@@ -316,6 +319,26 @@ reenabled, that is the call.
 ## Loop & coordination (open)
 
 ## 39. (closed 2026-09-10, see todo_records.md) — Looprunner prompt v2 proposal — applied + smoke test clean (2026-09-10)
+
+## 49. `handover_task.md` worktree/HEAD conflict — worktree holds the LANDED part-3 spec, HEAD holds the split-build spec (2026-09-10, looprun new-iter-1)
+
+- **Problem / evidence:** the maintainer's uncommitted worktree (observed 2026-09-10,
+  ses_f729fdeecffeL1itaHiEEsKjYG) reverted `.opencode/handover/handover_task.md` to the
+  part-3 TODO-split spec — byte-identical to `854bb68` (verified: `git diff 854bb68 --`
+  empty), a task that LANDED + was planner-verified (iter 6b). HEAD (`8b4123b`) holds the
+  delegation-ready split-build spec (parts 1+2+5 + session-id rules). Same batch of
+  worktree moves: inbox `260910-2147` re-inboxed (original text), `260910-2301` deleted
+  from `done/`, the first autorun session marker deleted — see the NAP iter-1 block.
+- **Outcome (goal):** ONE canonical spec in both worktree and HEAD; the split build is
+  launched (or the spec is revised per the maintainer's intent) — no worker may be
+  launched while the two disagree.
+- **Acceptance:** `git diff HEAD -- .opencode/handover/handover_task.md` empty; the
+  split-build worker run is green + verified (or a revised spec is committed); this
+  entry closes with the outcome.
+- **Scope (non-exhaustive):** `.opencode/handover/handover_task.md` (restore via
+  `git checkout HEAD --` or planner rewrite), the NAP, this entry.
+- **Status:** OPEN — maintainer call (calls list item 6 above; the loop is paused on
+  `ask_maintainer: waiting for approval`).
 
 ## Plugin & gauge (open)
 
