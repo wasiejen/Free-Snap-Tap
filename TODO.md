@@ -537,3 +537,83 @@ does NOT exist in pwsh 7.6 (the old text suggested it — guaranteed first-shot 
 carries a trailing `\`; bare `python` on PATH = 3.14.3 without repo deps (fake-starts,
 then import-fails — always venv exe); scalar listing recipe needs `-File`; `pwd -W`
 prints forward slashes. Status: closed — section committed as tested.
+
+## 42. Multi-notch scroll-wheel events (delta ≠ ±120) are untested across all layers; the filter pins wheel phase on single-notch equality (2026-09-10, Audit 3a)
+
+- **Problem / evidence:** `FST_Keyboard.mouse_win32_event_filter`'s inner `is_press()`
+  (fst_keyboard.py ≈456-460) returns True/False ONLY when `data.mouseData` is
+  EQUAL to the single-notch constants `4287102976` (down, delta −120) / `7864320`
+  (up, delta +120) — for any other wheel delta (240, 360, … common fast/momentum
+  scroll) it returns **implicit `None`** (same failure shape as #1's numeric-vk
+  branch). `None` then propagates as the falsy `is_keydown` into
+  `_win32_event_filter` (fst_keyboard.py ≈505-510); the vk code 6/7 itself is
+  assigned unconditionally for scroll messages (≈475-478), so multi-notch wheel
+  events flow through as release-phase-only events. The test suite pins exactly
+  the two single-notch constants — `tests/test_filter_behavior.py:402-410`
+  (`test_scroll_messages_map_to_vk_6_and_7`) uses `mouse_data=4287102976` /
+  `7864320` verbatim (constants echoed from the production source); a repo-wide
+  grep of `tests/` finds NO other wheel `mouseData` values (only 0 / 65536 /
+  131072 x-button values). The output-side `scroll_up/down/right/left(n)`
+  functions ARE tested with arbitrary magnitudes (`tests/test_output_manager.py`
+  `test_scroll_constraints` ≈594-601) — that covers only `Output_Manager`
+  constraint functions, never the `mouse_win32_event_filter` entry with a
+  multi-notch payload. Consequence: a regression in wheel delta handling (or a
+  deliberate semantics change) cannot be caught anywhere in the suite, and in
+  production every non-±120 delta event behaves like a release phase (phase
+  inversion vs. the ±120 path).
+- **Outcome (goal):** the suite pins multi-notch wheel semantics explicitly:
+  a wheel event with |delta| ≠ 120 (concrete example values computed for the
+  test: 2-notch up `mouseData=15728640`, 2-notch down `4279238656`) produces the
+  documented idealized output — either aggregated magnitude or the documented
+  single-unit equivalent — decided by the maintainer (this changes observable
+  behavior).
+- **Acceptance:** new test(s) drive `mouse_win32_event_filter` with the two
+  multi-notch constants and assert the exact `_win32_event_filter` /
+  `mouse.scroll` outcome for the chosen semantics; the single-notch tests stay
+  green; entry closes with a status note naming the decided semantics.
+- **Scope (non-exhaustive):** `tests/test_filter_behavior.py` (`TestMouseWin32Filter`,
+  ≈371-430); `fst_keyboard.py` ≈451-478 + ≈503-514 (read-only verification);
+  `fst_manager.py` ≈703-709 (scroll sign mapping — context for acceptance only).
+- **Status:** OPEN — NEW (Audit 3a exploration; entries verified from lead (b),
+  independently re-derived). MAINTAINER CALL if the fix changes the gating
+  behavior (aggregation vs. single-unit vs. documented drop); if the maintainer
+  rules current equality gating intended, pin that decision explicitly.
+
+## 43. `kb_env` fixture + `build()`/`down()` helpers are copy-pasted (drifted) across 6 test files — no shared conftest location (2026-09-10, Audit 3a)
+
+- **Problem / evidence:** the identical FST-Keyboard-env fixture concept
+  (`FST_Keyboard()`, mocked pynput controllers, `TIME_DIFF/START_TIME` reset,
+  `_listener` mocks, TIME restoration teardown) exists SIX TIMES in THREE
+  drifted shape-classes: (A) yields `SimpleNamespace(kb, kb_mock, mouse_mock)`
+  + pre-sets `WIN32_FILTER_PAUSED/ACT_DELAY/ACT_CROSSOVER` (NO
+  `_mouse_listener` mock): `test_filter_behavior.py:27-41`,
+  `test_extraction_filter_edges.py:26-40`; (B) yields the raw `keyboard`,
+  pre-sets the arg flags AND `_mouse_listener`: `test_filter_simulated.py:23-38`;
+  (C) yields the raw `keyboard`, `_mouse_listener` mocked, NO arg flags:
+  `test_control_actions.py:17-29`, `test_macro_playback_kbd.py:18-30`,
+  `test_facade_wiring.py:15-27`. Shape (C) fixtures silently differ from (A): a
+  `WIN32_FILTER_PAUSED=True` filter would behave differently per file — a
+  fixture bug fix has to be applied 6× and per-variant. The
+  config-build helper `build(kb, rebinds=None, macros=None, taps=None, aliases=None)`
+  (setting `config_manager._*_hr` + `initialize_groups_from_presorted_lines()`)
+  is triplicated at `test_filter_behavior.py:44-50`, `test_extraction_filter_edges.py:43-50`,
+  `test_filter_simulated.py:41-…`; `down()`/`up()` filter-event shorthands
+  duplicated at `test_filter_behavior.py:59-64` and `test_extraction_filter_edges.py:52-54`;
+  `hold_keys`/`mock_control_handlers` at `test_filter_behavior.py:290-297`. The
+  variants already DRIFT (SimpleNamespace vs. raw-yield fixtures; `_mouse_listener`
+  set in some copies, not others) — a behavioral test in the drifted variants is
+  invisible from the others, and a fixture bug fix has to be applied 6×.
+- **Outcome (goal):** ONE shared location for the `kb_env`-class fixtures and the
+  `build`/`down`/`up`/`hold_keys`/`mock_control_handlers` helpers (e.g. a
+  `tests/conftest.py` fixture + tiny helper importable or duplicated in ONE file);
+  no test file defines its own copy of these any more.
+- **Acceptance:** the six files import/use the shared fixture (no local
+  `def kb_env` in any of them); `pytest -q` count unchanged at 434; behavior of
+  each file's existing tests byte-identical to before the move (they pass as
+  before).
+- **Scope (non-exhaustive):** `tests/conftest.py`, the six files above.
+- **Status:** OPEN — test-suite hygiene, pre-approved class (no observable
+  behavior change — pure test refactoring); the `kb_env` variants' DIFFERENCES
+  (SimpleNamespace vs. raw yield) must be preserved or each file migrated
+  deliberately. MAINTAINER NOTE: if the maintainer prefers per-file fixtures for
+  independence, close this with a "documented preference" note instead.
