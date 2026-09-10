@@ -2,6 +2,43 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-10 (looprun 2, iteration 5) — P02 LANDED + planner-verified; P01 re-test PASSED
+- **Start state:** clean tree (top `1ed1108`), only `opencode.jsonc` modified BY
+  DESIGN. No interrupted planner/worker work. The launch-message XXX note = the
+  iteration-4 maintainer message RE-ROUTED verbatim — already applied (`c4ad33c`),
+  nothing new to do. Proposals channel: no new maintainer moves since iteration 4
+  (approved/ = P01/P02/P08; inbox_planner = the 1346 request).
+- **P02 LANDED + planner-verified (`adc9965`):** spec as committed in
+  `handover_task.md`. **LAUNCHED via `worker_Q4_120K` (Task tool) — the P01
+  re-test: PASSED** (worker-prompt launch survived its first request; the
+  `limit.context` declaration works — the raw-agent workaround is now optional,
+  keep it as fallback only). Worker completed clean (64 % at its last gauge).
+- **Planner verification (independent):** commit scope = exactly plugin + probe +
+  summary; `mirrorSummary` grep on the plugin = 0 hits; probe re-run 52/52 exit 0
+  (S3 08/09/10/12 now pin the NO-WRITE behavior = regression guard); gate re-run
+  **436 passed, 1 warning (known #10); ruff F=0**.
+- **8th summary-file collision — with a twist (recorded in the P02 verdict):**
+  post-run the file held the raw `<task_result>` dump again, BUT the opencode
+  process had the OLD plugin code loaded in memory (worker's edit only takes
+  effect from the next process start; looprunner↔planner↔worker share ONE
+  process). Restored via `git checkout --`. **Functional proof = the first
+  Task-tool run after a FRESH process** (maintainer restart of the loop). If it
+  still collides after a fresh process → root cause = the task-tool RESULT
+  channel itself (opencode core) → maintainer-side fix.
+- P02 moved → `proposals/implemented/` with the planner verdict (incl. the
+  in-process-staleness nuance + the worker's deactivated-code flag).
+- **NEXT (iteration 5, continued, in order):**
+  1. **P08** (#44 ConfigError, approved incl. degrade-to-defaults): fresh code
+     reads of the raise/catch sites, write the spec into `handover_task.md`,
+     delegate (`worker_Q4_120K` — the worker mechanic now works normally),
+     verify + move P08 → implemented.
+  2. Draft the **1346 proposal** (NAP bloat / prompt separation) into
+     `.opencode/proposals/` (request =
+     `proposals/maintainer/inbox_planner/M260910-1346_nap-bloat-prompt-separation.md`
+     — move it to `maintainer/done/` after drafting).
+  3. Maintainer calls bundle (≤3) in the closing message.
+- Baseline: 436 passed / ruff F=0 (unchanged — P02 touched no FST code).
+
 ## 2026-09-10 (looprun 2, iteration 4) — P09+P07 applied to the LIVE looprunner prompt + #47 CLOSED
 - **Start state:** dirty tree = `opencode.jsonc` (maintainer's live P01 edit,
   uncommitted BY DESIGN — never stage/flag it) + `.opencode/prompt_looprunner.md`
