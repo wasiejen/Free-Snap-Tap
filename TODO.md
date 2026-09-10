@@ -830,7 +830,7 @@ prints forward slashes. Status: closed — section committed as tested.
   (the known #10 coroutine warning, unchanged); `ruff check --select F .` = 0
   findings. Entry stays open for the maintainer's documented-preference call.
 
-## 44. Stale/unknown focus name → uncaught KeyError in `apply_focus_groups` / `apply_start_args_by_focus_name` (the config is reloaded *before* the lookup) (2026-09-10, Audit 3b)
+## 44. (closed 2026-09-10) Stale/unknown focus name → uncaught KeyError in `apply_focus_groups` / `apply_start_args_by_focus_name` (the config is reloaded *before* the lookup) (2026-09-10, Audit 3b)
 
 - **Problem / evidence:** `apply_focus_groups` (`fst_keyboard.py:386`) and
   `apply_start_args_by_focus_name` (`:1021`) index

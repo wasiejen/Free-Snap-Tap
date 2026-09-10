@@ -38,3 +38,15 @@ fallback is the one part that needs the maintainer's final yes.
 
 **Verdict:**
 - approved
+
+**PLANNER VERDICT (2026-09-10, iteration 5):** LANDED + verified (6622b80).
+- Independently re-verified after the worker's 3 mid-run compactions (maintainer
+  compaction_warning): commit scope = exactly the 10 intended files; gate
+  re-run **448 passed (436 + 12 new 	ests/test_config_error.py), 1 warning
+  (#10)**; uff check --select F . = 0 findings. No compaction damage found.
+- Accepted deviation: fail-closed ConfigError guard in constraint_evaluation
+  (st_manager.py:676, print + eturn False) - out-of-list latent-crash
+  fix, sound (the constraint simply evaluates unfulfilled). Residual for #1:
+  that path only console-prints (no toast) -> #1 stays OPEN for that part.
+- TODO #44 closed on this verification (the design approval incl.
+  degrade-to-defaults was the maintainer's ruling).
