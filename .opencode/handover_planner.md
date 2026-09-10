@@ -35,13 +35,15 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   models; the provider `models` entries remain, cosmetic); #34 no call needed;
   #3 §3 docs APPROVED → new entry **#47** (delegation-ready); #46 delegated;
   #4 general ruling recorded → P08.
-- **Delegation:** the approved-fix batch (#41+#42+#46) spec is in
-  `handover_task.md`; launched via the RAW `agent_Q4_120K` (the worker-prompt
-  variant dies at its first request — P01) + compact protocol repeated in the
-  launch message.
+- **Delegation:** the approved-fix batch (#41+#42+#46) spec is committed in
+  `handover_task.md` — **NOT launched** (the stop line — 89 % / REM 12k — was
+  reached before the launch; the whole state is committed at `d077de2` + the
+  follow-up NAP fix). Iteration 2 launches it via the RAW `agent_Q4_120K` (the
+  worker-prompt variant dies at its first request — P01) + compact protocol
+  repeated in the launch message.
 - **NEXT (iteration 2, in order):**
-  1. If the batch was in flight at interruption: VERIFY it — pytest (10× for the
-     #46 flake), ruff F=0, `git diff` scope = the allowed files, spot-check the
+  1. LAUNCH the batch per the committed spec, then VERIFY it — pytest (10× for
+     the #46 flake), ruff F=0, `git diff` scope = the allowed files, spot-check the
      #42 mask/shift expression against BOTH single-notch constants + the #41
      name parity + TODO tails; then the NAP tail + bookkeeping commit.
   2. Check `.opencode/proposals/{approved,commented}/` for maintainer moves —
