@@ -2,6 +2,56 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-10 (autonomous session 5) — #43 LANDED + verified (kb_env consolidation)
+- **No interrupted work at start:** clean tree, top commit `46c8b39` (s4 bookkeeping),
+  NAP current. Maintainer asleep (`<|autonom|>` run) — no new maintainer message
+  beyond the standing notes (Task tool not `opencode run`; explorer = Q3 with
+  scope discipline; observe the nudge mechanism while working WIP items).
+- **Nudge observation (maintainer task) — PARTIAL evidence:** the `ctx:` line
+  reached this session's first message with the OWN session id
+  (`ses_f75d238f9ffed…`, `CTX=notAvailable` = designed fresh-session readout) and
+  the per-session read is GENUINE (self-gauge cross-check `CTX=38447 (32%)`
+  vs. injected line, own sid, no db-error). The ladder itself (50/70/80/90/5k
+  rungs from `tool.execute.after`) has NOT fired in this session yet — needs a
+  session past 50 %; still pending the "forced high-readout nudge" production
+  evidence (TODO #30/#31 tails).
+- **#43 LANDED + planner-verified (`1fd669c` + `6238e47` + `95cce52`):** spec in
+  `handover_task.md` (three shape-classes restated from verified reads; hard
+  invariants: tests-only, verbatim bodies, 434 unchanged, FakeFST untouched).
+  Worker `worker_Q4_120K` via the Task tool. Chosen shape: `tests/kb_helpers.py`
+  (plain `build/down/up/hold_keys/mock_control_handlers`, prepend-mode import —
+  NO sys.path tweak needed) + conftest fixtures `kb_env_ns`/`kb_env_mouse`/
+  `kb_env_plain` (verbatim moves, shape-doc docstrings). Planner verification:
+  pytest **434/434 (1 known #10 warning)**, ruff **F=0**, DoD grep clean (no
+  local `def kb_env`/helper defs in the six files), fixture bodies spot-checked
+  VERBATIM vs. the originals I read pre-spec, `git show --stat` scope = the
+  expected 10 files only (zero production). Entry status tail in TODO.md
+  (LANDED, shapes named); entry NOT closed (the documented-preference maintainer
+  note stays his).
+- **Task-tool summary collision — REPEAT (third time):** the result channel
+  overwrote `handover_task_to_planner.md` with the raw `<task_result>` dump
+  post-commit; restored via `git checkout --`. Standing note: do this after
+  EVERY Task-tool run (it is now a confirmed systemic behavior, not a fluke —
+  candidate for a maintainer-side plugin/config fix, recorded here).
+- **Worker discipline note (good):** the Q4 worker caught its own bulk-rename
+  substring-collision mid-run (two-stage rename token) and recorded it in
+  agent_feedback (`95cce52`) — no residual damage found in the planner's diff
+  spot-checks.
+- **#3 DELEGATED (spec committed in this block's commit):** WIKI is IN-REPO
+  (`WIKI.md`, 256 lines; README 196; SPEC_FEATURES 326) → full #3 scope
+  actionable. Spec in `handover_task.md`: the §2 (5 items) + §4 (#5,#6,#7,#9,
+  #10,#11,#12,#13,#14,#15) decided fixes, code-verify-first rule, docs-only
+  diff, §3 undocumented features explicitly OUT of scope (residual note keeps
+  #3 open). Worker `worker_Q4_120K` via the Task tool (launched after this
+  block's commit). If the worker dies: verify per the #43 verification
+  recipe (tree, gate, diff scope, summary-file restore via `git checkout --`).
+- **NEXT after this block:** verify #3 on return (gate + diff scope + per-item
+  code-verification in the summary + summary-file restore), bookkeeping commit;
+  then the maintainer-call bundle is the only open work (unchanged: #41 fix
+  approval, #42/#43-preference/#44 semantics, post-restart nudge observation)
+  — if none may proceed autonomously, consider a NEW-issue sweep (explorer,
+  strict scope) or stopping with a full NAP.
+
 ## 2026-09-10 (autonomous session 4) — #39 closed + T2 #33 build launched (Task tool era)
 - **#39 CLOSED (planner-verified):** the smoke-test cycle ran clean — session 3
   closed with an `action: restart` line and the loop restarted THIS session with
@@ -222,14 +272,15 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
      the control-combination window verified clean except the #1 combo overlap
      (extended into #1). The audit goal is substantially complete — remaining
      work is maintainer-call (fix semantics) + docs + the behavior batch.
-4. **Maintainer calls accumulated (bundle ≤3, session-4 state):**
-    (1) **#41 fix approval** (recommended: singular call at `fst_manager.py:578`
-    + 2 test refs — mechanical, ready);
-    (2) **the audit batch semantics** — #42 (multi-notch wheel gating: keep
-    single-notch equality vs. generalize to `mouseData >> 16` magnitudes),
-    #43 (`kb_env` dedup — test-only refactor, effectively pre-approved, no call
-    needed if it stays behavior-neutral), #44 (stale-focus KeyError: degrade to
-    defaults vs. user-visible error — the fix changes observable error behavior);
+4. **Maintainer calls accumulated (bundle ≤3, session-5 state):**
+     (1) **#41 fix approval** (recommended: singular call at `fst_manager.py:578`
+     + 2 test refs — mechanical, ready);
+     (2) **the audit batch semantics** — #42 (multi-notch wheel gating: keep
+     single-notch equality vs. generalize to `mouseData >> 16` magnitudes),
+     #43 — **LANDED as pre-approved (session 5, `1fd669c`, behavior-neutral)** —
+     remaining maintainer note: documented preference if per-file fixtures are
+     preferred instead; #44 (stale-focus KeyError: degrade to defaults vs.
+     user-visible error — the fix changes observable error behavior);
     (3) **post-restart nudge observation** — after the next maintainer restart,
     the first `kind:"nudge"` evidence line in `.opencode/plugin.log` closes the
     #30/#31 production evidence (the maintainer's own task covers it).
