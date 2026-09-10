@@ -56,6 +56,27 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   sweep + the hot-path grep map — a follow-up skim of those 16 is cheap
   insurance (fold into 3b or a later run); its spec line counts were stale
   (miscounted) but the two-pass rule held.
+- **Audit 3b LANDED + planner-verified (`b9c7db5` + hash-fill `1978be1`):** the
+  Q3 explorer (again, strict scope). Findings: **TODO #44** (stale/unknown focus
+  name → uncaught KeyError in `apply_focus_groups`/`apply_start_args_by_focus_name`
+  — the config is reloaded *before* the lookup; three uncaught propagation paths:
+  win32 hot path via `check_control_actions`→`control_toggle_pause`, GUI
+  toggle-pause, CLI menu reload) — planner-verified the core claim:
+  `fst_keyboard.py:386` is a bare `multi_focus_dict[focus_name]` index with no
+  membership guard, and `update_focus_groups` (`:393`→`load_config`) replaces
+  the dict wholesale before the lookup, so a renamed/removed focus group between
+  the last `Focus_Task` match and the lookup raises. **EXTENDED #1** (overlap
+  rule, correct — not a new entry): `check_for_combination` (`:906-912`) feeds
+  `convert_to_vk_code`'s implicit-None result straight into
+  `get_real_key_press_state` — planner-verified as a genuine #1 overlap (one
+  general vk-resolution site). The 3a residual 16 files: 5 full reads (clean),
+  11 structural-only (def-maps + zero-hit smell sweep + window-symbol greps +
+  helper-dup check = exactly the six #43 files) — **zero additional findings**.
+  Verification: pytest 434/434 + ruff F=0 (planner re-ran). Deviation: the 85 %
+  line hit before all 16 were fully read (5 full / 11 structural, mitigated).
+  The audit (standing goal) is now substantially COMPLETE — hot-path + tests
+  covered; remaining = the maintainer calls (#41/#42/#43/#44 semantics) + #34
+  docs + the #1/#7/#8/#9 behavior batch.
 - TODO housekeeping: numbering header bumped to "start at #42"; #39 closed;
   #40 endpoint-cap call reduced to a low-priority config rename (the maintainer
   swapped the explorer to Q3 — the 256K-named gemma endpoint is no longer used
@@ -195,22 +216,26 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
        landed, leads (a)/(c) confirmed + extended-into #41/#1 only, hot-path gap
        map complete, verification green. Residual: a skim pass over the 16 test
        files the explorer budget-skipped (cheap insurance — fold into 3b).
-   (b) the `apply_focus_groups` focus-dict access + the CONSTANTS
-    control-combination candidates the dead worker was checking when it died.
-    Worker choice: the explorer (`worker_explorer_Q3_120K_mtp`) or
-    `worker_Q4_120K` via the **Task tool** (the session-3 CLI mechanic is
-    DEPRECATED — subagent_depth 2 works); strict scope: hot-path windows only,
-    findings checkpointed to TODO.md IMMEDIATELY (IDs from **#44**), gauge-check
-    every ~2 reads.
-4. **Maintainer calls accumulated (bundle ≤3):** #41 fix approval (recommended:
-    singular call at `fst_manager.py:578` + 2 test refs); #40 endpoint-cap
-    residual (reduced: rename/remove the 128k-capped "256K"-named gemma agent —
-    LOW priority, the explorer no longer uses it); `subagent_depth: 2` is
-    **APPLIED** (session 4 — the Task tool works; the CLI mechanic is
-    DEPRECATED). New post-build observation duty: after the next restart,
-    confirm the first `kind:"nudge"` evidence line in `.opencode/plugin.log`
-    (the #30/#31 production evidence — the maintainer's own nudge-observation
-    task covers it).
+   (b) ~~the `apply_focus_groups` focus-dict access + the CONSTANTS
+     control-combination candidates~~ — **DONE (session 4, `b9c7db5`):** #44
+     landed (the focus-dict KeyError — the dead worker's lead, now evidenced),
+     the control-combination window verified clean except the #1 combo overlap
+     (extended into #1). The audit goal is substantially complete — remaining
+     work is maintainer-call (fix semantics) + docs + the behavior batch.
+4. **Maintainer calls accumulated (bundle ≤3, session-4 state):**
+    (1) **#41 fix approval** (recommended: singular call at `fst_manager.py:578`
+    + 2 test refs — mechanical, ready);
+    (2) **the audit batch semantics** — #42 (multi-notch wheel gating: keep
+    single-notch equality vs. generalize to `mouseData >> 16` magnitudes),
+    #43 (`kb_env` dedup — test-only refactor, effectively pre-approved, no call
+    needed if it stays behavior-neutral), #44 (stale-focus KeyError: degrade to
+    defaults vs. user-visible error — the fix changes observable error behavior);
+    (3) **post-restart nudge observation** — after the next maintainer restart,
+    the first `kind:"nudge"` evidence line in `.opencode/plugin.log` closes the
+    #30/#31 production evidence (the maintainer's own task covers it).
+    Residuals (low priority): #40 endpoint-cap rename (the 256K-named gemma
+    agent is unused by the explorer now); `subagent_depth: 2` is **APPLIED**
+    (session 4 — the Task tool works; the CLI mechanic is DEPRECATED).
 5. #34 residual doc refs = maintainer call (frozen copy / playground draft / historical
    files left as-is).
 6. Delegation sizing lessons: (a) the 27B Q4 worker needs >40 min for a build of this
