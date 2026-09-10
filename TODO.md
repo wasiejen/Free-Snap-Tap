@@ -229,6 +229,12 @@ reenabled, that is the call.
 - **Status:** OPEN — APPROVED (maintainer 260910-1252); docs-only, not a maintainer
   call. Delegation-ready — scheduled for looprun 2 iteration 2 (the iteration-1
   approved-fix batch takes the delegation lane first).
+- **Status tail:** PARTIAL (2026-09-10) — WIKI [Configuration] chunk landed (multi-focus
+  names + multiline `:` continuation, both code-verified); all §3 features were
+  code-verified before the session hit the context stop line — the remaining docs
+  (invocations sections, extra start args, numpad combos, vk-0 key strings, README list)
+  are NOT yet written. Full per-feature verification notes (ready to write from) are in
+  `.opencode/handover_task_to_planner.md`; re-run the gate on the final chunk.
 
 ## 46. Flaky test: `test_crossover_not_taken_on_low_roll` — timing/order-dependent (2026-09-10)
 
