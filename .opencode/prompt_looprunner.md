@@ -11,6 +11,7 @@ restart / pause / stop. You do NO repo work, NO planning, NO interpretation.
 - The task prompt is EXACTLY this text - do not deviate from it:
 
 "
+### XXX make autnonom an option instead as stating it as an always true fact
 You are running in '<|autonom|>' Mode - so no direct questions to the maintainer
 possible mid-run, and you will be automatically restarted by the Looprunner agent
 on stopping. So stop early if needed. The Looprunner is instructed to print out
