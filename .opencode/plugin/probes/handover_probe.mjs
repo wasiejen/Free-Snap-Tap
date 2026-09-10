@@ -1,11 +1,13 @@
 // =============================================================================
 // Persistent offline probe for .opencode/plugin/handover_v2.4.ts (v2.5 — the
-// de-peek build: native session-gated context gauge on node:sqlite, TODO.md
-// #30/#35). REBUILT 2026-09-10 (continuation 2): the pre-rebuild probe
-// (v2.2.1 era) targeted the DELETED handover.ts, the retired
-// experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
-// all void with the shell gauge. PERMANENT repo tooling: RE-RUN, never rebuild
-// — exception: the plugin's hook surface changes.
+// de-peek build: native session-gated context gauge, TODO.md #30/#35;
+// backend chain node:sqlite → bun:sqlite → spawn-sqlite3, TODO #37).
+// REBUILT 2026-09-10 (continuation 2) + EXTENDED 2026-09-10 (#37 S7 backend
+// chain section): the pre-rebuild probe (v2.2.1 era) targeted the DELETED
+// handover.ts, the retired experimental.chat.system.transform hook, and the
+// fake-$-shell S4 shapes — all void with the shell gauge. PERMANENT repo
+// tooling: RE-RUN, never rebuild — exception: the plugin's hook surface
+// changes.
 //
 // EXACT RUN COMMAND (from the repo root, PowerShell 7 — this IS the run
 // command, do not rediscover anything):
@@ -16,10 +18,19 @@
 //     Node 24+ line): native TypeScript type-stripping (the .ts plugin is
 //     imported directly, no compile step, no flags, no bun) AND flag-free
 //     built-in `node:sqlite` (the probe BUILDS its temp fixture DBs with
-//     DatabaseSync — NO python, NO sqlite3.exe, NO live DB anywhere in the
-//     probe). One MODULE_TYPELESS_PACKAGE_JSON warning on stderr is expected
-//     and harmless (`.opencode/package.json` has no "type" field and must not
+//     DatabaseSync — NO python, NO live DB anywhere in the probe; the S7
+//     backend-chain section additionally exercises the spawn backend
+//     END-TO-END with the REAL maintainer-placed sqlite3.exe — READ-ONLY
+//     URIs against the sandbox fixtures, never the live db). One
+//     MODULE_TYPELESS_PACKAGE_JSON warning on stderr is expected and
+//     harmless (`.opencode/package.json` has no "type" field and must not
 //     gain one — that would change the plugin's module context).
+//   - the probe runs under NODE, so the chain backends that need a different
+//     host (bun:sqlite) are exercised by FORCING them via the core's
+//     setBackends hook: backend 2's ADAPTER shape is verified with a
+//     unit-mock module (the real bun:sqlite API was verified separately
+//     against the system bun 1.4.2 — host proof 2, see the worker summary),
+//     and backend 3 is verified end-to-end with the real exe.
 //   - the gauge's source in EVERY S4/S6 shape is a temp fixture sqlite DB
 //     built by this probe itself (opencode-like schema per the T1 spec fact 2:
 //     `session`(id, time_updated, model JSON) + `message`(session_id,
@@ -71,6 +82,28 @@
 //      every readout / parseWindow cases (256K, 210K, 1.5M, 120K_MTP, no-match,
 //      non-string) / parseModelId (JSON id / plain / malformed / empty) /
 //      setDbPath+getDbPath global plumbing with explicit-path override
+//   S7 backend chain (11) — the #37 chain IS contract: each backend is
+//      FORCED via setBackends([...]) and verified against the sandbox
+//      fixtures (the list is cleared/restored between sections):
+//      (29) node:sqlite forced → byte-identical readout + fields
+//      (30) bun:sqlite forced, module ABSENT on the node host → db-error
+//           NAMING the backend, no throw
+//      (31) failed import is memoized — NOT re-tried on subsequent fires
+//           (per-process cache; importAttemptsForTest counter)
+//      (32) bun:sqlite ADAPTER shape via a unit-mock module:
+//           Database(path, {readonly:true,timeout:2500}) + PRAGMA exec +
+//           prepare().get() ×2 (ordered) + close; readout byte-identical
+//      (33) unit-mock bun:sqlite no-row (get() → null, bun's no-row value)
+//           → no-total form byte-identical
+//      (34-36) spawn-sqlite3 forced, END-TO-END with the REAL exe on the
+//           fixtures: ok / unknown-window / no-total — all byte-identical
+//      (37) full chain, missing db → db-error naming the DEEPEST failing
+//           backend (spawn-sqlite3), notAvailable form
+//      (38) fallback: a working backend whose module later fails falls
+//           through to the next backend (spawn ok); the failed import is
+//           not re-tried (attempts +1 total)
+//      (39) hook restore: getBackends() back to the default chain order,
+//           setDbPath/getDbPath plumbing intact, read byte-identical
 //   S5 hygiene (5): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==3, chatmsg==8, gauge==3, event==0); the
@@ -81,8 +114,8 @@
 //      listing + git status, before vs after).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S5=5  →  "PROBE handover: 33/33 PASS", exit
-//   code 0. Anything else with THIS file = behavior drift or broken
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S5=5  →  "PROBE handover: 45/45 PASS",
+//   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
 // =============================================================================
@@ -223,7 +256,7 @@ const MISSING_DB = path.join(SANDBOX, "missing_fx.db"); // never created — the
 
 // the core — SAME module instance the plugin imports (same resolved file), so
 // setDbPath below steers the plugin's chat.message read to the fixtures.
-const { readGauge, formatGauge, parseWindow, parseModelId, setDbPath, getDbPath } =
+const { readGauge, formatGauge, parseWindow, parseModelId, setDbPath, getDbPath, setBackends, getBackends, DEFAULT_BACKENDS, setImportForTest, clearImportForTest, importAttemptsForTest } =
   await import(new URL("../../ctxgauge/gauge.mjs", import.meta.url).href);
 
 // the plugin, loaded from the REAL repo path (Node 24 strips the TS types)
@@ -577,9 +610,220 @@ check(
   );
 }
 
+// ------------------------------------------------------------------ S7 backend chain (11) — the #37 chain IS contract
+//
+// The chain: node:sqlite → bun:sqlite → spawn-sqlite3, first success wins,
+// per-process cached. The probe host is NODE, so bun:sqlite is exercised by
+// FORCING it (module absent → the named db-error path; adapter shape → a
+// unit-mock module) and spawn-sqlite3 END-TO-END with the REAL maintainer-
+// placed sqlite3.exe (read-only URIs on the sandbox fixtures). setBackends
+// clears/restores the restriction between sections; the core's cache is
+// keyed by db path and invalidated by setDbPath/setBackends.
+
+// The unit-mock of the bun:sqlite API surface (the REAL API was verified
+// separately against the system bun 1.4.2 — host proof 2): it records every
+// call so check 32 can assert the adapter's exact shape.
+class MockBunDatabase {
+  constructor(p2, opts) {
+    MOCK_LOG.push({ op: "construct", path: p2, opts: opts ? { ...opts } : undefined });
+  }
+  exec(sql) {
+    MOCK_LOG.push({ op: "exec", sql });
+  }
+  prepare(sql) {
+    MOCK_LOG.push({ op: "prepare", sql });
+    return {
+      get() {
+        if (String(sql).includes("tokens.total")) return { sid: "ses_fx_ok", model: JSON.stringify({ id: "probe-model-256K_MTP" }), total: 12345, output: 2345 };
+        return { id: "ses_fx_ok" };
+      },
+    };
+  }
+  close() {
+    MOCK_LOG.push({ op: "close" });
+  }
+}
+const MOCK_LOG = [];
+
+// 29 — backend 1 forced: the readout forms are chain-invariant (byte-identical)
+{
+  setBackends(["node:sqlite"]);
+  const r = await readGauge(FX_OK);
+  check(
+    "29",
+    "S7",
+    "chain/node:sqlite (forced): FX_OK byte-identical readout + fields (chain-invariant form)",
+    formatGauge(r) === "SESSION=ses_fx_ok CTX=10000 (3%) REM=246000" && r.ok === true && r.kind === "ok" && r.sid === "ses_fx_ok" && r.modelId === "probe-model-256K_MTP" && r.total === 12345 && r.output === 2345 && r.ctx === 10000 && r.window === 256000,
+    JSON.stringify(r),
+  );
+}
+
+// 30 — backend 2 forced, module ABSENT on the node host → db-error NAMING the
+//      backend (the production-diagnosability contract), no throw
+{
+  setBackends(["bun:sqlite"]);
+  let threw = false;
+  let r;
+  try {
+    r = await readGauge(FX_OK);
+  } catch {
+    threw = true;
+  }
+  check(
+    "30",
+    "S7",
+    "chain/bun:sqlite (forced, module absent on the node host): db-error naming the backend, no throw, notAvailable form",
+    !threw && r.ok === false && r.kind === "db-error" && r.sid === "unknown" && typeof r.error === "string" && r.error.startsWith("bun:sqlite ") && formatGauge(r) === "SESSION=unknown CTX=notAvailable",
+    JSON.stringify(r),
+  );
+}
+
+// 31 — per-process cache: a failed import is memoized, NOT re-tried on
+//      subsequent fires (the plugin host fires repeatedly)
+{
+  const a0 = importAttemptsForTest("bun:sqlite");
+  await readGauge(FX_OK);
+  await readGauge(FX_OK);
+  const a1 = importAttemptsForTest("bun:sqlite");
+  check("31", "S7", "per-process cache: failed bun:sqlite import NOT re-tried on subsequent fires (attempts unchanged)", a1 === a0, `attempts ${a0} -> ${a1}`);
+}
+
+// 32 — backend 2's ADAPTER shape via a unit-mock module (the real bun:sqlite
+//      API was verified separately against the system bun 1.4.2 — host proof
+//      2): the adapter must drive Database(path, {readonly:true,timeout:2500})
+//      + the busy_timeout PRAGMA + prepare().get() ×2 (ordered) + close, and
+//      the readout must be byte-identical to backend 1's form.
+{
+  MOCK_LOG.length = 0;
+  setImportForTest("bun:sqlite", { Database: MockBunDatabase });
+  const r = await readGauge(FX_OK);
+  const construct = MOCK_LOG.find((l) => l.op === "construct");
+  const execs = MOCK_LOG.filter((l) => l.op === "exec");
+  const prepares = MOCK_LOG.filter((l) => l.op === "prepare");
+  const closes = MOCK_LOG.filter((l) => l.op === "close");
+  check(
+    "32",
+    "S7",
+    "unit-mock bun:sqlite: adapter drives Database(path,{readonly:true,timeout:2500}) + PRAGMA exec + prepare().get() x2 (ordered) + close; readout byte-identical",
+    formatGauge(r) === "SESSION=ses_fx_ok CTX=10000 (3%) REM=246000" && r.ok === true && r.ctx === 10000 && r.window === 256000 &&
+      construct !== undefined && construct.path === FX_OK && construct.opts !== undefined && construct.opts.readonly === true && construct.opts.timeout === 2500 &&
+      execs.length === 1 && execs[0].sql === "PRAGMA busy_timeout = 2500;" &&
+      prepares.length === 2 && !String(prepares[0].sql).includes("tokens.total") && String(prepares[1].sql).includes("tokens.total") &&
+      closes.length === 1,
+    JSON.stringify({ r, MOCK_LOG }),
+  );
+}
+
+// 33 — unit-mock bun:sqlite, no finished step: bun's no-row value is NULL
+//      (node:sqlite's is undefined — both must read as "no row" → no-total)
+{
+  class MockBunNoStep extends MockBunDatabase {
+    prepare(sql) {
+      const s = super.prepare(sql);
+      return { get() { if (String(sql).includes("tokens.total")) return null; return { id: "ses_fx_empty" }; } };
+    }
+  }
+  setImportForTest("bun:sqlite", { Database: MockBunNoStep });
+  const r = await readGauge(FX_OK);
+  check(
+    "33",
+    "S7",
+    "unit-mock bun:sqlite no finished step (get() → null): no-total form byte-identical",
+    r.ok === false && r.kind === "no-total" && r.sid === "ses_fx_empty" && r.modelId === "" && formatGauge(r) === "SESSION=ses_fx_empty CTX=notAvailable",
+    JSON.stringify(r),
+  );
+}
+
+// 34-36 — backend 3 forced, END-TO-END with the REAL sqlite3.exe (read-only
+//      URIs on the sandbox fixtures): ok / unknown-window / no-total
+{
+  clearImportForTest("bun:sqlite");
+  setBackends(["spawn-sqlite3"]);
+  const r = await readGauge(FX_OK);
+  check(
+    "34",
+    "S7",
+    "chain/spawn-sqlite3 (forced, REAL exe end-to-end on the fixture): byte-identical readout + fields",
+    formatGauge(r) === "SESSION=ses_fx_ok CTX=10000 (3%) REM=246000" && r.ok === true && r.kind === "ok" && r.sid === "ses_fx_ok" && r.modelId === "probe-model-256K_MTP" && r.total === 12345 && r.output === 2345 && r.ctx === 10000 && r.window === 256000,
+    JSON.stringify(r),
+  );
+}
+{
+  const r = await readGauge(FX_UNKNOWN);
+  check(
+    "35",
+    "S7",
+    "spawn-sqlite3: FX_UNKNOWN byte-identical `SESSION=ses_fx_unk CTX=50` (unknown window via the real exe)",
+    formatGauge(r) === "SESSION=ses_fx_unk CTX=50" && r.ok === true && r.ctx === 50 && r.window === undefined,
+    JSON.stringify(r),
+  );
+}
+{
+  const r = await readGauge(FX_NOTAL);
+  check(
+    "36",
+    "S7",
+    "spawn-sqlite3: FX_NOTAL no-total byte-identical (M row absent via the real exe)",
+    r.ok === false && r.kind === "no-total" && r.sid === "ses_fx_empty" && formatGauge(r) === "SESSION=ses_fx_empty CTX=notAvailable",
+    JSON.stringify(r),
+  );
+}
+
+// 37 — full chain, missing db: every backend fails → db-error naming the
+//      DEEPEST failing backend (spawn-sqlite3 — the production last resort)
+{
+  setBackends([...DEFAULT_BACKENDS]);
+  const r = await readGauge(MISSING_DB);
+  check(
+    "37",
+    "S7",
+    "full chain, missing db: db-error (no throw) naming the deepest failing backend (spawn-sqlite3), notAvailable form",
+    r.ok === false && r.kind === "db-error" && r.sid === "unknown" && typeof r.error === "string" && r.error.startsWith("spawn-sqlite3 ") && formatGauge(r) === "SESSION=unknown CTX=notAvailable",
+    JSON.stringify(r),
+  );
+}
+
+// 38 — fallback: a working backend whose module LATER fails (host change)
+//      must fall through to the next backend — and the re-attempted import
+//      failure is memoized (attempts +1 exactly once across the 2 reads)
+{
+  const a0 = importAttemptsForTest("bun:sqlite");
+  setImportForTest("bun:sqlite", { Database: MockBunDatabase });
+  setBackends(["bun:sqlite", "spawn-sqlite3"]);
+  const r1 = await readGauge(FX_OK); // ok via the (mock) bun:sqlite — cached for FX_OK
+  clearImportForTest("bun:sqlite"); // the module "disappears" (real node import → fails)
+  const r2 = await readGauge(FX_OK); // bun re-import fails → falls through to spawn → ok
+  const a1 = importAttemptsForTest("bun:sqlite");
+  const r3 = await readGauge(FX_OK); // cached spawn — NO new bun import attempt
+  const a2 = importAttemptsForTest("bun:sqlite");
+  check(
+    "38",
+    "S7",
+    "fallback: working backend whose module later fails falls through to spawn (ok); failed import not re-tried (attempts +1 total)",
+    r1.ok === true && r2.ok === true && r3.ok === true && a1 === a0 + 1 && a2 === a1,
+    JSON.stringify({ r1: r1.kind, r2: r2.kind, r3: r3.kind, a0, a1, a2 }),
+  );
+}
+
+// 39 — hook restore: the default chain order is back, the setDbPath plumbing
+//      is intact, and the read is still byte-identical (the S4/S6 paths never
+//      change because of the chain machinery)
+{
+  clearImportForTest("bun:sqlite");
+  setBackends([...DEFAULT_BACKENDS]);
+  const r = await readGauge(FX_OK);
+  check(
+    "39",
+    "S7",
+    "hook restore: getBackends() back to the default chain order; setDbPath/getDbPath plumbing intact; read byte-identical",
+    JSON.stringify(getBackends()) === JSON.stringify(["node:sqlite", "bun:sqlite", "spawn-sqlite3"]) && getDbPath() === FX_OK && formatGauge(r) === "SESSION=ses_fx_ok CTX=10000 (3%) REM=246000",
+    JSON.stringify({ backends: getBackends(), dbPath: getDbPath(), r }),
+  );
+}
+
 // ------------------------------------------------------------------ S5 hygiene (5)
 
-// 29 — every sandbox plugin.log line parses as JSON (no stray/blank/garbled lines)
+// 40 — every sandbox plugin.log line parses as JSON (no stray/blank/garbled lines)
 {
   const bad = logLines().filter((l) => {
     try {
@@ -589,10 +833,10 @@ check(
       return true;
     }
   });
-  check("29", "S5", "every sandbox plugin.log line is JSON.parse-able", bad.length === 0, bad.slice(0, 3).join(" | "));
+  check("40", "S5", "every sandbox plugin.log line is JSON.parse-able", bad.length === 0, bad.slice(0, 3).join(" | "));
 }
 
-// 30 — every line <= 2000 chars with an ISO ts + a string kind
+// 41 — every line <= 2000 chars with an ISO ts + a string kind
 {
   const bad = logLines().filter((l) => {
     if (l.length > 2000) return true;
@@ -603,17 +847,17 @@ check(
       return true;
     }
   });
-  check("30", "S5", "every line <= 2000 chars, ISO ts + string kind", bad.length === 0, bad.slice(0, 3).join(" | "));
+  check("41", "S5", "every line <= 2000 chars, ISO ts + string kind", bad.length === 0, bad.slice(0, 3).join(" | "));
 }
 
-// 31 — exact kind tallies (no stray lines either): warn==2 (S1), tool.before==6
+// 42 — exact kind tallies (no stray lines either): warn==2 (S1), tool.before==6
 //      (S1 3 + S2 3), tool.after==3 (S3), chatmsg==8 (the 8 S4 fires — per fire,
 //      mismatch included), gauge==3 (db-error + parts-not-array + invalid-messageID),
 //      event==0
 {
   const tally = (k) => linesOfKind(k).length;
   check(
-    "31",
+    "42",
     "S5",
     "kind tallies exact: warn==2, tool.before==6, tool.after==3, chatmsg==8, gauge==3, event==0",
     tally("warn") === 2 && tally("tool.before") === 6 && tally("tool.after") === 3 && tally("chatmsg") === 8 && tally("gauge") === 3 && tally("event") === 0,
@@ -621,7 +865,7 @@ check(
   );
 }
 
-// 32 — zero co-appended LIVE lines: the real handover files must be byte-identical, and the
+// 43 — zero co-appended LIVE lines: the real handover files must be byte-identical, and the
 //      real plugin.log must only GROW. The LIVE session's own plugin legitimately appends its
 //      own lines while this probe runs — those are not probe writes. The probe's fingerprint
 //      is its synthetic ids (s1–s3/c1–c6/d1–d3/t1–t8/ses_fx_*/ses_other): if any appended
@@ -636,7 +880,7 @@ check(
   const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other"];
   const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`) || l.includes(`"sess":"${fid}"`)));
   check(
-    "32",
+    "43",
     "S5",
     "zero co-appended live lines: handover files byte-identical; plugin.log append-only; no probe-id lines in the appended tail",
     handoverDiff.length === 0 && monotonic && !probeWroteLive,
@@ -644,11 +888,11 @@ check(
   );
 }
 
-// 33 — zero writes outside the sandbox: .opencode listing + git status unchanged
+// 45 — zero writes outside the sandbox: .opencode listing + git status unchanged
 {
   const listingDiff = listOpencode().filter((p) => !PRE_OP_LISTING.includes(p));
   const gitChanged = gitStatus() !== PRE_GIT_STATUS;
-  check("33", "S5", "sandbox isolation: .opencode listing + git status unchanged (no new/changed files outside sandbox)", listingDiff.length === 0 && !gitChanged, `new: ${listingDiff.join(", ")}; gitChanged=${gitChanged}`);
+  check("45", "S5", "sandbox isolation: .opencode listing + git status unchanged (no new/changed files outside sandbox)", listingDiff.length === 0 && !gitChanged, `new: ${listingDiff.join(", ")}; gitChanged=${gitChanged}`);
 }
 
 // ------------------------------------------------------------------ summary

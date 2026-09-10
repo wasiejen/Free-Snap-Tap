@@ -1,27 +1,82 @@
 // =============================================================================
-// Shared context-gauge core (de-peek — TODO.md #30/#35): ONE implementation
-// imported by BOTH the handover plugin (chat.message injection,
-// .opencode/plugin/handover_v2.4.ts) and the self-peek CLI (peek.mjs).
+// Shared context-gauge core (de-peek — TODO.md #30/#35; backend chain — #37):
+// ONE implementation imported by BOTH the handover plugin (chat.message
+// injection, .opencode/plugin/handover_v2.4.ts) and the self-peek CLI
+// (peek.mjs).
 //
-// READ BACKEND — built-in `node:sqlite` (MAINTAINER RE-RULING 2026-09-10,
-// supersedes the 2026-09-09 spawn-CLI backend block): `node:sqlite`
-// (`DatabaseSync`) is flag-free on node v24.19.0 (the CLI / probe host,
-// verified). The module is imported DYNAMICALLY inside readGauge — the
-// bun-compiled opencode.exe plugin host is the KNOWN RISK (it may lack
-// `node:sqlite`): a missing/unsupported module never breaks the plugin
-// import, it just maps to kind "db-error" (the production guard — the
-// bun 1.4.2 host-proxy check + the maintainer's restart + one-shot log read
-// are the production evidence).
+// READ BACKEND CHAIN (MAINTAINER RULING 2026-09-10, TODO #37) — tried in
+// order, the FIRST SUCCESS WINS; the chosen backend is CACHED PER PROCESS
+// (keyed by db path; invalidated by setDbPath/setBackends) so the
+// repeatedly-firing plugin host does NOT re-try failed imports on every
+// fire (a failed import is memoized and re-thrown, never re-imported):
+//   1. node:sqlite   — dynamic import, DatabaseSync({ readOnly: true }).
+//                      Flag-free on the system node v24.19.0 (the CLI /
+//                      probe host, verified) and ALSO exposed by the SYSTEM
+//                      bun 1.4.2 — the 2026-09-10 host-proxy check measured
+//                      THAT host, NOT the opencode host (see the evidence
+//                      block below).
+//   2. bun:sqlite    — dynamic import, the NATIVE bun module — the best
+//                      zero-spawn hope on the bun-compiled opencode.exe
+//                      host. API facts VERIFIED 2026-09-10 against the
+//                      SYSTEM bun 1.4.2 (the spec sketch was wrong —
+//                      shape surprise, recorded in the worker summary):
+//                        - named export `Database`
+//                        - constructor option is `readonly: true` (NOT
+//                          node:sqlite's `readOnly`, NOT `readWrite`;
+//                          bun rejects unknown options — "Misspelled
+//                          option" / "bad parameter or other API misuse")
+//                        - a native `timeout` (busy-wait ms) option works
+//                          in combination with `readonly`
+//                        - `prepare().get()` returns a row object, or
+//                          NULL (not undefined like node:sqlite) on no row
+//                        - `exec("PRAGMA busy_timeout = N;")` + `close()`
+//                          work; write attempts on a readonly db throw
+//                          "attempt to write a readonly database"; a
+//                          readonly open of the LIVE WAL-mode db
+//                          (actively written by another process) works
+//                      The adapter tries `{ readonly: true, timeout }`
+//                      first and falls back to the plain `{ readonly: true }`
+//                      form on a constructor SHAPE error only (an open
+//                      error such as "unable to open database file" is
+//                      never swallowed).
+//   3. spawn-sqlite3 — the retired v1.x backend, PROVEN IN PRODUCTION under
+//                      the production bun host (maintainer-placed SQLite
+//                      CLI at .opencode/plugin/tools/sqlite3.exe — resolved
+//                      RELATIVE to this file, never a hardcoded user path).
+//                      The v1.x discipline, recovered from git history
+//                      (2cf5f33): ARGS ARRAY (no shell — no quoting
+//                      surface), the db as a READ-ONLY URI
+//                      `file:<path>/?mode=ro` (no journal write while
+//                      opencode writes concurrently), the MARKER SQL
+//                      (`M|…` / `S|…` rows — the message `data` JSON is
+//                      never fetched into JS), NO PRAGMA in the call (its
+//                      echo pollutes stdout). Timeout discipline (this
+//                      build): ONE attempt, hard 2500 ms KILL
+//                      (timeout ⇒ db-error, never a hang; no busy-retry —
+//                      the retry applies to the in-process backends only,
+//                      per the ruling).
 //
-// The DB is opened READ-ONLY (`{ readOnly: true }`) — no journal write while
-// opencode writes concurrently. Concurrency resilience (the ~2500 ms budget,
-// never throw): `PRAGMA busy_timeout = 2500` via exec (the API way) + ONE
-// retry on a busy/locked error. Any hard failure (missing file, missing
-// module, lock that beats both) returns kind:"db-error" with a capped error
-// preview — the gauge NEVER throws into a hook.
+// WHY THE CHAIN — PRODUCTION EVIDENCE (2026-09-10, maintainer restart):
+// the v2.5 node:sqlite-only core (313e83b) fails on EVERY chat.message fire
+// under the production opencode.exe (bun-compiled) host:
+//   kind:"gauge" reason:db-error preview:"sqlite-module ResolveMessage: No
+//   such built-in module: node:sqlite"
+// ⇒ NO `ctx:` line reached ANY agent in production. The opencode-baked bun's
+// capability (node:sqlite? bun:sqlite? neither?) is UNVERIFIED and lands
+// with the next maintainer restart — until then the chain degrades safely:
+// missing module ⇒ next backend; all backends failing ⇒ a db-error evidence
+// line that NAMES the failing backend (diagnosable straight from the
+// production plugin.log).
 //
-// QUERIES (json_extract in SQL — the message `data` JSON is never fetched or
-// JS-parsed; both are single-row `prepare().get()` reads):
+// NEVER-THROW (preserved across the whole chain): ANY failure in ANY backend
+// ⇒ kind:"db-error" with a capped preview that NAMES the failing backend
+// (`node:sqlite …` / `bun:sqlite …` / `spawn-sqlite3 …`). NO new `kind`
+// vocabulary, NO new gauge-failure reasons. Busy/locked on the in-process
+// backends (1+2): `PRAGMA busy_timeout = 2500` via the API + ONE retry;
+// the spawn backend keeps its own hard-timeout discipline (above).
+//
+// QUERIES — two single-row reads per read (json_extract in SQL — the message
+// `data` JSON is never fetched or JS-parsed):
 //   1. newest session:  SELECT id FROM session ORDER BY time_updated DESC LIMIT 1
 //   2. finished step:   the newest session's latest message row whose `data`
 //      carries the `"finish"` marker (json_extract of tokens.total/output;
@@ -46,7 +101,8 @@
 // guessed window).
 //
 // READOUT FORMS — the ONE string used by the CLI, the plugin's injected text,
-// and the T2 nudge text:
+// and the T2 nudge text (BYTE-IDENTICAL across the chain — the plugin and
+// peek.mjs need no change for the output):
 // - window known:      SESSION=<sid> CTX=<ctx> (<pct>%) REM=<window-ctx>
 //                       (pct = integer ctx*100//window)
 // - window unknown:    SESSION=<sid> CTX=<ctx> — nothing else (no guessed
@@ -62,23 +118,85 @@
 // newest finished message of ANOTHER session (that fallback WAS the feed bug).
 // =============================================================================
 
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
 import os from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
+const execFileAsync = promisify(execFile);
 const BUSY_TIMEOUT_MS = 2500;
+const SPAWN_TIMEOUT_MS = 2500;
+const MAX_BUFFER = 1024 * 1024;
+const THIS_DIR = dirname(fileURLToPath(import.meta.url));
 
 // The opencode.db location (fact-2 of the T1 spec, planner-verified).
 export const DEFAULT_DB_PATH = join(os.homedir(), ".local", "share", "opencode", "opencode.db");
+// The maintainer-placed SQLite CLI, resolved RELATIVE TO THIS FILE (stable
+// for the CLI cwd and the plugin import alike): .opencode/ctxgauge →
+// ../plugin/tools. NEVER deleted or moved (maintainer-placed, TODO #30/#37).
+export const DEFAULT_EXE_PATH = join(THIS_DIR, "..", "plugin", "tools", "sqlite3.exe");
+// The backend chain, in selection order (see the READ BACKEND CHAIN header).
+export const DEFAULT_BACKENDS = Object.freeze(["node:sqlite", "bun:sqlite", "spawn-sqlite3"]);
 
 // One process-wide current db path — the override lets the probe point
 // the plugin and the CLI at a temp fixture db without any file editing.
 // readGauge(p) accepts an explicit db path too (the probe's direct gauge calls).
 let dbPath = DEFAULT_DB_PATH;
+// The active backend list (setBackends = the probe's chain-restriction hook;
+// it also clears the backend cache — a restricted list changes the selection).
+let backendList = [...DEFAULT_BACKENDS];
+// Per-process cache: db path -> the last SUCCESSFUL backend name. Invalidated
+// by setDbPath and setBackends (documented ruling: invalidate on setDbPath).
+const backendCache = new Map();
+// Dynamic-import memo (per spec, per process): a rejected import is stored
+// as a failure marker and RE-THROWN — never re-imported on every fire.
+const importCache = new Map();
+const importAttemptCount = new Map();
+
 export function setDbPath(p) {
   dbPath = p;
+  backendCache.clear();
 }
 export function getDbPath() {
   return dbPath;
+}
+export function setBackends(list) {
+  backendList = Array.isArray(list) ? [...list] : [...DEFAULT_BACKENDS];
+  backendCache.clear();
+}
+export function getBackends() {
+  return [...backendList];
+}
+
+// Probe-only test hooks (the production host never calls these):
+export function setImportForTest(spec, moduleValue) {
+  importCache.set(spec, moduleValue);
+}
+export function clearImportForTest(spec) {
+  importCache.delete(spec);
+}
+export function importAttemptsForTest(spec) {
+  return importAttemptCount.get(spec) ?? 0;
+}
+
+function importModule(spec) {
+  const hit = importCache.get(spec);
+  if (hit !== undefined) {
+    if (hit !== null && typeof hit === "object" && hit.__failed) throw hit.err;
+    return hit;
+  }
+  importAttemptCount.set(spec, (importAttemptCount.get(spec) ?? 0) + 1);
+  const pr = import(spec).then(
+    (m) => m,
+    (e) => {
+      importCache.set(spec, { __failed: true, err: e });
+      throw e;
+    },
+  );
+  importCache.set(spec, pr);
+  return pr;
 }
 
 // Model id -> window. The ONLY parser — LAST marker wins, no fallback (see
@@ -108,7 +226,8 @@ export function parseModelId(raw) {
   return raw;
 }
 
-// Result shapes (one implementation shared by plugin + CLI + probe):
+// Result shapes (one implementation shared by plugin + CLI + probe —
+// UNCHANGED by the chain; the db-error `error` text now NAMES the backend):
 //   ok         : { ok:true,  kind:"ok",        sid, modelId, total, output, ctx, window }
 //   no total   : { ok:false, kind:"no-total",  sid, modelId }            // read ok, no total
 //   unreadable : { ok:false, kind:"db-error",  sid:"unknown", modelId:"", error }
@@ -139,61 +258,161 @@ const SQL_FINISHED_STEP =
   "WHERE s.id = (SELECT id FROM session ORDER BY time_updated DESC LIMIT 1) " +
   'AND m.data LIKE \'%"finish"%\' ORDER BY m.time_created DESC LIMIT 1';
 
-function attemptRead(DatabaseSync, p) {
-  let db;
-  try {
-    db = new DatabaseSync(p, { readOnly: true });
-    db.exec(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS};`);
-    const newest = db.prepare(SQL_NEWEST_SESSION).get();
-    const step = db.prepare(SQL_FINISHED_STEP).get();
-    return { newest, step };
-  } finally {
-    try {
-      db?.close();
-    } catch {
-      // best effort — the read outcome has already been captured
-    }
-  }
-}
+// The spawn backend's MARKER SQL (v1.x discipline — see the header): two
+// statements, marker-prefixed rows; an empty first result simply omits the M
+// row, so the output is never ambiguous.
+const GAUGE_SQL_MARKER =
+  "SELECT 'M', s.id, s.model, json_extract(m.data, '$.tokens.total'), json_extract(m.data, '$.tokens.output') " +
+  "FROM message m JOIN session s ON s.id = m.session_id " +
+  "WHERE s.id = (SELECT id FROM session ORDER BY time_updated DESC LIMIT 1) " +
+  "AND m.data LIKE '%\"finish\"%' ORDER BY m.time_created DESC LIMIT 1; " +
+  "SELECT 'S', id FROM session ORDER BY time_updated DESC LIMIT 1;";
 
-// Reads the db (never throws — a hard failure returns kind:"db-error").
-// Dynamic import: a host WITHOUT `node:sqlite` (the bun-compiled opencode.exe
-// risk) gets db-error instead of a broken module import.
-export async function readGauge(dbPathOverride) {
-  const p = dbPathOverride ?? dbPath;
-  let DatabaseSync;
+// ---------------------------------------------------------------------------
+// The backends — each returns the SAME raw shape:
+//   { sid: string|undefined, model: string|null, total: number|null, output: number|null }
+// and THROWS on any hard failure (the chain maps that to the named db-error).
+
+// In-process helper shared by backends 1+2: open (READ-ONLY), the busy_timeout
+// PRAGMA via the API, the two single-row reads, ONE retry on busy/locked,
+// best-effort close.
+function readApiDb(openFn) {
+  const attempt = () => {
+    let db;
+    try {
+      db = openFn();
+      db.exec(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS};`);
+      const newest = db.prepare(SQL_NEWEST_SESSION).get();
+      const step = db.prepare(SQL_FINISHED_STEP).get();
+      return {
+        sid: typeof newest?.id === "string" && newest.id !== "" ? newest.id : undefined,
+        model: step != null && typeof step.model === "string" ? step.model : null,
+        total: step?.total == null ? null : Number(step.total),
+        output: step?.output == null ? null : Number(step.output),
+      };
+    } finally {
+      try {
+        db?.close();
+      } catch {
+        // best effort — the read outcome has already been captured
+      }
+    }
+  };
   try {
-    DatabaseSync = (await import("node:sqlite")).DatabaseSync;
-  } catch (e) {
-    return { ok: false, kind: "db-error", sid: "unknown", modelId: "", error: `sqlite-module ${String(e).slice(0, 120)}` };
-  }
-  if (typeof DatabaseSync !== "function") {
-    return { ok: false, kind: "db-error", sid: "unknown", modelId: "", error: "sqlite-missing" };
-  }
-  let newest, step;
-  try {
-    ({ newest, step } = attemptRead(DatabaseSync, p));
+    return attempt();
   } catch (e) {
     if (/busy|locked/i.test(String(e?.message ?? e))) {
       // busy/locked on the first attempt (opencode writes concurrently) and
       // the busy_timeout budget exhausted: retry ONCE before giving up.
-      try {
-        ({ newest, step } = attemptRead(DatabaseSync, p));
-      } catch (e2) {
-        return { ok: false, kind: "db-error", sid: "unknown", modelId: "", error: String(e2?.message ?? e2).slice(0, 120) };
+      return attempt();
+    }
+    throw e;
+  }
+}
+
+// Backend 1 — node:sqlite (DatabaseSync, readOnly). Flag-free on the system
+// node v24.19.0; also exposed by the SYSTEM bun 1.4.2 (NOT the opencode host).
+async function readNodeSqlite(p) {
+  const mod = await importModule("node:sqlite");
+  const DatabaseSync = mod?.DatabaseSync;
+  if (typeof DatabaseSync !== "function") throw new Error("DatabaseSync export missing");
+  return readApiDb(() => new DatabaseSync(p, { readOnly: true }));
+}
+
+// Backend 2 — bun:sqlite (the native bun module). API facts verified on the
+// system bun 1.4.2 — see the READ BACKEND CHAIN header (the spec's
+// `{ create: false, readWrite: false }` sketch was WRONG for bun 1.4.2:
+// the option is `readonly`, unknown options are rejected).
+async function readBunSqlite(p) {
+  const mod = await importModule("bun:sqlite");
+  const Database = mod?.Database ?? (typeof mod?.default === "function" ? mod.default : mod?.default?.Database);
+  if (typeof Database !== "function") throw new Error("Database export missing");
+  const open = () => {
+    try {
+      return new Database(p, { readonly: true, timeout: BUSY_TIMEOUT_MS });
+    } catch (e) {
+      // shape-surprise fallback: a host whose bun rejects the combined
+      // options falls back to the plain readonly form — but ONLY for a
+      // constructor shape error; an OPEN error (missing file, …) propagates.
+      if (/bad parameter|api misuse|misspelled/i.test(String(e?.message ?? e))) return new Database(p, { readonly: true });
+      throw e;
+    }
+  };
+  return readApiDb(open);
+}
+
+// Backend 3 — spawn-sqlite3 (the v1.x discipline, recovered from git
+// history 2cf5f33; see the READ BACKEND CHAIN header for the full rationale).
+const uriRo = (p) => `file:${p.replace(/\\/g, "/")}?mode=ro`;
+// The sqlite3 CLI prints NULL as an EMPTY field (and honors a NULLVALUE of
+// "NULL" only if configured) — treat both as "no value" → no-total. (The
+// v1.x `Number("") → 0` would have misread that as total 0 — hardened here.)
+const parseMarkerNumber = (v) => {
+  if (typeof v !== "string" || v === "" || v === "NULL") return null;
+  const n = Number(v);
+  return Number.isNaN(n) ? null : n;
+};
+async function readSpawnSqlite3(p) {
+  if (!existsSync(DEFAULT_EXE_PATH)) throw new Error(`exe-missing ${DEFAULT_EXE_PATH}`);
+  let res;
+  try {
+    res = await execFileAsync(DEFAULT_EXE_PATH, [uriRo(p), GAUGE_SQL_MARKER], {
+      timeout: SPAWN_TIMEOUT_MS, // hard KILL — a stuck child becomes a db-error, never a hang
+      maxBuffer: MAX_BUFFER,
+      encoding: "utf8",
+    });
+  } catch (e) {
+    const isTimeout = e?.killed === true || /timed?\s*out/i.test(String(e?.message ?? ""));
+    const detail = isTimeout ? `timeout ${SPAWN_TIMEOUT_MS}ms kill` : String(e?.stderr ?? "").trim() || String(e?.message ?? e);
+    throw new Error(String(detail).replace(/\r?\n+/g, " | ").slice(0, 106));
+  }
+  let sid;
+  let model = null;
+  let total = null;
+  let output = null;
+  for (const line of String(res.stdout).split(/\r?\n/)) {
+    if (line.startsWith("S|")) {
+      sid = line.slice(2) || undefined;
+    } else if (line.startsWith("M|")) {
+      const parts = line.slice(2).split("|");
+      // sid | model... | total | output — total/output are the LAST two
+      // fields (a model id containing '|' is then still safe).
+      if (parts.length >= 4) {
+        sid = parts[0] || sid;
+        model = parts.slice(1, parts.length - 2).join("|") || null;
+        total = parseMarkerNumber(parts[parts.length - 2]);
+        output = parseMarkerNumber(parts[parts.length - 1]);
       }
-    } else {
-      return { ok: false, kind: "db-error", sid: "unknown", modelId: "", error: String(e?.message ?? e).slice(0, 120) };
     }
   }
-  const rawSid = newest?.id;
-  const sid = typeof rawSid === "string" && rawSid !== "" ? rawSid : "unknown";
-  const total = step?.total == null ? Number.NaN : Number(step.total);
-  if (Number.isNaN(total)) {
-    return { ok: false, kind: "no-total", sid, modelId: step ? parseModelId(step.model) : "" };
+  return { sid, model, total, output };
+}
+
+const BACKENDS = {
+  "node:sqlite": readNodeSqlite,
+  "bun:sqlite": readBunSqlite,
+  "spawn-sqlite3": readSpawnSqlite3,
+};
+
+function orderedBackendsFor(p) {
+  const cached = backendCache.get(p);
+  if (cached !== undefined && backendList.includes(cached)) {
+    // The last successful backend is tried FIRST (the per-process cache);
+    // the rest follow the chain order.
+    return [cached, ...backendList.filter((n) => n !== cached)];
   }
-  const output = step.output == null || Number.isNaN(Number(step.output)) ? 0 : Number(step.output);
-  const modelId = parseModelId(step.model);
+  return [...backendList];
+}
+
+// raw (any backend) -> the shared result shapes.
+function gaugeFromRaw(raw) {
+  const sid = typeof raw.sid === "string" && raw.sid !== "" ? raw.sid : "unknown";
+  const total = raw.total == null ? Number.NaN : Number(raw.total);
+  if (Number.isNaN(total)) {
+    return { ok: false, kind: "no-total", sid, modelId: parseModelId(raw.model) };
+  }
+  const output = raw.output == null || Number.isNaN(Number(raw.output)) ? 0 : Number(raw.output);
+  const modelId = parseModelId(raw.model);
   return {
     ok: true,
     kind: "ok",
@@ -203,5 +422,37 @@ export async function readGauge(dbPathOverride) {
     output,
     ctx: total - output,
     window: parseWindow(modelId),
+  };
+}
+
+// Reads the db (NEVER throws — a hard failure returns kind:"db-error").
+// Walks the backend chain in order (the per-path cached backend first); the
+// FIRST SUCCESS wins and is cached for the rest of the process. Every
+// backend failure is collected; if ALL fail, the result names the DEEPEST
+// failing backend (the last in the chain — the production last resort).
+export async function readGauge(dbPathOverride) {
+  const p = dbPathOverride ?? dbPath;
+  const failures = [];
+  for (const name of orderedBackendsFor(p)) {
+    const impl = BACKENDS[name];
+    if (impl === undefined) {
+      failures.push({ name, error: "unknown-backend" });
+      continue;
+    }
+    try {
+      const raw = await impl(p);
+      backendCache.set(p, name);
+      return gaugeFromRaw(raw);
+    } catch (e) {
+      failures.push({ name, error: String(e?.message ?? e).replace(/\r?\n+/g, " | ").slice(0, 106) });
+    }
+  }
+  const last = failures.length > 0 ? failures[failures.length - 1] : { name: "chain", error: "no backends configured" };
+  return {
+    ok: false,
+    kind: "db-error",
+    sid: "unknown",
+    modelId: "",
+    error: `${last.name} ${last.error}`.slice(0, 120),
   };
 }

@@ -259,6 +259,18 @@ reenabled, that is the call.
   session — `planner_Q4_120K`'s opencode.jsonc permission block denies
   `.opencode/handover_planner.md` (copy-paste from the worker profiles; the older
   `planner_Q3_120k_mtp` block does not have it) — flagged to the maintainer.
+- **2026-09-10 (autonomous session 1 — build LANDED):** the backend fallback chain is
+  implemented in the shared core (`node:sqlite` → `bun:sqlite` → spawn `sqlite3.exe`,
+  per-process cache, readout forms byte-identical, never-throw preserved; NO plugin
+  change needed) + probe extended to 45/45 (S7 forces each backend; the REAL
+  sqlite3.exe end-to-end on fixtures) + host proofs: system node peek green, system
+  bun 1.4.2 proxy green (all three backends on the live WAL db; bun:sqlite API
+  verified as `{readonly:true,timeout:N}` — NOT the spec sketch's `readWrite` — and
+  `get()`→`null` no-row). Suite 434/434 + ruff F=0. The worker (Q4_120K) built it and
+  was killed by the planner's 40-min CLI timeout at the final renumber step; the
+  planner finished (check-ID fix + final verifications). PRODUCTION EVIDENCE PENDING
+  maintainer restart (a `ctx: SESSION=<own sid>` line must reach the planner session
+  with NO db-error line). NOT closed.
 
 ## 33. v2.5 auto-nudge ladder build (folded in: the former TOP-of-file note) — STATUS: APPROVED — NEXT BUILD
 
