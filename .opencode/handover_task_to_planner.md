@@ -93,7 +93,7 @@ confirming the #44 gap: no test exercises an absent focus name anywhere.
 ## Commit
 `TODO.md` (new #44 + #1 evidence extension) + this summary in one commit (no push).
 Subject: "Audit 3b: focus-dict + combos hot windows + 3a skim — TODO #44, extend #1 (findings only)".
-HASH: `<filled in the follow-up commit — see git log, top commit = this run>`
+HASH: `b9c7db5` (TODO.md + summary); follow-up commit carries this hash line.
 
 ## Final gauge (verbatim — actually run)
 SESSION=ses_f75f08a56ffe4ji6i08BcpsWwm CTX=102091 (85%) REM=17909
