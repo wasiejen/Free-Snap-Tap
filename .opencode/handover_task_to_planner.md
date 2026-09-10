@@ -59,7 +59,8 @@ needed. Fixture names taken from the spec's suggestion (`kb_env_ns` /
 ## Commit
 Code + `TODO.md` (#43 status tail, entry NOT closed — the documented-preference
 note stays the maintainer's) + this summary file, one commit. No push.
-HASH: (see `git log` — subject "Consolidate kb_env fixtures + helpers into conftest + kb_helpers (#43)")
+HASH: `1fd669c` — "Consolidate kb_env fixtures + helpers into conftest + kb_helpers (#43)"
+(10 files changed, 379 insertions(+), 440 deletions(-)).
 
 ## Deliberately NOT done
 - Did NOT close TODO #43 (spec: status tail only; the MAINTAINER NOTE on
@@ -84,4 +85,4 @@ HASH: (see `git log` — subject "Consolidate kb_env fixtures + helpers into con
   numbers). No new TODO entries — the refactor surfaced no new discrepancies.
 
 ## Final gauge (verbatim — actually run)
-SESSION=ses_f75cdf7d4ffeHi0ELJg1EZeqsY CTX=64174 (53%) REM=55826
+SESSION=ses_f75cdf7d4ffeHi0ELJg1EZeqsY CTX=71353 (59%) REM=48647
