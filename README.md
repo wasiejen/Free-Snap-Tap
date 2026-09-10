@@ -43,7 +43,15 @@ For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
     - double left mouse click or middle mouse click will open the config file
 13. **[Crosshair]** `<arg>-crosshair` or `<arg>-crosshair=*pixel delta x*,*pixel delta y*`
     - displays a simple crosshair as overlay and can be controlled on a per game basis
-  
+14. **[Extra Start Arguments]** `<arg>` arguments that control runtime behavior (usable as default or per focus group)
+    - `-delay` / `-nodelay`: re-enable / disable the delays (arguments are processed in order, later overrides earlier)
+    - `-exec_one_macro`: only the first macro triggered by one real key event is played
+    - `-debug_numpad`: enables the ALT+NUM1..NUM8 numpad debug combos
+    - `-always_active`: the default groups stay active when no focus app matches
+    - `-tray_icon` / `-hide_cmd_window`: start the GUI loop with a tray icon / keep the console window hidden after start-up
+    - `-save_dir=*dir*` / `-backup_root_dir=*dir*`: the directories used by the `make_backup` / `restore_backup` invocations
+    - **deprecated:** `-focusapp=` prints a warning and exits with error code 1 (use `<focus>` in the config file instead)
+   
 Function Documentation V1.2.0 now in the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
 
 ## Example for a config file:

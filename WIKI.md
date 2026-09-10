@@ -42,6 +42,15 @@ It interpretes the real input (of keyboard and mouse) and according to defined r
 - **Return to Menu:** Press the `ALT + PAGE_DOWN` key to return to the menu.
 You can change the control key combinations in the py file under # Control key combination.
 
+### [Numpad debug combos]
+
+- only active with the start argument `<arg>-debug_numpad`
+- `ALT + NUM1` to `ALT + NUM4` toggle the internal debug outputs DEBUG, DEBUG2, DEBUG3 and DEBUG4
+- `ALT + NUM5` prints the internal representation of all groups
+- `ALT + NUM6` is unassigned (reserved)
+- `ALT + NUM7` prints the real pressed-key states
+- `ALT + NUM8` prints all pressed-key states (real and simulated)
+
 ### [Status Indicator - simple overlay for in game control]
 
 - `<arg>-status_indicator=*size in pixel*`
@@ -267,11 +276,102 @@ Every key event supports prefixes **prefix/modifier**
 - `|stop_all_repeat()` - will stop all active repeats
 - `|release_all_keys()` - will release all currently simulated keys that are pressed
 
+#### [Function results in general]
+
+The functions of the following sections are resolved by the same suffix evaluation as [Suffix/Evaluation] - usable on any key event, on trigger groups and on constraints:
+- a bool result acts as a constraint (True plays, False blocks)
+- an int result is used as a delay (in ms) after the key event
+- a None result passes (True)
+- any other result prints "! Constraint ... not valid" and passes
+
+#### [Variable system]
+
+- variables are kept in memory only - they are not saved with the config or the save file and start empty on every start of the program
+- **integer variables**:
+  - `|(set('name', *value*))`: set the variable *name* to *value* - a True/False *value* is stored as 1/0; without *value* the variable is set to 1
+  - `|(is_set('name'))`: evaluates to True iff the variable holds a value other than 0 - unknown names evaluate to False
+  - `|(get('name'))`: evaluates to the current value as an int (usable as a delay) - an unknown name is created with 0 and evaluates to 0
+  - `|(check('name', *value*))`: evaluates to True iff the variable matches *value* - an int *value* is compared for equality, a list/tuple checks membership; unknown names evaluate to False
+    - a *value* that is neither an int nor a list/tuple makes the check pass (True)
+  - `|(incr('name'))`: increase the variable by 1 - an unknown name is created at 1
+  - `|(decr('name'))`: decrease the variable by 1 - an unknown name is created at 0
+  - `|(clear('name'))`: set the variable to 0
+  - `|(clear_all_variables())`: remove ALL integer variables
+- **text variables** (for text values, in contrast to the integer variables):
+  - `|(set_var('name', 'text'))`: store the text under *name*
+  - `|(get_var('name'))`: evaluates to the stored text - an unknown name is created with the text "None" and returns it
+- `|(print_all_variables())`: print all integer variables to the console
+
+#### [Typing]
+
+- `|(type('text'))`: type the given text - all currently pressed modifier keys are released before typing starts
+- `|(write('text'))`: alias of `type`
+- `|(release_modifier())`: release all currently pressed modifier keys (left/right Shift, Ctrl, Alt) without typing anything
+
+#### [Toasts]
+
+- requires GUI mode (status indicator and/or tray icon) - in headless mode these invocations raise an error
+- `|(show_message('text', *display time in s*, *font size*))`: show a toast message in the status indicator - defaults: 3 s display time, font size 12, green background with white text
+- `|(show_timer('text', ...))`: same as `show_message`, the default background is yellow
+- `|(remove_toast('text'))`: remove the toast with the given text - the `immediately` parameter (default 0) is accepted but currently ignored
+- `|(remove_all_toasts())`: remove all toasts - the `immediately` parameter (default 0) is accepted but currently ignored
+
+#### [Mouse control]
+
+- `|(scroll_up(*amount*))`, `|(scroll_down(*amount*))`: send vertical wheel events (up / down)
+- `|(scroll_right(*amount*))`, `|(scroll_left(*amount*))`: send horizontal wheel events (right / left)
+- `|(mouse_move_abs(*x*, *y*))`: move the mouse to the absolute screen position (*x*, *y*)
+- `|(mouse_move(*dx*, *dy*))`: move the mouse relatively by (*dx*, *dy*)
+- `|(mouse_get_pos())`: evaluates to the current mouse position as a tuple - the position is additionally copied to the clipboard as text
+- `|(mouse_save_to_var('name'))`: save the current mouse position under *name*
+- `|(mouse_move_to_var('name'))`: move the mouse to the position saved under *name* - evaluates to False (blocks the key event) if the variable is unknown or does not hold a 2-tuple position
+
+#### [Mouse keys]
+
+- the mouse buttons and the scroll wheels can be used as keys in tap groups, rebinds and macros with these key strings (vk 1 to 7):
+  - `left_mouse` / `ml` / `lm` (vk 1, left button)
+  - `right_mouse` / `mr` / `rm` (vk 2, right button)
+  - `middle_mouse` / `mm` (vk 3, middle button)
+  - `mouse_x1` / `mx1` (vk 4)
+  - `mouse_x2` / `mx2` (vk 5)
+  - `scroll_vertical` / `scroll_y` (vk 6) and `scroll_horizontal` / `scroll_x` (vk 7)
+- the press/release state of a scroll key is derived from the sign of the wheel delta - a multi-notch wheel event keeps the state of the first notch
+- playing the press of the vertical scroll key sends one notch up, its release one notch down
+
+#### [Clipboard]
+
+- `|(copy_to_clipboard('text'))`: copy the text to the clipboard - a toast confirms the copy
+- `|(paste())`: evaluates to the current clipboard text - usable as a text value; used bare (not as a value) it passes like any other non-bool/non-int result
+
+#### [File operations]
+
+- relative file paths are resolved against the program's working directory
+- `|(save_into_file('text', *time stamp*, *mode*, *file path*))`: write the text to the file as "*time stamp*: *text*" - defaults: file `output.txt`, mode `'w'` (overwrite), time stamp `get_time()`
+- `|(append_to_file('text', ...))`: same as `save_into_file`, mode `'a'` (append)
+- `|(empty_file('file path'))`: truncate the file - default `output.txt`
+
+#### [Misc]
+
+- `|(cli('text'))`: print the text to the console
+- `|(date())`: evaluates to the current date as a "YYMMDD" string
+- `|(date_time())`: evaluates to the current date and time as a "YYMMDD-HHMM" string
+- `|(get_time())`: evaluates to the current time as an int of milliseconds since the epoch
+- `|(make_backup(*save dir*, *backup root dir*))` and `|(restore_backup(*save dir*, *backup root dir*))`:
+  - `make_backup` copies the save dir into a timestamped backup folder named `save-YYMMDD-HHMMSS` (a counter is appended when a backup of the same second already exists)
+  - `restore_backup` replaces the save dir with the newest backup
+  - both print to the console and show a toast (so they need GUI mode for the toast part)
+  - the default directories are the `-save_dir=` / `-backup_root_dir=` start arguments - without them the call fails with a FileNotFoundError
+- `|(clear_console())`: clear the console window
+- `|(is_repeat_active('name'))`: (an evaluation, not an invocation) evaluates to True iff the repeat handle with the given name is still active - unknown names evaluate to False
+
 #### [None / empty '' key event for invocations]
 
 with V1.1.2 a new key_event the `None` or just empty key event can be used in conjunction with evalations and invocations.
 - `None|(stop_all_repeat())` or just `|(stop_all_repeat())`
 - it has no default delay - a None/empty ke is a pure timing marker unless given explicit delays (e.g. `None|10|5`)
+- the same applies to the key strings `none`, `NONE`, `_`, `reset` and `delay` - they all map to the same vk 0 key event:
+  - the key event is never played (there is no physical key behind it)
+  - constraints, evaluations and invocations on it are still checked/evaluated as usual
 
 ```bash
 # on escape all repeated keys will be stopped, all currently pressed simulated keys will be released and the map seqence resetted
@@ -333,6 +433,18 @@ Everything else should be put in the config file and then can be applied on a pe
 - `<arg>-status_indicator=*size in pixel*`: a dot overlay that changes based on being active to green and on incative to red
 - `<arg>-crosshair` displays a simple crosshair as overlay and can be controlled on a per game basis in the center of the screen
 - `<arg>-crosshair=*pixel delta x*,*pixel delta y*`: changes centerpoint according the delta x and y values in pixels
+
+- start arguments are processed in the order they appear - a later argument overrides an earlier one (e.g. `-nodelay` followed by `-delay` keeps the delays active)
+
+- `<arg>-delay`: re-enable the delays - the delays are active on default, so this is only meaningful after an earlier `-nodelay`
+- `<arg>-exec_one_macro`: of all macros triggered by one real key event only the FIRST is played
+- `<arg>-debug_numpad`: enable the numpad debug combos (see [Numpad debug combos])
+- `<arg>-always_active`: if no focus app matches, the default groups stay active instead of the filter being paused - the status indicator shows blue while in this default-active state
+- `<arg>-tray_icon`: start the GUI loop with a tray icon (with or without status indicator) - the tray menu offers Open config / Reload / Toggle Pause / Return to Menu / Toggle Indicator / Toggle Crosshair / Toggle Console / Exit
+- `<arg>-hide_cmd_window`: keep the console window hidden after start-up - it can be re-shown via the tray menu "Toggle Console"
+- `<arg>-save_dir=*dir*`: the save dir used by the `make_backup` / `restore_backup` invocations
+- `<arg>-backup_root_dir=*dir*`: the backup root dir used by the `make_backup` / `restore_backup` invocations
+- `<arg>-focusapp=*name*`: **DEPRECATED** - prints a warning and exits the program with error code 1 (the focus app is defined in the config file via `<focus>` instead)
 
 **(deprecated)**
 Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_tap.exe)

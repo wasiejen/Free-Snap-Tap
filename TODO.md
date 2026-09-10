@@ -230,11 +230,23 @@ reenabled, that is the call.
   call. Delegation-ready — scheduled for looprun 2 iteration 2 (the iteration-1
   approved-fix batch takes the delegation lane first).
 - **Status tail:** PARTIAL (2026-09-10) — WIKI [Configuration] chunk landed (multi-focus
-  names + multiline `:` continuation, both code-verified); all §3 features were
-  code-verified before the session hit the context stop line — the remaining docs
-  (invocations sections, extra start args, numpad combos, vk-0 key strings, README list)
-  are NOT yet written. Full per-feature verification notes (ready to write from) are in
-  `.opencode/handover_task_to_planner.md`; re-run the gate on the final chunk.
+   names + multiline `:` continuation, both code-verified); all §3 features were
+   code-verified before the session hit the context stop line — the remaining docs
+   (invocations sections, extra start args, numpad combos, vk-0 key strings, README list)
+   are NOT yet written. Full per-feature verification notes (ready to write from) are in
+   `.opencode/handover_task_to_planner.md`; re-run the gate on the final chunk.
+- **Status tail:** LANDED (2026-09-10, resume run) — all remaining §3 docs written from
+   the verified notes: WIKI new invocation sections ([Function results in general],
+   [Variable system], [Typing], [Toasts], [Mouse control], [Mouse keys], [Clipboard],
+   [File operations], [Misc]), WIKI [Numpad debug combos] (ALT+NUM1..NUM8, NUM6
+   unassigned), WIKI [None/empty '' key event] extended to the vk-0 strings
+   `none`/`NONE`/`_`/`reset`/`delay`, WIKI [Start Arguments] extended (-delay,
+   -exec_one_macro, -debug_numpad, -always_active, -tray_icon, -hide_cmd_window,
+   -save_dir=, -backup_root_dir=, deprecated -focusapp= + argument order note), README
+   feature list item 14 [Extra Start Arguments]. The four confirmed-behavior flags are
+   documented as-is (headless toast crash, ignored `immediately` param, unassigned
+   ALT+NUM6, `check()` non-int/non-list value passing). Gate: `pytest -q` = 436 passed,
+   1 known warning; `ruff check --select F .` = 0 findings; docs-only diff.
 
 ## 46. Flaky test: `test_crossover_not_taken_on_low_roll` — timing/order-dependent (2026-09-10)
 
