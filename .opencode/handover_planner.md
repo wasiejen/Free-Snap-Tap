@@ -37,20 +37,48 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   substring-collision mid-run (two-stage rename token) and recorded it in
   agent_feedback (`95cce52`) — no residual damage found in the planner's diff
   spot-checks.
-- **#3 DELEGATED (spec committed in this block's commit):** WIKI is IN-REPO
-  (`WIKI.md`, 256 lines; README 196; SPEC_FEATURES 326) → full #3 scope
-  actionable. Spec in `handover_task.md`: the §2 (5 items) + §4 (#5,#6,#7,#9,
-  #10,#11,#12,#13,#14,#15) decided fixes, code-verify-first rule, docs-only
-  diff, §3 undocumented features explicitly OUT of scope (residual note keeps
-  #3 open). Worker `worker_Q4_120K` via the Task tool (launched after this
-  block's commit). If the worker dies: verify per the #43 verification
-  recipe (tree, gate, diff scope, summary-file restore via `git checkout --`).
-- **NEXT after this block:** verify #3 on return (gate + diff scope + per-item
-  code-verification in the summary + summary-file restore), bookkeeping commit;
-  then the maintainer-call bundle is the only open work (unchanged: #41 fix
-  approval, #42/#43-preference/#44 semantics, post-restart nudge observation)
-  — if none may proceed autonomously, consider a NEW-issue sweep (explorer,
-  strict scope) or stopping with a full NAP.
+- **#3 DELEGATED → LANDED + planner-verified:** spec in `handover_task.md`
+  (§2×5 + §4×10 decided fixes, code-verify-first, docs-only, §3 OUT of scope).
+  FIRST LAUNCH (`worker_Q4_120K`) DIED at the first request:
+  `context_length_exceeded ... context shift is disabled` (500) — the
+  worker-prompt request sits near opencode's ASSUMED window (no `limit` field
+  in `opencode.jsonc`; the "-120K" is only in the name). RETRY with the RAW
+  `agent_Q4_120K` (empty `prompt` → smaller initial request, same model/perms)
+  + a compact task message that repeats the protocol → **LANDED**
+  (`6c215b1` + adjacent `fcc3add`). PLANNER VERIFICATION (maintainer asked to
+  "check the work" — see his message below): gate green 3× consecutive
+  (434/434 + 1 known warning; ruff F=0), commit scope exactly the allowed
+  files, per-item code claims spot-checked TRUE (reset path `:996-1014` —
+  interrupt commented out + "reset failed" print; WIKI lines 30/33/84/
+  102/192-193/203/260 carry the rewrites incl. the adjacent #45 fixes).
+  New tracked file: **WIKI.md** (was untracked — stale `wiki.md` .gitignore
+  entry; the maintainer removed that line himself, see below; I committed it
+  as `28e1865`).
+  - **MAINTAINER IS ACTIVE (his `handover_maintainer.md`, untracked by design):**
+    (1) "i removed the gitignore for todo.md" = the `wiki.md` line (his words,
+    his change — recorded in `28e1865`); (2) "last worker Agent_Q4_120K Task —
+    #3 retry compacted 2 times without ending its own turn ... before writing
+    into todo.md. check the work." — the committed state IS complete (docs +
+    TODO tails + summary committed BEFORE the compaction; the compaction hit
+    the final-message phase). Work checked per this block. Left the
+    maintainer's file untracked (his scratch).
+  - **Protocol slips in the #3 run (minor, recorded):** the committed summary
+    ends WITHOUT the final verbatim gauge line (it only appeared in the
+    task-result message: `CTX=41709 (34%) REM=78291` — genuine per-session
+    read, cross-checkable); the summary labels the worker "worker_Q4_120K"
+    though the raw `agent_Q4_120K` ran.
+  - **Summary-file collision — FOURTH time** (raw run too): restored via
+    `git checkout --` post-run.
+- **Nudge observation update:** this session crossed 50 % (gauge `CTX=61889
+  (51%)`) with NO nudge arriving so far — consistent with the #33 design
+  (nudge queued as the next turn AT IDLE; continuous tool work never idles).
+  Verdict point: end of this session / next user message.
+- **NEXT after this block:** #46 (flaky `test_crossover_not_taken_on_low_roll`
+  — pre-approved test-only; deterministic wait instead of the fixed
+  `asyncio.sleep(0.02)`) as the next WIP item; then the maintainer-call bundle
+  (#41 fix approval, #42/#43-preference/#44 semantics, post-restart nudge
+  observation) is the only remaining open work — with the maintainer active,
+  the closing message should surface that bundle for his calls.
 
 ## 2026-09-10 (autonomous session 4) — #39 closed + T2 #33 build launched (Task tool era)
 - **#39 CLOSED (planner-verified):** the smoke-test cycle ran clean — session 3
