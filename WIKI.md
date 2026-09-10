@@ -300,6 +300,7 @@ The functions of the following sections are resolved by the same suffix evaluati
 - **text variables** (for text values, in contrast to the integer variables):
   - `|(set_var('name', 'text'))`: store the text under *name*
   - `|(get_var('name'))`: evaluates to the stored text - an unknown name is created with the text "None" and returns it
+- text and integer variables share the same name space - a name stored with `set_var` is visible to the integer accessors (`is_set` evaluates to True for a stored text, since a text is never equal to 0)
 - `|(print_all_variables())`: print all integer variables to the console
 
 #### [Typing]
@@ -337,6 +338,7 @@ The functions of the following sections are resolved by the same suffix evaluati
   - `scroll_vertical` / `scroll_y` (vk 6) and `scroll_horizontal` / `scroll_x` (vk 7)
 - the press/release state of a scroll key is derived from the sign of the wheel delta - a multi-notch wheel event keeps the state of the first notch
 - playing the press of the vertical scroll key sends one notch up, its release one notch down
+- playing the press of the horizontal scroll key sends one notch right, its release one notch left
 
 #### [Clipboard]
 
