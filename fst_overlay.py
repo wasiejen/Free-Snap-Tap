@@ -10,6 +10,8 @@ from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont
 
 import ctypes
 
+from fst_data_types import ConfigError
+
 import logging
 # Use __name__ to automatically label logs with the filename
 logger = logging.getLogger(__name__)
@@ -205,10 +207,16 @@ class GUI_Manager(QWidget):
         self._fst.open_config_file()
 
     def reload_from_file(self):
-        self._fst.reload_from_file()
+        try:
+            self._fst.reload_from_file()
+        except ConfigError as error:
+            self._fst.toast_callback(str(error), 5, 12, "rgba(200, 40, 40, 200)", "white")
 
     def toggle_pause(self):
-        self._fst.control_toggle_pause()
+        try:
+            self._fst.control_toggle_pause()
+        except ConfigError as error:
+            self._fst.toast_callback(str(error), 5, 12, "rgba(200, 40, 40, 200)", "white")
 
     def return_to_menu(self):
         self._fst.control_return_to_menu()
@@ -588,7 +596,10 @@ class StatusOverlay(QWidget):
 
     # --- Menu Actions ---
     def toggle_pause(self):
-        self._fst.control_toggle_pause()
+        try:
+            self._fst.control_toggle_pause()
+        except ConfigError as error:
+            self._fst.toast_callback(str(error), 5, 12, "rgba(200, 40, 40, 200)", "white")
 
     def return_to_menu(self):
         self._fst.control_return_to_menu()
@@ -604,7 +615,10 @@ class StatusOverlay(QWidget):
         self._fst.open_config_file()
 
     def reload_from_file(self):
-        self._fst.reload_from_file()
+        try:
+            self._fst.reload_from_file()
+        except ConfigError as error:
+            self._fst.toast_callback(str(error), 5, 12, "rgba(200, 40, 40, 200)", "white")
 
     def close_overlay(self):
         self.close()

@@ -11,7 +11,7 @@ from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_d
 import pprint
 from os import startfile
 
-from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro
+from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro, ConfigError
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
 from fst_manager import Input_State_Manager, Config_Manager
@@ -57,6 +57,8 @@ class FST_Keyboard():
         self._output_manager = Output_Manager(self)
         self._state_manager = Input_State_Manager(self)
         self._cli_menu = CLI_menu(self)
+
+        self._warned_config_errors = set()
 
         self.toast_callback = None # Will hold bridge.trigger_toast
         self.timer_callback = None # Will hold bridge.trigger_timer
@@ -148,9 +150,9 @@ class FST_Keyboard():
                 if 0 <= key_int < 256:
                 # if 0 < key_int < 256:
                     return key_int
-            except ValueError as error:
-                print(error)
-                raise KeyError
+                raise ConfigError(f"key '{key}' does not resolve to a vk code", str(key))
+            except ValueError:
+                raise ConfigError(f"key '{key}' does not resolve to a vk code", str(key))
 
     def initialize_groups_from_presorted_lines(self):
         '''
@@ -264,6 +266,9 @@ class FST_Keyboard():
             for alias, group in self._config_manager.alias_hr:
                 self._key_group_by_alias[alias] = convert_key_string_group(group)
 
+        except ConfigError as error:
+            print(f"ERROR: {error} \n -> in Alias: {group}")
+            raise
         except Exception as error:
             print(f"ERROR: {error} \n -> in Alias: {group}")
             raise Exception(error)
@@ -276,6 +281,9 @@ class FST_Keyboard():
                     key = self.convert_to_vk_code(key_string)
                     keys.append(Key(key, key_string=key_string))
                 self._tap_groups.append(Tap_Group(keys))
+        except ConfigError as error:
+            print(f"ERROR: {error} \n -> in Tap Group: {group}")
+            raise
         except Exception as error:
             print(f"ERROR: {error} \n -> in Tap Group: {group}")
             raise Exception(error)
@@ -335,6 +343,9 @@ class FST_Keyboard():
             for rebind in self._rebinds_dict.values():
                 self._rebinds.append(rebind)
 
+        except ConfigError as error:
+            print(f"ERROR: {error} \n -> in Rebind: {rebind}")
+            raise
         except Exception as error:
             print(f"ERROR: {error} \n -> in Rebind: {rebind}")
             raise Exception(error)
@@ -366,6 +377,9 @@ class FST_Keyboard():
             for macro in self._macros_dict.values():
                 self._macros.append(macro)
 
+        except ConfigError as error:
+            print(f"ERROR: {error} \n -> in Macro: {macro}")
+            raise
         except Exception as error:
             print(f"ERROR: {error} \n -> in Macro: {macro}")
             raise Exception(error)
@@ -383,6 +397,8 @@ class FST_Keyboard():
     def apply_focus_groups(self, focus_name = ''):
         default_lines = self._focus_manager.default_group_lines
         if focus_name != '':
+            if focus_name not in self._focus_manager.multi_focus_dict:
+                raise ConfigError(f"focus group '{focus_name}' not found - renamed or removed in config?", focus_name)
             _, focus_group_lines = self._focus_manager.multi_focus_dict[focus_name]
         else:
             _, focus_group_lines = [],[]
@@ -907,7 +923,13 @@ class FST_Keyboard():
         all_active = True
         for vk_code in vk_codes:
             if isinstance(vk_code, str):
-                vk_code = self.convert_to_vk_code(vk_code)
+                try:
+                    vk_code = self.convert_to_vk_code(vk_code)
+                except ConfigError as error:
+                    if vk_code not in self._warned_config_errors:
+                        self._warned_config_errors.add(vk_code)
+                        print(f"[FST] {error}")
+                    return False
             all_active = all_active and self._state_manager.get_real_key_press_state(vk_code)
         return all_active
 
@@ -922,7 +944,13 @@ class FST_Keyboard():
                 self.control_exit_program()
                     # Toggle paused/resume if the DELETE combination is pressed
             elif self.check_for_combination(CONSTANTS.TOGGLE_ON_OFF_Combination):
-                self.control_toggle_pause()
+                try:
+                    self.control_toggle_pause()
+                except ConfigError as error:
+                    print(f"[FST] {error}")
+                    self.update_args_and_groups('')
+                    self._arg_manager.WIN32_FILTER_PAUSED = False
+                    self._arg_manager.MANUAL_PAUSED = False
 
         # 'RESET ON ESC AND ALT+TAB'
         # if self.check_for_combination(['esc']):
@@ -1018,6 +1046,8 @@ class FST_Keyboard():
         self.update_focus_groups()
         # needs to be done after reloading of file or else it will not have the actual data
         if focus_name != '':
+            if focus_name not in self._focus_manager.multi_focus_dict:
+                raise ConfigError(f"focus group '{focus_name}' not found - renamed or removed in config?", focus_name)
             focus_start_arguments, _ = self._focus_manager.multi_focus_dict[focus_name]
         else:
             focus_start_arguments, _ = [],[]

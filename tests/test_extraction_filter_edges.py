@@ -13,7 +13,7 @@ from unittest.mock import MagicMock
 import pytest
 from pynput import keyboard as pynput_keyboard
 
-from fst_data_types import Key_Event, Key_Group, Macro
+from fst_data_types import Key_Event, Key_Group, Macro, ConfigError
 from fst_keyboard import FST_Keyboard
 
 from kb_helpers import build, down
@@ -28,14 +28,15 @@ class TestConvertToVkCode:
         kb = kb_env_ns.kb
         assert kb.convert_to_vk_code('255') == 255
 
-    def test_out_of_range_numeric_string_falls_to_implicit_none(self, kb_env_ns):
-        # suspected bug #2 (COVERAGE_TRIAGE.md): "300" slips past both branches
+    def test_out_of_range_numeric_string_raises_config_error(self, kb_env_ns):
+        # "300" is a valid int but out of the 0-256 vk range -> ConfigError
         kb = kb_env_ns.kb
-        assert kb.convert_to_vk_code('300') is None
+        with pytest.raises(ConfigError):
+            kb.convert_to_vk_code('300')
 
-    def test_unknown_non_numeric_key_raises_key_error(self, kb_env_ns):
+    def test_unknown_non_numeric_key_raises_config_error(self, kb_env_ns):
         kb = kb_env_ns.kb
-        with pytest.raises(KeyError):
+        with pytest.raises(ConfigError):
             kb.convert_to_vk_code('zz')
 
 
@@ -64,12 +65,12 @@ class TestConfigExceptionPaths:
 
     def test_tap_group_with_unknown_key_raises(self, kb_env_ns):
         kb = kb_env_ns.kb
-        with pytest.raises(Exception):
+        with pytest.raises(ConfigError):
             build(kb, taps=[['(TAP_1)', ['zz']]])
 
     def test_rebind_with_unknown_key_raises(self, kb_env_ns):
         kb = kb_env_ns.kb
-        with pytest.raises(Exception):
+        with pytest.raises(ConfigError):
             build(kb, rebinds=[['(r)', [['zz'], 'b']]])
 
 

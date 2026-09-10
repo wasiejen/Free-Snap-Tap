@@ -11,6 +11,7 @@ import datetime
 
 from fst_keyboard import FST_Keyboard
 from fst_manager import CONSTANTS
+from fst_data_types import ConfigError
 from fst_overlay import GUI_Manager, set_console_visibility, ToastBridge
 from PySide6.QtWidgets import QApplication
 
@@ -151,9 +152,13 @@ if __name__ == "__main__":
 
     set_console_visibility(False)  # Hide console window at startup
 
-    fst_keyboard = FST_Keyboard()
-    fst_keyboard.set_sys_start_arguments(sys.argv[1:] if len(sys.argv) > 1 else [])
-    fst_keyboard.update_args_and_groups(startup=True)
+    try:
+        fst_keyboard = FST_Keyboard()
+        fst_keyboard.set_sys_start_arguments(sys.argv[1:] if len(sys.argv) > 1 else [])
+        fst_keyboard.update_args_and_groups(startup=True)
+    except ConfigError as error:
+        print(f"[FST] {error}")
+        sys.exit(1)
 
     logic = MainLogic(fst_keyboard)
     logger.info("--- logic gestartet ---")

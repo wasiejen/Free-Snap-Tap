@@ -14,6 +14,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from fst_data_types import ConfigError  # noqa: E402
 from fst_keyboard import FST_Keyboard  # noqa: E402
 from fst_manager import CONSTANTS  # noqa: E402
 from fst_manager import Input_State_Manager  # noqa: E402
@@ -34,8 +35,9 @@ def convert_to_vk_code(key):
             key_int = int(key)
             if 0 <= key_int < 256:
                 return key_int
+            raise ConfigError(f"key '{key}' does not resolve to a vk code", str(key))
         except ValueError:
-            raise KeyError(key)
+            raise ConfigError(f"key '{key}' does not resolve to a vk code", str(key))
 
 
 class FakeFST(SimpleNamespace):
