@@ -170,6 +170,10 @@ reenabled, that is the call.
 - **Scope:** `README.md`, the WIKI pages, `SPEC_FEATURES.md` (source of the decisions).
 - **Status:** OPEN — default-approved docs work (NOT a maintainer call — just gets done).
 
+## 45. (closed 2026-09-10) Doc errors found adjacent to the #3 rework: WIKI invocation "evaluate to False" claim, WIKI `+a, +b` rebind notation, README "he first" (2026-09-10)
+
+One-line record: fixed in the adjacent commit of the #3 docs rework — WIKI [Suffixes] function-invocation description corrected (invocations always evaluate to True and the suffixed key_event is still played — all invocations return True in `constraint_evaluation`, cf. WIKI's own "ALL INVOCATIONS will always result in True"); WIKI [Rebinds] example `+a, +b` → `+a : +b` (the 2nd of the two Key:Key rebinds, `fst_keyboard.py` Key-pair expansion); README config comment "before he first <focus>" → "before the first <focus>".
+
 ## 40. Explorer run #1 output unreliable — no entries on disk, no commit, fabricated gauge, endpoint 128k ≠ 256K (2026-09-10)
 
 - **Problem / evidence:** the first REAL exploration run (`worker_explorer_jill_gemma_256K_mtp`,

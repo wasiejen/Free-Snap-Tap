@@ -49,7 +49,7 @@ Function Documentation V1.1.3 now in the [Wiki](https://github.com/wasiejen/Free
 ## Example for a config file:
 
 ```bash
-# default groups are defined before he first <focus> and will always be 
+# default groups are defined before the first <focus> and will always be 
 # active and also applied if a focus app is recognised before the focus groups will be apllied on top
 
 #<arg>-crossover=40       # anti_cheat measure - press and release will be switched with 40% propability
