@@ -1,4 +1,4 @@
-# Free Snap Tap: Universal Keyboard Snap Tap with Tap Groups, Rebinds (Key Replacements), Macros (Aliases) and custom adjustable delay for each key.
+# Free Snap Tap: Universal Keyboard Snap Tap with Tap Groups, Rebinds (Key Replacements), Macros, Aliases and custom adjustable delay for each key.
 
 **Works as of V0.8.0 without triggering Valve Anti Cheat (if delays are not set too short :-) )**
 
@@ -26,7 +26,7 @@ For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
 4. **[Macro_Sequences]** `trigger_group :: key_group 1 : key_group 2 : ...`
     - multiple macro key groups playable in sequence with the same trigger key on repeated reactivation of the same macro trigger.
     - can be reseted by itself or other rebinds or macros via invocation `|(*name of macro*)`
-5. **[Delays]** `ke|100` supported for Tap_Groups in general and in Macros in general and on a per key basis with option to be random in min, max limits
+5. **[Delays]** `ke|100` supported in Macros in general and on a per key basis with option to be random in min, max limits; for Tap_Groups only the global start arguments `-tapdelay=` / `-nodelay` apply (per-key delays are not valid there)
     - `ke|10|5` will use a random delay between 5 and 10 ms
 6. **[Focus Apps]** activates and deactivates the functionality based on set focus app names. Multiple focus app defineable with different settings and Tap Groups, Rebinds and Macros for each focus app
 7. **[Configuration]** everything can be configurated in a single text file
@@ -44,7 +44,7 @@ For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
 13. **[Crosshair]** `<arg>-crosshair` or `<arg>-crosshair=*pixel delta x*,*pixel delta y*`
     - displays a simple crosshair as overlay and can be controlled on a per game basis
   
-Function Documentation V1.1.3 now in the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
+Function Documentation V1.2.0 now in the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
 
 ## Example for a config file:
 
@@ -143,10 +143,10 @@ v : suppress              # v will always suppressed
 (autosprint_on_dc) +shift|(dc()<900) : +suppress
 (focus_toggle) p: ^alt
 
-# repetiton of scanning on v every 6.5 s
-# eval/invocation in sequence: if previous True evaluate the next
-# |(!) is sme aas |(False) and will result in that the rebind will never be played but the invocations were already executed
-# so no replacement of the key and the original key input will not be supressed
+# repetition of scanning on v every 6.5 s
+# |(!) is the same as |(False): suffixes are checked left to right and stop at the first False,
+# so the invocations placed before |(!) are already executed while the rebind itself is not played
+# -> no replacement of the key and the original key input is not suppressed
 (repeat_scan) +v|(tr("+v")>500)|(stop_repeat('<scan>'))|(!) : +v 
 (repeat_scan) -t|(toggle_repeat('<scan>', 6500))|(!) : -t
 (repeat_scan) -v|(reset_repeat('<scan>'))|(!) : -v
@@ -216,7 +216,7 @@ Snap Tapping is a feature that enhances your keyboard's responsiveness by priori
 
 ## Installation
 
-1. **Install Python:** Ensure Python 3.6 or higher is installed on your system. You can download it from [python.org](https://www.python.org/).
+1. **Install Python:** Ensure Python 3.12 is installed on your system. You can download it from [python.org](https://www.python.org/).
 2. **Install `pynput and pygetwindow` Package:** Open your terminal or command prompt and run:
 
 ```bash
