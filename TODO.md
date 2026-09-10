@@ -304,13 +304,15 @@ reenabled, that is the call.
     ⇒ 120k window). Shared gauge core / peek window read needs a fix before self-peek
     numbers are trusted; the true readout here was ≈`CTX=58271 (~49%) REM≈62k`.
 
-## 38. (TEST) explorer smoke test — jill gemmaQ4-256K first launch (2026-09-10)
+## 38. (closed 2026-09-10) (TEST) explorer smoke test — jill gemmaQ4-256K first launch
 
-- **Problem / evidence:** added by `worker_explorer_jill_gemmaQ4_256K` during its first launch to verify the explorer agent profile works (planner task: smoke test — NOT a real issue).
-- **Outcome (goal):** this entry exists in TODO.md; the planner verifies and closes it into `todo_records.md`.
-- **Acceptance:** planner confirms the entry landed + committed, then closes it.
-- **Scope:** `TODO.md` only.
-- **Status:** OPEN — smoke test, planner closes after verification.
+CLOSED (planner verified, 2026-09-10): smoke test PASSED — the explorer read the spec,
+appended this entry, committed ONLY `TODO.md` (`452de1a`), stopped fast (~45 s session).
+CAVEAT recorded: its final self-gauge line `CTX=14329 (11%) REM=241058` is FABRICATED —
+no finished step of its session carries that ctx, and the numbers are internally
+inconsistent for any window (14329/256k would be 5 % / REM 241671): it pattern-matched
+the required final-line format without running the command. Fast-but-dumb signal for
+the maintainer (check explorer work; the number itself is unverifiable).
 
 ## Closed entries
 
