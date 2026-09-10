@@ -9,42 +9,13 @@ input is ever emitted.
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-import pytest
-
 from fst_manager import CONSTANTS
-from fst_keyboard import FST_Keyboard
+
+from kb_helpers import build
 
 VK_A = 0x41
 VK_B = 0x42
 VK_C = 0x43
-
-
-@pytest.fixture
-def kb_env(monkeypatch):
-    kb_mock = MagicMock()
-    ms_mock = MagicMock()
-    monkeypatch.setattr('pynput.keyboard.Controller', lambda: kb_mock)
-    monkeypatch.setattr('pynput.mouse.Controller', lambda: ms_mock)
-    FST_Keyboard.TIME_DIFF = None
-    FST_Keyboard.START_TIME = None
-    keyboard = FST_Keyboard()
-    keyboard._listener = MagicMock()
-    keyboard._mouse_listener = MagicMock()
-    keyboard.arg_manager.WIN32_FILTER_PAUSED = False
-    keyboard.arg_manager.ACT_DELAY = False
-    keyboard.arg_manager.ACT_CROSSOVER = False
-    yield keyboard
-    FST_Keyboard.TIME_DIFF = None
-    FST_Keyboard.START_TIME = None
-
-
-def build(kb, rebinds=None, macros=None, taps=None, aliases=None):
-    cm = kb.config_manager
-    cm._tap_groups_hr = taps or []
-    cm._rebinds_hr = rebinds or []
-    cm._macros_hr = macros or []
-    cm._alias_hr = aliases or []
-    kb.initialize_groups_from_presorted_lines()
 
 
 def kb_msg_data(vk=VK_A, flags=0, t=1234):
@@ -55,26 +26,26 @@ class TestKeyboardWin32EventFilter:
     def patch_filter(self, kb, monkeypatch):
         monkeypatch.setattr(kb, '_win32_event_filter', MagicMock())
 
-    def test_keydown_delegates_vk_time_and_press(self, kb_env, monkeypatch):
-        kb = kb_env
+    def test_keydown_delegates_vk_time_and_press(self, kb_env_mouse, monkeypatch):
+        kb = kb_env_mouse
         self.patch_filter(kb, monkeypatch)
         kb.keyboard_win32_event_filter(256, kb_msg_data())
         kb._win32_event_filter.assert_called_once_with(VK_A, 1234, True, 0)
 
-    def test_syskeydown_counts_as_press(self, kb_env, monkeypatch):
-        kb = kb_env
+    def test_syskeydown_counts_as_press(self, kb_env_mouse, monkeypatch):
+        kb = kb_env_mouse
         self.patch_filter(kb, monkeypatch)
         kb.keyboard_win32_event_filter(260, kb_msg_data())
         kb._win32_event_filter.assert_called_once_with(VK_A, 1234, True, 0)
 
-    def test_keyup_delegates_release(self, kb_env, monkeypatch):
-        kb = kb_env
+    def test_keyup_delegates_release(self, kb_env_mouse, monkeypatch):
+        kb = kb_env_mouse
         self.patch_filter(kb, monkeypatch)
         kb.keyboard_win32_event_filter(257, kb_msg_data())
         kb._win32_event_filter.assert_called_once_with(VK_A, 1234, False, 0)
 
-    def test_llkhf_injected_flag_marks_event_simulated(self, kb_env, monkeypatch):
-        kb = kb_env
+    def test_llkhf_injected_flag_marks_event_simulated(self, kb_env_mouse, monkeypatch):
+        kb = kb_env_mouse
         self.patch_filter(kb, monkeypatch)
         kb.keyboard_win32_event_filter(256, kb_msg_data(flags=0x10))
         kb._win32_event_filter.assert_called_once_with(VK_A, 1234, True, 16)
@@ -92,8 +63,8 @@ class TestSimulatedContradiction:
     def sim_up(self, kb, vk, t):
         kb._win32_event_filter(vk, t, False, True)
 
-    def test_sim_press_of_empty_tap_group_passes(self, kb_env):
-        kb = kb_env
+    def test_sim_press_of_empty_tap_group_passes(self, kb_env_mouse):
+        kb = kb_env_mouse
         build(kb, taps=[['(TAP_1)', ['a', 'b']]])
         # fresh tap group: active key is None -> simulated key allowed
         self.sim_down(kb, VK_A, 1000)
@@ -102,29 +73,29 @@ class TestSimulatedContradiction:
         assert kb.state_manager.time_simulated[0][VK_A] == 1000
         assert kb.state_manager.time_all[0][VK_A] == 1000
 
-    def test_sim_release_of_active_tap_key_is_suppressed(self, kb_env):
-        kb = kb_env
+    def test_sim_release_of_active_tap_key_is_suppressed(self, kb_env_mouse):
+        kb = kb_env_mouse
         build(kb, taps=[['(TAP_1)', ['a', 'b']]])
         kb._tap_groups[0].update_tap_states(VK_A, True)  # active key: a
         self.sim_up(kb, VK_A, 1000)  # release of the active key
         kb._listener.suppress_event.assert_called_once_with()
 
-    def test_sim_press_of_inactive_tap_key_is_suppressed(self, kb_env):
-        kb = kb_env
+    def test_sim_press_of_inactive_tap_key_is_suppressed(self, kb_env_mouse):
+        kb = kb_env_mouse
         build(kb, taps=[['(TAP_1)', ['a', 'b']]])
         kb._tap_groups[0].update_tap_states(VK_A, True)  # active key: a
         self.sim_down(kb, VK_B, 1000)  # press of a non-active group key
         kb._listener.suppress_event.assert_called_once_with()
 
-    def test_sim_release_outside_tap_groups_not_suppressed(self, kb_env):
-        kb = kb_env
+    def test_sim_release_outside_tap_groups_not_suppressed(self, kb_env_mouse):
+        kb = kb_env_mouse
         build(kb)  # no tap groups
         self.sim_up(kb, VK_A, 1000)  # not in a tap group, not pressed
         kb._listener.suppress_event.assert_not_called()
         assert kb.state_manager.get_simulated_key_press_state(VK_A) is False
 
-    def test_sim_release_of_still_pressed_key_reaches_check(self, kb_env):
-        kb = kb_env
+    def test_sim_release_of_still_pressed_key_reaches_check(self, kb_env_mouse):
+        kb = kb_env_mouse
         build(kb)
         kb.state_manager.add_key_press_state(VK_A)
         self.sim_up(kb, VK_A, 1000)  # would release a real press
@@ -132,15 +103,15 @@ class TestSimulatedContradiction:
         kb._listener.suppress_event.assert_not_called()
         assert kb.state_manager.get_simulated_key_press_state(VK_A) is False
 
-    def test_sim_release_of_toggle_key_passes(self, kb_env):
-        kb = kb_env
+    def test_sim_release_of_toggle_key_passes(self, kb_env_mouse):
+        kb = kb_env_mouse
         build(kb)
         kb.state_manager.get_toggle_state(VK_C)  # register C as toggle key
         self.sim_up(kb, VK_C, 1000)
         kb._listener.suppress_event.assert_not_called()
 
-    def test_debug2_prints_contradiction_diagnostics(self, kb_env, capsys):
-        kb = kb_env
+    def test_debug2_prints_contradiction_diagnostics(self, kb_env_mouse, capsys):
+        kb = kb_env_mouse
         CONSTANTS.DEBUG2 = True
         build(kb)
         kb.state_manager.add_key_press_state(VK_A)

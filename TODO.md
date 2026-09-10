@@ -627,6 +627,18 @@ prints forward slashes. Status: closed — section committed as tested.
   (SimpleNamespace vs. raw yield) must be preserved or each file migrated
   deliberately. MAINTAINER NOTE: if the maintainer prefers per-file fixtures for
   independence, close this with a "documented preference" note instead.
+- **Status tail:** LANDED (2026-09-10) — the three drifted shape-classes moved
+  VERBATIM into `tests/conftest.py` as `kb_env_ns` (shape A, SimpleNamespace
+  yield + arg flags pre-set) / `kb_env_mouse` (shape B, raw yield +
+  `_mouse_listener` + arg flags) / `kb_env_plain` (shape C, raw yield, no arg
+  flags); `build`/`down`/`up`/`hold_keys`/`mock_control_handlers` defined once
+  in `tests/kb_helpers.py` (plain functions, imported by the test files via the
+  prepend-mode `tests/` sys.path entry); the six files' local `def kb_env` +
+  helper copies and the now-unused imports (`pytest`, `FST_Keyboard`,
+  `MagicMock`, `SimpleNamespace` per file) deleted, signatures/bodies re-bound
+  to the new fixture names. Verification: `pytest -q` = 434 passed, 1 warning
+  (the known #10 coroutine warning, unchanged); `ruff check --select F .` = 0
+  findings. Entry stays open for the maintainer's documented-preference call.
 
 ## 44. Stale/unknown focus name → uncaught KeyError in `apply_focus_groups` / `apply_start_args_by_focus_name` (the config is reloaded *before* the lookup) (2026-09-10, Audit 3b)
 

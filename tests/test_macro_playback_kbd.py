@@ -3,37 +3,19 @@ macro_task error path. The asyncio loop is the test's running loop; pynput
 controllers are mocked so no real input is emitted.
 """
 import concurrent.futures
-from unittest.mock import MagicMock
 
 import asyncio
 import pytest
 
 from fst_data_types import Key_Event
-from fst_keyboard import FST_Keyboard
 
 VK_B = 0x42
 
 
-@pytest.fixture
-def kb_env(monkeypatch):
-    kb_mock = MagicMock()
-    ms_mock = MagicMock()
-    monkeypatch.setattr('pynput.keyboard.Controller', lambda: kb_mock)
-    monkeypatch.setattr('pynput.mouse.Controller', lambda: ms_mock)
-    FST_Keyboard.TIME_DIFF = None
-    FST_Keyboard.START_TIME = None
-    keyboard = FST_Keyboard()
-    keyboard._listener = MagicMock()
-    keyboard._mouse_listener = MagicMock()
-    yield keyboard
-    FST_Keyboard.TIME_DIFF = None
-    FST_Keyboard.START_TIME = None
-
-
 class TestStartMacroPlayback:
     @pytest.mark.asyncio
-    async def test_schedules_macro_task_on_running_loop(self, kb_env, monkeypatch):
-        kb = kb_env
+    async def test_schedules_macro_task_on_running_loop(self, kb_env_plain, monkeypatch):
+        kb = kb_env_plain
         kb.loop = asyncio.get_running_loop()
 
         async def fake_sleep(t):
@@ -56,8 +38,8 @@ class TestStartMacroPlayback:
             handle.cancel()
 
     @pytest.mark.asyncio
-    async def test_macro_task_logs_and_swallows_errors(self, kb_env):
-        kb = kb_env
+    async def test_macro_task_logs_and_swallows_errors(self, kb_env_plain):
+        kb = kb_env_plain
         kb.loop = asyncio.get_running_loop()
 
         async def boom(key_event, *args, **kwargs):
