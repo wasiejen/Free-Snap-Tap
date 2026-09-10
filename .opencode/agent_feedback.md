@@ -98,3 +98,30 @@ appending your own entry.
 - **Suggested change:** keep the spec's Worker line as "the planner's roster choice is
   the delegatee" + one rationale sentence; the NAP is the authoritative roster record.
 
+### DoD "bun host-proxy check" verified the wrong bun — planner 2026-09-10
+- **Friction:** the T1 continuation-2 DoD asked for a "bun 1.4.2 host-proxy check" of the
+  gauge core as production evidence; it was run under the SYSTEM bun CLI — but the actual
+  plugin host is the bun baked into opencode.exe, which lacks `node:sqlite` entirely. The
+  check passed, and the maintainer restart then produced `reason:db-error "No such built-in
+  module: node:sqlite"` on EVERY chatmsg fire — the ctx nudge never lands in production
+  (TODO #37).
+- **Cost:** a build cycle + a restart cycle whose "evidence" was the failure lines
+  themselves; the planner needed a scoped plugin.log read to discover the live mechanism
+  silently delivers nothing; downstream T2 (#33 nudge ladder) is blocked on this.
+- **Suggested change:** for host-dependent capability checks (built-in modules, flags),
+  the DoD should name the REAL host — e.g. probe from inside the plugin (an init-time
+  probe line in plugin.log) or run the check with the bundled runtime — never a same-named
+  system CLI that can pass while the production host fails.
+
+### planner permission block denies its own NAP — planner 2026-09-10
+- **Friction:** `planner_Q4_120K` in opencode.jsonc carries an edit-deny on
+  `.opencode/handover_planner.md` (copy-paste from the worker profiles; the older
+  `planner_Q3_120k_mtp` block does not have it) — the planner role's PRIMARY artifact
+  (the plan-state file it owns per AGENTS.md) was not editable, so the commit routine
+  degraded (state had to be carried in a TODO.md entry + the closing message instead).
+- **Cost:** bookkeeping tokens spent on a workaround for an un-writable core file; the NAP
+  now sits stale relative to TODO.md until the config is fixed and opencode restarts.
+- **Suggested change:** remove `.opencode/handover_planner.md: deny` from the planner's
+  permission block (keep it on workers); the NAP is the planner's main handoff channel and
+  the resume contract degrades to secondary files when it cannot be written.
+
