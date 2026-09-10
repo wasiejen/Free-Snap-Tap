@@ -2,6 +2,59 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-10 (looprun 2, iteration 2) — approved-fix batch #41+#42+#46 LANDED + planner-verified
+- **Start state:** clean tree (top `1a4fefa`), the batch spec committed +
+  delegation-ready (iteration 1 stopped at the 89 % line BEFORE launching). No
+  interrupted work. No new maintainer message since the last launch.
+- **Batch LAUNCHED via raw `agent_Q4_120K`** (the worker-prompt variant still dies at
+  its first request — P01 pending) with the spec's built-in Protocol section as the
+  delegation protocol. The worker stopped at its own stop line (98 % / REM 2.2k) at a
+  clean committed point — the DoD worked.
+- **PLANNER VERIFIED (independent — not trusting the summary alone):**
+  - Gate re-run by the planner: **10/10 consecutive full `pytest -q` green at 436
+    passed, 1 warning** (baseline 434 + 2 new tests; the warning = the known #10
+    coroutine one); **ruff F=0**.
+  - #42 mask/shift `bool((data.mouseData >> 16) & 0x8000)` node-verified against ALL
+    FOUR constants: single-up(7864320)→False, single-down(4287102976)→True,
+    2-notch-up(15728640)→False, 2-notch-down(4279238656)→True; magnitudes cross-checked
+    (240<<16=15728640, 120<<16=7864320, (-120) low32=4287102976). ✓
+  - #41 name parity: singular `remove_all_callback` now uniform across
+    `fst_keyboard.py:64`, `free_snap_tap.py:193`, `fst_manager.py:578`, the conftest
+    FakeFST, the test assertion, AND the new drift-guard test
+    (`test_remove_all_toasts_drift_guard` — stand-in exposing only the singular; a
+    plural call would AttributeError, which `constraint_evaluation`'s NameError-only
+    catch does NOT swallow). Only historical plural refs remain (in TODO.md). ✓
+  - `git diff` scope = exactly the 7 allowed files; commit `bdab550`
+    (code+tests+TODO+summary) + `724a630` (hash backfill bookkeeping).
+- **Nuance recorded (NO behavior discrepancy):** the worker refined the maintainer's
+  bit-level description — the distinguishing bit is bit 31 (the sign of the high-16
+  delta word), not bits 16/17 as the ruling phrased it; the expression extracts bit 31
+  and the observable semantics (direction recognized regardless of the other bits;
+  multi-notch = SAME phase as single-notch, magnitude NOT aggregated) match the
+  approved ruling exactly.
+- **#48 ADDED** (the #42 report-back): packed-word equality sites found — (1) X-button
+  `mouseData == 65536/131072` exact equality (`fst_keyboard.py:471-473`, low word = key
+  state → with a modifier held the X-button event resolves no vk and is suppressed
+  without processing — same defect class as the pre-fix wheel check); (2) mouse
+  `is_simulated_key_event` `flags == 1` on the packed LLKHF word (`fst_keyboard.py:49` —
+  an injected event carrying any other LLKHF bit is misclassified as real). Correct
+  patterns (no action): keyboard `flags & 0x10` (`:520`), control combos (string
+  membership). Fixes NOT implemented this task (report-back only; implicitly approved
+  per the #42 ruling — delegation-ready).
+- **Summary-file collision — FIFTH time** (raw run too): restored `git checkout --`
+  post-run (P02 pending — the plugin `mirrorSummary` is the confirmed root cause).
+- **NEXT (iteration 3, in order):**
+  1. Check `.opencode/proposals/{approved,commented}/` for maintainer moves — approved
+     = tasks (P02/P03/P04/P06/P07/P09 are doc/config-only; P08 = the #44
+     configErrorException design — needs the degrade-to-defaults yes).
+  2. Delegate **#47** (§3 docs, APPROVED) — same raw-agent mechanic; docs-only, low risk.
+  3. Remaining maintainer calls (bundle ≤3): the FST behavior batch
+     (#1/#7/#8/#9/#4+#6), the P08 degrade-to-defaults yes, the #17 v1.3 log-profile
+     rebaseline (call 1, default SKIP), and now the #48 packed-word fixes (fix
+     semantics for the X-button + LLKHF sites — implicitly approved).
+- Standing lessons unchanged: raw `agent_Q4_120K` + the spec's Protocol section = the
+  delegation mechanic; restore the summary file after EVERY Task-tool run.
+
 ## 2026-09-10 (looprun 2, iteration 1) — maintainer rulings applied + proposals channel + nudge production evidence
 - **Start state:** clean tree (top `9c8b964`), no interrupted work. Maintainer
   ACTIVE: `handover_maintainer.md` (untracked, his scratch — never commit it)
