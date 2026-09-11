@@ -1,5 +1,6 @@
 // Handover plugin v2 — deterministic handover file ownership, built on the unchanged v1/v1.1
 // log observer.
+// renamed from handover_v2.4.ts 2026-09-11 (approved rename).
 //
 // v1.1 log (kept verbatim): `event`, `tool.execute.before`, `tool.execute.after` append one
 // capped JSON line to .opencode/plugin.log (delta filter + truncation ladder unchanged).

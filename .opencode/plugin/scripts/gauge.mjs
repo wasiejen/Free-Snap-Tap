@@ -1,7 +1,7 @@
 // =============================================================================
 // Shared context-gauge core (de-peek — TODO.md #30/#35; backend chain — #37):
 // ONE implementation imported by BOTH the handover plugin (chat.message
-// injection, .opencode/plugin/handover_v2.4.ts) and the self-peek CLI
+// injection, .opencode/plugin/ctx_watchdog.ts) and the self-peek CLI
 // (peek.mjs).
 //
 // READ BACKEND CHAIN (MAINTAINER RULING 2026-09-10, TODO #37) — tried in

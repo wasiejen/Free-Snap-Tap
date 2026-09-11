@@ -1,5 +1,5 @@
 // =============================================================================
-// Persistent offline probe for .opencode/plugin/handover_v2.4.ts (v2.5 — the
+// Persistent offline probe for .opencode/plugin/ctx_watchdog.ts (v2.5 — the
 // de-peek build: native session-gated context gauge, TODO.md #30/#35;
 // backend chain node:sqlite → bun:sqlite → spawn-sqlite3, TODO #37).
 // REBUILT 2026-09-10 (continuation 2) + EXTENDED 2026-09-10 (#37 S7 backend
@@ -180,7 +180,7 @@ import { DatabaseSync } from "node:sqlite";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(HERE, "..", "..", "..");
-const PLUGIN_TS = path.join(REPO_ROOT, ".opencode", "plugin", "handover_v2.4.ts");
+const PLUGIN_TS = path.join(REPO_ROOT, ".opencode", "plugin", "ctx_watchdog.ts");
 
 // --------------------------------------------------------------- fixed payloads
 

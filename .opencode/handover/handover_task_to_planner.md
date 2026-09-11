@@ -1,72 +1,87 @@
-# EXECUTIVE SUMMARY — TODO #48: mouse filter packed-word equality → bit tests
+# EXECUTIVE SUMMARY — T1: plugin rename `handover_v2.4.ts` → `ctx_watchdog.ts`
 
-**Outcome:** DONE — both packed-word equality sites in
-`FST_Keyboard.mouse_win32_event_filter` replaced with bit tests per the #42
-ruling; 3 new tests pin the invariants; gate green; #48 closed.
+**Outcome:** DONE — rename + header note + the 3 live comment/path refs, zero
+behavior change. All DoD checks green.
 
 ## What changed
-- `fst_keyboard.py` — mouse `is_simulated_key_event`: `flags == 1` →
-  `bool(flags & 1)` (bit 0 = injected; other LLKHF status bits must not matter;
-  explicit `bool` keeps the `assert_called_with(…, True/False, …)` pins exact).
-- `fst_keyboard.py` — X-button vk mapping (msg 523/524):
-  `data.mouseData == 65536/131072` → `(data.mouseData >> 16) == 1` → vk 4,
-  `== 2` → vk 5 (identifier = high word; the key-state low word is ignored —
-  mirrors the #42 wheel idiom `bool((data.mouseData >> 16) & 0x8000)`). One
-  comment added at the site; the `:451-453` doc block left as-is (still accurate
-  — it documents the high-word identifiers).
-- `tests/test_filter_behavior.py::TestMouseWin32Filter` — 3 new tests:
-  - `test_x_buttons_ignores_key_state_low_word` — x1 down (523) / x1 up (524)
-    with nonzero low words (`65536 | 0x0010`, `65536 | 0x0101`) → vk 4;
-    x2 down `131072 | 0x0101` → vk 5.
-  - `test_x_button_other_identifier_suppresses` — x3 identifier (`196608`)
-    resolves no vk → `_mouse_listener.suppress_event()` (unchanged behavior,
-    regression guard).
-  - `test_simulated_flag_bit0_only` — flags `1` and `0x21` classify simulated;
-    flags `0` and `0x20` classify real.
-- Existing `test_x_buttons_use_mousedata_for_vk` (zero low word) and
-  `test_simulated_flag_passthrough` UNCHANGED and green.
-- `TODO.md` — #48 collapsed to the one-line close
-  `(closed 2026-09-11, first commit after 00bc24f, see todo_records.md)`.
-- `todo_records.md` — full #48 record appended (evidence moved verbatim +
-  status tail with the measured gate).
+- `git mv .opencode/plugin/handover_v2.4.ts .opencode/plugin/ctx_watchdog.ts`
+  (100% rename; content untouched apart from the header note below).
+- `.opencode/plugin/ctx_watchdog.ts:3` — ONE rename line added to the header
+  block: `// renamed from handover_v2.4.ts 2026-09-11 (approved rename).`
+  (version-history block untouched).
+- `.opencode/plugin/probes/handover_probe.mjs:2` — header comment now points
+  at `ctx_watchdog.ts`.
+- `.opencode/plugin/probes/handover_probe.mjs:183` — `PLUGIN_TS` path →
+  `ctx_watchdog.ts`.
+- `.opencode/plugin/scripts/gauge.mjs:4` — header comment path →
+  `ctx_watchdog.ts`.
+
+The live-reference set was re-grepped before editing and matched the
+planner-verified set exactly (no unexpected live refs found).
 
 ## Verification (measured)
-- Baseline BEFORE changes: `& .\.venv\Scripts\python.exe -m pytest -q` =
-  **448 passed, 1 warning** (the known #10 coroutine warning) — matches the
-  task's stated baseline.
-- AFTER changes, same command: **451 passed, 1 warning** (448 + 3 new tests;
-  same single #10 warning).
-- Filter file alone: `pytest tests/test_filter_behavior.py -q` = 43 passed.
-- `& .\.venv\Scripts\ruff.exe check --select F .` = **0 findings**.
-- `git show --stat` scope of the landing commit = exactly 5 files:
-  `fst_keyboard.py`, `tests/test_filter_behavior.py`, `TODO.md`,
-  `todo_records.md`, this summary. `opencode.jsonc` NOT staged.
+- `node .opencode\plugin\probes\handover_probe.mjs` → **`PROBE handover:
+  63/63 PASS`**, exit 0 (SAME check count — rename only).
+- `& .\.venv\Scripts\python.exe -m pytest -q` → **451 passed, 1 warning**
+  (the known #10 `RuntimeWarning: coroutine never awaited` — no FST code
+  touched).
+- `& .\.venv\Scripts\ruff.exe check --select F .` → **0 findings**.
+- `git grep -n 'handover_v2\.4'` → hits ONLY in historical/spec locations:
+  `TODO.md`, `todo_records.md`, `.opencode/handover/` (NAP + this task spec),
+  `.opencode/proposals/`, `.opencode/loop/` + `.opencode/archive/loop/`
+  (past records), plus the intentional rename note in `ctx_watchdog.ts:3`
+  (required by the spec). ZERO live path references remain;
+  `.opencode/plugin/` tree is clean except that note.
+- `opencode.jsonc` re-verified by grep (committed + working tree):
+  **zero** references to the plugin filename → no config edit needed, and it
+  was NEVER staged.
 
 ## Commit
-- ONE commit: subject **"Mouse filter: packed-word equality → bit tests
-  (TODO #48)"**, the first commit after `00bc24f` (verify with
-  `git log --oneline 00bc24f..HEAD`).
-- NOTE (DoD deviation, flagged): the DoD asked for the commit hash in this
-  summary, but a commit cannot contain its own hash (self-referential SHA-1 is
-  infeasible — the hash covers the tree that would hold the hash). Per the
-  repo convention (cf. the #42/#47 status tails, which cite gate + subject,
-  not self-hashes), the commit is cited by date + parent + unique subject.
+- ONE commit (subject: **"Rename plugin to ctx_watchdog.ts (approved item 2);
+  update probe/gauge live refs"**), the first commit after `d69794d` —
+  scope exactly the DoD-5 set: the rename, the header note, the probe, the
+  gauge comment, and this summary. (Self-hash infeasible — cited by parent +
+  unique subject, same convention as the #48 summary. Verify with
+  `git log --oneline d69794d..HEAD`.)
+
+## Discrepancies / notes for the planner
+1. **Spec file path:** the task spec cites `proposals/approved/…`; the actual
+   folder is `.opencode/proposals/approved/2026-09-11_plugin-scope-tool-rename.md`
+   (found, read, item 2 confirmed — the rename ruling).
+2. **Proposal vs spec on config:** proposal item 2's text says "Rename touches
+   `opencode.jsonc` (your live file)"; the spec (planner-verified, later) says
+   no config references the filename (opencode auto-loads
+   `.opencode/plugin/*.ts`). Grep confirmed the spec: `opencode.jsonc` has
+   zero filename refs → no config edit, consistent with the spec.
+3. **Uncommitted spec at launch:** the launch message called the T1 spec
+   "committed", but at session start `handover_task.md` was modified (M) in
+   the working tree, NOT committed (the committed version at `d69794d` was the
+   superseded Cycle-1 spec). I left it UNSTAGED (DoD-5 enumerates the commit
+   set without it, and it is the planner's handover file). The working-tree
+   version is byte-identical to what the looprunner launched against
+   (`.opencode/loop/autorun-2026-09-11_17-23/plan2_t1_ho_task.md` untracked
+   copy exists too) — the planner/looprunner should commit it (or its NAP)
+   to make the spec canonical per the interaction contract.
+4. Other working-tree changes I deliberately left alone: `handover_planner.md`
+   (NAP — planner-owned), `loop_log.md` + the loop plan files (looprunner-
+   owned), `agent_readme_loop.md` (prompt file, not in my task),
+   `opencode.jsonc` (never stage).
 
 ## TODO entries
-- #48 CLOSED (one-line in `TODO.md`; full record in `todo_records.md`).
-- No new entries appended; `todo_inbox.md` untouched (no out-of-scope findings
-  — the `playground/pynput_mouse_probe.py` duplicate was correctly left out of
-  scope per the task, and the filter's other paths are already bit-tested /
-  packed-word-free).
+- None. No `TODO.md` / `todo_records.md` / `todo_inbox.md` edits — nothing
+  out of scope was found, and per the spec the historical records stay
+  untouched.
 
 ## Deliberately NOT done
-- `playground/pynput_mouse_probe.py` untouched (maintainer's personal probe —
-  out of scope per the task).
-- No docs changes (WIKI/README do not document these modifier edges).
-- No other filter changes (wheel path already bit-tested by #42; plain-button
-  paths have no packed word).
-- No live listeners / no real keyboard-mouse; all tests run against the
-  mocked `kb_env_ns` fixture.
-- The `:451-453` doc comment block was left verbatim (still accurate after the
-  change — minimal-diff choice, flagged here in case the planner wants it
-  reworded).
+- No behavior change: the plugin code is byte-identical to the pre-rename
+  file apart from the one header line (probe 63/63 confirms same check count
+  and identical pinned outputs).
+- `opencode.jsonc` untouched (no refs; never staged).
+- Maintainer prototypes `.opencode/tools/compact_memory.ts` +
+  `.opencode/plugin/context_recovery.ts` untouched (grep: no `handover_v2.4`
+  refs in them).
+- Historical records (TODO.md, todo_records.md, `.opencode/handover/`,
+  `.opencode/proposals/`, loop + archive folders) untouched — past-tense
+  refs to `handover_v2.4` stay as-is per the spec.
+- No FST python code touched. Nothing under `proposals/maintainer/` touched.
+- No SDK verification (spec: not needed for a rename).
