@@ -596,3 +596,4 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 - NO parsing of `.opencode/plugin.log` (call-1 one-shot only, default SKIP).
 - TODO.md curation: open items + one-line records in TODO.md; full text of
   closed entries in `todo_records.md` (formalized by split proposal part 3).
+- **Disclosure (dc3f137):** the `git add -A` there also staged the maintainer's live `opencode.jsonc` (compaction.keep now system:true / tokens:60000 / messages:20) and his new draft `draft/compact_memory/compact_memory.ts` (72 lines) - both were in the working tree at commit time. Nothing was reverted; maintainer decides whether that belongs in the git record.
