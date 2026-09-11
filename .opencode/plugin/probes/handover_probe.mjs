@@ -3,11 +3,12 @@
 // de-peek build: native session-gated context gauge, TODO.md #30/#35;
 // backend chain node:sqlite → bun:sqlite → spawn-sqlite3, TODO #37).
 // REBUILT 2026-09-10 (continuation 2) + EXTENDED 2026-09-10 (#37 S7 backend
-// chain section): the pre-rebuild probe (v2.2.1 era) targeted the DELETED
-// handover.ts, the retired experimental.chat.system.transform hook, and the
-// fake-$-shell S4 shapes — all void with the shell gauge. PERMANENT repo
-// tooling: RE-RUN, never rebuild — exception: the plugin's hook surface
-// changes.
+// chain section) + EXTENDED 2026-09-10/11 (v2.8: S9 readout append / ctx log /
+// deferred delivery + the S8 deferred-delivery ticks): the pre-rebuild probe
+// (v2.2.1 era) targeted the DELETED handover.ts, the retired
+// experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
+// all void with the shell gauge. PERMANENT repo tooling: RE-RUN, never rebuild
+// — exception: the plugin's hook surface changes.
 //
 // EXACT RUN COMMAND (from the repo root, PowerShell 7 — this IS the run
 // command, do not rediscover anything):
@@ -111,27 +112,60 @@
 //      PER-SESSION read against the fx_lad.db fixture (window 120K — one
 //      session per rung + two delivery-failure sessions); the plugin is
 //      re-initialized with a FAKE client that records every promptAsync
-//      call; evidence = kind:"nudge" lines only (silent on every non-fire):
+//      call; evidence = kind:"nudge" lines only (silent on every non-fire).
+//      v2.8: delivery is DEFERRED (setImmediate + the busy check) — every
+//      check awaits a ~25 ms tick() before asserting promptAsync calls:
 //      (46) below the first rung (49%) → SILENT (no line, no call)
 //      (47-51) rungs 1-5 each fire EXACTLY ONCE: byte-exact nudge line
 //          {session, rung, readout} + promptAsync payload
 //          {path:{id}, body:{parts:[{type:"text", synthetic:true, text =
-//          readout + " — " + rung instruction}]}}
+//          readout + " — " + rung instruction}]}} (after the tick)
 //      (52) per-rung dedup: a second fire at the same rung posts NOTHING
 //      (53) delivery failures evidence-logged (delivery-threw /
 //          delivery-rejected, preview capped) — never thrown
-//   S5 hygiene (5): every sandbox plugin.log line is JSON.parse-able; <=2000
+//   S9 readout + ctx log + deferred delivery (10) — the v2.8 build (the
+//      re-scoped design of record — see the plugin's v2.8 header block): ONE
+//      per-session gauge read per tool.execute.after feeds (1) the MINIMAL
+//      readout appended to the tool result, (2) the ladder (unchanged), (3)
+//      the single-file ctx log at SANDBOX/.opencode/temp/ctx.log (isomorphic:
+//      an entry IFF the readout was appended). Fixture fx_ro.db (window 120K
+//      except where noted; ses_ro_absent deliberately NOT in the db); the
+//      plugin is re-initialized with a status-aware fake client (a mutable
+//      S9_STATUS drives the busy/idle check — direct-map and SDK fields-style
+//      shapes):
+//      (54) known window: output byte-exact `tool body\n(35%/78K)` + ctx log
+//          line 1 `<dt> probe-model-120K_MTP (35%/78K)`, below rung 1
+//      (55) unknown window on a trailing-newline output `x\n`: direct concat
+//          byte-exact `x\n(46K)` + ctx log line 2 WITH the model
+//      (56) no-total (in-flight step, no finish): NO append / NO log /
+//          no nudge line
+//      (57) missing session (not in the db): per-session read no-total → same
+//      (58) non-string output.output (defensive — the SDK declares string):
+//          no throw, object untouched, NO log entry (isomorphism)
+//      (59) DEFERRED delivery (rung 1, status unknown): after the awaited
+//          afterFeed promptAsync NOT called synchronously (0 calls) while the
+//          nudge evidence line IS synchronous; exactly 1 call after the tick
+//          with the byte-shape synthetic payload (readout byte-exact)
+//      (60) BUSY (direct-map status fake): 0 calls after the tick, evidence
+//          line fired, readout append + log entry unaffected
+//      (61) status ABSENT (fn returns undefined): the deferral alone still
+//          delivers — exactly 1 call after the tick
+//      (62) BUSY via the SDK fields-style fake `{data: {sid: {type:"busy"}}}`:
+//          0 calls after the tick
+//      (63) IDLE (fields-style): exactly 1 call after the tick
+//   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
-//      tool.before==6, tool.after==12, chatmsg==8, gauge==3, event==0,
-//      nudge==9); the
+//      tool.before==6, tool.after==22, chatmsg==8, gauge==3, event==0,
+//      nudge==14); the
 //      real handover files byte-identical to pre-run and zero CO-APPENDED live
 //      lines (the real plugin.log may only grow — a line carrying a probe
-//      fingerprint id s*/c*/d*/t*/e1–e9/ses_fx_*/ses_other/ses_lad_* = the probe wrote out of
-//      the sandbox); zero new/changed files outside the sandbox (.opencode
-//      listing + git status, before vs after).
+//      fingerprint id s*/c*/d*/t*/e1–e9/f1–f10/ses_fx_*/ses_other/ses_lad_*/
+//      ses_ro_* = the probe wrote out of the sandbox); zero new/changed files
+//      outside the sandbox (.opencode listing + git status, before vs after);
+//      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S5=5  →  "PROBE handover: 52/52 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=10 S5=6  →  "PROBE handover: 63/63 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -895,10 +929,14 @@ const fakeClient = {
 await plugin({ directory: SANDBOX, client: fakeClient });
 const nudgeLines = () => linesOfKind("nudge").map((l) => JSON.parse(l));
 const afterLad = (sid, call) => afterFeed(sid, call, {}, { output: "x" });
+// v2.8 — delivery is DEFERRED (setImmediate + the busy check): every check
+// awaits this tick before asserting promptAsync calls.
+const tick = (ms = 25) => new Promise((r) => setTimeout(r, ms));
 
 // 46 — below the first rung (49% / REM 60k): SILENT — no nudge line, no promptAsync call
 {
   await afterLad("ses_lad_0", "e1");
+  await tick();
   check(
     "46",
     "S8",
@@ -924,6 +962,7 @@ const afterLad = (sid, call) => afterFeed(sid, call, {}, { output: "x" });
     const nBefore = nudgeLines().length;
     const cBefore = nudged.length;
     await afterLad(sid, call);
+    await tick();
     const nl = nudgeLines().slice(nBefore);
     const o = nl.length === 1 ? nl[0] : {};
     const c = nudged.length === cBefore + 1 ? nudged[cBefore] : null;
@@ -954,6 +993,7 @@ const afterLad = (sid, call) => afterFeed(sid, call, {}, { output: "x" });
   const nBefore = nudgeLines().length;
   const cBefore = nudged.length;
   await afterLad("ses_lad_1", "e7");
+  await tick();
   check(
     "52",
     "S8",
@@ -969,10 +1009,11 @@ const afterLad = (sid, call) => afterFeed(sid, call, {}, { output: "x" });
 {
   await plugin({ directory: SANDBOX, client: { session: { promptAsync: () => { throw new Error("boom-threw"); } } } });
   await afterLad("ses_lad_6", "e8");
+  await tick(); // the deferred fn runs here — the delivery-threw line lands synchronously-ish inside it
   const lt = nudgeLines().filter((o) => o.session === "ses_lad_6" && o.reason);
   await plugin({ directory: SANDBOX, client: { session: { promptAsync: () => Promise.reject(new Error("boom-rejected")) } } });
   await afterLad("ses_lad_7", "e9");
-  await new Promise((r) => setTimeout(r, 25)); // the .catch evidence line is async (microtask)
+  await tick(); // the deferred fn + the .catch evidence line (microtask) both land before this
   const lr = nudgeLines().filter((o) => o.session === "ses_lad_7" && o.reason);
   check(
     "53",
@@ -985,7 +1026,247 @@ const afterLad = (sid, call) => afterFeed(sid, call, {}, { output: "x" });
   await plugin({ directory: SANDBOX, client: fakeClient }); // restore the recording client
 }
 
-// ------------------------------------------------------------------ S5 hygiene (5)
+// ------------------------------------------------------------------ S9 readout + ctx log + deferred delivery (10) — v2.8
+//
+// The v2.8 build (the re-scoped design of record — the plugin's v2.8 header
+// block): ONE per-session gauge read per tool.execute.after feeds (1) the
+// MINIMAL readout appended to the tool result IN PLACE, (2) the ladder
+// (unchanged), (3) the single-file ctx log at SANDBOX/.opencode/temp/ctx.log
+// (isomorphic: an entry IFF the readout was appended). Fixture fx_ro.db
+// (window 120K except where noted); ses_ro_absent is deliberately NOT in the
+// db (the per-session no-total shape). The plugin is RE-INITIALIZED with a
+// status-aware fake client: a mutable S9_STATUS drives the busy/idle check
+// (direct-map and the SDK fields-style `{data: {…}}` shapes both accepted).
+const RO_ROW = (sid, ctx, model) => ({
+  id: sid,
+  time_updated: 3000,
+  model: model == null ? null : JSON.stringify({ id: model, providerID: "fx" }),
+  messages: [
+    {
+      time_created: 20,
+      data: JSON.stringify({
+        role: "assistant",
+        finish: "stop",
+        tokens: { total: ctx + 101, input: ctx, output: 101, reasoning: 0, cache: { write: 0, read: 0 } },
+      }),
+    },
+  ],
+});
+const FX_RO = path.join(SANDBOX, "fx_ro.db");
+buildFixtureDb(FX_RO, [
+  RO_ROW("ses_ro_k", 42_012, "probe-model-120K_MTP"), // known window → (35%/78K), below rung 1
+  RO_ROW("ses_ro_u", 45_678, "CPU-Qwen3-0.6B"), // no window marker → (46K)
+  RO_ROW("ses_ro_nom", 24_056, null), // model NULL → (24K) (the model-FIELD-omitted log shape; built per the locked fixture spec)
+  { id: "ses_ro_empty", time_updated: 3000, model: JSON.stringify({ id: "probe-model-120K_MTP", providerID: "fx" }), messages: [{ time_created: 20, data: INFLIGHT }] }, // no finish → no-total
+  RO_ROW("ses_ro_n1", 61_020, "probe-model-120K_MTP"), // rung 1 ×5 — the deferred-delivery sessions
+  RO_ROW("ses_ro_n2", 61_030, "probe-model-120K_MTP"),
+  RO_ROW("ses_ro_n3", 61_040, "probe-model-120K_MTP"),
+  RO_ROW("ses_ro_n4", 61_050, "probe-model-120K_MTP"),
+  RO_ROW("ses_ro_n5", 61_060, "probe-model-120K_MTP"),
+]);
+const RO_RO = {
+  ses_ro_n1: "SESSION=ses_ro_n1 CTX=61020 (50%) REM=58980",
+  ses_ro_n2: "SESSION=ses_ro_n2 CTX=61030 (50%) REM=58970",
+  ses_ro_n3: "SESSION=ses_ro_n3 CTX=61040 (50%) REM=58960",
+  ses_ro_n4: "SESSION=ses_ro_n4 CTX=61050 (50%) REM=58950",
+  ses_ro_n5: "SESSION=ses_ro_n5 CTX=61060 (50%) REM=58940",
+};
+setDbPath(FX_RO);
+let S9_STATUS; // the fake session.status() return (direct map / fields-style / undefined)
+const s9Calls = [];
+const s9Client = {
+  session: {
+    promptAsync: (options) => {
+      s9Calls.push(options);
+      return Promise.resolve({ ok: true });
+    },
+    status: () => S9_STATUS,
+  },
+};
+await plugin({ directory: SANDBOX, client: s9Client });
+const SB_CTXLOG = path.join(SANDBOX, ".opencode", "temp", "ctx.log");
+const ctxLogLines = () => (existsSync(SB_CTXLOG) ? readFileSync(SB_CTXLOG, "utf8").split("\n").filter((l) => l.length > 0) : []);
+const DT = "\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}";
+const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
+
+// 54 — known window: the append is BYTE-EXACT + the ctx log line 1 is
+//      byte-shape `<YYYY-MM-DD_HH-MM> probe-model-120K_MTP (35%/78K)`
+{
+  const pre = ctxLogLines().length; // S8's feeds already wrote entries (consumer 3 is unconditional) — delta-based
+  const out = { title: "t", output: "tool body", metadata: {} };
+  await afterFeed("ses_ro_k", "f1", {}, out);
+  const ll = ctxLogLines();
+  const last = ll.length > 0 ? ll[ll.length - 1] : "";
+  check(
+    "54",
+    "S9",
+    "known window: output byte-exact `tool body\\n(35%/78K)` + NEW ctx log line `<dt> probe-model-120K_MTP (35%/78K)`, below rung 1 (no nudge)",
+    out.output === "tool body\n(35%/78K)" && ll.length === pre + 1 && new RegExp(`^${DT} probe-model-120K_MTP \\(35%/78K\\)$`).test(last) && s9Nudge("ses_ro_k").length === 0,
+    JSON.stringify({ out: out.output, ll }),
+  );
+}
+
+// 55 — unknown window on a TRAILING-NEWLINE output: direct concat byte-exact
+//      `x\n(46K)` + the ctx log line 2 carries the model (CPU-Qwen3-0.6B)
+{
+  const pre = ctxLogLines().length;
+  const out = { title: "t", output: "x\n", metadata: {} };
+  await afterFeed("ses_ro_u", "f2", {}, out);
+  const ll = ctxLogLines();
+  const last = ll.length > 0 ? ll[ll.length - 1] : "";
+  check(
+    "55",
+    "S9",
+    "unknown window (trailing-newline output): byte-exact `x\\n(46K)` direct concat + NEW ctx log line `<dt> CPU-Qwen3-0.6B (46K)` (model carried)",
+    out.output === "x\n(46K)" && ll.length === pre + 1 && new RegExp(`^${DT} CPU-Qwen3-0.6B \\(46K\\)$`).test(last),
+    JSON.stringify({ out: out.output, ll }),
+  );
+}
+
+// 56 — no-total (in-flight step, no finish marker): NO append (the output is
+//      untouched), NO ctx log entry, no nudge line — silent
+{
+  const out = { title: "t", output: "untouched\n", metadata: {} };
+  const lBefore = ctxLogLines().length;
+  await afterFeed("ses_ro_empty", "f3", {}, out);
+  check(
+    "56",
+    "S9",
+    "no-total (in-flight step): NO append (output untouched), NO ctx log entry, no nudge line — silent",
+    out.output === "untouched\n" && ctxLogLines().length === lBefore && s9Nudge("ses_ro_empty").length === 0,
+    JSON.stringify({ out: out.output, log: ctxLogLines().length }),
+  );
+}
+
+// 57 — missing session (ses_ro_absent NOT in the db): the per-session read is
+//      no-total → NO append, NO log entry, no nudge line
+{
+  const out = { title: "t", output: "also untouched", metadata: {} };
+  const lBefore = ctxLogLines().length;
+  await afterFeed("ses_ro_absent", "f4", {}, out);
+  check(
+    "57",
+    "S9",
+    "missing session (not in the db): per-session read no-total → NO append, NO log entry, no nudge line",
+    out.output === "also untouched" && ctxLogLines().length === lBefore && s9Nudge("ses_ro_absent").length === 0,
+    JSON.stringify({ out: out.output, log: ctxLogLines().length }),
+  );
+}
+
+// 58 — non-string output.output (defensive — the SDK declares string): NO
+//      throw, the object UNTOUCHED, NO log entry (the log ⟷ appended-returns
+//      isomorphism holds even when the read itself was ok)
+{
+  const obj = { nested: true };
+  const out = { title: "t", output: obj, metadata: {} };
+  const lBefore = ctxLogLines().length;
+  let threw = false;
+  try {
+    await afterFeed("ses_ro_k", "f5", {}, out);
+  } catch {
+    threw = true;
+  }
+  check(
+    "58",
+    "S9",
+    "non-string output: no throw, object untouched, NO ctx log entry (isomorphism)",
+    !threw && out.output === obj && ctxLogLines().length === lBefore,
+    JSON.stringify({ threw, out: out.output, log: ctxLogLines().length }),
+  );
+}
+
+// 59 — DEFERRED delivery (rung 1, status unknown): after the awaited afterFeed
+//      promptAsync is NOT called synchronously (0 calls) while the nudge
+//      evidence line IS synchronous; exactly 1 call with the byte-shape
+//      synthetic payload after the tick (readout byte-exact = formatGauge)
+{
+  S9_STATUS = undefined; // status() returns undefined → unknown shape → deliver
+  const out = { title: "t", output: "n1 body", metadata: {} };
+  const lBefore = ctxLogLines().length; // captured BEFORE the feed (the append + log entry land inside it)
+  await afterFeed("ses_ro_n1", "f6", {}, out);
+  const n1 = s9Nudge("ses_ro_n1");
+  const syncOk = n1.length === 1 && n1[0].readout === RO_RO.ses_ro_n1 && s9Calls.length === 0;
+  await tick();
+  const c = s9Calls.length === 1 ? s9Calls[0] : null;
+  const p0 = c?.body?.parts?.[0];
+  const textOk = p0?.text === `${RO_RO.ses_ro_n1} \u2014 context watch: past 50% of the context window; gauge-check between steps and keep new work small.`;
+  check(
+    "59",
+    "S9",
+    "deferred delivery (status unknown): 0 sync promptAsync calls + synchronous nudge line (byte-exact formatGauge readout); exactly 1 call after tick (synthetic payload) + append + log entry",
+    syncOk && out.output === "n1 body\n(50%/59K)" && s9Calls.length === 1 && c?.path?.id === "ses_ro_n1" && c.body.parts.length === 1 && p0?.type === "text" && p0?.synthetic === true && textOk && ctxLogLines().length === lBefore + 1,
+    JSON.stringify({ syncCalls: s9Calls.length, c }),
+  );
+}
+
+// 60 — BUSY (direct-map status fake): the nudge evidence line FIRES
+//      (synchronous), the readout append + the ctx log entry are UNTOUCHED,
+//      but 0 promptAsync calls after the tick (the skip adds NO new reason)
+{
+  S9_STATUS = { ses_ro_n2: { type: "busy" } };
+  const out = { title: "t", output: "n2 body\n", metadata: {} };
+  const lBefore = ctxLogLines().length; // the entry is written synchronously INSIDE afterFeed — measure before
+  await afterFeed("ses_ro_n2", "f7", {}, out);
+  const fired = s9Nudge("ses_ro_n2").length === 1;
+  await tick();
+  check(
+    "60",
+    "S9",
+    "busy (direct-map status): evidence line fired, readout appended + log entry written, 0 promptAsync calls after tick (silent skip, no new reason)",
+    fired && out.output === "n2 body\n(50%/59K)" && ctxLogLines().length === lBefore + 1 && s9Calls.length === 1,
+    JSON.stringify({ fired, out: out.output, calls: s9Calls.length, log: ctxLogLines().length }),
+  );
+}
+
+// 61 — status ABSENT (the fn returns undefined): the deferral alone still
+//      delivers — exactly 1 call after the tick
+{
+  S9_STATUS = undefined;
+  const out = { title: "t", output: "n3 body", metadata: {} };
+  await afterFeed("ses_ro_n3", "f8", {}, out);
+  await tick();
+  check(
+    "61",
+    "S9",
+    "status absent (fn returns undefined): deferral alone still delivers — exactly 1 call after tick",
+    s9Calls.length === 2 && s9Calls[1]?.path?.id === "ses_ro_n3" && out.output === "n3 body\n(50%/59K)",
+    JSON.stringify({ calls: s9Calls.length }),
+  );
+}
+
+// 62 — BUSY via the SDK fields-style fake `{data: {sid: {type:"busy"}}}`:
+//      the `.data` carrier is accepted — 0 calls after the tick
+{
+  S9_STATUS = { data: { ses_ro_n4: { type: "busy" } } };
+  const out = { title: "t", output: "n4 body", metadata: {} };
+  await afterFeed("ses_ro_n4", "f9", {}, out);
+  await tick();
+  check(
+    "62",
+    "S9",
+    "busy (SDK fields-style {data:{…}}): 0 promptAsync calls after tick; evidence line fired",
+    s9Calls.length === 2 && s9Nudge("ses_ro_n4").length === 1 && out.output === "n4 body\n(50%/59K)",
+    JSON.stringify({ calls: s9Calls.length }),
+  );
+}
+
+// 63 — IDLE (fields-style `{data: {sid: {type:"idle"}}}`): idle is not busy —
+//      exactly 1 call after the tick
+{
+  S9_STATUS = { data: { ses_ro_n5: { type: "idle" } } };
+  const out = { title: "t", output: "n5 body", metadata: {} };
+  await afterFeed("ses_ro_n5", "f10", {}, out);
+  await tick();
+  check(
+    "63",
+    "S9",
+    "idle (fields-style status): exactly 1 call after tick (idle delivers)",
+    s9Calls.length === 3 && s9Calls[2]?.path?.id === "ses_ro_n5" && out.output === "n5 body\n(50%/59K)",
+    JSON.stringify({ calls: s9Calls.length }),
+  );
+}
+
+// ------------------------------------------------------------------ S5 hygiene (6)
 
 // 40 — every sandbox plugin.log line parses as JSON (no stray/blank/garbled lines)
 {
@@ -1015,17 +1296,18 @@ const afterLad = (sid, call) => afterFeed(sid, call, {}, { output: "x" });
 }
 
 // 42 — exact kind tallies (no stray lines either): warn==2 (S1), tool.before==6
-//      (S1 3 + S2 3), tool.after==12 (S3 3 + S8 9), chatmsg==8 (the 8 S4 fires —
-//      per fire, mismatch included), gauge==3 (db-error + parts-not-array +
-//      invalid-messageID), event==0, nudge==9 (S8: the 5 rung fires + the 2
-//      delivery-failure sessions × {fire line + failure line} = 5 + 4)
+//      (S1 3 + S2 3), tool.after==22 (S3 3 + S8 9 + S9 10), chatmsg==8 (the 8
+//      S4 fires — per fire, mismatch included), gauge==3 (db-error +
+//      parts-not-array + invalid-messageID), event==0, nudge==14 (S8 9: the 5
+//      rung fires + the 2 delivery-failure sessions × {fire line + failure
+//      line} = 5 + 4; S9 5: the rung-1 fires on ses_ro_n1..n5)
 {
   const tally = (k) => linesOfKind(k).length;
   check(
     "42",
     "S5",
-    "kind tallies exact: warn==2, tool.before==6, tool.after==12, chatmsg==8, gauge==3, event==0, nudge==9",
-    tally("warn") === 2 && tally("tool.before") === 6 && tally("tool.after") === 12 && tally("chatmsg") === 8 && tally("gauge") === 3 && tally("event") === 0 && tally("nudge") === 9,
+    "kind tallies exact: warn==2, tool.before==6, tool.after==22, chatmsg==8, gauge==3, event==0, nudge==14",
+    tally("warn") === 2 && tally("tool.before") === 6 && tally("tool.after") === 22 && tally("chatmsg") === 8 && tally("gauge") === 3 && tally("event") === 0 && tally("nudge") === 14,
     `warn=${tally("warn")} tool.before=${tally("tool.before")} tool.after=${tally("tool.after")} chatmsg=${tally("chatmsg")} gauge=${tally("gauge")} event=${tally("event")} nudge=${tally("nudge")}`,
   );
 }
@@ -1042,7 +1324,7 @@ const afterLad = (sid, call) => afterFeed(sid, call, {}, { output: "x" });
   const postLog = POST["plugin.log"] ?? "";
   const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
   const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
-  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7"];
+  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5"];
   const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`) || l.includes(`"sess":"${fid}"`)));
   check(
     "43",
@@ -1058,6 +1340,20 @@ const afterLad = (sid, call) => afterFeed(sid, call, {}, { output: "x" });
   const listingDiff = listOpencode().filter((p) => !PRE_OP_LISTING.includes(p));
   const gitChanged = gitStatus() !== PRE_GIT_STATUS;
   check("45", "S5", "sandbox isolation: .opencode listing + git status unchanged (no new/changed files outside sandbox)", listingDiff.length === 0 && !gitChanged, `new: ${listingDiff.join(", ")}; gitChanged=${gitChanged}`);
+}
+
+// 64 — the ctx log path is GIT-IGNORED: `git check-ignore -q .opencode/temp/ctx.log`
+//      exits 0 from REPO_ROOT (the `temp` entry in .opencode/.gitignore — the DoD4
+//      requirement; the file itself may or may not exist yet — check-ignore tests
+//      the rule)
+{
+  let ignored = true;
+  try {
+    execFileSync("git", ["check-ignore", "-q", ".opencode/temp/ctx.log"], { cwd: REPO_ROOT });
+  } catch {
+    ignored = false;
+  }
+  check("64", "S5", "the ctx log path is git-ignored (git check-ignore -q .opencode/temp/ctx.log exits 0)", ignored);
 }
 
 // ------------------------------------------------------------------ summary

@@ -13,19 +13,32 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   (date-sweep regex note) trimmed to a one-line pointer — process note, no
   repo file to fix, already recorded in the iter-3 deviation block; NOT a
   TODO entry. Numbering unchanged (next = #51).
-- **PLAN (the iter-3 DEFERRED list, in order):** 1. **loop.log prompt task**
-  (02-03 ruling): protocol section in `agent_readme_loop.md` (single source of
-  truth) + one short reference line in each of the 3 live prompts
-  (planner/task/looprunner) — reference, never restate; prompt-only,
-  pre-approved class. 2. **Re-scoped plugin task (01-41)**: fold-in spec
-  update into `proposals/approved/260910_plugin-compaction-detection.md` +
-  build — constant per-tool ctx readout appended to EVERY `tool.execute.after`
-  result (minimal `(50%/15K)`-ish, linear/cache-safe = the 031 option-2
-  mechanic), threshold nudges STAY as messages but idle-deferred (031
-  option-1 mechanic — no mid-turn `promptAsync` race), ctx logging moves to a
-  single log file (step-3 ruling: one file, leading datetime + model-if-found
-  + readout) based on the same read as the tool-return append. Both delegate
-  to `worker_Q4_120K` (fresh sessions, never resume — the 01-29 launch rule).
+- **LOOP.LOG TASK LANDED + verified (`4163894`, worker_Q4_120K, clean run at
+  its end 24 %):** `agent_readme_loop.md` `## Loop log` section (location =
+  the looprun autorun folder's `loop_log.md`; the START/RETURN/DONE lines
+  with the maintainer's fields in one consistent format; verbatim-gauge DONE;
+  append-only) + exactly one reference line in each of the 3 live prompts.
+  Planner verification: commit scope = the 4 files + summary; restate-grep
+  (`task-oneliner|RETURN|DONE`) over the prompts = 0 hits; gate unchanged
+  (448 / ruff 0, meta-only). The protocol takes effect from the NEXT
+  autonomous run (no `loop_log.md` created this run).
+- **PLUGIN v2.8 LANDED + verified (fold-in `66c0ac9` + build commit; full
+  record in `handover_task_to_planner.md`):** worker run 2 died on
+  `context_length_exceeded` mid-run having left the build nearly complete
+  UNCOMMITTED; planner verified the work coherent, ran the probe: 62/63 —
+  the ONE failure (check 60) was a PROBE off-by-one (`lBefore` measured after
+  the synchronous log write) — planner one-line inline fix (the direct-edit
+  allowance). Final verification (planner, measured): probe **63/63 PASS
+  exit 0**; gate **448 passed + 1 known warning, ruff F=0**; DoD-3 grep clean
+  (single `promptAsync` call site inside the setImmediate-deferred fn);
+  `temp` git-ignored (probe check 64). Landed = the locked plan from the
+  run-1 summary (resume contract, commit `3b1589c`): v2.8 header block,
+  restructured `onToolAfter` (ONE read → readout append `(NN%/NNNK)` in
+  place + ladder + single-file log `.opencode/temp/ctx.log`
+  `<datetime> [model] (readout)` IFF appended), race-free delivery
+  (`setImmediate` + `session.status()` busy-skip, both carriers). **Production
+  tail PENDING:** takes effect at the next maintainer process restart — the
+  next run confirms from its own appended tool results (no action needed).
 - **NOTE:** the 50% ladder rung fired in THIS session at the first gauge
   (readout CTX=60054 (50%)) — production evidence of the current
   fire-and-forget delivery; the plugin build's idle-deferral replaces that

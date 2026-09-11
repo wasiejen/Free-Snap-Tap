@@ -129,11 +129,54 @@
 // mirror was pure damage. The COMMITTED summary file is canonical; the plugin never touches it
 // anymore. Survivors: the `tool.execute.before` pre-flight warn, the tool.after log line, the
 // nudge ladder, and the chat.message ctx: line (the probe pins the new no-write behavior, S3).
+//
+// v2.8 (2026-09-10/11, plugin-compaction re-scope — the APPROVED re-scoped design of record,
+// recorded in `.opencode/proposals/approved/260910_plugin-compaction-detection.md`
+// "Planner status (2026-09-11, iteration 4)"; the 01-41 re-scope supersedes the 031 minimal
+// read; compaction is ENTIRELY DEACTIVATED — the window cannot be exceeded, so constant
+// current-ctx data matters MORE than compaction detection): ONE per-session gauge read (the
+// existing v2.6 mechanic) per `tool.execute.after` feeds THREE consumers from the SAME read —
+// the readout is no longer threshold-controlled, it fires on EVERY tool result:
+//   (1) READOUT APPEND (031 option 2 — mutate the tool result: linear, cache-safe, no second
+//       message): the MINIMAL form appended to `output.output` IN PLACE — `(NN%/NNNK)` for a
+//       known window (pct = the exact formatGauge pct formula, remK = REM in whole K rounded,
+//       floored at 0), `(NNNK)` for an unknown window; no-total / db-error → append NOTHING
+//       (silent, never throw, NO per-failure log line — the chat.message gauge lines stay the
+//       failure channel); non-string output.output (defensive — the SDK declares string) →
+//       silent skip, the object untouched. Append rule: empty string → readout alone; string
+//       ending `\n` → direct concat; else → `\n` + readout. The tool.after log line is written
+//       FIRST (byte-stable vs v2.7 — it logs the PRE-APPEND output).
+//   (2) LADDER (rungs / dedup / kind:"nudge" evidence unchanged) + RACE-FREE DELIVERY (031
+//       option 1): `deliverNudge` NEVER calls promptAsync synchronously — it schedules
+//       `setImmediate`; INSIDE the deferred fn: a session busy/idle check FIRST (the 031 race —
+//       a promptAsync during an in-flight turn would race it): busy → SKIP SILENTLY (the nudge
+//       evidence line was already appended at fire; the skip adds NO new failure reason);
+//       status fn absent / failing / unknown shape → undefined → the deferral alone still
+//       delivers; else promptAsync fire-and-forget EXACTLY as v2.6 (rejection →
+//       delivery-rejected, sync throw → delivery-threw — both now occur inside the deferred fn,
+//       still evidence-logged).
+//   (3) SINGLE-FILE CTX LOG (the step-3 ruling — SUPERSEDING the per-session
+//       `session_context/<sid>` writeout): ONE append-only file at `.opencode/temp/ctx.log`
+//       (git-ignored; the temp dir is mkdirSync'd recursive; best-effort, never throws).
+//       Entry = leading LOCAL datetime `YYYY-MM-DD_HH-MM` (the general convention) + the
+//       current model (the gauge read's modelId — the field is OMITTED when empty) + the SAME
+//       minimal readout as (1). Written IFF the readout was actually APPENDED (log ⟷ appended
+//       tool returns stay isomorphic — the maintainer's "base the logging on the directly
+//       appended tool returns"); non-ok reads → no entry.
+// SDK type facts (verified in @opencode-ai/plugin/dist/index.d.ts +
+// @opencode-ai/sdk/dist/gen/types.gen.d.ts): `tool.execute.after` input
+// `{tool, sessionID, callID, args}`, output `{title, output: string, metadata}`, the hook
+// returns Promise<void> — the passed `output` object is the ONLY mutation channel (no return
+// value is used). `client.session.status()` → GET /session/status → an ALL-SESSIONS
+// `{ [sessionID]: SessionStatus }` map (SessionStatus.type ∈ "idle" | "busy" | "retry"); the
+// default fields-style result carries the map under `.data` (the 031 sketch's
+// `status({path:{id}})` is NOT the SDK signature — no path argument). The `promptAsync`
+// payload shape is UNCHANGED (one options object, one synthetic text part).
 
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
-import { appendFileSync, readFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 // v2.5 — the native context gauge core (de-peek, TODO.md #30): ONE implementation
 // shared with the self-peek CLI (./scripts/peek.mjs). Reads the opencode db via
 // built-in node:sqlite (read-only, busy_timeout + one retry, NEVER throws — the
@@ -311,6 +354,10 @@ type PromptAsyncClient = {
       path: { id: string };
       body: { parts: Array<{ type: string; text: string; synthetic?: boolean }> };
     }) => Promise<unknown> | unknown;
+    // v2.8 — the ALL-SESSIONS status map (SDK fact — the v2.8 header block): GET
+    // /session/status → { [sessionID]: SessionStatus }. Optional — absent on older
+    // hosts / probe fakes without it → the busy check degrades to the deferral alone.
+    status?: () => Promise<unknown> | unknown;
   };
 };
 
@@ -358,14 +405,30 @@ function nudgeText(rung: number, readout: string): string {
   }
 }
 
-// Fire-and-forget delivery — NEVER awaited in the hook (the tool must not block on it);
-// a missing client (probe without a fake) is a no-op — the nudge line is the record.
-// Rejections and sync-throws are caught and evidence-logged (kind nudge, delivery-*).
+// v2.8 — RACE-FREE delivery (the v2.8 header block, consumer 2): the hook NEVER calls
+// promptAsync synchronously — it schedules a setImmediate tick, and the busy/idle check +
+// the fire-and-forget promptAsync happen INSIDE deferredDeliver (a rejection or sync throw
+// there is still evidence-logged — the delivery-* reasons are unchanged; the busy skip adds
+// NO new failure reason). A missing client (probe without a fake) is a no-op.
 function deliverNudge(sid: string, rung: number, text: string): void {
+  try {
+    setImmediate(() => {
+      void deferredDeliver(sid, rung, text);
+    });
+  } catch {
+    // never throw out of the hook
+  }
+}
+
+// The deferred delivery (runs on the setImmediate tick, OUTSIDE the hook): the busy-check
+// FIRST (the 031 race), then the v2.6 fire-and-forget promptAsync verbatim.
+async function deferredDeliver(sid: string, rung: number, text: string): Promise<void> {
   try {
     const ns = client?.session;
     const fn = ns?.promptAsync;
     if (typeof fn !== "function") return;
+    const st = await sessionStatus(ns, sid);
+    if (st?.type === "busy") return; // skip silently — the evidence line was appended at fire
     const p = fn.call(ns, { path: { id: sid }, body: { parts: [{ type: "text", text, synthetic: true }] } });
     if (p && typeof (p as Promise<unknown>).catch === "function") {
       (p as Promise<unknown>).catch((e) => {
@@ -389,14 +452,90 @@ function deliverNudge(sid: string, rung: number, text: string): void {
   }
 }
 
+// The ALL-SESSIONS status map (SDK fact — the v2.8 header block): client.session.status()
+// → { [sessionID]: SessionStatus } (type ∈ "idle" | "busy" | "retry"); the default
+// fields-style result carries the map under `.data` (both carriers are accepted). Missing
+// fn / failing call / unknown shape → undefined (unknown status must NOT block delivery —
+// the deferral alone still delivers).
+async function sessionStatus(
+  ns: { status?: () => Promise<unknown> | unknown } | undefined,
+  sid: string,
+): Promise<{ type?: unknown } | undefined> {
+  const st = ns?.status;
+  if (typeof st !== "function") return undefined;
+  let res: unknown;
+  try {
+    res = await st.call(ns);
+  } catch {
+    return undefined;
+  }
+  const carrier = (res as { data?: unknown } | null | undefined)?.data ?? res;
+  if (typeof carrier !== "object" || carrier == null) return undefined;
+  const entry = (carrier as Record<string, unknown>)[sid];
+  return typeof entry === "object" && entry != null ? (entry as { type?: unknown }) : undefined;
+}
+
+// v2.8 — the MINIMAL readout (consumer 1, the v2.8 header block): `(NN%/NNNK)` for a known
+// window (pct = the exact formatGauge pct formula; remK = REM in whole K, rounded, floored
+// at 0), `(NNNK)` for an unknown window; a non-ok read (no-total / db-error) → undefined
+// (append NOTHING — silent, never throw, NO per-failure log line).
+function minimalReadout(g: { ok?: boolean; kind?: string; ctx?: number; window?: number }): string | undefined {
+  if (g.kind !== "ok" || g.ok !== true) return undefined;
+  const ctx = g.ctx ?? 0;
+  const w = g.window;
+  if (w == null || w <= 0) return `(${Math.round(ctx / 1000)}K)`;
+  const pct = Math.floor((ctx * 100) / w);
+  const remK = Math.max(0, Math.round((w - ctx) / 1000));
+  return `(${pct}%/${remK}K)`;
+}
+
+// Consumer 1 — append the readout to the tool result IN PLACE (the SDK's `output` object is
+// the only mutation channel; the hook returns nothing). Returns whether the readout was
+// actually appended (consumer 3 — the ctx log — stays isomorphic to that). Append rule:
+// empty string → readout alone; trailing `\n` → direct concat; else → `\n` + readout.
+// Non-string output (defensive — the SDK declares string) → silent skip, the object untouched.
+function appendReadout(output: { output?: unknown }, readout: string | undefined): boolean {
+  if (readout == null) return false;
+  const cur = output.output;
+  if (typeof cur !== "string") return false;
+  output.output = cur === "" ? readout : cur.endsWith("\n") ? cur + readout : cur + "\n" + readout;
+  return true;
+}
+
+// `YYYY-MM-DD_HH-MM` LOCAL (the general convention the step-3 ruling names).
+function localStamp(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`;
+}
+
+// Consumer 3 — the single-file ctx log (the v2.8 header block): `.opencode/temp/ctx.log`
+// (append-only; the temp dir is mkdirSync'd recursive; best-effort, never throws). Entry =
+// leading local datetime + the model (the gauge read's modelId — the field is OMITTED when
+// empty) + the minimal readout.
+function appendCtxLog(modelId: string | undefined, readout: string): void {
+  try {
+    const p = join(dir ?? "", ".opencode", "temp", "ctx.log");
+    mkdirSync(dirname(p), { recursive: true });
+    const model = typeof modelId === "string" && modelId !== "" ? ` ${modelId}` : "";
+    appendFileSync(p, `${localStamp()}${model} ${readout}\n`, "utf8");
+  } catch {
+    // best effort — never break the hook over a write failure
+  }
+}
+
 // The ladder, run on EVERY tool.execute.after (agent-independent). NEVER throws; SILENT on
 // every non-fire (missing session id, no-total/db-error read, below the first rung, an
-// already-fired rung — no log line, the v1.x log-growth discipline).
-async function nudgeLadder(sessionID: string | undefined): Promise<void> {
+// already-fired rung — no log line, the v1.x log-growth discipline). v2.8 — takes the READ
+// (the single shared readGauge in onToolAfter) instead of doing its own: rung compute /
+// dedup / evidence line are unchanged.
+async function nudgeLadder(
+  sessionID: string | undefined,
+  g: { ok?: boolean; kind?: string; ctx?: number; window?: number },
+): Promise<void> {
   try {
     const sid = str(sessionID);
     if (!sid) return;
-    const g = await readGauge(undefined, sid);
     const rung = computeRung(g);
     if (rung < 1) return;
     let fired = nudgeFired.get(sid);
@@ -524,6 +663,8 @@ async function onToolAfter(
   input: ToolPayload,
   output: { title?: unknown; output?: unknown; metadata?: unknown },
 ): Promise<void> {
+  // 1 — the existing tool.after log line FIRST (byte-stable vs v2.7 — it logs the
+  // PRE-APPEND output).
   try {
     append(
       buildLine(
@@ -540,8 +681,22 @@ async function onToolAfter(
   } catch {
     // never throw
   }
-  // v2.6 — the auto-nudge ladder (every session, every tool — agent-independent).
-  await nudgeLadder(input?.sessionID);
+  // v2.8 — ONE per-session gauge read feeds all three consumers from the SAME read (the
+  // v2.8 header block is the design of record): (1) the minimal readout appended to the
+  // tool result, (2) the ladder (now takes the read), (3) the single-file ctx log (written
+  // IFF the readout was appended — isomorphic). NEVER throws; SILENT on every non-ok read.
+  try {
+    const sid = str(input?.sessionID);
+    if (sid) {
+      const g = await readGauge(undefined, sid);
+      const readout = minimalReadout(g);
+      const appended = appendReadout(output, readout);
+      await nudgeLadder(sid, g);
+      if (appended && readout != null) appendCtxLog(g.modelId, readout);
+    }
+  } catch {
+    // never throw
+  }
 }
 
 export default (async (input: PluginInput) => {

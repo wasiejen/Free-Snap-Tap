@@ -6,3 +6,4 @@ bun.lock
 plugin.log
 /plugins/context-meter/**
 /plugins/context-meter.ts
+temp
