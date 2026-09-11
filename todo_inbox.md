@@ -23,13 +23,5 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   TODO entry.
 
 ## 2026-09-11 — worker (T3, compact_memory)
-- Stale probe header vs code: `handover_probe.mjs` line ~28 (the "WHY THAT
-  COMMAND" block) states "`.opencode/package.json` has no "type" field and must
-  not gain one — that would change the plugin's module context", but
-  `.opencode/package.json` currently carries `"type": "module"` (plus a
-  `@opencode-ai/plugin` dependency). Either the header predates the package.json
-  addition and is stale, or the constraint was relaxed — needs a ruling / header
-  correction. Files: `.opencode/plugin/probes/handover_probe.mjs`,
-  `.opencode/package.json`. Why it matters: the header is the probe's
-  documented contract; an agent "fixing" the file to match it would remove the
-  `"type"` field and change the module context.
+- (curated 2026-09-11, iter-2) → `TODO.md` **#51** (stale probe header vs
+  package.json "type" field — maintainer call).

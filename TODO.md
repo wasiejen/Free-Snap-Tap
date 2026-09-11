@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #50, new
-entries start at #51 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #51, new
+entries start at #52 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -244,6 +244,20 @@ reenabled, that is the call.
 ## 38. (closed 2026-09-10, see todo_records.md) — (TEST) explorer smoke test — jill gemmaQ4-256K first launch
 
 ## 35. (closed 2026-09-11, see todo_records.md) — T1 de-peek build — LANDED (continuation 2); tail open: v1.3 log-profile re-baseline (call 1) + #34 residual doc refs (2026-09-10)
+
+## 51. Stale probe header vs `.opencode/package.json` "type" field (2026-09-11, T3 worker flag)
+
+- **Problem / evidence:** the probe "WHY THAT COMMAND" block
+  (`handover_probe.mjs` ≈28) says `.opencode/package.json` "has no 'type'
+  field and must not gain one — that would change the plugin's module
+  context", but the file NOW carries `"type": "module"` (+ the
+  `@opencode-ai/plugin` dep) — verified 2026-09-11.
+- **Outcome (goal):** ruling — is `type: module` the intended current
+  state? (header then corrected) or does the constraint still bind (field
+  removed)?
+- **Acceptance:** header and package.json agree; probe green.
+- **Scope:** the probe header (comment), `.opencode/package.json`.
+- **Status:** OPEN — maintainer call.
 
 ## Closed entries
 

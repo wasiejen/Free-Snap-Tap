@@ -90,14 +90,34 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   unless he moves it to `inbox_planner`; noted for feedback when idle.
   (Potentially useful for context economy — large file relocations burn
   tokens; watch for its inboxing.)
-- **T3 SPEC committed** (tool completion: ≤2 persisted budget + COMPACT
-  line + result note; build on the maintainer's tool shape — the npm
-  verification step is dead). **T3 LAUNCHED**
-  (`worker_Q4_120K` fresh session).
-- **NEXT:** VERIFY T3 (probe N/N + gate 451/ruff 0 + budget mechanic
-  recorded) → T4 standing trigger rule in the 3 acting prompts (SMALL —
-  candidate for planner-direct) → T5 recovery-plugin completion →
-  Cycle-2 live acceptance at the next maintainer process restart.
+- **T3 LANDED + verified (`ccfedfc`, worker_Q4_120K fresh, clean run;
+  worker stopped at ITS stop line 96 %):** gate re-measured BY ME: probe
+  **74/74** (new S10 checks 67-75, sandboxed fake client, disk-persistence
+  proven via cache-busted re-import), pytest **451 + 1 #10 warning**,
+  ruff **F=0**; tool file read through by me — budget = JSON store
+  `.opencode/temp/compact_budget.json` (≤2/session, success-only
+  increment, gate BEFORE the compact call, hand-over refusal note);
+  COMPACT line `<stamp>[ <model>] COMPACT <sid> tokens=<t> messages=<m>
+  [ (<pre-readout>)]` (model/pre-readout best-effort from `context` —
+  the SDK ToolContext declares neither → both omitted in production
+  until the host provides them; session id + params always present);
+  ACCEPTED adjacent FIX: the prototype's directive path separators were
+  JS escape sequences (`\s`/`\a`) silently stripping the pointer — now
+  escaped (sentence unchanged).
+- **Curation:** worker's T3 inbox flag → **TODO #51** (stale probe header
+  vs `package.json` "type" field — maintainer call; facts verified by
+  me: the file carries `"type": "module"`); inbox trimmed to a pointer.
+- **STOPPED at the stop line (90 %/11K) — wind-down, not done.**
+- **NEXT (iteration 3, in order):** T4 standing trigger rule in the 3
+  acting role prompts (ONE short block each — design text is in the
+  approved proposal L3; SMALL, planner-direct candidate); T5
+  recovery-plugin completion on the maintainer's
+  `context_recovery.ts` (default export, shared budget FILE with the
+  tool, informed keep, activation flag default-OFF read from config,
+  over-budget clean fail); then Cycle-2 live acceptance at the next
+  maintainer process restart (real overflow → -WARNING). Standing
+  maintainer calls: the 2 proposals at the `proposals/` root (FST
+  behavior batch + contradiction block) + new #51.
 
 ## 2026-09-11 (new looprun, iteration 1; ses_f6ef5418effeloEwm4zr53XpXa) — approval moves landing; #17/#30/#35 closed; Cycle-1 + rename build
 - **Start state:** HEAD `5a39c3f` (NAP disclosure commit); tree carried the
