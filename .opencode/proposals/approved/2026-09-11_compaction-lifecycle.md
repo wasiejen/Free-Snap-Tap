@@ -2,7 +2,7 @@
 
 Design agreed in chat with the maintainer 2026-09-11 (session
 `ses_f6fd8a0caffedqEYeUMCq0x12f`), built from his
-`proposals/maintainer/inbox_planner/draft/compact_memory/2026-09-11_13-44.md`
+  `proposals/maintainer/inbox_planner/draft/compact_memory/2026-09-11_13-44.md`
 (generic sketches) + today's compaction experiments. Supersedes the
 deferred defect pair (nudge delivery — **moot, nudge deleted**; ctx.log
 event markers — **included here**) and the custom-tool go/no-go in
@@ -150,3 +150,6 @@ now (unblocks the stop-line ceiling and your fork experiments), Cycle 2
 after test 1's answer. On approval: retire
 `2026-09-11_plugin-scope-tool-rename.md` item 1 (custom tool) — the rename
 item survives there; folder moves stay maintainer-side.
+
+maintainer:
+- both cycles approved

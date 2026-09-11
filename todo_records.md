@@ -32,6 +32,9 @@ from the live file).
 ## 32. v2.4 part-schema SchemaError = v2.4.1 + v2.5 nudge ladder spec — CLOSED (maintainer restart live-clean, 2026-09-10) — the root cause + design record: the LIVE `chat.message` input carries only `{sessionID, agent, model}` (no `messageID` — proven from the plugin's OWN scoped evidence reads); the v2.5 nudge ladder spec → #33; the target-scope pre-build call lives at section item 3 (NOT dropped).
 ## 260908-0951 (NAP-copied dedup block) — DEDUP (2026-09-08) — item 1 (116–117 unreachable) → #4; item 2 (lint 6→8 at `ca61a26`) → #5; item 3 (C-class lines covered as by-products — expected state confirmed) → record only (no open work); item 4 (302–303 unreachable + 707 empty-macro contradiction) → #6 + #7.
 ## 47. Docs: §3 undocumented features - CLOSED (looprun 2, iteration 4, docs commit after c4ad33c) - all §3 docs landed (b40a1a7 + 73c0097) + the two residual WIKI lines (shared text/integer variable name-space; horizontal scroll press=right/release=left) applied from the settled planner-verified answers; gate 436 passed / ruff F=0.
+## 17. v1.3 log-growth confirmation — CLOSED (planner, 2026-09-11, approved one-shot read) — post-base segment (base 1269, new base 2474) of `.opencode/plugin.log`: the three silenced types (`file.watcher.updated`/`file.edited`/`session.idle`) = 0 (expected ≈79 % event-line cut verified in kind — they were the growth driver); residual event lines are low-frequency lifecycle only (54 of 1205 lines: message.removed 25, session.created 13, session.error 12, session.compacted 1, todo.updated 1, permission.asked/replied 1+1); new log base 2474 recorded in the NAP.
+## 30. De-peek — CLOSED (planner, 2026-09-11) — the node:sqlite build completed 2026-09-10 (core + v2.5 wiring + probe, token semantics verified); the open tails resolved this cycle: v1.3 log-profile rebaseline done (the #17 one-shot read) + #34 residual doc refs gone (live prompts + repo parts grep-clean; the AGENTS.md copy in `proposals/files/` is archived; `playground/` excluded as maintainer-personal per the date-sweep scope rule).
+## 35. T1 de-peek build — CLOSED (planner, 2026-09-11) — build scope complete since 2026-09-10 (continuation 2); the remaining tail (v1.3 rebaseline + #34 doc refs) resolved this cycle — see the #17 + #30 records.
 
 ## 47. Docs: §3 undocumented features (variable system, invocations, extra start args, numpad debug combos) (2026-09-10, from the #3 residual) (closed 2026-09-10, full text moved from TODO.md)
 
@@ -500,3 +503,113 @@ canonical, tree clean) → closed; the split build launched per the committed sp
    infeasible; the repo convention is date + gate + subject).
 
 ## 50. (closed 2026-09-11, planner-direct, approved by maintainer inbox 11-11) — repo_map.md refresh: (a) §Worker-roster explorer bullet "findings to `TODO.md`" → "findings to `todo_inbox.md` (the planner curates + assigns the TODO IDs)"; (b) §Module-map `.opencode/` bullet now lists `system_prompts/repo/` parts + `agent_readme_*.md` readmes + the `loop/` current-looprun / `archive/loop/` history convention (and drops the stale "draft copies in `proposals/files/`" — they are archived). "Stable facts only" kept — no phase progress introduced.
+
+## 17. (closed 2026-09-11, see one-line record above) — v1.3 log-growth CONFIRMATION — one-shot read, deferred by the no-`plugin.log` constraint (2026-09-08)
+
+- **Problem / evidence:** the old-profile measurement (v1.1+v2 era): the delegation cycle
+  grew the log to 1036 lines / 571 KB in 5 min (≈0.9 KB/s — the "rapid growth" complaint,
+  quantified); child-session lines ≈47 % of total; the residual unsilenced types were
+  `file.watcher.updated` ×41, `file.edited` ×7, `session.idle` ×1. v1.3 = silence exactly
+  those — landed 2026-09-09 (#29 item 3) — but the live byte-ratio of that extension has
+  NOT been measured; measuring requires a read of `plugin.log`, which the standing
+  maintainer constraint forbids except ONE scoped, one-shot read on request.
+- **Outcome (goal):** take the v1.3 profile — ONE scoped, one-shot read of the retained
+  log's post-base segment; expect the three types at 0 + ≈79 % event-line cut; refresh the
+  NAP's log base (currently 1269 — STALE on purpose).
+- **Acceptance:** measured ratio + new log base recorded in the NAP; this entry closes.
+- **Status:** OPEN — MAINTAINER CALL (section above, item 1; default: SKIP unless asked —
+  never parse the log unprompted).
+
+## 30. (closed 2026-09-11, see one-line record above) — De-peek: replace the peek.py shell-out with an in-plugin `node:sqlite` read (2026-09-09)
+
+- **Problem / evidence:** the gauge shell-outs (`$`-tagged-template → `.venv/Scripts/python.exe
+  .opencode/ctxgauge/peek.py`, `handover.ts` ≈301) against the OLD opencode.db schema —
+  fragile (fresh-session `fetchone() → None` class of bug, #21/#24). `node:sqlite` is
+  built into the probe node v24.19.0 (confirm exposed on the system CLI host — it was
+  absent in the electron host).
+- **Outcome (goal — ONE cycle, APPROVED):** (1) in-plugin `node:sqlite` gauge landing +
+  peek.py removal (`.opencode/ctxgauge/` delete, unless the maintainer keeps a
+  standalone-CLI copy — his call) + doc purge (`AGENTS.md` COPY — the original is
+  agent-read-only — + `prompt_agent_planner.md` + `prompt_agent_task.md`); (2) re-baseline
+  the v1.3 log-profile measurement in the SAME cycle (landing de-peek re-baselines the
+  gauge host — the probe's S4 fake-shell gauge shapes must be rebuilt per the #20
+  exception); (3) the read is written against the CURRENT opencode.db schema (`session` /
+  message-token JSON; model id from `session.model`'s `id`) and guards the fresh-session
+  case like peek.py does (no finished message ⇒ `CTX=0`, never throw into the transform) —
+  this replaces the parked #21 v2-schema note.
+- **Carry-over caveat (UNVERIFIED, from the 2026-09-09 dirty `peek.py` diff, committed with
+  that entry):** "should total not be the most current total token number? output should
+  be the generated tokens for the last message so it should be substract output from
+  total" — i.e. `total − output` may already be the right readout — CHECK the token-field
+  meaning BEFORE wiring the same arithmetic into handover.ts; record the verified meaning
+  when done.
+- **Acceptance:** no python shell-out on the gauge path; probe passes (rebuilt S4); the
+  doc references purged (AGENTS.md via the hand-over copy); token semantics recorded here.
+- **Scope:** `.opencode/plugin/handover_v2.4.ts` (readout ≈301), `.opencode/plugin/scripts/`
+  (the gauge core + self-peek CLI — moved out of the former `.opencode/ctxgauge/` on
+  2026-09-10), `prompt_agent_planner.md`, `prompt_agent_task.md`, the AGENTS.md copy.
+- **Token semantics — VERIFIED (record per this cycle's task fact 3, closes the
+  carry-over caveat above):** `total = input + output + cache.read` holds EXACTLY across all
+  recent step rows → `ctx = total − output` = the exact prompt size at the latest finished
+  step = current context at that moment (measured 2026-09-10; the implemented read-out is built on this).
+- **Backend ruling (2026-09-09, maintainer):** the node:sqlite design is SUPERSEDED — the
+  plugin host (opencode.exe, a bun-compiled binary) cannot be trusted with node:sqlite (the
+  T1 worker could not solve a sqlite call via node modules there). The core now spawns the
+  maintainer-placed `.opencode/plugin/tools/sqlite3.exe` (args array, `file:…?mode=ro`,
+  marker SQL `M|…`/`S|…`, no PRAGMA in the call — its echo pollutes stdout). Verified live
+  under node v24.19.0 + bun 1.4.2; the worker's digit corruption (multiplier `105` →
+  `100`/`1000`) fixed; window rule = trailing `<N>K` × 1000 exactly, last marker wins
+  (maintainer-confirmed).
+- **Backend RE-RULING (2026-09-10, maintainer):** the sqlite3.exe spawn backend is
+  SUPERSEDED — back to built-in `node:sqlite` (`DatabaseSync`; node v24.19.0 flag-free per
+  fact 1 of the task spec). Rationale: the 3bit Q3 workers lost coherence on the SQL/JSON
+  detail work; the build now runs on the 4bit same-model worker `worker_Q4_120K`
+  (maintainer restart with the new roster). The bun-compiled opencode.exe host risk is
+  guarded by the never-throw `db-error` fallback; the worker records a bun 1.4.2 host-proxy
+  check; production evidence = maintainer restart + one-shot log read (call 1).
+  `sqlite3.exe` stays on disk (maintainer-placed, now unused — do not delete).
+- **Status:** LANDING (2026-09-10, continuation 2 — node:sqlite re-ruling) —
+  plugin wiring + probe + node:sqlite core landed this cycle — log-profile
+  re-baseline pending maintainer restart + one-shot log read (call 1, default
+  SKIP). bun 1.4.2 host-proxy check: PASS (core import + `readGauge()` green
+  under system bun, kind=ok on the live db). The build scope is complete (core
+  node:sqlite-only, v2.5 plugin wiring + probe 33/33, peek.py deleted); do NOT
+  close — the log-profile tail + #34 residual doc refs remain open.
+  **2026-09-10 (evening, production restart evidence):** the read fails under the
+   PRODUCTION bun host (`db-error`, no `node:sqlite` — Bun error format) → no ctx line
+   lands; see #37 (the bun-1.4.2 system-bun proxy check measured the wrong host).
+   **2026-09-10 (T2 #33): ladder build LANDED —** per-session read (gauge.mjs optional
+  sessionID param) + the v2.6 nudge ladder in handover_v2.4.ts + probe S8 (checks
+  46-53; 52/52 PASS, exit 0) + suite 434/434 + ruff F=0; production evidence (a forced
+  high-readout nudge after a maintainer restart) PENDING.
+
+## 35. (closed 2026-09-11, see one-line record above) — T1 de-peek build — LANDED (continuation 2); tail open: v1.3 log-profile re-baseline (call 1) + #34 residual doc refs (2026-09-10)
+
+- **Problem / evidence:** T1 build (task file `.opencode/handover_task.md`) stopped at the
+  context stop-line: self-gauge read at stop time `CTX=106441 (87%)` (≈14 k left vs. ≈45–50 k
+  estimated for the remainder). Landed + committed: shared gauge core (`ctxgauge/gauge.mjs`)
+  + self-peek CLI (`ctxgauge/peek.mjs`, verified live against the real DB) + peek.py
+  deletion + suite 434/434. NOT landed (spec DoD pending): the v2.5 plugin wiring in
+  `handover_v2.4.ts` (native gauge import + session-gated match-only post + `sess` evidence
+  field + db-error vocabulary + header block + dead shell mechanism deletion), the probe
+  rebuild (currently pointing at the deleted `handover.ts` — stale; S4/S6 shapes per spec),
+  the doc purge (#34), the v1.3 log-profile rebaseline (call 1, default SKIP).
+- **Outcome (goal):** T1 completed per spec (probe `PROBE handover: N/N PASS`, suite 434/434,
+  `peek.mjs` prints the `SESSION=…` line — this one already holds — plugin lands the gated read, #30/#33 tail updates, commit).
+- **Acceptance:** task file DoD items 1–5 all true.
+- **Suggested scope:** `.opencode/plugin/handover_v2.4.ts`, `.opencode/plugin/probes/handover_probe.mjs`, doc files in #34, `TODO.md`.
+- **Status:** OPEN — the T1 build scope itself is COMPLETE (2026-09-10, continuation 2 —
+  see the status tail below); remaining tail = the v1.3 log-profile rebaseline + #34
+  residual doc refs. 2026-09-09 update:
+  the sqlite-via-node:sqlite problem is SOLVED per maintainer ruling — the core
+  (`ctxgauge/gauge.mjs` + `peek.mjs`) landed on the sqlite3.exe backend (planner-direct,
+  verified live, corruption fixed; task file now carries a PLANNER RULING block). Remaining
+  continuation scope: plugin wiring (session-gated match-only post) + probe rebuild +
+  suite/ruff + peek.py deletion + #30/#35 status lines — per the ruling block + DoD.
+  2026-09-10: backend RE-RULING (node:sqlite, see #30) — the committed core's sqlite3.exe
+  read mechanic is re-implemented in continuation 2; the 3bit 210K delegation looped
+  (no partial commits, verified via git log); re-delegated to `worker_Q4_120K`.
+  **2026-09-10 (continuation 2 — LANDED):** node:sqlite core + v2.5 plugin wiring +
+  probe rebuild (33/33) + suite 434/434 + ruff F=0 + peek.py deletion committed;
+  remaining tail = the v1.3 log-profile rebaseline (maintainer call 1) + #34
+  residual doc refs (planner/maintainer-owned).
