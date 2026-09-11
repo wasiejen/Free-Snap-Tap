@@ -88,7 +88,7 @@ that proposal's rename item stays open on its own).
 ## Re-application directive (committed file, pointer-referenced)
 The directive does NOT embed the file list — it points at a committed file
 so protocol changes (e.g. loop.log v2) never require a code change:
-`.opencode/system_prompts/post_compaction_reapply.md`, content:
+`.opencode\system_prompts\agent_readme_post_compaction.md`, content:
 
 ```
 POST-COMPACTION RE-APPLICATION — read this first, act after.
