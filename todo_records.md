@@ -453,3 +453,48 @@ canonical, tree clean) → closed; the split build launched per the committed sp
 
 ## 3. Rework README and WIKI to the current state of the code (2026-09-06) - CLOSED (work LANDED 2026-09-10; curated 2026-09-11, iter 5) - all 15 fix-list items reworded per the 2026-09-06 decisions, each verified against the code before rewording (the per-item evidence status tail lives in TODO.md's git history); the §3-undocumented-features residual went to #47 (closed 2026-09-10).
 ## 40. Explorer run #1 output unreliable (2026-09-10) - CLOSED (maintainer ruling 2026-09-10: the gemma agent option removed, verified in the live opencode.jsonc; curated 2026-09-11, iter 5) - the audit re-run goal was completed via audit 3a/3b (session 4; #48 is the only open audit residual); the gauge-fabrication caveats stand as the explorer-output-check lesson (verify numbers against the real command).
+
+## 48. Packed-word equality checks in the mouse filter: X-button mouseData + LLKHF flags (2026-09-10, #42 report-back) (closed 2026-09-11, full text moved from TODO.md)
+
+- **Problem / evidence:** the #42 audit (ruling: report back on ANY other
+   equality comparison against a packed multi-bit status word / single-bit-in-a-
+   series check) found two production sites of the same defect class in
+   `FST_Keyboard.mouse_win32_event_filter`:
+   (a) `fst_keyboard.py:471-473` — X-button vk mapping compares
+   `data.mouseData == 65536` (x1) / `== 131072` (x2) on EXACT equality; for
+   WM_XBUTTONDOWN/UP the high word is the XBUTTON identifier and the low word
+   is the key state (ctrl/shift) — with a modifier held the low word is
+   nonzero, the equality fails, `get_mouse_vk_code()` returns None and the
+   event is suppressed via `self._mouse_listener.suppress_event()` (≈514)
+   without any rebind/tap processing (silently dropped).
+   (b) `fst_keyboard.py:49` — mouse `is_simulated_key_event` is
+   `flags == 1` on the packed LLKHF flags word; an injected event carrying any
+   other LLKHF bit (e.g. LLKHF_LOWER_IL_INJECTED 0x20) is misclassified as real
+   input. Correct bit-test pattern already in the same file: keyboard
+   `flags & 0x10` (fst_keyboard.py:520). Secondary (playground probe, not
+   production): `playground/pynput_mouse_probe.py:101, 109-125` carries the
+   same patterns. The post-#42 wheel sign test is the reference pattern.
+- **Outcome (goal):** the X-button vk mapping and the mouse simulated-check use
+   bit tests / masks instead of packed-word equality — status bits in the other
+   half of the word must not change the outcome (per the #42 ruling).
+- **Acceptance:** x1/x2 down/up with a nonzero low word (shift/ctrl state)
+   still map to vk 4/5; a flags value `1 | 0x20` is still classified simulated;
+   tests pin both; suite green.
+- **Scope (non-exhaustive):** `fst_keyboard.py` ≈49, ≈471-474; tests in
+  `tests/test_filter_behavior.py::TestMouseWin32Filter`.
+- **Status:** CLOSED (2026-09-11, worker) — the mouse `is_simulated_key_event`
+  now tests bit 0 (`bool(flags & 1)`) and the X-button vk mapping tests the
+  high word (`(data.mouseData >> 16) == 1` → vk 4, `== 2` → vk 5, mirroring the
+  #42 wheel idiom); status bits in the other half of the word do not change
+  the outcome. 3 new tests in `tests/test_filter_behavior.py::TestMouseWin32Filter`:
+  `test_x_buttons_ignores_key_state_low_word` (x1 down/up + x2 down with
+  nonzero low words → vk 4/5), `test_x_button_other_identifier_suppresses`
+  (x3 identifier `196608` → suppress path, regression guard),
+  `test_simulated_flag_bit0_only` (flags 1 / 0x21 simulated; 0 / 0x20 real).
+  The existing `test_x_buttons_use_mousedata_for_vk` +
+  `test_simulated_flag_passthrough` unchanged and green. Gate: `pytest -q` =
+  **451 passed + 1 known #10 warning** (baseline 448 before the new tests);
+  `ruff check --select F .` = 0. Landing commit: the first commit after
+  `00bc24f`, subject "Mouse filter: packed-word equality → bit tests (TODO
+  #48)" (a commit cannot cite its own hash — self-referential SHA is
+  infeasible; the repo convention is date + gate + subject).

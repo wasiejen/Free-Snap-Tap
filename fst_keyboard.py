@@ -462,7 +462,9 @@ class FST_Keyboard():
         # Button.middle
 
         def is_simulated_key_event(flags):
-            return flags == 1
+            # packed LLKHF word: bit 0 = injected; other status bits in the
+            # same word must not matter
+            return bool(flags & 1)
 
         def is_press(msg):
             if msg in FST_Keyboard.MSG_MOUSE_DOWN:
@@ -484,9 +486,11 @@ class FST_Keyboard():
             if msg in [519, 520]:
                 return 3
             if msg in [523, 524]:
-                if data.mouseData == 65536:
+                # x-button identifier = high 16 bits of mouseData; the low
+                # word holds key state (ctrl/shift) and must not matter
+                if (data.mouseData >> 16) == 1:
                     return 4
-                if data.mouseData == 131072:
+                if (data.mouseData >> 16) == 2:
                     return 5
             if msg == FST_Keyboard.MSG_MOUSE_SCROLL_VERTICAL:
                 return 6

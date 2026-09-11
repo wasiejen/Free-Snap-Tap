@@ -155,36 +155,7 @@ reenabled, that is the call.
   `XXX 241016-1101` pin at ≈791 is HIS find-marker — do not remove or reword it on his
   behalf. Content verbatim from the 2026-09-08 record.
 
-## 48. Packed-word equality checks in the mouse filter: X-button mouseData + LLKHF flags (2026-09-10, #42 report-back)
-
-- **Problem / evidence:** the #42 audit (ruling: report back on ANY other
-   equality comparison against a packed multi-bit status word / single-bit-in-a-
-   series check) found two production sites of the same defect class in
-   `FST_Keyboard.mouse_win32_event_filter`:
-   (a) `fst_keyboard.py:471-473` — X-button vk mapping compares
-   `data.mouseData == 65536` (x1) / `== 131072` (x2) on EXACT equality; for
-   WM_XBUTTONDOWN/UP the high word is the XBUTTON identifier and the low word
-   is the key state (ctrl/shift) — with a modifier held the low word is
-   nonzero, the equality fails, `get_mouse_vk_code()` returns None and the
-   event is suppressed via `self._mouse_listener.suppress_event()` (≈514)
-   without any rebind/tap processing (silently dropped).
-   (b) `fst_keyboard.py:49` — mouse `is_simulated_key_event` is
-   `flags == 1` on the packed LLKHF flags word; an injected event carrying any
-   other LLKHF bit (e.g. LLKHF_LOWER_IL_INJECTED 0x20) is misclassified as real
-   input. Correct bit-test pattern already in the same file: keyboard
-   `flags & 0x10` (fst_keyboard.py:520). Secondary (playground probe, not
-   production): `playground/pynput_mouse_probe.py:101, 109-125` carries the
-   same patterns. The post-#42 wheel sign test is the reference pattern.
-- **Outcome (goal):** the X-button vk mapping and the mouse simulated-check use
-   bit tests / masks instead of packed-word equality — status bits in the other
-   half of the word must not change the outcome (per the #42 ruling).
-- **Acceptance:** x1/x2 down/up with a nonzero low word (shift/ctrl state)
-   still map to vk 4/5; a flags value `1 | 0x20` is still classified simulated;
-   tests pin both; suite green.
-- **Scope (non-exhaustive):** `fst_keyboard.py` ≈49, ≈471-474; tests in
-  `tests/test_filter_behavior.py::TestMouseWin32Filter`.
-- **Status:** OPEN — implicitly approved per the #42 report-back ruling
-  (260910); delegation-ready.
+## 48. (closed 2026-09-11, first commit after `00bc24f`, see todo_records.md) — Packed-word equality checks in the mouse filter: X-button mouseData + LLKHF flags (2026-09-10, #42 report-back)
 
 ## Docs & misc (open)
 
