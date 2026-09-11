@@ -11,6 +11,7 @@
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { tool } from "@opencode-ai/plugin"
 
 // Define the reusable injection directive string. NOTE (T3): the prototype's
 // single backslashes were JS escape sequences (`\s`, `\a`) that silently
@@ -151,67 +152,53 @@ function appendCompactLine(root: string, context: any, sessionID: string, tokens
 /**
  * 1. CUSTOM TOOL: Agent Self-Compaction Tool
  */
+// -- maintainer: adapted to the tool() function and is now visible to agents (tested) and live right now
+// but does not work: returns "undefined is not an object (evaluating 'context.client.session'""
+export default tool({
+  description: "Triggers immediate session compaction to free context space.",
+  args: {
+    keepTokens: tool.schema.number().describe("Number of recent tokens to retain (e.g. 10000 or 30000)"),
+    keepMessages: tool.schema.number().describe("Number of recent messages to retain (e.g. 6 or 12)"),
+    sessionID: tool.schema.string().describe("Number of recent messages to retain (e.g. 6 or 12)"),
+  },
 
-export default {
-  tools: {
-    compact_memory: {
-      description: "Triggers immediate session compaction to free context space.",
-      parameters: {
-        type: "object",
-        properties: {
-          keepTokens: {
-            type: "number",
-            description: "Number of recent tokens to retain (e.g. 10000 or 30000)"
-          },
-          keepMessages: {
-            type: "number",
-            description: "Number of recent messages to retain (e.g. 6 or 12)"
-          },
-          sessionID: {
-            type: "string",
-            description: "String of the Session ID to be compacted (e.g. ses_f6ebb2c22ffeyEOWXquADsZ091)"
-          }
-        }
-      },
-      execute: async (args: any, context: any) => {
-        try {
-          // Extract with fallback defaults if the agent omits an argument
-          const tokensToKeep = args?.keepTokens ?? 30000;
-          const messagesToKeep = args?.keepMessages ?? 12;
-          const sessionID = args?.sessionID ?? context?.sessionId ?? context?.sessionID;
+  execute: async (args: any, context: any) => {
+    try {
+      // Extract with fallback defaults if the agent omits an argument
+      const tokensToKeep = args?.keepTokens ?? 30000;
+      const messagesToKeep = args?.keepMessages ?? 12;
+      const sessionID = args?.sessionID ?? context?.sessionId ?? context?.sessionID;
 
-          if (typeof sessionID !== "string" || sessionID === "") {
-            return "Compaction request failed: no session id available (pass the sessionID argument or a context session id).";
-          }
-
-          // The budget gate (≤2 per session id, self + emergency combined) comes
-          // BEFORE the compact call: exhausted → the hand-over note, no compact.
-          const root = resolveRoot(context);
-          if (budgetExhausted(root, sessionID)) {
-            return `Compaction refused: the session compaction budget (${COMPACT_BUDGET_PER_SESSION} per session, self + emergency combined) is exhausted for ${sessionID}. Hand over and start fresh — write the handover summary and let the loop restart with a fresh session.`;
-          }
-
-          await context.client.session.compact({
-            path: { id: sessionID },
-            body: {
-              keep: {
-                tokens: tokensToKeep,
-                messages: messagesToKeep
-              }
-            }
-          });
-
-          // Success only: persist the budget increment + write the COMPACT line
-          // (both best-effort — the compaction itself already happened).
-          recordSuccess(root, sessionID);
-          appendCompactLine(root, context, sessionID, tokensToKeep, messagesToKeep);
-
-          // Returning this string ensures the post-compaction response contains the directive
-          return `Context successfully compacted: kept last ${messagesToKeep} messages / ${tokensToKeep} tokens.\n\n${COMPACTION_RELOAD_DIRECTIVE}`;
-        } catch (err: any) {
-          return `Compaction request failed: ${err.message}`;
-        }
+      if (typeof sessionID !== "string" || sessionID === "") {
+        return "Compaction request failed: no session id available (pass the sessionID argument or a context session id).";
       }
+
+      // The budget gate (≤2 per session id, self + emergency combined) comes
+      // BEFORE the compact call: exhausted → the hand-over note, no compact.
+      const root = resolveRoot(context);
+      if (budgetExhausted(root, sessionID)) {
+        return `Compaction refused: the session compaction budget (${COMPACT_BUDGET_PER_SESSION} per session, self + emergency combined) is exhausted for ${sessionID}. Hand over and start fresh — write the handover summary and let the loop restart with a fresh session.`;
+      }
+
+      await context.client.session.compact({
+        path: { id: sessionID },
+        body: {
+          keep: {
+            tokens: tokensToKeep,
+            messages: messagesToKeep
+          }
+        }
+      });
+
+      // Success only: persist the budget increment + write the COMPACT line
+      // (both best-effort — the compaction itself already happened).
+      recordSuccess(root, sessionID);
+      appendCompactLine(root, context, sessionID, tokensToKeep, messagesToKeep);
+
+      // Returning this string ensures the post-compaction response contains the directive
+      return `Context successfully compacted: kept last ${messagesToKeep} messages / ${tokensToKeep} tokens.\n\n${COMPACTION_RELOAD_DIRECTIVE}`;
+    } catch (err: any) {
+      return `Compaction request failed: ${err.message}`;
     }
   }
-};
+});
