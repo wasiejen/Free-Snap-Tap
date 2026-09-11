@@ -42,7 +42,7 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
 ## Instruction index
 - `.opencode/system_prompts/agent_readme_loop.md` — read when driving the loop
   (autonomous launch): iteration semantics, the autorun archive convention
-  (incl. the session marker), closing + interrupt handling.
+  (incl. the session marker), the §Loop log protocol, closing + interrupt handling.
 
 ## Loop hygiene
 - At 85%, stop cleanly and print the summary — you cannot restart yourself.

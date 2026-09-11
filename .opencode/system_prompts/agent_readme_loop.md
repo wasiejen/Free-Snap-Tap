@@ -28,6 +28,32 @@ not here.
   before the worker launch) and `plan<N>_ho_task_to_planner.md` (the worker
   summary, copied after verification).
 
+## Loop log
+- The looprun activity log — who ran when, on what; for the loop itself and for
+  the maintainer after the fact.
+- ONE file per looprun, in that looprun's autorun archive folder:
+  `.opencode/archive/autorun-<YYYY-MM-DD_HH-MM>/loop_log.md` — append only,
+  created on first write. (Distinct from the looprunner's own
+  `.opencode/loop_log.md`, §Looprunner's own file.) Loopruns only — interactive
+  sessions have no log.
+- One line per event, `date_time TYPE session_id agent_model <extra>`:
+  - `START` — looprunner, planner, and worker each write one at their own
+    session/task start; `<extra>` is the task-oneliner.
+  - `RETURN` — planner and looprunner each write one when a sub-agent returns;
+    the id/model name the RETURNED agent.
+  - `DONE` — EVERY agent writes one on task completion; `<extra>` is the final
+    gauge readout `<CTX>%/<REM>K` — verbatim from the gauge command, never
+    guessed.
+- Examples (one per type):
+  ```
+  2026-09-11_09-30 START  ses_abc123 Qwen3.8-27B-IQ4KT-120K plan3: loop-log section
+  2026-09-11_09-45 RETURN ses_abc123 Qwen3.8-27B-IQ4KT-120K
+  2026-09-11_10-02 DONE   ses_abc123 Qwen3.8-27B-IQ4KT-120K 42%/78K
+  ```
+- `session_id` is the `SESSION=` field of the injected `ctx:` line.
+- Discipline: append only; NO curation of this file — a dead session loses at
+  most its unfinished tail.
+
 ## Interrupt handling
 - Rebuild from committed state: `git log`, the NAP
   (`.opencode/handover/handover_planner.md`), `TODO.md` — never from memory.

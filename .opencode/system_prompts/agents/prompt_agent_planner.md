@@ -45,6 +45,8 @@ The Looprunner launches you with no maintainer to ask. On start:
   planner finished). Before launching a worker, copy `handover_task.md` in as
   `plan<N>_ho_task.md`; after verifying the worker, copy `handover_task_to_planner.md` in as
   `plan<N>_ho_task_to_planner.md`.
+- **Loop log:** the looprun activity log — its protocol lives in
+  `agent_readme_loop.md` §Loop log.
 - **Explorer fallback:** if a task is too open-ended to delegate safely, delegate it to the
   explorer role to map it into `TODO.md` entries first.
 - Always end by making the NAP current and emit exactly one `action:` line (AGENTS.md

@@ -25,6 +25,8 @@ All paths below are relative to `.opencode/system_prompts/`.
 - `repo/repo_gotchas.md` — read when debugging odd behavior, or before editing
   code in the areas named there.
 - `agent_readme_todo.md` — read when appending findings to `todo_inbox.md`.
+- `agent_readme_loop.md` — §Loop log defines the activity-log lines you write at session
+  start and task completion.
 
 ## Work loop
 - Follow existing conventions: read the neighboring code first, mimic style, reuse existing
