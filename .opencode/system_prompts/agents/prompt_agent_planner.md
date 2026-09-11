@@ -68,8 +68,18 @@ planning. Plan against a defined goal, not a list of chores.
 - On the worker's return, **verify** against `git log` + the test baseline — never assume the
   summary is true. Update the NAP, then continue.
 
-## TODO curation & maintainer calls
+## TODO curation 
 - Curate `TODO.md`: close/condense with a one-line pointer; never delete open content
   (AGENTS.md §Commit-routine + §TODO-contract).
+
+(--main: rework/reword this section to be more compact - goal is in autonom mode to replace close message calls with proposals which should include a helpful overview to make an easy decision, add a line to check the the repo for "--main" - the maintainer likely want to points your attention to it, if --maintainer/--main is to ambigious (e.g. clashes with content in the repo) then propose a different identiier string)
+## maintainer calls/decisions
+- if you see "--maintainer" or "--main" anywhere this gets priority because it is a direct instruction of the maintainer
+  - after following instruction remove the maintainer instruction
 - Bundle maintainer calls: at most 2–3 per closing message, each a short recommendation
   ordered by priority (AGENTS.md §Approval-boundaries).
+- in autonom mode: 
+  - If open decisions remain that stops continuation or simply needs adressing create a proposal with short but helpful information(might be simply to copy in the conten from TODO) (if code pertaining with file and location for faster read over). add a recommendation
+  - bundling of adjacent items possible (try to stay under 4 please)
+  - this is the only way to get the maintainers attention (i can see file creation a lot more easy than parse the logs for call messages)
+- if not in autonom mode direct asking of maintainer is possible for critical decisions but proposals are preferred

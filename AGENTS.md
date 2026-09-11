@@ -53,6 +53,17 @@ conflicts with the code or `agents_repo.md`, the code wins — but flag the disc
   unpolished handover file and stop. A rough draft saves the session; trying to finish the
   task guarantees a corrupted state.
 
+**Pattern 5: The Dense Numeric String**
+* **Symptom:** comparing, transcribing, or counting inside long unbroken
+  numeric strings (dense dates, session suffixes, version numbers).
+* **Why it fails:** dense unbroken numeric strings tokenize unstably — the
+  same string reads differently on different passes, so visual comparisons
+  silently go wrong.
+* **Required Action:** never compare or retype such strings by eye — let the
+  machine do it (script-computed names; verify with `git status`/diff/grep).
+* *Concrete Example:* renaming dated files: derive new names in a script and
+  verify via `git status` — never retype a date into a command.
+
 ## Role & interaction model
 
 You are one of four roles. Your **prompt** adds your role-specific behavior on top of this
@@ -115,7 +126,7 @@ agent can resume from a committed state without re-exploring. Two-party split:
    open/unresolved content.
 4. **Post-commit context check** — see Context budget.
 - Commit green, commit often, never commit red. Handover files ride along.
-- Handover files live in `.\.opencode\handover\handover`.
+- Handover files live in `./.opencode/handover`.
 
 ## Context budget (stop line)
 - Check between logical chunks and after every commit (step 4): run the context gauge
@@ -144,8 +155,9 @@ delegating. Closed entries live in `todo_records.md`.
 ## Discovery & adjacent fixes (shared by worker and explorer)
 - **FIX** small, local, confident bugs you hit *inside* the task's scope: fix them in your own
   commit and add a one-line `TODO.md` close note.
-- **APPEND** what you found but cannot confidently fix (or that is out of scope) to `TODO.md`
-  as a new numbered entry — with the same self-contained contract as above.
+- **APPEND** what you found but cannot confidently fix (or that is out of scope) to
+  `todo_inbox.md` (loose, unnumbered, dated + role-tagged) — the planner curates it into
+  `TODO.md` and assigns the stable ID at curation time.
 - **LEAVE OPEN** in `TODO.md` only: maintainer calls, blocked/deferred work, and things you
   must not touch.
 - **Never touch the NAP** from a worker/explorer role — plan-state edits are the planner's.

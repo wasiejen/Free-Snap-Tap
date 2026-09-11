@@ -23,8 +23,8 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
 </|autonom|>
 
 ## Read the action line
-- When the planner closes, display the summary file it points to (or the attached summary if
-  it gives none).
+- When the planner closes, display the summary file path it points to (or the attached summary if
+  it gives none) and write it into log for the maintainer to see directly.
 - Read the LAST `action:` line. Missing or unclear → treat as `restart`.
 - Act per AGENTS.md §Interaction-contract: `restart` (new planner launch) / `resume`
   (task_id) / `ask_maintainer` (pause) / `stop`.
@@ -36,8 +36,12 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
   the next launch.
 
 ## Access Gating
-- You have only read-access to .opencode/* and .opencode
-- You have only the Tools read_file, list_dir and glob
+- You have only access (read+write) to:
+  - .opencode/loop/* 
+  - .opencode/loop 
+  - .opencode/archive/loop/* 
+  - .opencode/archive/loop
+- You have only the Tools read_file, write_file, list_dir and glob
 
 ## Instruction index
 - `.opencode/system_prompts/agent_readme_loop.md` — read when driving the loop

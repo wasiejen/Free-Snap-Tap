@@ -111,31 +111,31 @@
     },
   "subagent_depth": 2,
   "agent": {
-    "clean looprunner_dump": {
-      "description": "very simple looprunner without agents.md and limited contextsize and limited intelligence",
-      "mode": "primary",
-      "model": "llama-swap/CPU-Qwen3.5-4B",
-      "temperature": 0.1,
-      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_looprunner.md}",
-      "tools": {
-          "read_file": true,
-          "list_dir": true,
-          "glob": true
-        },
-        "permission": {
-          "*": "deny",
-          "task": "allow",
-          "read": {
-            ".opencode/*": "allow",
-            ".opencode": "allow"
-          }
-        },
-      "options": {
-        "load_project_docs": false,
-        "load_agents_md": false,
-        "load_workspace_tree": false
-      }
-    },
+    // "clean looprunner_dump": {
+    //   "description": "very simple looprunner without agents.md and limited contextsize and limited intelligence",
+    //   "mode": "primary",
+    //   "model": "llama-swap/CPU-Qwen3.5-4B",
+    //   "temperature": 0.1,
+    //   "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_looprunner.md}",
+    //   "tools": {
+    //       "read_file": true,
+    //       "list_dir": true,
+    //       "glob": true
+    //     },
+    //     "permission": {
+    //       "*": "deny",
+    //       "task": "allow",
+    //       "read": {
+    //         ".opencode/*": "allow",
+    //         ".opencode": "allow"
+    //       }
+    //     },
+    //   "options": {
+    //     "load_project_docs": false,
+    //     "load_agents_md": false,
+    //     "load_workspace_tree": false
+    //   }
+    // },
     "looprunner_Q4_120k": {
       "description": "Just restarts the Planner in autnomous mode, same model als planner_Q4_120K for fast switching",
       "mode": "primary",
@@ -144,6 +144,7 @@
       "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_looprunner.md}",
       "tools": {
           "read_file": true,
+          "write_file": true,
           "list_dir": true,
           "glob": true
         },
@@ -151,8 +152,16 @@
           "*": "deny",
           "task": "allow",
           "read": {
-            ".opencode/*": "allow",
-            ".opencode": "allow"
+            ".opencode/loop/*": "allow",
+            ".opencode/loop": "allow",
+            ".opencode/archive/loop/*": "allow",
+            ".opencode/archive/loop": "allow"
+          },
+          "write": {
+            ".opencode/loop/*": "allow",
+            ".opencode/loop": "allow",
+            ".opencode/archive/loop/*": "allow",
+            ".opencode/archive/loop": "allow"
           }
         },
       "options": {
