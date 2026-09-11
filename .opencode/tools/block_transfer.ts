@@ -5,54 +5,16 @@ import { tool } from "@opencode-ai/plugin"
 // Persistent memory cache for named clipboards across tool invocations within the session
 const clipboardBuffers: Record<string, string[]> = {};
 
-//--maintainer needs to be translated from the non tool() format into this to be registered as plugin
-// i do not know how the enum of line 27 translates into this schema
-// e.g.
-//
- // export default tool({
-   // description: "Query the project database",
-   // args: {
-     // mode: tool.schema.string().nonoptional().describe("XXX"),
-//
-
-
-export default {
-  name: "block_transfer",
+export default tool({
   description: "Performs low-token line-range editing operations (MOVE, COPY, CUT, PASTE, DELETE, CLEAR) across files using unique anchor markers and internal named clipboards.",
-  parameters: {
-    type: "object",
-    properties: {
-      mode: {
-        type: "string",
-        enum: ["MOVE", "COPY", "CUT", "PASTE", "DELETE", "CLEAR"],
-        description: "Operation mode: MOVE (immediate cut-and-paste), COPY (yank to buffer), CUT (yank to buffer and delete from source), PASTE (write buffer to target), DELETE (cut to null), CLEAR (empty buffer)."
-      },
-      srcFile: {
-        type: "string",
-        description: "Source file path. Required for MOVE, COPY, CUT, and DELETE."
-      },
-      dstFile: {
-        type: "string",
-        description: "Destination file path. Required for MOVE or PASTE."
-      },
-      startMarker: {
-        type: "string",
-        description: "Unique line anchor marking the beginning of the block (MOVE, COPY, CUT, DELETE)."
-      },
-      endMarker: {
-        type: "string",
-        description: "Unique line anchor marking the end of the block (MOVE, COPY, CUT, DELETE)."
-      },
-      targetMarker: {
-        type: "string",
-        description: "Unique line anchor in dstFile where the block should be inserted. If omitted in MOVE or PASTE, appends to EOF."
-      },
-      bufferName: {
-        type: "string",
-        description: "Name of the clipboard buffer (defaults to 'default'). Allows managing multiple clipboards."
-      }
-    },
-    required: ["mode"]
+  args: {
+    mode: tool.schema.enum(["MOVE", "COPY", "CUT", "PASTE", "DELETE", "CLEAR"]).describe("Operation mode: MOVE (immediate cut-and-paste), COPY (yank to buffer), CUT (yank to buffer and delete from source), PASTE (write buffer to target), DELETE (cut to null), CLEAR (empty buffer)."),
+    srcFile: tool.schema.string().optional().describe("Source file path. Required for MOVE, COPY, CUT, and DELETE."),
+    dstFile: tool.schema.string().optional().describe("Destination file path. Required for MOVE or PASTE."),
+    startMarker: tool.schema.string().optional().describe("Unique line anchor marking the beginning of the block (MOVE, COPY, CUT, DELETE)."),
+    endMarker: tool.schema.string().optional().describe("Unique line anchor marking the end of the block (MOVE, COPY, CUT, DELETE)."),
+    targetMarker: tool.schema.string().optional().describe("Unique line anchor in dstFile where the block should be inserted. If omitted in MOVE or PASTE, appends to EOF."),
+    bufferName: tool.schema.string().optional().describe("Name of the clipboard buffer (defaults to 'default'). Allows managing multiple clipboards.")
   },
 
   execute: async (args: any, context: any) => {
@@ -168,4 +130,4 @@ export default {
       return `block_transfer failed: ${err.message}`;
     }
   }
-};
+});
