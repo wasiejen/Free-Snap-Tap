@@ -47,10 +47,26 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   budget, cycle split); the draft's `session.compact`/`promptAsync` call
   shapes are the reference for the SDK wiring. NOT in this task: the Cycle-2
   recovery path (session.error hook + activation flag + -WARNING verification).
-- **NEXT:** verify the worker's build (commit scope + probe + gate + spot-
-  checks); then Cycle 2 (recovery path) as the next task; the live evidence
-  (tool actually compacts a session + directive re-application) lands at the
-  next maintainer process restart.
+- **STOPPED at the stop line (93 %, REM≈8K) — wind-down, not done:** the
+  worker launch did NOT happen this session (starting the build past the line
+  was a rule violation). The spec is committed + delegation-ready — iteration
+  2 opens by LAUNCHING it per the committed spec (`handover_task.md`, copy in
+  the loop folder), fresh `worker_Q4_120K` (maintainer rule: always a new
+  agent, never a resume), then VERIFY (commit scope + probe N/N + gate 451/
+  ruff 0 + spot-checks: rename grep-clean, directive file verbatim vs the
+  proposal, 3 prompt blocks only, budget persistence mechanic recorded).
+  Skipped as optional: the draft-folder feedback note (his README invites it
+  when idle) + the probe-count check for the launch.
+- **NEXT (iteration 2, in order):** 1. LAUNCH + VERIFY the Cycle-1 + rename
+  build per the committed spec (above); 2. then Cycle 2 (recovery path:
+  session.error hook, informed keep, synthetic directive injection, shared
+  budget, over-budget clean fail, activation flag default-OFF, -WARNING
+  verification) — spec needs fresh reads of the hook surface; 3. the live
+  evidence (the tool actually compacts a session + the agent follows the
+  re-application file) lands at the next maintainer process restart — the
+  next run confirms from its own tool results. Standing maintainer calls
+  unchanged (FST behavior batch + contradiction block = the 2 proposals still
+  at the proposals/ root, awaiting his ruling).
 
 ## 2026-09-11 (same direct run, post-compaction chat segment; ses_f6fd8a0caffedqEYeUMCq0x12f) — compaction-lifecycle design agreed + proposal written
 - Maintainer ran compaction experiments in this session (keep 30K tokens +
