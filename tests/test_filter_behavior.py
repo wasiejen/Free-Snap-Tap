@@ -356,6 +356,29 @@ class TestMouseWin32Filter:
         kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=131072))  # x2 down
         kb._win32_event_filter.assert_called_with(5, 1234, True, False, True)
 
+    def test_x_buttons_ignores_key_state_low_word(self, kb_env_ns, monkeypatch):
+        # x-button identifier = high 16 bits of mouseData; the low word holds
+        # key state (ctrl/shift) and must not matter (#42 ruling)
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=65536 | 0x0010))  # x1 down + shift
+        kb._win32_event_filter.assert_called_with(4, 1234, True, False, True)
+        kb.mouse_win32_event_filter(524, mouse_msg_data(mouse_data=65536 | 0x0101))  # x1 up + ctrl/alt
+        kb._win32_event_filter.assert_called_with(4, 1234, False, False, True)
+        kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=131072 | 0x0101))  # x2 down
+        kb._win32_event_filter.assert_called_with(5, 1234, True, False, True)
+
+    def test_x_button_other_identifier_suppresses(self, kb_env_ns, monkeypatch):
+        # an x-button identifier other than x1/x2 resolves no vk_code ->
+        # suppress path (unchanged behavior, regression guard)
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        kb._mouse_listener = MagicMock()
+        kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=196608))  # x3
+        kb._win32_event_filter.assert_not_called()
+        kb._mouse_listener.suppress_event.assert_called_once_with()
+        kb._listener.suppress_event.assert_not_called()
+
     def test_scroll_messages_map_to_vk_6_and_7(self, kb_env_ns, monkeypatch):
         kb = kb_env_ns.kb
         self.patch_filter(kb, monkeypatch)
@@ -384,6 +407,20 @@ class TestMouseWin32Filter:
         kb.mouse_win32_event_filter(513, mouse_msg_data(flags=1))
         kb._win32_event_filter.assert_called_with(1, 1234, True, True, True)
         kb.mouse_win32_event_filter(513, mouse_msg_data(flags=0))
+        kb._win32_event_filter.assert_called_with(1, 1234, True, False, True)
+
+    def test_simulated_flag_bit0_only(self, kb_env_ns, monkeypatch):
+        # packed LLKHF word: bit 0 = injected; other status bits (e.g.
+        # LLKHF_LOWER_IL_INJECTED 0x20) must not change the outcome
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        kb.mouse_win32_event_filter(513, mouse_msg_data(flags=1))
+        kb._win32_event_filter.assert_called_with(1, 1234, True, True, True)
+        kb.mouse_win32_event_filter(513, mouse_msg_data(flags=0x21))  # injected + lower-IL
+        kb._win32_event_filter.assert_called_with(1, 1234, True, True, True)
+        kb.mouse_win32_event_filter(513, mouse_msg_data(flags=0))
+        kb._win32_event_filter.assert_called_with(1, 1234, True, False, True)
+        kb.mouse_win32_event_filter(513, mouse_msg_data(flags=0x20))  # lower-IL only
         kb._win32_event_filter.assert_called_with(1, 1234, True, False, True)
 
     def test_unrecognized_mouse_event_suppresses(self, kb_env_ns, monkeypatch):
