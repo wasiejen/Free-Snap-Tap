@@ -30,8 +30,9 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
   (task_id) / `ask_maintainer` (pause) / `stop`.
 
 ## Maintainer messages (routing)
-- No prefix, or `--planner`: for the planner — append to the next launch, verbatim.
+- No prefix, or `--planner`: for the planner — append to the next launch, verbatim (including --main or --maintainer prefix).
 - `--loop` / `--looprunner`: for you — take effect at the next closing; acknowledge now.
+- 
 - After an `ask_maintainer` pause, the next un-prefixed message is the answer — append it to
   the next launch.
 

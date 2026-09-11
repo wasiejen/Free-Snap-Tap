@@ -2,11 +2,18 @@
   "$schema": "https://opencode.ai/config.json",
   "disabled_providers": [],
   // needs to be tested
+  "plugins": [
+    "./.opencode/plugin/context_recovery.ts"
+  ],
+  "tools": {
+    "block_transfer": true, // to be tested
+    "compact_memory": true  // to be tested
+  },
   "compaction": {
     "auto": false,
       "keep": {
         "system": true,
-        "tokens": 30000, //excluding system prompt - lands around 60k token wiht 12 messages
+        "tokens": 30000, //excluding system prompt - with sp and last messages lands around 60k token wiht 12 messages
         "messages": 12
     },
     // how close to the defined limit is allowed, default 20000

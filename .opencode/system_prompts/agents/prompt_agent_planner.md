@@ -28,6 +28,7 @@ All paths below are relative to `.opencode/system_prompts/`.
   design change.
 - `agent_readme_todo.md` — read when curating `TODO.md` / `todo_inbox.md` or
   assigning entry IDs.
+- `agent_readme_task_spec.md` — read when creating tasks for agents and write specificatins
 - `agent_readme_loop.md` — read when driving the loop (autonomous launch).
 
 ## Autonomous mode (when the launch message carries `<|autonom|>`)
