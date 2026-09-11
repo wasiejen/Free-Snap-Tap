@@ -2,6 +2,77 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-11 (DIRECT planner run; ses_f6fd8a0caffedqEYeUMCq0x12f) — inbox 11-11 handled: loop.log v2 + loop/ reorg + #50 + decision proposals
+- **Start state:** HEAD `b11e1b8` (maintainer PR merge + `6bcb80f` cleanup: new
+  live prompts, AGENTS.md swap done, drafts → `archive/proposals/files/`,
+  plan4/5 summaries relocated, `opencode.jsonc` compaction `auto:false` +
+  looprunner access gating to `loop/`). Tree clean except the maintainer's
+  looprunner-prompt Access-Gating tweak (adopted into the commit below).
+  Baseline carried: **451 passed** / ruff F=0 / probe 63/63 (meta-only run —
+  no FST code touched; NOT re-gated at the stop line).
+- **Folder reorg (maintainer #2):** the 5 `archive/autorun-…/` dirs →
+  `archive/loop/` (21 files, zero loss); the CURRENT looprun now lives in
+  `.opencode/loop/autorun-2026-09-11_13-24/` (loop_log.md in the NEW format;
+  session-id marker files RETIRED — the loop log records session ids).
+- **Loop.log v2 protocol (maintainer #1):** `agent_readme_loop.md` §Loop
+  folder + §Loop log rewritten: line =
+  `date_time <STATUS> <role>[-<iter>] <session_id> <model> <content>`; 8-char
+  statuses `START-->` / `-RETURN-` / `--INFO--` / `-WARNING` (failed
+  sub-agent `context_length_exceeded` → failed session id + cause) /
+  `<---DONE` (verbatim gauge `<CTX>%/<REM>K`); rollover at iteration 1
+  (move current → `archive/loop/`, create new); looprunner prompt: lookup
+  line = last `START-->` `planner-*` line of `loop/autorun-…/loop_log.md`;
+  planner prompt: loop-folder bullet reworded (marker rule dropped).
+- **Planner prompt maintainer-calls section REWORKED** (per the embedded
+  `--main` instruction, marker line then removed): priority marker rule +
+  grep-the-repo-for-`--main` line + autonom → proposals (≤4, overview +
+  pointers + ONE recommendation). Identifier VERIFIED unambiguous (no clash
+  in FST content; only third-party venv docs) → `--main`/`--maintainer` stays.
+- **#50 LANDED + CLOSED** (approved in the inbox; planner-direct, explicit
+  task per the maintainer-owned-parts rule): `repo_map.md` — explorer roster
+  bullet → `todo_inbox.md` (planner curates); `.opencode/` module-map bullet
+  now lists `system_prompts/repo/` parts + `agent_readme_*.md` + the
+  `loop/`/`archive/loop/` convention (stale `proposals/files/` draft ref
+  dropped). One-line record in `todo_records.md`; next ID = #51.
+- **Plugin rundown (maintainer #3):** `proposals/maintainer/feedback/
+  2026-09-11_plugin-status-rundown.md` — v2.8 is LIVE + production-confirmed
+  (this session's own tool results carry the `(NN%/NNNK)` per-tool readout;
+  `ctx.log` writing).
+- **Answer to maintainer #4 (plan1_summary points still current?):**
+  (1) TODO #49 spec conflict — RESOLVED by `b6dc3e7` (closed); (2) 2306#2
+  compaction-detection fold-in — SUPERSEDED (compaction deactivated; the
+  v2.8 re-scope in `approved/260910_plugin-compaction-detection.md` is the
+  design of record; only the rename tail survives → proposal 3); (3) 2306#1
+  custom tool — still OPEN → proposal 3. plan1 "Observations": 2301-rule
+  still practiced (the 4 proposals below follow it); `feedback/` folder
+  exists again and is now two-way (rundown written there); P01 residue in
+  `approved/` — folder moves stay maintainer-side (untouched).
+- **`--maintainer` instruction honored — 4 decision proposals at
+  `proposals/` root (each with recommendations):**
+  `2026-09-11_fst-behavior-batch-decisions.md` (#1 build / #7 behavior-wins /
+  #8 union / #9 harden / #4+#6 delete),
+  `2026-09-11_log-profile-rebaseline.md` (#17/#30/#35 one-shot log read,
+  default SKIP + #34 doc-purge),
+  `2026-09-11_plugin-scope-tool-rename.md` (2306#1 custom tool GO + rename
+  with it),
+  `2026-09-11_contradiction-block-decision.md` (#11 — keep OFF + reword,
+  marker untouched).
+- **Inbox:** `2026-09-11_11-11.md` → `maintainer/done/` content-untouched.
+- **Skipped at the stop line (91 %, REM≈10k) — flagged, not done:**
+  `agent_readme_proposals.md` stale lines (retired "replier: block" inbox
+  convention; `proposals/files/` "draft test set" now archived;
+  `feedback/` is now two-way, not read-only).
+- **Friction flags (maintainer's file `opencode.jsonc`, not touched):**
+  (a) worker deny pattern `.opencode/prompt_**` no longer matches the moved
+  prompt location `system_prompts/agents/` → workers can currently edit
+  prompts; (b) the explorer has no write access to `todo_inbox.md` nor to
+  `.opencode/loop/` (its loop-log completion rides the planner's RETURN
+  line — the protocol was adapted accordingly).
+- **NEXT:** maintainer rulings on the 4 proposals (FST batch = the oldest
+  open work); then delegate the approved builds. Next autonomous launch
+  handles the loop-folder rollover per §Loop folder if it is iteration 1.
+  Standing: `opencode.jsonc` uncommitted by design; baselines as carried.
+
 ## 2026-09-11 (looprun 3, iteration 5; ses_f714b3128ffeILuAaWp2YUqnLt) — TODO curation + #48 delegated
 - **Start state:** HEAD `449556f` (iter-4 close); planner/worker inboxes EMPTY (no
   maintainer messages; `approved/` unchanged); baseline = iter-4 measured

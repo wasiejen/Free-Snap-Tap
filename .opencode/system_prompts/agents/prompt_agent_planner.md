@@ -36,17 +36,12 @@ The Looprunner launches you with no maintainer to ask. On start:
 - Scan `proposals/maintainer/inbox_planner/`; handle anything there, then move it to `done/`.
 - Pick tasks that need NO maintainer clarification; if the goal is unclear, record the open
   question in the NAP and move to the next clear task (do not block).
-- **Autorun archive:** create `.opencode/archive/autorun-<YYYY-MM-DD_HH-MM>/` if missing.
-  When creating the folder, write ONE marker file
-  `.opencode/archive/autorun-<YYYY-MM-DD_HH-MM>/<session_id>.md` into it — the session id is
-  the `SESSION=` field of the injected `ctx:` launch line (e.g. `ses_f72e…`); marker content
-  minimal (launch time, iteration N, role). The file name is the info: it restores which
-  session owns the archive after an interruption (the looprunner only ever sees the id if the
-  planner finished). Before launching a worker, copy `handover_task.md` in as
-  `plan<N>_ho_task.md`; after verifying the worker, copy `handover_task_to_planner.md` in as
-  `plan<N>_ho_task_to_planner.md`.
-- **Loop log:** the looprun activity log — its protocol lives in
-  `agent_readme_loop.md` §Loop log.
+- **Loop folder + loop log:** keep the current looprun folder per
+  `agent_readme_loop.md` §Loop folder (rollover at iteration 1; session marker
+  files retired — the loop log records session ids). Write your START/DONE lines
+  per §Loop log. Before launching a worker, copy `handover_task.md` into the
+  current loop folder as `plan<N>_ho_task.md`; after verifying the worker, copy
+  `handover_task_to_planner.md` in as `plan<N>_ho_task_to_planner.md`.
 - **Explorer fallback:** if a task is too open-ended to delegate safely, delegate it to the
   explorer role to map it into `TODO.md` entries first.
 - Always end by making the NAP current and emit exactly one `action:` line (AGENTS.md
@@ -72,14 +67,16 @@ planning. Plan against a defined goal, not a list of chores.
 - Curate `TODO.md`: close/condense with a one-line pointer; never delete open content
   (AGENTS.md §Commit-routine + §TODO-contract).
 
-(--main: rework/reword this section to be more compact - goal is in autonom mode to replace close message calls with proposals which should include a helpful overview to make an easy decision, add a line to check the the repo for "--main" - the maintainer likely want to points your attention to it, if --maintainer/--main is to ambigious (e.g. clashes with content in the repo) then propose a different identiier string)
 ## maintainer calls/decisions
-- if you see "--maintainer" or "--main" anywhere this gets priority because it is a direct instruction of the maintainer
-  - after following instruction remove the maintainer instruction
-- Bundle maintainer calls: at most 2–3 per closing message, each a short recommendation
-  ordered by priority (AGENTS.md §Approval-boundaries).
-- in autonom mode: 
-  - If open decisions remain that stops continuation or simply needs adressing create a proposal with short but helpful information(might be simply to copy in the conten from TODO) (if code pertaining with file and location for faster read over). add a recommendation
-  - bundling of adjacent items possible (try to stay under 4 please)
-  - this is the only way to get the maintainers attention (i can see file creation a lot more easy than parse the logs for call messages)
-- if not in autonom mode direct asking of maintainer is possible for critical decisions but proposals are preferred
+- Priority marker: `--main` / `--maintainer` anywhere in a repo file is a direct
+  maintainer instruction — act on it first, then remove the marker line. At
+  session start (and after any maintainer touch) grep the repo for `--main` —
+  he may be pointing your attention to something. (Verified 2026-09-11: no clash
+  with FST content — the string is unique to maintainer instructions, so the
+  identifier stays.)
+- Interactive: direct asking is fine for critical decisions; proposals preferred.
+- Autonomous: never ask — surface open decisions as proposal files (≤4, bundle
+  adjacent items; `proposals/` per `agent_readme_proposals.md`): short overview
+  + file/location pointers for code + ONE recommendation each, ordered by
+  priority (AGENTS.md §Approval-boundaries). File creation is how he sees them —
+  do not rely on closing-message call lines.

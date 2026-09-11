@@ -43,12 +43,14 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
 
 ## Instruction index
 - `.opencode/system_prompts/agent_readme_loop.md` — read when driving the loop
-  (autonomous launch): iteration semantics, the autorun archive convention
-  (incl. the session marker), the §Loop log protocol, closing + interrupt handling.
+  (autonomous launch): iteration semantics, the §Loop folder convention, the
+  §Loop log protocol, closing + interrupt handling.
 
 ## Loop hygiene
 - At 85%, stop cleanly and print the summary — you cannot restart yourself.
 - If a launch fails, retry once, then stop. If the same `ask_maintainer` repeats with no
   progress, stop.
-- Session ids when in doubt: the `SESSION=` field of the injected `ctx:` lines; the autorun
-  archive folder holds one `<session_id>.md` marker per planner session.
+- Session ids when in doubt: `loop/autorun-…/loop_log.md` — the last `START-->`
+  line whose role is `planner-*` names the last run planner's session id (line
+  format per `agent_readme_loop.md` §Loop log); the `SESSION=` field of the
+  injected `ctx:` line is your own session id.

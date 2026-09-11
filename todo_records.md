@@ -495,6 +495,8 @@ canonical, tree clean) → closed; the split build launched per the committed sp
   `test_simulated_flag_passthrough` unchanged and green. Gate: `pytest -q` =
   **451 passed + 1 known #10 warning** (baseline 448 before the new tests);
   `ruff check --select F .` = 0. Landing commit: the first commit after
-  `00bc24f`, subject "Mouse filter: packed-word equality → bit tests (TODO
-  #48)" (a commit cannot cite its own hash — self-referential SHA is
-  infeasible; the repo convention is date + gate + subject).
+   `00bc24f`, subject "Mouse filter: packed-word equality → bit tests (TODO
+   #48)" (a commit cannot cite its own hash — self-referential SHA is
+   infeasible; the repo convention is date + gate + subject).
+
+## 50. (closed 2026-09-11, planner-direct, approved by maintainer inbox 11-11) — repo_map.md refresh: (a) §Worker-roster explorer bullet "findings to `TODO.md`" → "findings to `todo_inbox.md` (the planner curates + assigns the TODO IDs)"; (b) §Module-map `.opencode/` bullet now lists `system_prompts/repo/` parts + `agent_readme_*.md` readmes + the `loop/` current-looprun / `archive/loop/` history convention (and drops the stale "draft copies in `proposals/files/`" — they are archived). "Stable facts only" kept — no phase progress introduced.

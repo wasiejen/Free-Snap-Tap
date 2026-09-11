@@ -171,25 +171,7 @@ reenabled, that is the call.
 
 ## 41. (closed 2026-09-10, see todo_records.md) — Production bug: `remove_all_toasts()` control function calls a nonexistent attribute (plural/singular mismatch) (2026-09-10)
 
-## 50. repo_map.md refresh — two stale bullets from the split build (2026-09-10, worker findings, iter-3 curation)
-
-- **Problem / evidence:** (curated from `todo_inbox.md`, worker, split-build run)
-  (a) `system_prompts/repo/repo_map.md` §Worker-roster — the explorer bullet still says
-  "audit/map → findings to `TODO.md`"; the retarget to `todo_inbox.md` lives in the live
-  prompts + `agent_readme_todo.md` + the queued root-`AGENTS.md` swap, so the roster
-  bullet is stale.
-  (b) `system_prompts/repo/repo_map.md` §Module-map `.opencode/` bullet does not list
-  the new `system_prompts/repo/` parts or the `system_prompts/agent_readme_*.md` files
-  (kept verbatim per the split rule "no new facts").
-- **Outcome (goal):** repo_map.md reflects the post-split layout — the roster bullet
-  points at `todo_inbox.md` (planner curates), the `.opencode/` bullet lists the repo
-  parts + the agent_readme files.
-- **Acceptance:** both bullets updated; the file keeps "stable facts only" (no phase
-  progress introduced).
-- **Scope (non-exhaustive):** `.opencode/system_prompts/repo/repo_map.md`.
-- **Status:** OPEN — the repo parts are maintainer-owned ("agents do not edit it
-  directly — edit a part only if explicitly tasked") → awaiting a maintainer repo-map
-  refresh or an explicit task; delegation-ready otherwise.
+## 50. (closed 2026-09-11, see todo_records.md) — repo_map.md refresh — two stale bullets from the split build (2026-09-10, worker findings, iter-3 curation)
 
 ## Loop & coordination (open)
 

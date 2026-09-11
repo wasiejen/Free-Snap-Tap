@@ -59,10 +59,14 @@ config file. README/WIKI have some stale examples — trust the convention above
   and exclude from EXE packaging. If the maintainer explicitly requests a live
   probe, run these directly from the repo root; otherwise do not execute them.
 - `.opencode/` — opencode meta files (not FST code):
-  `system_prompts/agents/prompt_agent_*.md` (live agent prompts; draft copies in
-  `proposals/files/`), `handover/` — `handover_planner.md` (planner
-  state/continuation file, the NAP), `handover_task.md` (current task spec),
-  `handover_task_to_planner.md` (worker's latest EXECUTIVE SUMMARY).
+  `system_prompts/` — `agents/prompt_agent_*.md` (live agent prompts),
+  `repo/` (the `agents_repo.md` parts: map/commands/testgate/gotchas),
+  `agent_readme_*.md` (protocol readmes: loop / proposals / todo);
+  `handover/` — `handover_planner.md` (planner state/continuation file, the
+  NAP), `handover_task.md` (current task spec),
+  `handover_task_to_planner.md` (worker's latest EXECUTIVE SUMMARY);
+  `loop/autorun-…/` — the CURRENT looprun (spec/summary copies + `loop_log.md`);
+  older loopruns live in `archive/loop/`.
 - `plugin/scripts/` — the context gauge (`peek.mjs` self-peek CLI + `gauge.mjs`
   core, node:sqlite) — moved out of the old `ctxgauge/` dir (2026-09-10, per the
   compaction-detection proposal comment).
@@ -90,8 +94,9 @@ faster/weaker):
   precision. The large-context `…210K` variant is for very long / deeply complex
   single tasks only.
 - `worker_explorer_*` (explorer mode, `prompt_agent_explorer.md`): audit/map →
-  findings to `TODO.md`; edit allow-list = `TODO.md` / summary / scratchpad only,
-  no code fixes. Weaker on detail — ALWAYS check its work.
+  findings to `todo_inbox.md` (the planner curates + assigns the TODO IDs);
+  edit allow-list = `TODO.md` / summary / scratchpad only, no code fixes.
+  Weaker on detail — ALWAYS check its work.
 - Raw `agent_*` variants: same models WITHOUT the worker prompt (ad-hoc, no
   handover protocol). `looprunner_*` / `planner_*` are not workers.
 
