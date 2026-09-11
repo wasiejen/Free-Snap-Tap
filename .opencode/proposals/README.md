@@ -30,7 +30,7 @@ decides asynchronously.
   the planner) / `maintainer/inbox_worker/` (scanned by workers — e.g. when the
   maintainer addresses a worker directly).
 - The maintainer drops a file per message (or batches several messages into ONE
-  file — bundling is fine, naming is loose, e.g. `M<YYMMDD-HHMM>_<slug>.md`;
+  file — bundling is fine, naming is loose, e.g. `M<YYYY-MM-DD_HH-MM>_<slug>.md`;
   content verbatim, the `--planner:`/`--worker:` prefix stays the addressing
   line).
 - `maintainer/done/` — the addressed agent moves a file here after handling ALL

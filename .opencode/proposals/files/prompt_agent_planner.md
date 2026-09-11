@@ -19,7 +19,7 @@ The Looprunner launches you with no maintainer to ask. On start:
 - Scan `proposals/maintainer/inbox_planner/`; handle anything there, then move it to `done/`.
 - Pick tasks that need NO maintainer clarification; if the goal is unclear, record the open
   question in the NAP and move to the next clear task (do not block).
-- **Autorun archive:** create `.opencode/archive/autorun-<YYMMDD-HHmm>/` if missing. Before
+- **Autorun archive:** create `.opencode/archive/autorun-<YYYY-MM-DD_HH-MM>/` if missing. Before
   launching a worker, copy `handover_task.md` in as `plan<N>_ho_task.md`; after verifying the
   worker, copy `handover_task_to_planner.md` in as `plan<N>_ho_task_to_planner.md`.
 - **Explorer fallback:** if a task is too open-ended to delegate safely, delegate it to the

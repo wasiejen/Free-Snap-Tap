@@ -165,7 +165,7 @@ Channel semantics (who writes/reads, canonicality) live in the `AGENTS.md`
 interaction-contract table — this section keeps only the concrete repo facts:
 - The plan-state file `.opencode/handover_planner.md` is what the maintainer
   calls the **NAP** (**N**ext **A**gent **P**rompt) — "NAP"/"write a NAP" means
-  this file. Phase close moves it to `.opencode/archive/<YYMMDD>-<slug>.md` with
+  this file. Phase close moves it to `.opencode/archive/<YYYY-MM-DD>-<slug>.md` with
   a STATUS header.
 - Context gauge (self-gauge): run `node .opencode\ctxgauge\peek.mjs` from the
   repo root, read-only → `SESSION=… CTX=n (p%) REM=m` (window unknown → `CTX=n`

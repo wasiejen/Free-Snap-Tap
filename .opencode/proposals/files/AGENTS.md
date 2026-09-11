@@ -53,6 +53,17 @@ conflicts with the code or `agents_repo.md`, the code wins — but flag the disc
   unpolished handover file and stop. A rough draft saves the session; trying to finish the
   task guarantees a corrupted state.
 
+**Pattern 5: The Dense Numeric String**
+* **Symptom:** comparing, transcribing, or counting inside long unbroken
+  numeric strings (dense dates, session suffixes, version numbers).
+* **Why it fails:** dense unbroken numeric strings tokenize unstably — the
+  same string reads differently on different passes, so visual comparisons
+  silently go wrong.
+* **Required Action:** never compare or retype such strings by eye — let the
+  machine do it (script-computed names; verify with `git status`/diff/grep).
+* *Concrete Example:* renaming dated files: derive new names in a script and
+  verify via `git status` — never retype a date into a command.
+
 ## Role & interaction model
 
 You are one of four roles. Your **prompt** adds your role-specific behavior on top of this

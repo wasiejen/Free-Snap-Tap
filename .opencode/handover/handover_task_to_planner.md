@@ -1,113 +1,94 @@
-# EXECUTIVE SUMMARY — prompt/repo split build (parts 1+2+5) + session-id rules (2147)
+# EXECUTIVE SUMMARY — date-convention sweep (Part A renames + Part B convention lines + AGENTS.md-copy Pattern 5)
 
-Task: `.opencode/handover/handover_task.md`. META-ONLY (no FST code, no tests, no
-plugin, no `opencode.jsonc`, no root `AGENTS.md`, no `TODO.md`). ONE commit (the
-commit containing this summary; subject: "Prompt/repo split build: repo-map parts,
-feature readmes, prompt indexes, todo_inbox, session-marker rule" — hash verifiable
-via `git log -1`; a commit hash cannot be embedded in its own commit).
+Task: `.opencode/handover/handover_task.md`. META-ONLY (no FST code, no plugin, no
+observable behavior change). ONE commit (the commit containing this summary; subject:
+"Date-convention sweep: rename dense dates to YYYY-MM-DD_HH-MM, fix 3 convention lines, add Pattern 5" —
+hash verifiable via `git log -1`; a commit hash cannot be embedded in its own commit).
 
-## Gate (unchanged, measured after all edits)
-- `& .\.venv\Scripts\python.exe -m pytest -q` → `448 passed, 1 warning` (the known
-  #10 warning).
-- `& .\.venv\Scripts\ruff.exe check --select F .` → `All checks passed!` (0 findings).
+## Gate (DoD 4, unchanged, measured after all changes)
+- `& .\.venv\Scripts\python.exe -m pytest -q` → `448 passed, 1 warning in 1.93s` (the
+  known #10 warning).
+- `& .\.venv\Scripts\ruff.exe check --select F .` → `All checks passed!` (exit 0,
+  zero findings).
 
-## 1. Section→part mapping (all 12 original sections, facts verbatim, exactly one home)
-| original section | part (`system_prompts/repo/`) |
-|---|---|
-| What this is | `repo_map.md` |
-| Sign convention (IMPORTANT) | `repo_map.md` |
-| Module map (repo root) | `repo_map.md` |
-| Data flow | `repo_map.md` |
-| Worker roster | `repo_map.md` |
-| Phase-scoped work | `repo_map.md` |
-| Environment & shell | `repo_commands.md` |
-| Run / test | `repo_commands.md` |
-| Handover file paths | `repo_commands.md` — MOVED from the spec's suggested mapping (the proposal left it unmapped; the gauge command is a hot path for every role and the spec's own example trigger ties the gauge to `repo_commands.md`) |
-| Safety limits (repo-specific) | `repo_testgate.md` |
-| Test conventions | `repo_testgate.md` |
-| Gotchas | `repo_gotchas.md` |
+## Part A — RENAME (15 dense names → 0 remaining)
+All targets derived by SCRIPT from the spec's conversion rules (scratchpad
+`exec_renames.cjs`; names read from disk, never retyped; collision pre-checked:
+no target existed, no dup targets).
+- **14 × `git mv`** (staged, visible as `R` in `git status --short`):
+  - `maintainer/done/`: 8 files `260910-HHMM.md` → `2026-09-10_HH-MM.md` (1537, 1806,
+    1813, 1818, 2147, 2301, 2336, 0) + the M-prefixed file →
+    `M2026-09-10_13-46_nap-bloat-prompt-separation.md`.
+  - `archive/`: 2 files `260908-<slug>.md` → `2026-09-08_<slug>.md` (date/slug `-` →
+    `_`) + 3 dirs `autorun-260910` → `autorun-2026-09-10`, `autorun-260910-0` →
+    `autorun-2026-09-10-0` (non-date suffix kept), `autorun-260910-2307` →
+    `autorun-2026-09-10_23-07`.
+- **1 × fs-level removal** (deviation 2): the 15th dense name was an EMPTY,
+  UNTRACKED dir. `git mv` is impossible for it (git: "source directory is empty");
+  its rule target already existed with content. Machine-verified empty
+  (`contents: []`), removed via `fs.rmdirSync` (succeeds only if empty) — zero data
+  loss.
+- Post-rename disk state (machine-verified): `dense-left: []` in both `done/` and
+  `archive/`.
 
-Machine-verified: each of the 12 section bodies (whitespace-normalized) is a
-substring of exactly one part; none remains in the root index (node script,
-scratchpad). Root `agents_repo.md` is now a 19-line thin index (≤ 35 ✓), entry
-point intact (what-this-is + maintainership rule + one "read when …" line per part).
+## Part B — CONTENT (exactly 3 one-line fixes + 1 append)
+1. `.opencode/proposals/README.md:33` — `M<YYMMDD-HHMM>_<slug>.md` →
+   `M<YYYY-MM-DD_HH-MM>_<slug>.md` (rest of sentence kept).
+2. `.opencode/proposals/files/agents_repo.md:168` —
+   `.opencode/archive/<YYMMDD>-<slug>.md` → `.opencode/archive/<YYYY-MM-DD>-<slug>.md`.
+3. `.opencode/proposals/files/prompt_agent_planner.md:22` —
+   `autorun-<YYMMDD-HHmm>/` → `autorun-<YYYY-MM-DD_HH-MM>/`.
+4. `.opencode/proposals/files/AGENTS.md` — Pattern 5 appended after Pattern 4,
+   before `## Role & interaction model` (4-bullet shape, 9 lines; line 118
+   handover-path line left untouched, already the fixed single path).
 
-## 2. Verbatim spot-checks (grep hits per part, all = 1)
-- `repo_map.md`: `re-emits "idealized" input`, `+key` = key **released**,
-  `Focus change re-runs`, `Raw `agent_*` variants`
-- `repo_commands.md`: `here-strings are the only heredoc`,
-  `CI installs runtime+dev only`, `no finished step`, `N**ext **A**gent`
-- `repo_testgate.md`: `mocked-`FakeFST` pattern`, `recreate the pattern if
-  needed`, `Do not hard-code test-count assumptions`
-- `repo_gotchas.md`: `monkeypatch `_open_config_file``, `qtbot.mouseDClick`,
-  `opencode.exe-bun false confidence`
+## Verification scan (DoD 2) — command + result
+`node <scratchpad>\scan_dod2.cjs` — regex `\b26\d{4}\b` over the CONTENT of
+`.opencode/proposals/README.md`, all files in `.opencode/proposals/files/*`,
+all files in `.opencode/system_prompts/**`, root `agents_repo.md` (21 files) +
+all FILE AND DIR NAMES under `.opencode/archive/` and
+`.opencode/proposals/maintainer/done/` (33 names, recursive):
+- result: `spec-regex-hits=0`
+- same pass with broader `26\d{4}` (no `\b`): `broad-regex-hits=0` (covers the
+  M-prefix gap, deviation 4).
 
-## 3. Files
-- NEW parts: `.opencode/system_prompts/repo/repo_{map,commands,testgate,gotchas}.md`
-  (102/61/21/45 lines).
-- NEW readmes (each ≤ 50 ✓): `.opencode/system_prompts/agent_readme_{proposals,todo,
-  loop}.md` (33/29/37 lines).
-- `todo_inbox.md` (repo root) — 12-line header + 3 findings I appended this session
-  (roster-bullet drift, module-map bullet gap, mid-session inbox item — see §5).
-- `agents_repo.md` — rewritten as the thin index.
-- `prompt_agent_planner.md` — stale paths fixed (NAP line 13 →
-  `.opencode/handover/handover_planner.md`; task spec line 39 →
-  `.opencode/handover/handover_task.md`); Autorun-archive bullet replaced: new date
-  pattern `autorun-<YYYY-MM-DD_HH-MM>` + ONE `<session_id>.md` marker file (id = the
-  `SESSION=` field of the injected `ctx:` launch line; minimal content; file name is
-  the info) — spec/summary copy lines kept; roster reference now points at
-  `.opencode/system_prompts/repo/repo_map.md`; Instruction index (7 lines) added.
-- `prompt_agent_task.md` — stale task-spec path fixed (line 12); inbox rule added
-  (Work loop: unfixable/out-of-scope findings → `todo_inbox.md`, NOT `TODO.md`);
-  Instruction index (5 lines) added.
-- `prompt_agent_explorer.md` — stale task-spec path fixed (line 10); same inbox rule
-  (Work loop); safety reference repointed to `repo_testgate.md`; Instruction index
-  (5 lines) added.
-- `prompt_agent_looprunner.md` — Instruction index (loop-readme line) + session-id
-  lookup line in Loop hygiene (`SESSION=` field of `ctx:` lines; one
-  `<session_id>.md` marker per planner session in the autorun archive; plain-text
-  session log deliberately NOT referenced, per spec §6).
-- Stale-path grep over the 4 live prompts + root index: zero
-  `.opencode/handover_<name>.md` no-slash forms remain ✓.
+## Deviations / notes for the planner
+1. **Spec-table source mismatch (done/):** the table's source `260910-0` does not
+   exist on disk; the on-disk file is `260910-0`. Renamed per the rules →
+   `2026-09-10_0` (the date in the on-disk name is the truth; the table row
+   appears to misread the date).
+2. **Spec-table duplicated row + collision case (archive/):** the table lists
+   `autorun-260910-2307` twice; the fourth dense dir on disk (not in the table)
+   was the empty untracked dir `autorun-260910-0`. Its rule-derived target
+   `autorun-2026-09-10-0` already existed with content (the git-mv'd dir holding
+   the tracked `plan1_summary.md`) — the spec's STOP case ("two source names map
+   to the SAME target"). Since the dir was verifiably empty, I removed it
+   (fs-level, no data loss) rather than guess a name resolution; recorded here +
+   agent_feedback instead of inventing a convention.
+3. **Spec's Pattern-5 draft would have failed its own DoD:** the draft contains
+   the literal dense date `260910-2307`, which `\b26\d{4}\b` matches — pasted
+   verbatim it would leave a hit in `.opencode/proposals/files/*`. Used the
+   spec's "minor wording polish allowed": wrote "dense dates" instead; kept the
+   4-bullet shape and the draft's content otherwise (9 lines vs the draft's 12).
+4. **Scan-regex gap:** `\b26\d{4}\b` structurally cannot match M-prefixed dense
+   names (no word boundary before the `2`). Ran the broader `26\d{4}` pass
+   alongside (0 hits); the only in-scope M file was renamed anyway, so no dense
+   name survives under either regex. Note appended to `todo_inbox.md` for future
+   sweep specs.
+5. **Commit contents:** exactly the 14 renames + 4 modified files (README.md,
+   files/agents_repo.md, files/prompt_agent_planner.md, files/AGENTS.md) + this
+   summary + `todo_inbox.md` + `agent_feedback.md`. Untracked planner file
+   `archive/autorun-2026-09-10_03-05/plan3_ho_task.md` left unstaged;
+   `opencode.jsonc` never touched/staged.
 
-## 4. Queued maintainer swap
-- `.opencode/proposals/files/AGENTS.md` §Discovery "APPEND" bullet retargeted:
-  worker/explorer findings now go to `todo_inbox.md` (loose, unnumbered, dated +
-  role-tagged); the planner curates into `TODO.md` and assigns the stable ID at
-  curation. Root `AGENTS.md` (agent read-only) still says "to `TODO.md`" — the
-  maintainer replaces the root file from this copy when ready.
-
-## 5. Deviations / notes for the planner
-1. The spec's "current state" listed 2 stale no-slash paths (planner 13/39); the
-   LIVE worker (line 12) and explorer (line 10) prompts also carried
-   `.opencode/handover_task.md`. DoD 5 bans the no-slash form across all 4
-   prompts, so all 4 were fixed (2 extra edits, same pattern, no behavior change
-   to the protocol — just the correct directory).
-2. 3 stale no-slash NAP references inside the MOVED sections were fixed to
-   `.opencode/handover/handover_planner.md` (Run/test, Test conventions,
-   Phase-scoped work) — reference fix only, facts unchanged.
-3. `repo_map.md` §Worker-roster still says explorer "findings to `TODO.md`" and the
-   explorer prompt still frames `TODO.md` as its core artifact (verbatim rule +
-   "keep everything else unchanged" both forbid deeper edits here) — the inbox
-   retarget lives in the one added line + `agent_readme_todo.md` + the queued
-   swap. Residual tension flagged in `todo_inbox.md`; your call how far the
-   explorer-role rewrite goes (likely a follow-up task, needs a spec).
-4. Mid-session, maintainer inbox item `inbox_worker/2026-09-11_02-03.md` arrived
-   (loop.log START/RETURN/DONE lines for the three roles, log in the autorun
-   archive folder). OUT OF SCOPE here — the task spec defers the plain-text
-   session log to the compaction-detection task. I did not act on it and did NOT
-   move it to `done/` (unhandled); it is recorded in `todo_inbox.md`. Rule needed:
-   fold into the compaction-detection task spec or spec separately.
-5. The `ctx:` session-id marker practice already exists on disk
-   (`.opencode/archive/autorun-260910-2307/ses_f72e…md` and
-   `autorun-2026-09-11_01-29/ses_f725…md`) — the prompt/readme wording matches
-   established practice.
-
-## 6. Deliberately NOT done
-- No FST code / tests / plugin / `opencode.jsonc` / root `AGENTS.md` / `TODO.md` /
-  `todo_records.md` / NAP touched. No `proposals/files/*` touched except the one
-  allowed AGENTS.md line. Untracked planner files left alone (`archive/…/
-  plan2_ho_task.md`, `inbox_planner/2026-09-11_02-03.md`).
+## Deliberately NOT done
+- Every EXCLUDED item untouched: `WIKI.md`, FST `*.py`/`tests/**`/`built_*.bat`/
+  `playground/`/`SCRATCH_PAD.md`, `proposals/implemented/*`, archive file CONTENTS
+  (Part A renamed archive-ROOT names only), `COVERAGE_TRIAGE.md`,
+  `handover_maintainer.md`, `TODO.md`/`todo_records.md`, `.opencode/handover/*`
+  (except my own summary), `.opencode/plugin/**`, `opencode.jsonc`, root
+  `AGENTS.md`, live prompts + root `agents_repo.md` (re-verified 0 dense hits
+  there via the scan — no in-scope hits found, so nothing applied).
 
 ## Final gauge (pre-commit, verbatim)
-SESSION=ses_f7239dd5fffeUBcphbE8PjuHLX CTX=85762 (71%) REM=34238
+SESSION=ses_f71f945ceffeAi56Ae6xSx7FRs CTX=90261 (75%) REM=29739
