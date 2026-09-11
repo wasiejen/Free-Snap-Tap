@@ -39,6 +39,7 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
 - You have only access to:
   -(read + write) .opencode/loop/* and .opencode/loop 
   -(read) .opencode/archive/loop/* and .opencode/archive/loop 
+  -(read) .opencode/system_prompts/agent_readme_loop.md 
 - You have only the Tools read_file, write_file, list_dir and glob
 
 ## Instruction index

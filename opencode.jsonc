@@ -6,8 +6,8 @@
     "auto": false,
       "keep": {
         "system": true,
-        "tokens": 60000,
-        "messages": 20
+        "tokens": 30000, //excluding system prompt - lands around 60k token wiht 12 messages
+        "messages": 12
     },
     // how close to the defined limit is allowed, default 20000
     // there seems to be no option to set buffer per model like the limit
@@ -24,8 +24,8 @@
         "baseURL": "http://192.168.178.20:8033/v1"
       },
       "models": {
-        "Qwen3.8-27B-IQ3KT-120K_MTP:chat": {
-          "name": "Qwen3.8-27B-IQ3KT-MTP:chat",
+        "Qwen3.8-27B-IQ4KT-120K:chat": {
+          "name": "Qwen3.8-27B-IQ4KT:chat",
           "limit": {
             "context": 120000,
             "output": 120000, // 131072 normally but adapted to contextsize
@@ -140,7 +140,7 @@
     "looprunner_Q4_120k": {
       "description": "Just restarts the Planner in autnomous mode, same model als planner_Q4_120K for fast switching",
       "mode": "primary",
-      "model": "llama-swap/Qwen3.8-27B-IQ4KT-120K",
+      "model": "llama-swap/Qwen3.8-27B-IQ4KT-120K:chat",
       "temperature": 0.1,
       "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_looprunner.md}",
       "tools": {
@@ -156,7 +156,8 @@
             ".opencode/loop/*": "allow",
             ".opencode/loop": "allow",
             ".opencode/archive/loop/*": "allow",
-            ".opencode/archive/loop": "allow"
+            ".opencode/archive/loop": "allow",
+            ".opencode/system_prompts/agent_readme_loop.md": "allow"
           },
           "write": {
             ".opencode/loop/*": "allow",
