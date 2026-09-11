@@ -1,89 +1,123 @@
-# TASK T3 — `compact_memory` tool completion (L2, approved: `proposals/approved/2026-09-11_compaction-lifecycle.md` L2)
+# TASK T5 — recovery-plugin completion (Cycle 2, L4 + L5, approved: `.opencode/proposals/approved/2026-09-11_compaction-lifecycle.md`)
 
 FIRST read `AGENTS.md`, `agents_repo.md` (+ the repo parts it names as
-needed), this file, the L2 + "Re-application directive" sections of the
-approved proposal, and the maintainer's prototype
-`.opencode/tools/compact_memory.ts` (57 lines — the WORKING shape).
-MEDIUM task: extend the prototype with the budget + the COMPACT line. Do
-NOT rewrite the tool from scratch — the shape (export form, arg names,
-call shapes) is the maintainer's and stays.
+needed), this file, the L4/L5 sections of the approved proposal, and the
+maintainer's prototype `.opencode/plugin/context_recovery.ts` (54 lines —
+the working shape). MEDIUM task: complete the prototype into a live
+plugin. Do NOT rewrite from scratch — the export shape below and the
+prototype's handler/call shapes are the reference; build on them, never
+re-verify the SDK from the npm type defs.
 
 ## Goal
 
-Complete the `compact_memory` custom tool per the approved design:
-1. **Budget:** ≤2 compactions per session id (self + emergency COMBINED —
-   the future T5 recovery hook will share this store). The tool REFUSES
-   with a "hand over and start fresh" result note when exhausted (no
-   compact call). Budget state must be PERSISTED to disk (a small state
-   store — json or sqlite — under `.opencode/temp/`; your call on the
-   mechanic, RECORD it in your summary) — in-memory-only is NOT
-   acceptable. Increment on SUCCESS only (a failed compact does not
-   consume budget).
-2. **COMPACT line:** after a successful compaction the tool appends its
-   own COMPACT line to `.opencode/temp/ctx.log` (in-process file append —
-   the design explicitly allows it; never throws). Shape: match the T2
-   line convention (`<stamp>[ <modelId>]…` — omit-when-empty fields);
-   content per the design: `COMPACT` + session id + `tokens=<t>`
-   `messages=<m>` + the PRE-compaction readout in parentheses
-   (best-effort: if the pre-readout or model id is unavailable, omit that
-   field, never throw — record what you could and could not obtain from
-   the tool's `context`).
-3. **Result note:** keep the prototype's shape — short note
-   ("compacted; kept last N messages / T tokens") + the pointer to
-   `.opencode\system_prompts\agent_readme_post_compaction.md` (the
-   prototype's directive SENTENCE stays — it is a pointer, the content
-   lives in the file). On budget refusal: the hand-over note instead.
-4. **Never throws:** every error path returns a note (the prototype
-   already does this — keep it).
+Make `.opencode/plugin/context_recovery.ts` a LIVE opencode plugin: on an
+overflow `session.error` → (activation flag ON) → budget-gated compaction
+with informed keep → synthetic re-application directive → retry. Default
+OFF. Over-budget → clean fail (the session error propagates; the
+looprunner's `-WARNING` is the planner/looprunner's job, not the
+plugin's).
+
+1. **Default export (the plugin is currently INERT):** the live reference
+   shape is `.opencode/plugin/ctx_watchdog.ts` (its tail, lines
+   707-720): `export default (async (input: PluginInput) => { …; return
+   { "session.error": <handler> }; }) satisfies Plugin;` — the factory
+   captures `input.directory` (root) + `input.client`; the handler keeps
+   the prototype's `(error, context)` shape with `context.sessionId` +
+   `context.client`. The named `EmergencyCompactionPlugin` export is
+   retired. `import type { Plugin, PluginInput } from
+   "@opencode-ai/plugin"` — type-only, stripped by node's native type
+   stripping (the live plugin + the S10 tool import rely on exactly this).
+2. **Activation flag (L5):** read `<root>/opencode.jsonc` per hook fire.
+   Top-level BOOLEAN key `emergencyRecovery`; ONLY the value `true`
+   enables. Missing file / missing key / any other value / unparseable →
+   OFF (the experiment-phase default — the visible hard stop). JSONC
+   handling: strip `//` line + `/* */` block comments (string-aware) then
+   `JSON.parse`; any failure → OFF. OFF + overflow → the hook does
+   NOTHING (returns unhandled: no compact, no retry).
+3. **Budget (shared with the tool by FILE):** the store is the SAME file
+   the tool uses (verified in `.opencode/tools/compact_memory.ts`):
+   `<root>/.opencode/temp/compact_budget.json`, shape `{ "version": 1,
+   "maxPerSession": 2, "sessions": { "<sid>": { "count", "updated" }
+   } }`. Gate BEFORE the compact call: exhausted (count ≥ 2) → CLEAN
+   FAIL — no compact, no directive, return unhandled, no budget change.
+   Increment on SUCCESS only, re-read-then-write (no await between the
+   read and the write — the tool's comment explains why).
+4. **Informed keep:** `keep: { tokens: 30_000, messages: 12 }` as module
+   constants with a comment: the design's measured rebuild profile
+   (system prompt <10K + keep ≈30K + last 12 messages ≈ 31.7K) — this
+   replaces the host's blind opencode.json default; the prototype's
+   stale inline comment ("10,000 tokens") is wrong and goes.
+5. **On success** (compact resolved): increment the budget file + append
+   the COMPACT line to `<root>/.opencode/temp/ctx.log` (shape verified
+   from the tool: `<stamp>[ <model>] COMPACT <sid> tokens=<t>
+   messages=<m>[ (<pre-readout>)]` — model/pre-readout best-effort from
+   the hook context, OMITTED when absent, never throw) + `promptAsync`
+   the synthetic directive.
+6. **The directive:** the prototype's directive text has the SAME escape
+   bug T3 fixed in the tool (unescaped backslashes in the template
+   literal — JS strips them; verified at prototype line 4). Use the
+   tool's directive string (`.opencode/tools/compact_memory.ts` lines
+   19-21, escaped) — byte-identical to what the tool emits.
+7. **Header comment block** (the live-plugin version-record convention):
+   what this is, the L4/L5 pointer, the flag key name, the keep
+   rationale.
+
+## Probe extension
+
+`.opencode/plugin/probes/handover_probe.mjs` — new S11 section (copy the
+S10 sandbox pattern: direct type-stripped import of the `.ts`, fake
+client RECORDING `session.compact` / `session.promptAsync` calls,
+sandbox root, pre-seeded / cache-busted store for persistence):
+1. the file imports and exposes a default factory whose returned hooks
+   object carries `"session.error"`.
+2. flag OFF (no `opencode.jsonc` in the sandbox) + overflow error → no
+   compact, no promptAsync, unhandled.
+3. flag ON (fixture `opencode.jsonc` carrying the key AND real `//`
+   comments — proves the JSONC path) + overflow + fresh budget →
+   `compact` called with EXACTLY keep `{30_000, 12}`; `promptAsync`
+   directive byte-matches the tool's string; budget file count=1 ON
+   DISK; return `{ handled: true, action: "retry" }`.
+4. flag ON + overflow + pre-seeded exhausted budget (count=2) → no
+   compact, no promptAsync, unhandled, budget unchanged.
+5. flag ON + NON-overflow error → no-op.
+6. the COMPACT line is present in the sandbox `ctx.log` after the
+   success case (stamp + `COMPACT <sid> tokens=30_000 messages=12`),
+   ABSENT after the refusal.
+Report the final total probe check count in your summary.
 
 ## Do NOT touch
 
-- `.opencode/plugin/ctx_watchdog.ts` and the probe's existing plugin
-  checks (T5 adds the recovery hook to the plugin later).
-- The role prompts (T4), `opencode.jsonc` (NEVER stage it), anything
-  under `.opencode/proposals/maintainer/`, FST python code.
-- The prototype's arg names (`keepTokens`/`keepMessages`/`sessionID`)
-  and its `context.client.session.compact({path, body})` call shape.
-
-## Probe extension (the probe host imports the tool file DIRECTLY —
-type-stripping, the same way it loads the plugin; the tool file must load
-that way)
-
-New checks covering at least (fake client + fake shell, sandboxed like the
-existing plugin checks):
-1. The tool file imports and exposes `compact_memory`.
-2. `execute` calls `session.compact` with the PASSED-THROUGH keep knobs
-   (fake client captures the call; also the `context.sessionId` fallback
-   when the `sessionID` arg is absent).
-3. The COMPACT line is written after success (session id + params present;
-   pre-readout field per its best-effort availability).
-4. The budget allows 2 compactions and REFUSES the 3rd with the
-   hand-over note (no compact call on the 3rd); the state file exists on
-   DISK after the calls (persistence, not in-memory).
-5. A failing `session.compact` returns an error note, never throws, and
-   does NOT consume budget.
-6. The success return contains the re-application file pointer; the
-   refusal return contains the hand-over note.
+- `ctx_watchdog.ts`, `compact_memory.ts`,
+  `.opencode/system_prompts/agent_readme_post_compaction.md` (canonical
+  verbatim), the live `opencode.jsonc` (read-only for the plugin; it is
+  uncommitted by design — NEVER stage it), FST python + `tests/`, the
+  role prompts, the NAP, anything under
+  `.opencode/proposals/maintainer/`, the loop folder.
 
 ## Definition of done
 
-1. `node .opencode/plugin/probes/handover_probe.mjs` →
-   `PROBE handover: N/N PASS`, exit 0 (N > 65, the new checks above green).
+1. `node .opencode\plugin\probes\handover_probe.mjs` →
+   `PROBE handover: N/N PASS`, exit 0; the S10 checks 67-75 UNCHANGED
+   (the tool file is untouched).
 2. `& .\.venv\Scripts\python.exe -m pytest -q` → 451 passed + 1 known #10
    warning (no FST code touched).
 3. `& .\.venv\Scripts\ruff.exe check --select F .` → 0.
-4. ONE commit: the tool + the probe + the summary file. Record in your
-   summary: the budget-store mechanic + its path, the final COMPACT line
-   shape, and everything you verified about the tool `context` (what
-   fields it provides in the probe / what you had to treat as
-   best-effort). Follow the AGENTS.md commit routine (gauge check after
+4. `context_recovery.ts` has exactly ONE default export; the named
+   `EmergencyCompactionPlugin` is gone; its directive string
+   byte-matches the tool's.
+5. ONE commit: the plugin + the probe + the summary file + your
+   `TODO.md`/`todo_inbox.md` entries (if any). Summary
+   (`.opencode/handover/handover_task_to_planner.md`): what changed,
+   measured probe/pytest/ruff lines VERBATIM, commit hash, final probe
+   count, the flag key + keep constants documented, what you deliberately
+   did NOT do. Follow the AGENTS.md commit routine (gauge check after
    commit; your loop-log START/DONE lines per the protocol).
 
 ## Approval boundary
 
-Pre-approved by the approved proposal (meta-only: the custom tool +
-probe; no observable FST change; no config edit; the ctx.log is the
-maintainer's observation file). If you hit a genuine design fork the
+Pre-approved by the approved proposal (meta-only: the plugin + probe;
+no observable FST change; no edit of `opencode.jsonc` — the plugin only
+READS it; the flag defaults OFF). If you hit a genuine design fork the
 proposal doesn't answer, pick the minimal option, RECORD it in your
 summary, and flag it in `todo_inbox.md`.
 
