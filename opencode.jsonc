@@ -4,9 +4,10 @@
   // needs to be tested
   "compaction": {
     "auto": false,
-    "keep": {
-      // how much of the original prompt to keep, default 15000
-      "tokens": 60000,
+      "keep": {
+        "system": true,
+        "tokens": 60000,
+        "messages": 20
     },
     // how close to the defined limit is allowed, default 20000
     // there seems to be no option to set buffer per model like the limit

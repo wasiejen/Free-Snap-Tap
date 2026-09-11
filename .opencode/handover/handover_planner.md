@@ -2,6 +2,30 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-11 (same direct run, post-compaction chat segment; ses_f6fd8a0caffedqEYeUMCq0x12f) — compaction-lifecycle design agreed + proposal written
+- Maintainer ran compaction experiments in this session (keep 30K tokens +
+  last 12 messages; reverts to test agent memory). Key established facts:
+  per-tool readout works agent-side, invisible in UI by design (ctx.log is
+  the maintainer's window); no post-compaction injection or log entry
+  exists in handover.ts (gap); sub-agent overflow auto-cuts the tail at the
+  last tool call/thought block BEFORE compaction (no ghost residue), 4–5
+  retries then clean fail; tail-cut ≡ revert ≡ handover situation (no
+  observed degradation).
+- Design agreed in chat (five layers: data / tool / standing trigger rule
+  with nudge DELETED / single overflow-recovery path for sub-agent + direct
+  / activation flag; compaction budget ≤2 per session id; directive points
+  at a committed re-application file). Written out as
+  `proposals/2026-09-11_compaction-lifecycle.md` — it subsumes the deferred
+  nudge-delivery defect (moot) + ctx.log event markers + the custom-tool
+  go/no-go (first custom tool; `2026-09-11_plugin-scope-tool-rename.md`
+  item 1 to be retired on approval, rename item survives there).
+- Both `--main` markers in the maintainer's draft
+  `inbox_planner/draft/compact_memory/2026-09-11_13-44.md` handled
+  (adapted into the proposal; markers removed, pointer left).
+- NEXT: maintainer approval (recommendation: Cycle 1 now, Cycle 2 after
+  re-prefill test 1); then delegate builds. Other open proposals
+  (FST batch, log-profile, plugin scope, #11) unchanged.
+
 ## 2026-09-11 (DIRECT planner run; ses_f6fd8a0caffedqEYeUMCq0x12f) — inbox 11-11 handled: loop.log v2 + loop/ reorg + #50 + decision proposals
 - **Start state:** HEAD `b11e1b8` (maintainer PR merge + `6bcb80f` cleanup: new
   live prompts, AGENTS.md swap done, drafts → `archive/proposals/files/`,
