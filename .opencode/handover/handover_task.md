@@ -1,116 +1,69 @@
-# TASK — date-convention sweep (rename + 3 convention lines + AGENTS.md-copy Pattern 5)
+# TASK — loop.log protocol (prompt-only): `agent_readme_loop.md` section + 3 prompt reference lines
 
-FIRST read `AGENTS.md`, `agents_repo.md`, and this file. Source of the sweep:
-maintainer inbox `2026-09-10_01-16` (in `maintainer/done/`) — the dense
-`YYMMDD-HHMM` convention tokenizes unstably for quantized models and breaks
-comparisons; the new convention is `YYYY-MM-DD_HH-MM` (already adopted in the
-split build's prompt revision). The scope decision below was recorded by the
-planner (NAP iter-2 block). This is **meta-only** work: no FST code, no plugin,
-no observable behavior change — pre-approved class.
+FIRST read `AGENTS.md`, `agents_repo.md`, and this file. Source of the
+protocol: maintainer inbox `2026-09-11_02-03` (in `maintainer/done/`) — a
+looprun-level activity log so the loop (and the maintainer after the fact)
+can see who ran when, on what. Planner ruling (NAP iter-2 block): implement as
+a SEPARATE prompt-only task — the protocol text lives in
+`agent_readme_loop.md` (single source of truth), the 3 live prompts get a
+SHORT REFERENCE LINE ONLY — reference, never restate (AGENTS.md
+§Role-and-interaction-model rule: prompts reference shared sections by name).
+This is **meta-only** work: no FST code, no plugin, no observable behavior
+change — pre-approved class.
 
-## Conversion rules (the only rules — do not invent others)
-- Dense 6-digit date `26MMDD` (`26` + 4 digits, not adjacent to other digits) →
-  `2026-MM-DD`.
-- Dense time `HHMM` that follows a converted date across a separator → `_HH-MM`
-  (e.g. `260910-2307` → `2026-09-10_23-07`).
-- Date + slug in one name: `260908-phase5-coverage.md` →
-  `2026-09-08_phase5-coverage.md` (date/slug separator becomes `_`).
-- Prefixed form: `M260910-1346_slug` → `M2026-09-10_13-46_slug`.
-- Non-date suffixes stay untouched (`autorun-260910-0` → `autorun-2026-09-10-0`).
-- If any two source names would map to the SAME target, STOP and report it in
-  the summary — do not guess a resolution.
+## The protocol (what the section must specify)
+- **Log location:** ONE file per looprun, in that looprun's autorun archive
+  folder — `.opencode/archive/autorun-<YYYY-MM-DD_HH-MM>/loop_log.md` (append
+  only; created on first write).
+- **Three line types** (fields the maintainer named — pick ONE consistent
+  line format for all three and show an example in the section):
+  - `START` — written by looprunner, planner, and worker, each at its own
+    session/task start: `date_time`, `session_id`, `agent_model`,
+    task-oneliner.
+  - `RETURN` — written by planner and looprunner, each when a sub-agent
+    returns: same triple (date_time, the returned agent's session_id,
+    agent_model).
+  - `DONE` — written by EVERY agent on task completion, additionally carrying
+    the final gauge readout (`<CTX>%/<REM>K` — verbatim from the gauge
+    command, never guessed).
+- **Discipline:** append-only; no curation of this file; a dead session loses
+  at most its unfinished tail; the `session_id` is the `SESSION=` field of
+  the injected `ctx:` line. Keep the section SHORT (≤ ~30 lines).
 
-## Part A — RENAME (all via `git mv`; the table is the full scope)
-`.opencode/proposals/maintainer/done/` (9 files):
-| from | to |
-|---|---|
-| `260910-1537.md` | `2026-09-10_15-37.md` |
-| `260910-1806.md` | `2026-09-10_18-06.md` |
-| `260910-1813.md` | `2026-09-10_18-13.md` |
-| `260910-1818.md` | `2026-09-10_18-18.md` |
-| `260910-2147.md` | `2026-09-10_21-47.md` |
-| `260910-2301.md` | `2026-09-10_23-01.md` |
-| `260910-2336.md` | `2026-09-10_23-36.md` |
-| `260910-0031.md` | `2026-09-10_00-31.md` |
-| `M260910-1346_nap-bloat-prompt-separation.md` | `M2026-09-10_13-46_nap-bloat-prompt-separation.md` |
+## Edits (exactly 4 files)
+1. `.opencode/system_prompts/agent_readme_loop.md` — add a `## Loop log`
+   section (placement: after `## Autorun archive` — the two sections share
+   the autorun folder; or another fitting spot, your call) specifying the
+   protocol above.
+2. `.opencode/system_prompts/agents/prompt_agent_planner.md` — ONE short
+   reference line pointing at the Loop-log section (e.g. inside the
+   Instruction-index or the Autonomous-mode block — where it reads naturally).
+3. `.opencode/system_prompts/agents/prompt_agent_task.md` — ONE short
+   reference line (same rule).
+4. `.opencode/system_prompts/agents/prompt_agent_looprunner.md` — ONE short
+   reference line (same rule).
 
-`.opencode/archive/` (4 dirs, contents move with them):
-| from | to |
-|---|---|
-| `autorun-260910` | `autorun-2026-09-10` |
-| `autorun-260910-0` | `autorun-2026-09-10-0` |
-| `autorun-260910-2307` | `autorun-2026-09-10_23-07` |
-| `autorun-260910-2307` | `autorun-2026-09-10_23-07` |
+The reference lines must NOT restate the protocol (no field lists, no line
+formats) — one sentence max each, naming the section.
 
-`.opencode/archive/` (2 dated files):
-| from | to |
-|---|---|
-| `260908-phase5-coverage.md` | `2026-09-08_phase5-coverage.md` |
-| `260908-v21-session-graph-spec.md` | `2026-09-08_v21-session-graph-spec.md` |
-
-Folders already in the new pattern (e.g. `autorun-2026-09-10_01-29`,
-`autorun-2026-09-10_03-05`) are NOT touched — the table is complete.
-
-## Part B — CONTENT (exactly 3 lines + 1 append)
-1. `.opencode/proposals/README.md:33` — ``M<YYMMDD-HHMM>_<slug>.md`` →
-   ``M<YYYY-MM-DD_HH-MM>_<slug>.md`` (keep the rest of the sentence).
-2. `.opencode/proposals/files/agents_repo.md:168` —
-   ``.opencode/archive/<YYMMDD>-<slug>.md`` →
-   ``.opencode/archive/<YYYY-MM-DD>-<slug>.md``.
-3. `.opencode/proposals/files/prompt_agent_planner.md:22` —
-   ``autorun-<YYMMDD-HHmm>/`` → ``autorun-<YYYY-MM-DD_HH-MM>/``.
-4. `.opencode/proposals/files/AGENTS.md` — append ONE short new example to the
-   `## CRITICAL LOOP-BREAKING PROTOCOLS` section, after **Pattern 4** (same
-   4-bullet shape, ≤ 8 lines). Draft (minor wording polish allowed, keep it
-   short):
-
-   **Pattern 5: The Dense Numeric String**
-   * **Symptom:** You are comparing, transcribing, or counting inside long
-     unbroken numeric strings (dates like `260910-2307`, session suffixes,
-     version numbers).
-   * **Why it fails:** dense unbroken numeric strings tokenize unstably — the
-     same string reads differently on different passes, so visual comparisons
-     silently go wrong.
-   * **Required Action:** never compare or retype such strings by eye — let the
-     machine do it (compute new names in a script, verify with `git status` /
-     a diff, grep for the exact byte sequence).
-   * ***Concrete Example:*** renaming dated files: derive the new names with a
-     script and verify via `git status` — never retype a date into a command.
-
-   Note: line 118 of that copy (the handover-path line) is ALREADY the fixed
-   single path — do NOT touch it.
-
-## EXCLUDED — do not touch (the 01-16 scope decision)
-- `WIKI.md` (documents FST OUTPUT naming `save-YYMMDD-HHMMSS` / `date()` — that
-  is the app's own format, not the meta convention).
-- FST `*.py`, `tests/**`, `built_*.bat`, `playground/`, `SCRATCH_PAD.md`.
-- `.opencode/proposals/implemented/*` (history), archive file CONTENTS (Part A
-  renames the two archive-ROOT file names; nothing inside archive dirs is
-  edited), `COVERAGE_TRIAGE.md`, `handover_maintainer.md` (archive root, no
-  date in the name — keep).
-- `TODO.md`, `todo_records.md`, `todo_inbox.md`, `.opencode/handover/*`,
-  `.opencode/plugin/**`, `opencode.jsonc`, root `AGENTS.md` (agent-read-only).
-- The live prompts + repo parts (`.opencode/system_prompts/**`, root
-  `agents_repo.md`): the planner verified **0** dense-date hits there. Re-run
-  the verification scan (below); if it finds a hit in those files, the
-  conversion IS in scope (they are on the content list) — apply it and report
-  it as a deviation.
+## Out of scope
+- Do NOT create `loop_log.md` now — the protocol takes effect from the NEXT
+  autonomous run (the current run predates it; the section's example line
+  shows the shape).
+- No `TODO.md` / `todo_records.md` changes; no other files; root `AGENTS.md`
+  is agent-read-only.
 
 ## Definition of done
-1. All 15 renames applied with `git mv`; no target collision; `git status`
-   shows exactly the Part-A renames + the Part-B file changes (plus your
-   summary file; `opencode.jsonc` never staged).
-2. Verification scan — regex `\b26\d{4}\b` — returns **0 hits** in:
-   `.opencode/proposals/README.md`, `.opencode/proposals/files/*`,
-   `.opencode/system_prompts/**`, root `agents_repo.md`, and in the NAMES of
-   the files/dirs under `.opencode/archive/` + `.opencode/proposals/maintainer/
-   done/` (after the renames). Record the scan command + result in the summary.
-3. Part B item 4 present in the AGENTS.md copy (4-bullet shape, after
-   Pattern 4, before `## Role & interaction model`).
-4. Gate re-run (meta-only, must be unchanged): `& .\.venv\Scripts\python.exe
+1. `agent_readme_loop.md` carries the `## Loop log` section: location, the
+   three line types with the maintainer's fields, the verbatim-gauge rule for
+   DONE, the append-only discipline, and one example line per type.
+2. Each of the 3 live prompts carries exactly ONE new short reference line;
+   a grep for the protocol field names (`task-oneliner`, `RETURN`, `DONE`) in
+   the three prompt files returns 0 hits (reference only, no restate).
+3. Gate re-run (meta-only, must be unchanged): `& .\.venv\Scripts\python.exe
    -m pytest -q` = **448 passed** + 1 known #10 warning;
    `& .\.venv\Scripts\ruff.exe check --select F .` = **0**.
-5. ONE commit: sweep + this task's handover files. Commit message: one-line
+4. ONE commit: the 4 files + your summary file. Commit message: one-line
    imperative subject.
 
 ## Context gauge / stop line

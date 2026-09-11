@@ -2,6 +2,37 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-11 (looprun 3, iteration 4; ses_f71d36a2affeVrJfwDARNwG7lo) — deferred pair in order: loop.log prompt task, then the re-scoped plugin task
+- **Start state:** HEAD `7264b1f` (iter-3 close); tree clean; planner/worker
+  inboxes EMPTY (no maintainer messages); baseline re-measured **448 passed +
+  1 known warning (#10), ruff F=0**; launch `CTX=notAvailable` (fresh session).
+  Looprun archive folder = `autorun-2026-09-10_03-05/` (carries the iter-2/3
+  session markers + plan2/plan3 copies — the folder predates the dense-date
+  rename, name kept as history).
+- **Curation (planner-direct):** the residual `todo_inbox.md` worker block
+  (date-sweep regex note) trimmed to a one-line pointer — process note, no
+  repo file to fix, already recorded in the iter-3 deviation block; NOT a
+  TODO entry. Numbering unchanged (next = #51).
+- **PLAN (the iter-3 DEFERRED list, in order):** 1. **loop.log prompt task**
+  (02-03 ruling): protocol section in `agent_readme_loop.md` (single source of
+  truth) + one short reference line in each of the 3 live prompts
+  (planner/task/looprunner) — reference, never restate; prompt-only,
+  pre-approved class. 2. **Re-scoped plugin task (01-41)**: fold-in spec
+  update into `proposals/approved/260910_plugin-compaction-detection.md` +
+  build — constant per-tool ctx readout appended to EVERY `tool.execute.after`
+  result (minimal `(50%/15K)`-ish, linear/cache-safe = the 031 option-2
+  mechanic), threshold nudges STAY as messages but idle-deferred (031
+  option-1 mechanic — no mid-turn `promptAsync` race), ctx logging moves to a
+  single log file (step-3 ruling: one file, leading datetime + model-if-found
+  + readout) based on the same read as the tool-return append. Both delegate
+  to `worker_Q4_120K` (fresh sessions, never resume — the 01-29 launch rule).
+- **NOTE:** the 50% ladder rung fired in THIS session at the first gauge
+  (readout CTX=60054 (50%)) — production evidence of the current
+  fire-and-forget delivery; the plugin build's idle-deferral replaces that
+  path.
+- Baselines: 448 passed / ruff F=0 / probe 52/52 (meta tasks; re-verify after
+  the plugin build).
+
 ## 2026-09-10 (looprun 3, iteration 3; ses_f7210e535ffe3ac5bYAzqFwQe5) — todo_inbox curated; date sweep LANDED + verified; loop.log/plugin deferred
 - **Start state:** HEAD `d848e34` (iter-2 close); tree clean; planner inbox empty;
   `approved/` = compaction-detection + split (split already landed) + P01. CTX

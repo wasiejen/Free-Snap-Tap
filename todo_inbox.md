@@ -17,10 +17,7 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   copies in `maintainer/done/`) — no further action.
 
 ## 2026-09-10 — worker (date-convention sweep)
-- The sweep DoD scan regex `\b26\d{4}\b` cannot structurally match M-prefixed
-  dense names (`M26…` maintainer-inbox files — no word boundary before `26`).
-  This sweep was covered by also running a broader `26\d{4}` (no `\b`) pass
-  (0 hits), and the only M-prefixed file in scope was renamed anyway — but
-  future sweep specs should use the broader regex (or a lookaround) for name
-  scans. Evidence: spec DoD 2 vs `M260910-1346_…` (now `M2026-09-10_13-46_…`).
-  File: process/spec note, no repo file to fix.
+- (curated iter 4, 2026-09-11) Process note, no repo file to fix: future sweep
+  specs use a broader name-scan regex / lookaround (the `\b26\d{4}\b` DoD regex
+  misses M-prefixed names). Recorded in the NAP iter-3 deviation block; not a
+  TODO entry.
