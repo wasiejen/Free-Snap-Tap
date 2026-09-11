@@ -56,13 +56,47 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   `.opencode\handover`; the interaction-contract table above it is correct). The
   `proposals/files/AGENTS.md` copy carries the same line → include the fix in the
   queued swap (date task).
-- **LAUNCHED:** split build (committed spec `8b4123b` + the §4 pattern revision) via
-  `worker_Q4_120K`. NO code touched by the planner this iteration; baselines unchanged
-  (448 passed / ruff F=0).
-- **NEXT (iteration 3, in order):** 1. VERIFY the split build (DoD spot-checks + gate +
-  scope); 2. write + launch the date-sweep spec (scope above); 3. write + launch the
-  nudge-race option-1 plugin spec; standing maintainer calls otherwise unchanged (FST
-  behavior batch #1/#7/#8/#9/#4+#6 is the oldest open work).
+- **LAUNCHED + VERIFIED:** split build (committed spec `8b4123b` + the §4 pattern
+  revision) via `worker_Q4_120K` (FRESH session after the cancelled old-session launch;
+  clean run, 75 % at its end). Planner verification: commit `04b1f4d` scope = exactly
+  the Boundary files + summary (15 files; `opencode.jsonc`/root AGENTS.md/TODO/records/
+  NAP untouched); gate re-run **448 passed + 1 warning (#10), ruff F=0**; spot-checks
+  passed (forbidden `.opencode/handover_<name>` form = 0 hits over prompts+index;
+  Instruction-index present in all 4 prompts; planner marker rule at 39-41 with the NEW
+  pattern; looprunner session-id line; task+explorer inbox rule; AGENTS.md-copy diff =
+  exactly the one-line APPEND retarget; root index 19 lines; readmes 33/29/37 lines;
+  distinctive-string distribution across the 4 parts). Deviations ACCEPTED: (1) 2 extra
+  stale-path fixes in the worker/explorer prompts (DoD 5 justifies — it bans the form
+  across all 4); (2) 3 stale no-slash NAP refs inside the MOVED sections fixed
+  (reference-only); (3) "Handover file paths" → `repo_commands.md` (the proposal's
+  mapping left it unmapped; gauge trigger ties it to repo_commands — mapping table
+  recorded in the summary). Baselines unchanged (meta-only).
+  - **Worker's open item (your call was mine to take):** the explorer-role TODO.md
+    framing tension (repo_map roster + explorer prompt are verbatim-locked; the inbox
+    retarget lives in the added line + readme + queued swap) → follow-up spec, NOT
+    done here (recorded in `todo_inbox.md`).
+  - **`todo_inbox.md` now carries 3 worker findings + 1 tension flag** — curate into
+    TODO.md with stable IDs (next = #50) at iteration-3 start.
+- **Inbox `2026-09-11_02-03` handled (both copies → `done/` content-untouched; the
+  worker copy suffixed `_worker` to avoid a name collision in the flat done/ dir):**
+  loop.log protocol — START (date_time/session_id/agent_model/task-oneliner) on
+  looprunner+planner+worker startup, RETURN (same triple) on sub-agent return for
+  planner+looprunner, DONE (+ `<CTX>%/<REM>K`) on task completion for every agent;
+  the log lives in the corresponding `.opencode/archive/autorun*` folder. RULING:
+  implement as a SEPARATE prompt-only task (3 live prompts + `agent_readme_loop.md` —
+  cheap, via system prompts per his note); the plugin's context-logging (01-41:
+  base it on the appended tool returns) stays in the plugin task; usefulness
+  comparison ("doubles a bit the feature of the log of the handover plugin — lets
+  see what is more useful") after both land. The worker copy's tail line "this is a
+  new commit!" read as a maintainer note to the (then-running) worker — no action
+  needed, the worker finished clean.
+- **NEXT (iteration 3, in order):** 1. curate `todo_inbox.md` (IDs #50+); 2. write +
+  launch the date-sweep spec (scope decision recorded above); 3. write + launch the
+  loop.log prompt task; 4. write + launch the re-scoped plugin task (01-41: constant
+  per-tool ctx readout + idle-deferred threshold nudges + logging on tool returns +
+  fold into `proposals/approved/260910_plugin-compaction-detection.md`). Standing
+  maintainer calls otherwise unchanged (FST behavior batch #1/#7/#8/#9/#4+#6 is the
+  oldest open work).
 
 ## 2026-09-10 (new looprun, iteration 1 per launch; ses_f729fdeecffeL1itaHiEEsKjYG) — inbox feedback given; loop paused for approval
 - **Start state (fresh session):** HEAD `8b4123b` (split-build spec committed, both
