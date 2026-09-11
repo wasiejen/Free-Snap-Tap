@@ -30,20 +30,64 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   protocol). NO proposal path inside the blocks (move-robust). Loop log
   START+INFO written. Meta-only (prompts + log) — FST gate untouched;
   will re-verify at the T5 landing.
-- **NEXT:** T5 recovery-plugin completion — spec → `handover_task.md` →
-  copy to the loop folder → launch `worker_Q4_120K` FRESH (never resume):
-  complete the maintainer's `.opencode/plugin/context_recovery.ts`
-  prototype per the approved L4/L5 — default export (currently inert,
-  named export only), shared budget FILE `.opencode/temp/
-  compact_budget.json` (same store the `compact_memory` tool uses —
-  self + emergency combined ≤2/session), informed keep, activation flag
-  read from `opencode.jsonc` (default OFF), over-budget clean fail
-  (no compaction, no retry). Then Cycle-2 LIVE acceptance at the next
-  maintainer process restart: a REAL sub-agent overflow → informed
-  compaction + directive → continuation OR budget-exhausted clean fail +
-  `-WARNING`. Standing maintainer calls: the 2 proposals at the
-  `proposals/` root (FST behavior batch + contradiction block) + TODO
-  #51 (stale probe `"type"` field).
+- **T5 spec committed** (`39ffb39`) + copied to the loop folder as
+  `plan3_ho_task.md`; launch saga: launch-1 (`worker-3` session
+  `ses_f6e042f6effe62A9iDbtoxFI7M`) reported a server-side
+  `context_length_exceeded` at launch, BUT the session actually ran
+  (files written 21:58/22:24) and produced a near-complete T5 build
+  (296-line `context_recovery.ts` + probe S10/S11) before dying at the
+  context limit (no self-compact — the tool was not live yet); launch-2
+  (my slimmer retry, session `ses_f6de1d7fdffeZEJWEXNWCrrZnp`) was
+  cancelled by the maintainer.
+- **Live test results (maintainer-ordered, his instructions `260911-2
+  27.md` + note `2026-09-11-_22_-27.md`, both handled → `done/`):**
+  (a) `compact_memory` was NOT in any agent toolset before his rewrite
+  (tested via a fresh subagent — also absent there); (b) he then
+  live-rewrote the tool to the `tool()` import form (his uncommitted
+  `compact_memory.ts`, 101-line diff) — now visible to agents but the
+  call FAILS: `context.client.session` undefined in the tool env (no
+  session client wired into custom tools — maintainer domain); (c) the
+  `context_recovery` plugin did NOT fire on the overflow (it is loaded
+  via `opencode.jsonc` `plugins:`; host hook dispatch needs
+  investigation — maintainer domain); (d) resuming the at-limit
+  `ses_f6e042...` session fails (`request exceeds the available context
+  size`) — resuming an at-limit session is not a recovery path; (e)
+  the maintainer compacted MY session live: 90%/11K → 30%/83K — **L2
+  acceptance LIVE PASS** (explicit `sessionID` param worked server-side).
+- **T5 work state (WIP rescue committed):** S10 code unchanged since T3
+  (proven 74/74 vs the committed T3-shape tool file at HEAD); S11
+  UNVERIFIED — the probe cannot run to completion in the live tree
+  because the maintainer's uncommitted tool() rewrite breaks S10 check
+  67 (export shape) and crashes the probe before S11. Committed as an
+  explicit WIP rescue (subject says WIP/unverified) — next session
+  re-verifies S10+S10→S11 after his tool file stabilizes, then converts
+  to the proper task commit.
+- **Maintainer commits during this iteration (his calls, recorded):**
+  `3d4cfe2` (block_transfer draft), `5c07ba3` (activation prep:
+  `opencode.jsonc` `plugins:`+`tools:` keys, `block_transfer.ts`
+  landed, planner-prompt index line for `agent_readme_task_spec.md`),
+  `9d514d1` ("Got custom tools running in opencode + draft save" — the
+  committed `compact_memory.ts` is still the T3 shape; his tool()
+  rewrite remains UNCOMMITTED in the tree — do NOT stage it).
+- **Protocol:** the maintainer adopted my iter-2 task-spec-discipline
+  feedback proposal as `agent_readme_task_spec.md` (new system_prompts
+  file, referenced by the committed planner prompt) — committed in this
+  iteration's bookkeeping. His live files to leave untouched:
+  `compact_memory.ts` (uncommitted rewrite), `opencode.jsonc` (NEVER
+  stage), the `draft/` folders (block_transfer_v2, revert_to_message,
+  the name-mangled `260911-<corrupt>_21-50.md`).
+- **NEXT (iteration 4, in order):** 1. Re-verify T5 (probe S10+S11,
+  pytest 451+#10, ruff F=0) once the maintainer's `compact_memory.ts`
+  stabilizes/commits — align S10 to the final tool shape first if it
+  changed; then convert the WIP to the task commit. 2. Cycle-2 LIVE
+  acceptance still pending: a REAL sub-agent overflow → the recovery
+  plugin firing (it did NOT fire — needs the maintainer's host
+  investigation) → informed compaction + directive → continuation, OR
+  budget-exhausted clean fail + `-WARNING`. Standing maintainer calls
+  (unchanged): the 2 proposals at the `proposals/` root (FST behavior
+  batch + contradiction block) + TODO #51 (stale probe `"type"` field).
+  Baselines carried: probe 74/74 (at HEAD, T3-shape tool file), pytest
+  **451 + 1 #10 warning**, ruff **F=0**.
 
 ## 2026-09-11 (iteration 2; ses_f6eb9cab5ffebLGhxdSs8jBrGI) — maintainer prototypes landed; spec re-decomposed T1–T5; T1 launched
 - **Start state:** HEAD `1db6743` (maintainer "permissions fix … prompts again");
