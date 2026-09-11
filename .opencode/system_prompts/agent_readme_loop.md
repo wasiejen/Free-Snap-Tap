@@ -65,9 +65,9 @@ not here.
 - `session_id` is the `SESSION=` field of the injected `ctx:` line.
 - Examples (one per type):
   ```
-  2026-09-11_09-30 START-->  planner-3 ses_abc123 Qwen3.8-27B-IQ4KT-120K plan3: loop-log section
+  2026-09-11_09-30 -->START  planner-3 ses_abc123 Qwen3.8-27B-IQ4KT-120K plan3: loop-log section
   2026-09-11_09-45 -RETURN-  planner-3 ses_abc123 Qwen3.8-27B-IQ4KT-120K worker-3 ses_def456 Qwen3.8-27B-IQ4KT-120K
-  2026-09-11_10-02 <---DONE  planner-3 ses_abc123 Qwen3.8-27B-IQ4KT-120K 42%/78K
+  2026-09-11_10-02 DONE<---  planner-3 ses_abc123 Qwen3.8-27B-IQ4KT-120K 42%/78K
   ```
 - Discipline: append only; NO curation of this file — a dead session loses at
   most its unfinished tail.
