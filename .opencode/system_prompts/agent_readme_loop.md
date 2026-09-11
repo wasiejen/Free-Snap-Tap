@@ -19,13 +19,10 @@ not here.
 - The CURRENT looprun lives in `.opencode/loop/autorun-<YYYY-MM-DD_HH-MM>/` —
   exactly one folder there at any time (unambiguous).
 - ALL older loopruns live in `.opencode/archive/loop/autorun-…/`.
-- Rollover: 
-  - When the looprunner starts a new looprun, it moves the current `loop/autorun-…/` 
-  folder into `archive/loop/` and creates a fresh `loop/autorun-<now>/`. 
-    - Exception is when directly instructed to resume the current loop, 
-      then the already existing folder will be used, looprunner checks what 
-      the current iteration is (via files in loop/autorun or the loop.log)
-  - A direct (non-looprun) planner run starts its own current folder the same way
+- Rollover: when the planner starts at ITERATION 1 (a new looprun), it moves
+  the current `loop/autorun-…/` folder into `archive/loop/` and creates a fresh
+  `loop/autorun-<now>/` (folder name machine-generated, never retyped). A
+  direct (non-looprun) planner run starts its own current folder the same way
   if `loop/` is empty.
 - Spec/summary copies ride along in the current folder: `plan<N>_ho_task.md`
   (the task spec, copied before the worker launch) and
@@ -44,7 +41,7 @@ not here.
   direct planner runs; plain interactive chat has no log.
 - One line per event:
   `date_time <STATUS> <role>[-<iteration>] <session_id> <agent_model> <content>`
-  - `<STATUS>` is exactly one of these 8-char tokens: `START-->`, `<---DONE`,
+  - `<STATUS>` is exactly one of these 8-char tokens: `-->START`, `DONE<---`,
     `-RETURN-`, `-WARNING`, `--INFO--`.
   - `<role>[-<iteration>]` — `looprunner` / `planner-N` / `worker-N` /
     `explorer-N`; the iteration number when known (it is in the launch

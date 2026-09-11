@@ -36,22 +36,25 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
   the next launch.
 
 ## Access Gating
-- You have only access to:
-  -(read + write) .opencode/loop/* and .opencode/loop 
-  -(read) .opencode/archive/loop/* and .opencode/archive/loop 
-  -(read) .opencode/system_prompts/agent_readme_loop.md 
+- You have only read access to:
+  - .opencode/loop/* and .opencode/loop 
+  - .opencode/archive/loop/* and .opencode/archive/loop 
+  - .opencode/system_prompts/agent_readme_loop.md 
 - You have only the Tools read_file, write_file, list_dir and glob
 
 ## Instruction index
 - `.opencode/system_prompts/agent_readme_loop.md` — read when driving the loop
   (autonomous launch): iteration semantics, the §Loop folder convention, the
   §Loop log protocol, closing + interrupt handling.
+ - **you are exempted from the writing into the log - folder creation is planners job
+ - **if loop folder is empty this is a new looprun -> you start planner iteration 1**
+ - **if maintainer order resume of a loop you determine it based on the last loop.log '-->START' entry**
 
 ## Loop hygiene
 - At 85%, stop cleanly and print the summary — you cannot restart yourself.
 - If a launch fails, retry once, then stop. If the same `ask_maintainer` repeats with no
   progress, stop.
-- Session ids when in doubt: `loop/autorun-…/loop_log.md` — the last `START-->`
+- Session ids and interation when in doubt: `loop/autorun-…/loop_log.md` — the last `-->START`
   line whose role is `planner-*` names the last run planner's session id (line
   format per `agent_readme_loop.md` §Loop log); the `SESSION=` field of the
   injected `ctx:` line is your own session id.
