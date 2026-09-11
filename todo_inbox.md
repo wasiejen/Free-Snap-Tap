@@ -10,18 +10,8 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
 - Entry shape: `## <YYYY-MM-DD> — <role>` + problem/evidence + files + why it
   matters.
 
-## 2026-09-11 — worker
-- `repo_map.md` §Worker-roster still says explorer "findings to `TODO.md`" (verbatim
-  carry-over from the split); the inbox retarget now lives in the live prompts +
-  `agent_readme_todo.md` + the queued root-`AGENTS.md` swap — reconcile the roster
-  bullet when the maintainer replaces the root file or refreshes the repo map.
-- `repo_map.md` §Module-map `.opencode/` bullet does not list the new
-  `system_prompts/repo/` parts or `system_prompts/agent_readme_*.md` (kept verbatim
-  per the split rule "no new facts") — add at the next repo-map refresh.
-- Maintainer inbox item `proposals/maintainer/inbox_worker/2026-09-11_02-03.md`
-  arrived mid-task (loop.log START/RETURN/DONE lines for looprunner/planner/worker,
-  log file in the autorun archive folder). Out of this task's scope — the task
-  spec defers the plain-text session log to the compaction-detection task and
-  this item predates no spec — planner to rule: fold into the
-  compaction-detection task spec or spec separately. Not moved to `done/`
-  (not handled by this worker).
+## 2026-09-10 — planner curation (iter 3)
+- Worker block (2026-09-10) curated: the two `repo_map.md` findings → `TODO.md`
+  **#50** (repo-map refresh; maintainer-owned file). The 02-03 loop.log item was
+  already ruled in the NAP iter-2 block (separate prompt-only task; both file
+  copies in `maintainer/done/`) — no further action.
