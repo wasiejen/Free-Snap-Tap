@@ -37,6 +37,12 @@ All paths below are relative to `.opencode/system_prompts/`.
 - Findings you cannot confidently fix, or that are out of scope, go to `todo_inbox.md`
   (loose, unnumbered) — NOT `TODO.md`; the planner assigns IDs at curation.
 
+## Context-budget trigger (L3)
+Standing rule on top of the stop line (AGENTS.md §Context budget): with a big
+unit ahead and the readout ≥80 % → run `compact_memory` BEFORE starting it;
+≥90 % → compact now, keeping back to the task spec; if the tool refuses
+(session budget exhausted) → hand over per the stop line.
+
 ## Honesty guard (hard rule)
 - Report only what is on disk. If you did not write a file or entry, say so — never claim a
   change that does not exist.

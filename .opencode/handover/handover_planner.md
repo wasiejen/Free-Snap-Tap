@@ -2,6 +2,49 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-11 (iteration 3; ses_f6e137295ffeH81n9i8wLI3cz7) — T4 landed (planner-direct); T5 spec/launch
+- **Start state:** HEAD `f3dd195` (iter-2 close); tree = `opencode.jsonc`
+  (maintainer, uncommitted by design) + UNTRACKED `.opencode/proposals/
+  feedback/2026-09-11_planner-task-scope-reduction.md` (my own iter-2
+  feedback proposal — a NEW top-level `feedback/` folder alongside the
+  old `maintainer/feedback/`; committed here as bookkeeping, folder
+  structure NOT moved — his call) + `draft/block_transfer_tool/` (his live
+  draft folder — no action unless inboxed). `--main`/`--maintainer` grep:
+  **0 hits**. `inbox_planner/`: draft folders only, no direct items.
+  Baselines carried from iter-2 measured: probe **74/74**, pytest
+  **451 + 1 #10 warning**, ruff **F=0**.
+- **Protocol note:** iter-2 never wrote the `-RETURN-` line for the T3
+  worker (`ses_f6e3ee3ffe9D3uMpx9aR0VQ4`) before its own DONE (21-11) —
+  noted retroactively as an INFO line in the loop log (append-only, no
+  curation).
+- **T4 LANDED (planner-direct, this commit):** the L3 standing trigger
+  rule — exactly ONE short `## Context-budget trigger (L3)` block in each
+  of the 3 acting role prompts (`prompt_agent_planner.md` after
+  `Delegate vs. do`, `prompt_agent_task.md` after `Work loop`,
+  `prompt_agent_explorer.md` after `Work loop`; looprunner untouched —
+  mechanical role). Design text = the approved
+  `2026-09-11_compaction-lifecycle.md` L3 verbatim, role-adapted only in
+  the keep-point (worker: task spec; planner: last verified NAP state;
+  explorer: last verified finding state) + the refusal→handover tail
+  (design: budget exhaustion routes into the stop-line/handover
+  protocol). NO proposal path inside the blocks (move-robust). Loop log
+  START+INFO written. Meta-only (prompts + log) — FST gate untouched;
+  will re-verify at the T5 landing.
+- **NEXT:** T5 recovery-plugin completion — spec → `handover_task.md` →
+  copy to the loop folder → launch `worker_Q4_120K` FRESH (never resume):
+  complete the maintainer's `.opencode/plugin/context_recovery.ts`
+  prototype per the approved L4/L5 — default export (currently inert,
+  named export only), shared budget FILE `.opencode/temp/
+  compact_budget.json` (same store the `compact_memory` tool uses —
+  self + emergency combined ≤2/session), informed keep, activation flag
+  read from `opencode.jsonc` (default OFF), over-budget clean fail
+  (no compaction, no retry). Then Cycle-2 LIVE acceptance at the next
+  maintainer process restart: a REAL sub-agent overflow → informed
+  compaction + directive → continuation OR budget-exhausted clean fail +
+  `-WARNING`. Standing maintainer calls: the 2 proposals at the
+  `proposals/` root (FST behavior batch + contradiction block) + TODO
+  #51 (stale probe `"type"` field).
+
 ## 2026-09-11 (iteration 2; ses_f6eb9cab5ffebLGhxdSs8jBrGI) — maintainer prototypes landed; spec re-decomposed T1–T5; T1 launched
 - **Start state:** HEAD `1db6743` (maintainer "permissions fix … prompts again");
   tree = his live loop-protocol edits (token flip `-->START`/`DONE<---`,

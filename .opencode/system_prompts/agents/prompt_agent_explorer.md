@@ -31,6 +31,13 @@ All paths below are relative to `.opencode/system_prompts/`.
   (loose, unnumbered) — NOT `TODO.md`; the planner assigns IDs at curation.
 - Iterate until the scope is charted.
 
+## Context-budget trigger (L3)
+Standing rule on top of the stop line (AGENTS.md §Context budget): with a big
+unit ahead and the readout ≥80 % → run `compact_memory` BEFORE starting it;
+≥90 % → compact now, keeping back to the last verified finding state (findings
+written, committed); if the tool refuses (session budget exhausted) → hand
+over per the stop line.
+
 ## Per-finding checkpoint (critical for this role)
 - After EACH verified finding, write it to `TODO.md` immediately. A finding is the unit of
   work — a dead session loses at most one finding (AGENTS.md §Discovery). Do not batch

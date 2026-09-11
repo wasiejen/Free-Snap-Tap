@@ -11,3 +11,5 @@
 2026-09-11_20-51 -->START worker-2 ses_f6e3ee339ffe9D3uMpx9aR0VQ4 Qwen3.8-27B-IQ4KT-120K T3: compact_memory tool completion (budget + COMPACT line + probe S10)
 2026-09-11_21-05 DONE<--- worker-2 ses_f6e3ee339ffe9D3uMpx9aR0VQ4 Qwen3.8-27B-IQ4KT-120K 94%/6K
 2026-09-11_21-11 DONE<--- planner-2 ses_f6eb9cab5ffebLGhxdSs8jBrGI Qwen3.8-27B-IQ4KT-120K 92%/9K
+2026-09-11_21-28 -->START planner-3 ses_f6e137295ffeH81n9i8wLI3cz7 Qwen3.8-27B-IQ4KT-120K plan3: T4 standing trigger rule in 3 acting role prompts (planner-direct) + T5 recovery-plugin spec/launch
+2026-09-11_21-28 --INFO-- planner-3 ses_f6e137295ffeH81n9i8wLI3cz7 Qwen3.8-27B-IQ4KT-120K retroactive: iter-2 (planner-2) never wrote the -RETURN- line for worker-2 ses_f6e3ee3ffe9D3uMpx9aR0VQ4 (T3) before its own DONE at 21-11; noted here, log stays append-only uncurated

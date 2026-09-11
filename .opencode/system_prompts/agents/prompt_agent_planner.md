@@ -63,6 +63,13 @@ planning. Plan against a defined goal, not a list of chores.
 - On the worker's return, **verify** against `git log` + the test baseline — never assume the
   summary is true. Update the NAP, then continue.
 
+## Context-budget trigger (L3)
+Standing rule on top of the stop line (AGENTS.md §Context budget): with a big
+unit ahead and the readout ≥80 % → run `compact_memory` BEFORE starting it;
+≥90 % → compact now, keeping back to the last verified state (NAP current,
+committed); if the tool refuses (session budget exhausted) → hand over per the
+stop line.
+
 ## TODO curation 
 - Curate `TODO.md`: close/condense with a one-line pointer; never delete open content
   (AGENTS.md §Commit-routine + §TODO-contract).
