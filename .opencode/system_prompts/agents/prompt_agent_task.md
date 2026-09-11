@@ -43,6 +43,14 @@ unit ahead and the readout ≥80 % → run `compact_memory` BEFORE starting it;
 ≥90 % → compact now, keeping back to the task spec; if the tool refuses
 (session budget exhausted) → hand over per the stop line.
 
+## Early handover (maintainer protocol, 2026-09-12)
+Do not wait for the stop line to write the handover. When the readout reaches
+≥70 % — or the current unit clearly cannot finish before the stop line — PAUSE
+at a clean checkpoint, write the CURRENT state of
+`handover_task_to_planner.md` (marked IN PROGRESS: what's done, what's left,
+baselines) and COMMIT it, then continue. A committed partial handover at 70 %
+beats an emergency one at 90 %.
+
 ## Honesty guard (hard rule)
 - Report only what is on disk. If you did not write a file or entry, say so — never claim a
   change that does not exist.

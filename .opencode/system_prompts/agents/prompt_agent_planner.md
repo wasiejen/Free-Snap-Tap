@@ -28,7 +28,8 @@ All paths below are relative to `.opencode/system_prompts/`.
   design change.
 - `agent_readme_todo.md` — read when curating `TODO.md` / `todo_inbox.md` or
   assigning entry IDs.
-- `agent_readme_task_spec.md` — read when creating tasks for agents and write specificatins
+- `agent_readme_task_spec.md` — MANDATORY: read it BEFORE writing or launching
+  any task spec (`handover_task.md`) — it sets the scope/size discipline for specs.
 - `agent_readme_loop.md` — read when driving the loop (autonomous launch).
 
 ## Autonomous mode (when the launch message carries `<|autonom|>`)
@@ -58,7 +59,8 @@ planning. Plan against a defined goal, not a list of chores.
 - Do it yourself only if it is small and obvious (a direct edit you can verify inline).
 - Delegate everything larger (>~15 diff lines, >3 files, or a heavy run) via the Task tool.
 - Write the task spec (`.opencode/handover/handover_task.md`): goal + definition of done +
-  approval boundary + suggested scope + which worker. Procedure is a suggestion, not a protocol.
+  approval boundary + suggested scope + which worker — read `agent_readme_task_spec.md`
+  FIRST (mandatory, per the Instruction index). Procedure is a suggestion, not a protocol.
 - Pick the worker per the roster in `.opencode/system_prompts/repo/repo_map.md` (worker for
   implementation, explorer for audit/map).
 - On the worker's return, **verify** against `git log` + the test baseline — never assume the
@@ -70,6 +72,13 @@ unit ahead and the readout ≥80 % → run `compact_memory` BEFORE starting it;
 ≥90 % → compact now, keeping back to the last verified state (NAP current,
 committed); if the tool refuses (session budget exhausted) → hand over per the
 stop line.
+
+## Early handover (maintainer protocol, 2026-09-12)
+Do not wait for the stop line to write the handover. When the readout reaches
+≥70 % — or the next unit clearly cannot finish before the stop line — PAUSE
+the current unit, bring the NAP fully current (what's done, next, baselines)
+and COMMIT it, then continue. A committed handover at 70 % beats an emergency
+one at 90 %.
 
 ## TODO curation 
 - Curate `TODO.md`: close/condense with a one-line pointer; never delete open content
