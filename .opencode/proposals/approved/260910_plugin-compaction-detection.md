@@ -72,3 +72,38 @@ Planner status (2026-09-10, iteration 6):
   - without information which session of planner this actually is it will be hard to attribute a file to a worker or planner session. at least for me. so the benefit of the seperate files vanish.
     - so lets log all into one file which appends with leading data-time format like the general convention. if we find information of current model in use it should be the next entry and then just normal output.
     - if compaction works then the output should be in the same form: data-time + model + compaction info + optional data depending on what data you can find in the hook of the compactiontool.above and tool.before (i assume both will be used?)
+
+Planner status (2026-09-11, iteration 4) — v2.8 design of record (re-scoped;
+maintainer-approved in the 2026-09-10_01-41 inbox message, which names this
+file as the place to record it):
+- **Compaction is entirely DEACTIVATED** (the context window cannot be
+  exceeded) — constant current-ctx data now matters MORE than compaction
+  detection; the 01-41 re-scope supersedes the 031 minimal read (the readout
+  is no longer threshold-controlled — it fires on EVERY `tool.execute.after`).
+- **ONE per-session gauge read per `tool.execute.after`** (the existing v2.6
+  per-session mechanic stays) feeds THREE consumers from the SAME read:
+  (1) the constant per-tool readout, appended to the tool result itself — 031
+  **option 2** landed (mutate the tool result: linear, cache-safe, no second
+  message); minimal form `(NN%/NNNK)` (pct of window + REM in K), unknown
+  window → `(NNNK)`; no-signal / db-error → append nothing, stay silent (never
+  throw, no per-failure log line).
+  (2) the threshold nudges STAY as messages (the 50/70/80/90/5k ladder,
+  per-rung per-session dedup, kind:"nudge" evidence — unchanged), delivery
+  RACE-FREE per 031 **option 1** landed: `setImmediate`-deferred + a session
+  busy/idle check before `promptAsync`. SDK fact: the client exposes
+  `session.status()` → GET /session/status → an all-sessions
+  `{ [sid]: SessionStatus }` map (type "idle" | "busy" | "retry") — the 031
+  sketch's `status({path:{id}})` is NOT the SDK signature (no path argument);
+  busy → skip, status absent/failing → the deferral alone. NEVER synchronous
+  inside the hook anymore.
+  (3) the single-file ctx log (this step-3 ruling, SUPERSEDING the per-session
+  `session_context/<sid>` writeout): ONE append-only file at
+  **`.opencode/temp/ctx.log`** (git-ignored), entry = leading local datetime
+  (`YYYY-MM-DD_HH-MM`, the general convention) + the current model if
+  discoverable from the gauge read + the readout — logged on the same per-tool
+  read as (1) so the planner can gauge a worker's LAST state from the log or
+  the session's own appended tool returns.
+- The chat.message ctx: line, the `tool.execute.before` pre-flight, and the
+  silence discipline (no NEW gauge-failure reasons, no per-tool plugin.log
+  growth beyond the existing tool.after line) stay as-is. Build: the v2.8
+  header block in `.opencode/plugin/handover_v2.4.ts` + probe S9.
