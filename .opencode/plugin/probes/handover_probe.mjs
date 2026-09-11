@@ -4,7 +4,9 @@
 // backend chain node:sqlite → bun:sqlite → spawn-sqlite3, TODO #37).
 // REBUILT 2026-09-10 (continuation 2) + EXTENDED 2026-09-10 (#37 S7 backend
 // chain section) + EXTENDED 2026-09-10/11 (v2.8: S9 readout append / ctx log /
-// deferred delivery + the S8 deferred-delivery ticks): the pre-rebuild probe
+// deferred delivery + the S8 deferred-delivery ticks) + EXTENDED 2026-09-11
+// (L1: the ctx log tool-name field — S9 checks 54/55 byte-shapes updated +
+// new 65/66): the pre-rebuild probe
 // (v2.2.1 era) targeted the DELETED handover.ts, the retired
 // experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
 // all void with the shell gauge. PERMANENT repo tooling: RE-RUN, never rebuild
@@ -123,20 +125,23 @@
 //      (52) per-rung dedup: a second fire at the same rung posts NOTHING
 //      (53) delivery failures evidence-logged (delivery-threw /
 //          delivery-rejected, preview capped) — never thrown
-//   S9 readout + ctx log + deferred delivery (10) — the v2.8 build (the
+//   S9 readout + ctx log + deferred delivery (12) — the v2.8 build (the
 //      re-scoped design of record — see the plugin's v2.8 header block): ONE
 //      per-session gauge read per tool.execute.after feeds (1) the MINIMAL
 //      readout appended to the tool result, (2) the ladder (unchanged), (3)
 //      the single-file ctx log at SANDBOX/.opencode/temp/ctx.log (isomorphic:
-//      an entry IFF the readout was appended). Fixture fx_ro.db (window 120K
+//      an entry IFF the readout was appended). The ctx log line carries the
+//      tool-name field (the tool.execute.after tool — OMITTED when the
+//      payload has none, mirroring the model field; L1 of the
+//      compaction-lifecycle proposal). Fixture fx_ro.db (window 120K
 //      except where noted; ses_ro_absent deliberately NOT in the db); the
 //      plugin is re-initialized with a status-aware fake client (a mutable
 //      S9_STATUS drives the busy/idle check — direct-map and SDK fields-style
 //      shapes):
 //      (54) known window: output byte-exact `tool body\n(35%/78K)` + ctx log
-//          line 1 `<dt> probe-model-120K_MTP (35%/78K)`, below rung 1
+//          line 1 `<dt> probe-model-120K_MTP task (35%/78K)`, below rung 1
 //      (55) unknown window on a trailing-newline output `x\n`: direct concat
-//          byte-exact `x\n(46K)` + ctx log line 2 WITH the model
+//          byte-exact `x\n(46K)` + ctx log line 2 WITH the model + tool
 //      (56) no-total (in-flight step, no finish): NO append / NO log /
 //          no nudge line
 //      (57) missing session (not in the db): per-session read no-total → same
@@ -153,19 +158,23 @@
 //      (62) BUSY via the SDK fields-style fake `{data: {sid: {type:"busy"}}}`:
 //          0 calls after the tick
 //      (63) IDLE (fields-style): exactly 1 call after the tick
+//      (65) ctx log tool-name field PRESENT: byte-shape
+//          `<dt> CPU-Qwen3-0.6B task (46K)` (the fake tool name)
+//      (66) ctx log tool-name field OMITTED: payload without a `tool` key →
+//          byte-shape `<dt> CPU-Qwen3-0.6B (46K)`
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
-//      tool.before==6, tool.after==22, chatmsg==8, gauge==3, event==0,
+//      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
 //      nudge==14); the
 //      real handover files byte-identical to pre-run and zero CO-APPENDED live
 //      lines (the real plugin.log may only grow — a line carrying a probe
-//      fingerprint id s*/c*/d*/t*/e1–e9/f1–f10/ses_fx_*/ses_other/ses_lad_*/
+//      fingerprint id s*/c*/d*/t*/e1–e9/f1–f14/ses_fx_*/ses_other/ses_lad_*/
 //      ses_ro_* = the probe wrote out of the sandbox); zero new/changed files
 //      outside the sandbox (.opencode listing + git status, before vs after);
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=10 S5=6  →  "PROBE handover: 63/63 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S5=6  →  "PROBE handover: 65/65 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -1090,7 +1099,8 @@ const DT = "\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}";
 const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
 
 // 54 — known window: the append is BYTE-EXACT + the ctx log line 1 is
-//      byte-shape `<YYYY-MM-DD_HH-MM> probe-model-120K_MTP (35%/78K)`
+//      byte-shape `<YYYY-MM-DD_HH-MM> probe-model-120K_MTP task (35%/78K)`
+//      (the tool-name field is present — the probe's fake tool name)
 {
   const pre = ctxLogLines().length; // S8's feeds already wrote entries (consumer 3 is unconditional) — delta-based
   const out = { title: "t", output: "tool body", metadata: {} };
@@ -1100,14 +1110,15 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
   check(
     "54",
     "S9",
-    "known window: output byte-exact `tool body\\n(35%/78K)` + NEW ctx log line `<dt> probe-model-120K_MTP (35%/78K)`, below rung 1 (no nudge)",
-    out.output === "tool body\n(35%/78K)" && ll.length === pre + 1 && new RegExp(`^${DT} probe-model-120K_MTP \\(35%/78K\\)$`).test(last) && s9Nudge("ses_ro_k").length === 0,
+    "known window: output byte-exact `tool body\\n(35%/78K)` + NEW ctx log line `<dt> probe-model-120K_MTP task (35%/78K)`, below rung 1 (no nudge)",
+    out.output === "tool body\n(35%/78K)" && ll.length === pre + 1 && new RegExp(`^${DT} probe-model-120K_MTP task \\(35%/78K\\)$`).test(last) && s9Nudge("ses_ro_k").length === 0,
     JSON.stringify({ out: out.output, ll }),
   );
 }
 
 // 55 — unknown window on a TRAILING-NEWLINE output: direct concat byte-exact
-//      `x\n(46K)` + the ctx log line 2 carries the model (CPU-Qwen3-0.6B)
+//      `x\n(46K)` + the ctx log line 2 carries the model (CPU-Qwen3-0.6B) +
+//      the tool name
 {
   const pre = ctxLogLines().length;
   const out = { title: "t", output: "x\n", metadata: {} };
@@ -1117,8 +1128,8 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
   check(
     "55",
     "S9",
-    "unknown window (trailing-newline output): byte-exact `x\\n(46K)` direct concat + NEW ctx log line `<dt> CPU-Qwen3-0.6B (46K)` (model carried)",
-    out.output === "x\n(46K)" && ll.length === pre + 1 && new RegExp(`^${DT} CPU-Qwen3-0.6B \\(46K\\)$`).test(last),
+    "unknown window (trailing-newline output): byte-exact `x\\n(46K)` direct concat + NEW ctx log line `<dt> CPU-Qwen3-0.6B task (46K)` (model + tool carried)",
+    out.output === "x\n(46K)" && ll.length === pre + 1 && new RegExp(`^${DT} CPU-Qwen3-0.6B task \\(46K\\)$`).test(last),
     JSON.stringify({ out: out.output, ll }),
   );
 }
@@ -1266,6 +1277,42 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
   );
 }
 
+// 65 — ctx log tool-name field PRESENT: the probe's fake tool name (`task`,
+//      carried by the afterFeed payload) appears on the line — byte-shape
+//      `<dt> CPU-Qwen3-0.6B task (46K)`
+{
+  const out = { title: "t", output: "f13 body", metadata: {} };
+  const pre = ctxLogLines().length;
+  await afterFeed("ses_ro_u", "f13", {}, out);
+  const ll = ctxLogLines();
+  const last = ll.length > 0 ? ll[ll.length - 1] : "";
+  check(
+    "65",
+    "S9",
+    "ctx log tool-name field PRESENT: NEW line `<dt> CPU-Qwen3-0.6B task (46K)` (the fake tool `task` from the payload)",
+    ll.length === pre + 1 && new RegExp(`^${DT} CPU-Qwen3-0.6B task \\(46K\\)$`).test(last) && out.output === "f13 body\n(46K)",
+    JSON.stringify({ out: out.output, ll }),
+  );
+}
+
+// 66 — ctx log tool-name field OMITTED: a payload WITHOUT the `tool` key (the
+//      hook called directly, afterFeed minus the tool) → the field is absent
+//      (mirroring the model-field convention) — byte-shape `<dt> CPU-Qwen3-0.6B (46K)`
+{
+  const out = { title: "t", output: "f14 body", metadata: {} };
+  const pre = ctxLogLines().length;
+  await hooks["tool.execute.after"]({ sessionID: "ses_ro_u", callID: "f14", args: {} }, out);
+  const ll = ctxLogLines();
+  const last = ll.length > 0 ? ll[ll.length - 1] : "";
+  check(
+    "66",
+    "S9",
+    "ctx log tool-name field OMITTED (no tool in the payload): NEW line `<dt> CPU-Qwen3-0.6B (46K)`",
+    ll.length === pre + 1 && new RegExp(`^${DT} CPU-Qwen3-0.6B \\(46K\\)$`).test(last) && out.output === "f14 body\n(46K)",
+    JSON.stringify({ out: out.output, ll }),
+  );
+}
+
 // ------------------------------------------------------------------ S5 hygiene (6)
 
 // 40 — every sandbox plugin.log line parses as JSON (no stray/blank/garbled lines)
@@ -1296,7 +1343,7 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
 }
 
 // 42 — exact kind tallies (no stray lines either): warn==2 (S1), tool.before==6
-//      (S1 3 + S2 3), tool.after==22 (S3 3 + S8 9 + S9 10), chatmsg==8 (the 8
+//      (S1 3 + S2 3), tool.after==24 (S3 3 + S8 9 + S9 12), chatmsg==8 (the 8
 //      S4 fires — per fire, mismatch included), gauge==3 (db-error +
 //      parts-not-array + invalid-messageID), event==0, nudge==14 (S8 9: the 5
 //      rung fires + the 2 delivery-failure sessions × {fire line + failure
@@ -1306,8 +1353,8 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
   check(
     "42",
     "S5",
-    "kind tallies exact: warn==2, tool.before==6, tool.after==22, chatmsg==8, gauge==3, event==0, nudge==14",
-    tally("warn") === 2 && tally("tool.before") === 6 && tally("tool.after") === 22 && tally("chatmsg") === 8 && tally("gauge") === 3 && tally("event") === 0 && tally("nudge") === 14,
+    "kind tallies exact: warn==2, tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0, nudge==14",
+    tally("warn") === 2 && tally("tool.before") === 6 && tally("tool.after") === 24 && tally("chatmsg") === 8 && tally("gauge") === 3 && tally("event") === 0 && tally("nudge") === 14,
     `warn=${tally("warn")} tool.before=${tally("tool.before")} tool.after=${tally("tool.after")} chatmsg=${tally("chatmsg")} gauge=${tally("gauge")} event=${tally("event")} nudge=${tally("nudge")}`,
   );
 }
@@ -1324,7 +1371,7 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
   const postLog = POST["plugin.log"] ?? "";
   const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
   const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
-  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5"];
+  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5"];
   const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`) || l.includes(`"sess":"${fid}"`)));
   check(
     "43",

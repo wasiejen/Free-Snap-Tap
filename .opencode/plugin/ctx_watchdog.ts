@@ -160,7 +160,9 @@
 //       `session_context/<sid>` writeout): ONE append-only file at `.opencode/temp/ctx.log`
 //       (git-ignored; the temp dir is mkdirSync'd recursive; best-effort, never throws).
 //       Entry = leading LOCAL datetime `YYYY-MM-DD_HH-MM` (the general convention) + the
-//       current model (the gauge read's modelId — the field is OMITTED when empty) + the SAME
+//       current model (the gauge read's modelId — the field is OMITTED when empty) + the
+//       tool name (the tool.execute.after tool — the field is OMITTED when empty, mirroring
+//       the model field; L1 of the compaction-lifecycle proposal, 2026-09-11) + the SAME
 //       minimal readout as (1). Written IFF the readout was actually APPENDED (log ⟷ appended
 //       tool returns stay isomorphic — the maintainer's "base the logging on the directly
 //       appended tool returns"); non-ok reads → no entry.
@@ -513,13 +515,15 @@ function localStamp(): string {
 // Consumer 3 — the single-file ctx log (the v2.8 header block): `.opencode/temp/ctx.log`
 // (append-only; the temp dir is mkdirSync'd recursive; best-effort, never throws). Entry =
 // leading local datetime + the model (the gauge read's modelId — the field is OMITTED when
-// empty) + the minimal readout.
-function appendCtxLog(modelId: string | undefined, readout: string): void {
+// empty) + the tool name (the tool.execute.after tool — the field is OMITTED when empty,
+// mirroring the model field) + the minimal readout.
+function appendCtxLog(modelId: string | undefined, tool: string | undefined, readout: string): void {
   try {
     const p = join(dir ?? "", ".opencode", "temp", "ctx.log");
     mkdirSync(dirname(p), { recursive: true });
     const model = typeof modelId === "string" && modelId !== "" ? ` ${modelId}` : "";
-    appendFileSync(p, `${localStamp()}${model} ${readout}\n`, "utf8");
+    const toolField = typeof tool === "string" && tool !== "" ? ` ${tool}` : "";
+    appendFileSync(p, `${localStamp()}${model}${toolField} ${readout}\n`, "utf8");
   } catch {
     // best effort — never break the hook over a write failure
   }
@@ -693,7 +697,7 @@ async function onToolAfter(
       const readout = minimalReadout(g);
       const appended = appendReadout(output, readout);
       await nudgeLadder(sid, g);
-      if (appended && readout != null) appendCtxLog(g.modelId, readout);
+      if (appended && readout != null) appendCtxLog(g.modelId, str(input?.tool), readout);
     }
   } catch {
     // never throw
