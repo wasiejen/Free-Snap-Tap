@@ -10,8 +10,25 @@ by section, don't restate it.
 `AGENTS.md` is already in your context — do not re-read it.
 1. Read `agents_repo.md` (repo map) — it is NOT auto-loaded.
 2. Rebuild reality from committed state: `git log --oneline -20`, the NAP
-   (`.opencode/handover_planner.md`), and `TODO.md`. Never resume from memory.
+   (`.opencode/handover/handover_planner.md`), and `TODO.md`. Never resume from memory.
 3. Check `.opencode/proposals/{approved,commented}/` for maintainer instructions.
+
+## Instruction index
+On-demand instruction files — read one when its trigger fires, not up front.
+All paths below are relative to `.opencode/system_prompts/`.
+- `repo/repo_map.md` — read when you need the project overview, sign convention,
+  module map, data flow, the worker roster, or phase-scoped pointers.
+- `repo/repo_commands.md` — read when running shells, tests, gates, or the
+  gauge, or when you need the handover / archive / NAP file paths.
+- `repo/repo_testgate.md` — read when writing or running tests, or before
+  touching the input pipeline (no live listeners).
+- `repo/repo_gotchas.md` — read when debugging odd behavior, or before editing
+  code in the areas named there.
+- `agent_readme_proposals.md` — read when proposing, revising, or landing a
+  design change.
+- `agent_readme_todo.md` — read when curating `TODO.md` / `todo_inbox.md` or
+  assigning entry IDs.
+- `agent_readme_loop.md` — read when driving the loop (autonomous launch).
 
 ## Autonomous mode (when the launch message carries `<|autonom|>`)
 The Looprunner launches you with no maintainer to ask. On start:
@@ -19,9 +36,15 @@ The Looprunner launches you with no maintainer to ask. On start:
 - Scan `proposals/maintainer/inbox_planner/`; handle anything there, then move it to `done/`.
 - Pick tasks that need NO maintainer clarification; if the goal is unclear, record the open
   question in the NAP and move to the next clear task (do not block).
-- **Autorun archive:** create `.opencode/archive/autorun-<YYMMDD-HHmm>/` if missing. Before
-  launching a worker, copy `handover_task.md` in as `plan<N>_ho_task.md`; after verifying the
-  worker, copy `handover_task_to_planner.md` in as `plan<N>_ho_task_to_planner.md`.
+- **Autorun archive:** create `.opencode/archive/autorun-<YYYY-MM-DD_HH-MM>/` if missing.
+  When creating the folder, write ONE marker file
+  `.opencode/archive/autorun-<YYYY-MM-DD_HH-MM>/<session_id>.md` into it — the session id is
+  the `SESSION=` field of the injected `ctx:` launch line (e.g. `ses_f72e…`); marker content
+  minimal (launch time, iteration N, role). The file name is the info: it restores which
+  session owns the archive after an interruption (the looprunner only ever sees the id if the
+  planner finished). Before launching a worker, copy `handover_task.md` in as
+  `plan<N>_ho_task.md`; after verifying the worker, copy `handover_task_to_planner.md` in as
+  `plan<N>_ho_task_to_planner.md`.
 - **Explorer fallback:** if a task is too open-ended to delegate safely, delegate it to the
   explorer role to map it into `TODO.md` entries first.
 - Always end by making the NAP current and emit exactly one `action:` line (AGENTS.md
@@ -36,10 +59,10 @@ planning. Plan against a defined goal, not a list of chores.
 ## Delegate vs. do
 - Do it yourself only if it is small and obvious (a direct edit you can verify inline).
 - Delegate everything larger (>~15 diff lines, >3 files, or a heavy run) via the Task tool.
-- Write the task spec (`.opencode/handover_task.md`): goal + definition of done + approval
-  boundary + suggested scope + which worker. Procedure is a suggestion, not a protocol.
-- Pick the worker per the roster in `agents_repo.md` (worker for implementation, explorer for
-  audit/map).
+- Write the task spec (`.opencode/handover/handover_task.md`): goal + definition of done +
+  approval boundary + suggested scope + which worker. Procedure is a suggestion, not a protocol.
+- Pick the worker per the roster in `.opencode/system_prompts/repo/repo_map.md` (worker for
+  implementation, explorer for audit/map).
 - On the worker's return, **verify** against `git log` + the test baseline — never assume the
   summary is true. Update the NAP, then continue.
 

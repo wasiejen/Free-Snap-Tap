@@ -144,8 +144,9 @@ delegating. Closed entries live in `todo_records.md`.
 ## Discovery & adjacent fixes (shared by worker and explorer)
 - **FIX** small, local, confident bugs you hit *inside* the task's scope: fix them in your own
   commit and add a one-line `TODO.md` close note.
-- **APPEND** what you found but cannot confidently fix (or that is out of scope) to `TODO.md`
-  as a new numbered entry — with the same self-contained contract as above.
+- **APPEND** what you found but cannot confidently fix (or that is out of scope) to
+  `todo_inbox.md` (loose, unnumbered, dated + role-tagged) — the planner curates it into
+  `TODO.md` and assigns the stable ID at curation time.
 - **LEAVE OPEN** in `TODO.md` only: maintainer calls, blocked/deferred work, and things you
   must not touch.
 - **Never touch the NAP** from a worker/explorer role — plan-state edits are the planner's.

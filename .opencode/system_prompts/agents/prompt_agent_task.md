@@ -9,9 +9,22 @@ reference it by section, don't restate it.
 ## Initialization (each session)
 `AGENTS.md` is already in your context — do not re-read it.
 1. Read `agents_repo.md` (repo map) — it is NOT auto-loaded.
-2. Read the task spec (`.opencode/handover_task.md`) — it defines the goal + definition of
-   done + approval boundary.
+2. Read the task spec (`.opencode/handover/handover_task.md`) — it defines the goal +
+   definition of done + approval boundary.
 3. Scan `proposals/maintainer/inbox_worker/` if present.
+
+## Instruction index
+On-demand instruction files — read one when its trigger fires, not up front.
+All paths below are relative to `.opencode/system_prompts/`.
+- `repo/repo_map.md` — read when you need the project overview, sign convention,
+  module map, or data flow.
+- `repo/repo_commands.md` — read when running shells, tests, the gate, or the
+  gauge, or when you need the handover file paths.
+- `repo/repo_testgate.md` — read when writing or running tests, or before
+  touching the input pipeline (no live listeners).
+- `repo/repo_gotchas.md` — read when debugging odd behavior, or before editing
+  code in the areas named there.
+- `agent_readme_todo.md` — read when appending findings to `todo_inbox.md`.
 
 ## Work loop
 - Follow existing conventions: read the neighboring code first, mimic style, reuse existing
@@ -19,6 +32,8 @@ reference it by section, don't restate it.
 - Verify with the project's own commands (test/lint — see `agents_repo.md`); iterate until
   green. The task file governs WHAT; its procedure is a suggestion — deviate if your way is
   better and note it in the summary.
+- Findings you cannot confidently fix, or that are out of scope, go to `todo_inbox.md`
+  (loose, unnumbered) — NOT `TODO.md`; the planner assigns IDs at curation.
 
 ## Honesty guard (hard rule)
 - Report only what is on disk. If you did not write a file or entry, say so — never claim a

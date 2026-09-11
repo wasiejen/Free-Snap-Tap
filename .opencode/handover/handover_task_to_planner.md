@@ -1,74 +1,113 @@
-# EXECUTIVE SUMMARY — TODO split part 3 (closed entries → todo_records.md)
+# EXECUTIVE SUMMARY — prompt/repo split build (parts 1+2+5) + session-id rules (2147)
 
-Task: `.opencode/handover/handover_task.md` (part 3 only). Meta/file cleanup, no FST
-code, no behavior change. ONE commit (the commit containing this summary; subject:
-"TODO split part 3: closed entries → todo_records.md, stubs in TODO.md" — hash
-verifiable via `git log -1`; a commit hash cannot be embedded in its own commit).
+Task: `.opencode/handover/handover_task.md`. META-ONLY (no FST code, no tests, no
+plugin, no `opencode.jsonc`, no root `AGENTS.md`, no `TODO.md`). ONE commit (the
+commit containing this summary; subject: "Prompt/repo split build: repo-map parts,
+feature readmes, prompt indexes, todo_inbox, session-marker rule" — hash verifiable
+via `git log -1`; a commit hash cannot be embedded in its own commit).
 
-## What changed
-- `TODO.md`: 891 → 504 lines. 12 closed entries replaced by one-line stubs in place
-  (format `## N. (closed <date>, see todo_records.md) — <original title>`); the open
-  entry #48 (misfiled under "Closed entries") moved as a whole block into "FST
-  behavior decisions (open — maintainer calls unless noted)" (before "## Docs & misc
-  (open)"); the now-mismatched section renamed to
-  `## Closed entries (mismatch: contains open entry #35)` (per spec rule: something
-  open remained there — #35, judged open below).
-- `todo_records.md`: 34 → 446 lines. Existing 34 lines byte-identical (verified as
-  prefix); 12 full-text blocks appended at the end, one per moved entry, format
-  `## N. <original title> (closed <date>, full text moved from TODO.md)` + original
-  body verbatim. Append order: the planner's MOVE-list order (#47, #45, #39, #37,
-  #38, #34, #36, #43, #44) then the judged-closed (#46, #41, #42).
+## Gate (unchanged, measured after all edits)
+- `& .\.venv\Scripts\python.exe -m pytest -q` → `448 passed, 1 warning` (the known
+  #10 warning).
+- `& .\.venv\Scripts\ruff.exe check --select F .` → `All checks passed!` (0 findings).
 
-## Moved entries (12)
-#47, #45, #39, #37, #38, #34, #36, #43, #44 (planner pre-ruling) + #46, #41, #42
-(judged closed, below).
+## 1. Section→part mapping (all 12 original sections, facts verbatim, exactly one home)
+| original section | part (`system_prompts/repo/`) |
+|---|---|
+| What this is | `repo_map.md` |
+| Sign convention (IMPORTANT) | `repo_map.md` |
+| Module map (repo root) | `repo_map.md` |
+| Data flow | `repo_map.md` |
+| Worker roster | `repo_map.md` |
+| Phase-scoped work | `repo_map.md` |
+| Environment & shell | `repo_commands.md` |
+| Run / test | `repo_commands.md` |
+| Handover file paths | `repo_commands.md` — MOVED from the spec's suggested mapping (the proposal left it unmapped; the gauge command is a hot path for every role and the spec's own example trigger ties the gauge to `repo_commands.md`) |
+| Safety limits (repo-specific) | `repo_testgate.md` |
+| Test conventions | `repo_testgate.md` |
+| Gotchas | `repo_gotchas.md` |
 
-## Judged entries (decision + one-line evidence)
-- **#46 → CLOSED (moved):** the LANDED tail fully meets the acceptance — event-driven
-  bounded wait in BOTH crossover tests, 10 consecutive full `pytest -q` runs green,
-  production `send_keys_for_tap_group` untouched; scope == what LANDED.
-- **#41 → CLOSED (moved):** acceptance met — `fst_manager.py:578` + conftest FakeFST +
-  test assertion all on the singular production name, drift-guard test added, gate
-  green (436 passed / ruff F=0).
-- **#42 → CLOSED (moved):** multi-notch semantics pinned by the new
-  `test_multi_notch_scroll_keeps_single_notch_phase`, single-notch tests green, the
-  decided mask/shift semantics named in the LANDED tail; the report-back ruling became
-  the separate (still open) entry #48.
-- **#40 → LEFT OPEN:** the goal's reliable re-run + tests/ smell-check half is not
-  evidenced done — the entry itself lists "Remaining scope: the tests/ smell check +
-  the focus-dict/combination candidates"; the maintainer's "CLOSED" tail only resolves
-  the gemma agent-config sub-call.
-- **#35 → LEFT OPEN:** the T1 build scope LANDED, but the tail still carries the v1.3
-  log-profile re-baseline = open maintainer call 1 (default SKIP) — scope broader than
-  what LANDED.
+Machine-verified: each of the 12 section bodies (whitespace-normalized) is a
+substring of exactly one part; none remains in the root index (node script,
+scratchpad). Root `agents_repo.md` is now a 19-line thin index (≤ 35 ✓), entry
+point intact (what-this-is + maintainership rule + one "read when …" line per part).
 
-## Oddities / stale refs found (reported per spec, NOT edited)
-- `todo_records.md` header numbering line is stale ("currently #38, next = #39";
-  reality: up to #48, next #49) — left as-is (spec: append-only for that file).
-- Maintainer-calls list: NO stale refs — all referenced entries (#17, #11, #33, #1,
-  #7, #8, #9, #4, #6, #30) are still open; item 6's #39 ref already reads CLOSED.
-- Open #35's body references the old `ctxgauge/` path (moved to `plugin/scripts/` on
-  2026-09-10) — stale path inside an open entry; left byte-identical per scope.
-- Kept the pre-existing one-line records for #38 and #47 and appended the full text
-  (spec pre-ruling; duplicated heading accepted): #38's title therefore occurs 3×
-  total (stub + kept record + new block), all other moved titles exactly 2×.
+## 2. Verbatim spot-checks (grep hits per part, all = 1)
+- `repo_map.md`: `re-emits "idealized" input`, `+key` = key **released**,
+  `Focus change re-runs`, `Raw `agent_*` variants`
+- `repo_commands.md`: `here-strings are the only heredoc`,
+  `CI installs runtime+dev only`, `no finished step`, `N**ext **A**gent`
+- `repo_testgate.md`: `mocked-`FakeFST` pattern`, `recreate the pattern if
+  needed`, `Do not hard-code test-count assumptions`
+- `repo_gotchas.md`: `monkeypatch `_open_config_file``, `qtbot.mouseDClick`,
+  `opencode.exe-bun false confidence`
 
-## Verification (scripted, machine-checked — see temp scripts if needed)
-- Open entries byte-identical: #1 #7 #8 #9 #4 #6 #11 #3 #40 #35 #17 #30 #33; file
-  header (7 lines) and the maintainer-calls section byte-identical.
-- #48 block moved verbatim into FST behavior decisions; renamed section heading
-  present; entry-id set of TODO.md unchanged (stubs keep their numbers).
-- Every moved title: exactly 2 occurrences across TODO.md + todo_records.md
-  (3 for #38, accepted); no moved entry's full body remains in TODO.md
-  (contiguous body-blob substring check per entry).
-- `todo_records.md` old content byte-identical prefix; 12 record headings present.
-- `git diff --stat`: exactly `TODO.md` + `todo_records.md` (+ this summary).
+## 3. Files
+- NEW parts: `.opencode/system_prompts/repo/repo_{map,commands,testgate,gotchas}.md`
+  (102/61/21/45 lines).
+- NEW readmes (each ≤ 50 ✓): `.opencode/system_prompts/agent_readme_{proposals,todo,
+  loop}.md` (33/29/37 lines).
+- `todo_inbox.md` (repo root) — 12-line header + 3 findings I appended this session
+  (roster-bullet drift, module-map bullet gap, mid-session inbox item — see §5).
+- `agents_repo.md` — rewritten as the thin index.
+- `prompt_agent_planner.md` — stale paths fixed (NAP line 13 →
+  `.opencode/handover/handover_planner.md`; task spec line 39 →
+  `.opencode/handover/handover_task.md`); Autorun-archive bullet replaced: new date
+  pattern `autorun-<YYYY-MM-DD_HH-MM>` + ONE `<session_id>.md` marker file (id = the
+  `SESSION=` field of the injected `ctx:` launch line; minimal content; file name is
+  the info) — spec/summary copy lines kept; roster reference now points at
+  `.opencode/system_prompts/repo/repo_map.md`; Instruction index (7 lines) added.
+- `prompt_agent_task.md` — stale task-spec path fixed (line 12); inbox rule added
+  (Work loop: unfixable/out-of-scope findings → `todo_inbox.md`, NOT `TODO.md`);
+  Instruction index (5 lines) added.
+- `prompt_agent_explorer.md` — stale task-spec path fixed (line 10); same inbox rule
+  (Work loop); safety reference repointed to `repo_testgate.md`; Instruction index
+  (5 lines) added.
+- `prompt_agent_looprunner.md` — Instruction index (loop-readme line) + session-id
+  lookup line in Loop hygiene (`SESSION=` field of `ctx:` lines; one
+  `<session_id>.md` marker per planner session in the autorun archive; plain-text
+  session log deliberately NOT referenced, per spec §6).
+- Stale-path grep over the 4 live prompts + root index: zero
+  `.opencode/handover_<name>.md` no-slash forms remain ✓.
 
-## Deliberately not done
-- No edits to the maintainer-calls list; no new TODO.md entries (spec: "you add NO
-  entries"); `todo_records.md` existing lines untouched; no gate run (meta-only per
-  spec); `opencode.jsonc` left in the tree (not staged).
+## 4. Queued maintainer swap
+- `.opencode/proposals/files/AGENTS.md` §Discovery "APPEND" bullet retargeted:
+  worker/explorer findings now go to `todo_inbox.md` (loose, unnumbered, dated +
+  role-tagged); the planner curates into `TODO.md` and assigns the stable ID at
+  curation. Root `AGENTS.md` (agent read-only) still says "to `TODO.md`" — the
+  maintainer replaces the root file from this copy when ready.
 
-Final gauge (verbatim): `SESSION=ses_f731be360ffe6v9T67ufY3Bt3s CTX=2176 (1%) REM=117824`
-(note: the injected plugin nudge at the same time read CTX=84298 (70%) REM=35702 — the
-self-gauge is source of truth per AGENTS.md; both are far above the stop line).
+## 5. Deviations / notes for the planner
+1. The spec's "current state" listed 2 stale no-slash paths (planner 13/39); the
+   LIVE worker (line 12) and explorer (line 10) prompts also carried
+   `.opencode/handover_task.md`. DoD 5 bans the no-slash form across all 4
+   prompts, so all 4 were fixed (2 extra edits, same pattern, no behavior change
+   to the protocol — just the correct directory).
+2. 3 stale no-slash NAP references inside the MOVED sections were fixed to
+   `.opencode/handover/handover_planner.md` (Run/test, Test conventions,
+   Phase-scoped work) — reference fix only, facts unchanged.
+3. `repo_map.md` §Worker-roster still says explorer "findings to `TODO.md`" and the
+   explorer prompt still frames `TODO.md` as its core artifact (verbatim rule +
+   "keep everything else unchanged" both forbid deeper edits here) — the inbox
+   retarget lives in the one added line + `agent_readme_todo.md` + the queued
+   swap. Residual tension flagged in `todo_inbox.md`; your call how far the
+   explorer-role rewrite goes (likely a follow-up task, needs a spec).
+4. Mid-session, maintainer inbox item `inbox_worker/2026-09-11_02-03.md` arrived
+   (loop.log START/RETURN/DONE lines for the three roles, log in the autorun
+   archive folder). OUT OF SCOPE here — the task spec defers the plain-text
+   session log to the compaction-detection task. I did not act on it and did NOT
+   move it to `done/` (unhandled); it is recorded in `todo_inbox.md`. Rule needed:
+   fold into the compaction-detection task spec or spec separately.
+5. The `ctx:` session-id marker practice already exists on disk
+   (`.opencode/archive/autorun-260910-2307/ses_f72e…md` and
+   `autorun-2026-09-11_01-29/ses_f725…md`) — the prompt/readme wording matches
+   established practice.
+
+## 6. Deliberately NOT done
+- No FST code / tests / plugin / `opencode.jsonc` / root `AGENTS.md` / `TODO.md` /
+  `todo_records.md` / NAP touched. No `proposals/files/*` touched except the one
+  allowed AGENTS.md line. Untracked planner files left alone (`archive/…/
+  plan2_ho_task.md`, `inbox_planner/2026-09-11_02-03.md`).
+
+## Final gauge (pre-commit, verbatim)
+SESSION=ses_f7239dd5fffeUBcphbE8PjuHLX CTX=85762 (71%) REM=34238

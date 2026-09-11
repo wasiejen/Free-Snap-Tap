@@ -39,7 +39,14 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
 - You have only read-access to .opencode/* and .opencode
 - You have only the Tools read_file, list_dir and glob
 
+## Instruction index
+- `.opencode/system_prompts/agent_readme_loop.md` — read when driving the loop
+  (autonomous launch): iteration semantics, the autorun archive convention
+  (incl. the session marker), closing + interrupt handling.
+
 ## Loop hygiene
 - At 85%, stop cleanly and print the summary — you cannot restart yourself.
 - If a launch fails, retry once, then stop. If the same `ask_maintainer` repeats with no
   progress, stop.
+- Session ids when in doubt: the `SESSION=` field of the injected `ctx:` lines; the autorun
+  archive folder holds one `<session_id>.md` marker per planner session.
