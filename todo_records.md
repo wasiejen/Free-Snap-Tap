@@ -5,7 +5,7 @@ One-line records; resolution lives in the file / git log. Moved out of `TODO.md`
 from the live file).
 
 **Numbering rule:** every ID used here is RESERVED and never reused — new entries in
-`TODO.md` continue from the last used ID (currently #49, next = #50).
+`TODO.md` continue from the last used ID (currently #50, next = #51).
 
 ## 2. Fix the 6 ruff `F` findings — CLOSED (worker, `cdbbdcd`, 2026-09-10) — all six F sites removed (incl. the cascaded dead `cube_distance`); ruff F 6→0; pytest 434→434, 13 warnings same profile.
 ## 5. Lint baseline 6 → 8 at `ca61a26` — CLOSED (`0025a57`, 2026-09-08) — the three unused `SimpleNamespace` imports removed — the 6-finding baseline restored (later → 0 via #2).
@@ -450,3 +450,6 @@ One-line record: maintainer call — the worktree held the LANDED part-3 spec (b
 to `854bb68`) while HEAD held the split-build spec (`8b4123b`); the maintainer resolved it
 directly (`b6dc3e7` "cleaned up commit mess" — restored lost updates, HEAD split-build spec
 canonical, tree clean) → closed; the split build launched per the committed spec.
+
+## 3. Rework README and WIKI to the current state of the code (2026-09-06) - CLOSED (work LANDED 2026-09-10; curated 2026-09-11, iter 5) - all 15 fix-list items reworded per the 2026-09-06 decisions, each verified against the code before rewording (the per-item evidence status tail lives in TODO.md's git history); the §3-undocumented-features residual went to #47 (closed 2026-09-10).
+## 40. Explorer run #1 output unreliable (2026-09-10) - CLOSED (maintainer ruling 2026-09-10: the gemma agent option removed, verified in the live opencode.jsonc; curated 2026-09-11, iter 5) - the audit re-run goal was completed via audit 3a/3b (session 4; #48 is the only open audit residual); the gauge-fabrication caveats stand as the explorer-output-check lesson (verify numbers against the real command).

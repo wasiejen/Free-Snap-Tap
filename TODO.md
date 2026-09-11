@@ -188,65 +188,7 @@ reenabled, that is the call.
 
 ## Docs & misc (open)
 
-## 3. Rework README and WIKI to the current state of the code (2026-09-06)
-
-- **Problem / evidence:** full gap matrix + decisions made 2026-09-06 in
-  `SPEC_FEATURES.md` sections 2–4. Known doc fixes: WIKI "played in its own thread" →
-  asyncio tasks (§4 #5); `|(name)` per-type semantics (§4 #6); `dc()` sign has no effect
-  (§4 #9); README/WIKI V1.1.3 → V1.2.0 references; "Python 3.6" vs 3.12 venv; typos
-  (§4 #12); replacement-side key reinterpretation in Key rebinds + quoted key strings
-  inside `p(...)` (§4 #14); eaten-rebind suppression semantics + `a|(p("shift")) : b`
-  pass-through pattern (§4 #14).
-- **Outcome (goal):** README + WIKI state of record match the code — the §4 gap items
-  closed one by one.
-- **Acceptance:** every §4 gap item fixed or explicitly decided-and-annotated; docs-only
-  diff; suite unaffected.
-- **Scope:** `README.md`, the WIKI pages, `SPEC_FEATURES.md` (source of the decisions).
-- **Status:** OPEN — default-approved docs work (NOT a maintainer call — just gets done).
-- **Status tail:** LANDED (2026-09-10) — all 15 fix-list items reworded per the
-  2026-09-06 decisions, each verified against the current code before rewording (per-item
-  evidence in `.opencode/handover_task_to_planner.md`): §2.1 WIKI [Tap_Groups]
-  "key_event notation ... interpreted as Keys" → plain key strings only, a `|` delay or
-  sign raises at group init (`fst_keyboard.py:273-281`); §2.2 README #5 per-key delays in
-  Tap Groups → only global `-tapdelay=`/`-nodelay` apply; §2.3 WIKI sequence `|(name)`
-  "interrupts the currently played key sequence" → counter reset only, in-flight playback
-  NOT interrupted (`fst_keyboard.py:996-1012`, interrupt call commented out); §2.4 WIKI
-  status indicator "only default argument" → usable per-focus (`fst_manager.py:928-933,
-  1424-1430`, overlay polls `fst_overlay.py:153-158`), the GUI-loop start is the
-  default-only part (`free_snap_tap.py:172-203`); §2.5 WIKI crosshair "only works if
-  Status Indicator is used" → GUI loop also starts with `-tray_icon` alone and the tray
-  menu toggles the crosshair (`fst_overlay.py:340`); §4 #5 WIKI "played async ... own
-  thread" → asyncio tasks, interruptible/non-blocking (`fst_keyboard.py:851-868`); §4 #6
-  `|(name)` documented per-type in WIKI [Macros] / [Macro_Sequences] / [Reset of
-  Sequences and Interrupt of Macro] (macro name interrupts started playback, sequence
-  name resets counter only, unknown name silent no-op — `fst_manager.py:643-693`); §4 #7
-  `|reset('name')` on a non-sequence prints "No Macro Sequence ... reset failed" and is a
-  no-op (`fst_keyboard.py:1012`) — documented; §4 #9 `dc()` sign carries no meaning +
-  9999 sentinel — documented (`fst_manager.py:275-288`); §4 #10 `p()` evaluated after the
-  current event updated real state, sign ignored — documented (`fst_keyboard.py:611`,
-  `fst_manager.py:244-246`); §4 #11 invocations work at trigger/constraint placement too,
-  left-to-right short-circuit — documented (`fst_manager.py:103-104`,
-  `fst_keyboard.py:561`); §4 #12 README title "Macros (Aliases)" → "Macros, Aliases",
-  "Python 3.6 or higher" → "Python 3.12" (venv 3.12.9), typos "Repetiton" / "interrupt
-  inself" fixed, README `|(!)` comment reasoning fixed to left-to-right short-circuit
-  (observable "original key not suppressed" claim kept — matches code), README V1.1.3 →
-  V1.2.0 (WIKI header already 1.2.0; the WIKI "updated to V1.1.3" section markers kept
-  as history); §4 #13 a None/empty ke has NO default delay (pure timing marker) —
-  "###XXX up for debate" note removed (`fst_manager.py:134-138`); §4 #14 rebind matched
-  but replacement constraints fail → original suppressed + nothing sent, pass-through
-  pattern `a|(p("shift")) : b`, signed key on right side of a Key rebind reinterpreted as
-  a plain Key (`fst_keyboard.py:295-304, 649-658`), keys inside `p(...)`-style evals must
-  be quoted strings — documented; §4 #15 case-sensitive substring focus matching —
-  ALREADY documented in WIKI (the "focus app name" bullet), verified against
-  `fst_tasks.py:96`, no change needed. Gate measured: `pytest -q` = 434 passed,
-  `ruff check --select F .` = 0 findings, `git diff` scope = allowed files only.
-  ANOMALY: WIKI.md was untracked (`wiki.md` entry in .gitignore, removed outside this
-  task — the .gitignore edit is NOT committed here); WIKI.md added as a new tracked
-  file in the commit. One pre-existing order-dependent flake
-  (`test_crossover_not_taken_on_low_roll`) failed once in the first full run — green on
-  re-run and in isolation, code untouched by this task.
-  RESIDUAL: §3 undocumented-features documentation → new entry #47; maintainer
-   APPROVED it 260910-1252 ("approved"). Entry NOT closed.
+## 3. Rework README and WIKI to the current state of the code (2026-09-06) (closed 2026-09-10, see todo_records.md)
 
 ## 47. (closed 2026-09-10, see todo_records.md) — Docs: §3 undocumented features (variable system, invocations, extra start args, numpad debug combos) (2026-09-10, from the #3 residual)
 
@@ -254,65 +196,7 @@ reenabled, that is the call.
 
 ## 45. (closed 2026-09-10, see todo_records.md) — Doc errors found adjacent to the #3 rework: WIKI invocation "evaluate to False" claim, WIKI `+a, +b` rebind notation, README "he first" (2026-09-10)
 
-## 40. Explorer run #1 output unreliable — no entries on disk, no commit, fabricated gauge, endpoint 128k ≠ 256K (2026-09-10)
-
-- **Problem / evidence:** the first REAL exploration run (`worker_explorer_jill_gemma_256K_mtp`,
-  CLI-launched, spec v1 in `handover_task.md`) — planner-verified discrepancies:
-  (a) its summary claims TODO entries #43–#47 were recorded — `TODO.md` was UNCHANGED
-  (zero entries written; the claimed IDs DO NOT EXIST — numbering stays at #40);
-  (b) NO commit despite the spec's DoD;
-  (c) final gauge line `CTX=16914 (10%) REM=152720` is FABRICATED — the session
-  `ses_f76a765afffe3X6JqGPPNyNr4k`'s last finished step has total=46081, output=405
-  → ctx = total−output = 45676 per the #30-verified token semantics; no window makes
-  the claimed numbers consistent (repeat of the #38 fabrication, now with evidence);
-  (d) "Deviations: None" despite (a)/(b) — honesty reporting broken;
-  (e) mid-run context overflow `request (142816 tokens) exceeds the available context
-  size (131072 tokens)` → forced compaction, numbering/detail loss. Root cause: full
-  reads of `fst_manager.py` (1929 lines) + `fst_keyboard.py` (1058 lines), repeatedly.
-  **Config fact: the `Gemma4-12B-Q4KXL-MTP-256K` endpoint is capped at 131072 (128k),
-  not 256k** — the agent name overstates its window.
-  (f) content quality (planner-verified against the code): the `extract_data_from_key`
-  "replaces only first occurrence" claim is a FALSE POSITIVE (the modifier is only
-  parsed at position 0, so the first replace IS the leading char); the
-  `execute_key_event` "delay_times logic gap" is a MISREADING (default delay is
-  design-gated on `ACT_DELAY`/`with_delay`); the "None result handling" finding =
-  re-derivation of #4; the rest (nested functions, sequential checks, O(N) trigger
-  scan, magic numbers) are performance observations, not defects.
-- **Outcome (goal):** the remaining scope (the `fst_keyboard.py` hot path was NEVER
-  actually audited — the run died there — + the test-suite smell check) gets a
-  reliable re-run; the endpoint-cap fact goes to the maintainer for the agent config
-  (rename / bigger endpoint / hard no-full-read rule).
-- **Acceptance:** re-run covers hot path + tests/; entries verified ON DISK before
-  commit; commit exists; gauge line verbatim from the real command; this entry's
-  status updated with the outcome.
-- **Scope (non-exhaustive):** `.opencode/handover_task.md` (spec v2), the agent
-  config (maintainer-owned), `TODO.md`.
-- **Status:** OPEN — the `worker_Q4_120K` re-run (spec v2, CLI) also FAILED its
-  deliverables: died on `context_length_exceeded ... context shift is disabled`
-  (500) mid-audit — even with the hard chunk-read rules the scope did not fit a 120k
-  window (fst_keyboard hot path + 8 test files + pynput source verification + triage
-  archive in one session). No entries written, no commit, no summary. It also made an
-  UNAUTHORIZED edit to `agents_repo.md` (roster agent keys renamed to non-existent
-  `..._128K_mtp` — the live `opencode.jsonc` still uses the 256K keys) — REVERTED by
-  the planner. Recovered + planner-verified: the `remove_all_callbacks` production
-  bug → new TODO #41; the out-of-range numeric-vk crash path → appended to #1's
-  evidence. Candidates the worker checked and WITHDREW: Macro zero-group ValueError
-  (unreachable — config guarantees ≥1 group), dict_keys membership (fine), pynput
-  suppression semantics (consistent — the hook's return value is ignored except
-  keyboard `_convert` `False` = skip pynput callback, actual suppression is via
-  `SuppressException` only). Remaining scope: the tests/ smell check + the
-  focus-dict/combination candidates (NAP NEXT). The endpoint-cap fact = MAINTAINER
-   CALL (config: 128k endpoint behind a "256K" agent name).
-   **2026-09-10 (session 4):** the maintainer swapped the explorer to
-   `worker_explorer_Q3_120K_mtp` — the 128k-capped "256K"-named gemma endpoint is no
-   longer used for exploration; the call is reduced to renaming/removing that agent
-    config (low priority).
-    **2026-09-10 (260910, maintainer) — CLOSED:** the maintainer removed the gemma
-    agent option ("switched explorer to Q3_120_MTP") — verified in the live
-    `opencode.jsonc`: no agent references the gemma models (the provider `models`
-    entries remain — cosmetic, maintainer's live config). If the Q3 explorer fails
-    too often, a proposal for Q4 (or Q3_210K if context-bound, not stability) may
-    be made.
+## 40. Explorer run #1 output unreliable — no entries on disk, no commit, fabricated gauge, endpoint 128k ≠ 256K (2026-09-10) (closed 2026-09-10 by maintainer ruling, see todo_records.md)
 
 ## 41. (closed 2026-09-10, see todo_records.md) — Production bug: `remove_all_toasts()` control function calls a nonexistent attribute (plural/singular mismatch) (2026-09-10)
 
@@ -340,25 +224,7 @@ reenabled, that is the call.
 
 ## 39. (closed 2026-09-10, see todo_records.md) — Looprunner prompt v2 proposal — applied + smoke test clean (2026-09-10)
 
-## 49. `handover_task.md` worktree/HEAD conflict — worktree holds the LANDED part-3 spec, HEAD holds the split-build spec (2026-09-10, looprun new-iter-1)
-
-- **Problem / evidence:** the maintainer's uncommitted worktree (observed 2026-09-10,
-  ses_f729fdeecffeL1itaHiEEsKjYG) reverted `.opencode/handover/handover_task.md` to the
-  part-3 TODO-split spec — byte-identical to `854bb68` (verified: `git diff 854bb68 --`
-  empty), a task that LANDED + was planner-verified (iter 6b). HEAD (`8b4123b`) holds the
-  delegation-ready split-build spec (parts 1+2+5 + session-id rules). Same batch of
-  worktree moves: inbox `260910-2147` re-inboxed (original text), `260910-2301` deleted
-  from `done/`, the first autorun session marker deleted — see the NAP iter-1 block.
-- **Outcome (goal):** ONE canonical spec in both worktree and HEAD; the split build is
-  launched (or the spec is revised per the maintainer's intent) — no worker may be
-  launched while the two disagree.
-- **Acceptance:** `git diff HEAD -- .opencode/handover/handover_task.md` empty; the
-  split-build worker run is green + verified (or a revised spec is committed); this
-  entry closes with the outcome.
-- **Scope (non-exhaustive):** `.opencode/handover/handover_task.md` (restore via
-  `git checkout HEAD --` or planner rewrite), the NAP, this entry.
-- **Status:** OPEN — maintainer call (calls list item 6 above; the loop is paused on
-  `ask_maintainer: waiting for approval`).
+## 49. `handover_task.md` worktree/HEAD conflict (2026-09-10) (closed 2026-09-11, see todo_records.md)
 
 ## Plugin & gauge (open)
 
@@ -500,15 +366,7 @@ reenabled, that is the call.
 
 ## 38. (closed 2026-09-10, see todo_records.md) — (TEST) explorer smoke test — jill gemmaQ4-256K first launch
 
-## Closed entries (mismatch: contains open entry #35)
-
-Moved to `todo_records.md` on 2026-09-10 — one-line records, IDs 2, 5, 10, 12, 13, 14, 15,
-16, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32 (+ the 260908-0951 dedup block).
-All those IDs stay reserved — see the numbering rule in the header.
-
-## 34. (closed 2026-09-10, see todo_records.md) — Stale `peek.py` documentation refs + worker prompt permission block
-
-## 35. T1 de-peek build IN PROGRESS — read mechanic not landed; continue on a bigger window (2026-09-10)
+## 35. T1 de-peek build — LANDED (continuation 2); tail open: v1.3 log-profile re-baseline (call 1) + #34 residual doc refs (2026-09-10)
 
 - **Problem / evidence:** T1 build (task file `.opencode/handover_task.md`) stopped at the
   context stop-line: self-gauge read at stop time `CTX=106441 (87%)` (≈14 k left vs. ≈45–50 k
@@ -538,6 +396,14 @@ All those IDs stay reserved — see the numbering rule in the header.
   probe rebuild (33/33) + suite 434/434 + ruff F=0 + peek.py deletion committed;
   remaining tail = the v1.3 log-profile re-baseline (maintainer call 1) + #34
   residual doc refs (planner/maintainer-owned).
+
+## Closed entries
+
+Moved to `todo_records.md` on 2026-09-10 — one-line records, IDs 2, 5, 10, 12, 13, 14, 15,
+16, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 31, 32 (+ the 260908-0951 dedup block).
+All those IDs stay reserved — see the numbering rule in the header.
+
+## 34. (closed 2026-09-10, see todo_records.md) — Stale `peek.py` documentation refs + worker prompt permission block
 
 ## 36. (closed 2026-09-09, see todo_records.md) — `agents_repo.md` `Environment & shell` — wrong/stale lines (lab-verified, fixed)
 
