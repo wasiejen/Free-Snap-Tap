@@ -1,10 +1,23 @@
 import * as fs from "fs";
 import * as path from "path";
+import { tool } from "@opencode-ai/plugin"
 
 // Persistent memory cache for named clipboards across tool invocations within the session
 const clipboardBuffers: Record<string, string[]> = {};
 
+//--maintainer needs to be translated from the non tool() format into this to be registered as plugin
+// i do not know how the enum of line 27 translates into this schema
+// e.g.
+//
+ // export default tool({
+   // description: "Query the project database",
+   // args: {
+     // mode: tool.schema.string().nonoptional().describe("XXX"),
+//
+
+
 export default {
+  name: "block_transfer",
   description: "Performs low-token line-range editing operations (MOVE, COPY, CUT, PASTE, DELETE, CLEAR) across files using unique anchor markers and internal named clipboards.",
   parameters: {
     type: "object",
