@@ -8,3 +8,5 @@
 2026-09-11_20-30 -->START worker-2 ses_f6e4ff455ffejgV7rT26dCHyKR Qwen3.8-27B-IQ4KT-120K T2: ctx.log tool-name field (START written retroactively at completion — the line timestamp is the write time)
 2026-09-11_20-30 DONE<--- worker-2 ses_f6e4ff455ffejgV7rT26dCHyKR Qwen3.8-27B-IQ4KT-120K 54%/54K
 2026-09-11_20-35 -RETURN- planner-2 ses_f6eb9cab5ffebLGhxdSs8jBrGI Qwen3.8-27B-IQ4KT-120K worker-2 ses_f6e4ff455ffejgV7rT26dCHyKR Qwen3.8-27B-IQ4KT-120K
+2026-09-11_20-51 -->START worker-2 ses_f6e3ee339ffe9D3uMpx9aR0VQ4 Qwen3.8-27B-IQ4KT-120K T3: compact_memory tool completion (budget + COMPACT line + probe S10)
+2026-09-11_21-05 DONE<--- worker-2 ses_f6e3ee339ffe9D3uMpx9aR0VQ4 Qwen3.8-27B-IQ4KT-120K 94%/6K

@@ -6,7 +6,9 @@
 // chain section) + EXTENDED 2026-09-10/11 (v2.8: S9 readout append / ctx log /
 // deferred delivery + the S8 deferred-delivery ticks) + EXTENDED 2026-09-11
 // (L1: the ctx log tool-name field — S9 checks 54/55 byte-shapes updated +
-// new 65/66): the pre-rebuild probe
+// new 65/66) + EXTENDED 2026-09-11 (L2: the compact_memory custom tool —
+// the new S10 section, checks 67-75; the tool file is imported DIRECT,
+// type-stripped, the same way the plugin loads): the pre-rebuild probe
 // (v2.2.1 era) targeted the DELETED handover.ts, the retired
 // experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
 // all void with the shell gauge. PERMANENT repo tooling: RE-RUN, never rebuild
@@ -159,10 +161,41 @@
 //          0 calls after the tick
 //      (63) IDLE (fields-style): exactly 1 call after the tick
 //      (65) ctx log tool-name field PRESENT: byte-shape
-//          `<dt> CPU-Qwen3-0.6B task (46K)` (the fake tool name)
-//      (66) ctx log tool-name field OMITTED: payload without a `tool` key →
-//          byte-shape `<dt> CPU-Qwen3-0.6B (46K)`
-//   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
+ //          `<dt> CPU-Qwen3-0.6B task (46K)` (the fake tool name)
+ //      (66) ctx log tool-name field OMITTED: payload without a `tool` key →
+ //          byte-shape `<dt> CPU-Qwen3-0.6B (46K)`
+ //   S10 compact_memory tool (9) — the L2 approved design (the
+ //      compaction-lifecycle proposal): the tool file
+ //      .opencode/tools/compact_memory.ts is imported DIRECT from the repo
+ //      path (type-stripped, the same way the plugin loads — the tool file
+ //      MUST load that way) and driven with a FAKE client (records every
+ //      session.compact call; a mutable FAIL switch) + a FAKE context
+ //      (directory=SANDBOX steers ALL the tool's fs writes — the budget
+ //      store + the COMPACT ctx.log line — into the sandbox; sessionId per
+ //      the prototype's working shape, modelId/preReadout = the best-effort
+ //      L1 fields):
+ //      (67) the tool file imports and exposes default.tools.compact_memory
+ //          (description + async execute + the prototype's arg names)
+ //      (68) execute calls session.compact with the PASSED-THROUGH keep
+ //          knobs (the fake client captures the call) + path.id
+ //      (69) the sessionID arg ABSENT → the context.sessionId fallback
+ //          targets the compact call
+ //      (70) the COMPACT line is written after success — byte-shape
+ //          `<dt> <model> COMPACT <sid> tokens=<t> messages=<m>
+ //          (<pre-readout>)` (best-effort fields PRESENT when carried)
+ //      (71) the same line with model + pre-readout ABSENT → BOTH fields
+ //          OMITTED (the T2 omit-when-empty convention), never thrown
+ //      (72) the budget allows EXACTLY 2 compactions per session id and
+ //          REFUSES the 3rd with the hand-over note (NO compact call on
+ //          the 3rd)
+ //      (73) the budget state is PERSISTED to disk: compact_budget.json
+ //          carries count==2 AND a FRESH module instance (cache-busted
+ //          re-import) still refuses — persistence, not in-memory
+ //      (74) a FAILING session.compact returns the error note (no throw)
+ //          and does NOT consume the budget (the next call compacts)
+ //      (75) the success return carries the re-application file pointer;
+ //          the refusal return carries the hand-over note
+ //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
 //      nudge==14); the
@@ -174,7 +207,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S5=6  →  "PROBE handover: 65/65 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S5=6  →  "PROBE handover: 74/74 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -1313,6 +1346,191 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
   );
 }
 
+// ------------------------------------------------------------------ S10 compact_memory tool (9) — L2 (the approved design)
+//
+// The custom tool at .opencode/tools/compact_memory.ts (T3, the compaction-
+// lifecycle proposal L2): imported DIRECT from the repo path (type-stripped,
+// the same way the plugin loads — the tool file MUST load that way) and driven
+// with a FAKE client (records every session.compact call; a mutable FAIL switch
+// forces the failure shape) + a FAKE context: directory=SANDBOX steers ALL the
+// tool's fs writes (the budget store + the COMPACT ctx.log line) into the
+// sandbox; sessionId is the prototype's working shape (modelId/preReadout are
+// the best-effort L1 fields — carried in check 70, absent in all others).
+const TOOL_TS = path.join(REPO_ROOT, ".opencode", "tools", "compact_memory.ts");
+const cmCompactCalls = [];
+const cmFail = { fail: false, error: "boom-compact" };
+const cmClient = {
+  session: {
+    compact: (options) => {
+      cmCompactCalls.push(options);
+      if (cmFail.fail) return Promise.reject(new Error(cmFail.error));
+      return Promise.resolve({ ok: true });
+    },
+  },
+};
+const cmCtx = (extra = {}) => ({ sessionId: "ses_cm_1", directory: SANDBOX, client: cmClient, ...extra });
+let cmTool;
+const cmExec = (args, extra) => cmTool.execute(args, cmCtx(extra));
+
+// 67 — the tool file imports (type-stripped, direct) and exposes the tool
+{
+  const toolMod = await import(pathToFileURL(TOOL_TS).href);
+  cmTool = toolMod.default?.tools?.compact_memory;
+  check(
+    "67",
+    "S10",
+    "tool file imports (type-stripped, direct) and exposes default.tools.compact_memory (description + async execute + the prototype's arg names)",
+    cmTool != null && typeof cmTool.description === "string" && typeof cmTool.execute === "function" &&
+      JSON.stringify(Object.keys(cmTool.parameters?.properties ?? {})) === JSON.stringify(["keepTokens", "keepMessages", "sessionID"]),
+    JSON.stringify(Object.keys(toolMod.default?.tools ?? {})),
+  );
+}
+
+// 68 — execute calls session.compact with the PASSED-THROUGH keep knobs (the
+//      fake client captures the call) + the sessionID arg as path.id
+{
+  const before = cmCompactCalls.length;
+  const res = await cmExec({ keepTokens: 42000, keepMessages: 7, sessionID: "ses_cm_1" });
+  const calls = cmCompactCalls.slice(before);
+  check(
+    "68",
+    "S10",
+    "execute calls session.compact with the PASSED-THROUGH keep knobs + path.id (the sessionID arg)",
+    calls.length === 1 && calls[0]?.path?.id === "ses_cm_1" && calls[0]?.body?.keep?.tokens === 42000 && calls[0]?.body?.keep?.messages === 7,
+    JSON.stringify({ calls, res: String(res).slice(0, 80) }),
+  );
+}
+
+// 69 — the sessionID arg ABSENT → the context.sessionId fallback targets the
+//      compact call (the prototype's fallback shape)
+{
+  const before = cmCompactCalls.length;
+  await cmExec({ keepTokens: 101, keepMessages: 3 }, { sessionId: "ses_cm_fb" });
+  const calls = cmCompactCalls.slice(before);
+  check(
+    "69",
+    "S10",
+    "sessionID arg absent: the context.sessionId fallback targets the compact call",
+    calls.length === 1 && calls[0]?.path?.id === "ses_cm_fb" && calls[0]?.body?.keep?.tokens === 101 && calls[0]?.body?.keep?.messages === 3,
+    JSON.stringify(calls),
+  );
+}
+
+// 70 — the COMPACT line after success, the best-effort model + pre-readout
+//      fields PRESENT (the context carries them): byte-shape
+//      `<dt> probe-model-120K_MTP COMPACT ses_cm_line tokens=50123 messages=9 (87%/52K)`
+{
+  const pre = ctxLogLines().length;
+  await cmExec({ keepTokens: 50123, keepMessages: 9, sessionID: "ses_cm_line" }, { modelId: "probe-model-120K_MTP", preReadout: "87%/52K" });
+  const ll = ctxLogLines();
+  const last = ll.length > 0 ? ll[ll.length - 1] : "";
+  check(
+    "70",
+    "S10",
+    "COMPACT line after success (model + pre-readout PRESENT): `<dt> probe-model-120K_MTP COMPACT ses_cm_line tokens=50123 messages=9 (87%/52K)`",
+    ll.length === pre + 1 && new RegExp(`^${DT} probe-model-120K_MTP COMPACT ses_cm_line tokens=50123 messages=9 \\(87%/52K\\)$`).test(last),
+    JSON.stringify({ pre, ll: ll.slice(-1) }),
+  );
+}
+
+// 71 — the same line with model + pre-readout ABSENT from the context → BOTH
+//      fields OMITTED (the T2 omit-when-empty convention), never thrown
+{
+  const pre = ctxLogLines().length;
+  await cmExec({ keepTokens: 1, keepMessages: 1, sessionID: "ses_cm_bare" });
+  const ll = ctxLogLines();
+  const last = ll.length > 0 ? ll[ll.length - 1] : "";
+  check(
+    "71",
+    "S10",
+    "COMPACT line best-effort OMITTED (no model / no pre-readout in the context): `<dt> COMPACT ses_cm_bare tokens=1 messages=1`",
+    ll.length === pre + 1 && new RegExp(`^${DT} COMPACT ses_cm_bare tokens=1 messages=1$`).test(last),
+    JSON.stringify(ll.slice(-1)),
+  );
+}
+
+// 72 — the budget allows EXACTLY 2 compactions per session id and REFUSES the
+//      3rd with the hand-over note (NO compact call on the 3rd)
+{
+  const before = cmCompactCalls.length;
+  const a1 = await cmExec({ keepTokens: 10, keepMessages: 2, sessionID: "ses_cm_budget" });
+  const a2 = await cmExec({ keepTokens: 10, keepMessages: 2, sessionID: "ses_cm_budget" });
+  const cAfter2 = cmCompactCalls.length;
+  const a3 = await cmExec({ keepTokens: 10, keepMessages: 2, sessionID: "ses_cm_budget" });
+  check(
+    "72",
+    "S10",
+    "budget: 2 compactions allowed, the 3rd REFUSED with the hand-over note and NO compact call",
+    cAfter2 === before + 2 && cmCompactCalls.length === cAfter2 && /compacted/i.test(a1) && /compacted/i.test(a2) && /hand over/i.test(a3) && /start fresh/i.test(a3),
+    JSON.stringify({ calls: cmCompactCalls.length - before, a1: String(a1).slice(0, 60), a2: String(a2).slice(0, 60), a3 }),
+  );
+}
+
+// 73 — the budget state is PERSISTED to disk (persistence, not in-memory):
+//      compact_budget.json carries count==2 after the calls AND a FRESH module
+//      instance (cache-busted re-import of the SAME tool file) still refuses
+//      the next call with NO compact call — an in-memory store would grant the
+//      re-imported module a fresh budget.
+{
+  const stateFile = path.join(SANDBOX, ".opencode", "temp", "compact_budget.json");
+  let st = null;
+  try {
+    st = JSON.parse(readFileSync(stateFile, "utf8"));
+  } catch {
+    st = null;
+  }
+  const freshMod = await import(pathToFileURL(TOOL_TS).href + "?cm_reimport=1");
+  const before = cmCompactCalls.length;
+  const a4 = await freshMod.default.tools.compact_memory.execute({ keepTokens: 10, keepMessages: 2, sessionID: "ses_cm_budget" }, cmCtx());
+  check(
+    "73",
+    "S10",
+    "budget PERSISTED to disk (compact_budget.json count==2) and honored by a FRESH module instance (4th call refused, no compact call)",
+    st != null && st?.sessions?.ses_cm_budget?.count === 2 && cmCompactCalls.length === before && /hand over/i.test(a4),
+    JSON.stringify({ st, calls: cmCompactCalls.length - before, a4: String(a4).slice(0, 80) }),
+  );
+}
+
+// 74 — a FAILING session.compact returns the error note (never throws) and
+//      does NOT consume the budget (the very next call compacts fine)
+{
+  cmFail.fail = true;
+  let threw = false;
+  let res = "";
+  try {
+    res = await cmExec({ keepTokens: 10, keepMessages: 2, sessionID: "ses_cm_fail" });
+  } catch {
+    threw = true;
+  }
+  cmFail.fail = false;
+  const before = cmCompactCalls.length;
+  const ok = await cmExec({ keepTokens: 10, keepMessages: 2, sessionID: "ses_cm_fail" });
+  check(
+    "74",
+    "S10",
+    "failing session.compact: error note (no throw), budget NOT consumed (the next call compacts)",
+    !threw && /compaction request failed/i.test(res) && String(res).includes("boom-compact") && cmCompactCalls.length === before + 1 && /compacted/i.test(ok),
+    JSON.stringify({ threw, res: String(res), ok: String(ok).slice(0, 60) }),
+  );
+}
+
+// 75 — the success return carries the re-application file pointer (the
+//      prototype's directive SENTENCE — with the T3 escape fix, the path
+//      separators survive); the refusal return carries the hand-over note
+//      (the exhausted ses_cm_budget is reused — no compact call)
+{
+  const before = cmCompactCalls.length;
+  const ok = await cmExec({ keepTokens: 10, keepMessages: 2, sessionID: "ses_cm_ptr" });
+  const ref = await cmExec({ keepTokens: 10, keepMessages: 2, sessionID: "ses_cm_budget" });
+  check(
+    "75",
+    "S10",
+    "success return carries the re-application file pointer; refusal return carries the hand-over note",
+    String(ok).includes(".opencode\\system_prompts\\agent_readme_post_compaction.md") && /hand over and start fresh/i.test(ref) && cmCompactCalls.length === before + 1,
+    JSON.stringify({ ok: String(ok).slice(0, 160), ref }),
+  );
+}
+
 // ------------------------------------------------------------------ S5 hygiene (6)
 
 // 40 — every sandbox plugin.log line parses as JSON (no stray/blank/garbled lines)
@@ -1371,7 +1589,7 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
   const postLog = POST["plugin.log"] ?? "";
   const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
   const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
-  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5"];
+  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr"];
   const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`) || l.includes(`"sess":"${fid}"`)));
   check(
     "43",
