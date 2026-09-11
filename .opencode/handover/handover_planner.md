@@ -70,9 +70,34 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   the looprunner's live lookup; the stale examples in
   `agent_readme_loop.md` (planner-owned file) fixed in this commit — doc
   fix, pre-approved class.
-- **NEXT:** VERIFY T1 (probe 63/63 + gate 451/ruff 0 + grep-clean) →
-  T2 → T3 → T4 → T5 (each spec committed before launch; 1–2 launches per
-  session on context).
+- **T2 LANDED + verified (`6fca6bb` + worker bookkeeping `dd41f36`,
+  worker_Q4_120K fresh, clean run at 54 %):** plugin diff = exactly the
+  tool-name field (`appendCtxLog(modelId, tool, readout)`, omit-when-empty)
+  + header comment; chosen line shape (T3 must match):
+  `<stamp>[ <modelId>][ <tool>] <readout>`; gate re-measured BY ME: probe
+  **65/65**, pytest **451 + 1 #10 warning**, ruff **F=0**; worker's loop
+  log lines use the NEW tokens correctly. Accepted worker note: only probe
+  checks 54/55 were byte-exact on the ctx.log format (my spec said
+  54/59-63 — the 59-63 checks assert delivery, not the line bytes).
+  PRODUCTION TAIL: live ctx.log lines keep the OLD format until the
+  maintainer's next process restart (in-process staleness, expected —
+  same as the P02 saga).
+- **MAINTAINER DRAFT FOLDER appeared mid-run:**
+  `proposals/maintainer/inbox_planner/draft/block_transfer_tool/`
+  (`2026-09-11-20-05.md` + `block_tansfer_v2.ts`) — a token-saving
+  `block_transfer` tool concept (move/copy a text block between files by
+  start/end markers). Per the draft README: HIS live folder, NO action
+  unless he moves it to `inbox_planner`; noted for feedback when idle.
+  (Potentially useful for context economy — large file relocations burn
+  tokens; watch for its inboxing.)
+- **T3 SPEC committed** (tool completion: ≤2 persisted budget + COMPACT
+  line + result note; build on the maintainer's tool shape — the npm
+  verification step is dead). **T3 LAUNCHED**
+  (`worker_Q4_120K` fresh session).
+- **NEXT:** VERIFY T3 (probe N/N + gate 451/ruff 0 + budget mechanic
+  recorded) → T4 standing trigger rule in the 3 acting prompts (SMALL —
+  candidate for planner-direct) → T5 recovery-plugin completion →
+  Cycle-2 live acceptance at the next maintainer process restart.
 
 ## 2026-09-11 (new looprun, iteration 1; ses_f6ef5418effeloEwm4zr53XpXa) — approval moves landing; #17/#30/#35 closed; Cycle-1 + rename build
 - **Start state:** HEAD `5a39c3f` (NAP disclosure commit); tree carried the
