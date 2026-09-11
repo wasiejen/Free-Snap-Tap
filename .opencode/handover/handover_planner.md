@@ -30,6 +30,25 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
     message might arrive later"): ADOPTED — plugin task, spec AFTER the date sweep
     (needs fresh code reads of the nudge delivery path; observable plugin behavior —
     approved by this message).
+  - **`2026-09-11_01-41` (→ `done/` content-untouched) — RE-SCOPES the plugin task:**
+    (1) the "adapt handover plugin as a tool" idea was a miscommunication — he meant the
+    PEEK functionality; TABLED regardless → the 2306#1 assessment record is corrected
+    (queued: note it where the 2306#1 reply lives). (2) NUDGE REDESIGN (supersedes the
+    031 minimal read): the PRIORITY is a CONSTANT ctx readout appended to EVERY
+    `tool.execute.after` result (option-2 mechanic from the 031 note — linear,
+    cache-safe), NOT threshold-gated, very minimal format like `(80%/15K)` — reason:
+    **compaction is now ENTIRELY DEACTIVATED** (the window can't be exceeded; current
+    ctx data is what matters — the planner can gauge a worker's last state from it, e.g.
+    for restart-after-interruption). The threshold nudges STAY as messages (emergency
+    reset/instruction access points) but delivered race-free (option 1 = idle-deferred).
+    Context LOGGING moves to the appended tool returns (not the nudge messages). Include
+    all of this in the appropriate files — he names
+    `proposals/approved/260910_plugin-compaction-detection.md` → the plugin task now =
+    fold-in spec update + build, still AFTER the date sweep.
+  - **Worker-launch note:** the first split-build Task call landed on an EXISTING
+    75k-token worker session (maintainer cancelled it — no partial work, tree clean).
+    Maintainer rule: **always start a NEW agent, never restart/resume one** → the
+    relaunch below is a fresh call, no `task_id`.
 - **#49 CLOSED** (maintainer resolved via `b6dc3e7`; one-line record in
   `todo_records.md`; numbering now up to #49, next #50).
 - **FLAG (maintainer's file, not touched):** `AGENTS.md` line "Handover files live in
