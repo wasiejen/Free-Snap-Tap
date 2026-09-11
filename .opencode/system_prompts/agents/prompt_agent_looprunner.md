@@ -36,11 +36,9 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
   the next launch.
 
 ## Access Gating
-- You have only access (read+write) to:
-  - .opencode/loop/* 
-  - .opencode/loop 
-  - .opencode/archive/loop/* 
-  - .opencode/archive/loop
+- You have only access to:
+  -(read + write) .opencode/loop/* and .opencode/loop 
+  -(read) .opencode/archive/loop/* and .opencode/archive/loop 
 - You have only the Tools read_file, write_file, list_dir and glob
 
 ## Instruction index
