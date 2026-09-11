@@ -2,6 +2,42 @@
 
 FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 
+## 2026-09-11 (looprun 3, iteration 5; ses_f714b3128ffeILuAaWp2YUqnLt) — TODO curation + #48 delegated
+- **Start state:** HEAD `449556f` (iter-4 close); planner/worker inboxes EMPTY (no
+  maintainer messages; `approved/` unchanged); baseline = iter-4 measured
+  (448 passed + 1 #10 warning / ruff F=0 / probe 63/63); launch
+  `CTX=notAvailable` (fresh session). FIRST run under the loop.log protocol —
+  `autorun-2026-09-10_03-05/loop_log.md` created with the planner START line
+  (the looprunner's own START for this iter was never written — protocol
+  predates its existence); session marker added per convention.
+- **Curation (planner-direct, `a683047`):** (1) ADOPTED uncommitted worktree
+  edits present at start (author unknown — post-iter-4-close; an interrupted
+  step or the maintainer): TODO #3 + #40 collapsed to one-line closed
+  records (full text moved to `todo_records.md` with dated records), the
+  records-header numbering line fixed (#49 → #50, next #51 — already matching
+  the TODO.md header). Content verified contract-compliant; no open content
+  lost. (2) Resolved the flagged "Closed entries (mismatch: contains open
+  entry #35)" section: open #35 moved into `## Plugin & gauge (open)` with its
+  stale "IN PROGRESS — read mechanic not landed" title refreshed (continuation
+ 2 LANDED per its own status tail; body untouched); section heading now plain
+  `## Closed entries`.
+- **#48 DELEGATED (spec in `handover_task.md`):** mouse filter packed-word
+  equality → bit tests — LLKHF `flags == 1` → `bool(flags & 1)` and the
+  X-button `mouseData == 65536/131072` → high-word test (low word = key state
+  must not matter), per the maintainer's #42 ruling ("implicitly approved …
+  delegation-ready" — pre-approved, NOT a new behavior call). Worker
+  `worker_Q4_120K` FRESH session (no `task_id`). Spec line refs re-anchored to
+  the 1088-line file (`:464-465` simulated-check, `:486-490` X-button map,
+  reference idioms wheel `:473-476` / keyboard `:535-536`); playground probe
+  explicitly OUT of scope (maintainer personal file).
+- Baseline: 448 passed / ruff F=0 / probe 63/63 (unchanged at launch; #48
+  lands code+tests — re-verify post-landing).
+- **NEXT (iteration 6):** verify #48 (commit scope, gate re-run, bit-test
+  spot-checks, #48 close record) → bookkeeping commit. Standing maintainer
+  calls unchanged (FST behavior batch #1/#7/#8/#9/#4+#6 still the oldest open
+  work; #50 awaits the maintainer's repo-map refresh; #35/#17/#11 tails
+  await their calls).
+
 ## 2026-09-11 (looprun 3, iteration 4; ses_f71d36a2affeVrJfwDARNwG7lo) — deferred pair in order: loop.log prompt task, then the re-scoped plugin task
 - **Start state:** HEAD `7264b1f` (iter-3 close); tree clean; planner/worker
   inboxes EMPTY (no maintainer messages); baseline re-measured **448 passed +
