@@ -34,7 +34,12 @@ All paths below are relative to `.opencode/agent/prompts/`.
 - `.opencode/agent/knowledge/` (repo-root-relative, NOT under agent/prompts) —
   the knowledge base (gained findings, not instructions): read the area file
   (`knowledge_tools.md` / `knowledge_plugins.md`) when entering that area; add an
-  entry when you gain verified, actionable knowledge (format in its README).
+   entry when you gain verified, actionable knowledge (format in its README).
+
+## .opencode layout
+- Creating a new sub-folder under `.opencode/` requires its README (≤20 lines:
+  purpose, what goes here, what does NOT — usage, not content) in the SAME
+  commit; the folder tree must stay self-explanatory (each folder has one).
 
 ## Autonomous mode (when the launch message carries `<|autonom|>`)
 The Looprunner launches you with no maintainer to ask. On start:

@@ -22,12 +22,15 @@ Read when proposing, revising, or landing a design change.
 - **Acceptance** — how to verify it worked.
 - **Status** — current state (awaiting approval / approved / implemented).
 
-## Maintainer inbox channel
+## maintainer/ — the reverse direction (maintainer→agent, P10)
 - `proposals/maintainer/inbox_planner/` and `proposals/maintainer/inbox_worker/`
-  — each role scans its own inbox at session start; handle an item, then move
-  it to `proposals/maintainer/done/` with a `---` + `replier:` block appended.
-- NEVER edit the maintainer's text — replies are appended after a `---`.
-- `proposals/maintainer/feedback/` — maintainer feedback notes; read-only input
-  for the next session.
+  — each role scans its own inbox at session start BEFORE planning/executing;
+  handle an item, then move it to `proposals/maintainer/done/` with content
+  UNTOUCHED (the move is the read-receipt; the handling is recorded in the
+  NAP/summary/TODO as usual). `inbox_planner/draft/` is his drafting scratch —
+  scan it only when nothing else is open.
+- NEVER edit the maintainer's text.
+- `proposals/feedback/` — maintainer feedback notes on agent behavior;
+  read-only input for the next session.
 - `proposals/files/` — the maintainer's draft test set; READ-ONLY unless a task
   explicitly says otherwise.
