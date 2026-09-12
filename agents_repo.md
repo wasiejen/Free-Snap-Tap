@@ -2,7 +2,7 @@
 
 Windows-only snap-tapping / rebind / macro tool (pynput low-level hooks,
 PySide6 GUI, asyncio tasks) — the repo map is split into parts under
-`.opencode/system_prompts/repo/`; read the part(s) you need, not the whole set.
+`.opencode/agent/prompts/repo/`; read the part(s) you need, not the whole set.
 
 Maintained by the maintainer; agents do not edit it directly. If a part
 conflicts with the code, the code wins — flag the discrepancy in your summary

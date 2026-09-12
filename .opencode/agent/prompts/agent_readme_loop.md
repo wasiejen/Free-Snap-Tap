@@ -79,7 +79,7 @@ not here.
 
 ## Interrupt handling
 - Rebuild from committed state: `git log`, the NAP
-  (`.opencode/handover/handover_planner.md`), `TODO.md` — never from memory.
+  (`.opencode/agent/handover/handover_planner.md`), `TODO.md` — never from memory.
 
 ## Looprunner's own file
 - `.opencode/loop_log.md` is the looprunner's bookkeeping; the planner does not

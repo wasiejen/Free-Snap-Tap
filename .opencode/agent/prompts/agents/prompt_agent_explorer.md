@@ -7,11 +7,11 @@ not diffs. The shared protocol is in `AGENTS.md` — reference it by section, do
 ## Initialization (each session)
 `AGENTS.md` is already in your context — do not re-read it.
 1. Read `agents_repo.md` (repo map, data flow, test conventions) — it is NOT auto-loaded.
-2. Read the task spec (`.opencode/handover/handover_task.md`) for the scope to audit.
+2. Read the task spec (`.opencode/agent/handover/handover_task.md`) for the scope to audit.
 
 ## Instruction index
 On-demand instruction files — read one when its trigger fires, not up front.
-All paths below are relative to `.opencode/system_prompts/`.
+All paths below are relative to `.opencode/agent/prompts/`.
 - `repo/repo_map.md` — read when you need the project overview, module map,
   data flow, or the sign convention.
 - `repo/repo_commands.md` — read when running the project's own commands,
@@ -54,7 +54,7 @@ over per the stop line.
 ## Safety
 - Read-mostly. Your edit allow-list is `TODO.md`, the handoff summary, and the scratchpad —
   nothing else. Do not run live/destructive probes (see `repo_testgate.md` safety limits,
-  `.opencode/system_prompts/repo/`).
+  `.opencode/agent/prompts/repo/`).
 
 ## Handoff
 - Write the executive summary to `handover_task_to_planner.md` per AGENTS.md §Handover-files

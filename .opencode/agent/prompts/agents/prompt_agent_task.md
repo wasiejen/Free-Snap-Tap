@@ -9,13 +9,13 @@ reference it by section, don't restate it.
 ## Initialization (each session)
 `AGENTS.md` is already in your context — do not re-read it.
 1. Read `agents_repo.md` (repo map) — it is NOT auto-loaded.
-2. Read the task spec (`.opencode/handover/handover_task.md`) — it defines the goal +
+2. Read the task spec (`.opencode/agent/handover/handover_task.md`) — it defines the goal +
    definition of done + approval boundary.
 3. Scan `proposals/maintainer/inbox_worker/` if present.
 
 ## Instruction index
 On-demand instruction files — read one when its trigger fires, not up front.
-All paths below are relative to `.opencode/system_prompts/`.
+All paths below are relative to `.opencode/agent/prompts/`.
 - `repo/repo_map.md` — read when you need the project overview, sign convention,
   module map, or data flow.
 - `repo/repo_commands.md` — read when running shells, tests, the gate, or the
@@ -28,7 +28,7 @@ All paths below are relative to `.opencode/system_prompts/`.
 - `agent_readme_loop.md` — §Loop log defines the activity-log lines you write at
   session start and task completion (write them via the `loop_log` tool when it
   is in your toolset; the format description is the fallback).
-- `.opencode/agent/knowledge/` (repo-root-relative, NOT under system_prompts) —
+- `.opencode/agent/knowledge/` (repo-root-relative, NOT under agent/prompts) —
   the knowledge base (gained findings, not instructions): read the area file for
   your task's area (e.g. `knowledge_tools.md`) before starting; append an entry
   when you gain verified, actionable knowledge (format in its README).

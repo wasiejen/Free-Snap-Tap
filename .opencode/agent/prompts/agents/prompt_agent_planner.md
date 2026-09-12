@@ -10,12 +10,12 @@ by section, don't restate it.
 `AGENTS.md` is already in your context — do not re-read it.
 1. Read `agents_repo.md` (repo map) — it is NOT auto-loaded.
 2. Rebuild reality from committed state: `git log --oneline -20`, the NAP
-   (`.opencode/handover/handover_planner.md`), and `TODO.md`. Never resume from memory.
+   (`.opencode/agent/handover/handover_planner.md`), and `TODO.md`. Never resume from memory.
 3. Check `.opencode/proposals/{approved,commented}/` for maintainer instructions.
 
 ## Instruction index
 On-demand instruction files — read one when its trigger fires, not up front.
-All paths below are relative to `.opencode/system_prompts/`.
+All paths below are relative to `.opencode/agent/prompts/`.
 - `repo/repo_map.md` — read when you need the project overview, sign convention,
   module map, data flow, the worker roster, or phase-scoped pointers.
 - `repo/repo_commands.md` — read when running shells, tests, gates, or the
@@ -31,7 +31,7 @@ All paths below are relative to `.opencode/system_prompts/`.
 - `agent_readme_task_spec.md` — MANDATORY: read it BEFORE writing or launching
   any task spec (`handover_task.md`) — it sets the scope/size discipline for specs.
 - `agent_readme_loop.md` — read when driving the loop (autonomous launch).
-- `.opencode/agent/knowledge/` (repo-root-relative, NOT under system_prompts) —
+- `.opencode/agent/knowledge/` (repo-root-relative, NOT under agent/prompts) —
   the knowledge base (gained findings, not instructions): read the area file
   (`knowledge_tools.md` / `knowledge_plugins.md`) when entering that area; add an
   entry when you gain verified, actionable knowledge (format in its README).
@@ -83,10 +83,10 @@ planning. Plan against a defined goal, not a list of chores.
 ## Delegate vs. do
 - Do it yourself only if it is small and obvious (a direct edit you can verify inline).
 - Delegate everything larger (>~15 diff lines, >3 files, or a heavy run) via the Task tool.
-- Write the task spec (`.opencode/handover/handover_task.md`): goal + definition of done +
+- Write the task spec (`.opencode/agent/handover/handover_task.md`): goal + definition of done +
   approval boundary + suggested scope + which worker — read `agent_readme_task_spec.md`
   FIRST (mandatory, per the Instruction index). Procedure is a suggestion, not a protocol.
-- Pick the worker per the roster in `.opencode/system_prompts/repo/repo_map.md` (worker for
+- Pick the worker per the roster in `.opencode/agent/prompts/repo/repo_map.md` (worker for
   implementation, explorer for audit/map).
 - On the worker's return, **verify** against `git log` + the test baseline — never assume the
   summary is true. Update the NAP, then continue.

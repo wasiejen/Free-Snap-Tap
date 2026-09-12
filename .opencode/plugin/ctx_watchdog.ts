@@ -12,11 +12,11 @@
 //
 // v2 additions (all best-effort; no hook ever throws out into a delegation, and v2 behavior is
 // restricted to handover delegations — a `task` call whose `args.prompt` contains
-// ".opencode/handover_task.md"):
+// ".opencode/agent/handover/handover_task.md"):
 //   - `tool.execute.before` (handover): pre-flight — spec file missing or empty → one warn
 //     line to plugin.log. Observation only: never blocks or mutates the delegation.
 //   - `tool.execute.after` (handover): summary mirror — OVERWROTE
-//     .opencode/handover_task_to_planner.md with the worker final message from `output`
+//     .opencode/agent/handover/handover_task_to_planner.md with the worker final message from `output`
 //     VERBATIM. REMOVED in v2.7 (P02) — see the v2.7 block below; historical record kept.
 //   - `experimental.chat.system.transform`: the raw payload is evidence-logged (kind
 //     "transform") so the LIVE shape is visible from the post-restart plugin.log — the SDK
@@ -123,7 +123,7 @@
 //
 // v2.7 (2026-09-10, P02 — maintainer-approved in the proposals channel): the `tool.execute.after`
 // summary mirror (the after-hook write to handover_task_to_planner.md) is REMOVED. It OVERWROTE
-// .opencode/handover_task_to_planner.md with the worker's RAW final message after EVERY Task-tool
+// .opencode/agent/handover/handover_task_to_planner.md with the worker's RAW final message after EVERY Task-tool
 // run — 7 confirmed collisions across sessions, each costing the planner a `git checkout --`
 // recovery. The mirror's original purpose (avoid the "write file + final message" doubling) was
 // resolved on the worker-prompt side (the worker writes its own summary file, 52eb0aa) — the
@@ -209,7 +209,7 @@ const SKIP_EVENT_TYPES = new Set([
 ]);
 
 // v2 — handover ownership
-const HANDOVER_SPEC_PATH = ".opencode/handover_task.md";
+const HANDOVER_SPEC_PATH = ".opencode/agent/handover/handover_task.md";
 
 // v2.5 — the $/BunShell machinery (ShellPromiseLike/ShellLike, the `shell` global,
 // GAUGE_TIMEOUT_MS, withTimeout, GaugeReadout, gaugePreviewOf, gaugeReadout) is DELETED

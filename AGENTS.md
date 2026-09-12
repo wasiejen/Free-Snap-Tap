@@ -82,9 +82,9 @@ shared protocol; it does not replace it. Read these sections once and reference 
 
 | channel | path | written by | read by | canonical when |
 |---|---|---|---|---|
-| task spec | `.opencode/handover/handover_task.md` | planner | worker | committed |
-| worker summary | `.opencode/handover/handover_task_to_planner.md` | worker | planner | committed (the Task-tool result may clobber it post-commit — the committed copy wins) |
-| plan state / NAP | `.opencode/handover/handover_planner.md` | planner | planner (next session), looprunner (indirect) | committed |
+| task spec | `.opencode/agent/handover/handover_task.md` | planner | worker | committed |
+| worker summary | `.opencode/agent/handover/handover_task_to_planner.md` | worker | planner | committed (the Task-tool result may clobber it post-commit — the committed copy wins) |
+| plan state / NAP | `.opencode/agent/handover/handover_planner.md` | planner | planner (next session), looprunner (indirect) | committed |
 | action line | last `action:` line of planner's closing message | planner | looprunner | last one in the message |
 | iteration N | top of looprunner's launch message | looprunner | planner | the launch message |
 | maintainer → role | `.opencode/proposals/maintainer/inbox_<role>/` | maintainer | named role | moved to `maintainer/done/` after handling |
@@ -126,7 +126,7 @@ agent can resume from a committed state without re-exploring. Two-party split:
    open/unresolved content.
 4. **Post-commit context check** — see Context budget.
 - Commit green, commit often, never commit red. Handover files ride along.
-- Handover files live in `./.opencode/handover`.
+- Handover files live in `./.opencode/agent/handover`.
 
 ## Context budget (stop line)
 - Check between logical chunks and after every commit (step 4): run the context gauge
@@ -192,7 +192,7 @@ delegating. Closed entries live in `todo_records.md`.
 - Concrete paths: see the interaction-contract table above and `agents_repo.md`.
 
 ## agent_feedback (maintainer-only friction log)
-- `.opencode/agent_feedback.md` is a **maintainer-only** log of what slowed or confused you
+- `.opencode/agent/agent_feedback.md` is a **maintainer-only** log of what slowed or confused you
   (friction points, unclear rules, missing context). Append a dated, role-tagged line when you
   hit real friction — do not edit prior entries. It is the maintainer's inbox for improving
   these prompts; it is *not* a TODO and does not block work.

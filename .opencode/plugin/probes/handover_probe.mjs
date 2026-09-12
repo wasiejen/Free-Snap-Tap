@@ -54,7 +54,7 @@
 // WHAT IT RUNS:
 //   The plugin is initialized with directory=<temp sandbox root> (os.tmpdir,
 //   mkdtemp), so ALL its fs writes land in the sandbox: dummy
-//   .opencode/handover_task.md spec (non-empty sentinel), mirror file pre-filled
+//   .opencode/agent/handover/handover_task.md spec (non-empty sentinel), mirror file pre-filled
 //   with STALE content, empty plugin.log. The real .opencode/ files are NEVER
 //   touched (S5 verifies byte-identity + zero writes outside the sandbox).
 //   S1 pre-flight warn (3): spec present → no warn; renamed away → exactly ONE
@@ -287,9 +287,9 @@ const PLUGIN_TS = path.join(REPO_ROOT, ".opencode", "plugin", "ctx_watchdog.ts")
 
 // --------------------------------------------------------------- fixed payloads
 
-const HOV_PROMPT = "Read .opencode/handover_task.md and execute it EXACTLY.";
+const HOV_PROMPT = "Read .opencode/agent/handover/handover_task.md and execute it EXACTLY.";
 const ORIGINAL_SPEC =
-  "# PROBE DUMMY SPEC\n\nsentinel — NOT the real spec file (the real one lives at <repo root>/.opencode/handover_task.md).\n";
+  "# PROBE DUMMY SPEC\n\nsentinel — NOT the real spec file (the real one lives at <repo root>/.opencode/agent/handover/handover_task.md).\n";
 // P02 (v2.7): the mirror is DISABLED — the plugin must NEVER touch this file, so the
 // sentinel must survive the whole probe byte-for-byte.
 const STALE_SENTINEL = "STALE MIRROR SENTINEL — the plugin must NOT touch this file (mirror disabled, P02).\n";
@@ -302,7 +302,7 @@ const cap120 = (s) => (s.length <= 120 ? s : s.slice(0, 119) + "\u2026");
 // ------------------------------------------------------------------ real files
 
 const REAL_OP = path.join(REPO_ROOT, ".opencode");
-const REAL_FILES = ["handover_task.md", "handover_task_to_planner.md", "plugin.log"];
+const REAL_FILES = ["agent/handover/handover_task.md", "agent/handover/handover_task_to_planner.md", "plugin.log"];
 const readOrNull = (p) => (existsSync(p) ? readFileSync(p).toString("utf8") : null);
 const snapshotReal = () => Object.fromEntries(REAL_FILES.map((f) => [f, readOrNull(path.join(REAL_OP, f))]));
 const PRE_REAL = snapshotReal();
@@ -338,10 +338,10 @@ const check = (id, section, label, cond, detail = "") => {
 // temp sandbox root — the plugin is initialized with directory=SANDBOX, so every
 // fs write it performs lands here, never in the repo. The fixture DBs live here too.
 const SANDBOX = mkdtempSync(path.join(os.tmpdir(), "fst_handover_probe_"));
-const SB_SPEC = path.join(SANDBOX, ".opencode", "handover_task.md");
-const SB_MIRROR = path.join(SANDBOX, ".opencode", "handover_task_to_planner.md");
+const SB_SPEC = path.join(SANDBOX, ".opencode", "agent", "handover", "handover_task.md");
+const SB_MIRROR = path.join(SANDBOX, ".opencode", "agent", "handover", "handover_task_to_planner.md");
 const SB_LOG = path.join(SANDBOX, ".opencode", "plugin.log");
-mkdirSync(path.join(SANDBOX, ".opencode"), { recursive: true });
+mkdirSync(path.join(SANDBOX, ".opencode", "agent", "handover"), { recursive: true });
 writeFileSync(path.join(SANDBOX, "sandbox_root_marker.txt"), "sandbox\n");
 writeFileSync(SB_SPEC, ORIGINAL_SPEC);
 writeFileSync(SB_MIRROR, STALE_SENTINEL);
@@ -1591,7 +1591,7 @@ const cmExec = (args, extra) => cmTool.execute(args, cmCtx(extra));
     "75",
     "S10",
     "success return carries the re-application file pointer; refusal return carries the hand-over note",
-    String(ok).includes(".opencode\\system_prompts\\agent_readme_post_compaction.md") && /hand over and start fresh/i.test(ref) && cmCompactCalls.length === before + 1,
+    String(ok).includes(".opencode\\agent\\prompts\\agent_readme_post_compaction.md") && /hand over and start fresh/i.test(ref) && cmCompactCalls.length === before + 1,
     JSON.stringify({ ok: String(ok).slice(0, 160), ref }),
   );
 }
@@ -1620,7 +1620,7 @@ const RC_TS = path.join(REPO_ROOT, ".opencode", "plugin", "context_recovery.ts")
 // plugin's own "byte-identical to the tool" header comment is stale — see
 // todo_inbox.md).
 const RC_DIRECTIVE =
-  "[SYSTEM CONTEXT DIRECTIVE]\nContext was compacted. Read .opencode\\system_prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.\nIf your role is Looprunner continue the last restart/resume close message of a Planner you have received.";
+  "[SYSTEM CONTEXT DIRECTIVE]\nContext was compacted. Read .opencode\\agent\\prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.\nIf your role is Looprunner continue the last restart/resume close message of a Planner you have received.";
 const RC_BUDGET = path.join(SANDBOX, ".opencode", "temp", "compact_budget.json");
 const SB_JSONC = path.join(SANDBOX, "opencode.jsonc");
 const JSONC_FIXTURE = [

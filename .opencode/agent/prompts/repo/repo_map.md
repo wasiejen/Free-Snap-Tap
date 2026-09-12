@@ -59,12 +59,12 @@ config file. README/WIKI have some stale examples — trust the convention above
   and exclude from EXE packaging. If the maintainer explicitly requests a live
   probe, run these directly from the repo root; otherwise do not execute them.
 - `.opencode/` — opencode meta files (not FST code):
-  `system_prompts/` — `agents/prompt_agent_*.md` (live agent prompts),
-  `repo/` (the `agents_repo.md` parts: map/commands/testgate/gotchas),
-  `agent_readme_*.md` (protocol readmes: loop / proposals / todo);
-  `handover/` — `handover_planner.md` (planner state/continuation file, the
-  NAP), `handover_task.md` (current task spec),
-  `handover_task_to_planner.md` (worker's latest EXECUTIVE SUMMARY);
+  `agent/` — the agent-side home: `prompts/` (`agents/prompt_agent_*.md` live
+  agent prompts, `repo/` the `agents_repo.md` parts, `agent_readme_*.md`
+  protocol readmes: loop / proposals / todo), `handover/` (`handover_planner.md`
+  planner state/continuation file, the NAP; `handover_task.md` current task
+  spec; `handover_task_to_planner.md` worker's latest EXECUTIVE SUMMARY),
+  `knowledge/` (area knowledge base), `agent_feedback.md` (friction log);
   `loop/autorun-…/` — the CURRENT looprun (spec/summary copies + `loop_log.md`);
   older loopruns live in `archive/loop/`.
 - `plugin/scripts/` — the context gauge (`peek.mjs` self-peek CLI + `gauge.mjs`
@@ -102,6 +102,6 @@ faster/weaker):
 
 ## Phase-scoped work
 Phase plans, the progress log, current baselines, and the rules of the current
-handoff live in `.opencode/handover/handover_planner.md` (the NAP) — read it first
+handoff live in `.opencode/agent/handover/handover_planner.md` (the NAP) — read it first
 when you get one. `TODO.md` holds durable maintainer TODOs. This file holds
 stable facts and conventions only — never phase progress.

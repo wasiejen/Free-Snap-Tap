@@ -40,11 +40,11 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
 - You have only read access to:
   - .opencode/loop/* and .opencode/loop 
   - .opencode/archive/loop/* and .opencode/archive/loop 
-  - .opencode/system_prompts/agent_readme_loop.md 
+  - .opencode/agent/prompts/agent_readme_loop.md 
 - You have only the Tools read_file, write_file, list_dir and glob
 
 ## Instruction index
-- `.opencode/system_prompts/agent_readme_loop.md` — read when driving the loop
+- `.opencode/agent/prompts/agent_readme_loop.md` — read when driving the loop
   (autonomous launch): iteration semantics, the §Loop folder convention, the
   §Loop log protocol, closing + interrupt handling.
  - **you are exempted from the writing into the log - folder creation is planners job

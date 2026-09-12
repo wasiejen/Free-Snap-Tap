@@ -11,11 +11,11 @@
 //
 // v2 additions (all best-effort; no hook ever throws out into a delegation, and v2 behavior is
 // restricted to handover delegations — a `task` call whose `args.prompt` contains
-// ".opencode/handover_task.md"):
+// ".opencode/agent/handover/handover_task.md"):
 //   - `tool.execute.before` (handover): pre-flight — spec file missing or empty → one warn
 //     line to plugin.log. Observation only: never blocks or mutates the delegation.
 //   - `tool.execute.after` (handover): summary mirror — OVERWRITES
-//     .opencode/handover_task_to_planner.md with the worker final message from `output`
+//     .opencode/agent/handover/handover_task_to_planner.md with the worker final message from `output`
 //     VERBATIM (no log truncation ladder — that applies to plugin.log lines only).
 //     Empty `output` → file untouched. `metadata.truncated === true` → one trailer line.
 //   - `experimental.chat.system.transform`: the raw payload is evidence-logged (kind
@@ -90,7 +90,7 @@ const SKIP_EVENT_TYPES = new Set([
 ]);
 
 // v2 — handover ownership
-const HANDOVER_SPEC_PATH = ".opencode/handover_task.md";
+const HANDOVER_SPEC_PATH = ".opencode/agent/handover/handover_task.md";
 const GAUGE_TIMEOUT_MS = 3000;
 
 // BunShell is not re-exported by @opencode-ai/plugin (type is internal to dist/shell), so

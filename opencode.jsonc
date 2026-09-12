@@ -120,7 +120,7 @@
       "mode": "primary",
       "model": "llama-swap/Qwen3.8-27B-IQ4KT-120K:chat",
       "temperature": 0.1,
-      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_looprunner.md}",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_looprunner.md}",
       "tools": {
           "read_file": true,
           "list_dir": true,
@@ -134,7 +134,7 @@
           ".opencode/loop": "allow",
           ".opencode/archive/loop/*": "allow",
           ".opencode/archive/loop": "allow",
-          ".opencode/system_prompts/agent_readme_loop.md": "allow"
+          ".opencode/agent/prompts/agent_readme_loop.md": "allow"
         },
       },
       "options": {
@@ -148,7 +148,7 @@
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
       "temperature": 1.0,
-      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_planner.md}",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_planner.md}",
       "permission": {
         "edit": {
           "*": "allow",
@@ -163,7 +163,7 @@
       "description": "half prefill, very intelligent, moderately fast, 120k context, plans tasks and delegates to sub-agents, higher precision and higher stability due to 4bit Quant",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ4KT-120K",
-      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_planner.md}",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_planner.md}",
       "temperature": 1.0,
       "permission": {
         "task": "allow",
@@ -182,13 +182,13 @@
       "description": "intelligent, fast generation, 120K context window, to be used to explore code base - to be checked",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
-      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_explorer.md}",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_explorer.md}",
       "temperature": 1.0,
       "permission": {
         "edit": {
           "*": "deny",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
-          ".opencode/handover_task_to_planner.md": "allow",
+          ".opencode/agent/handover/handover_task_to_planner.md": "allow",
           "TODO.md": "allow"
         },
         "bash": "allow",
@@ -201,7 +201,7 @@
       "description": "intelligent, fast, 120k context, medium precision due to 3bit Quant",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ3KT-120K_MTP",
-      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_task.md}",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
       "temperature": 0.3,
       "permission": {
         "task": "allow",
@@ -210,8 +210,8 @@
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
           "agents_repo.md": "deny",
-          ".opencode/prompt_**": "deny",
-          ".opencode/handover_planner.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
         },
@@ -224,7 +224,7 @@
       "description": "half prefill, very intelligent, moderately fast, 120k context, higher precision and higher stability due to 4bit Quant",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ4KT-120K",
-      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_task.md}",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
       "temperature": 1.0,
       "permission": {
         "task": "allow",
@@ -233,8 +233,8 @@
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
           "agents_repo.md": "deny",
-          ".opencode/prompt_**": "deny",
-          ".opencode/handover_planner.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
         },
@@ -247,7 +247,7 @@
       "description": "intelligent, slow, big 210k context - for very long and complex tasks, medium precision due to 3bit Quant",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-IQ3KT-210K",
-      "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_task.md}",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
       "temperature": 0.3,
       "permission": {
         "task": "allow",
@@ -256,8 +256,8 @@
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
           "agents_repo.md": "deny",
-          ".opencode/prompt_**": "deny",
-          ".opencode/handover_planner.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
         },
@@ -279,8 +279,8 @@
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
           "agents_repo.md": "deny",
-          ".opencode/prompt_**": "deny",
-          ".opencode/handover_planner.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
         },
@@ -304,8 +304,8 @@
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
           "agents_repo.md": "deny",
-          ".opencode/prompt_**": "deny",
-          ".opencode/handover_planner.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
         },
@@ -327,8 +327,8 @@
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
           "agents_repo.md": "deny",
-          ".opencode/prompt_**": "deny",
-          ".opencode/handover_planner.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
         },
@@ -350,8 +350,8 @@
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
           "agents_repo.md": "deny",
-          ".opencode/prompt_**": "deny",
-          ".opencode/handover_planner.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
         },
@@ -392,7 +392,7 @@
 //   "mode": "primary",
 //   "model": "llama-swap/CPU-Qwen3.5-4B",
 //   "temperature": 0.1,
-//   "prompt": "{file:./.opencode/system_prompts/agents/prompt_agent_looprunner.md}",
+//   "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_looprunner.md}",
 //   "tools": {
 //       "read_file": true,
 //       "list_dir": true,

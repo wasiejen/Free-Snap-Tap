@@ -5,13 +5,13 @@ compaction summary is a LOSSY compression — protocol details (formats, paths,
 commands, baselines) must be re-applied from the files, never from the summary.
 STEP 1 — Re-read ALL of these files now, in ONE parallel batch:
   agents_repo.md
-  .opencode/system_prompts/repo/repo_map.md
-  .opencode/system_prompts/repo/repo_commands.md
-  .opencode/system_prompts/repo/repo_testgate.md
-  .opencode/system_prompts/repo/repo_gotchas.md
-  .opencode/system_prompts/agent_readme_proposals.md
-  .opencode/system_prompts/agent_readme_todo.md
-  .opencode/system_prompts/agent_readme_loop.md
+  .opencode/agent/prompts/repo/repo_map.md
+  .opencode/agent/prompts/repo/repo_commands.md
+  .opencode/agent/prompts/repo/repo_testgate.md
+  .opencode/agent/prompts/repo/repo_gotchas.md
+  .opencode/agent/prompts/agent_readme_proposals.md
+  .opencode/agent/prompts/agent_readme_todo.md
+  .opencode/agent/prompts/agent_readme_loop.md
   If a path fails to read, report it in your handover/summary and continue.
 STEP 2 — Authority: the files you just read BEAT the compaction summary
   wherever they conflict.

@@ -2,7 +2,7 @@
 
 Acquired, VERIFIED, ACTIONABLE knowledge that agents consult when working in a
 given area. This is NOT protocol/instructions (that lives in `AGENTS.md` +
-`system_prompts/`) — it is hard-won findings that replace re-deriving the same
+`agent/prompts/`) — it is hard-won findings that replace re-deriving the same
 lookups and keep them out of the working context.
 
 ## Principle: keep only what is actionable

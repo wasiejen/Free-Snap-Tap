@@ -36,7 +36,7 @@ import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 // proposals/2026-09-12_recovery-directive-looprunner-line.md).
 const COMPACTION_RELOAD_DIRECTIVE = `
 [SYSTEM CONTEXT DIRECTIVE]
-Context was compacted. Read .opencode\\system_prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.
+Context was compacted. Read .opencode\\agent\\prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.
 If your role is Looprunner continue the last restart/resume close message of a Planner you have received.
 `.trim();
 

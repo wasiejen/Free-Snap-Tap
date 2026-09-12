@@ -27,7 +27,7 @@ import { tool } from "@opencode-ai/plugin"
 // so the pointer reaches the agent verbatim (the sentence itself is unchanged).
 const COMPACTION_RELOAD_DIRECTIVE = `
 [SYSTEM CONTEXT DIRECTIVE]
-Context was compacted. Read .opencode\\system_prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.
+Context was compacted. Read .opencode\\agent\\prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.
 `.trim();
 
 // ------------------------------------------------------------------ budget store
