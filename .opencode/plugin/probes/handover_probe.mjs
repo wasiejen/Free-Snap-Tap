@@ -256,7 +256,21 @@
 //          stderr addition)
 //      (85) hook restore (cf. check 39): the global db path is back where
 //          S12 found it; a global read and an explicit-path read of the
-//          restored path agree byte-exact (no drift left by S12)
+ //          restored path agree byte-exact (no drift left by S12)
+//   S13 compact_memory plugin tool (14) — the approved v2 proposal (the
+//      plugin-registered compact_memory, quant-class budget; supersedes the
+//      v1 pinned by S10): the plugin file is imported DIRECT (type-stripped)
+//      — no hook fires (S5 tallies unaffected); ALL fs writes steered into
+//      the sandbox via directory=SANDBOX; fake client records
+//      summarize/compact/messages; fresh ses_qc_* ids (in the FINGERPRINT):
+//      (86) registration shape; (87) classifier fixtures incl. the trap;
+//      (88) summarize path + default response BYTE-EXACT; (89) keep
+//          retry-once; (90) compact flat; (91) no-client error naming both
+//          probes; (92) gate (cap−1 allowed, cap denied, zero side effects);
+//      (93) CPU always denied; (94) increment-on-success only; (95) v2 store
+//          schema on disk (model populated); (96) COMPACT line WITH model;
+//      (97) message + one-line trailer; (98) cross-session model read (the
+//          LAST entry); (99) failing RPC (default cap + note, no throw)
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -269,7 +283,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S5=6  →  "PROBE handover: 84/84 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=14 S5=6  →  "PROBE handover: 98/98 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -1887,6 +1901,279 @@ const dbPathBeforeS12 = getDbPath(); // the hook-restore capture (cf. check 39)
   );
 }
 
+// ------------------------------------------------------------------ S13 compact_memory plugin tool (14) — the approved v2 proposal
+//
+// The plugin-registered compact_memory (quant-class budget, approved proposal
+// .opencode/proposals/approved/2026-09-12_compact_memory_plugin.md, supersedes
+// the v1 artifact pinned by S10): the plugin file is imported DIRECT
+// (type-stripped) — NO hook fires, the S5 tallies are unaffected; ALL the
+// tool's fs writes are steered into the sandbox via the tool context's
+// directory=SANDBOX; the fake client records every session.summarize /
+// session.compact / session.messages call. Fresh ses_qc_* ids (in the
+// FINGERPRINT array, check 43). The budget store file is SHARED with S10/S11
+// (the v2 reader is lenient; S13's version-2 writes happen after S10/S11's
+// checks have run).
+const QC_PLUGIN_TS = path.join(REPO_ROOT, ".opencode", "plugin", "compact_memory.ts");
+const qcMod = await import(pathToFileURL(QC_PLUGIN_TS).href);
+const qcClassify = qcMod.classifyQuantClass;
+const QC_DIRECTIVE =
+  "[SYSTEM CONTEXT DIRECTIVE]\nContext was compacted. Read .opencode\\agent\\prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.";
+const qcMakeClient = (spec = {}) => {
+  const rec = { summarize: [], compact: [], messages: [] };
+  const client = { session: {} };
+  if (spec.compact) client.session.compact = (o) => { rec.compact.push(o); return Promise.resolve({ ok: true }); };
+  if (spec.summarize) client.session.summarize = (o) => {
+    rec.summarize.push(o);
+    if (spec.summarizeError != null) {
+      const e = typeof spec.summarizeError === "function" ? spec.summarizeError(rec.summarize.length) : spec.summarizeError;
+      if (e != null) return Promise.reject(e); // null = this call is clean (the retry)
+    }
+    return Promise.resolve({ ok: true });
+  };
+  if (spec.messages != null || spec.messagesError) client.session.messages = (o) => {
+    rec.messages.push(o);
+    if (spec.messagesError) return Promise.reject(spec.messagesError);
+    return Promise.resolve(spec.messages);
+  };
+  return { client, rec };
+};
+const qcCtx = (over = {}) => ({ sessionID: "ses_qc_self", directory: SANDBOX, extra: { model: { id: "Qwen3.8-27B-IQ4KT-120K" } }, ...over });
+const qcExec = async (spec, args, over) => {
+  const { client, rec } = qcMakeClient(spec);
+  const t = (await qcMod.default({ client })).tool.compact_memory;
+  const res = await t.execute(args, qcCtx(over));
+  return { rec, res };
+};
+const qcStore = () => JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "temp", "compact_budget.json"), "utf8"));
+
+// 86 — the registration shape: the default factory (the plugin ctx capture)
+//      returns tool.compact_memory — description + the 4 optional args
+//      (sessionID/keepTokens/keepMessages/message) as zod schemas + execute
+{
+  const { client } = qcMakeClient({ summarize: true });
+  const reg = await qcMod.default({ client });
+  const t = reg?.tool?.compact_memory;
+  check(
+    "86",
+    "S13",
+    "registration shape: default factory → tool.compact_memory (description + args [sessionID, keepTokens, keepMessages, message] as zod schemas + execute)",
+    t != null && typeof t.description === "string" && typeof t.execute === "function" &&
+      JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "keepTokens", "keepMessages", "message"]) &&
+      Object.values(t.args).every((s) => s != null && typeof s.safeParse === "function"),
+    JSON.stringify({ tools: Object.keys(reg?.tool ?? {}), args: Object.keys(t?.args ?? {}) }),
+  );
+}
+
+// 87 — the classifier fixtures (the exported rule table): IQ4→3, IQ3→1,
+//      Q4KM→3, CPU-…→0 (the prefix rule FIRST), unknown→1, and the ordering
+//      trap "Qwen3.8-27B-IQ4KT-120K"→3 (the 4-bit row wins, not the 3-bit one)
+{
+  const caps = {
+    iq4: qcClassify("Qwen-IQ4-Test").cap,
+    iq3: qcClassify("Qwen-IQ3-Test").cap,
+    q4km: qcClassify("Gemma-Q4KM-12B").cap,
+    cpu: qcClassify("CPU-Qwen3-0.6B").cap,
+    unknown: qcClassify("Mystery-7B").cap,
+    trap: qcClassify("Qwen3.8-27B-IQ4KT-120K").cap,
+  };
+  check(
+    "87",
+    "S13",
+    "classifier fixtures: IQ4→3, IQ3→1, Q4KM→3, CPU-…→0, unknown→1, the Qwen3.8-27B-IQ4KT-120K ordering trap→3 (the 4-bit row wins)",
+    caps.iq4 === 3 && caps.iq3 === 1 && caps.q4km === 3 && caps.cpu === 0 && caps.unknown === 1 && caps.trap === 3,
+    JSON.stringify(caps),
+  );
+}
+
+// 88 — the summarize path (THE ACTIVE BUILD SHAPE): called with path.id +
+//      body.keep WHEN GIVEN; the default response (the message arg ABSENT) is
+//      BYTE-EXACT — the v1 success line + the reload directive
+{
+  const { rec, res } = await qcExec({ summarize: true }, { keepTokens: 42000, keepMessages: 7 });
+  check(
+    "88",
+    "S13",
+    "summarize path (the ACTIVE build shape): called with path.id + body.keep; the default response BYTE-EXACT (the v1 success line + the reload directive)",
+    rec.summarize.length === 1 && rec.summarize[0]?.path?.id === "ses_qc_self" &&
+      rec.summarize[0]?.body?.keep?.tokens === 42000 && rec.summarize[0]?.body?.keep?.messages === 7 &&
+      res === `Context successfully compacted: kept last 7 messages / 42000 tokens.\n\n${QC_DIRECTIVE}`,
+    JSON.stringify({ calls: rec.summarize, res: String(res).slice(0, 120) }),
+  );
+}
+
+// 89 — the keep retry-once: a 400/unexpected-field error on the FIRST call →
+//      the call is retried ONCE WITHOUT the keep fields (the 2nd body is
+//      null) and the response reports "keep not accepted by this build"
+{
+  const boom = Object.assign(new Error("400 unexpected field"), { status: 400 });
+  const { rec, res } = await qcExec({ summarize: true, summarizeError: (n) => (n === 1 ? boom : null) }, { keepTokens: 101, keepMessages: 3, sessionID: "ses_qc_retry" });
+  check(
+    "89",
+    "S13",
+    "keep retry-once: 400/unexpected-field → the 2nd call has NO body; the response reports keep not accepted by this build",
+    rec.summarize.length === 2 && rec.summarize[0]?.body?.keep?.tokens === 101 && rec.summarize[1]?.body == null &&
+      String(res).includes("keep not accepted by this build") && /compacted/i.test(res),
+    JSON.stringify({ n: rec.summarize.length, res: String(res).slice(0, 160) }),
+  );
+}
+
+// 90 — the compact flat path (the v2 client shape): compact present →
+//      compact({sessionID}) with FLAT parameters, summarize NOT called
+{
+  const { rec, res } = await qcExec({ summarize: true, compact: true }, { keepTokens: 5, keepMessages: 2, sessionID: "ses_qc_flat" });
+  check(
+    "90",
+    "S13",
+    "compact flat path (compact present): compact({sessionID}) FLAT, summarize NOT called",
+    rec.compact.length === 1 && rec.compact[0]?.sessionID === "ses_qc_flat" && rec.summarize.length === 0 && /compacted/i.test(res),
+    JSON.stringify({ compact: rec.compact, res: String(res).slice(0, 120) }),
+  );
+}
+
+// 91 — the no-client error: NEITHER probe is a function → a clear error
+//      NAMING both probed methods + the typeof result (no silent fallback)
+{
+  const t = (await qcMod.default({})).tool.compact_memory;
+  const res = await t.execute({}, qcCtx({ sessionID: "ses_qc_nocli" }));
+  check(
+    "91",
+    "S13",
+    "no-client error: names both probed methods (compact + summarize) + the typeof result, no compaction performed",
+    /Compaction request failed/.test(res) && /compact/i.test(res) && /summarize/i.test(res) && /function/i.test(res),
+    res,
+  );
+}
+
+// 92 — the gate (IQ4 cap 3, increment-on-success): count=cap−1 (the 3rd
+//      call) is ALLOWED; count=cap (the 4th) is DENIED naming class+cap+
+//      count with ZERO side effects (no compact call, no increment, no line)
+{
+  const { client, rec } = qcMakeClient({ summarize: true });
+  const t = (await qcMod.default({ client })).tool.compact_memory;
+  const run = (args) => t.execute(args, qcCtx({}));
+  await run({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" });
+  await run({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" });
+  const res3 = await run({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" }); // count=cap−1 → allowed
+  const callsBefore4 = rec.summarize.length;
+  const res4 = await run({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" }); // count=cap → denied
+  const st = qcStore();
+  check(
+    "92",
+    "S13",
+    "gate (IQ4 cap 3): count=cap−1 allowed (the 3rd); count=cap DENIED (the 4th) naming class+cap+count with ZERO side effects (no call, no increment, no line)",
+    /compacted/i.test(res3) && rec.summarize.length === callsBefore4 && /refused/.test(res4) && res4.includes("cap 3") && res4.includes("3/3") &&
+      st.sessions.ses_qc_gate?.count === 3,
+    JSON.stringify({ calls: rec.summarize.length, res4: String(res4).slice(0, 160) }),
+  );
+}
+
+// 93 — the CPU model is ALWAYS denied (the cap-0 ruling, cross read): refused
+//      naming cap 0, zero side effects (no compact call, no store entry)
+{
+  const { rec, res } = await qcExec({ summarize: true, messages: [{ info: { modelID: "CPU-Qwen3-0.6B" } }] }, { sessionID: "ses_qc_cpu" });
+  const st = qcStore();
+  check(
+    "93",
+    "S13",
+    "CPU model ALWAYS denied (cap 0, cross read): refused naming cap 0, zero side effects (no call, no store entry)",
+    /refused/.test(res) && res.includes("cap 0") && rec.summarize.length === 0 && st.sessions.ses_qc_cpu == null,
+    JSON.stringify({ res: String(res).slice(0, 160) }),
+  );
+}
+
+// 94 — increment-on-success ONLY: a FAILING summarize (a plain error, not a
+//      keep-rejection) → the error note (no throw) and the budget is NOT
+//      consumed (no store entry)
+{
+  const { rec, res } = await qcExec({ summarize: true, summarizeError: new Error("boom-qc") }, { keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_fail" });
+  const st = qcStore();
+  check(
+    "94",
+    "S13",
+    "increment-on-success only: a failing summarize → the error note (no throw), NO increment (no store entry)",
+    /Compaction request failed/.test(res) && res.includes("boom-qc") && rec.summarize.length === 1 && st.sessions.ses_qc_fail == null,
+    JSON.stringify({ res: String(res).slice(0, 160) }),
+  );
+}
+
+// 95 — the v2 store schema ON DISK: version 2 + the entry shape {count,
+//      updated, model} with the model POPULATED (the resolved model id at the
+//      last increment — the cap lives in the classifier, not the file)
+{
+  const st = qcStore();
+  const e = st.sessions.ses_qc_gate;
+  check(
+    "95",
+    "S13",
+    "v2 store schema on disk: version 2 + entry {count, updated, model} with the model POPULATED",
+    st.version === 2 && e?.count === 3 && e?.model === "Qwen3.8-27B-IQ4KT-120K" && !Number.isNaN(Date.parse(e?.updated ?? "")),
+    JSON.stringify({ version: st.version, e }),
+  );
+}
+
+// 96 — the COMPACT line WITH the model field POPULATED (the sandbox ctx.log):
+//      `<dt> Qwen3.8-27B-IQ4KT-120K COMPACT ses_qc_self tokens=42000 messages=7`
+{
+  const line = ctxLogLines().find((l) => l.includes("COMPACT ses_qc_self"));
+  check(
+    "96",
+    "S13",
+    "COMPACT line WITH the model field populated (sandbox ctx.log): `<dt> Qwen3.8-27B-IQ4KT-120K COMPACT ses_qc_self tokens=42000 messages=7`",
+    line != null && new RegExp(`^${DT} Qwen3\\.8-27B-IQ4KT-120K COMPACT ses_qc_self tokens=42000 messages=7$`).test(line),
+    JSON.stringify(line),
+  );
+}
+
+// 97 — the message response shape (the message arg GIVEN): the message +
+//      EXACTLY ONE trailer line containing the reload pointer (the reload
+//      invariant survives whatever the caller writes)
+{
+  const { res } = await qcExec({ summarize: true, messages: [{ info: { modelID: "IQ4-x" } }] }, { message: "resume unit-3", sessionID: "ses_qc_msg" });
+  const trailer = "Post-compaction reminder: re-read .opencode/agent/prompts/agent_readme_post_compaction.md before continuing.";
+  check(
+    "97",
+    "S13",
+    "message response: the message + exactly ONE trailer line with the pointer (byte-exact)",
+    res === `resume unit-3\n${trailer}`,
+    JSON.stringify(res),
+  );
+}
+
+// 98 — the cross-session model read: the target's model is NOT in context →
+//      session.messages({path:{id}}) → the LAST entry's info.modelID (the
+//      assistant message) resolves the budget class + the stored model
+{
+  const { rec, res } = await qcExec({ summarize: true, messages: [{ info: { model: "user-x" } }, { info: { modelID: "Qwen3.8-27B-IQ3KT-210K" } }] }, { keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_cross" });
+  const st = qcStore();
+  check(
+    "98",
+    "S13",
+    "cross-session model read: the LAST entry's info.modelID resolves the target's model (stored, count 1)",
+    rec.messages[0]?.path?.id === "ses_qc_cross" && st.sessions.ses_qc_cross?.model === "Qwen3.8-27B-IQ3KT-210K" && st.sessions.ses_qc_cross?.count === 1 && /compacted/i.test(res),
+    JSON.stringify(st.sessions.ses_qc_cross),
+  );
+}
+
+// 99 — the failing RPC: session.messages THROWS → NO throw, the default cap 1
+//      applies + a note in the response (the model stays empty in the store)
+{
+  let threw = false;
+  let res = "";
+  try {
+    res = (await qcExec({ summarize: true, messagesError: new Error("boom-rpc-qc") }, { keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_rpc" })).res;
+  } catch {
+    threw = true;
+  }
+  const st = qcStore();
+  check(
+    "99",
+    "S13",
+    "failing RPC: NO throw, the default cap 1 applies + a note in the response (the model stays empty)",
+    !threw && /compacted/i.test(res) && /model read/.test(res) && st.sessions.ses_qc_rpc?.count === 1 && st.sessions.ses_qc_rpc?.model === "",
+    String(res).slice(0, 160),
+  );
+}
+
 // ------------------------------------------------------------------ S5 hygiene (6)
 
 // 40 — every sandbox plugin.log line parses as JSON (no stray/blank/garbled lines)
@@ -1945,7 +2232,7 @@ const dbPathBeforeS12 = getDbPath(); // the hook-restore capture (cf. check 39)
   const postLog = POST["plugin.log"] ?? "";
   const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
   const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
-  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non"];
+  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non", "ses_qc_self", "ses_qc_retry", "ses_qc_flat", "ses_qc_nocli", "ses_qc_gate", "ses_qc_cpu", "ses_qc_fail", "ses_qc_msg", "ses_qc_cross", "ses_qc_rpc"];
   const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`) || l.includes(`"sess":"${fid}"`)));
   check(
     "43",
