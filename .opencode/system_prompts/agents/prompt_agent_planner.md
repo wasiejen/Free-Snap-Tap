@@ -31,6 +31,10 @@ All paths below are relative to `.opencode/system_prompts/`.
 - `agent_readme_task_spec.md` — MANDATORY: read it BEFORE writing or launching
   any task spec (`handover_task.md`) — it sets the scope/size discipline for specs.
 - `agent_readme_loop.md` — read when driving the loop (autonomous launch).
+- `.opencode/agent/knowledge/` (repo-root-relative, NOT under system_prompts) —
+  the knowledge base (gained findings, not instructions): read the area file
+  (`knowledge_tools.md` / `knowledge_plugins.md`) when entering that area; add an
+  entry when you gain verified, actionable knowledge (format in its README).
 
 ## Autonomous mode (when the launch message carries `<|autonom|>`)
 The Looprunner launches you with no maintainer to ask. On start:

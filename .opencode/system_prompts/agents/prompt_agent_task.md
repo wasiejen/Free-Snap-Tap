@@ -28,6 +28,10 @@ All paths below are relative to `.opencode/system_prompts/`.
 - `agent_readme_loop.md` — §Loop log defines the activity-log lines you write at
   session start and task completion (write them via the `loop_log` tool when it
   is in your toolset; the format description is the fallback).
+- `.opencode/agent/knowledge/` (repo-root-relative, NOT under system_prompts) —
+  the knowledge base (gained findings, not instructions): read the area file for
+  your task's area (e.g. `knowledge_tools.md`) before starting; append an entry
+  when you gain verified, actionable knowledge (format in its README).
 
 ## Work loop
 - Follow existing conventions: read the neighboring code first, mimic style, reuse existing
