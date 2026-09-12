@@ -49,10 +49,19 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   their size — loop very fast, bad at tool calling, slow; parallelism is the
   only upside, and testing showed tool-calling problems even as looprunner →
   cap 0. Recorded in the proposal's Rulings section.
-- **STOPPED per his instruction** ("stop after this to let me check the
-  proposal") — the proposal v2 is AWAITING APPROVAL; the build does NOT start
-  before his approval.
-- **Open questions:** none — both resolved by the rulings above.
+- **APPROVED (his chat, 2026-09-12, same session):** "yes fold it in and i
+  now approve it" — the `message` arg (Part 1: absent → today's directive
+  byte-identical; given → message + fixed ONE-LINE reload trailer;
+  cross-session resume-note bonus) folded in as the final revision; proposal
+  → `proposals/approved/` with the approval line (this commit).
+- **NEXT (fresh session — this one is at the stop line):** delegate the
+  build — fresh `worker_Q4_120K`, spec per the approved proposal (Parts 1-4;
+  `dev_probe_ctx.ts` as the shape reference; probe S-section APPEND-only;
+  gates: probe green + pytest 459+1#10 + ruff F=0; diff scope = new plugin
+  file + retired `tools/compact_memory.ts` + bookkeeping). Registration
+  (live `opencode.jsonc` plugins array + per-agent grants) = HIS side; live
+  acceptance after his restart. Then: loop_log-v2 (approved) is the queued
+  next unit.
   (Q2 model source RESOLVED by his evidence — see Verified facts; `context.extra.
   model.id` self + `session.messages` cross, the loop_log-v2 "model open" note
   corrected in that proposal.)

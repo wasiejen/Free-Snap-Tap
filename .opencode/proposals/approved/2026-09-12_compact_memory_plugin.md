@@ -40,6 +40,15 @@ plugin — makes state tracking much easier").
     session (planner/looprunner compacting a sub-agent on request or in
     emergencies).
   - `keepTokens` / `keepMessages` — carried in the call BODY when given.
+  - `message` — post-compaction continuation message for the target session.
+    ABSENT → the response carries today's reload directive BYTE-IDENTICAL
+    (default behavior unchanged). GIVEN → it replaces the directive as the
+    response body, followed by a fixed ONE-LINE trailer (the
+    `agent_readme_post_compaction.md` pointer — the reload invariant survives
+    whatever the caller writes; ruling 2026-09-12, chat). Cross-session bonus:
+    a planner compacts a sub-agent and hands it a resume note in the same
+    call. Description usage hint: "1-3 lines: what to resume + which files to
+    re-read."
 - Resolution:
   - sessionID: `args.sessionID` → `c.sessionID`.
   - client call: `typeof ctx.client?.session?.compact === "function"` → v2
@@ -93,7 +102,8 @@ plugin — makes state tracking much easier").
   finally POPULATED from the resolved model id (today it is always empty,
   since `context.modelId`/`context.model.id` don't exist).
 - The refusal note (hand over and start fresh) on budget denial; the
-  post-compaction reload directive in the success response.
+  post-compaction success response: the reload directive by default, or
+  `message` + the one-line trailer when the arg is given (Part 1).
 
 ### Part 4 — retirements + registration
 - Retire `.opencode/tools/compact_memory.ts` (superseded).
@@ -110,7 +120,8 @@ plugin — makes state tracking much easier").
   error path; classifier fixtures (IQ4 → 3, IQ3 → 1, `Q4KM` → 3,
   `CPU-…` → 0, unknown → 1, the "Qwen3.8 contains Q3" trap name → 3); gate
   cases (count = cap−1 allowed, count = cap denied, CPU model always denied,
-  increment-on-success only).
+  increment-on-success only); response shapes (default → directive
+  byte-identical to today's; `message` given → message + one-line trailer).
 
 ## Evidence (measured 2026-09-12)
 - Key dump (`dev_get_context_keys`): tool ctx keys = sessionID, abort,
@@ -142,5 +153,8 @@ plugin — makes state tracking much easier").
 ## Status
 REWRITTEN v2 (2026-09-12, direct session ses_f6976031bffeRa8gNNcpy5FoYj) per
 the maintainer's rulings (rewrite; `CPU-` prefix exclusion confirmed with the
-instability rationale above). AWAITING APPROVAL — the maintainer is checking
-this revision now; the build does NOT start before his approval.
+instability rationale above). APPROVED — the `message` arg folded into Part 1
+as the final revision. Moved to `approved/`.
+
+- approved (2026-09-12, maintainer chat, direct session
+  ses_f6976031bffeRa8gNNcpy5FoYj: "yes fold it in and i now approve it")
