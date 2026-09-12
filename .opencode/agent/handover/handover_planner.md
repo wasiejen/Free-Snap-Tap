@@ -7,8 +7,19 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
 - **Part 1 (planner-direct, pre-approved meta + his approval):** 100% renames `system_prompts/`→`agent/prompts/`, `agent_feedback.md`→`agent/`, `handover/`→`agent/handover/`. Updated live refs: `opencode.jsonc` (8 prompt paths incl. commented block, looprunner read rule, 7 worker/agent deny pairs `.opencode/prompt_**`→`.opencode/agent/prompts/**` + NAP deny, explorer summary allow — the formerly-STALE no-slash forms now point at the real files), AGENTS.md, agents_repo.md, SCRATCH_PAD.md (NAP pointer), 4 plugin files (ctx_watchdog/deactivated-handover `HANDOVER_SPEC_PATH` now = the REAL spec path; context_recovery + compact_memory directive text; probe expectations + sandbox constants SB_SPEC/SB_MIRROR/REAL_FILES follow), moved prompts/repo-parts/knowledge-README cross-refs. History untouched (archive/, records, proposal files, NAP history, agent_feedback log, TODO.md:124 record).
 - **Verified (me):** acceptance grep (`system_prompts` / `.opencode[/\\]handover` / `.opencode[/\\]agent_feedback` over live files) = **0 live hits** (all remaining = archive/records/proposal texts/plugin.log); probe **84/84** under NODE (`node .opencode/plugin/probes/handover_probe.mjs` — bun host breaks check [30] by design: bun:sqlite present, check expects its absence).
 - **GATED on his host RESTART:** `opencode.jsonc` takes effect at restart — until then the running host holds the OLD paths in memory (this session is unaffected; a fresh host launched before the restart would fail prompt loads). Part 1 acceptance "one full loop iteration after the restart" is his to run.
-- **Same session, after Part 1 commit:** Part 2 (folder READMEs ≤20 lines + standing rule in planner prompt: new `.opencode/` sub-folder ⇒ README in same commit), Part 3 (proposals/README rework: flow kept, proposals ARE the agent→maintainer channel — no fine-grained maintainer inbox; `maintainer/{inbox_*,done}` stays the reverse direction), then this proposal → `implemented/` (Status + Part 4 deferral recorded).
-- Baselines (carried; FST code untouched this session): probe 84/84 (re-measured), pytest 459+1#10, ruff F=0.
+- **Parts 2+3 DONE (`cc9c67e`):** 12 folder READMEs (≤20 lines: purpose / what /
+  what-NOT — usage, not content) + `loop/` created (.gitkeep); standing rule in
+  the planner prompt (new `.opencode/` sub-folder ⇒ README in the same commit);
+  proposals/README reworked (location = state; proposals ARE the agent→maintainer
+  channel — NO fine-grained maintainer inbox; `maintainer/` stays the reverse
+  direction); `agent_readme_proposals.md` aligned with the real tree
+  (`proposals/feedback/` at the root, not `maintainer/feedback/`; done-moves
+  content-untouched — the old "replier: block" wording was stale).
+- **Proposal moved to `implemented/`** (Status + Part 4 deferral recorded).
+  Restructure complete. Remaining acceptance (his side): host restart, then one
+  full loop iteration.
+- Baselines (carried; FST code untouched this session): probe 84/84 (re-measured
+  under node), pytest 459+1#10, ruff F=0.
 
 ## 2026-09-12 (direct session; ses_f6a42cb49ffev8w5ITrdSkUpPd) — merge `fst_work`→`opencode_test` done (`ef2f05b`); inbox handled: 5 proposals filed, 6 items → done; sweep PENDING
 - **Merge (his chat directive, done, verified):** `fst_work` (38 commits) merged into `opencode_test` @ `ef2f05b`, zero-loss conflict resolution (handover files take the newer fst_work state; planner-8 loop lines already back-filled in the archived loop_log; plan8 files → archive; old `.opencode/loop/` retired). Tree clean; working branch `opencode_test`.
