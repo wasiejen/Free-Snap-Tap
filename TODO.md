@@ -248,7 +248,18 @@ reenabled, that is the call.
   `proposals/2026-09-12_compact_memory_plugin.md` (AWAITING APPROVAL).
   Probe evidence: `.opencode/plugin/dev_probe_ctx.ts` (client present in
   plugin ctx; summarize=function, compact=undefined; session methods on
-  the prototype → detect with typeof; registration via the `plugins` array).
+  the prototype → detect with typeof; registration via the `plugins` array;
+  the file IS the worked example of a plugin-registered tool — the
+  registration shape is verified live).
+- **2026-09-12 (direct session ses_f6976031bffeRa8gNNcpy5FoYj):** model
+  field RESOLVED — it is nested, not top-level: `context.extra.model.id`
+  (live capture `tools/dev/hot_loaded_tool.ts` + maintainer `--todo` note in
+  the loop_log-v2 approval; the earlier key dump listed top-level keys
+  only). Feeds the Part 4 quant-class classification (priority.md #1) and
+  loop_log-v2 Part A. `priority.md` #1 (his `--wip` item) extends this
+  design with the per-model quant-class budget: Q4→3, Q3→1, other→1
+  preliminary, CPU models excluded — design grounded in the NAP, awaiting
+  his ruling (approval path + CPU- prefix confirmation).
 
 ## Closed entries
 

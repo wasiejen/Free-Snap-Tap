@@ -19,10 +19,20 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   - The v1 `Session` type carries NO model field (`@opencode-ai/sdk/dist/gen/types.gen.
     d.ts:465`); the model lives on MESSAGES (`UserMessage.model.{providerID,modelID}`
     L52; `AssistantMessage.modelID` L108).
-  - `client.session.messages({path:{id}})` → `200: Array<{info: Message, parts}>`
-    (types.gen L2234) — ONE uniform RPC yields the model for BOTH self-compact and
-    cross-session compact (last entry's `info.modelID` / `info.model`); the plugin-ctx
-    client is v1-generation (probe-verified: summarize=function, compact=undefined).
+  - **Model source RESOLVED by the maintainer (his `--todo` note + the live capture
+     in `tools/dev/hot_loaded_tool.ts`):** the model is nested in the tool context —
+     `context.extra.model.id` (e.g. `Qwen3.8-27B-IQ4KT-120K`) + `providerID` +
+     `limit` (window); `context.agent` = the agent identifier (e.g.
+     `agent_Q4_120K`). The earlier "NO model field" key dump listed TOP-LEVEL keys
+     only (`extra` was there, nesting the model). SELF-compact reads it directly
+     (no RPC). CROSS-session (`sessionID` arg — target's model NOT in context) →
+     `client.session.messages({path:{id}})` → `200: Array<{info, parts}>`
+     (types.gen L234) → last `info.modelID`/`info.model` → classify; RPC failure /
+     no messages → default cap (1) + note. The plugin-ctx client is v1-generation
+     (probe-verified: summarize=function, compact=undefined);
+     `plugin/dev_probe_ctx.ts` IS the worked example of a plugin-registered tool
+     (the Part 1 registration shape — `tool: { name: tool({...}) }` + captured
+     `ctx.client` — verified live on this host).
   - Model names (opencode.jsonc): `Qwen3.8-27B-IQ4KT-*` (→3), `Qwen3.8-27B-IQ3KT-*` (→1),
     `Gemma4-12B-Q4K*` (→3), `CPU-*` (excluded). **ORDERING TRAP:** "Qwen3.8"/"Qwen3.5"
     contain the substring "Q3" → classify CPU FIRST, then Q4, then Q3, then default.
@@ -35,18 +45,29 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   1. Approval path: approve the pending proposal (Parts 1-3) as-is AND add Part 4 to the
      same file, or a fresh revision file? (The proposal stays AWAITING APPROVAL until his
      call — nothing propagated.)
-  2. Model source: my recommendation = the ONE uniform path, last message's modelID via
-     `client.session.messages` (works self + cross); the alternative `context.agent` is
-     always present but a ROLE name (no CPU marker, config-coupled). Fallback on RPC
-     failure / no messages: default cap (1) + a note in the denial/grant message — confirm.
-  3. "CPU models excluded" = the `CPU-` name prefix in his provider config? (I know no
-     other exclusion criterion.)
-- **NEXT (after his ruling):** extend the proposal with Part 4 (classifier = an ordered
-  rule table at the top of the plugin file, maintainer-editable; probe pins fixture model
-  names incl. the Q3-substring trap) → delegate the build (worker_Q4_120K) → verify →
-  registration his side. Standing gated, unchanged: #11, #51, TODO #54 (wording/placement
-  his call), the SWEEP (`summary_summary.md`, loop-run side), live-triage acceptance
-  (first loop iteration).
+  2. "CPU models excluded" = the `CPU-` name prefix in his provider config
+     (`CPU-Qwen3-0.6B` / `CPU-Gemma4-E2B` / `CPU-Qwen3.5-4B`)? (I know no other
+     exclusion criterion.)
+  (Q2 model source RESOLVED by his evidence — see Verified facts; `context.extra.
+  model.id` self + `session.messages` cross, the loop_log-v2 "model open" note
+  corrected in that proposal.)
+- **Bookkeeping landed this session (committed):** knowledge entry
+  (`knowledge_tools.md` — model nested in `context.extra.model`); loop_log-v2
+  proposal "Open question" corrected (his approval + `--todo` lines untouched —
+  his `--todo` directives for Part A: automatic population, `context.agent` for
+  the agent, `context.extra.model.id` for the model, "agent replaces role" —
+  recorded in-file, to be encoded at Part A spec time); TODO #52 status line
+  (model field resolved + priority #1 extension noted).
+- **NEXT (after his ruling on Q1/Q2):** extend the proposal with Part 4
+  (classifier = an ordered rule table at the top of the plugin file,
+  maintainer-editable; caps per his item: `^cpu`→0, `iq4|q4`→3, `iq3|q3`→1,
+  default→1; probe pins fixture model names incl. the Q3-substring trap) →
+  delegate the build (worker_Q4_120K, `dev_probe_ctx.ts` as the shape
+  reference) → verify → registration his side. After that build: loop_log-v2
+  (approved, Part A directives above) is the queued next unit. Standing gated,
+  unchanged: #11, #51, TODO #54 (wording/placement his call), the SWEEP
+  (`summary_summary.md`, loop-run side), live-triage acceptance (first loop
+  iteration).
 - Baselines (carried; FST code untouched this session): probe 84/84, pytest 459+1#10,
   ruff F=0.
 

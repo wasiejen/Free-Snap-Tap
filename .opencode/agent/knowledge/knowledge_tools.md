@@ -33,6 +33,24 @@ instructions/protocol — facts that save lookups. Format per the README:
   `maintainer/done/knowledge_opencode_tools_plugins.md` §1.
 - **Keys:** context, sessionID, messageID, agent, Tool.Context.
 
+## Model identity lives in `context.extra.model` (NOT a top-level field)
+- **Do:** read the session's model as `context.extra?.model` — the object
+  carries `id` (raw model id, e.g. `Qwen3.8-27B-IQ4KT-120K`), `name`,
+  `providerID` (e.g. `llama-swap`), `limit.{context,output}` (the window),
+  `capabilities`. Top-level `context.modelId` / `context.model` do NOT
+  exist; a key-dump that lists top-level keys only will report "no model
+  field" even though `extra` nests the full model.
+- **Why (evidence):** live capture printed from a real tool's execute
+  (`.opencode/tools/dev/hot_loaded_tool.ts` header comment, session
+  ses_f6a7938a0ffeWOfcOHOmX9PR6P, 2026-09-12): `extra.model.id =
+  "Qwen3.8-27B-IQ4KT-120K"`, `agent = "agent_Q4_120K"`; maintainer note in
+  the loop_log-v2 approval ("context.extra.model.id for the model_name");
+  `dev_get_context_keys` confirms `extra` in the top-level key list.
+- **Ref:** `.opencode/tools/dev/hot_loaded_tool.ts`; `proposals/approved/
+  2026-09-12_loop_log-v2.md` (`--todo` note); TODO #52.
+- **Keys:** context.extra, model.id, providerID, limit, window, agent,
+  key dump, nested, model_name.
+
 ## `context.client` is ABSENT in this host build's tool context (CONFIRMED)
 - **Do:** do NOT rely on `context.client` (or `context.api`) for SDK calls
   in a CUSTOM TOOL — the client is intentionally not injected into the tool
