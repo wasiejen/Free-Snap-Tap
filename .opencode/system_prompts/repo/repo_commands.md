@@ -55,7 +55,11 @@ interaction-contract table — this section keeps only the concrete repo facts:
   NAP" means this file. Phase close moves it to
   `.opencode/archive/<YYYY-MM-DD>-<slug>.md` with a STATUS header. All handover
   files live in `.opencode/handover/`.
-- Context gauge (self-gauge): run `node .opencode\plugin\scripts\peek.mjs` from
-  the repo root, read-only → `SESSION=… CTX=n (p%) REM=m` (window unknown →
-  `CTX=n` only; no finished step → `CTX=notAvailable`).
+- Context gauge (self-gauge): prefer the `ctx_gauge` tool when it is in your
+  toolset (same readout, in-band — no shell-out); the command below is the
+  fallback (the tool is registered host-side and takes effect at the
+  maintainer's next process restart): run
+  `node .opencode\plugin\scripts\peek.mjs` from the repo root, read-only →
+  `SESSION=… CTX=n (p%) REM=m` (window unknown → `CTX=n` only; no finished
+  step → `CTX=notAvailable`).
 - Durable maintainer TODOs: `TODO.md`.

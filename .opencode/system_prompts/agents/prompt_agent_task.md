@@ -54,8 +54,10 @@ beats an emergency one at 90 %.
 ## Honesty guard (hard rule)
 - Report only what is on disk. If you did not write a file or entry, say so — never claim a
   change that does not exist.
-- The final context-gauge line must be the VERBATIM output of the gauge command (`agents_repo.md`
-  gives the exact command); never pattern-match or guess the format.
+- The final context-gauge line must be the VERBATIM readout; never pattern-match
+  or guess the format. Prefer the `ctx_gauge` tool when it is in your toolset
+  (same readout, in-band); the peek.mjs command in `agents_repo.md` is the
+  fallback.
 
 ## Checkpoint & handoff
 - Checkpoint each unit: after each verified change, commit (green) so a dead session loses at
