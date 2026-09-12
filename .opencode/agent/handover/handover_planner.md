@@ -41,13 +41,18 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
     unchanged; the resolved modelID can ALSO fill the COMPACT line's best-effort model
     field (currently always empty — `context.modelId`/`context.model.id` absent per the
     key dump).
-- **Open questions (his ruling, in priority order):**
-  1. Approval path: approve the pending proposal (Parts 1-3) as-is AND add Part 4 to the
-     same file, or a fresh revision file? (The proposal stays AWAITING APPROVAL until his
-     call — nothing propagated.)
-  2. "CPU models excluded" = the `CPU-` name prefix in his provider config
-     (`CPU-Qwen3-0.6B` / `CPU-Gemma4-E2B` / `CPU-Qwen3.5-4B`)? (I know no other
-     exclusion criterion.)
+- **RULINGS LANDED (his chat, 2026-09-12, same session):** (1) **rewrite the
+  proposal** → `proposals/2026-09-12_compact_memory_plugin.md` REWRITTEN as v2
+  (this commit — full revision incl. Part 2 quant-class budget; the v1 text is
+  superseded, git history keeps it); (2) **`CPU-` prefix exclusion CONFIRMED**
+  with rationale: the small models (0.6 B vs 27 B params) are unstable at
+  their size — loop very fast, bad at tool calling, slow; parallelism is the
+  only upside, and testing showed tool-calling problems even as looprunner →
+  cap 0. Recorded in the proposal's Rulings section.
+- **STOPPED per his instruction** ("stop after this to let me check the
+  proposal") — the proposal v2 is AWAITING APPROVAL; the build does NOT start
+  before his approval.
+- **Open questions:** none — both resolved by the rulings above.
   (Q2 model source RESOLVED by his evidence — see Verified facts; `context.extra.
   model.id` self + `session.messages` cross, the loop_log-v2 "model open" note
   corrected in that proposal.)
