@@ -21,9 +21,10 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
    `approved/2026-09-11_fst-behavior-batch-decisions.md`: all 5 Recs approved; #6 = KEEP
    `fst_keyboard.py:302-303` until more testing; branch directive: new `fst_work` branch)
    → ALL LANDED on branch `fst_work` (iter-9: unit A `4b93d37` + unit B `2891dab`); the proposal moved to `implemented/` with the verdict.
-5. Schedule (DECIDED — not open calls): #33 v2.5 build is NOT a maintainer call — APPROVED,
-   next build; #30 de-peek APPROVED — ONE cycle (node:sqlite gauge landing + peek.py removal
-   + doc purge + v1.3 log-profile re-baseline), scheduled AFTER #33.
+5. ~~Schedule~~ — RESOLVED 2026-09-12 (iter-14 curation): the #30 de-peek + #33 v2.5 schedule
+   is fully landed — #30 CLOSED + #33 LANDED (see their entries); the v1.3 log-profile
+   re-baseline tail resolved 2026-09-10 (one-shot read, approved/2026-09-11_log-profile-rebaseline.md).
+   No further build scheduled.
 6. ~~`handover_task.md` worktree/HEAD conflict~~ — RESOLVED 2026-09-11: maintainer fixed
    the git mess directly (`b6dc3e7` — restored lost updates; the HEAD split-build spec is
    canonical, tree clean) → #49 CLOSED; the split build is the iteration-2 launch.
