@@ -2,6 +2,53 @@
 
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
+## 2026-09-13 (direct session; ses_f692e1071ffevodtnJTET0DEEs) — compact_memory live no-op bug FIXED (commit follows this section)
+- **Root cause (evidence chain, all verified):** the server's `summarize`
+  payload schema REQUIRES `providerID`+`modelID` (binary: the handler
+  `SessionHttpApi.summarize` ~offset 100639023 reads both from the body;
+  the payload struct is `{providerID, modelID, auto?}`). The old body
+  (undefined / `{keep}` only) → schema rejection: HTTP 404 JSON
+  `{name:"BadRequest"}` + a logged WARN "schema rejection" (6 in
+  `~/.local/share/opencode/log/opencode.log` — one per fired tool, both
+  test sessions); the handler NEVER ran → no compaction part/message/flag
+  in the DB (`time_compacting:null`, tokens monotonically grew); and the
+  host SDK client does NOT throw on the 404 (client.gen.js: non-ok → throw
+  only if `throwOnError`, otherwise it resolves with the parsed error or
+  undefined) → the plugin's await-no-throw = FALSE success + budget burn.
+- **Fix (`.opencode/plugin/compact_memory.ts`):** the body ALWAYS carries
+  the resolved model pair (self: `extra.model.{id,providerID}`; cross: the
+  last message info — assistant `modelID`+`providerID`, user `model`
+  object); an unresolvable pair → the request is NOT sent (clear failure,
+  no increment, no COMPACT line); the resolved result is VERIFIED
+  (success = the handler's boolean `true` / `{data:true}` /
+  `{response.ok:true}`; a resolved 404 JSON is a failure carrying the
+  server's message); the keep-retry now also triggers on
+  "missing key"/`BadRequest` and VALIDATES the retry result.
+- **Probe re-pinned** (S13: mock success = `true`; ctx model + cross mocks
+  carry providerID; the retry 2nd body keeps the pair; the failing-RPC
+  check now pins NO-SEND) + **S11 RC import REPOINTED** to
+  `plugin/deactivated/context_recovery.ts` — the maintainer's cleanup
+  `4b44d8c` moved the file without repointing the probe, so the probe was
+  broken at HEAD (same re-point pattern as `44df939` for the v1 tool).
+- **Baselines:** probe **98/98**, smoke **23/23** (smoke is stateful —
+  wipe `Temp/opencode/qc_smoke/.opencode` before re-running).
+- **NEXT (live acceptance):** a real fire must show the compaction part +
+  the `time_compacting` flag (DB: `C:\Users\Wasiejen\.local\share\opencode\
+  opencode.db`; read-only helpers in `Temp/opencode/`: sesdata.cjs,
+  compaudit.cjs, binhits.cjs, binoff.cjs, logctx.cjs, probe_fix*.cjs,
+  smoke_fix.cjs). Open question for him: the keep fields are currently
+  IGNORED by the server (the payload schema has no keep key) — the body
+  still sends them as a hedge.
+- **Inbox (3 new unmarked items, UNHANDLED — queue per the ladder):**
+  `maintainer/inbox_planner/analyse_helper_scripts.md`,
+  `save_all_plugin_took_testing_files.md`, `snippet_collection.md`.
+  `priority.md` was live-edited by him (unstaged M — leave alone).
+  The nap-size proposal is ALREADY approved+committed in `4b44d8c` → its
+  build is the next buildable task AFTER the live acceptance.
+- His `--maintainer` instruction 2026-09-13: "continue with the work on
+  the bugfix for the compact_memory. ignore standard protokol for
+  compaction" (he compacts his sessions by hand).
+
 ## 2026-09-12 (direct session; ses_f692e1071ffevodtnJTET0DEEs) — priority #1 BUILD DELEGATED: compact_memory plugin (approved proposal v2, Parts 1-4)
 - **Start:** HEAD `b684894` (clean); direct session — his message: start on the
   compact_memory plugin (the NAP's NEXT after the approval commit). 0 live

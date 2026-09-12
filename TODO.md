@@ -255,7 +255,29 @@ reenabled, that is the call.
   plugin ctx; summarize=function, compact=undefined; session methods on
   the prototype → detect with typeof; registration via the `plugins` array;
   the file IS the worked example of a plugin-registered tool — the
-  registration shape is verified live).
+   registration shape is verified live).
+  - **2026-09-13 (direct session ses_f692e1071ffevodtnJTET0DEEs):** live
+    no-op bug FIXED — root cause: the server's `summarize` payload schema
+    REQUIRES `providerID` + `modelID` (binary: the handler
+    `SessionHttpApi.summarize` reads both from the body; a missing body /
+    missing key is a schema rejection → HTTP 404 JSON `{name:"BadRequest"}`
+    + a logged WARN "schema rejection" — 6 in the server log, one per fired
+    tool, both test sessions). The handler never ran → NO compaction; and
+    the host client does NOT throw on the 404 (it resolves) → the old code
+    reported a false success and burned a budget slot. Fix: the body ALWAYS
+    carries the resolved model pair (self: `extra.model.{id, providerID}`;
+    cross: the last message's info, assistant `modelID`+`providerID` / user
+    `model` object); an unresolvable pair → the request is NOT sent (clear
+    failure, no increment, no COMPACT line); the resolved result is VERIFIED
+    (success = the handler's boolean `true`; a resolved 404 JSON is a
+    failure carrying the server's message). Probe re-pinned (S13: the retry
+    2nd body keeps the pair, the failing-RPC path no-sends) + the S11 RC
+    import REPOINTED to `plugin/deactivated/context_recovery.ts` (the
+    maintainer's cleanup 4b44d8c moved the file without repointing the
+    probe — the probe was broken at HEAD). Gates: probe 98/98, smoke 23/23.
+    Live acceptance STILL PENDING: a real fire must show the compaction
+    part + the `time_compacting` flag in the DB (verify with
+    `Temp/opencode/sesdata.cjs` or `compaudit.cjs`).
 - **2026-09-12 (direct session ses_f6976031bffeRa8gNNcpy5FoYj):** model
   field RESOLVED — it is nested, not top-level: `context.extra.model.id`
   (live capture `tools/dev/hot_loaded_tool.ts` + maintainer `--todo` note in

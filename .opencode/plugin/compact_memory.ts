@@ -33,11 +33,17 @@
 // typeof ctx.client?.session?.summarize === "function" → v1
 // `summarize({ path: { id }, body })` — THE ACTIVE PATH ON THIS BUILD (the
 // client is v1-generation: summarize = function, compact = undefined); ELSE a
-// clear error NAMING what was probed (no silent fallback). Keep fields go in
-// the summarize body WHEN GIVEN (they are NOT in the generated v1 body type —
-// providerID/modelID only); on a 400/unexpected-field error the call is
+// clear error NAMING what was probed (no silent fallback). The body MUST
+// carry providerID + modelID — the server's payload schema REQUIRES both
+// (the 2026-09-12 live no-op: a missing body was a schema rejection — HTTP
+// 404 JSON + a logged WARN, the handler never ran, and this host's client
+// does NOT throw on the 404, so the resolved result is verified explicitly —
+// a resolved call is success ONLY on the handler's boolean true). Keep
+// fields go in the body WHEN GIVEN (unknown fields are ignored by the
+// router); on a 404/missing-key/unexpected-field rejection the call is
 // retried ONCE without the keep fields and the response reports "keep not
-// accepted by this build".
+// accepted by this build". An unresolvable model pair → the request is NOT
+// sent (a clear failure, no budget burned).
 //
 // Quant-class compaction budget (Part 2, priority.md #1): the cap is resolved
 // AT CALL TIME from the target session's model name — SELF:
@@ -224,41 +230,123 @@ function appendCompactLine(root: string, context: any, sessionID: string, model:
 
 // A 400 / unexpected-field style error — the "keep not accepted by this
 // build" retry trigger (the generated v1 body type has no keep fields).
+// A 404 / missing-key / unexpected-field style rejection — the "keep not
+// accepted by this build" retry trigger. Covers BOTH failure shapes this
+// host produces: a THROWN error (throw-on client) and a RESOLVED 404 JSON
+// error object / server message string (throw-off client — the active case).
 function isKeepRejectedError(err: any): boolean {
   const status = err?.status ?? err?.data?.status;
-  if (status === 400) return true;
-  const msg = typeof err?.message === "string" ? err.message : "";
-  return /unexpected field|unknown field|bad request/i.test(msg);
+  if (status === 404) return true;
+  if (err?.name === "BadRequest") return true;
+  const msg =
+    typeof err?.message === "string"
+      ? err.message
+      : typeof err?.data?.message === "string"
+        ? err.data.message
+        : typeof err === "string"
+          ? err
+          : "";
+  return /unexpected field|unknown field|bad request|missing key/i.test(msg);
+}
+
+// The resolved result of a summarize/compact call — this host's client does
+// NOT throw on a 404 (it resolves with the parsed error object or undefined),
+// so a resolved promise is NOT success: success is the handler's boolean
+// `true` (full style: { data: true } / { response.ok: true }); anything else
+// is a failure carrying the server's message (the ROOT of the 2026-09-12
+// live no-op — the old code treated every resolved call as a success).
+function compactionFailure(result: any): string {
+  if (result === true) return "";
+  if (result != null && typeof result === "object") {
+    if (result.data === true) return "";
+    if (result.response != null && result.response.ok === true) return "";
+    const err = result.error;
+    const msg =
+      typeof err?.data?.message === "string"
+        ? err.data.message
+        : typeof err?.message === "string"
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : "";
+    return msg !== "" ? msg : "the server rejected the compaction request (no usable success result)";
+  }
+  return "the server rejected the compaction request (no usable success result)";
+}
+
+function errorMessage(err: any): string {
+  const msg =
+    typeof err?.data?.message === "string"
+      ? err.data.message
+      : typeof err?.message === "string"
+        ? err.message
+        : err != null && typeof err !== "object"
+          ? String(err)
+          : "";
+  return msg !== "" ? msg : "unknown error";
 }
 
 // The v1-generation call (THE ACTIVE PATH ON THIS BUILD):
-// summarize({ path: { id }, body }). The keep fields go in the body WHEN GIVEN;
-// on a 400/unexpected-field error the call is retried ONCE without them.
-// Returns a NOTE ("keep not accepted by this build") when the retry path ran,
-// else "".
-async function callSummarize(client: any, sessionID: string, body: any): Promise<string> {
+// summarize({ path: { id }, body }). The body ALWAYS carries providerID +
+// modelID (REQUIRED by the server payload schema — an unresolvable pair is
+// refused BEFORE any call); the keep fields go in the body WHEN GIVEN; on a
+// 404/missing-key/unexpected-field rejection the call is retried ONCE without
+// the keep fields. Returns { note, error }: error "" = success — the result
+// was VERIFIED (a resolved 404 is a failure, never a silent success).
+async function callSummarize(
+  client: any,
+  sessionID: string,
+  ref: { providerID: string; modelID: string },
+  keep: Record<string, number> | undefined,
+): Promise<{ note: string; error: string }> {
+  const base: Record<string, unknown> = {};
+  if (ref.providerID !== "") base.providerID = ref.providerID;
+  if (ref.modelID !== "") base.modelID = ref.modelID;
+  const hasKeep = keep != null && Object.keys(keep).length > 0;
+  const attempt = (withKeep: boolean): Promise<any> =>
+    client.session.summarize({ path: { id: sessionID }, body: withKeep ? { ...base, keep } : base });
+  const NOTE = "keep not accepted by this build (retried without the keep fields)";
   try {
-    await client.session.summarize({ path: { id: sessionID }, body });
-    return "";
-  } catch (err: any) {
-    if (body != null && isKeepRejectedError(err)) {
-      await client.session.summarize({ path: { id: sessionID } });
-      return "keep not accepted by this build (retried without the keep fields)";
+    let error = compactionFailure(await attempt(hasKeep));
+    if (error !== "" && hasKeep && isKeepRejectedError({ message: error })) {
+      const error2 = compactionFailure(await attempt(false));
+      if (error2 === "") return { note: NOTE, error: "" };
+      error = error2;
     }
-    throw err;
+    return { note: "", error };
+  } catch (err: any) {
+    if (hasKeep && isKeepRejectedError(err)) {
+      try {
+        const error2 = compactionFailure(await attempt(false));
+        if (error2 === "") return { note: NOTE, error: "" };
+        return { note: "", error: error2 };
+      } catch (err2: any) {
+        return { note: "", error: errorMessage(err2) };
+      }
+    }
+    return { note: "", error: errorMessage(err) };
   }
 }
 
-// Resolves the target session's model id (Part 2): SELF (no explicit id, or
-// the explicit id == the calling session) → c.extra?.model?.id; CROSS → the
-// LAST entry of session.messages({ path: { id } }) — info.modelID (assistant)
-// / info.model (user). RPC failure / no messages / no client → "" + a NOTE
+// Resolves the target session's model PAIR (id + providerID — the server's
+// summarize payload REQUIRES both): SELF (no explicit id, or the explicit id
+// == the calling session) → c.extra?.model ({ id, providerID }); CROSS → the
+// LAST entry of session.messages({ path: { id } }) — info.modelID +
+// info.providerID (assistant) / the info.model object { id/modelID,
+// providerID } (user). RPC failure / no messages / no client → "" + a NOTE
 // (the default cap 1 applies downstream — never a throw).
-async function resolveModel(client: any, toolCtx: any, sessionID: string, isSelf: boolean): Promise<{ model: string; note: string }> {
+async function resolveModel(
+  client: any,
+  toolCtx: any,
+  sessionID: string,
+  isSelf: boolean,
+): Promise<{ model: string; providerID: string; note: string }> {
+  const self = toolCtx?.extra?.model;
+  const selfId = typeof self?.id === "string" && self.id !== "" ? self.id : typeof self?.modelID === "string" ? self.modelID : "";
+  const selfPid = typeof self?.providerID === "string" ? self.providerID : "";
   if (isSelf) {
-    const id = toolCtx?.extra?.model?.id;
-    if (typeof id === "string" && id !== "") return { model: id, note: "" };
-    return { model: "", note: "model unknown (no extra.model.id in the tool context) — default compaction budget applied" };
+    if (selfId !== "") return { model: selfId, providerID: selfPid, note: "" };
+    return { model: "", providerID: "", note: "model unknown (no extra.model.id in the tool context) — default compaction budget applied" };
   }
   try {
     if (typeof client?.session?.messages !== "function") {
@@ -266,21 +354,32 @@ async function resolveModel(client: any, toolCtx: any, sessionID: string, isSelf
       // is the best-effort path): a cross compact of a sibling session on this
       // host is most likely the SAME model, so fall back to the CALLING
       // session's model for the budget class; absent → default cap + note.
-      const id = toolCtx?.extra?.model?.id;
-      if (typeof id === "string" && id !== "") {
-        return { model: id, note: "cross-session model read unavailable (no client.session.messages) — the calling session's model is used for the budget class" };
+      if (selfId !== "") {
+        return { model: selfId, providerID: selfPid, note: "cross-session model read unavailable (no client.session.messages) — the calling session's model is used for the budget class" };
       }
-      return { model: "", note: "cross-session model read unavailable (no client.session.messages) — default compaction budget applied" };
+      return { model: "", providerID: "", note: "cross-session model read unavailable (no client.session.messages) — default compaction budget applied" };
     }
     const msgs = await client.session.messages({ path: { id: sessionID } });
     if (Array.isArray(msgs) && msgs.length > 0) {
       const info = msgs[msgs.length - 1]?.info ?? {};
-      const id = typeof info.modelID === "string" && info.modelID !== "" ? info.modelID : info.model;
-      if (typeof id === "string" && id !== "") return { model: id, note: "" };
+      let id = "";
+      let pid = "";
+      if (typeof info.modelID === "string" && info.modelID !== "") {
+        id = info.modelID;
+        pid = typeof info.providerID === "string" ? info.providerID : "";
+      } else if (info.model != null) {
+        if (typeof info.model === "string") {
+          id = info.model;
+        } else if (typeof info.model === "object") {
+          id = typeof info.model.id === "string" ? info.model.id : typeof info.model.modelID === "string" ? info.model.modelID : "";
+          pid = typeof info.model.providerID === "string" ? info.model.providerID : "";
+        }
+      }
+      if (id !== "") return { model: id, providerID: pid, note: "" };
     }
-    return { model: "", note: "cross-session model read empty (no messages) — default compaction budget applied" };
+    return { model: "", providerID: "", note: "cross-session model read empty (no messages) — default compaction budget applied" };
   } catch {
-    return { model: "", note: "cross-session model read FAILED (RPC error) — default compaction budget applied" };
+    return { model: "", providerID: "", note: "cross-session model read FAILED (RPC error) — default compaction budget applied" };
   }
 }
 
@@ -308,7 +407,7 @@ export default async function CompactMemoryPlugin(ctx: any) {
             const isSelf = args?.sessionID == null || (typeof c?.sessionID === "string" && args.sessionID === c.sessionID);
 
             // 2. resolve the model + the quant-class cap AT CALL TIME (Part 2)
-            const { model, note: modelNote } = await resolveModel(ctx?.client, c, sessionID, isSelf);
+            const { model, providerID, note: modelNote } = await resolveModel(ctx?.client, c, sessionID, isSelf);
             const { cap, label } = classifyQuantClass(model);
 
             // 3. the budget gate — BEFORE any compact call: denial has ZERO
@@ -323,22 +422,50 @@ export default async function CompactMemoryPlugin(ctx: any) {
               );
             }
 
-            // 4. resolve the client call path (Part 1) — typeof detection
-            //    (the SDK methods live on the prototype)
+           // 4. resolve the client call path (Part 1) — typeof detection
+            //    (the SDK methods live on the prototype). A FAILURE here
+            //    returns immediately: NO increment, NO COMPACT line (the
+            //    2026-09-12 live no-op was a FAILURE reported as a success —
+            //    it burned a budget slot for a compaction that never ran).
             let keepNote = "";
             const client = ctx?.client;
             if (typeof client?.session?.compact === "function") {
               // v2: FLAT parameters — the generated v2 types mark the options
               // body `never` (no keep fields)
-              await client.session.compact({ sessionID });
+              let result: any;
+              try {
+                result = await client.session.compact({ sessionID });
+              } catch (err: any) {
+                return `Compaction request failed: ${errorMessage(err)}` + (modelNote !== "" ? `\n${modelNote}` : "");
+              }
+              const error = compactionFailure(result);
+              if (error !== "") {
+                return `Compaction request failed: ${error}` + (modelNote !== "" ? `\n${modelNote}` : "");
+              }
             } else if (typeof client?.session?.summarize === "function") {
-              // v1 — THE ACTIVE PATH ON THIS BUILD: keep fields in the body
-              // WHEN GIVEN; 400/unexpected-field → retry ONCE without them
+              // v1 — THE ACTIVE PATH ON THIS BUILD: the body MUST carry
+              // providerID + modelID (REQUIRED by the server payload schema);
+              // keep fields in the body WHEN GIVEN; 404/missing-key →
+              // retry ONCE without the keep fields
+              if (model === "" || providerID === "") {
+                return (
+                  `Compaction request failed: no resolvable model for ${sessionID} (the server requires providerID + modelID in the summarize body) — the request was NOT sent.` +
+                  (modelNote !== "" ? `\n${modelNote}` : "")
+                );
+              }
               const keep: Record<string, number> = {};
               if (args?.keepTokens != null) keep.tokens = args.keepTokens;
               if (args?.keepMessages != null) keep.messages = args.keepMessages;
-              const body = Object.keys(keep).length > 0 ? { keep } : undefined;
-              keepNote = await callSummarize(client, sessionID, body);
+              const { note, error } = await callSummarize(
+                client,
+                sessionID,
+                { providerID, modelID: model },
+                Object.keys(keep).length > 0 ? keep : undefined,
+              );
+              if (error !== "") {
+                return `Compaction request failed: ${error}` + [modelNote, note].filter((s) => s !== "").join("\n");
+              }
+              keepNote = note;
             } else {
               const compactType = typeof client?.session?.compact;
               const summarizeType = typeof client?.session?.summarize;

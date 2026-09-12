@@ -207,8 +207,8 @@
   //          the refusal return carries the hand-over note
   //   S11 emergency recovery plugin (6) — the T5 L4 + L5 approved design
   //      (the compaction-lifecycle proposal): the plugin file
-  //      .opencode/plugin/context_recovery.ts is imported DIRECT from the
-  //      repo path (type-stripped, the same way the plugin loads) and
+  //      .opencode/plugin/deactivated/context_recovery.ts is imported DIRECT
+  //      from the repo path (type-stripped, the same way the plugin loads) and
   //      driven with a FAKE client (records every session.compact /
   //      session.promptAsync call) + a sandbox root (directory=SANDBOX
   //      steers the flag read, the budget store, and the COMPACT ctx.log
@@ -1617,8 +1617,9 @@ const cmExec = (args, extra) => cmTool.execute(args, cmCtx(extra));
 
 // ------------------------------------------------------------------ S11 emergency recovery plugin (6) — T5 L4 + L5 (the approved design)
 //
-// The plugin at .opencode/plugin/context_recovery.ts (T5, the compaction-
-// lifecycle proposal L4 + L5): imported DIRECT from the repo path (type-
+// The plugin at .opencode/plugin/deactivated/context_recovery.ts (T5, the
+// compaction-lifecycle proposal L4 + L5): imported DIRECT from the repo path
+// (type-
 // stripped, the same way the plugin loads — the file MUST load that way)
 // and driven with a FAKE client (records every session.compact /
 // session.promptAsync call) + a sandbox root (directory=SANDBOX steers the
@@ -1629,7 +1630,11 @@ const cmExec = (args, extra) => cmTool.execute(args, cmCtx(extra));
 // 78-81). The budget is the SAME compact_budget.json the S10 tool uses —
 // the pre-seeded exhausted store (check 79) proves the gate reads from
 // disk, not from module memory.
-const RC_TS = path.join(REPO_ROOT, ".opencode", "plugin", "context_recovery.ts");
+// REPOINTED 2026-09-12: the maintainer's cleanup (commit 4b44d8c) moved the
+// plugin to plugin/deactivated/ — the probe keeps pinning the frozen
+// artifact from its new home (same pattern as the v1 compact_memory
+// re-point in 44df939); the file contents are unchanged.
+const RC_TS = path.join(REPO_ROOT, ".opencode", "plugin", "deactivated", "context_recovery.ts");
 // Byte-identical copy of the RECOVERY PLUGIN's directive constant
 // (context_recovery.ts lines 35-39, the T5-escaped form — the runtime value
 // carries the SINGLE backslashes in the path pointer): the tool's 2-line
@@ -1921,14 +1926,17 @@ const QC_DIRECTIVE =
 const qcMakeClient = (spec = {}) => {
   const rec = { summarize: [], compact: [], messages: [] };
   const client = { session: {} };
-  if (spec.compact) client.session.compact = (o) => { rec.compact.push(o); return Promise.resolve({ ok: true }); };
+  // The success value is the handler's real return: boolean `true` (the
+  // server handler ends with `return true` — the 2026-09-12 bugfix verifies
+  // the resolved result, so the mock must resolve `true`, not an ok flag).
+  if (spec.compact) client.session.compact = (o) => { rec.compact.push(o); return Promise.resolve(true); };
   if (spec.summarize) client.session.summarize = (o) => {
     rec.summarize.push(o);
     if (spec.summarizeError != null) {
       const e = typeof spec.summarizeError === "function" ? spec.summarizeError(rec.summarize.length) : spec.summarizeError;
       if (e != null) return Promise.reject(e); // null = this call is clean (the retry)
     }
-    return Promise.resolve({ ok: true });
+    return Promise.resolve(true);
   };
   if (spec.messages != null || spec.messagesError) client.session.messages = (o) => {
     rec.messages.push(o);
@@ -1937,7 +1945,7 @@ const qcMakeClient = (spec = {}) => {
   };
   return { client, rec };
 };
-const qcCtx = (over = {}) => ({ sessionID: "ses_qc_self", directory: SANDBOX, extra: { model: { id: "Qwen3.8-27B-IQ4KT-120K" } }, ...over });
+const qcCtx = (over = {}) => ({ sessionID: "ses_qc_self", directory: SANDBOX, extra: { model: { id: "Qwen3.8-27B-IQ4KT-120K", providerID: "llama-swap" } }, ...over });
 const qcExec = async (spec, args, over) => {
   const { client, rec } = qcMakeClient(spec);
   const t = (await qcMod.default({ client })).tool.compact_memory;
@@ -2002,16 +2010,19 @@ const qcStore = () => JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "t
 }
 
 // 89 — the keep retry-once: a 400/unexpected-field error on the FIRST call →
-//      the call is retried ONCE WITHOUT the keep fields (the 2nd body is
-//      null) and the response reports "keep not accepted by this build"
+//      the call is retried ONCE WITHOUT the keep fields (the 2nd body keeps
+//      providerID + modelID and drops the keep fields) and the response
+//      reports "keep not accepted by this build"
 {
   const boom = Object.assign(new Error("400 unexpected field"), { status: 400 });
   const { rec, res } = await qcExec({ summarize: true, summarizeError: (n) => (n === 1 ? boom : null) }, { keepTokens: 101, keepMessages: 3, sessionID: "ses_qc_retry" });
   check(
     "89",
     "S13",
-    "keep retry-once: 400/unexpected-field → the 2nd call has NO body; the response reports keep not accepted by this build",
-    rec.summarize.length === 2 && rec.summarize[0]?.body?.keep?.tokens === 101 && rec.summarize[1]?.body == null &&
+    "keep retry-once: 400/unexpected-field → the 2nd call keeps providerID+modelID and drops the keep fields; the response reports keep not accepted by this build",
+    rec.summarize.length === 2 && rec.summarize[0]?.body?.keep?.tokens === 101 &&
+      rec.summarize[1]?.body?.keep == null && rec.summarize[1]?.body?.providerID === "llama-swap" &&
+      rec.summarize[1]?.body?.modelID === "Qwen3.8-27B-IQ4KT-120K" &&
       String(res).includes("keep not accepted by this build") && /compacted/i.test(res),
     JSON.stringify({ n: rec.summarize.length, res: String(res).slice(0, 160) }),
   );
@@ -2128,7 +2139,7 @@ const qcStore = () => JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "t
 //      EXACTLY ONE trailer line containing the reload pointer (the reload
 //      invariant survives whatever the caller writes)
 {
-  const { res } = await qcExec({ summarize: true, messages: [{ info: { modelID: "IQ4-x" } }] }, { message: "resume unit-3", sessionID: "ses_qc_msg" });
+  const { res } = await qcExec({ summarize: true, messages: [{ info: { modelID: "IQ4-x", providerID: "llama-swap" } }] }, { message: "resume unit-3", sessionID: "ses_qc_msg" });
   const trailer = "Post-compaction reminder: re-read .opencode/agent/prompts/agent_readme_post_compaction.md before continuing.";
   check(
     "97",
@@ -2143,7 +2154,7 @@ const qcStore = () => JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "t
 //      session.messages({path:{id}}) → the LAST entry's info.modelID (the
 //      assistant message) resolves the budget class + the stored model
 {
-  const { rec, res } = await qcExec({ summarize: true, messages: [{ info: { model: "user-x" } }, { info: { modelID: "Qwen3.8-27B-IQ3KT-210K" } }] }, { keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_cross" });
+  const { rec, res } = await qcExec({ summarize: true, messages: [{ info: { model: "user-x" } }, { info: { modelID: "Qwen3.8-27B-IQ3KT-210K", providerID: "llama-swap" } }] }, { keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_cross" });
   const st = qcStore();
   check(
     "98",
@@ -2154,13 +2165,17 @@ const qcStore = () => JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "t
   );
 }
 
-// 99 — the failing RPC: session.messages THROWS → NO throw, the default cap 1
-//      applies + a note in the response (the model stays empty in the store)
+// 99 — the failing RPC: session.messages THROWS → NO throw, the request is NOT sent (no resolvable model pair — the server
+//      requires both; a send would be a guaranteed schema rejection, the
+//      2026-09-12 live no-op) + the note in the response, NO increment
 {
   let threw = false;
   let res = "";
+  let rec = null;
   try {
-    res = (await qcExec({ summarize: true, messagesError: new Error("boom-rpc-qc") }, { keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_rpc" })).res;
+    const r = await qcExec({ summarize: true, messagesError: new Error("boom-rpc-qc") }, { keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_rpc" });
+    res = r.res;
+    rec = r.rec;
   } catch {
     threw = true;
   }
@@ -2168,8 +2183,9 @@ const qcStore = () => JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "t
   check(
     "99",
     "S13",
-    "failing RPC: NO throw, the default cap 1 applies + a note in the response (the model stays empty)",
-    !threw && /compacted/i.test(res) && /model read/.test(res) && st.sessions.ses_qc_rpc?.count === 1 && st.sessions.ses_qc_rpc?.model === "",
+    "failing RPC: NO throw, the request is NOT sent (no resolvable model) + the note in the response, NO increment",
+    !threw && /no resolvable model/i.test(res) && /NOT sent/i.test(res) && /model read/.test(res) &&
+      rec.summarize.length === 0 && st.sessions.ses_qc_rpc == null,
     String(res).slice(0, 160),
   );
 }
