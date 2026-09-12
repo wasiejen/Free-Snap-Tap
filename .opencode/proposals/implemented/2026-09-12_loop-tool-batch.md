@@ -175,3 +175,31 @@ approvable; a maintainer veto on any part stops only that part. Build order:
 Part 1 → Part 2 → Part 3 (one task spec each, written against the
 just-verified state per `agent_readme_task_spec.md`; specs committed before
 launch).
+
+## Verdict (implemented 2026-09-12, looprun autorun-2026-09-11_17-23)
+- **Part 1 — LANDED** (T1, iter-10, task commit `f95e9de`): the `sandboxCheck`
+  path guard (roots = cwd + `TEMP ?? TMP`, case-insensitive, before EVERY fs
+  access, MOVE dst pre-guarded = no partial cut) + the description rewritten as
+  the usage guide; smoke 52/52, probe 80/80, pytest 459+1#10, ruff F=0;
+  allowed-path semantics byte-identical. Open tail (maintainer call): the
+  pre-existing MOVE-dstFile-missing data-loss quirk (a one-line check-hoist
+  changes observable behavior).
+- **Part 2 — LANDED** (T2, iter-10+1, task commit `fbe0cef`; planner-rescued
+  after the worker session died at `context_length_exceeded`): `ctx_gauge.ts`
+  wrapping the gauge core (optional `sessionID`, db-error in-band) + probe S12
+  (APPEND-only, checks 82-85); smoke 3/3 (LIVE byte-identity vs `peek.mjs` in
+  one window), probe 84/84.
+- **Part 3 — LANDED** (T3, iter-13, task commit `6ebe288`): `loop_log.ts`
+  (five-token zod status enum rejected at parse time; `context.directory ??
+  cwd`; machine-computed `autorun-<date>` folder when `loop/` empty; multi-
+  folder anomaly surfaced, not silently resolved; append-only exact line form)
+  + scratchpad smoke 24/24; probe stays 84/84 (smoke-based acceptance).
+- **Prompt/doc preference lines — APPLIED** by the planner in the batch-close
+  bookkeeping commits: Part 2 = `repo_commands.md` + the worker/explorer
+  honesty-guard gauge lines; Part 3 = `agent_readme_loop.md` §Loop log + the
+  planner/worker/looprunner loop lines (prefer the `ctx_gauge`/`loop_log`
+  tools when in the toolset; the shell-out/format descriptions stay the
+  fallbacks).
+- **Remaining tail (maintainer host-side):** tool REGISTRATION —
+  `block_transfer` / `ctx_gauge` / `loop_log` all take effect at his next
+  process restart.
