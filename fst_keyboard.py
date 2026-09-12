@@ -734,7 +734,8 @@ class FST_Keyboard():
                                 # only spawn a thread for execution if more than one key event in to be played key sequence
                                 if CONSTANTS.DEBUG:
                                     print(f"D1: key_sequence: {key_sequence}")
-                                # if there is an empty key group ... just ignore it and do not supress the triggerkey
+                                # an empty key group does not start playback, but the trigger key is still
+                                # suppressed (alias_fired is set before this empty check)
                                 if len(key_sequence) == 0:
                                     pass
                                 elif len(key_sequence) > 0:
