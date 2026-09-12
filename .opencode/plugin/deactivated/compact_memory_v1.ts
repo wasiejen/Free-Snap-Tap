@@ -1,3 +1,5 @@
+// RETIRED (2026-09-12): superseded by .opencode/plugin/compact_memory.ts (the plugin-registered compact_memory tool, approved proposal .opencode/proposals/approved/2026-09-12_compact_memory_plugin.md — the custom-tool context is clientless by design on this host); content FROZEN, pinned by the probe's S10.
+// NOTE (self-location depth): the SELF_OPENCODE_DIR fallback (one level up) assumes this file's OLD depth (.opencode/tools/); the probe steers ALL fs writes with an explicit directory, so it stays green.
 // T3 (L2 — approved design: .opencode/proposals/approved/2026-09-11_compaction-lifecycle.md):
 // the `compact_memory` custom tool, completed on the maintainer's prototype. The
 // prototype's export shape (default export → tools.compact_memory), its arg names

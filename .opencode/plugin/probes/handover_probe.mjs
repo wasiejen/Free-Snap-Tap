@@ -170,10 +170,11 @@
  //          `<dt> CPU-Qwen3-0.6B task (46K)` (the fake tool name)
  //      (66) ctx log tool-name field OMITTED: payload without a `tool` key →
  //          byte-shape `<dt> CPU-Qwen3-0.6B (46K)`
- //   S10 compact_memory tool (9) — the L2 approved design (the
- //      compaction-lifecycle proposal): the tool file
- //      .opencode/tools/compact_memory.ts is imported DIRECT from the repo
- //      path (type-stripped, the same way the plugin loads — the tool file
+ //   S10 compact_memory v1 tool (9) — the L2 approved design (the
+  //      compaction-lifecycle proposal): the RETIRED v1 tool file
+  //      .opencode/plugin/deactivated/compact_memory_v1.ts is imported DIRECT
+  //      from the repo path (type-stripped, the same way the plugin loads —
+  //      the tool file
  //      MUST load that way) and driven with a FAKE client (records every
  //      session.compact call; a mutable FAIL switch) + a FAKE context
  //      (directory=SANDBOX steers ALL the tool's fs writes — the budget
@@ -1407,17 +1408,21 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
   );
 }
 
-// ------------------------------------------------------------------ S10 compact_memory tool (9) — L2 (the approved design)
+// ------------------------------------------------------------------ S10 compact_memory v1 tool (9) — L2 (the approved design)
 //
-// The custom tool at .opencode/tools/compact_memory.ts (T3, the compaction-
-// lifecycle proposal L2): imported DIRECT from the repo path (type-stripped,
-// the same way the plugin loads — the tool file MUST load that way) and driven
-// with a FAKE client (records every session.compact call; a mutable FAIL switch
-// forces the failure shape) + a FAKE context: directory=SANDBOX steers ALL the
-// tool's fs writes (the budget store + the COMPACT ctx.log line) into the
-// sandbox; sessionId is the prototype's working shape (modelId/preReadout are
-// the best-effort L1 fields — carried in check 70, absent in all others).
-const TOOL_TS = path.join(REPO_ROOT, ".opencode", "tools", "compact_memory.ts");
+// The RETIRED v1 custom tool at
+// .opencode/plugin/deactivated/compact_memory_v1.ts (retired 2026-09-12 from
+// its former tools/ home, superseded by the plugin-registered
+// .opencode/plugin/compact_memory.ts — pinned by S13): this section pins the
+// RETIRED v1 ARTIFACT (T3, the compaction-lifecycle proposal L2): imported
+// DIRECT from the repo path (type-stripped, the same way the plugin loads —
+// the tool file MUST load that way) and driven with a FAKE client (records
+// every session.compact call; a mutable FAIL switch forces the failure shape)
+// + a FAKE context: directory=SANDBOX steers ALL the tool's fs writes (the
+// budget store + the COMPACT ctx.log line) into the sandbox; sessionId is the
+// prototype's working shape (modelId/preReadout are the best-effort L1 fields
+// — carried in check 70, absent in all others).
+const TOOL_TS = path.join(REPO_ROOT, ".opencode", "plugin", "deactivated", "compact_memory_v1.ts");
 const cmCompactCalls = [];
 const cmFail = { fail: false, error: "boom-compact" };
 const cmClient = {
