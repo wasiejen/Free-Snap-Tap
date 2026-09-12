@@ -1,96 +1,93 @@
-# WORKER SUMMARY — T2 (iter-10+1): ctx_gauge tool + probe S12
+# WORKER SUMMARY — T3 (iter-13): loop_log tool (the loop log as a directly-fired tool)
 
-RESCUE RECORD — the building worker session `ses_f6c3b810bffe00MWTFdwDZ2JKx`
-(label per spec `worker-10`, model `Qwen3.8-27B-IQ4KT-120K`, branch
-`fst_work`) died at `context_length_exceeded` after writing the tool file +
-the probe S12 section (file stamps 06:19) and before the smoke / gates /
-summary / commit. Planner-10 verified the artifacts (probe re-run: 84/84)
-and completed the remaining spec items PLANNER-DIRECT (rescue — precedent:
-the T5 WIP rescue, the T1 bookkeeping fix). This summary is the rescue
-record; the verification below was measured by planner-10, not by a worker.
+worker-13, session `ses_f6bfc1752ffeW9mfpMBAJXzTql`, model
+`Qwen3.8-27B-IQ4KT-120K`, branch `fst_work`. META task (no FST python code).
+Implemented `.opencode/tools/loop_log.ts` + the scratchpad smoke per the approved
+Part 3 design and the iter-13 task spec; re-measured all gates; ONE green task
+commit (scope = `loop_log.ts` + bookkeeping only — NO probe/prompt changes).
 
-## What changed (task commit: tool + probe + bookkeeping only)
+## What changed (task commit scope: `loop_log.ts` NEW + bookkeeping)
 
-`.opencode/tools/ctx_gauge.ts` (NEW) + `.opencode/plugin/probes/handover_probe.mjs`
-(S12 section + header update) — META task, no FST python code:
+`loop_log.ts` is a `tool()` (no `name` field — host names by filename, the
+committed form of ctx_gauge.ts / block_transfer.ts) that an agent fires DIRECTLY
+to append its loop-log line. No hand-formatting, no per-agent folder-permission
+management (the single write-access point).
 
-1. **`ctx_gauge.ts`** — the approved Part 2 design, verbatim shape:
-   `import { tool } from "@opencode-ai/plugin"` + relative import of the
-   shared core (`../plugin/scripts/gauge.mjs` — resolved against the tool
-   file's own location, works under both the Node-24 type-stripped probe
-   import and the opencode host); args = optional `sessionID` (empty/omitted
-   = newest-session default read, a value = the per-session read, passed
-   through); `execute` = `formatGauge(await readGauge(undefined,
-   sessionID))` with the `db-error` note APPENDED in-band (` — <error>` —
-   the line is NEVER replaced by a stack trace; mirror of peek.mjs's stderr
-   note); `description` = the 1–2-line usage guide (read-only, fire for
-   context-budget decisions instead of the peek.mjs shell-out); NO `name`
-   field (host names by filename).
-2. **Probe S12 (APPEND-ONLY, checks 82-85, no renumbering):**
-   - 82: tool file imports type-stripped + tool() default export (description
-     string, `args` keys exactly `[sessionID]` with a zod schema — undefined
-     parses / non-string rejects, async execute, NO `name` field);
-   - 83: execute steered via `setDbPath(FX_OK)`: default newest-session read
-     BYTE-EXACT `SESSION=ses_fx_ok CTX=10000 (3%) REM=246000` + the
-     sessionID arg passed through (`ses_fx_old` → `SESSION=ses_fx_old
-     CTX=10000 (8%) REM=110000`);
-   - 84: db-error (never-created `MISSING_DB`): no throw, `SESSION=unknown
-     CTX=notAvailable` + the appended ` — <error>` note;
-   - 85: hook restore (cf. check 39) — global db path back where S12 found
-     it; global read == explicit-path read (byte-exact, no drift).
-   - Header: the section-sum comment now carries `S12=4` → expected
-     `84/84 PASS` (measured).
-   - Note: check 85's restore capture uses `getDbPath()` — a REAL core
-     export (gauge.mjs:172) that the spec's fact list omitted (the spec
-     listed readGauge/formatGauge/setDbPath); the usage is valid, no core
-     change.
+- **args** (zod via `tool.schema`): `role` (required), `model` (required,
+  verbatim model id), `status` (required — a zod **enum of exactly the five
+  8-char tokens** `-->START` / `DONE<---` / `-RETURN-` / `-WARNING` / `--INFO--`,
+  so a bogus token is rejected at PARSE time, not a runtime check), `content`
+  (required), `session` (OPTIONAL — omitted/empty → the literal `unknown`).
+- **execute** (append-only; the tool never rewrites/curates the file):
+  resolve `.opencode/loop/` against `context.directory ?? process.cwd()`; if NO
+  `autorun-*` folder exists → create `autorun-<YYYY-MM-DD_HH-MM>` (name
+  MACHINE-COMPUTED from the local clock, never retyped — pattern-5 discipline)
+  + its `loop_log.md`; if EXACTLY ONE → use it; if SEVERAL → use the
+  most-recently-MODIFIED and surface the anomaly in the return value (never
+  silently resolved, never an arbitrary pick); append ONE machine-timestamped
+  line `<date_time> <status> <role> <session|unknown> <model> <content>` (the
+  established local `YYYY-MM-DD_HH-MM` form); return the folder name + the exact
+  line written (+ the anomaly note on the multi-folder case).
+- **description**: 1–2-line usage guide (append ONE loop-log line to the current
+  looprun's `loop_log.md`; auto-creates the dated folder when empty; returns
+  folder + line; fire for START/DONE/RETURN/WARNING/INFO).
 
-## Measured verification (planner-10, at the rescue commit HEAD)
+The smoke lives in the scratchpad (untracked):
+`C:/Users/Wasiejen/AppData/Local/Temp/opencode/loop_log_smoke.mjs` (the iter-4
+Node-24 type-stripped import pattern; the context object carries a scratchpad
+temp `directory` — NEVER the live `.opencode/loop/`).
 
-- **Probe** `node .opencode/plugin/probes/handover_probe.mjs`: **84/84
-  PASS**, exit 0 (full run incl. all four S12 checks; the pre-existing
-  S1–S11 sections green — no drift).
-- **Smoke** `C:/Users/Wasiejen/AppData/Local/Temp/opencode/ctx_gauge_smoke.mjs`
-  (scratchpad, untracked, iter-4 pattern): **3/3 PASS** —
-  (1) LIVE BYTE-IDENTITY: the child-process `peek.mjs` output vs the tool's
-  `execute` output for the same live db state, run in ONE bash invocation
-  (the db cannot change between the two reads within the window) — byte
-  equal, both reading the planner's own session; (2) the no-arg live read
-  is well-formed `SESSION=… CTX=… (…%) REM=…`; (3) db-error path (in-process
-  `setDbPath` to a nonexistent path, restored after): no throw, the line
-  never replaced, the ` — <error>` note appended.
+## Measured verification (all re-measured by worker-13, at HEAD)
+
+- **Probe** `node .opencode/plugin/probes/handover_probe.mjs`: **84/84 PASS**,
+  exit 0 — the UNCHANGED total (this task adds NO probe section per Part 3's
+  smoke-based acceptance; the probe simply stays green).
+- **Smoke** `node <scratchpad>/loop_log_smoke.mjs`: **24/24 PASS** —
+  (shape: tool() result, no stale name/parameters, async execute; the status
+  enum rejects a bogus token at parse time + accepts all five; role/model/
+  content required, session optional) + (A) empty dir → creates the dated
+  `autorun-*` folder (verified by LISTING, form
+  `autorun-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}`) + `loop_log.md`, the written line
+  byte-equals a hand-built expected line (MINUTE-BOUNDARY-SAFE: compared
+  against the stamp computed before AND after the call) and is the file's only
+  line; (B) a second call appends (both lines present, order preserved, file
+  not rewritten); (C) `session` omitted → the literal `unknown` in the line;
+  (D) a bogus status token fails `safeParse` → nothing written (fresh dir stays
+  empty); (E) multi-folder anomaly: two pre-created `autorun-*` dirs with
+  explicitly-bumped, far-apart mtimes → the line lands in the
+  most-recently-modified one, the other is untouched, and the return value
+  mentions the anomaly.
 - **pytest** `& .\.venv\Scripts\python.exe -m pytest -q`: **459 passed,
   1 warning** (the known #10 warning).
 - **ruff** `& .\.venv\Scripts\ruff.exe check --select F .`: **All checks
   passed** (F=0).
 
-## Method note (byte-identity, spec vs. architecture)
+## Method / DO-NOT-touch compliance
 
-The spec asked to compare the tool readout byte-exact with
-`node .opencode/plugin/scripts/peek.mjs` "for one fixture" — but peek.mjs
-CANNOT be steered at a fixture: the core has no env/path override for
-`DEFAULT_DB_PATH` (fixed `~/.local/share/opencode/opencode.db`), and
-pointing the child process at the live db is the only option. The smoke
-therefore proves byte-identity on the LIVE db inside a single invocation
-window (the stronger claim: the production path, both sides), and the
-fixture byte-exactness is pinned by probe check 83 (in-process, steered).
-Together they cover the requirement; no core edit was needed (DO-NOT-touch
-respected — the diff is exactly tool + probe + bookkeeping).
+- The live `.opencode/loop/` folder was NEVER pointed at by the smoke (the
+  smoke targets a scratchpad `directory` only); this summary's hand-appended
+  loop-log lines (the START line written at session start and this DONE line)
+  are the only writes to the live loop folder, done by hand per the iter-13
+  protocol (the new tool is NOT registered in the live host yet).
+- NO probe file change, NO prompt change (those are planner-applied after
+  verification, per Part 3); `opencode.jsonc` NOT staged; nothing under
+  `proposals/maintainer/` or the FST python packages touched. The `git diff`
+  of the task commit is exactly `loop_log.ts` (new) + this summary + the loop-
+  log lines.
+- The multi-folder anomaly rule (most-recently-modified) was NOT found to be
+  flaky on this host: the smoke sets the two dirs' mtimes explicitly 5 minutes
+  apart (`fs.utimesSync`), so `statSync().mtimeMs` is unambiguous — no
+  under-determination to escalate (the approval-boundary stop condition did not
+  trigger).
 
 ## Open items / not done (deliberate)
 
-- Tool registration is host-side (the maintainer's live `opencode.jsonc`) —
-  the tool takes effect at his next process restart, like T1 / the
-  compact_memory v2 tail.
-- No core changes (`gauge.mjs` / `peek.mjs` untouched), no S1–S11 probe
-  renumbering, no FST code — per the spec.
+- The tool is NOT registered in any config (host-side, the maintainer's domain —
+  the live `opencode.jsonc` + the per-agent tool-access grant; takes effect at
+  his next process restart).
+- No probe section (Part 3 acceptance is smoke-based — the probe stays at the
+  unchanged 84/84); no FST code — per the spec.
 
-## Commit / process notes
+## Final gauge (verbatim, at summary-writing time, pre-commit)
 
-- The dead worker session wrote NO loop-log lines (it died before
-  bookkeeping) — the planner logged a `-WARNING` for the failed launch + an
-  `--INFO--` for the rescue in the loop folder log; this summary records the
-  failed session id so the loop log's `-WARNING` line is the durable record.
-- Final gauge (verbatim, at summary-writing time, pre-commit):
-  `SESSION=ses_f6c4471a3ffeaQ9rXpnmUTg2AS CTX=83548 (69%) REM=36452`
-  (the smoke's live readout — the same state the smoke compared byte-exact).
+`SESSION=ses_f6bfc1752ffeW9mfpMBAJXzTql CTX=68010 (56%) REM=51990`
