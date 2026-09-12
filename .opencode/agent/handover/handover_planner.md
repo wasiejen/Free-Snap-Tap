@@ -8,8 +8,25 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   `--main`/`--maintainer` markers (grep hits all historical: NAP/proposal text,
   prompts, done/, the standing `--defer` SWEEP at `inbox_planner/summary_summary.md`);
   `priority.md` active list = item #1 (compact_memory, his `--wip` line — untouched);
-  item #2 empty. Full-context session (he compacts manually) — stop-line discipline
-  relaxed, early-handover still applied.
+  item #2 empty AT MY FIRST READ. Full-context session (he compacts manually) — stop-
+  line discipline relaxed, early-handover still applied.
+- **priority.md LIVE-EDITED MID-SESSION (his file — NOT staged, NOT touched, recorded
+  for the next session):** between my first read and the spec commit the working tree
+  gained: item #2 = POST-BUILD follow-ups ("when compact_memory tool works need a
+  guideline for its usage" + Q: does the compact return signal the count, e.g.
+  `COMPACTION: 2/3` "needed for agents to help identify their last run" + Q: can an
+  emergency compaction extend the max compaction?) + a DUPLICATED item #3 (nap size
+  reduction; and "ready made grep command to find maintainer attention markers in the
+  planner prompt — planner often tries multiple times to discover discrepancies in the
+  command formulation" — the PowerShell `rg` marker-grep struggles of THIS session are
+  the living example; the working form: `rg -n --hidden --no-require-git -e '--main'
+  -e '--maintainer'` + `-u`/`--no-require-git` is NOT enough for hidden dirs, `--hidden`
+  is the flag that found them). His own sequencing: #2 is explicitly AFTER the build
+  ("when the tool works") → the build stays approved-scope; my close summary answers
+  the #2 questions with recommendations (return-value line: small approved follow-up
+  if he says yes; emergency-extend + the context_recovery flat-cap question (d) below
+  are rulings). The grep-helper item = queued quick planner-direct prompt fix after
+  the build verifies (pre-approved meta class).
 - **Baseline re-measured this session:** probe **84/84** under `node .opencode/
   plugin/probes/handover_probe.mjs` (HEAD green); pytest 459+1#10 + ruff F=0 CARRIED
   (no FST code change since the attention-keywords verify).
@@ -34,8 +51,43 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   (the T5 emergency hook, shares the same budget FILE) keeps its FLAT cap 2
   while the tool uses the quant-class cap — does the emergency path also
   respect the quant class?
-- **LAUNCH:** fresh `worker_Q4_120K` (task tool). On return: verify against
-  git log + re-measured gates (probe 84+n, pytest, ruff, rename check, the
+- **LAUNCH 1 DIED (worker-1 `worker_Q4_120K`, session
+  `ses_f691b7802ffe2wMtz7svBy36Ya` — the dump's filename):** heavy prefill
+  (the spec's read order) left him at ~70 % before writing; he underestimated
+  his remaining budget by ~5k (his); ran out after writing the plugin + the
+  smoke. Loop log carries only the START line (no DONE). His `compact_memory`
+  was unavailable in the dead session (the v1 tool cannot compact on this host
+  — the very defect this build fixes).
+- **WIP RESCUED (this commit):** `.opencode/plugin/compact_memory.ts` (332
+  lines — smoke-verified architecture: registration shape, summarize path,
+  cross-model read, retry-once, no-client error, CPU denial, message+trailer,
+  COMPACT line — ALL PASS) + the dead worker's pre-write thought dump (his
+  file, committed as the bounded-read reference) + the worker's loop line.
+  Smoke harness lives in the scratchpad: `Temp\opencode\qc_smoke\smoke.mjs`
+  (23 checks + sandbox state).
+- **SMOKE RE-RUN BY ME: 8 FAILURES** (15 pass): (a) clf IQ4 / clf Q4KM /
+  clf trap / gate-3rd-4th — ONE root cause, VERIFIED BY ME: the quant rules
+  lack the `i` flag (`compact_memory.ts:71-72` `/iq4|q4/`, `/iq3|q3/` miss
+  uppercase `IQ4KT`; the `^cpu` rule has the flag). `clf IQ3` passes TRIVIALLY
+  (default cap == q3 cap == 1). (b) retry note emits `err.message` = "null"
+  instead of the Part-1 "keep not accepted by this build" wording. (c)
+  `fail no increment` = smoke-harness mock bug (`spec.summarizeError is not
+  a function` — the harness, not the plugin). (d) v2 schema write (model
+  field empty in that case) + lenient v1 read+bump — read against the smoke
+  for the exact assertions.
+- **PROBE RE-VERIFIED 84/84** (HEAD green; the WIP touched no probe file).
+- **HIS IDEA (dump-reference resume) — sound, adopted with discipline:**
+  same pattern as the T2/T5 WIP rescues. Discipline: the new worker gets
+  BOUNDED reads of the dump ONLY (grep for a question / tail range — 921 raw
+  lines, no headings, never the whole file); the spec stays the contract.
+  His dump tail already settled the commit strategy (checkpoint-per-unit;
+  the v1 MOVE + the S10 TOOL_TS re-point in ONE commit — the move alone
+  breaks S10; final commit = bookkeeping close) — recorded in the resume
+  spec so the new worker does not re-deliberate it.
+- **LAUNCH 2 (this session):** fresh `worker_Q4_120K` with the RESUME spec
+  (replaces `handover_task.md`; leaner prefill — the WIP exists, so the
+  heavy design reads are targeted-only). On return: verify against git log +
+  re-measured gates (smoke 23/23, probe 84+n, pytest, ruff, the rename, the
   TOOL_TS grep), then bookkeeping commit (this NAP current + proposal →
   `implemented/` only AFTER his live acceptance per the proposal's Acceptance
   section — items 2-4 are HIS side: registration in the live opencode.jsonc
