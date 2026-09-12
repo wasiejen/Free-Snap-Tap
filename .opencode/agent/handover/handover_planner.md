@@ -2,6 +2,54 @@
 
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
+## 2026-09-12 (direct session; ses_f6976031bffeRa8gNNcpy5FoYj) — attention-keywords close-out; priority #1 (compact_memory quant-class budget) design grounded — awaiting his ruling
+- **Start:** HEAD `6b51fe2` (clean); 0 live `--main`/`--maintainer` markers; `--wip` at
+  `priority.md:28` (his live WIP item — untouched, per the `--wip` guard); `proposals/
+  commented/` empty; inbox = drafts only + `summary_summary.md` (the standing SWEEP item —
+  unchanged, still the loop-run side of the book per the prior entry).
+- **Close-out (planner-direct, pre-approved meta, this commit):** `proposals/approved/
+  2026-09-12_attention-keywords.md` → `implemented/` + Status note (task `20aff36` verified;
+  residual live-triage acceptance = the FIRST LOOP ITERATION, his side). TODO untouched;
+  baselines unchanged (no code touched): probe 84/84, pytest 459+1#10, ruff F=0.
+- **Priority #1 (his new `priority.md` item, `--wip`) — design grounded, AWAITING HIS
+  RULING:** the pending proposal `proposals/2026-09-12_compact_memory_plugin.md` (Parts
+  1-3, AWAITING APPROVAL) is the base; priority #1 extends it with Part 4 = the per-session
+  compaction budget differentiated by the session's model quant class (his item: Q4→3,
+  Q3→1, other→1 preliminary, CPU models excluded). Verified facts (measured this session):
+  - The v1 `Session` type carries NO model field (`@opencode-ai/sdk/dist/gen/types.gen.
+    d.ts:465`); the model lives on MESSAGES (`UserMessage.model.{providerID,modelID}`
+    L52; `AssistantMessage.modelID` L108).
+  - `client.session.messages({path:{id}})` → `200: Array<{info: Message, parts}>`
+    (types.gen L2234) — ONE uniform RPC yields the model for BOTH self-compact and
+    cross-session compact (last entry's `info.modelID` / `info.model`); the plugin-ctx
+    client is v1-generation (probe-verified: summarize=function, compact=undefined).
+  - Model names (opencode.jsonc): `Qwen3.8-27B-IQ4KT-*` (→3), `Qwen3.8-27B-IQ3KT-*` (→1),
+    `Gemma4-12B-Q4K*` (→3), `CPU-*` (excluded). **ORDERING TRAP:** "Qwen3.8"/"Qwen3.5"
+    contain the substring "Q3" → classify CPU FIRST, then Q4, then Q3, then default.
+  - Budget store today = global `maxPerSession: 2` (`tools/compact_memory.ts:45`); Part 4
+    = cap resolved at gate time from the quant class; increment-on-success + COMPACT line
+    unchanged; the resolved modelID can ALSO fill the COMPACT line's best-effort model
+    field (currently always empty — `context.modelId`/`context.model.id` absent per the
+    key dump).
+- **Open questions (his ruling, in priority order):**
+  1. Approval path: approve the pending proposal (Parts 1-3) as-is AND add Part 4 to the
+     same file, or a fresh revision file? (The proposal stays AWAITING APPROVAL until his
+     call — nothing propagated.)
+  2. Model source: my recommendation = the ONE uniform path, last message's modelID via
+     `client.session.messages` (works self + cross); the alternative `context.agent` is
+     always present but a ROLE name (no CPU marker, config-coupled). Fallback on RPC
+     failure / no messages: default cap (1) + a note in the denial/grant message — confirm.
+  3. "CPU models excluded" = the `CPU-` name prefix in his provider config? (I know no
+     other exclusion criterion.)
+- **NEXT (after his ruling):** extend the proposal with Part 4 (classifier = an ordered
+  rule table at the top of the plugin file, maintainer-editable; probe pins fixture model
+  names incl. the Q3-substring trap) → delegate the build (worker_Q4_120K) → verify →
+  registration his side. Standing gated, unchanged: #11, #51, TODO #54 (wording/placement
+  his call), the SWEEP (`summary_summary.md`, loop-run side), live-triage acceptance
+  (first loop iteration).
+- Baselines (carried; FST code untouched this session): probe 84/84, pytest 459+1#10,
+  ruff F=0.
+
 ## 2026-09-12 (direct session; ses_f6a0d11ebffed36PDKoTeWxddD) — .opencode restructure, Part 1 LANDED: agent-side home; host restart required
 - **Ruling (his chat, "approved as commented"):** `approved/2026-09-12_opencode-structure.md` approved; direct session ONLY (moving the prompt folder mid-loop risks config mismatch/worker death); Part 4 (2-git separation) DEFERRED per his ruling.
 - **Part 1 (planner-direct, pre-approved meta + his approval):** 100% renames `system_prompts/`→`agent/prompts/`, `agent_feedback.md`→`agent/`, `handover/`→`agent/handover/`. Updated live refs: `opencode.jsonc` (8 prompt paths incl. commented block, looprunner read rule, 7 worker/agent deny pairs `.opencode/prompt_**`→`.opencode/agent/prompts/**` + NAP deny, explorer summary allow — the formerly-STALE no-slash forms now point at the real files), AGENTS.md, agents_repo.md, SCRATCH_PAD.md (NAP pointer), 4 plugin files (ctx_watchdog/deactivated-handover `HANDOVER_SPEC_PATH` now = the REAL spec path; context_recovery + compact_memory directive text; probe expectations + sandbox constants SB_SPEC/SB_MIRROR/REAL_FILES follow), moved prompts/repo-parts/knowledge-README cross-refs. History untouched (archive/, records, proposal files, NAP history, agent_feedback log, TODO.md:124 record).

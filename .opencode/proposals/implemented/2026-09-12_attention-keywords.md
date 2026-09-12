@@ -42,3 +42,10 @@ awaiting approval (prompt change = maintainer-gated)
 
 - approved
 - add --wip to mark files that are live editid by maintainer. edits in this file might clash (will be used sparingly if ever - just in case)
+- IMPLEMENTED 2026-09-12 (task commit `20aff36`, verified by the planner direct session
+  `ses_f6a0d11ebffed36PDKoTeWxddD`): the marker table incl. `--wip` + the priority ladder
+  (direct + autonomous sections) are in the planner prompt; the `--wip` guard in the worker
+  prompt; the verbatim-rider line in the looprunner prompt; probe 84/84 (node) + grep
+  acceptance per spec.
+- Residual acceptance (maintainer-side): live triage of a marked test-file set per the
+  ladder = the FIRST LOOP ITERATION after his host restart (NAP 2026-09-12, direct session).
