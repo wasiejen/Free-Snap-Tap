@@ -171,33 +171,56 @@ reenabled, that is the call.
 - **Problem / evidence:** firing the `compact_memory` tool returns
   "Compaction request failed: Unable to connect. Is the computer able to
   access the url?" in the current host build (verified live 2026-09-12).
-  Diagnosis in the same session: the only opencode process (`opencode.exe`,
-  the npm `opencode-ai` bin) listens on NO TCP port at all
-  (`Get-NetTCPConnection` — no listener for that PID); `OPENCODE_PORT` is
-  empty, so the HTTP fallback targets `localhost:4096`, where nothing
-  listens; the SDK-client path (`context.client.session.compact`) is
-  therefore either not wired or points at an unreachable URL in this
-  build. 2026-09-12 follow-up (maintainer probe via a modified
-  `session_info`): accessing `context.client.app` throws "undefined is not
-  an object" — **`context.client` is UNDEFINED in this host build**, so the
-  client path is unavailable and the failure came from the HTTP fallback
-  (localhost:4096, no listener). The failure did NOT consume the per-session compaction budget
-  (no `.opencode/temp/compact_budget.json` was created — the
-  increment-on-success design holds).
+  Diagnosis (same session, measured): the only opencode process
+  (`opencode.exe`) listens on NO TCP port at all; `OPENCODE_PORT` is empty
+  → the HTTP fallback targets `localhost:4096`, where nothing listens.
+  Maintainer probe (modified `session_info`): `context.client` is
+  **UNDEFINED in this host build** — so the client path is unavailable and
+  the failure came from the HTTP fallback. The failure did NOT consume the
+  per-session compaction budget (no `.opencode/temp/compact_budget.json`
+  — increment-on-success holds).
+  Installed-SDK evidence (2026-09-12, grepped from
+  `.opencode/node_modules/@opencode-ai/sdk/dist/`): **v1** generated types
+  expose only `session.summarize` (url `/session/{id}/summarize`) — NO
+  `compact` method; **v2** exposes both `summarize` and `compact`
+  (`compact` url `/api/session/{sessionID}/compact`, FLAT `parameters`
+  shape). Consequences: (a) the tool's current call
+  `client.session.compact({path:{id}, body:{keep}})` mixes generations —
+  v1 has no `compact`, v2's `compact` takes flat parameters, so even WITH a
+  wired client the call shape is suspect; (b) the HTTP fallback hits
+  `/api/session/compact` with the sessionId IN THE BODY — matches NEITHER
+  typed endpoint (both are session-ID-in-path); (c) the `context.api`
+  fallback is dubious per the maintainer's knowledge doc (not necessarily
+  SDK-client-interchangeable).
 - **Outcome (goal):** `compact_memory` compacts a live session in the
-  current host build, or the tool reports WHICH resolution path failed
-  (client vs HTTP + port) so the wiring can be fixed without blind
-  guessing.
+  current host build via the path this build actually exposes (client
+  wiring decision = maintainer domain); if no path exists in this build,
+  the tool reports WHICH path was attempted and why it failed (client
+  absent / HTTP no-listener / endpoint mismatch) instead of the generic
+  "Unable to connect".
 - **Acceptance:** a live fire in a session → success (COMPACT line in
   `.opencode/temp/ctx.log` + budget increment), or a maintainer decision
-  on the supported host configuration.
-- **Scope:** `.opencode/tools/compact_memory.ts` (error reporting), the
-  host-side client/URL wiring (maintainer domain), the v2 test notes
+  on the supported host configuration. The chosen call shape must match
+  the installed SDK `.d.ts` (grep-verified against
+  `sdk/dist/{gen,v2/gen}`); if the HTTP fallback stays, its endpoint is
+  `/api/session/{sessionID}/compact` and it only applies when a server is
+  actually listening.
+- **Scope:** `.opencode/tools/compact_memory.ts` (resolution chain:
+  `context.sessionID` first per the knowledge doc; `context.client` only —
+  drop the silent `context.api` equivalence; error reporting),
+  `.opencode/node_modules/@opencode-ai/sdk/dist/{gen,v2/gen}/*.d.ts`
+  (installed types — the authority for the call shape), the host-side
+  client/URL wiring (maintainer domain), the v2 test notes
   (`proposals/maintainer/done/compact_memory_v2test.ts` +
-  `compaction_warning.md`). Related: the loop_log-v2 proposal's Part A
-  context probe has the same unknown (which context fields the host
-  actually wires).
-- **Status:** OPEN — maintainer call.
+  `compaction_warning.md`), the knowledge doc
+  (`proposals/maintainer/done/knowledge_opencode_tools_plugins.md`).
+  Related: the loop_log-v2 proposal's Part A context probe (which context
+  fields the host wires — `sessionID`/`agent` confirmed, model open); the
+  installed plugin package DOES expose the
+  `experimental.session.compacting` hook (candidate alternative design:
+  inject durable context AT compaction instead of triggering it).
+- **Status:** OPEN — maintainer call (which path this host build should
+  expose; hook-based alternative on the table).
 
 ## Closed entries
 
