@@ -68,8 +68,9 @@ import { tool } from "@opencode-ai/plugin";
 // row, not the 3-bit one).
 const QUANT_CLASS_RULES: Array<{ test: (name: string) => boolean; cap: number; label: string }> = [
   { test: (name) => /^cpu/i.test(name), cap: 0, label: "cpu (excluded)" },
-  { test: (name) => /iq4|q4/.test(name), cap: 3, label: "4-bit quant" },
-  { test: (name) => /iq3|q3/.test(name), cap: 1, label: "3-bit quant" },
+  // case-insensitive: the LIVE model names are UPPERCASE ("Qwen3.8-27B-IQ4KT-120K")
+  { test: (name) => /iq4|q4/i.test(name), cap: 3, label: "4-bit quant" },
+  { test: (name) => /iq3|q3/i.test(name), cap: 1, label: "3-bit quant" },
   { test: () => true, cap: 1, label: "default" },
 ];
 
@@ -261,6 +262,14 @@ async function resolveModel(client: any, toolCtx: any, sessionID: string, isSelf
   }
   try {
     if (typeof client?.session?.messages !== "function") {
+      // No messages RPC on the client (the v1 host client HAS it — this branch
+      // is the best-effort path): a cross compact of a sibling session on this
+      // host is most likely the SAME model, so fall back to the CALLING
+      // session's model for the budget class; absent → default cap + note.
+      const id = toolCtx?.extra?.model?.id;
+      if (typeof id === "string" && id !== "") {
+        return { model: id, note: "cross-session model read unavailable (no client.session.messages) — the calling session's model is used for the budget class" };
+      }
       return { model: "", note: "cross-session model read unavailable (no client.session.messages) — default compaction budget applied" };
     }
     const msgs = await client.session.messages({ path: { id: sessionID } });
