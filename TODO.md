@@ -65,9 +65,12 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Scope (non-exhaustive):** `convert_to_vk_code` + all its call sites (`fst_manager.py`,
   `fst_keyboard.py`, …); `constraint_evaluation`'s unknown-key branch.
 - **Status:** RULING 2026-09-12 — Rec approved (build the P08-style user-visible error at
-   every vk-resolution site; the constraint path reuses it). IN PROGRESS on branch
-   `fst_work` (iter-7). Unknown constraint *names* stay silent no-ops by design
-   (`SPEC_FEATURES.md` §4 #2) — out of scope.
+   every vk-resolution site; the constraint path reuses it). LANDED on branch `fst_work`
+   (iter-9, unit A, commit 4b93d37): one `FST_Keyboard.surface_config_error` helper; both
+   constraint fail-closed guards + `check_for_combination` (+ the hot-path resume catch)
+   route through it (GUI P08 error toast / headless print, dedup + fail-closed preserved) —
+   the console-only residual is closed by this build. Unknown constraint *names* stay silent
+   no-ops by design (`SPEC_FEATURES.md` §4 #2) — out of scope.
 
 ## 7. Empty macro: comment/behavior mismatch at `fst_keyboard.py` 707 (2026-09-08)
 
