@@ -57,3 +57,42 @@ Gained, verified knowledge for opencode plugins. Format per the README:
   changes; renumbering is forbidden.
 - **Ref:** `repo_commands.md`; `handover_probe.mjs`.
 - **Keys:** node, probe, handover_probe.mjs, green gate, append-only.
+
+## Plugins can register tools; client-needing tools belong HERE
+- **Do:** a custom tool (`.opencode/tools/*.ts`) does NOT get `context.client`
+  (by design — see `knowledge_tools.md`). If a tool needs the SDK client /
+  RPC access (e.g. `session.compact`), register it FROM a plugin
+  (`.opencode/plugin/*.ts`): the plugin function receives `ctx` which
+  carries client/RPC access, and a plugin can register custom tools it
+  exposes to agents. The registered tool's `execute` still receives
+  sessionID / agent.
+- **Why (evidence):** maintainer Q&A (2026-09-12,
+  `proposals/maintainer/done/plugin_exposed_custom_tool.md`): the
+  custom-tool context is intentionally limited (no client); a custom tool
+  CANNOT "start"/obtain a plugin context, but a plugin CAN register tools —
+  "Do not use a separate `.opencode/tools/...` tool if it requires
+  `context.client`; register that tool from `.opencode/plugins/...`
+  instead." A spawned Node process is NOT a plugin context (would need its
+  own server connection) — avoid that workaround.
+- **Ref:** `proposals/maintainer/done/plugin_exposed_custom_tool.md`;
+  `get_context_keys` key dump (clientKeys empty); TODO #52.
+- **Keys:** plugin, register tool, context.client, RPC, SDK access,
+  .opencode/tools, .opencode/plugin, compact, ctx.
+
+## A plugin can REPLACE the compaction prompt (shape the resume context)
+- **Do:** to control what a compaction produces, use the
+  `experimental.session.compacting` hook and set `output.prompt` (replaces
+  the default compaction prompt ENTIRELY). This is a prompt-level lever —
+  it does NOT trigger compaction; the host does that. Useful to bias the
+  resume prompt toward durable project state (task status, files touched,
+  blockers, next steps) for the multi-agent swarm.
+- **Why (evidence):** the installed plugin types expose
+  `experimental.session.compacting` (dist L277-296) whose doc says
+  `prompt` "replaces the default compaction prompt entirely". A maintainer
+  WIP (`custom_compaction.ts`, 2026-09-12) uses it to inject a swarm-oriented
+  resume prompt.
+- **Ref:** `.opencode/node_modules/@opencode-ai/plugin/dist/index.d.ts`
+  (~L277-296); maintainer WIP `custom_compaction.ts` (uncommitted);
+  `proposals/maintainer/done/plugin_exposed_custom_tool.md`; TODO #52.
+- **Keys:** experimental.session.compacting, output.prompt, compaction,
+  resume prompt, swarm, durable state.

@@ -223,8 +223,23 @@ reenabled, that is the call.
   installed plugin package DOES expose the
   `experimental.session.compacting` hook (candidate alternative design:
   inject durable context AT compaction instead of triggering it).
-- **Status:** OPEN — maintainer call (which path this host build should
-  expose; hook-based alternative on the table).
+- **Solution paths (2026-09-12, maintainer Q&A + this session):**
+  (1) **Plugin-registered compact tool** — the clean architecture: the
+  custom-tool context is clientless BY DESIGN, so a client-needing tool
+  must be registered FROM a plugin (plugin `ctx` carries the SDK/RPC
+  access; plugins can register tools; the tool's execute still gets
+  sessionID/agent). I.e. move `compact_memory` to a plugin-registered
+  tool (registration = maintainer domain; the call shape must still match
+  the installed SDK `.d.ts` per the evidence above).
+  (2) **Compaction hook plugin** (prompt-level) — the maintainer's WIP
+  `inbox_planner/custom_compaction.ts` sets `output.prompt` in
+  `experimental.session.compacting` to a swarm-oriented resume prompt
+  (shape verified against installed plugin types 2026-09-12). Complements
+  (1): compaction stays host-triggered (maintainer compacts manually in a
+  direct session); the plugin shapes the resulting prompt.
+  (Source: `proposals/maintainer/done/plugin_exposed_custom_tool.md`.)
+- **Status:** OPEN — maintainer call; solution paths (1)+(2) are the table
+  (2026-09-12). Paths are complementary, not competing.
 
 ## Closed entries
 

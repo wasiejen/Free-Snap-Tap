@@ -34,21 +34,23 @@ instructions/protocol — facts that save lookups. Format per the README:
 - **Keys:** context, sessionID, messageID, agent, Tool.Context.
 
 ## `context.client` is ABSENT in this host build's tool context (CONFIRMED)
-- **Do:** do NOT rely on `context.client` (or `context.api`) for SDK calls in
-  this build — the client is not wired. Prefer direct context fields
-  (sessionID / messageID / agent); if a client is ever required, guard with a
-  clear error, not a silent fallback.
+- **Do:** do NOT rely on `context.client` (or `context.api`) for SDK calls
+  in a CUSTOM TOOL — the client is intentionally not injected into the tool
+  context (by design, not a bug). Prefer direct context fields (sessionID /
+  messageID / agent). **A tool that needs the client must be registered from
+  a PLUGIN** (see `knowledge_plugins.md`, "Plugins can register tools").
 - **Why (evidence):** the `get_context_keys` probe (definitive key dump,
  2026-09-12) returned `clientKeys: []` and `sessionKeys: []` — i.e.
   `context?.client` is undefined, so `client` is ABSENT (not "present but
   lacking .app"). The earlier `context.client.app` throw was `client` itself
-  being undefined. This is why compact_memory's client path fails here → it
-  fell to the HTTP fallback → no listener on 4096 → "Unable to connect"
-  (TODO #52).
+  being undefined. Maintainer Q&A (2026-09-12): the documented custom-tool
+  context is intentionally limited — the SDK client is not injected there.
+  This is why compact_memory's client path fails here → it fell to the HTTP
+  fallback → no listener on 4096 → "Unable to connect" (TODO #52).
 - **Ref:** `get_context_keys.ts` run in session ses_f6b7c5242ffeZpNl0Ar8mILWua;
-  TODO #52.
+  `proposals/maintainer/done/plugin_exposed_custom_tool.md`; TODO #52.
 - **Keys:** context.client, context.api, get_context_keys, contextKeys,
-  clientKeys, sessionKeys, absent, undefined, SDK client, guard.
+  clientKeys, sessionKeys, absent, intentionally, plugin registration, guard.
 
 ## Installed SDK method shape — grep the `.d.ts`, don't trust examples
 - **Do:** before writing any SDK/session call, grep the installed types:
