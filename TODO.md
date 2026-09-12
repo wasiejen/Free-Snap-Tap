@@ -17,9 +17,10 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
    most-recently-updated-session caveat stays acceptable for reminder text only); read
    mechanic (session id in the readout vs per-session readout) = build worker's call under
    that invariant → #33.
-4. **Deferred FST behavior batch** (post-plugin; present ≤3 per message): #1 vk-error
-   surfacing, #7 empty-macro comment vs behavior, #8 ap/ar semantics, #9 except-harden,
-   #4 + #6 dead-code deletion.
+4. ~~**Deferred FST behavior batch**~~ — RESOLVED 2026-09-12 (maintainer ruled in
+   `approved/2026-09-11_fst-behavior-batch-decisions.md`: all 5 Recs approved; #6 = KEEP
+   `fst_keyboard.py:302-303` until more testing; branch directive: new `fst_work` branch)
+   → builds in progress on branch `fst_work` (iter-7).
 5. Schedule (DECIDED — not open calls): #33 v2.5 build is NOT a maintainer call — APPROVED,
    next build; #30 de-peek APPROVED — ONE cycle (node:sqlite gauge landing + peek.py removal
    + doc purge + v1.3 log-profile re-baseline), scheduled AFTER #33.
@@ -63,8 +64,10 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   green.
 - **Scope (non-exhaustive):** `convert_to_vk_code` + all its call sites (`fst_manager.py`,
   `fst_keyboard.py`, …); `constraint_evaluation`'s unknown-key branch.
-- **Status:** OPEN — maintainer call (section above, item 4). Unknown constraint *names*
-  stay silent no-ops by design (`SPEC_FEATURES.md` §4 #2) — out of scope.
+- **Status:** RULING 2026-09-12 — Rec approved (build the P08-style user-visible error at
+   every vk-resolution site; the constraint path reuses it). IN PROGRESS on branch
+   `fst_work` (iter-7). Unknown constraint *names* stay silent no-ops by design
+   (`SPEC_FEATURES.md` §4 #2) — out of scope.
 
 ## 7. Empty macro: comment/behavior mismatch at `fst_keyboard.py` 707 (2026-09-08)
 
@@ -77,7 +80,8 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Acceptance:** the 707 comment matches the (possibly new) behavior; a test pins the
   chosen semantics; suite green.
 - **Scope:** `fst_keyboard.py` empty-macro check (≈697/707); the pinning test in `tests/`.
-- **Status:** OPEN — maintainer call (item 4 above).
+- **Status:** RULING 2026-09-12 — Rec approved (behavior wins: keep the suppression,
+  reword the comment, pin with a test). IN PROGRESS on branch `fst_work` (iter-7).
 
 ## 8. `ap`/`ar` "all keys (incl simulated)" is not a union — last-write-wins shared dict (2026-09-08)
 
@@ -95,7 +99,8 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   the confirmed semantics (the other side's `all` state preserved under a union); the
   guard symmetric if the union is confirmed; suite green.
 - **Scope:** `Input_State_Manager` state setters (≈1611–1632); `ap(...)` docs (253–256).
-- **Status:** OPEN — maintainer call (item 4 above).
+- **Status:** RULING 2026-09-12 — Rec approved (union semantics real OR simulated;
+  symmetric `vk_code > 0` guard; pinning test). IN PROGRESS on branch `fst_work` (iter-7).
 
 ## 9. Repeat-constraint excepts too narrow for malformed `repeat_thread_dict` entries (2026-09-08)
 
@@ -108,7 +113,8 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Acceptance:** decision recorded here; if harden: `ValueError` covered in the four
   methods + a test; suite green.
 - **Scope:** `fst_manager.py` ≈301–365 (`Input_State_Manager` repeat methods).
-- **Status:** OPEN — maintainer call (item 4 above).
+- **Status:** RULING 2026-09-12 — Rec approved (harden: add `ValueError` to the four
+  repeat methods + a test). IN PROGRESS on branch `fst_work` (iter-7).
 
 ## 4. Dead code: `fst_manager.py` 116–117 ("None result → pass") unreachable (2026-09-07/08)
 
@@ -122,7 +128,8 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Acceptance:** 116–117 removed (or the triage plan reclassified by the maintainer);
   suite green; coverage expectations updated.
 - **Scope:** `fst_manager.py` ≈107–125; the triage plan (maintainer-side only).
-- **Status:** OPEN — maintainer call (item 4 above, batched with #6).
+- **Status:** RULING 2026-09-12 — Rec approved (delete the dead branch). IN PROGRESS on
+  branch `fst_work` (iter-7).
 
 ## 6. Dead code: `fst_keyboard.py` 302–303 (mixed-Key rebind conversion) unreachable (2026-09-08)
 
@@ -139,7 +146,9 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   decision — the triage class correction rides with #4).
 - **Acceptance:** 302–303 removed; suite green; coverage expectations updated.
 - **Scope:** `fst_keyboard.py` ≈295–305.
-- **Status:** OPEN — maintainer call (item 4 above, batched with #4).
+- **Status:** RULING 2026-09-12 — KEEP 302-303 (maintainer: "keep this until I can test a
+  bit more") → CLOSED by ruling (no deletion; the triage class correction stays
+  maintainer-side per #4).
 
 ## 11. General contradiction prevention disabled (`XXX 241016-1101`, `fst_keyboard.py` 791) — HOLDING (2026-09-08)
 

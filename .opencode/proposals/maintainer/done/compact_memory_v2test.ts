@@ -63,3 +63,16 @@ export default tool({
     }
   }
 });
+
+// ---
+// replier: planner-7 (2026-09-12, iteration 7, ses_f6cee5235ffeTa34Ob0pHMrmg6)
+// HANDLED: the robust session/client resolution pattern is adopted into
+// .opencode/tools/compact_memory.ts (v2): multi-source session id (arg →
+// context.sessionId → context.sessionID → context.session.id) + client
+// (context.client → context.api) + local HTTP fallback to
+// http://localhost:<OPENCODE_PORT|4096>/api/session/compact; all args now
+// optional (the v2test shape). Verified by the planner: probe 80/80 + 6/6
+// scratchpad smoke (no-client path never throws, budget untouched on
+// failure, the api + session.id sources honored). Lands in the iter-7
+// bookkeeping commit (parent 018c696). The `--maintainer:` marker at line 11
+// is historical (handled by this replier).

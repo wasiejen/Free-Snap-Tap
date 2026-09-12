@@ -37,3 +37,7 @@ tool's constant)?
   `proposals/implemented/` with a one-line verdict.
 
 -keep
+
+- verdict (2026-09-12, planner iter-7): **KEEP** — maintainer ruling "-keep"
+  recorded above. No code change (the runtime string and probe check 78 stay
+  as-is); the file moves here per the acceptance clause.

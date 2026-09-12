@@ -8,6 +8,14 @@
 //   (2) the tool's own COMPACT line appended to .opencode/temp/ctx.log after each
 //       successful compaction (in-process file append; best-effort, never throws),
 //   (3) the refusal note (hand over and start fresh) when the budget is exhausted.
+// v2 (2026-09-12, maintainer test `compact_memory_v2test.ts` in
+//   proposals/maintainer/done/): the host does not always wire
+//   `context.client.session` — the session id AND the client are now resolved
+//   from MULTIPLE sources (arg → context.sessionId → context.sessionID →
+//   context.session.id; client → context.client → context.api), and when no
+//   client exposes `session.compact` the tool falls back to a local HTTP call
+//   to the opencode server. All args are optional (the fallbacks make them
+//   redundant in the host's own session).
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -153,13 +161,15 @@ function appendCompactLine(root: string, context: any, sessionID: string, tokens
  * 1. CUSTOM TOOL: Agent Self-Compaction Tool
  */
 // -- maintainer: adapted to the tool() function and is now visible to agents (tested) and live right now
-// but does not work: returns "undefined is not an object (evaluating 'context.client.session'""
+// v2 (2026-09-12): the former "does not work: context.client.session undefined" gap is
+// handled by the robust multi-source resolution + HTTP fallback below; live acceptance
+// stays the maintainer's host test.
 export default tool({
   description: "Triggers immediate session compaction to free context space.",
   args: {
-    keepTokens: tool.schema.number().describe("Number of recent tokens to retain (e.g. 10000 or 30000)"),
-    keepMessages: tool.schema.number().describe("Number of recent messages to retain (e.g. 6 or 12)"),
-    sessionID: tool.schema.string().describe("Number of recent messages to retain (e.g. 6 or 12)"),
+    keepTokens: tool.schema.number().optional().describe("Number of recent tokens to retain (e.g. 10000 or 30000)"),
+    keepMessages: tool.schema.number().optional().describe("Number of recent messages to retain (e.g. 6 or 12)"),
+    sessionID: tool.schema.string().optional().describe("Session ID to compact (defaults to the current session)"),
   },
 
   execute: async (args: any, context: any) => {
@@ -167,7 +177,9 @@ export default tool({
       // Extract with fallback defaults if the agent omits an argument
       const tokensToKeep = args?.keepTokens ?? 30000;
       const messagesToKeep = args?.keepMessages ?? 12;
-      const sessionID = args?.sessionID ?? context?.sessionId ?? context?.sessionID;
+      // v2: resolve the session id from multiple sources (the host wires it
+      // differently across builds).
+      const sessionID = args?.sessionID ?? context?.sessionId ?? context?.sessionID ?? context?.session?.id;
 
       if (typeof sessionID !== "string" || sessionID === "") {
         return "Compaction request failed: no session id available (pass the sessionID argument or a context session id).";
@@ -180,15 +192,35 @@ export default tool({
         return `Compaction refused: the session compaction budget (${COMPACT_BUDGET_PER_SESSION} per session, self + emergency combined) is exhausted for ${sessionID}. Hand over and start fresh — write the handover summary and let the loop restart with a fresh session.`;
       }
 
-      await context.client.session.compact({
-        path: { id: sessionID },
-        body: {
-          keep: {
-            tokens: tokensToKeep,
-            messages: messagesToKeep
+      // v2: resolve the session client from multiple sources (context.client in
+      // one host build, context.api in another); if neither exposes
+      // session.compact, fall back to a local HTTP call to the opencode server
+      // (endpoint shape per the maintainer's v2test — verified in his host env).
+      const client = context?.client || context?.api;
+      if (client?.session?.compact) {
+        await client.session.compact({
+          path: { id: sessionID },
+          body: {
+            keep: {
+              tokens: tokensToKeep,
+              messages: messagesToKeep
+            }
           }
+        });
+      } else {
+        const port = process.env.OPENCODE_PORT || "4096";
+        const response = await fetch(`http://localhost:${port}/api/session/compact`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            sessionId: sessionID,
+            keep: { tokens: tokensToKeep, messages: messagesToKeep }
+          })
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${await response.text()}`);
         }
-      });
+      }
 
       // Success only: persist the budget increment + write the COMPACT line
       // (both best-effort — the compaction itself already happened).
