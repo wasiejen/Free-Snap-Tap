@@ -39,6 +39,11 @@ not here.
   created on first write. (Distinct from the looprunner's own
   `.opencode/loop_log.md`, §Looprunner's own file.) Logged: loopruns and
   direct planner runs; plain interactive chat has no log.
+- Tool: when the `loop_log` tool is in your toolset, WRITE your lines via it —
+  it resolves the current looprun folder (creating the dated one when absent),
+  machine-stamps, and appends exactly one line, returning what it wrote. The
+  line-format description below stays the FALLBACK for when the tool is not
+  registered (hand-append in that case, in the exact form below).
 - One line per event:
   `date_time <STATUS> <role>[-<iteration>] <session_id> <agent_model> <content>`
   - `<STATUS>` is exactly one of these 8-char tokens: `-->START`, `DONE<---`,

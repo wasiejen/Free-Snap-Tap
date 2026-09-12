@@ -11,7 +11,10 @@
 // type-stripped, the same way the plugin loads) + EXTENDED 2026-09-11
 // (T5 L4+L5: the emergency recovery plugin — the new S11 section, checks
 // 76-81; the plugin file is imported DIRECT, type-stripped, the same way
-// the probe loads the tool): the pre-rebuild probe
+// the probe loads the tool) + EXTENDED 2026-09-12 (T2 loop-tool-batch part
+// 2: the ctx_gauge custom tool — the new S12 section, checks 82-85; the
+// tool file is imported DIRECT, type-stripped, the same way the probe
+// loads the tool): the pre-rebuild probe
 // (v2.2.1 era) targeted the DELETED handover.ts, the retired
 // experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
 // all void with the shell gauge. PERMANENT repo tooling: RE-RUN, never rebuild
@@ -230,7 +233,30 @@
   //      (81) the COMPACT line is in the sandbox ctx.log after the
   //          success (`<dt> COMPACT ses_rc_ok tokens=30_000 messages=12`)
   //          and ABSENT after the refusal (ses_rc_exh)
-  //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
+//   S12 ctx_gauge tool (4) — the loop-tool-batch part 2 approved design
+//      (the peek readout as a directly-fired tool): the tool file
+//      .opencode/tools/ctx_gauge.ts is imported DIRECT from the repo path
+//      (type-stripped, the same way the probe loads compact_memory.ts — the
+//      tool file MUST load that way); the tool wraps the SAME gauge-core
+//      module instance (its relative import resolves to the same file), so
+//      the setDbPath steering below reaches its reads; the tool is READ-ONLY
+//      (no fs writes, no plugin hooks — the S5 tallies are unaffected):
+//      (82) the tool file imports and exposes the tool() default export
+//          (description string + the optional sessionID arg as a zod schema
+//          — undefined parses, a non-string rejects + async execute, NO
+//          name field — the host names the tool by filename)
+//      (83) execute on the FX_OK fixture (steered via setDbPath): the
+//          default newest-session read is BYTE-EXACT (the S4/S7 readout
+//          form) and the sessionID arg is passed through (the per-session
+//          read of the older fixture session)
+//      (84) db-error (the never-created MISSING_DB): no throw, the line is
+//          NEVER replaced — `SESSION=unknown CTX=notAvailable` + the
+//          APPENDED ` — <error>` note (the in-band mirror of peek.mjs's
+//          stderr addition)
+//      (85) hook restore (cf. check 39): the global db path is back where
+//          S12 found it; a global read and an explicit-path read of the
+//          restored path agree byte-exact (no drift left by S12)
+//   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
 //      nudge==14); the
@@ -242,7 +268,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S5=6  →  "PROBE handover: 80/80 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S5=6  →  "PROBE handover: 84/84 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -1758,6 +1784,101 @@ const rcFire = (error, sessionId) =>
     "COMPACT line in the sandbox ctx.log after the success (`<dt> COMPACT ses_rc_ok tokens=30_000 messages=12`), ABSENT after the refusal (ses_rc_exh)",
     okLine && !exhLine,
     JSON.stringify(lines.filter((l) => l.includes("ses_rc"))),
+  );
+}
+
+// ------------------------------------------------------------------ S12 ctx_gauge tool (4) — the loop-tool-batch part 2 (the approved design)
+//
+// The custom tool at .opencode/tools/ctx_gauge.ts (T2, the loop-tool-batch
+// proposal part 2): the peek readout as a directly-fired tool. Imported
+// DIRECT from the repo path (type-stripped, the same way the probe loads
+// compact_memory.ts — the tool file MUST load that way). The tool wraps the
+// ONE shared gauge core — the SAME module instance this probe imported at
+// the top (the tool's relative import resolves to the same file), so the
+// setDbPath steering below reaches the tool's reads. The tool is READ-ONLY:
+// no fs writes, no plugin hooks, no sandbox log lines — the S5 tallies are
+// unaffected.
+const CG_TOOL_TS = path.join(REPO_ROOT, ".opencode", "tools", "ctx_gauge.ts");
+let cgTool;
+const dbPathBeforeS12 = getDbPath(); // the hook-restore capture (cf. check 39)
+
+// 82 — the tool file imports (type-stripped, direct) and exposes the tool()
+//      default export: description (non-empty string) + args carrying the
+//      OPTIONAL sessionID (a zod schema: undefined parses, a non-string
+//      rejects) + execute (async) + NO `name` field (the host names the
+//      tool by FILENAME)
+{
+  const toolMod = await import(pathToFileURL(CG_TOOL_TS).href);
+  cgTool = toolMod.default;
+  const sch = cgTool?.args?.sessionID;
+  check(
+    "82",
+    "S12",
+    "tool file imports (type-stripped, direct) and exposes the tool() default export (description + optional sessionID arg + async execute, NO name field)",
+    cgTool != null && typeof cgTool.description === "string" && cgTool.description.length > 0 &&
+      JSON.stringify(Object.keys(cgTool.args ?? {})) === JSON.stringify(["sessionID"]) &&
+      sch != null && typeof sch.safeParse === "function" && sch.safeParse(undefined).success === true && sch.safeParse(42).success === false &&
+      typeof cgTool.execute === "function" && cgTool.execute.constructor.name === "AsyncFunction" &&
+      !("name" in cgTool),
+    JSON.stringify({ keys: Object.keys(cgTool ?? {}), desc: typeof cgTool?.description, schOk: sch?.safeParse?.(undefined)?.success, async: cgTool?.execute?.constructor?.name }),
+  );
+}
+
+// 83 — execute against the FX_OK fixture (steered via setDbPath): the
+//      NEWEST-SESSION default read is BYTE-EXACT (the same readout form the
+//      S4/S7 sections pin on the core — the tool must not drift) AND the
+//      sessionID arg is PASSED THROUGH (the per-session read of the older
+//      fixture session ses_fx_old, window 120K)
+{
+  setDbPath(FX_OK);
+  const def = await cgTool.execute({}, {});
+  const per = await cgTool.execute({ sessionID: "ses_fx_old" }, {});
+  check(
+    "83",
+    "S12",
+    "execute on the fixture (setDbPath): default newest-session read BYTE-EXACT `SESSION=ses_fx_ok CTX=10000 (3%) REM=246000`; sessionID arg passed through (ses_fx_old → `SESSION=ses_fx_old CTX=10000 (8%) REM=110000`)",
+    def === "SESSION=ses_fx_ok CTX=10000 (3%) REM=246000" && per === "SESSION=ses_fx_old CTX=10000 (8%) REM=110000",
+    JSON.stringify({ def, per }),
+  );
+}
+
+// 84 — the db-error path (setDbPath to the never-created MISSING_DB): NO
+//      throw, the line is NEVER replaced — `SESSION=unknown CTX=notAvailable`
+//      + the APPENDED ` — <error>` note (the in-band mirror of peek.mjs's
+//      stderr addition; the core's own capped error text)
+{
+  setDbPath(MISSING_DB);
+  let threw = false;
+  let res = "";
+  try {
+    res = await cgTool.execute({}, {});
+  } catch (e) {
+    threw = true;
+    res = String(e?.message ?? e);
+  }
+  check(
+    "84",
+    "S12",
+    "db-error (missing db): no throw; the line is NOT replaced — `SESSION=unknown CTX=notAvailable` + the appended ` — <error>` note (in-band mirror of peek.mjs's stderr)",
+    !threw && res.startsWith("SESSION=unknown CTX=notAvailable — ") && res.length > "SESSION=unknown CTX=notAvailable — ".length,
+    JSON.stringify({ threw, res }),
+  );
+}
+
+// 85 — hook restore (cf. check 39): the global db path is back where S12
+//      found it (the plumbing intact) and a global read and an explicit-path
+//      read of the SAME restored path agree byte-exact (S12 left no drift in
+//      the core)
+{
+  setDbPath(dbPathBeforeS12);
+  const g = await readGauge();
+  const e = await readGauge(dbPathBeforeS12);
+  check(
+    "85",
+    "S12",
+    "hook restore: the global db path is back where S12 found it; global read == explicit-path read of the restored path (byte-exact, no drift)",
+    getDbPath() === dbPathBeforeS12 && g.kind === e.kind && g.sid === e.sid && formatGauge(g) === formatGauge(e),
+    JSON.stringify({ getDbPath: getDbPath(), before: dbPathBeforeS12, g: formatGauge(g), e: formatGauge(e) }),
   );
 }
 

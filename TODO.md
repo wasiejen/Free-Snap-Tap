@@ -11,7 +11,7 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
    one-shot read in `approved/2026-09-11_log-profile-rebaseline.md`; executed + recorded
    in the NAP) → #17 CLOSED.
 2. **#11 contradiction prevention** — held on the maintainer's LIVE test: the `XXX 241016-1101`
-   pin at `fst_keyboard.py` ≈791 is his find-marker — do not touch → #11.
+   pin at `fst_keyboard.py` ≈821 is his find-marker — do not touch → #11.
 3. **v2.5 nudge target scope — RESOLVED 2026-09-10 (maintainer ruling):** the readout must
    reach EVERY acting session — blind spots unacceptable for an action (the #18
    most-recently-updated-session caveat stays acceptable for reminder text only); read
@@ -20,10 +20,11 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 4. ~~**Deferred FST behavior batch**~~ — RESOLVED 2026-09-12 (maintainer ruled in
    `approved/2026-09-11_fst-behavior-batch-decisions.md`: all 5 Recs approved; #6 = KEEP
    `fst_keyboard.py:302-303` until more testing; branch directive: new `fst_work` branch)
-   → builds in progress on branch `fst_work` (iter-7).
-5. Schedule (DECIDED — not open calls): #33 v2.5 build is NOT a maintainer call — APPROVED,
-   next build; #30 de-peek APPROVED — ONE cycle (node:sqlite gauge landing + peek.py removal
-   + doc purge + v1.3 log-profile re-baseline), scheduled AFTER #33.
+   → ALL LANDED on branch `fst_work` (iter-9: unit A `4b93d37` + unit B `2891dab`); the proposal moved to `implemented/` with the verdict.
+5. ~~Schedule~~ — RESOLVED 2026-09-12 (iter-14 curation): the #30 de-peek + #33 v2.5 schedule
+   is fully landed — #30 CLOSED + #33 LANDED (see their entries); the v1.3 log-profile
+   re-baseline tail resolved 2026-09-10 (one-shot read, approved/2026-09-11_log-profile-rebaseline.md).
+   No further build scheduled.
 6. ~~`handover_task.md` worktree/HEAD conflict~~ — RESOLVED 2026-09-11: maintainer fixed
    the git mess directly (`b6dc3e7` — restored lost updates; the HEAD split-build spec is
    canonical, tree clean) → #49 CLOSED; the split build is the iteration-2 launch.
@@ -32,127 +33,24 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 
 ## FST behavior decisions (open — maintainer calls unless noted)
 
-## 1. General vk resolution: unknown keys must surface to the user (tabled 2026-09-06)
+## 1. (closed 2026-09-12, iter-9 unit A `4b93d37` on `fst_work`, full text in todo_records.md) — General vk resolution: unknown keys surface as ONE user-visible error at every vk-resolution site (P08 error toast / headless print) via the shared `FST_Keyboard.surface_config_error` helper; both constraint fail-closed guards + `check_for_combination` (+ hot-path resume catch) route through it, dedup + fail-closed preserved; unknown constraint *names* stay silent no-ops by design.
+## 7. (closed 2026-09-12, iter-9 unit B `2891dab` on `fst_work`, full text in todo_records.md) — Empty macro: BEHAVIOR WINS — the trigger key IS suppressed for an empty key group (kept); the stale comment reworded to match ("supress" fixed); pinned by the pre-existing `test_empty_macro_sequence_no_playback` (no-playback AND suppression).
 
-- **Problem / evidence:** wherever a key string resolves to a vk_code (`convert_to_vk_code`
-  + all its call sites) it should raise AND be communicated to the user — important
-  feedback; today many paths fail silently or only print to console. State-shorthand
-   constraints now fail-closed on unknown keys (2026-09-06, `fst_manager.py`
-   `constraint_evaluation`) but still only print — fold into the general solution.
-   Verified crash path (2026-09-10, session-3 probe): `convert_to_vk_code('300')` /
-   `('256')` return an implicit `None` (the numeric branch swallows the KeyError when
-   `key_int` is out of range — `fst_keyboard.py:146-150`), and the following
-   `if vk_code <= 0:` in `extract_data_from_key` (`fst_keyboard.py:224`) then raises
-   `TypeError: '<=' not supported between instances of 'NoneType' and 'int'` — an
-   out-of-range numeric key string in the config crashes group init with an
-   unhelpful TypeError instead of a surfaced error. `test_extraction_filter_edges.py`
-   ≈61-64 pins the implicit-None behavior (archived triage "suspected bug #2").
-    **Audit 3b addition (2026-09-10):** `check_for_combination` (`fst_keyboard.py:906-912`,
-    called from the hot path at `:627` via `check_control_actions`) converts its string
-    combo entries with `convert_to_vk_code` (`:910`); a non-resolving string returns
-    implicit None and then SILENTLY poisons state instead of erroring —
-    `get_real_key_press_state(None)` catches its own KeyError
-    (`fst_manager.py:1604-1609`) and INSERTS a `None` key into BOTH
-    `_real_key_press_states_dict` AND `_all_key_press_states_dict`
-    (via `set_real_key_press_state`, 1612-1613 — this setter writes `_all` unguarded).
-    The combos resolve today (alt/end/delete/page_down all in `vk_codes_dict`,
-    verified 2026-09-10) — the defect is latent for any custom/unresolvable combo string.
- - **Outcome (goal):** ONE general solution covering every vk-resolution site (not
-  per-call-site fixes) with the user-visible error; the constraint path reuses it.
-- **Acceptance:** unknown key ⇒ user-visible error at every resolution site (never
-  console-only); the constraint fail-closed path emits the same user-visible error; suite
-  green.
-- **Scope (non-exhaustive):** `convert_to_vk_code` + all its call sites (`fst_manager.py`,
-  `fst_keyboard.py`, …); `constraint_evaluation`'s unknown-key branch.
-- **Status:** RULING 2026-09-12 — Rec approved (build the P08-style user-visible error at
-   every vk-resolution site; the constraint path reuses it). IN PROGRESS on branch
-   `fst_work` (iter-7). Unknown constraint *names* stay silent no-ops by design
-   (`SPEC_FEATURES.md` §4 #2) — out of scope.
+## 8. (closed 2026-09-12, iter-9 unit B `2891dab` on `fst_work`, full text in todo_records.md) — `ap`/`ar` "all keys (incl simulated)" = UNION (real OR simulated): both setters write the `all` dict as `is_press or <other side's state>` + the symmetric `vk_code > 0` guard on the real setter; doc comments state the union; 3 new pinning tests (crossing release both directions + vk guard).
 
-## 7. Empty macro: comment/behavior mismatch at `fst_keyboard.py` 707 (2026-09-08)
 
-- **Problem / evidence:** the comment says an empty key group does "not supress the
-  triggerkey", but `alias_fired = True` (line 697) is set BEFORE the empty check — so the
-  trigger IS suppressed (`_listener.suppress_event`, verified by
-  `test_empty_macro_sequence_no_playback`). Comment and behavior cannot both be right.
-- **Outcome (goal):** comment and behavior agree — decide which is right, reword or fix
-  accordingly.
-- **Acceptance:** the 707 comment matches the (possibly new) behavior; a test pins the
-  chosen semantics; suite green.
-- **Scope:** `fst_keyboard.py` empty-macro check (≈697/707); the pinning test in `tests/`.
-- **Status:** RULING 2026-09-12 — Rec approved (behavior wins: keep the suppression,
-  reword the comment, pin with a test). IN PROGRESS on branch `fst_work` (iter-7).
+## 9. (closed 2026-09-12, iter-9 unit B `2891dab` on `fst_work`, full text in todo_records.md) — Repeat-constraint excepts hardened: `ValueError` added to `toggle_repeat`/`is_repeat_active`/`reset_repeat`/`stop_all_repeat` (+ `stop_repeat` as the fifth consistency site); one pinning test covers all five methods with malformed (1-/3-element) entries.
 
-## 8. `ap`/`ar` "all keys (incl simulated)" is not a union — last-write-wins shared dict (2026-09-08)
 
-- **Problem / evidence:** `ap(...)` documents "press of all keys (incl simulated)"
-  (`fst_manager.py` 253–256), but `set_real_key_press_state` (1611–1614) and
-  `set_simulated_key_press_state` (1622–1625) both write the shared
-  `_all_key_press_states_dict` last-write-wins — a release from either side clears `all`
-  even while the other press is still active, so `ap` may not behave as "real OR
-  simulated". Asymmetric: the real-setter lacks the `vk_code > 0` guard the other two
-  setters have. Found in the interrupted Phase-5 run (it explains the 1630–1632 KeyError
-  coverage gap).
-- **Outcome (goal):** confirm the intended `ap`/`ar` semantics (or fix the dict handling +
-  the missing guard) and pin the chosen behavior with a test.
-- **Acceptance:** documented semantics; crossing press/release on either side behaves per
-  the confirmed semantics (the other side's `all` state preserved under a union); the
-  guard symmetric if the union is confirmed; suite green.
-- **Scope:** `Input_State_Manager` state setters (≈1611–1632); `ap(...)` docs (253–256).
-- **Status:** RULING 2026-09-12 — Rec approved (union semantics real OR simulated;
-  symmetric `vk_code > 0` guard; pinning test). IN PROGRESS on branch `fst_work` (iter-7).
+## 4. (closed 2026-09-12, iter-9 unit B `2891dab` on `fst_work`, full text in todo_records.md) — Dead `elif result is None: pass` branch deleted from `check_constraint_fulfillment` (unreachable — `constraint_evaluation` normalizes None→True); the A→C triage reclassification stays maintainer-side (`COVERAGE_TRIAGE.md` is agent-read-only).
 
-## 9. Repeat-constraint excepts too narrow for malformed `repeat_thread_dict` entries (2026-09-08)
 
-- **Problem / evidence:** `toggle_repeat` (327), `is_repeat_active` (340), `reset_repeat`
-  (350) catch `(KeyError, AttributeError)`; `stop_all_repeat` (365) only `AttributeError` —
-  but unpacking an entry that is not a 2-tuple raises `ValueError`, uncaught, propagating
-  out of `constraint_evaluation`. Low severity: entries are only written as 2-tuples
-  `[task, handle]` by `start_repeat` (301).
-- **Outcome (goal):** decide harden the excepts or leave as-is — record the decision.
-- **Acceptance:** decision recorded here; if harden: `ValueError` covered in the four
-  methods + a test; suite green.
-- **Scope:** `fst_manager.py` ≈301–365 (`Input_State_Manager` repeat methods).
-- **Status:** RULING 2026-09-12 — Rec approved (harden: add `ValueError` to the four
-  repeat methods + a test). IN PROGRESS on branch `fst_work` (iter-7).
+## 6. (closed 2026-09-12 by maintainer ruling — KEEP, full text in todo_records.md) — `fst_keyboard.py` 302-303 (mixed-Key rebind conversion) RULING-KEEP ("keep this until I can test a bit more"): the `###XXX 241022-1341` block stays and is DO-NOT-TOUCH; the triage class correction stays maintainer-side per #4.
 
-## 4. Dead code: `fst_manager.py` 116–117 ("None result → pass") unreachable (2026-09-07/08)
 
-- **Problem / evidence:** `check_constraint_fulfillment`'s "None → pass" branch (line 117)
-  can never run — `constraint_evaluation` normalizes `None` → `True` (≈691) before
-  returning, and no other branch returns `None`; line 117 stays uncovered in every run and
-  the triage's 2098/2217 (94.6 %) ceiling is really 2097/2217 (same rounded number).
-  Recorded at discovery (`2007698` commit msg). Absorbs the 260908-0951 dedup-block item 1.
-- **Outcome (goal):** the dead branch is deleted — the A→C triage reclassification is the
-  maintainer's call (`COVERAGE_TRIAGE.md` is agent-read-only).
-- **Acceptance:** 116–117 removed (or the triage plan reclassified by the maintainer);
-  suite green; coverage expectations updated.
-- **Scope:** `fst_manager.py` ≈107–125; the triage plan (maintainer-side only).
-- **Status:** RULING 2026-09-12 — Rec approved (delete the dead branch). IN PROGRESS on
-  branch `fst_work` (iter-7).
+## 11. General contradiction prevention disabled (`XXX 241016-1101`, `fst_keyboard.py` ≈821) — HOLDING (2026-09-08)
 
-## 6. Dead code: `fst_keyboard.py` 302–303 (mixed-Key rebind conversion) unreachable (2026-09-08)
-
-- **Problem / evidence:** in `initialize_groups_from_presorted_lines`, `convert_key_string_group`
-  only ever appends `Key_Event`s (bare keys expand to press/release events), so
-  `new_trigger_group[0]` is never a `Key`; the 295-block is entered only via a `Key`
-  replacement — which makes line 301 `False`, so 302–303 (`replacement_key = Key(...)`)
-  can never execute. Proven at `fffea8b` (rebinds `w : e` and `w : +e` both leave 302–303
-  uncovered). Triage classed them A — same misclassification as #4. Also: the triage's
-  numeric example `"8" → 8` is wrong — `"8"` resolves via the dict to 56; the numeric
-  branch needs a string absent from `vk_codes_dict` (e.g. `"255"`). Absorbs the 260908-0951
-  dedup-block item 4 (first half).
-- **Outcome (goal):** the dead block is deleted (or kept on an explicit maintainer
-  decision — the triage class correction rides with #4).
-- **Acceptance:** 302–303 removed; suite green; coverage expectations updated.
-- **Scope:** `fst_keyboard.py` ≈295–305.
-- **Status:** RULING 2026-09-12 — KEEP 302-303 (maintainer: "keep this until I can test a
-  bit more") → CLOSED by ruling (no deletion; the triage class correction stays
-  maintainer-side per #4).
-
-## 11. General contradiction prevention disabled (`XXX 241016-1101`, `fst_keyboard.py` 791) — HOLDING (2026-09-08)
-
-`###XXX 241016-1101 general contradiction prevention disabled to test` — the 793–803
+`###XXX 241016-1101 general contradiction prevention disabled to test` — the ≈821-840
 contradiction block of `_win32_event_filter` no longer suppresses (`to_be_suppressed` is
 not set), and the Phase-5 tests (`tests/test_filter_simulated.py`) now pin that
 non-suppression. Clarify + document as final decision: if it stays off, reword the
@@ -160,7 +58,7 @@ XXX/"to test" comment so it reads as an intentional decision; if it was meant to
 reenabled, that is the call.
 
 - **Status:** HOLDING — the maintainer's LIVE test decides (DECISION); the
-  `XXX 241016-1101` pin at ≈791 is HIS find-marker — do not remove or reword it on his
+  `XXX 241016-1101` pin at ≈821 is HIS find-marker — do not remove or reword it on his
   behalf. Content verbatim from the 2026-09-08 record.
 
 ## 48. (closed 2026-09-11, first commit after `00bc24f`, see todo_records.md) — Packed-word equality checks in the mouse filter: X-button mouseData + LLKHF flags (2026-09-10, #42 report-back)
@@ -267,6 +165,88 @@ reenabled, that is the call.
 - **Acceptance:** header and package.json agree; probe green.
 - **Scope:** the probe header (comment), `.opencode/package.json`.
 - **Status:** OPEN — maintainer call.
+
+## 52. `compact_memory` fails in the current host build — connection error on both paths (2026-09-12, planner ses_f6b7c5242ffeZpNl0Ar8mILWua)
+
+- **Problem / evidence:** firing the `compact_memory` tool returns
+  "Compaction request failed: Unable to connect. Is the computer able to
+  access the url?" in the current host build (verified live 2026-09-12).
+  Diagnosis (same session, measured): the only opencode process
+  (`opencode.exe`) listens on NO TCP port at all; `OPENCODE_PORT` is empty
+  → the HTTP fallback targets `localhost:4096`, where nothing listens.
+  Definitive key dump (maintainer's `get_context_keys` probe, 2026-09-12):
+  contextKeys = sessionID, abort, messageID, callID, extra, agent, messages,
+  metadata, ask, directory, worktree — **NO `client` key** (clientKeys /
+  sessionKeys empty). So `context.client` IS absent from the tool context in
+  this build (the earlier throw was `client` itself being undefined, not a
+  missing `.app`). The failure came from the HTTP fallback (no usable client
+  + no listener on 4096). The failure did NOT consume the
+  per-session compaction budget (no `.opencode/temp/compact_budget.json`
+  — increment-on-success holds).
+  Installed-SDK evidence (2026-09-12, grepped from
+  `.opencode/node_modules/@opencode-ai/sdk/dist/`): **v1** generated types
+  expose only `session.summarize` (url `/session/{id}/summarize`) — NO
+  `compact` method; **v2** exposes both `summarize` and `compact`
+  (`compact` url `/api/session/{sessionID}/compact`, FLAT `parameters`
+  shape). Consequences: (a) the tool's current call
+  `client.session.compact({path:{id}, body:{keep}})` mixes generations —
+  v1 has no `compact`, v2's `compact` takes flat parameters, so even WITH a
+  wired client the call shape is suspect; (b) the HTTP fallback hits
+  `/api/session/compact` with the sessionId IN THE BODY — matches NEITHER
+  typed endpoint (both are session-ID-in-path); (c) the `context.api`
+  fallback is dubious per the maintainer's knowledge doc (not necessarily
+  SDK-client-interchangeable).
+- **Outcome (goal):** `compact_memory` compacts a live session in the
+  current host build via the path this build actually exposes (client
+  wiring decision = maintainer domain); if no path exists in this build,
+  the tool reports WHICH path was attempted and why it failed (client
+  absent / HTTP no-listener / endpoint mismatch) instead of the generic
+  "Unable to connect".
+- **Acceptance:** a live fire in a session → success (COMPACT line in
+  `.opencode/temp/ctx.log` + budget increment), or a maintainer decision
+  on the supported host configuration. The chosen call shape must match
+  the installed SDK `.d.ts` (grep-verified against
+  `sdk/dist/{gen,v2/gen}`); if the HTTP fallback stays, its endpoint is
+  `/api/session/{sessionID}/compact` and it only applies when a server is
+  actually listening.
+- **Scope:** `.opencode/tools/compact_memory.ts` (resolution chain:
+  `context.sessionID` first per the knowledge doc; `context.client` only —
+  drop the silent `context.api` equivalence; error reporting),
+  `.opencode/node_modules/@opencode-ai/sdk/dist/{gen,v2/gen}/*.d.ts`
+  (installed types — the authority for the call shape), the host-side
+  client/URL wiring (maintainer domain), the v2 test notes
+  (`proposals/maintainer/done/compact_memory_v2test.ts` +
+  `compaction_warning.md`), the knowledge doc
+  (`proposals/maintainer/done/knowledge_opencode_tools_plugins.md`).
+  Related: the loop_log-v2 proposal's Part A context probe (which context
+  fields the host wires — `sessionID`/`agent` confirmed, model open); the
+  installed plugin package DOES expose the
+  `experimental.session.compacting` hook (candidate alternative design:
+  inject durable context AT compaction instead of triggering it).
+- **Solution paths (2026-09-12, maintainer Q&A + this session):**
+  (1) **Plugin-registered compact tool** — the clean architecture: the
+  custom-tool context is clientless BY DESIGN, so a client-needing tool
+  must be registered FROM a plugin (plugin `ctx` carries the SDK/RPC
+  access; plugins can register tools; the tool's execute still gets
+  sessionID/agent). I.e. move `compact_memory` to a plugin-registered
+  tool (registration = maintainer domain; the call shape must still match
+  the installed SDK `.d.ts` per the evidence above).
+  (2) **Compaction hook plugin** (prompt-level) — the maintainer's WIP
+  `inbox_planner/custom_compaction.ts` sets `output.prompt` in
+  `experimental.session.compacting` to a swarm-oriented resume prompt
+  (shape verified against installed plugin types 2026-09-12). Complements
+  (1): compaction stays host-triggered (maintainer compacts manually in a
+  direct session); the plugin shapes the resulting prompt.
+  (Source: `proposals/maintainer/done/plugin_exposed_custom_tool.md`.)
+- **Status:** OPEN — design agreed with the maintainer (2026-09-12):
+  plugin-registered `compact_memory` tool (client via captured plugin ctx;
+  v1 `summarize` path ACTIVE on this build + v2 `compact` hedge; keep args
+  optional in the body with a 400-retry; cross-session via `sessionID` arg;
+  HTTP fallback + compaction hook retired). Proposal:
+  `proposals/2026-09-12_compact_memory_plugin.md` (AWAITING APPROVAL).
+  Probe evidence: `.opencode/plugin/dev_probe_ctx.ts` (client present in
+  plugin ctx; summarize=function, compact=undefined; session methods on
+  the prototype → detect with typeof; registration via the `plugins` array).
 
 ## Closed entries
 

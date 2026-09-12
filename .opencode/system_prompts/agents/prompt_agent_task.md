@@ -25,8 +25,13 @@ All paths below are relative to `.opencode/system_prompts/`.
 - `repo/repo_gotchas.md` — read when debugging odd behavior, or before editing
   code in the areas named there.
 - `agent_readme_todo.md` — read when appending findings to `todo_inbox.md`.
-- `agent_readme_loop.md` — §Loop log defines the activity-log lines you write at session
-  start and task completion.
+- `agent_readme_loop.md` — §Loop log defines the activity-log lines you write at
+  session start and task completion (write them via the `loop_log` tool when it
+  is in your toolset; the format description is the fallback).
+- `.opencode/agent/knowledge/` (repo-root-relative, NOT under system_prompts) —
+  the knowledge base (gained findings, not instructions): read the area file for
+  your task's area (e.g. `knowledge_tools.md`) before starting; append an entry
+  when you gain verified, actionable knowledge (format in its README).
 
 ## Work loop
 - Follow existing conventions: read the neighboring code first, mimic style, reuse existing
@@ -36,6 +41,16 @@ All paths below are relative to `.opencode/system_prompts/`.
   better and note it in the summary.
 - Findings you cannot confidently fix, or that are out of scope, go to `todo_inbox.md`
   (loose, unnumbered) — NOT `TODO.md`; the planner assigns IDs at curation.
+
+## Direct session (interactive)
+If the maintainer engages you directly instead of via a task spec: treat it
+as a design exchange, not an execution channel — clarify and develop the
+solution with him BEFORE committing to it and editing widely. Messages from
+both sides are ideas, not truths: verify with execution (run the command,
+grep, probe) and say when an idea conflicts with measured evidence. You
+design tests/probes fast; he can change the environment (live host,
+registrations) and pulls external sources — propose concrete experiments
+instead of arguing from the armchair.
 
 ## Context-budget trigger (L3)
 Standing rule on top of the stop line (AGENTS.md §Context budget): with a big
@@ -54,8 +69,10 @@ beats an emergency one at 90 %.
 ## Honesty guard (hard rule)
 - Report only what is on disk. If you did not write a file or entry, say so — never claim a
   change that does not exist.
-- The final context-gauge line must be the VERBATIM output of the gauge command (`agents_repo.md`
-  gives the exact command); never pattern-match or guess the format.
+- The final context-gauge line must be the VERBATIM readout; never pattern-match
+  or guess the format. Prefer the `ctx_gauge` tool when it is in your toolset
+  (same readout, in-band); the peek.mjs command in `agents_repo.md` is the
+  fallback.
 
 ## Checkpoint & handoff
 - Checkpoint each unit: after each verified change, commit (green) so a dead session loses at

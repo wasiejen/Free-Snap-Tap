@@ -143,6 +143,18 @@ class TestCheckForCombinationConfigError:
         kb.check_for_combination([VK_MENU, 'zz'])
         assert capsys.readouterr().out == ''
 
+    def test_unresolvable_string_gui_toasts_and_dedups(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        kb.toast_callback = MagicMock()
+        kb.state_manager.set_real_key_press_state(VK_MENU, True)
+        assert kb.check_for_combination([VK_MENU, 'zz']) is False
+        kb.toast_callback.assert_called_once()
+        assert 'FST config error' in kb.toast_callback.call_args.args[0]
+        assert 'zz' in kb.toast_callback.call_args.args[0]
+        # second occurrence surfaces nothing (dedup held with the helper)
+        kb.check_for_combination([VK_MENU, 'zz'])
+        assert kb.toast_callback.call_count == 1
+
     def test_resolvable_combination_still_evaluates(self, kb_env_ns):
         kb = kb_env_ns.kb
         kb.state_manager.set_real_key_press_state(VK_MENU, True)
@@ -153,8 +165,37 @@ class TestCheckForCombinationConfigError:
 
 
 class TestConstraintEvalConfigError:
-    def test_constraint_function_unknown_key_fails_closed(self, fake_fst, capsys):
-        om = Output_Manager(fake_fst)
-        result = om.constraint_evaluation('p("zz")', Key_Event(VK_A, True))
-        assert result is False
+    def _om(self, fake_fst):
+        return Output_Manager(fake_fst)
+
+    # headless (toast_callback is None) -> the console-print fallback fires
+
+    def test_eval_branch_unknown_key_fails_closed_and_prints_headless(self, fake_fst, capsys):
+        fake_fst.toast_callback = None
+        om = self._om(fake_fst)
+        assert om.constraint_evaluation('p("zz")', Key_Event(VK_A, True)) is False
         assert 'FST config error' in capsys.readouterr().out
+
+    def test_short_eval_branch_unknown_key_fails_closed_and_prints_headless(self, fake_fst, capsys):
+        fake_fst.toast_callback = None
+        om = self._om(fake_fst)
+        assert om.constraint_evaluation('!zz', Key_Event(VK_A, True)) is False
+        assert 'FST config error' in capsys.readouterr().out
+
+    # GUI (toast bridge wired) -> P08 error toast, nothing on the console
+
+    def test_eval_branch_unknown_key_toasts(self, fake_fst, capsys):
+        om = self._om(fake_fst)
+        assert om.constraint_evaluation('p("zz")', Key_Event(VK_A, True)) is False
+        fake_fst.toast_callback.assert_called_once()
+        assert 'FST config error' in fake_fst.toast_callback.call_args.args[0]
+        assert 'zz' in fake_fst.toast_callback.call_args.args[0]
+        assert capsys.readouterr().out == ''
+
+    def test_short_eval_branch_unknown_key_toasts(self, fake_fst, capsys):
+        om = self._om(fake_fst)
+        assert om.constraint_evaluation('!zz', Key_Event(VK_A, True)) is False
+        fake_fst.toast_callback.assert_called_once()
+        assert 'FST config error' in fake_fst.toast_callback.call_args.args[0]
+        assert 'zz' in fake_fst.toast_callback.call_args.args[0]
+        assert capsys.readouterr().out == ''

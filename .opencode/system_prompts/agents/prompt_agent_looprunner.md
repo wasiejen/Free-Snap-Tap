@@ -59,3 +59,7 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
   line whose role is `planner-*` names the last run planner's session id (line
   format per `agent_readme_loop.md` §Loop log); the `SESSION=` field of the
   injected `ctx:` line is your own session id.
+- Any loop-log line you DO write goes via the `loop_log` tool when it is in
+  your toolset (it resolves the current looprun folder and appends the
+  formatted line); the §Loop log format description is the fallback when the
+  tool is not registered.

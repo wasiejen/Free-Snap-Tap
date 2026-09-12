@@ -59,3 +59,12 @@ prefer split presentation).
 ## 3 Rec approved
 ## 4 Rec approved
 ## 5 Rec approved without removing `fst_keyboard.py:302-303` (mixed Key rebind conversion - keep this until I can test a bit more)
+## VERDICT (2026-09-12, iter-9 — all 5 items LANDED on branch `fst_work`)
+
+- **Rec 1 (#1):** unit A, commit `4b93d37` — one `FST_Keyboard.surface_config_error` helper (GUI P08 error toast / headless print); both constraint fail-closed guards + `check_for_combination` (+ the hot-path resume catch) route through it; dedup + fail-closed preserved; unknown constraint *names* stay silent no-ops by design.
+- **Rec 2 (#7):** unit B, commit `2891dab` — behavior wins; the stale comment reworded (spelling fixed); pinned by the pre-existing `test_empty_macro_sequence_no_playback`.
+- **Rec 3 (#8):** unit B — union semantics (real OR simulated) in both setters + the symmetric `vk_code > 0` guard on the real setter; `ap`/`ar` doc comments state the union; 3 new pinning tests.
+- **Rec 4 (#9):** unit B — `ValueError` added to `toggle_repeat`/`is_repeat_active`/`reset_repeat`/`stop_all_repeat`; **`stop_repeat` added as the fifth consistency site** (same dict, same catch — beyond the ruling's letter, flagged); `stop_all_repeat` except = `(AttributeError, ValueError)`.
+- **Rec 5 (#4):** unit B — the dead `elif result is None: pass` branch deleted. **(#6: KEEP per the ruling — the `###XXX 241022-1341` block untouched.)**
+
+Gate at landing: pytest 459 passed + 1 known #10 warning, ruff F=0. TODO #1/#4/#6/#7/#8/#9 closed (full text in `todo_records.md`). The A→C triage reclassification (`COVERAGE_TRIAGE.md`) stays maintainer-side.

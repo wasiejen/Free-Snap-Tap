@@ -261,6 +261,28 @@ class TestInvocations:
         # unknown alias -> silent True
         assert om_env.om.constraint_evaluation("reset_repeat('nope')", make_ke()) is True
 
+    def test_malformed_repeat_entry_does_not_raise(self, om_env, monkeypatch):
+        # a non-2-tuple repeat_thread_dict entry raises ValueError on unpack -
+        # it must not propagate out of any of the five repeat constraint methods
+        monkeypatch.setattr(fst_manager, 'Macro_Repeat_Task', lambda *a, **k: MagicMock())
+        monkeypatch.setattr(asyncio, 'run_coroutine_threadsafe',
+                            lambda coro, loop: MagicMock())
+        om = om_env.om
+        ke = make_ke()
+        # 1-element entries: "not enough values to unpack" -> ValueError
+        om.repeat_thread_dict['stop'] = [MagicMock()]
+        om.repeat_thread_dict['active'] = [MagicMock()]
+        om.repeat_thread_dict['reset'] = [MagicMock()]
+        om.repeat_thread_dict['toggle'] = [MagicMock()]
+        # 3-element entry: "too many values to unpack" -> ValueError
+        om.repeat_thread_dict['all'] = [MagicMock(), MagicMock(), MagicMock()]
+        assert om.constraint_evaluation("stop_repeat('stop')", ke) is True
+        assert om.constraint_evaluation("is_repeat_active('active')", ke) is False
+        assert om.constraint_evaluation("reset_repeat('reset')", ke) is True
+        # ValueError path -> except -> start_repeat replaces the malformed entry
+        assert om.constraint_evaluation("toggle_repeat('toggle', 650)", ke) is True
+        assert om.constraint_evaluation('stop_all_repeat()', ke) is True
+
     def test_variable_roundtrip(self, om_env):
         om = om_env.om
         ke = make_ke()

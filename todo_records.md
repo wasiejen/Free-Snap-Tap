@@ -5,7 +5,7 @@ One-line records; resolution lives in the file / git log. Moved out of `TODO.md`
 from the live file).
 
 **Numbering rule:** every ID used here is RESERVED and never reused — new entries in
-`TODO.md` continue from the last used ID (currently #50, next = #51).
+`TODO.md` continue from the last used ID (currently #51, next = #52).
 
 ## 2. Fix the 6 ruff `F` findings — CLOSED (worker, `cdbbdcd`, 2026-09-10) — all six F sites removed (incl. the cascaded dead `cube_distance`); ruff F 6→0; pytest 434→434, 13 warnings same profile.
 ## 5. Lint baseline 6 → 8 at `ca61a26` — CLOSED (`0025a57`, 2026-09-08) — the three unused `SimpleNamespace` imports removed — the 6-finding baseline restored (later → 0 via #2).
@@ -613,3 +613,136 @@ canonical, tree clean) → closed; the split build launched per the committed sp
   probe rebuild (33/33) + suite 434/434 + ruff F=0 + peek.py deletion committed;
   remaining tail = the v1.3 log-profile rebaseline (maintainer call 1) + #34
   residual doc refs (planner/maintainer-owned).
+
+## 2026-09-12 (iter-9, branch `fst_work`) — FST behavior batch closed (ruling 2026-09-12; unit A `4b93d37` + unit B `2891dab`; gate 459 passed + 1 known #10 warning, ruff F=0) — full text of closed entries #1, #7, #8, #9, #4, #6 (moved from TODO.md):
+
+## 1. General vk resolution: unknown keys must surface to the user (tabled 2026-09-06)
+
+- **Problem / evidence:** wherever a key string resolves to a vk_code (`convert_to_vk_code`
+  + all its call sites) it should raise AND be communicated to the user — important
+  feedback; today many paths fail silently or only print to console. State-shorthand
+   constraints now fail-closed on unknown keys (2026-09-06, `fst_manager.py`
+   `constraint_evaluation`) but still only print — fold into the general solution.
+   Verified crash path (2026-09-10, session-3 probe): `convert_to_vk_code('300')` /
+   `('256')` return an implicit `None` (the numeric branch swallows the KeyError when
+   `key_int` is out of range — `fst_keyboard.py:146-150`), and the following
+   `if vk_code <= 0:` in `extract_data_from_key` (`fst_keyboard.py:224`) then raises
+   `TypeError: '<=' not supported between instances of 'NoneType' and 'int'` — an
+   out-of-range numeric key string in the config crashes group init with an
+   unhelpful TypeError instead of a surfaced error. `test_extraction_filter_edges.py`
+   ≈61-64 pins the implicit-None behavior (archived triage "suspected bug #2").
+    **Audit 3b addition (2026-09-10):** `check_for_combination` (`fst_keyboard.py:906-912`,
+    called from the hot path at `:627` via `check_control_actions`) converts its string
+    combo entries with `convert_to_vk_code` (`:910`); a non-resolving string returns
+    implicit None and then SILENTLY poisons state instead of erroring —
+    `get_real_key_press_state(None)` catches its own KeyError
+    (`fst_manager.py:1604-1609`) and INSERTS a `None` key into BOTH
+    `_real_key_press_states_dict` AND `_all_key_press_states_dict`
+    (via `set_real_key_press_state`, 1612-1613 — this setter writes `_all` unguarded).
+    The combos resolve today (alt/end/delete/page_down all in `vk_codes_dict`,
+    verified 2026-09-10) — the defect is latent for any custom/unresolvable combo string.
+ - **Outcome (goal):** ONE general solution covering every vk-resolution site (not
+  per-call-site fixes) with the user-visible error; the constraint path reuses it.
+- **Acceptance:** unknown key ⇒ user-visible error at every resolution site (never
+  console-only); the constraint fail-closed path emits the same user-visible error; suite
+  green.
+- **Scope (non-exhaustive):** `convert_to_vk_code` + all its call sites (`fst_manager.py`,
+  `fst_keyboard.py`, …); `constraint_evaluation`'s unknown-key branch.
+- **Status:** RULING 2026-09-12 — Rec approved (build the P08-style user-visible error at
+   every vk-resolution site; the constraint path reuses it). LANDED on branch `fst_work`
+   (iter-9, unit A, commit 4b93d37): one `FST_Keyboard.surface_config_error` helper; both
+   constraint fail-closed guards + `check_for_combination` (+ the hot-path resume catch)
+   route through it (GUI P08 error toast / headless print, dedup + fail-closed preserved) —
+   the console-only residual is closed by this build. Unknown constraint *names* stay silent
+   no-ops by design (`SPEC_FEATURES.md` §4 #2) — out of scope.
+## 7. Empty macro: comment/behavior mismatch at `fst_keyboard.py` 707 (2026-09-08)
+
+- **Problem / evidence:** the comment says an empty key group does "not supress the
+  triggerkey", but `alias_fired = True` (line 697) is set BEFORE the empty check — so the
+  trigger IS suppressed (`_listener.suppress_event`, verified by
+  `test_empty_macro_sequence_no_playback`). Comment and behavior cannot both be right.
+- **Outcome (goal):** comment and behavior agree — decide which is right, reword or fix
+  accordingly.
+- **Acceptance:** the 707 comment matches the (possibly new) behavior; a test pins the
+  chosen semantics; suite green.
+- **Scope:** `fst_keyboard.py` empty-macro check (≈697/707); the pinning test in `tests/`.
+- **Status:** RULING 2026-09-12 — Rec approved (behavior wins: keep the suppression,
+  reword the comment, pin with a test). LANDED on branch `fst_work` (iter-9, unit B,
+  commit 2891dab): the 737 comment reworded to match the kept suppression ("supress"
+  spelling fixed); `test_empty_macro_sequence_no_playback` already pinned both
+  no-playback AND trigger suppression — comment-only change, no new test needed.
+## 8. `ap`/`ar` "all keys (incl simulated)" is not a union — last-write-wins shared dict (2026-09-08)
+
+- **Problem / evidence:** `ap(...)` documents "press of all keys (incl simulated)"
+  (`fst_manager.py` 253–256), but `set_real_key_press_state` (1611–1614) and
+  `set_simulated_key_press_state` (1622–1625) both write the shared
+  `_all_key_press_states_dict` last-write-wins — a release from either side clears `all`
+  even while the other press is still active, so `ap` may not behave as "real OR
+  simulated". Asymmetric: the real-setter lacks the `vk_code > 0` guard the other two
+  setters have. Found in the interrupted Phase-5 run (it explains the 1630–1632 KeyError
+  coverage gap).
+- **Outcome (goal):** confirm the intended `ap`/`ar` semantics (or fix the dict handling +
+  the missing guard) and pin the chosen behavior with a test.
+- **Acceptance:** documented semantics; crossing press/release on either side behaves per
+  the confirmed semantics (the other side's `all` state preserved under a union); the
+  guard symmetric if the union is confirmed; suite green.
+- **Scope:** `Input_State_Manager` state setters (≈1611–1632); `ap(...)` docs (253–256).
+- **Status:** RULING 2026-09-12 — Rec approved (union semantics real OR simulated;
+  symmetric `vk_code > 0` guard; pinning test). LANDED on branch `fst_work` (iter-9,
+  unit B, commit 2891dab): both setters now write the `all` dict as a union
+  (`is_press or <other side's state>`, missing side defaults False); the real setter
+  gained the symmetric `vk_code > 0` guard; `ap`/`ar` doc comments state the union
+  (the "relese" typo fixed as an adjacent comment fix); 3 new pinning tests
+  (crossing release both directions + vk guard) in `test_input_state_manager.py`.
+## 9. Repeat-constraint excepts too narrow for malformed `repeat_thread_dict` entries (2026-09-08)
+
+- **Problem / evidence:** `toggle_repeat` (327), `is_repeat_active` (340), `reset_repeat`
+  (350) catch `(KeyError, AttributeError)`; `stop_all_repeat` (365) only `AttributeError` —
+  but unpacking an entry that is not a 2-tuple raises `ValueError`, uncaught, propagating
+  out of `constraint_evaluation`. Low severity: entries are only written as 2-tuples
+  `[task, handle]` by `start_repeat` (301).
+- **Outcome (goal):** decide harden the excepts or leave as-is — record the decision.
+- **Acceptance:** decision recorded here; if harden: `ValueError` covered in the four
+  methods + a test; suite green.
+- **Scope:** `fst_manager.py` ≈301–365 (`Input_State_Manager` repeat methods).
+- **Status:** RULING 2026-09-12 — Rec approved (harden: add `ValueError` to the four
+  repeat methods + a test). LANDED on branch `fst_work` (iter-9, unit B, commit
+  2891dab): `ValueError` added to the excepts of `toggle_repeat` / `is_repeat_active`
+  / `reset_repeat` / `stop_all_repeat` (+ `stop_repeat` as the fifth site — consistency
+  addition beyond the ruling's letter); one new pinning test covers all five methods
+  with malformed (1- and 3-element) entries.
+## 4. Dead code: `fst_manager.py` 116–117 ("None result → pass") unreachable (2026-09-07/08)
+
+- **Problem / evidence:** `check_constraint_fulfillment`'s "None → pass" branch (line 117)
+  can never run — `constraint_evaluation` normalizes `None` → `True` (≈691) before
+  returning, and no other branch returns `None`; line 117 stays uncovered in every run and
+  the triage's 2098/2217 (94.6 %) ceiling is really 2097/2217 (same rounded number).
+  Recorded at discovery (`2007698` commit msg). Absorbs the 260908-0951 dedup-block item 1.
+- **Outcome (goal):** the dead branch is deleted — the A→C triage reclassification is the
+  maintainer's call (`COVERAGE_TRIAGE.md` is agent-read-only).
+- **Acceptance:** 116–117 removed (or the triage plan reclassified by the maintainer);
+  suite green; coverage expectations updated.
+- **Scope:** `fst_manager.py` ≈107–125; the triage plan (maintainer-side only).
+- **Status:** RULING 2026-09-12 — Rec approved (delete the dead branch). LANDED on
+  branch `fst_work` (iter-9, unit B, commit 2891dab): the unreachable
+  `elif result is None: pass` branch is deleted (suite green, the `else:` print for
+  other non-bool/int results stays); the A→C triage reclassification stays
+  maintainer-side (`COVERAGE_TRIAGE.md` is agent-read-only — untouched).
+## 6. Dead code: `fst_keyboard.py` 302–303 (mixed-Key rebind conversion) unreachable (2026-09-08)
+
+- **Problem / evidence:** in `initialize_groups_from_presorted_lines`, `convert_key_string_group`
+  only ever appends `Key_Event`s (bare keys expand to press/release events), so
+  `new_trigger_group[0]` is never a `Key`; the 295-block is entered only via a `Key`
+  replacement — which makes line 301 `False`, so 302–303 (`replacement_key = Key(...)`)
+  can never execute. Proven at `fffea8b` (rebinds `w : e` and `w : +e` both leave 302–303
+  uncovered). Triage classed them A — same misclassification as #4. Also: the triage's
+  numeric example `"8" → 8` is wrong — `"8"` resolves via the dict to 56; the numeric
+  branch needs a string absent from `vk_codes_dict` (e.g. `"255"`). Absorbs the 260908-0951
+  dedup-block item 4 (first half).
+- **Outcome (goal):** the dead block is deleted (or kept on an explicit maintainer
+  decision — the triage class correction rides with #4).
+- **Acceptance:** 302–303 removed; suite green; coverage expectations updated.
+- **Scope:** `fst_keyboard.py` ≈295–305.
+- **Status:** RULING 2026-09-12 — KEEP 302-303 (maintainer: "keep this until I can test a
+  bit more") → CLOSED by ruling (no deletion; the triage class correction stays
+  maintainer-side per #4).
