@@ -28,10 +28,12 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 
-// The re-application directive — byte-identical to the compact_memory tool's
-// constant (.opencode/tools/compact_memory.ts, the T3-escaped form: the
-// prototype's single backslashes were JS escape sequences that silently
-// stripped the path separators from the emitted pointer).
+// The re-application directive — the compact_memory tool's 2-line constant
+// (the T3-escaped form: the prototype's single backslashes were JS escape
+// sequences that silently stripped the path separators from the emitted
+// pointer) plus one looprunner continuation line (added by the T5 build;
+// keep/remove = maintainer call, tracked in
+// proposals/2026-09-12_recovery-directive-looprunner-line.md).
 const COMPACTION_RELOAD_DIRECTIVE = `
 [SYSTEM CONTEXT DIRECTIVE]
 Context was compacted. Read .opencode\\system_prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.
