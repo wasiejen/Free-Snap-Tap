@@ -2,6 +2,50 @@
 
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
+## 2026-09-12 (direct session; ses_f692e1071ffevodtnJTET0DEEs) — priority #1 BUILD DELEGATED: compact_memory plugin (approved proposal v2, Parts 1-4)
+- **Start:** HEAD `b684894` (clean); direct session — his message: start on the
+  compact_memory plugin (the NAP's NEXT after the approval commit). 0 live
+  `--main`/`--maintainer` markers (grep hits all historical: NAP/proposal text,
+  prompts, done/, the standing `--defer` SWEEP at `inbox_planner/summary_summary.md`);
+  `priority.md` active list = item #1 (compact_memory, his `--wip` line — untouched);
+  item #2 empty. Full-context session (he compacts manually) — stop-line discipline
+  relaxed, early-handover still applied.
+- **Baseline re-measured this session:** probe **84/84** under `node .opencode/
+  plugin/probes/handover_probe.mjs` (HEAD green); pytest 459+1#10 + ruff F=0 CARRIED
+  (no FST code change since the attention-keywords verify).
+- **Spec COMMITTED (this commit):** `handover_task.md` = the build per the approved
+  proposal `approved/2026-09-12_compact_memory_plugin.md` (Parts 1-4; worker
+  `worker_Q4_120K`; dev_probe_ctx.ts shape; probe S13 APPEND-only + S10 TOOL_TS
+  re-point; gates: probe 84+n green + pytest 459+1#10 + ruff F=0; diff scope =
+  new plugin file + v1 retirement + probe + bookkeeping). **Spec-level gaps
+  resolved planner-side (maintainer-vetoable, recorded here):** (a) RETIRE =
+  `git mv tools/compact_memory.ts → plugin/deactivated/compact_memory_v1.ts`
+  (the repo deactivation convention, cf. `deactivated/handover.ts`) + 2 frozen
+  header lines; the probe S10 pins the retired v1 artifact at the new path
+  (one-line re-point — the alternative, deleting the file, breaks S10 checks
+  67-75); the v1 self-location fallback assumes its old depth (probe drives it
+  with an explicit `directory` → stays green; noted in the frozen header).
+  (b) COMPACT line keeps the v1 keep-defaults (30000/12) for the reporting
+  fields when the keep args are absent (Part 3 "carried" reading; the BODY
+  carries keep only when given per Part 1). (c) `opencode.jsonc` DO-NOT-TOUCH
+  (his live registration file — its commented tools/plugins lines go stale;
+  flagged here, his to update at registration). (d) OPEN QUESTION for him
+  (surfaced in the close summary, NOT in the build): `context_recovery.ts`
+  (the T5 emergency hook, shares the same budget FILE) keeps its FLAT cap 2
+  while the tool uses the quant-class cap — does the emergency path also
+  respect the quant class?
+- **LAUNCH:** fresh `worker_Q4_120K` (task tool). On return: verify against
+  git log + re-measured gates (probe 84+n, pytest, ruff, rename check, the
+  TOOL_TS grep), then bookkeeping commit (this NAP current + proposal →
+  `implemented/` only AFTER his live acceptance per the proposal's Acceptance
+  section — items 2-4 are HIS side: registration in the live opencode.jsonc
+  plugins array + per-agent grants + restart + live self/cross fires).
+- **NEXT after verify:** close summary to him (incl. the (d) open question +
+  the stale opencode.jsonc comment lines) → then the queued loop_log-v2
+  (approved) if he wants to continue.
+- Baselines (carried; FST untouched): probe **84/84** (re-measured), pytest
+  **459 + 1 #10**, ruff **F=0**.
+
 ## 2026-09-12 (direct session; ses_f6976031bffeRa8gNNcpy5FoYj) — attention-keywords close-out; priority #1 (compact_memory quant-class budget) design grounded — awaiting his ruling
 - **Start:** HEAD `6b51fe2` (clean); 0 live `--main`/`--maintainer` markers; `--wip` at
   `priority.md:28` (his live WIP item — untouched, per the `--wip` guard); `proposals/
