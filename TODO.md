@@ -84,7 +84,10 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   chosen semantics; suite green.
 - **Scope:** `fst_keyboard.py` empty-macro check (≈697/707); the pinning test in `tests/`.
 - **Status:** RULING 2026-09-12 — Rec approved (behavior wins: keep the suppression,
-  reword the comment, pin with a test). IN PROGRESS on branch `fst_work` (iter-7).
+  reword the comment, pin with a test). LANDED on branch `fst_work` (iter-9, unit B,
+  commit 2891dab): the 737 comment reworded to match the kept suppression ("supress"
+  spelling fixed); `test_empty_macro_sequence_no_playback` already pinned both
+  no-playback AND trigger suppression — comment-only change, no new test needed.
 
 ## 8. `ap`/`ar` "all keys (incl simulated)" is not a union — last-write-wins shared dict (2026-09-08)
 
@@ -103,7 +106,12 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   guard symmetric if the union is confirmed; suite green.
 - **Scope:** `Input_State_Manager` state setters (≈1611–1632); `ap(...)` docs (253–256).
 - **Status:** RULING 2026-09-12 — Rec approved (union semantics real OR simulated;
-  symmetric `vk_code > 0` guard; pinning test). IN PROGRESS on branch `fst_work` (iter-7).
+  symmetric `vk_code > 0` guard; pinning test). LANDED on branch `fst_work` (iter-9,
+  unit B, commit 2891dab): both setters now write the `all` dict as a union
+  (`is_press or <other side's state>`, missing side defaults False); the real setter
+  gained the symmetric `vk_code > 0` guard; `ap`/`ar` doc comments state the union
+  (the "relese" typo fixed as an adjacent comment fix); 3 new pinning tests
+  (crossing release both directions + vk guard) in `test_input_state_manager.py`.
 
 ## 9. Repeat-constraint excepts too narrow for malformed `repeat_thread_dict` entries (2026-09-08)
 
@@ -117,7 +125,11 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   methods + a test; suite green.
 - **Scope:** `fst_manager.py` ≈301–365 (`Input_State_Manager` repeat methods).
 - **Status:** RULING 2026-09-12 — Rec approved (harden: add `ValueError` to the four
-  repeat methods + a test). IN PROGRESS on branch `fst_work` (iter-7).
+  repeat methods + a test). LANDED on branch `fst_work` (iter-9, unit B, commit
+  2891dab): `ValueError` added to the excepts of `toggle_repeat` / `is_repeat_active`
+  / `reset_repeat` / `stop_all_repeat` (+ `stop_repeat` as the fifth site — consistency
+  addition beyond the ruling's letter); one new pinning test covers all five methods
+  with malformed (1- and 3-element) entries.
 
 ## 4. Dead code: `fst_manager.py` 116–117 ("None result → pass") unreachable (2026-09-07/08)
 
@@ -131,8 +143,11 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Acceptance:** 116–117 removed (or the triage plan reclassified by the maintainer);
   suite green; coverage expectations updated.
 - **Scope:** `fst_manager.py` ≈107–125; the triage plan (maintainer-side only).
-- **Status:** RULING 2026-09-12 — Rec approved (delete the dead branch). IN PROGRESS on
-  branch `fst_work` (iter-7).
+- **Status:** RULING 2026-09-12 — Rec approved (delete the dead branch). LANDED on
+  branch `fst_work` (iter-9, unit B, commit 2891dab): the unreachable
+  `elif result is None: pass` branch is deleted (suite green, the `else:` print for
+  other non-bool/int results stays); the A→C triage reclassification stays
+  maintainer-side (`COVERAGE_TRIAGE.md` is agent-read-only — untouched).
 
 ## 6. Dead code: `fst_keyboard.py` 302–303 (mixed-Key rebind conversion) unreachable (2026-09-08)
 
