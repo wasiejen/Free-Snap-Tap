@@ -40,3 +40,15 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   + per-value `safeParse` guard); the fact is recorded in the NAP iter-6
   block (spec-discipline lesson: verify the committed shape before prescribing
   the probe access in a spec).
+
+## 2026-09-12 — worker-10 (T1, block_transfer sandbox)
+- MOVE mode with `dstFile` missing: the block is CUT from the source BEFORE
+  the `'dstFile' is required for MOVE mode.` check runs (the check sits in
+  the later MOVE section, after the src write), so the block is silently
+  LOST from the source file. Pre-existing (not introduced by T1). I did NOT
+  hoist the check because that changes observable behavior for allowed
+  paths (T1 approval boundary: allowed-path semantics must stay
+  byte-identical — the planner decides). Fix would be: move the
+  `!args.dstFile` check to the top of the anchor-extraction section, before
+  any write. File: `.opencode/tools/block_transfer.ts`. Recorded as an open
+  item in the worker summary.
