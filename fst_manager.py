@@ -112,8 +112,6 @@ class Output_Manager():
                         fullfilled = fullfilled and result
                     elif isinstance(result, int):
                         temp_delays.append(result)
-                    elif result is None:
-                        pass
                     else:
                         print(f"! Constraint {constraint} is not valid.")
 
@@ -249,12 +247,12 @@ class Output_Manager():
         def r(key_string):
             return not p(key_string)
 
-        # press of all keys (incl simulated)
+        # press of all keys (incl simulated) - union: real OR simulated
         def ap(key_string):
             vk_code, _ = get_vk_code_and_press_from_keystring(key_string)
             return self._fst.state_manager.get_all_key_press_state(vk_code)
 
-        # relese of all keys (incl simulated)
+        # release of all keys (incl simulated) - union: real OR simulated
         def ar(key_string):
             return not ap(key_string)
 
@@ -308,7 +306,7 @@ class Output_Manager():
                 if not _handle.done():
                     repeat_task.cancel_playback()
                     _handle.cancel()
-            except (KeyError, AttributeError):
+            except (KeyError, AttributeError, ValueError):
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - stop_repeat()")
             return True
@@ -323,7 +321,7 @@ class Output_Manager():
                 else:
                     # print(f"{current_ke} restarting repeat")
                     start_repeat(alias_string, repeat_time)
-            except (KeyError, AttributeError):
+            except (KeyError, AttributeError, ValueError):
                 # this thread was not started before
                 # print(f"{current_ke} starting repeat for first time")
                 start_repeat(alias_string, repeat_time)
@@ -336,7 +334,7 @@ class Output_Manager():
                     return True
                 else:
                     return False
-            except (KeyError, AttributeError):
+            except (KeyError, AttributeError, ValueError):
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - stop_repeat()")
             return False
@@ -346,7 +344,7 @@ class Output_Manager():
                 repeat_task, _handle = self._repeat_thread_dict[alias_string]
                 if not _handle.done():
                     repeat_task.reset()
-            except (KeyError, AttributeError):
+            except (KeyError, AttributeError, ValueError):
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_string} - reset_repeat()")
                 # raise KeyError(error)
@@ -361,7 +359,7 @@ class Output_Manager():
                         _handle.cancel()
                 if CONSTANTS.DEBUG4:
                     print("D4: -- Eval: stopped all Repeat")
-            except AttributeError:
+            except (AttributeError, ValueError):
                 if CONSTANTS.DEBUG3:
                     print(f"can not find a Repeat called {alias_name} - reset_all_repeat()")
             return True
@@ -1617,8 +1615,11 @@ class Input_State_Manager():
             return False
     def set_real_key_press_state(self, vk_code, is_press):
         # print(f"real key state of {vk_code} set to {is_press}")
-        self._real_key_press_states_dict[vk_code] = is_press
-        self._all_key_press_states_dict[vk_code] = is_press
+        if vk_code > 0:
+            self._real_key_press_states_dict[vk_code] = is_press
+            # union: a real release must not clear the all state while the
+            # simulated press of the same key is still active
+            self._all_key_press_states_dict[vk_code] = is_press or self._simulated_key_press_states_dict.get(vk_code, False)
 
     def get_simulated_key_press_state(self, vk_code):
         try:
@@ -1629,7 +1630,9 @@ class Input_State_Manager():
     def set_simulated_key_press_state(self, vk_code, is_press):
         if vk_code > 0:
             self._simulated_key_press_states_dict[vk_code] = is_press
-            self._all_key_press_states_dict[vk_code] = is_press
+            # union: a simulated release must not clear the all state while the
+            # real press of the same key is still active
+            self._all_key_press_states_dict[vk_code] = is_press or self._real_key_press_states_dict.get(vk_code, False)
 
     def get_all_key_press_state(self, vk_code):
         try:

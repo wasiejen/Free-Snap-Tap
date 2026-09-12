@@ -49,6 +49,38 @@ class TestPressStateDicts:
         assert sm.get_all_key_press_state(VK_B) is False
         assert sm._all_key_press_states_dict[VK_B] is False
 
+    def test_all_state_is_union_of_real_and_simulated(self, sm):
+        # crossing semantics: a release from either side keeps the all state
+        # while the other side's press is still active (union, not last-write)
+        sm.set_real_key_press_state(VK_A, True)
+        sm.set_simulated_key_press_state(VK_A, True)
+        assert sm.get_all_key_press_state(VK_A) is True
+        # simulated release while the real press is still held -> all stays True
+        sm.set_simulated_key_press_state(VK_A, False)
+        assert sm.get_all_key_press_state(VK_A) is True
+        # real release of the last active side -> all becomes False
+        sm.set_real_key_press_state(VK_A, False)
+        assert sm.get_all_key_press_state(VK_A) is False
+
+    def test_crossing_release_from_real_side_keeps_simulated_all_state(self, sm):
+        sm.set_simulated_key_press_state(VK_A, True)
+        sm.set_real_key_press_state(VK_A, True)
+        # real release must not clear the still-active simulated press
+        sm.set_real_key_press_state(VK_A, False)
+        assert sm.get_all_key_press_state(VK_A) is True
+        assert sm.get_real_key_press_state(VK_A) is False
+        assert sm.get_simulated_key_press_state(VK_A) is True
+        # simulated release of the last active side -> all becomes False
+        sm.set_simulated_key_press_state(VK_A, False)
+        assert sm.get_all_key_press_state(VK_A) is False
+
+    def test_set_real_only_positive_vk(self, sm):
+        # symmetric with the simulated setter: a vk_code <= 0 is not written
+        sm.set_real_key_press_state(0, True)
+        assert 0 not in sm._real_key_press_states_dict
+        assert 0 not in sm._all_key_press_states_dict
+        assert sm.get_real_key_press_state(0) is False
+
 
 class TestPressedKeysSet:
     def test_event_based_add_and_remove(self, sm):
