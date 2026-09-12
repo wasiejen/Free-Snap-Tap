@@ -80,6 +80,5 @@ Worker: worker-10 (session `ses_f6c5f161fffes1Ze5jsgnZ47D0`), model
   this summary + the loop-log lines in ONE commit); the spec's DoD wording
   "task commit + bookkeeping commit" read as loose phrasing — AGENTS.md's
   two-party split is authoritative. Flagging the deviation.
-- Final gauge: `SESSION=ses_f6c5f161fffes1Ze5jsgnZ47D0 CTX=63257 (52%)
-  REM=56743` (measured before the summary commit; re-measured at the
-  post-commit check below).
+- Final gauge (verbatim, post-commit check): `SESSION=ses_f6c5f161fffes1Ze5jsgnZ47D0
+  CTX=67304 (56%) REM=52696`.
