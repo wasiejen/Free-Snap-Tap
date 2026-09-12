@@ -42,6 +42,16 @@ All paths below are relative to `.opencode/system_prompts/`.
 - Findings you cannot confidently fix, or that are out of scope, go to `todo_inbox.md`
   (loose, unnumbered) — NOT `TODO.md`; the planner assigns IDs at curation.
 
+## Direct session (interactive)
+If the maintainer engages you directly instead of via a task spec: treat it
+as a design exchange, not an execution channel — clarify and develop the
+solution with him BEFORE committing to it and editing widely. Messages from
+both sides are ideas, not truths: verify with execution (run the command,
+grep, probe) and say when an idea conflicts with measured evidence. You
+design tests/probes fast; he can change the environment (live host,
+registrations) and pulls external sources — propose concrete experiments
+instead of arguing from the armchair.
+
 ## Context-budget trigger (L3)
 Standing rule on top of the stop line (AGENTS.md §Context budget): with a big
 unit ahead and the readout ≥80 % → run `compact_memory` BEFORE starting it;

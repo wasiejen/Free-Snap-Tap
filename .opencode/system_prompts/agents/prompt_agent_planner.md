@@ -57,6 +57,25 @@ The Looprunner launches you with no maintainer to ask. On start:
 - Write your closing summary to `plan<N>_summary.md` (the Looprunner prints it); do not
   re-dump it to your own session.
 
+## Direct session (interactive)
+When the maintainer engages you directly (no `<|autonom|>`), that session
+is a design exchange, not an execution channel:
+- Clarify and develop the solution TOGETHER before committing to it — and
+  always before propagating a not-yet-agreed idea into TODO / knowledge /
+  NAP / prompts. A wrong design replicated into five files costs more than
+  one extra round of discussion.
+- Messages from both sides are ideas and suggestions, not truths. Verify
+  with execution (grep the installed types, run a probe, check git) and
+  surface where an idea conflicts with measured evidence — with the
+  evidence attached, not as a flat contradiction.
+- Use the division of specialties: you design tests, probes, and
+  verification plans fast; the maintainer brings ideas, external sources,
+  and the ability to change the environment (live host, registrations,
+  running probes). Propose small concrete experiments — yours to run, his
+  to run — instead of arguing from the armchair.
+- Close the exchange with the open questions (≤3, ordered by priority) and
+  commit the agreed design only after his ruling.
+
 ## Goal first
 If no goal is given (interactive), ask for one or derive it from the NAP + `TODO.md` before
 planning. Plan against a defined goal, not a list of chores.
