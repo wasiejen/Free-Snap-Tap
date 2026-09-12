@@ -79,3 +79,39 @@ export async function execute(args: any, context: any) {
 //   "directory": "C:\\Users\\Wasiejen\\Projects\\OpenCodeProjects\\Free-Snap-Tap\\Free-Snap-Tap",
 //   "worktree": "C:\\Users\\Wasiejen\\Projects\\OpenCodeProjects\\Free-Snap-Tap\\Free-Snap-Tap"
 // }
+
+//"messages": [
+// {
+//   "info": {
+//     "role": "user",
+//     "time": {
+//       "created": 1789215033194
+//     },
+//     "agent": "agent_Q4_120K",
+//     "model": {
+//       "providerID": "llama-swap",
+//       "modelID": "Qwen3.8-27B-IQ4KT-120K"
+//     },
+//     "summary": {
+//       "diffs": []
+//     },
+//     "id": "msg_09586c76a001u8igUcH1m4mfL6",
+//     "sessionID": "ses_f6a7938a0ffeWOfcOHOmX9PR6P"
+//   },
+//   "parts": [
+//     {
+//       "type": "text",
+//       "text": "ctx: SESSION=ses_f6a7938a0ffeWOfcOHOmX9PR6P CTX=notAvailable",
+//       "id": "prt-ctx-69f7eded-3291-4357-a8b8-2b6aa803d176",
+//       "sessionID": "ses_f6a7938a0ffeWOfcOHOmX9PR6P",
+//       "messageID": "msg_09586c76a001u8igUcH1m4mfL6"
+//     },
+//     {
+//       "type": "text",
+//       "text": "what tools do you have access to?",
+//       "id": "prt_09586c76b001ZLA8fKjRX42KMr",
+//       "sessionID": "ses_f6a7938a0ffeWOfcOHOmX9PR6P",
+//       "messageID": "msg_09586c76a001u8igUcH1m4mfL6"
+//     }
+//   ]
+// },

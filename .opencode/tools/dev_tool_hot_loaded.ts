@@ -1,3 +1,8 @@
+// works but still needs a restart
+// kept for reference if i can think of a better way
+// would be nice to have for prototyping
+// import a lot of libs and then freely change the loaded tool to let the agents probe the api
+
 // .opencode/tools/dev-tool.ts
 import { tool } from "@opencode-ai/plugin"
 import { pathToFileURL } from "node:url"

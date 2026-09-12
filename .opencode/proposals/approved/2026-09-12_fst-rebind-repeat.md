@@ -45,3 +45,8 @@
 
 ## Status
 awaiting approval (observable behavior change = maintainer-gated; approval boundary per AGENTS.md)
+
+1. yes macro and togge repeat stay supressed. so if we have 
+a : b
+-b|(p("shift")) :: c
+then holding a should result in repeated b, but as soon as e.g. shift is hold it would fires the macro and then it should no longer be repeating. 1 action results in one macro/toggle triggering.

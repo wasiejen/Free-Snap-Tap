@@ -52,3 +52,9 @@
 ## Status
 awaiting approval (Part 1 = config-affecting move, maintainer-gated + host restart; Part 2 is
 pre-approved meta once agreed; Part 4 needs his explicit deferral/decision)
+
+--maintainer: first direct session task
+- approved
+- but only in a direct session. as soon as you move prompt folder the worker you might space will not have a prompt or might not start because of config mismatch
+- defer part 4 as recommended
+good work :-)

@@ -10,7 +10,7 @@ May be stale; nothing here is required to be maintained.
 - we might need regular scheduale tasks like look over knowledge base and compact knowledge for each file.
 ## need for a dedicated web researcher - can be a lean agent - does not need to know much about rhe repo or opencode. dispatched by the planner (keep his context save)
 - knowledge_crawler on own repo
-  - agentic knowledge
+    - agentic knowledge
   - workflow knoeledge
   - repo specific knowlegde
   - crawls the workspace and looks for specific items
