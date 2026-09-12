@@ -49,6 +49,14 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   self-documented in `priority.md` itself (any agent reading it learns it).
 - His uncommitted working-tree change left alone: `roles/agent_prompt_
   engineer.md` → `prompt_engineer.md` (his rename, not staged).
+- **Attention-keywords: spec committed, worker_Q4_120K launching** (his
+  approval note lines 43–44 committed with the spec: approved + `--wip`
+  marker addition). Task: marker table + priority ladder + inbox cadence in
+  the planner prompt (canonical), `--wip` guard one-liner in the worker
+  prompt, routing one-liner in the looprunner prompt; grep + probe (84/84
+  node) acceptance. VERIFY ON RETURN: git log + worker summary + grep +
+  probe; then proposal → `implemented/` with Status note. Live triage
+  acceptance (marked test files per the ladder) = first loop iteration.
 - Baselines (carried; FST code untouched this session): probe 84/84 (re-measured
   under node), pytest 459+1#10, ruff F=0.
 
