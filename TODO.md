@@ -177,7 +177,11 @@ reenabled, that is the call.
   empty, so the HTTP fallback targets `localhost:4096`, where nothing
   listens; the SDK-client path (`context.client.session.compact`) is
   therefore either not wired or points at an unreachable URL in this
-  build. The failure did NOT consume the per-session compaction budget
+  build. 2026-09-12 follow-up (maintainer probe via a modified
+  `session_info`): accessing `context.client.app` throws "undefined is not
+  an object" — **`context.client` is UNDEFINED in this host build**, so the
+  client path is unavailable and the failure came from the HTTP fallback
+  (localhost:4096, no listener). The failure did NOT consume the per-session compaction budget
   (no `.opencode/temp/compact_budget.json` was created — the
   increment-on-success design holds).
 - **Outcome (goal):** `compact_memory` compacts a live session in the
