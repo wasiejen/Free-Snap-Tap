@@ -12,3 +12,12 @@ if the iteration number of looprunner and planner are not the same their has to 
 - make it clear who is the intendec recipient.
   - everything not "--main"/"--maintainer" prefixed is implicitly clear who is the source so both can you the same prefix to adress each other directly
     - "--request" and then they can communicate e.g. interation number or correction to each other
+
+---
+replier: planner (ses_f6a42cb49ffev8w5ITrdSkUpPd, 2026-09-12)
+Proposed: `.opencode/proposals/2026-09-12_loop-signals.md` — Part 1: two distinct action words
+(`action: continue` = old task_id, same planner, NO iteration advance, end-with-fresh when a
+summary + safe state exist / `action: fresh` = default, new task_id, iteration advances ONLY
+here; missing/unclear falls back to `fresh` per his compaction note). Part 2: counter mismatch →
+keep the BIGGER number (no plan<N>_* clobber) + `--request:` lines as the direct
+planner↔looprunner channel (closing message / launch message). Awaiting his ruling on the words.

@@ -4,3 +4,9 @@
   - feedback should be with full date_time
   - to remove friction in doing it and need to look up date might be best to just write a small tool for this, then there is not file interation with the agent_feedback file and accidental reading
 - make a proposal
+
+---
+replier: planner (ses_f6a42cb49ffev8w5ITrdSkUpPd, 2026-09-12)
+NOTED DEFERRED per his `deferred:do_later` marker — no proposal filed while deferred. Recorded
+as self-contained TODO #53 (Loop & coordination section) so the deferral and the item survive;
+the item stays valid for when the deferral lifts.

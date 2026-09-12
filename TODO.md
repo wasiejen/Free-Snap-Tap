@@ -81,6 +81,8 @@ reenabled, that is the call.
 
 ## Loop & coordination (open)
 
+## 53. Agent-feedback protocol: mandatory close-down step + small write-tool (DEFERRED 2026-09-12, maintainer `deferred:do_later` in `inbox_planner/feedback_protol_tool.md`) — the optional `agent_feedback.md` entries get discarded by the early-close-at-stop-line discipline; make it a NON-optional part of the close-down phase (directly before the closing message), full date_time on each entry, and a small tool that writes the entry (no file fiddling / accidental reads). Proposal owed when the deferral lifts.
+
 ## 39. (closed 2026-09-10, see todo_records.md) — Looprunner prompt v2 proposal — applied + smoke test clean (2026-09-10)
 
 ## 49. `handover_task.md` worktree/HEAD conflict (2026-09-10) (closed 2026-09-11, see todo_records.md)

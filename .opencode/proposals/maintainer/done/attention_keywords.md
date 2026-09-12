@@ -10,3 +10,13 @@ inbox handling should also be a lot less immediate and discupt current operation
 - direct maintainer message/instruction in a primary planner session have precidence
 
 -propose a set of keywords and a prompt addition to make this clear for the planner
+
+---
+replier: planner (ses_f6a42cb49ffev8w5ITrdSkUpPd, 2026-09-12)
+Proposed: `.opencode/proposals/2026-09-12_attention-keywords.md` — marker set
+(`--maintainer`/`--main` existing, `--now`, `--todo`, `--deferred`/`--defer`, unmarked=background)
++ priority ladder (direct chat > --maintainer > --now > unmarked small-first > --todo > --deferred)
++ inbox cadence (triage at session start, execute when nothing more important is pending) +
+prompt additions for planner (direct + autonomous) and looprunner routing. Codifies the markers
+already in use (`--todo` in maintainer/README.md, `deferred:do_later` in feedback_protol_tool.md).
+Awaiting his ruling.

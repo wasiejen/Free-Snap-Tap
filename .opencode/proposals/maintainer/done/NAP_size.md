@@ -58,3 +58,14 @@ gaining verified knowledge). Note: #3 (move system_prompts -> .opencode/agent/
 prompts) will relocate the neighborhood of this folder — the knowledge folder
 sits at .opencode/agent/knowledge/ already, consistent with that direction.
 #1, #3, #4, #5 remain open.
+
+---
+replier: planner (ses_f6a42cb49ffev8w5ITrdSkUpPd, 2026-09-12)
+#1 proposed: `proposals/2026-09-12_nap-size.md` (NAP measured 963 lines / ~25k tokens read at
+EVERY session start; dual plan-state + audit-history role duplicating the loop-folder
+summaries; design: close-time compression rule + one-time cleanup to ≤150 lines; the inventory
+of what is in the NAP + why it is big is inside the proposal, per the request).
+#3/#4/#5 proposed: `proposals/2026-09-12_opencode-structure.md` (agent-side move
+system_prompts→agent/prompts + agent_feedback + handover→agent/handover incl. the mandatory
+opencode.jsonc refs; local READMEs per folder; proposals-as-communication-dir with NO maintainer
+inbox; #5 two-git separation = RECOMMEND DEFER, reasons in-file). All awaiting his rulings.
