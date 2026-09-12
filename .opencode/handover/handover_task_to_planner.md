@@ -1,118 +1,120 @@
-# EXECUTIVE SUMMARY — T3: `compact_memory` tool completion (L2, approved `2026-09-11_compaction-lifecycle.md`)
+# EXECUTIVE SUMMARY — T5 (re-verify): recovery-plugin verification + WIP→commit conversion (Cycle 2, L4+L5)
 
-**Outcome:** DONE — the prototype is complete per the approved design: persisted
-≤2-per-session budget + the tool's own COMPACT line + result/pointer/refusal notes.
-All DoD checks green (measured pre-commit; the single task commit carries this file).
+**Outcome:** DONE — GATE verified met at launch (clean tree; `git show HEAD:.opencode/tools/compact_memory.ts` contains `export default tool(`); probe S10 re-aligned to the committed tool() shape; the S10→S10 section verified green for the FIRST time (never run at `9e173d1`); WIP rescue `9e173d1` converted to a proper task commit (NOT rewritten). All DoD items green.
 
-## Budget-store mechanic + path (RECORDED per spec)
+## GATE (verified FIRST, before any work)
 
-- **Mechanic: a small JSON state store** (not sqlite — the minimal host-independent
-  option; the probe host is plain node and the store is a ~3-line read/increment/write,
-  no query surface needed. T5's emergency hook shares the store **by file**).
-- **Path:** `<root>/.opencode/temp/compact_budget.json`, shape:
-  ```json
-  { "version": 1, "maxPerSession": 2,
-    "sessions": { "<sid>": { "count": <n>, "updated": "<iso ts>" } } }
-  ```
-- Rules: ≤2 per session id, **self + emergency combined**; **increment on SUCCESS
-  only** (a failed compact consumes nothing); exhausted → the hand-over refusal note,
-  **no** `session.compact` call. The increment is **re-read-then-write with no await
-  between** (the only interleaving-safe sequence for a file shared with the future T5
-  hook in-process). Missing/corrupt store → treated as fresh (never throws).
-- **Root resolution:** `context.directory` if the tool context carries it (the SDK
-  `ToolContext` declares it; the probe passes the sandbox) — else **self-location**
-  (the tool file always lives at `<root>/.opencode/tools/compact_memory.ts`), which
-  keeps it cwd-independent in the real opencode host.
+1. `git status --porcelain` → empty (clean tree; `compact_memory.ts` NOT in unstaged).
+2. `git show HEAD:.opencode/tools/compact_memory.ts` → contains `export default tool(` (commit `6ea8c2f`).
+→ gate MET; work proceeded.
 
-## Final COMPACT line shape (RECORDED per spec)
+## Committed tool shape (re-confirmed vs the spec's assumptions)
 
+Runtime-verified via a scratch type-stripped import of the committed file (plain
+system node 24.19.0, the probe's host): `tool()` from `@opencode-ai/plugin` returns
+its input verbatim (`tool.schema = z`), so the default export is exactly
+`{ description, args, execute }`:
+- `description`: string ✓
+- `execute`: function ✓
+- `args`: **DELTA vs the spec** — a PLAIN object of NAME → zod schema
+  (`{ keepTokens: ZodNumber, keepMessages: ZodNumber, sessionID: ZodString }`,
+  zod 4.1.8; opencode tool() convention), NOT a zod object. The spec's prescribed
+  `Object.keys(cmTool.args?.shape ?? {})` would yield `[]`. Aligned the probe to
+  the committed reality (recorded in `todo_inbox.md` per the spec's approval
+  boundary).
+- Budget store / COMPACT line / directive strings: UNCHANGED from the T3 build —
+  checks 68-75 needed no target changes.
+
+## Exact check-67 diff (the probe re-alignment)
+
+`cmTool` access (~line 1409):
+```diff
+-  cmTool = toolMod.default?.tools?.compact_memory;
++  cmTool = toolMod.default;
 ```
-<YYYY-MM-DD_HH-MM>[ <modelId>] COMPACT <sessionID> tokens=<t> messages=<m>[ (<pre-readout>)]
+Check 67 label + arg-name assert + evidence (~lines 1406-1418):
+```diff
+-    "tool file imports (type-stripped, direct) and exposes default.tools.compact_memory (description + async execute + the prototype's arg names)",
+-    cmTool != null && typeof cmTool.description === "string" && typeof cmTool.execute === "function" &&
+-      JSON.stringify(Object.keys(cmTool.parameters?.properties ?? {})) === JSON.stringify(["keepTokens", "keepMessages", "sessionID"]),
+-    JSON.stringify(Object.keys(toolMod.default?.tools ?? {})),
++    "tool file imports (type-stripped, direct) and exposes the tool() default export (description + async execute + the prototype's arg names as args NAME → zod schema)",
++    cmTool != null && typeof cmTool.description === "string" && typeof cmTool.execute === "function" &&
++      JSON.stringify(Object.keys(cmTool.args ?? {})) === JSON.stringify(["keepTokens", "keepMessages", "sessionID"]) &&
++      Object.values(cmTool.args ?? {}).every((s) => s != null && typeof s.safeParse === "function"),
++    JSON.stringify(Object.keys(toolMod.default ?? {})),
 ```
-- Appended by the tool to `.opencode/temp/ctx.log` (in-process `appendFileSync`,
-  `mkdir -p`, wrapped in try/catch — **never throws**). Same local-stamp +
-  omit-when-empty convention as the T2 line.
-- `<t>`/`<m>` = the keep knobs actually passed to `session.compact` (args or the
-  prototype defaults 30000/12); `<sessionID>` = the resolved target (arg or the
-  `context.sessionId` fallback).
-- Samples (probe-verified byte-shapes):
-  - `2026-09-11_21-05 probe-model-120K_MTP COMPACT ses_cm_line tokens=50123 messages=9 (87%/52K)`
-  - `2026-09-11_21-05 COMPACT ses_cm_bare tokens=1 messages=1` (model + pre-readout omitted)
+(added the per-value `safeParse` guard so check 67 pins the tool() shape, not just
+the names). Check 73 fresh-module call site (~line 1515):
+```diff
+-  const a4 = await freshMod.default.tools.compact_memory.execute({ … }, cmCtx());
++  const a4 = await freshMod.default.execute({ … }, cmCtx());
+```
+Header comment (WHAT-IT-RUNS check-67 description) updated to the tool() shape.
 
-## Verified `context` fields (RECORDED per spec)
+## S10→S10 finding (first-ever run of checks 76-81)
 
-- **In the probe (fake context):** `client` (captures `session.compact`), `sessionId`,
-  `directory` (sandbox steering), and the optional best-effort `modelId` +
-  `preReadout`. All six spec'd behaviors verified against it (checks 67–75).
-- **Best-effort (omitted when absent, never thrown):** model id from
-  `context.modelId` (string) else `context.model.id`; pre-readout from
-  `context.preReadout` (string, wrapped in parentheses on the line). The SDK's
-  `ToolContext` (`@opencode-ai/plugin` 1.18.29) declares **neither** a model id nor a
-  readout — so in the real opencode host these fields will be **omitted** from the
-  line (best-effort by design); the line always carries stamp + `COMPACT <sid>
-  tokens=<t> messages=<m>`.
-- **Session id:** the prototype's working shape `context.sessionId` is kept as the
-  primary fallback; I added `context.sessionID` as a SECONDARY fallback (the SDK
-  types use that spelling) — a one-token defensive extension, recorded here.
-- A missing/unresolvable session id returns a failure note (never throws).
+Check 78 went RED on the first full run: the probe's `RC_DIRECTIVE` (a
+"byte-identical copy of the tool's directive") did not match the plugin's
+`promptAsync` text. Root cause: the committed plugin's
+`COMPACTION_RELOAD_DIRECTIVE` carries the tool's 2-line directive **plus a
+looprunner continuation line** ("If your role is Looprunner continue the last
+restart/resume close message of a Planner you have received.") — added by the T5
+WIP build, never verified (the S10→S10 section was never run before this
+re-verify). Per spec ("the PLUGIN is NOT changed by this task — only the PROBE
+is re-aligned"): the probe's `RC_DIRECTIVE` + check-78 label + header line were
+re-aligned to the committed plugin's runtime string (byte-verified equal, 297
+chars, via a scratch fire of the hook). CONSEQUENCE: the plugin's own header
+comment (context_recovery.ts lines 31-34: "byte-identical to the compact_memory
+tool's constant") is now FALSE — finding recorded in `todo_inbox.md` (decision:
+fix the comment, or make the directive byte-identical — the latter is a behavior
+change → maintainer call).
 
-## What changed
+## Verification (measured, pre-commit; verbatim)
 
-- `.opencode/tools/compact_memory.ts` — built ON the prototype (export shape, arg
-  names `keepTokens`/`keepMessages`/`sessionID`, and the
-  `context.client.session.compact({path:{id}, body:{keep:{tokens,messages}}})` call
-  shape all unchanged):
-  - budget gate BEFORE the compact call; `recordSuccess` AFTER it;
-  - the COMPACT-line append after success (shape above);
-  - success note = the prototype's sentence + `kept last <N> messages / <T> tokens`
-    + the unchanged directive pointer; refusal note = "Compaction refused: … budget
-    … exhausted … **Hand over and start fresh** — …"; error note = the prototype's
-    `Compaction request failed: <msg>`.
-  - **FIX (in-scope, prototype bug):** the directive template literal's single
-    backslashes were JS escapes (`\s`, `\a`) that **silently stripped the path
-    separators** from the emitted pointer (runtime string became
-    `.opendocesystem_promptagent_readme_post_compaction.md`). Now escaped — the
-    sentence is unchanged; probe check 75 pins the correct pointer.
-- `.opencode/plugin/probes/handover_probe.mjs` — NEW **S10** section (checks
-  **67–75**, sandboxed fake client + fake context, tool imported DIRECT /
-  type-stripped): import+exposure / passed-through keep knobs /
-  `context.sessionId` fallback / COMPACT line with + without the best-effort fields /
-  budget 2-allow-3rd-refuse-no-call / **disk-persistence proven by a cache-busted
-  re-import** (fresh module instance still refused) / failing-compact no-throw +
-  no-budget-consumption / pointer + hand-over notes. Header block (EXTENDED line,
-  S10 WHAT-IT-RUNS, EXPECTED OUTPUT 65→74) and check 43's fingerprint list
-  (`ses_cm_*` ids) updated.
-- `.opencode/loop/autorun-2026-09-11_17-23/loop_log.md` — `-->START` line (this
-  session) + `DONE<---` line with the final gauge readout.
+- `node .opencode\plugin\probes\handover_probe.mjs` → **`PROBE handover: 80/80 PASS`**, exit 0.
+- `& .\.venv\Scripts\python.exe -m pytest -q` → **`451 passed, 1 warning in 2.62s`** (the known #10 warning: `RuntimeWarning: coroutine 'Output_Manager.execute_key_event' was never awaited`, `tests/test_extraction_filter_edges.py::test_mouse_rebind_schedule_error_is_logged`; no FST code touched).
+- `& .\.venv\Scripts\ruff.exe check --select F .` → **`All checks passed!`** (F=0).
 
-## Verification (measured, pre-commit)
+## Header total reconciliation
 
-- `node .opencode\plugin\probes\handover_probe.mjs` → **`PROBE handover: 74/74
-  PASS`**, exit 0 (N=74 > 65; baseline before the change was 65/65 green).
-- `& .\.venv\Scripts\python.exe -m pytest -q` → **451 passed, 1 warning** (the known
-  #10 warning — no FST code touched).
-- `& .\.venv\Scripts\ruff.exe check --select F .` → **All checks passed (0 findings)**.
-- S5 sandbox hygiene still green: zero writes outside the sandbox, plugin.log kind
-  tallies unchanged (the tool section writes nothing to plugin.log), git status /
-  .opencode listing unchanged during the probe run.
+The spec expected the stale header total to be reconciled from "80/80" to a
+measured 74/74. MEASURED reality: **N=80 — the header was already correct.**
+Count audit (scripted): 75 literal `check()` calls + 5 dynamic S8 rung checks
+(47-51) = 80; per-section breakdown (S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12
+S10=9 S11=6 S5=6) sums to 80 and matches the check-id groups (id 44 absent by
+design). The carried "74/74" figure was the T3-era baseline (74 = 80 − the 6
+S10→S10 checks added by the WIP rescue, whose worker already updated the header
+to 80/80). No header edit was made — nothing to reconcile.
+
+## Commit
+
+The task commit (this file + the probe re-alignment + the loop-log START line +
+the `todo_inbox.md` entries) is the single new commit after launch-HEAD
+`73ff6e` (subject names the T5 re-verify); its exact hash is recorded in the
+loop-log `DONE<---` line + the close commit. The WIP-rescue commit `9e173d1`
+is NOT rewritten (remains in history; its probe diff + `context_recovery.ts`
+now carry verified status via this commit).
 
 ## TODO / discrepancy entries
 
 - `TODO.md`: unchanged (no numbered entry touched; nothing to close).
-- `todo_inbox.md`: one dated worker block appended — the probe header (line ~28)
-  claims `.opencode/package.json` "has no 'type' field and must not gain one", but
-  the file currently carries `"type": "module"` (stale header text vs code; out of
-  my scope — the probe file's historical header I did not rewrite).
+- `todo_inbox.md`: one dated worker block appended (2 items): (1) the stale
+  plugin "byte-identical" comment + the decision needed (fix comment vs make
+  directive byte-identical — the latter needs approval); (2) the spec delta
+  (`args` plain-object vs zod-object assumption — no action, recorded per the
+  spec's approval boundary).
 
 ## Deliberately NOT done (per spec boundaries)
 
-- T4 (role-prompt standing trigger rule) and T5 (the plugin recovery hook + shared
-  enforcement at the hook level) — later tasks; the budget STORE is shared-ready
-  (file-based, root-independent, re-read-increment).
-- `opencode.jsonc` (left locally modified, NEVER staged), anything under
-  `.opencode/proposals/maintainer/` (left untracked/untouched),
-  `.opencode/plugin/ctx_watchdog.ts` + the probe's existing checks, FST python code.
-- The proposal's live acceptance (a forked session self-compacting with explicit
-  params) — that is the maintainer's live test; the probe covers the tool
-  sandboxed. Git emitted the pre-existing LF→CRLF warning on the edited files
-  (repo-wide checkout behavior, unchanged by this task).
+- `context_recovery.ts` (the plugin) — untouched, per spec (the directive
+  question is a maintainer call — inbox entry).
+- `ctx_watchdog.ts`, the live `opencode.jsonc`, FST python + `tests/`, the role
+  prompts, the NAP, `.opencode/proposals/maintainer/`, everything in the loop
+  folder except the append-only `loop_log.md` START line (ordered by the launch
+  message; the DONE line rides the close commit, loop precedent `7edca3d`).
+- The committed `compact_memory.ts` — read-only (the gate reads it; not edited).
+- Cycle-2 LIVE acceptance (a real sub-agent overflow → the plugin fires) —
+  still maintainer host domain (per the iter-3/4 findings: the hook did not
+  fire live; hook dispatch + the tool's `context.client.session` gap are the
+  maintainer's live environment, not probe-reachable).

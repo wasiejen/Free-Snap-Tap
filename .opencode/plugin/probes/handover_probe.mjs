@@ -177,8 +177,11 @@
  //      store + the COMPACT ctx.log line — into the sandbox; sessionId per
  //      the prototype's working shape, modelId/preReadout = the best-effort
  //      L1 fields):
- //      (67) the tool file imports and exposes default.tools.compact_memory
- //          (description + async execute + the prototype's arg names)
+ //      (67) the tool file imports and exposes the tool() default export
+  //          (description + async execute + the prototype's arg names as a
+  //          plain-object args of NAME → zod schema; the T3 prototype's
+  //          default.tools.compact_memory shape is GONE — re-aligned
+  //          2026-09-12 to the committed tool() form, T5 re-verify)
  //      (68) execute calls session.compact with the PASSED-THROUGH keep
  //          knobs (the fake client captures the call) + path.id
  //      (69) the sessionID arg ABSENT → the context.sessionId fallback
@@ -216,9 +219,10 @@
   //          (undefined), no compact, no promptAsync
   //      (78) flag ON (JSONC fixture) + overflow + fresh budget → compact
   //          with EXACTLY keep {30_000, 12}, the promptAsync directive
-  //          byte-matches the tool's string, the budget file carries
-  //          count==1 ON DISK, and the hook returns
-  //          {handled:true, action:"retry"}
+  //          byte-matches the plugin's constant (the tool's 2-line directive
+  //          + the looprunner continuation line — re-aligned 2026-09-12 at
+  //          the T5 re-verify), the budget file carries count==1 ON DISK,
+  //          and the hook returns {handled:true, action:"retry"}
   //      (79) flag ON + overflow + pre-seeded exhausted budget
   //          (count==2) → unhandled, no compact, no promptAsync, budget
   //          unchanged
@@ -1403,17 +1407,21 @@ const cmCtx = (extra = {}) => ({ sessionId: "ses_cm_1", directory: SANDBOX, clie
 let cmTool;
 const cmExec = (args, extra) => cmTool.execute(args, cmCtx(extra));
 
-// 67 — the tool file imports (type-stripped, direct) and exposes the tool
+// 67 — the tool file imports (type-stripped, direct) and exposes the tool()
+//      default export: { description, args (plain object NAME → zod schema),
+//      execute } — the maintainer's committed tool() form (the T3 prototype's
+//      default.tools.compact_memory shape is GONE)
 {
   const toolMod = await import(pathToFileURL(TOOL_TS).href);
-  cmTool = toolMod.default?.tools?.compact_memory;
+  cmTool = toolMod.default;
   check(
     "67",
     "S10",
-    "tool file imports (type-stripped, direct) and exposes default.tools.compact_memory (description + async execute + the prototype's arg names)",
+    "tool file imports (type-stripped, direct) and exposes the tool() default export (description + async execute + the prototype's arg names as args NAME → zod schema)",
     cmTool != null && typeof cmTool.description === "string" && typeof cmTool.execute === "function" &&
-      JSON.stringify(Object.keys(cmTool.parameters?.properties ?? {})) === JSON.stringify(["keepTokens", "keepMessages", "sessionID"]),
-    JSON.stringify(Object.keys(toolMod.default?.tools ?? {})),
+      JSON.stringify(Object.keys(cmTool.args ?? {})) === JSON.stringify(["keepTokens", "keepMessages", "sessionID"]) &&
+      Object.values(cmTool.args ?? {}).every((s) => s != null && typeof s.safeParse === "function"),
+    JSON.stringify(Object.keys(toolMod.default ?? {})),
   );
 }
 
@@ -1512,7 +1520,7 @@ const cmExec = (args, extra) => cmTool.execute(args, cmCtx(extra));
   }
   const freshMod = await import(pathToFileURL(TOOL_TS).href + "?cm_reimport=1");
   const before = cmCompactCalls.length;
-  const a4 = await freshMod.default.tools.compact_memory.execute({ keepTokens: 10, keepMessages: 2, sessionID: "ses_cm_budget" }, cmCtx());
+  const a4 = await freshMod.default.execute({ keepTokens: 10, keepMessages: 2, sessionID: "ses_cm_budget" }, cmCtx());
   check(
     "73",
     "S10",
@@ -1577,11 +1585,16 @@ const cmExec = (args, extra) => cmTool.execute(args, cmCtx(extra));
 // the pre-seeded exhausted store (check 79) proves the gate reads from
 // disk, not from module memory.
 const RC_TS = path.join(REPO_ROOT, ".opencode", "plugin", "context_recovery.ts");
-// Byte-identical copy of the tool's directive constant (compact_memory.ts
-// lines 19-21, the T3-escaped form — the runtime value carries the SINGLE
-// backslashes in the path pointer).
+// Byte-identical copy of the RECOVERY PLUGIN's directive constant
+// (context_recovery.ts lines 35-39, the T5-escaped form — the runtime value
+// carries the SINGLE backslashes in the path pointer): the tool's 2-line
+// directive + the looprunner continuation line. NOTE (T5 re-verify
+// 2026-09-12): the WIP probe assumed byte-identity with the TOOL's directive;
+// the committed plugin's constant carries the extra looprunner line (the
+// plugin's own "byte-identical to the tool" header comment is stale — see
+// todo_inbox.md).
 const RC_DIRECTIVE =
-  "[SYSTEM CONTEXT DIRECTIVE]\nContext was compacted. Read .opencode\\system_prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.";
+  "[SYSTEM CONTEXT DIRECTIVE]\nContext was compacted. Read .opencode\\system_prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.\nIf your role is Looprunner continue the last restart/resume close message of a Planner you have received.";
 const RC_BUDGET = path.join(SANDBOX, ".opencode", "temp", "compact_budget.json");
 const SB_JSONC = path.join(SANDBOX, "opencode.jsonc");
 const JSONC_FIXTURE = [
@@ -1657,8 +1670,9 @@ const rcFire = (error, sessionId) =>
 
 // 78 — flag ON (the JSONC fixture with REAL comments, incl. a // inside a
 //      string) + overflow + fresh budget → compact with EXACTLY keep
-//      {30_000, 12}, the promptAsync directive BYTE-MATCHES the tool's
-//      string (synthetic text part), the budget file carries count==1 ON
+//      {30_000, 12}, the promptAsync directive BYTE-MATCHES the plugin's
+//      constant (the tool's 2-line directive + the looprunner continuation
+//      line — synthetic text part), the budget file carries count==1 ON
 //      DISK, and the hook returns {handled:true, action:"retry"}
 {
   writeFileSync(SB_JSONC, JSONC_FIXTURE);
@@ -1676,7 +1690,7 @@ const rcFire = (error, sessionId) =>
   check(
     "78",
     "S11",
-    'flag ON (JSONC w/ comments) + overflow + fresh budget: compact keep {30_000,12}, directive byte-exact (synthetic), budget count==1 on disk, {handled:true,action:"retry"}',
+    'flag ON (JSONC w/ comments) + overflow + fresh budget: compact keep {30_000,12}, directive byte-exact (the plugin constant: tool directive + looprunner line), budget count==1 on disk, {handled:true,action:"retry"}',
     cc.length === 1 && cc[0]?.path?.id === "ses_rc_ok" && cc[0]?.body?.keep?.tokens === 30_000 && cc[0]?.body?.keep?.messages === 12 &&
       pc.length === 1 && pc[0]?.path?.id === "ses_rc_ok" && pc[0]?.body?.parts?.length === 1 && p0?.type === "text" && p0?.synthetic === true && p0?.text === RC_DIRECTIVE &&
       budget?.sessions?.ses_rc_ok?.count === 1 &&
