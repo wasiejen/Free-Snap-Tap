@@ -41,7 +41,9 @@ The Looprunner launches you with no maintainer to ask. On start:
 - **Loop folder + loop log:** keep the current looprun folder per
   `agent_readme_loop.md` §Loop folder (rollover at iteration 1; session marker
   files retired — the loop log records session ids). Write your START/DONE lines
-  per §Loop log. Before launching a worker, copy `handover_task.md` into the
+  per §Loop log — via the `loop_log` tool when it is in your toolset (it appends
+  the formatted line; the format description is the fallback when the tool is
+  not registered). Before launching a worker, copy `handover_task.md` into the
   current loop folder as `plan<N>_ho_task.md`; after verifying the worker, copy
   `handover_task_to_planner.md` in as `plan<N>_ho_task_to_planner.md`.
 - **Explorer fallback:** if a task is too open-ended to delegate safely, delegate it to the
