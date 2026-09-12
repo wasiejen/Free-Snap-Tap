@@ -238,8 +238,15 @@ reenabled, that is the call.
   (1): compaction stays host-triggered (maintainer compacts manually in a
   direct session); the plugin shapes the resulting prompt.
   (Source: `proposals/maintainer/done/plugin_exposed_custom_tool.md`.)
-- **Status:** OPEN — maintainer call; solution paths (1)+(2) are the table
-  (2026-09-12). Paths are complementary, not competing.
+- **Status:** OPEN — design agreed with the maintainer (2026-09-12):
+  plugin-registered `compact_memory` tool (client via captured plugin ctx;
+  v1 `summarize` path ACTIVE on this build + v2 `compact` hedge; keep args
+  optional in the body with a 400-retry; cross-session via `sessionID` arg;
+  HTTP fallback + compaction hook retired). Proposal:
+  `proposals/2026-09-12_compact_memory_plugin.md` (AWAITING APPROVAL).
+  Probe evidence: `.opencode/plugin/dev_probe_ctx.ts` (client present in
+  plugin ctx; summarize=function, compact=undefined; session methods on
+  the prototype → detect with typeof; registration via the `plugins` array).
 
 ## Closed entries
 

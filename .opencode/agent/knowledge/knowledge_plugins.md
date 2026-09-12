@@ -79,6 +79,25 @@ Gained, verified knowledge for opencode plugins. Format per the README:
 - **Keys:** plugin, register tool, context.client, RPC, SDK access,
   .opencode/tools, .opencode/plugin, compact, ctx.
 
+## The plugin ctx client on THIS host (probe-verified) + detection gotchas
+- **Do:** reach the SDK client via the CAPTURED plugin ctx
+  (`ctx.client.session.*`). Detect methods with `typeof` — `Object.keys`
+  MISSES prototype methods (`Object.keys(client.session)` returns only
+  `["_client"]`). On this build `summarize` is a function and `compact` is
+  UNDEFINED (v1-generation client). A tool-exposing plugin registers ONLY
+  via the live `opencode.jsonc` `plugins` array — a dropped-in file without
+  the config entry does not register.
+- **Why (evidence):** `dev_probe_ctx.ts` probe (2026-09-12, output in its
+  header comment): pluginCtxKeys = client, project, worktree, directory,
+  experimental_workspace, serverUrl, $; client exposes 21 keys (session,
+  app, event, config, ...); summarizeType=function, compactType=undefined;
+  the tool's execute context inside the plugin has NO client (same 11 keys
+  as the custom-tool context).
+- **Ref:** `.opencode/plugin/dev_probe_ctx.ts`; TODO #52;
+  `proposals/2026-09-12_compact_memory_plugin.md`.
+- **Keys:** plugin ctx, client, summarize, compact, v1, v2, prototype,
+  typeof, plugins array, registration, dev_probe_ctx.
+
 ## A plugin can REPLACE the compaction prompt (shape the resume context)
 - **Do:** to control what a compaction produces, use the
   `experimental.session.compacting` hook and set `output.prompt` (replaces
