@@ -69,14 +69,14 @@
             "output": 120000
           }
         },
-        "Gemma4-12B-Q4KM-UC-256K": {
+        "Gemma4-12B-Q4KM-UC-128K": {
           "name": "Gemma4-12B-Q4KM-UC",
           "limit": {
             "context": 131072,
             "output": 131072
           }
         },
-        "Gemma4-12B-Q4KXL-MTP-256K": {
+        "Gemma4-12B-Q4KXL-MTP-128K": {
           "name": "Gemma4-12B-Q4KXL-MTP",
           "limit": {
             "context": 131072,
