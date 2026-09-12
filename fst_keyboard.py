@@ -154,6 +154,16 @@ class FST_Keyboard():
             except ValueError:
                 raise ConfigError(f"key '{key}' does not resolve to a vk code", str(key))
 
+    def surface_config_error(self, error):
+        '''
+        surface a ConfigError to the user at a hot path / vk-resolution site:
+        GUI mode (toast bridge wired) -> P08 error toast; headless -> console print
+        '''
+        if self.toast_callback is not None:
+            self.toast_callback(f"[FST] {error}", 5, 12, "rgba(200, 40, 40, 200)", "white")
+        else:
+            print(f"[FST] {error}")
+
     def initialize_groups_from_presorted_lines(self):
         '''
         in new form there are rebinds and macros
@@ -932,7 +942,7 @@ class FST_Keyboard():
                 except ConfigError as error:
                     if vk_code not in self._warned_config_errors:
                         self._warned_config_errors.add(vk_code)
-                        print(f"[FST] {error}")
+                        self.surface_config_error(error)
                     return False
             all_active = all_active and self._state_manager.get_real_key_press_state(vk_code)
         return all_active
@@ -951,7 +961,7 @@ class FST_Keyboard():
                 try:
                     self.control_toggle_pause()
                 except ConfigError as error:
-                    print(f"[FST] {error}")
+                    self.surface_config_error(error)
                     self.update_args_and_groups('')
                     self._arg_manager.WIN32_FILTER_PAUSED = False
                     self._arg_manager.MANUAL_PAUSED = False

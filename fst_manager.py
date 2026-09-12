@@ -653,7 +653,11 @@ class Output_Manager():
                 else:
                     return False
             except Exception as error:
-                print(error)
+                if isinstance(error, ConfigError):
+                    self._fst.surface_config_error(error)
+                else:
+                    # defensive: any other unexpected exception stays console-only
+                    print(error)
                 # unknown key in a state constraint fails the constraint (fail-closed)
                 return False
 
@@ -674,7 +678,7 @@ class Output_Manager():
             try:
                 result = eval(constraint_to_evaluate)
             except ConfigError as error:
-                print(error)
+                self._fst.surface_config_error(error)
                 # unknown key in a constraint function call fails the constraint (fail-closed)
                 return False
             except NameError as error:
