@@ -10,7 +10,7 @@ Gained, verified knowledge for opencode plugins. Format per the README:
   Do not conflate the two shapes.
 - **Why (evidence):** the current opencode docs describe plugin vs custom-tool
   context differently; using the wrong shape is the common trap.
-- **Ref:** `proposals/maintainer/done/knowledge_opencode_tools_plugins.md`
+- **Ref:** `maintainer/done/knowledge_opencode_tools_plugins.md`
   §1 + §4.
 - **Keys:** plugin context, Tool.Context, ctx.session, get, context, v2.
 
@@ -67,14 +67,14 @@ Gained, verified knowledge for opencode plugins. Format per the README:
   exposes to agents. The registered tool's `execute` still receives
   sessionID / agent.
 - **Why (evidence):** maintainer Q&A (2026-09-12,
-  `proposals/maintainer/done/plugin_exposed_custom_tool.md`): the
+  `maintainer/done/plugin_exposed_custom_tool.md`): the
   custom-tool context is intentionally limited (no client); a custom tool
   CANNOT "start"/obtain a plugin context, but a plugin CAN register tools —
   "Do not use a separate `.opencode/tools/...` tool if it requires
   `context.client`; register that tool from `.opencode/plugins/...`
   instead." A spawned Node process is NOT a plugin context (would need its
   own server connection) — avoid that workaround.
-- **Ref:** `proposals/maintainer/done/plugin_exposed_custom_tool.md`;
+- **Ref:** `maintainer/done/plugin_exposed_custom_tool.md`;
   `get_context_keys` key dump (clientKeys empty); TODO #52.
 - **Keys:** plugin, register tool, context.client, RPC, SDK access,
   .opencode/tools, .opencode/plugin, compact, ctx.
@@ -112,6 +112,6 @@ Gained, verified knowledge for opencode plugins. Format per the README:
   resume prompt.
 - **Ref:** `.opencode/node_modules/@opencode-ai/plugin/dist/index.d.ts`
   (~L277-296); maintainer WIP `custom_compaction.ts` (uncommitted);
-  `proposals/maintainer/done/plugin_exposed_custom_tool.md`; TODO #52.
+  `maintainer/done/plugin_exposed_custom_tool.md`; TODO #52.
 - **Keys:** experimental.session.compacting, output.prompt, compaction,
   resume prompt, swarm, durable state.

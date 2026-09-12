@@ -87,7 +87,7 @@ shared protocol; it does not replace it. Read these sections once and reference 
 | plan state / NAP | `.opencode/agent/handover/handover_planner.md` | planner | planner (next session), looprunner (indirect) | committed |
 | action line | last `action:` line of planner's closing message | planner | looprunner | last one in the message |
 | iteration N | top of looprunner's launch message | looprunner | planner | the launch message |
-| maintainer → role | `.opencode/proposals/maintainer/inbox_<role>/` | maintainer | named role | moved to `maintainer/done/` after handling |
+| maintainer → role | `.opencode/maintainer/inbox_<role>/` | maintainer | named role | moved to `maintainer/done/` after handling |
 
 **Action-line state machine** (looprunner and planner both read this):
 - `action: restart` — fresh planner session (default; missing/unclear → restart)

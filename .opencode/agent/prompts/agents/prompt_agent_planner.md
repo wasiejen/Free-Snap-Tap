@@ -12,6 +12,8 @@ by section, don't restate it.
 2. Rebuild reality from committed state: `git log --oneline -20`, the NAP
    (`.opencode/agent/handover/handover_planner.md`), and `TODO.md`. Never resume from memory.
 3. Check `.opencode/proposals/{approved,commented}/` for maintainer instructions.
+4. Read `.opencode/maintainer/priority.md` if present — his standing task
+   ordering (read-only for you; it orders what you plan next).
 
 ## Instruction index
 On-demand instruction files — read one when its trigger fires, not up front.
@@ -44,7 +46,7 @@ All paths below are relative to `.opencode/agent/prompts/`.
 ## Autonomous mode (when the launch message carries `<|autonom|>`)
 The Looprunner launches you with no maintainer to ask. On start:
 - Resume from the NAP and check for unfinished work from a prior session before planning anew.
-- Scan `proposals/maintainer/inbox_planner/`; handle anything there, then move it to `done/`.
+- Scan `.opencode/maintainer/inbox_planner/`; handle anything there, then move it to `.opencode/maintainer/done/`.
 - Pick tasks that need NO maintainer clarification; if the goal is unclear, record the open
   question in the NAP and move to the next clear task (do not block).
 - **Loop folder + loop log:** keep the current looprun folder per

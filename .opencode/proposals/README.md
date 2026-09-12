@@ -10,12 +10,9 @@ root = pending → `commented/` (in-file comments; the planner revises, never
 edits his text; back to root) → `approved/` (a task; the `--maintainer:` block
 is the ruling) → `implemented/` (verdict note in-file; he removes eventually).
 `rejected/` + `unclear_if_implemented/` = closed / needs revisit; `files/` =
-his read-only draft test set; `feedback/` = his notes on agent behavior.
+his read-only draft test set.
 
-## maintainer/ — reverse direction (maintainer→agent, P10)
-His outbox: `inbox_planner/`, `inbox_worker/`, `inbox_planner/draft/` (his
-drafting scratch). The addressed agent scans at session start, handles, moves
-the file to `maintainer/done/` (content untouched; move = read-receipt).
-
-## Not for here
-Repo code bugs (`TODO.md`), product ideas, anything needing no decision.
+## Not here
+maintainer→agent traffic lives one level up in `.opencode/maintainer/` (his
+outbox: inboxes, feedback, `priority.md` — see its README). Also NOT for: repo
+code bugs (`TODO.md`), product ideas, anything needing no decision.

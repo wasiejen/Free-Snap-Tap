@@ -217,9 +217,9 @@ reenabled, that is the call.
   `.opencode/node_modules/@opencode-ai/sdk/dist/{gen,v2/gen}/*.d.ts`
   (installed types — the authority for the call shape), the host-side
   client/URL wiring (maintainer domain), the v2 test notes
-  (`proposals/maintainer/done/compact_memory_v2test.ts` +
+  (`maintainer/done/compact_memory_v2test.ts` +
   `compaction_warning.md`), the knowledge doc
-  (`proposals/maintainer/done/knowledge_opencode_tools_plugins.md`).
+  (`maintainer/done/knowledge_opencode_tools_plugins.md`).
   Related: the loop_log-v2 proposal's Part A context probe (which context
   fields the host wires — `sessionID`/`agent` confirmed, model open); the
   installed plugin package DOES expose the
@@ -239,7 +239,7 @@ reenabled, that is the call.
   (shape verified against installed plugin types 2026-09-12). Complements
   (1): compaction stays host-triggered (maintainer compacts manually in a
   direct session); the plugin shapes the resulting prompt.
-  (Source: `proposals/maintainer/done/plugin_exposed_custom_tool.md`.)
+  (Source: `maintainer/done/plugin_exposed_custom_tool.md`.)
 - **Status:** OPEN — design agreed with the maintainer (2026-09-12):
   plugin-registered `compact_memory` tool (client via captured plugin ctx;
   v1 `summarize` path ACTIVE on this build + v2 `compact` hedge; keep args

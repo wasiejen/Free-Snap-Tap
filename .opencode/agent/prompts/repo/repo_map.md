@@ -65,6 +65,10 @@ config file. README/WIKI have some stale examples — trust the convention above
   planner state/continuation file, the NAP; `handover_task.md` current task
   spec; `handover_task_to_planner.md` worker's latest EXECUTIVE SUMMARY),
   `knowledge/` (area knowledge base), `agent_feedback.md` (friction log);
+  `maintainer/` — the maintainer→agent exchange (`inbox_planner/`,
+  `inbox_worker/`, `done/`, `feedback/`, `priority.md` his standing task
+  ordering; see its README); `proposals/` — the agent→maintainer decision
+  channel (root → commented → approved → implemented/rejected);
   `loop/autorun-…/` — the CURRENT looprun (spec/summary copies + `loop_log.md`);
   older loopruns live in `archive/loop/`.
 - `plugin/scripts/` — the context gauge (`peek.mjs` self-peek CLI + `gauge.mjs`

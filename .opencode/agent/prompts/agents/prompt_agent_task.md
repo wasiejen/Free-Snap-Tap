@@ -11,7 +11,7 @@ reference it by section, don't restate it.
 1. Read `agents_repo.md` (repo map) — it is NOT auto-loaded.
 2. Read the task spec (`.opencode/agent/handover/handover_task.md`) — it defines the goal +
    definition of done + approval boundary.
-3. Scan `proposals/maintainer/inbox_worker/` if present.
+3. Scan `.opencode/maintainer/inbox_worker/` if present.
 
 ## Instruction index
 On-demand instruction files — read one when its trigger fires, not up front.

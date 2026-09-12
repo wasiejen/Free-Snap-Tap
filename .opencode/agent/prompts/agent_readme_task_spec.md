@@ -14,7 +14,7 @@
 - **The spec is a contract, not an essay:** exact scope, exact DoD
   (measurable end states — probe count, grep-clean, byte-exact format),
   and an explicit **DO-NOT-touch** list (including the maintainer's live
-  files and anything under `proposals/maintainer/`). Pin the WHAT and the
+   files and anything under `.opencode/maintainer/`). Pin the WHAT and the
   end state; the HOW is the worker's call inside the DoD.
 - **Spec size is context.** Keep specs short (usually < 100 lines).
   Every spec line competes with the work for the worker's window.

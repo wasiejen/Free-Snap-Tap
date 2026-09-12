@@ -30,7 +30,7 @@ instructions/protocol — facts that save lookups. Format per the README:
   (2026-09-12) — the host populates sessionID / messageID / agent on the tool
   context.
 - **Ref:** `session_info.ts` probe output;
-  `proposals/maintainer/done/knowledge_opencode_tools_plugins.md` §1.
+  `maintainer/done/knowledge_opencode_tools_plugins.md` §1.
 - **Keys:** context, sessionID, messageID, agent, Tool.Context.
 
 ## `context.client` is ABSENT in this host build's tool context (CONFIRMED)
@@ -48,7 +48,7 @@ instructions/protocol — facts that save lookups. Format per the README:
   This is why compact_memory's client path fails here → it fell to the HTTP
   fallback → no listener on 4096 → "Unable to connect" (TODO #52).
 - **Ref:** `get_context_keys.ts` run in session ses_f6b7c5242ffeZpNl0Ar8mILWua;
-  `proposals/maintainer/done/plugin_exposed_custom_tool.md`; TODO #52.
+  `maintainer/done/plugin_exposed_custom_tool.md`; TODO #52.
 - **Keys:** context.client, context.api, get_context_keys, contextKeys,
   clientKeys, sessionKeys, absent, intentionally, plugin registration, guard.
 
@@ -71,7 +71,7 @@ instructions/protocol — facts that save lookups. Format per the README:
   `POST /api/session/{sessionID}/compact`.
 - **Why (evidence):** running via the CLI does not imply a listener on 4096; a
   request with no listener fails with "Unable to connect."
-- **Ref:** `proposals/maintainer/done/knowledge_opencode_tools_plugins.md` §5;
+- **Ref:** `maintainer/done/knowledge_opencode_tools_plugins.md` §5;
   live `Get-NetTCPConnection` check (2026-09-12).
 - **Keys:** http, localhost, 4096, listener, Get-NetTCPConnection, fallback.
 

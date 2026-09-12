@@ -16,8 +16,22 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   (`proposals/feedback/` at the root, not `maintainer/feedback/`; done-moves
   content-untouched — the old "replier: block" wording was stale).
 - **Proposal moved to `implemented/`** (Status + Part 4 deferral recorded).
-  Restructure complete. Remaining acceptance (his side): host restart, then one
-  full loop iteration.
+- **maintainer/ lift + priority.md (his chat ruling, same session):** his
+  outbox is not nested under the proposals flow and not at the repo root
+  (he loses overview at both) → `.opencode/proposals/maintainer/` lifted to
+  `.opencode/maintainer/` (directly in his traversal area); `proposals/feedback/`
+  moved in (it's his feedback-gathering place); NEW `priority.md` — his simple
+  ordered task list (persistent, never to done/, agents READ-ONLY, planner
+  reads it at session start = planner prompt init step 4; it orders planning,
+  TODO.md stays the detail record). Two directions now = two sibling folders:
+  `proposals/` = agent→maintainer, `maintainer/` = maintainer→agent. Refs
+  updated: AGENTS.md contract table, planner/worker prompts,
+  agent_readme_proposals/task_spec, repo_map bullet, proposals/README (now
+  pure agent→maintainer + pointer), stale source pointers in TODO.md /
+  compact_memory.ts / knowledge files. opencode.jsonc had NO rules on these
+  paths → no new config fragility.
+- Restructure complete. Remaining acceptance (his side): host restart, then
+  one full loop iteration.
 - Baselines (carried; FST code untouched this session): probe 84/84 (re-measured
   under node), pytest 459+1#10, ruff F=0.
 

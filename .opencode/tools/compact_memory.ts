@@ -9,7 +9,7 @@
 //       successful compaction (in-process file append; best-effort, never throws),
 //   (3) the refusal note (hand over and start fresh) when the budget is exhausted.
 // v2 (2026-09-12, maintainer test `compact_memory_v2test.ts` in
-//   proposals/maintainer/done/): the host does not always wire
+//   maintainer/done/): the host does not always wire
 //   `context.client.session` — the session id AND the client are now resolved
 //   from MULTIPLE sources (arg → context.sessionId → context.sessionID →
 //   context.session.id; client → context.client → context.api), and when no
