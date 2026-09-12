@@ -50,8 +50,21 @@
 - Part 3: one full proposal cycle (draft → comment → approve → implement) runs unchanged.
 
 ## Status
-awaiting approval (Part 1 = config-affecting move, maintainer-gated + host restart; Part 2 is
-pre-approved meta once agreed; Part 4 needs his explicit deferral/decision)
+implemented 2026-09-12 (direct session ses_f6a0d11ebffed36PDKoTeWxddD, planner-
+direct per his "direct session only" caveat):
+- **Part 1** — commit `6ef2c4e`: 100% renames + all live references (opencode.jsonc,
+  AGENTS.md, agents_repo.md, SCRATCH_PAD.md, 4 plugin files incl. probe sandbox
+  constants, tools/compact_memory.ts + context_recovery.ts directive text, moved
+  files' cross-refs). Verified: acceptance grep = 0 live hits; probe 84/84 under
+  NODE. The "one full loop iteration after the host restart" acceptance part is
+  the maintainer's to run (his restart activates the opencode.jsonc change).
+- **Parts 2+3** — commit `cc9c67e`: 12 folder READMEs (≤20 lines) + `loop/`
+  created (.gitkeep) + the standing rule in the planner prompt; proposals/README
+  reworked (location = state; proposals ARE the agent→maintainer channel — no
+  fine-grained maintainer inbox); agent_readme_proposals.md aligned with the real
+  tree (`feedback/` at the proposals root; done-moves content-untouched).
+- **Part 4** — DEFERRED per his ruling (the recommendation above stands; revisit
+  after the rework has settled).
 
 --maintainer: first direct session task
 - approved
