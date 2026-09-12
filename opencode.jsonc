@@ -209,8 +209,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-          "agents_repo.md": "deny",
-          ".opencode/agent/prompts/**": "deny",
+           ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -232,8 +231,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-          "agents_repo.md": "deny",
-          ".opencode/agent/prompts/**": "deny",
+           ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -255,8 +253,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-          "agents_repo.md": "deny",
-          ".opencode/agent/prompts/**": "deny",
+           ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -278,8 +275,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-          "agents_repo.md": "deny",
-          ".opencode/agent/prompts/**": "deny",
+           ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -303,8 +299,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-          "agents_repo.md": "deny",
-          ".opencode/agent/prompts/**": "deny",
+           ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -326,8 +321,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-          "agents_repo.md": "deny",
-          ".opencode/agent/prompts/**": "deny",
+           ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -349,8 +343,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-          "agents_repo.md": "deny",
-          ".opencode/agent/prompts/**": "deny",
+           ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"

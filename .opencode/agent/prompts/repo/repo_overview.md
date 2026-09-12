@@ -1,8 +1,8 @@
-# agents_repo.md — repo-specific map for Free Snap Tap
+# repo_overview.md — repo-specific map for Free Snap Tap (READ FIRST)
 
 Windows-only snap-tapping / rebind / macro tool (pynput low-level hooks,
-PySide6 GUI, asyncio tasks) — the repo map is split into parts under
-`.opencode/agent/prompts/repo/`; read the part(s) you need, not the whole set.
+PySide6 GUI, asyncio tasks) — the repo map is split into the parts in THIS
+folder; read the part(s) you need, not the whole set.
 
 Maintained by the maintainer; agents do not edit it directly. If a part
 conflicts with the code, the code wins — flag the discrepancy in your summary

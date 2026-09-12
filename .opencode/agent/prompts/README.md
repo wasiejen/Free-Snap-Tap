@@ -2,7 +2,7 @@
 
 Purpose: the instruction text agent sessions load — role prompts + on-demand
 instruction files. `agents/prompt_agent_*.md` (live role prompts, wired in
-`opencode.jsonc`), `repo/repo_*.md` (the `agents_repo.md` parts),
+`opencode.jsonc`), `repo/repo_*.md` (`repo_overview.md` + the parts),
 `agent_readme_*.md` (protocol readmes: loop / proposals / todo /
 post-compaction), `roles/` (role-design drafts).
 

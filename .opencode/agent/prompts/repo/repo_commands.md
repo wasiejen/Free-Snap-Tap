@@ -1,6 +1,6 @@
-# repo_commands.md — repo commands part of `agents_repo.md` (split 2026-09-11)
+# repo_commands.md — repo commands part of `repo_overview.md` (split 2026-09-11)
 
-Sections moved verbatim from the root `agents_repo.md`; the root file is now a
+Sections moved verbatim from the former root file; the overview (`repo_overview.md`, this folder) is now a
 thin index pointing at the parts.
 
 ## Environment & shell

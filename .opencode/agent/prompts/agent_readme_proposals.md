@@ -30,8 +30,10 @@ Lives at `.opencode/maintainer/` — a SIBLING of `proposals/`, not under it
   `done/` with content UNTOUCHED (the move is the read-receipt; the handling
   is recorded in the NAP/summary/TODO as usual). `inbox_planner/draft/` is
   his drafting scratch — scan it only when nothing else is open.
-- `priority.md` — his standing task ordering; read-only for you, it orders
-  what you plan next (the planner reads it at session start).
+- `priority.md` — his standing task ordering; the planner reads it at session
+  start and orders planning by it. Agents may only REMOVE a line they have
+  fully handled, appending a one-line reply to `_past_priorities.md` (the
+  file itself documents the convention).
 - `feedback/` — his notes on agent behavior; read-only input for the next
   session.
 - NEVER edit his text.

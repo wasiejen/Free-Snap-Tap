@@ -1,6 +1,6 @@
-# repo_map.md — repo map part of `agents_repo.md` (split 2026-09-11)
+# repo_map.md — repo map part of `repo_overview.md` (split 2026-09-11)
 
-Sections moved verbatim from the root `agents_repo.md`; the root file is now a
+Sections moved verbatim from the former root file; the overview (`repo_overview.md`, this folder) is now a
 thin index pointing at the parts.
 
 ## What this is
@@ -60,7 +60,7 @@ config file. README/WIKI have some stale examples — trust the convention above
   probe, run these directly from the repo root; otherwise do not execute them.
 - `.opencode/` — opencode meta files (not FST code):
   `agent/` — the agent-side home: `prompts/` (`agents/prompt_agent_*.md` live
-  agent prompts, `repo/` the `agents_repo.md` parts, `agent_readme_*.md`
+  agent prompts, `repo/` the repo docs (`repo_overview.md` + parts), `agent_readme_*.md`
   protocol readmes: loop / proposals / todo), `handover/` (`handover_planner.md`
   planner state/continuation file, the NAP; `handover_task.md` current task
   spec; `handover_task_to_planner.md` worker's latest EXECUTIVE SUMMARY),

@@ -1,6 +1,6 @@
 # HANDOVER PLANNER — Phase 6 (post-T1; autonomous-loop era)
 
-FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
+FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 ## 2026-09-12 (direct session; ses_f6a0d11ebffed36PDKoTeWxddD) — .opencode restructure, Part 1 LANDED: agent-side home; host restart required
 - **Ruling (his chat, "approved as commented"):** `approved/2026-09-12_opencode-structure.md` approved; direct session ONLY (moving the prompt folder mid-loop risks config mismatch/worker death); Part 4 (2-git separation) DEFERRED per his ruling.
@@ -32,6 +32,23 @@ FIRST read AGENTS.md, agents_repo.md, TODO.md, this file.
   paths → no new config fragility.
 - Restructure complete. Remaining acceptance (his side): host restart, then
   one full loop iteration.
+- **repo_overview + priority convention (his chat ruling, same session):**
+  (a) root `agents_repo.md` (a 19-line pointer stub) → `.opencode/agent/
+  prompts/repo/repo_overview.md` — the repo-docs family is now one folder
+  (overview + parts); the name is self-evident and it reads FIRST (role-prompt
+  init step 1 + top of post-compaction STEP 1). Refs updated: AGENTS.md (5),
+  planner/worker/explorer prompts (command/gauge refs now point precisely at
+  `repo_commands.md`), post_compaction, prompts/README, the 4 part headers,
+  repo_map bullet. opencode.jsonc: 7 explicit `"agents_repo.md": "deny"`
+  EDIT-rules removed — the new location is already covered by the blanket
+  `.opencode/agent/prompts/**` deny (no behavior change). Probe 84/84 under
+  node. (b) `priority.md` convention relaxed: an agent may only REMOVE a line
+  it has FULLY handled, appending a one-line reply per item to
+  `_past_priorities.md` (new sibling, append-only, he trims it); partial/
+  blocked items stay in the list with status in the NAP. The convention is
+  self-documented in `priority.md` itself (any agent reading it learns it).
+- His uncommitted working-tree change left alone: `roles/agent_prompt_
+  engineer.md` → `prompt_engineer.md` (his rename, not staged).
 - Baselines (carried; FST code untouched this session): probe 84/84 (re-measured
   under node), pytest 459+1#10, ruff F=0.
 

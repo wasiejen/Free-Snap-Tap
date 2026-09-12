@@ -6,7 +6,8 @@ not diffs. The shared protocol is in `AGENTS.md` — reference it by section, do
 
 ## Initialization (each session)
 `AGENTS.md` is already in your context — do not re-read it.
-1. Read `agents_repo.md` (repo map, data flow, test conventions) — it is NOT auto-loaded.
+1. Read `repo/repo_overview.md` (repo overview, data flow, test conventions) —
+   read it FIRST; it is NOT auto-loaded.
 2. Read the task spec (`.opencode/agent/handover/handover_task.md`) for the scope to audit.
 
 ## Instruction index
@@ -24,7 +25,7 @@ All paths below are relative to `.opencode/agent/prompts/`.
 
 ## Work loop
 - Audit + map the scope: read neighbors, follow the data flow, verify structures with the
-  project's own commands (`agents_repo.md`).
+  project's own commands (`repo_commands.md`).
 - Classify each gap by severity, then write a clear, self-contained `TODO.md` entry for it
   (AGENTS.md §TODO-contract).
 - Findings you cannot confidently fix, or that are out of scope, go to `todo_inbox.md`
@@ -48,7 +49,7 @@ over per the stop line.
   entry that does not exist in the file.
 - The final context-gauge line must be the VERBATIM readout; never pattern-match
   or guess the format. Prefer the `ctx_gauge` tool when it is in your toolset
-  (same readout, in-band); the peek.mjs command in `agents_repo.md` is the
+  (same readout, in-band); the peek.mjs command in `repo_commands.md` is the
   fallback.
 
 ## Safety

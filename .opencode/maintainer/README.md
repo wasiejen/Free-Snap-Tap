@@ -16,7 +16,11 @@ Supersedes the retired single-file `handover_maintainer.md` (archived 2026-09-10
   session (moved in from `proposals/feedback/`).
 - `priority.md` — PERSISTENT (never moves to done/): his simple ordered list
   of what he wants next; the planner reads it at session start and uses it to
-  order planning. Agents are read-only on it — he adds/reorders/deletes lines.
+  order planning. Agents may only REMOVE a line they have FULLY handled,
+  appending a one-line reply for it to `_past_priorities.md` (the file itself
+  documents the convention).
+- `_past_priorities.md` — append-only log of handled priority items with
+  short replies; the maintainer erases entries when he wants.
 
 Naming for inbox messages is loose (e.g. `M<YYYY-MM-DD_HH-MM>_<slug>.md`;
 bundling several messages in one file is fine; the `--planner:`/`--worker:`

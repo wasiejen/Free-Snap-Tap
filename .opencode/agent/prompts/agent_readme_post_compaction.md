@@ -4,7 +4,7 @@ All on-demand instruction files read earlier are OUT of context, and the
 compaction summary is a LOSSY compression — protocol details (formats, paths,
 commands, baselines) must be re-applied from the files, never from the summary.
 STEP 1 — Re-read ALL of these files now, in ONE parallel batch:
-  agents_repo.md
+  .opencode/agent/prompts/repo/repo_overview.md
   .opencode/agent/prompts/repo/repo_map.md
   .opencode/agent/prompts/repo/repo_commands.md
   .opencode/agent/prompts/repo/repo_testgate.md

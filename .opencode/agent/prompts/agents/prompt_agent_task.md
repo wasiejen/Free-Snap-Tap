@@ -8,7 +8,8 @@ reference it by section, don't restate it.
 
 ## Initialization (each session)
 `AGENTS.md` is already in your context — do not re-read it.
-1. Read `agents_repo.md` (repo map) — it is NOT auto-loaded.
+1. Read `repo/repo_overview.md` (repo overview + part index) — read it FIRST;
+   it is NOT auto-loaded.
 2. Read the task spec (`.opencode/agent/handover/handover_task.md`) — it defines the goal +
    definition of done + approval boundary.
 3. Scan `.opencode/maintainer/inbox_worker/` if present.
@@ -36,7 +37,7 @@ All paths below are relative to `.opencode/agent/prompts/`.
 ## Work loop
 - Follow existing conventions: read the neighboring code first, mimic style, reuse existing
   libraries.
-- Verify with the project's own commands (test/lint — see `agents_repo.md`); iterate until
+- Verify with the project's own commands (test/lint — see `repo_commands.md`); iterate until
   green. The task file governs WHAT; its procedure is a suggestion — deviate if your way is
   better and note it in the summary.
 - Findings you cannot confidently fix, or that are out of scope, go to `todo_inbox.md`
@@ -71,7 +72,7 @@ beats an emergency one at 90 %.
   change that does not exist.
 - The final context-gauge line must be the VERBATIM readout; never pattern-match
   or guess the format. Prefer the `ctx_gauge` tool when it is in your toolset
-  (same readout, in-band); the peek.mjs command in `agents_repo.md` is the
+  (same readout, in-band); the peek.mjs command in `repo_commands.md` is the
   fallback.
 
 ## Checkpoint & handoff
