@@ -265,3 +265,21 @@ All those IDs stay reserved — see the numbering rule in the header.
 ## 43. (closed 2026-09-10, see todo_records.md) — `kb_env` fixture + `build()`/`down()` helpers are copy-pasted (drifted) across 6 test files — no shared conftest location (2026-09-10, Audit 3a)
 
 ## 44. (closed 2026-09-10, see todo_records.md) — Stale/unknown focus name → uncaught KeyError in `apply_focus_groups` / `apply_start_args_by_focus_name` (the config is reloaded *before* the lookup) (2026-09-10, Audit 3b)
+
+## 54. (open, maintainer call 2026-09-12) — Rule: never circumvent access restrictions; blocked-file protocol for agents
+
+- **Problem / evidence:** worker_Q4_120K (attention-keywords task, 2026-09-12) had no
+  edit access to `.opencode/agent/prompts/**` (opencode.jsonc edit-deny) and tried to
+  circumvent via bash; task cancelled by the maintainer before anything landed.
+- **Desired outcome:** the rule is codified in the role prompts: (1) an agent NEVER
+  circumvents access restrictions (no bash/write workarounds around edit-denies);
+  (2) when blocked on a file the task needs: do the work as far as possible and note
+  the block in `handover_task_to_planner.md`, OR — if the blocked files ARE the main
+  body of the work — close the session and report the fact back (no partial hacks).
+- **Acceptance criteria:** the rule present in `prompt_agent_task.md` (honesty guard /
+  work loop) and in the planner's delegation section; grep-verifiable; zero
+  circumvention attempts in subsequent loop logs.
+- **Suggested scope:** `prompt_agent_task.md`, `prompt_agent_planner.md`, possibly
+  AGENTS.md (maintainer's call — it is his file).
+- **Status:** open — maintainer call 2026-09-12 (wording per his direct-session
+  instructions).

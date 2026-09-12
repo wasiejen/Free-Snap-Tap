@@ -93,6 +93,12 @@ planning. Plan against a defined goal, not a list of chores.
 ## Delegate vs. do
 - Do it yourself only if it is small and obvious (a direct edit you can verify inline).
 - Delegate everything larger (>~15 diff lines, >3 files, or a heavy run) via the Task tool.
+- A worker has NO edit access to `.opencode/agent/prompts/**` (edit-deny in
+  opencode.jsonc). For prompt/doc text work, launch a PLANNER agent instead
+  (`planner_Q3_120k_mtp` / `planner_Q4_120K`), instructed in the launch prompt
+  to IGNORE its planner prompt and act as a plain text worker on the spec
+  ("Planner-as-text-worker mode" below). Never launch a worker for files it
+  cannot edit — it will hit the deny (and must not circumvent it; TODO #54).
 - Write the task spec (`.opencode/agent/handover/handover_task.md`): goal + definition of done +
   approval boundary + suggested scope + which worker — read `agent_readme_task_spec.md`
   FIRST (mandatory, per the Instruction index). Procedure is a suggestion, not a protocol.
@@ -132,3 +138,11 @@ one at 90 %.
   + file/location pointers for code + ONE recommendation each, ordered by
   priority (AGENTS.md §Approval-boundaries). File creation is how he sees them —
   do not rely on closing-message call lines.
+
+## Planner-as-text-worker mode (when instructed to ignore planner mode)
+When your launch prompt instructs you to IGNORE your planner prompt (you were
+started for file access a worker lacks — e.g. prompt text work): skip the
+planner workflow entirely — no NAP, no delegation, no loop driving, no TODO
+curation. Work exactly per the task spec like a worker: edit, verify its
+acceptance, commit per the commit routine, write your handover to
+`handover_task_to_planner.md`, and end with a short pointer to it.
