@@ -33,17 +33,22 @@ instructions/protocol — facts that save lookups. Format per the README:
   `proposals/maintainer/done/knowledge_opencode_tools_plugins.md` §1.
 - **Keys:** context, sessionID, messageID, agent, Tool.Context.
 
-## `context.client` is UNDEFINED in this host build
-- **Do:** do not rely on `context.client` (or `context.api`) for SDK calls in
-  this build. `context.api` is NOT necessarily SDK-client-interchangeable.
-  Prefer direct context fields; if a client is required, guard with a clear
-  error, not a silent fallback.
-- **Why (evidence):** probe (modified session_info) threw `undefined is not an
-  object (evaluating 'context.client.app')` (2026-09-12). This is why
-  compact_memory's client path fails here → it fell to the HTTP fallback → no
-  listener → "Unable to connect" (TODO #52).
-- **Ref:** probe in session ses_f6b7c5242ffeZpNl0Ar8mILWua; TODO #52.
-- **Keys:** context.client, context.api, undefined, SDK client, compact, guard.
+## `context.client` presence is UNCONFIRMED (the `.app` throw is ambiguous)
+- **Do:** do NOT assume `context.client` is present OR absent. Before relying
+  on it, dump the actual keys (the `get_context_keys` probe returns
+  contextKeys / clientKeys / sessionKeys). `context.api` is NOT necessarily
+  SDK-client-interchangeable. Prefer direct context fields; if a client is
+  required, guard with a clear error, not a silent fallback.
+- **Why (evidence):** a probe evaluating `context.client.app` threw
+  `undefined is not an object (evaluating 'context.client.app')` (2026-09-12).
+  That only proves the ACCESS path failed — `client` may exist with `.app`
+  missing, or `client` may be undefined. Maintainer's read (2026-09-12): most
+  likely the `.app` part. The compact_memory failure is real either way (no
+  usable client for compact + no HTTP listener on 4096).
+- **Ref:** probe in session ses_f6b7c5242ffeZpNl0Ar8mILWua; TODO #52;
+  `get_context_keys.ts` (definitive key dump).
+- **Keys:** context.client, context.api, get_context_keys, contextKeys,
+  clientKeys, sessionKeys, SDK client, guard.
 
 ## Installed SDK method shape — grep the `.d.ts`, don't trust examples
 - **Do:** before writing any SDK/session call, grep the installed types:
