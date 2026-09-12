@@ -1,93 +1,92 @@
-# WORKER SUMMARY — T3 (iter-13): loop_log tool (the loop log as a directly-fired tool)
+# PLANNER-AS-TEXT-WORKER SUMMARY — attention-keywords: marker set + priority ladder + inbox cadence
 
-worker-13, session `ses_f6bfc1752ffeW9mfpMBAJXzTql`, model
-`Qwen3.8-27B-IQ4KT-120K`, branch `fst_work`. META task (no FST python code).
-Implemented `.opencode/tools/loop_log.ts` + the scratchpad smoke per the approved
-Part 3 design and the iter-13 task spec; re-measured all gates; ONE green task
-commit (scope = `loop_log.ts` + bookkeeping only — NO probe/prompt changes).
+Session `ses_f69895339ffe1gJaUk4OblfuJp`, model `Qwen3.8-27B-IQ3KT-120K_MTP`,
+branch `opencode_test`. Spec: `.opencode/agent/handover/handover_task.md` (the
+approved proposal `2026-09-12_attention-keywords.md` incl. his `--wip` note).
+Pure prompt/text task — NO FST code, NO `opencode.jsonc`, no access
+restrictions circumvented, DO-NOT-touch list honored.
 
-## What changed (task commit scope: `loop_log.ts` NEW + bookkeeping)
+## What changed (task commit = this file + the three prompt files)
 
-`loop_log.ts` is a `tool()` (no `name` field — host names by filename, the
-committed form of ctx_gauge.ts / block_transfer.ts) that an agent fires DIRECTLY
-to append its loop-log line. No hand-formatting, no per-agent folder-permission
-management (the single write-access point).
+- **Planner prompt** (`agents/prompt_agent_planner.md`, canonical home):
+  - `## maintainer calls/decisions`: the single-line `--main`/`--maintainer`
+    rule became the FULL marker table (canonical; rows: `--maintainer`/`--main`,
+    `--now`, `--todo`, `--deferred` (alias `--defer`), `--wip`, no-marker
+    background) + **Priority ladder** + **Inbox cadence** (session-start scan =
+    TRIAGE by the ladder, not execution; small items ≤ a few lines of effect
+    inline) + **Marker removal** rule (generalized `--main` rule; EXCEPTION
+    `--wip` — agents never remove it, owner: maintainer) + the session-start
+    grep sweep now covers the whole marker set, with a verified-2026-09-12
+    no-clash note (all marker hits measured to live in `.opencode/**`
+    docs/agent files only — no FST product content clash).
+  - `## Autonomous mode`: the bare "scan inbox; handle anything there" line is
+    now ladder triage (scan → classify → act per ladder).
+  - **Priority ladder one-liner, IDENTICAL text in BOTH sections** (§Autonomous
+    mode line 54 and §Direct session line 75): direct maintainer message in a
+    primary session > `--maintainer`/`--main` > `--now` > unmarked inbox items
+    (small first) > `--todo` capture > `--deferred`.
+- **Worker prompt** (`agents/prompt_agent_task.md`): ONE guard bullet in
+  §Work loop — `--wip` files are maintainer-live-edited: READ ok, never EDIT,
+  if the task requires it stop + flag in the summary; pointer to the canonical
+  table (no restatement).
+- **Looprunner prompt** (`agents/prompt_agent_looprunner.md`): ONE line in
+  §Maintainer messages (routing) — the five markers (`--main`, `--now`,
+  `--todo`, `--deferred`, `--wip`) ride VERBATIM with the messages; the
+  looprunner does not interpret them.
 
-- **args** (zod via `tool.schema`): `role` (required), `model` (required,
-  verbatim model id), `status` (required — a zod **enum of exactly the five
-  8-char tokens** `-->START` / `DONE<---` / `-RETURN-` / `-WARNING` / `--INFO--`,
-  so a bogus token is rejected at PARSE time, not a runtime check), `content`
-  (required), `session` (OPTIONAL — omitted/empty → the literal `unknown`).
-- **execute** (append-only; the tool never rewrites/curates the file):
-  resolve `.opencode/loop/` against `context.directory ?? process.cwd()`; if NO
-  `autorun-*` folder exists → create `autorun-<YYYY-MM-DD_HH-MM>` (name
-  MACHINE-COMPUTED from the local clock, never retyped — pattern-5 discipline)
-  + its `loop_log.md`; if EXACTLY ONE → use it; if SEVERAL → use the
-  most-recently-MODIFIED and surface the anomaly in the return value (never
-  silently resolved, never an arbitrary pick); append ONE machine-timestamped
-  line `<date_time> <status> <role> <session|unknown> <model> <content>` (the
-  established local `YYYY-MM-DD_HH-MM` form); return the folder name + the exact
-  line written (+ the anomaly note on the multi-folder case).
-- **description**: 1–2-line usage guide (append ONE loop-log line to the current
-  looprun's `loop_log.md`; auto-creates the dated folder when empty; returns
-  folder + line; fire for START/DONE/RETURN/WARNING/INFO).
+## Measured verification
 
-The smoke lives in the scratchpad (untracked):
-`C:/Users/Wasiejen/AppData/Local/Temp/opencode/loop_log_smoke.mjs` (the iter-4
-Node-24 type-stripped import pattern; the context object carries a scratchpad
-temp `directory` — NEVER the live `.opencode/loop/`).
+- **Grep acceptance (git grep, worktree):** `--now`/`--deferred`/`--todo`/`--wip`
+  all present in the planner prompt (table rows + ladder lines); `--wip` in the
+  worker prompt (line 45); all five markers in the looprunner one-liner (line
+  35). Table rows (`| … |`) exist ONLY in the planner prompt (8 rows);
+  worker/looprunner prompts carry ZERO table rows → the marker table lives in
+  exactly ONE place, referenced but not restated elsewhere.
+- **Probe gate:** `node .opencode/plugin/probes/handover_probe.mjs` →
+  `PROBE handover: 84/84 PASS`, exit 0 (run under NODE, AFTER the edits).
+  Pre-edit baseline at HEAD was likewise 84/84 — the probe verifies
+  ctx_watchdog behavior and is insensitive to the prompt text; green is the
+  spec gate.
 
-## Measured verification (all re-measured by worker-13, at HEAD)
+## Commits
 
-- **Probe** `node .opencode/plugin/probes/handover_probe.mjs`: **84/84 PASS**,
-  exit 0 — the UNCHANGED total (this task adds NO probe section per Part 3's
-  smoke-based acceptance; the probe simply stays green).
-- **Smoke** `node <scratchpad>/loop_log_smoke.mjs`: **24/24 PASS** —
-  (shape: tool() result, no stale name/parameters, async execute; the status
-  enum rejects a bogus token at parse time + accepts all five; role/model/
-  content required, session optional) + (A) empty dir → creates the dated
-  `autorun-*` folder (verified by LISTING, form
-  `autorun-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}`) + `loop_log.md`, the written line
-  byte-equals a hand-built expected line (MINUTE-BOUNDARY-SAFE: compared
-  against the stamp computed before AND after the call) and is the file's only
-  line; (B) a second call appends (both lines present, order preserved, file
-  not rewritten); (C) `session` omitted → the literal `unknown` in the line;
-  (D) a bogus status token fails `safeParse` → nothing written (fresh dir stays
-  empty); (E) multi-folder anomaly: two pre-created `autorun-*` dirs with
-  explicitly-bumped, far-apart mtimes → the line lands in the
-  most-recently-modified one, the other is untouched, and the return value
-  mentions the anomaly.
-- **pytest** `& .\.venv\Scripts\python.exe -m pytest -q`: **459 passed,
-  1 warning** (the known #10 warning).
-- **ruff** `& .\.venv\Scripts\ruff.exe check --select F .`: **All checks
-  passed** (F=0).
+- **Task commit:** the commit containing this summary + the three prompt files
+  (subject "Attention-keywords: marker set, priority ladder, inbox cadence in
+  the role prompts"). No self-hash (the hash exists only after this file is
+  committed) — identify it by its file set.
+- **`cec9570`** (separate, committed first): a PRE-EXISTING pending unit found
+  uncommitted in the worktree at start — the planner-prompt
+  Planner-as-text-worker-mode hunk (delegation bullet + mode section) + the
+  open `TODO.md` #54 entry, left pending since the maintainer's direct session
+  (after `db5d1ec`/`00cdc09`). Committed as its own unit so this task's commit
+  stayed single-theme (AGENTS.md commit routine); NOT my implementation — the
+  wording is the direct session's, verbatim as found.
 
-## Method / DO-NOT-touch compliance
+## TODO entries
 
-- The live `.opencode/loop/` folder was NEVER pointed at by the smoke (the
-  smoke targets a scratchpad `directory` only); this summary's hand-appended
-  loop-log lines (the START line written at session start and this DONE line)
-  are the only writes to the live loop folder, done by hand per the iter-13
-  protocol (the new tool is NOT registered in the live host yet).
-- NO probe file change, NO prompt change (those are planner-applied after
-  verification, per Part 3); `opencode.jsonc` NOT staged; nothing under
-  `proposals/maintainer/` or the FST python packages touched. The `git diff`
-  of the task commit is exactly `loop_log.ts` (new) + this summary + the loop-
-  log lines.
-- The multi-folder anomaly rule (most-recently-modified) was NOT found to be
-  flaky on this host: the smoke sets the two dirs' mtimes explicitly 5 minutes
-  apart (`fs.utimesSync`), so `statSync().mtimeMs` is unambiguous — no
-  under-determination to escalate (the approval-boundary stop condition did not
-  trigger).
+- NONE added (spec DoD 6 — nothing genuinely open was hit; spec already covers
+  the design). No `todo_inbox.md` entries.
+- Note for the planner: `TODO.md` #54 remains OPEN (its worker-side acceptance —
+  the circumvention rule in `prompt_agent_task.md` — is not written yet).
 
-## Open items / not done (deliberate)
+## Deliberately NOT done
 
-- The tool is NOT registered in any config (host-side, the maintainer's domain —
-  the live `opencode.jsonc` + the per-agent tool-access grant; takes effect at
-  his next process restart).
-- No probe section (Part 3 acceptance is smoke-based — the probe stays at the
-  unchanged 84/84); no FST code — per the spec.
+- #54's worker-side circumvention rule was NOT added to the worker prompt —
+  outside this spec's DoD (the worker gets exactly the one `--wip` guard line).
+- Looprunner prompt: a pre-existing stray empty bullet (`- ` alone, in the
+  routing list just above the new marker line) left untouched — out of scope;
+  flagged for the planner's curation call.
+- Pre-existing uncommitted items left EXACTLY as found (not mine, not this
+  spec's): the maintainer's live edit of
+  `.opencode/maintainer/inbox_planner/summary_summary.md` (line 1 now
+  `--maintainer:--defer please do this first…` — a live double marker for a
+  planner-session triage per the new rules; maintainer space, DO-NOT-touch) and
+  the in-progress `roles/agent_prompt_engineer.md` → `roles/prompt_engineer.md`
+  rename (deleted + untracked new file).
+- No NAP update (planner-as-text-worker mode: spec-driven, no plan state of my
+  own to record — the planner owns the NAP; flagged for him to note this
+  landing).
 
-## Final gauge (verbatim, at summary-writing time, pre-commit)
+## Final gauge (verbatim, pre-commit)
 
-`SESSION=ses_f6bfc1752ffeW9mfpMBAJXzTql CTX=68010 (56%) REM=51990`
+`SESSION=ses_f69895339ffe1gJaUk4OblfuJp CTX=79126 (65%) REM=40874`

@@ -42,6 +42,7 @@ All paths below are relative to `.opencode/agent/prompts/`.
   better and note it in the summary.
 - Findings you cannot confidently fix, or that are out of scope, go to `todo_inbox.md`
   (loose, unnumbered) — NOT `TODO.md`; the planner assigns IDs at curation.
+- `--wip` guard: files marked `--wip` are live-edited by the maintainer — READ ok, never EDIT; if the task requires editing one, stop and flag it in the summary (canonical marker table: planner prompt §maintainer calls/decisions).
 
 ## Direct session (interactive)
 If the maintainer engages you directly instead of via a task spec: treat it

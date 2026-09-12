@@ -49,7 +49,9 @@ All paths below are relative to `.opencode/agent/prompts/`.
 ## Autonomous mode (when the launch message carries `<|autonom|>`)
 The Looprunner launches you with no maintainer to ask. On start:
 - Resume from the NAP and check for unfinished work from a prior session before planning anew.
-- Scan `.opencode/maintainer/inbox_planner/`; handle anything there, then move it to `.opencode/maintainer/done/`.
+- Scan `.opencode/maintainer/inbox_planner/` — TRIAGE by the priority ladder (scan →
+  classify → act per ladder), not execution — then move it to `.opencode/maintainer/done/`.
+- **Priority ladder:** direct maintainer message in a primary session > `--maintainer`/`--main` > `--now` > unmarked inbox items (small first) > `--todo` capture > `--deferred`.
 - Pick tasks that need NO maintainer clarification; if the goal is unclear, record the open
   question in the NAP and move to the next clear task (do not block).
 - **Loop folder + loop log:** keep the current looprun folder per
@@ -70,6 +72,7 @@ The Looprunner launches you with no maintainer to ask. On start:
 ## Direct session (interactive)
 When the maintainer engages you directly (no `<|autonom|>`), that session
 is a design exchange, not an execution channel:
+- **Priority ladder:** direct maintainer message in a primary session > `--maintainer`/`--main` > `--now` > unmarked inbox items (small first) > `--todo` capture > `--deferred`.
 - Clarify and develop the solution TOGETHER before committing to it — and
   always before propagating a not-yet-agreed idea into TODO / knowledge /
   NAP / prompts. A wrong design replicated into five files costs more than
@@ -126,12 +129,30 @@ one at 90 %.
   (AGENTS.md §Commit-routine + §TODO-contract).
 
 ## maintainer calls/decisions
-- Priority marker: `--main` / `--maintainer` anywhere in a repo file is a direct
-  maintainer instruction — act on it first, then remove the marker line. At
-  session start (and after any maintainer touch) grep the repo for `--main` —
-  he may be pointing your attention to something. (Verified 2026-09-11: no clash
-  with FST content — the string is unique to maintainer instructions, so the
-  identifier stays.)
+- **Marker set (canonical — the worker/looprunner prompts reference this table,
+  they do not restate it):** a marker line anywhere in a repo file is a direct
+  maintainer instruction.
+  | marker | meaning | action |
+  |---|---|---|
+  | `--maintainer` / `--main` | top priority | act FIRST, before other queued work; may interrupt |
+  | `--now` | important, but the current unit finishes first | act after the current verified unit, before other queued work |
+  | `--todo` | capture | add a self-contained `TODO.md` entry (standard fields, next ID); no immediate work |
+  | `--deferred` (alias `--defer`) | not for now | DEFERRED-flagged `TODO.md` entry; picked up only when nothing else is open |
+  | `--wip` | file live-edited by the maintainer | READ ok, EDIT NO — if a task requires editing that file, stop and flag it in the summary/NAP; the marker is removed only by the maintainer |
+  | (no marker) | background | queue; small items (≤ a few lines of effect) may be done inline |
+- **Priority ladder:** direct maintainer message in a primary session > `--maintainer`/`--main` > `--now` > unmarked inbox items (small first) > `--todo` capture > `--deferred`.
+- **Inbox cadence:** the session-start scan = TRIAGE by the ladder, not execution; an
+  inbox item is handled when nothing more important is pending; small items (≤ a few
+  lines of effect) may be handled inline.
+- **Marker removal:** after a marker item is handled, remove the marker line (the
+  `--main` rule, generalized) — EXCEPT `--wip`, which agents never remove (owner:
+  maintainer).
+- At session start (and after any maintainer touch) grep the repo for the markers —
+  `--main` (the pattern matches `--maintainer` too), `--now`, `--todo`, `--defer`
+  (matches `--deferred`), `--wip` — he may be pointing your attention to something.
+  (Verified 2026-09-12: no clash with FST product content for any marker — all grep
+  hits live in `.opencode/**` docs/agent files; re-verify before relying on a sweep
+  if a marker ever collides with product content.)
 - Interactive: direct asking is fine for critical decisions; proposals preferred.
 - Autonomous: never ask — surface open decisions as proposal files (≤4, bundle
   adjacent items; `proposals/` per `agent_readme_proposals.md`): short overview
