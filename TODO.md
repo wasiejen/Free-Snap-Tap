@@ -174,13 +174,13 @@ reenabled, that is the call.
   Diagnosis (same session, measured): the only opencode process
   (`opencode.exe`) listens on NO TCP port at all; `OPENCODE_PORT` is empty
   → the HTTP fallback targets `localhost:4096`, where nothing listens.
-  Maintainer probe (modified `session_info`): evaluating
-  `context.client.app` threw "undefined is not an object" — AMBIGUOUS:
-  `context.client` itself may be undefined, or `client` may exist with
-  `.app` missing (maintainer: most likely the `.app` part). Definitive
-  answer pending from the `get_context_keys` probe (contextKeys/clientKeys/
-  sessionKeys dump). The failure came from the HTTP fallback either way
-  (client path unusable for compact + no listener on 4096). The failure did NOT consume the
+  Definitive key dump (maintainer's `get_context_keys` probe, 2026-09-12):
+  contextKeys = sessionID, abort, messageID, callID, extra, agent, messages,
+  metadata, ask, directory, worktree — **NO `client` key** (clientKeys /
+  sessionKeys empty). So `context.client` IS absent from the tool context in
+  this build (the earlier throw was `client` itself being undefined, not a
+  missing `.app`). The failure came from the HTTP fallback (no usable client
+  + no listener on 4096). The failure did NOT consume the
   per-session compaction budget (no `.opencode/temp/compact_budget.json`
   — increment-on-success holds).
   Installed-SDK evidence (2026-09-12, grepped from
