@@ -166,6 +166,35 @@ reenabled, that is the call.
 - **Scope:** the probe header (comment), `.opencode/package.json`.
 - **Status:** OPEN — maintainer call.
 
+## 52. `compact_memory` fails in the current host build — connection error on both paths (2026-09-12, planner ses_f6b7c5242ffeZpNl0Ar8mILWua)
+
+- **Problem / evidence:** firing the `compact_memory` tool returns
+  "Compaction request failed: Unable to connect. Is the computer able to
+  access the url?" in the current host build (verified live 2026-09-12).
+  Diagnosis in the same session: the only opencode process (`opencode.exe`,
+  the npm `opencode-ai` bin) listens on NO TCP port at all
+  (`Get-NetTCPConnection` — no listener for that PID); `OPENCODE_PORT` is
+  empty, so the HTTP fallback targets `localhost:4096`, where nothing
+  listens; the SDK-client path (`context.client.session.compact`) is
+  therefore either not wired or points at an unreachable URL in this
+  build. The failure did NOT consume the per-session compaction budget
+  (no `.opencode/temp/compact_budget.json` was created — the
+  increment-on-success design holds).
+- **Outcome (goal):** `compact_memory` compacts a live session in the
+  current host build, or the tool reports WHICH resolution path failed
+  (client vs HTTP + port) so the wiring can be fixed without blind
+  guessing.
+- **Acceptance:** a live fire in a session → success (COMPACT line in
+  `.opencode/temp/ctx.log` + budget increment), or a maintainer decision
+  on the supported host configuration.
+- **Scope:** `.opencode/tools/compact_memory.ts` (error reporting), the
+  host-side client/URL wiring (maintainer domain), the v2 test notes
+  (`proposals/maintainer/done/compact_memory_v2test.ts` +
+  `compaction_warning.md`). Related: the loop_log-v2 proposal's Part A
+  context probe has the same unknown (which context fields the host
+  actually wires).
+- **Status:** OPEN — maintainer call.
+
 ## Closed entries
 
 Moved to `todo_records.md` on 2026-09-10 — one-line records, IDs 2, 5, 10, 12, 13, 14, 15,
