@@ -5,6 +5,22 @@ authoritative record — the change record is `git log`, the live backlog is
 `TODO.md`, agent-facing rules are `AGENTS.md` / `.opencode/handover_planner.md`.
 May be stale; nothing here is required to be maintained.
 
+
+260912-0953
+- we might need regular scheduale tasks like look over knowledge base and compact knowledge for each file.
+## need for a dedicated web researcher - can be a lean agent - does not need to know much about rhe repo or opencode. dispatched by the planner (keep his context save)
+- knowledge_crawler on own repo
+  - agentic knowledge
+  - workflow knoeledge
+  - repo specific knowlegde
+  - crawls the workspace and looks for specific items
+
+another input field for compaction : role
+- dependent on role give another compaction message after it
+what message to put before and how?
+
+
+
 260909-1512:
 
 # WIP
