@@ -3,9 +3,10 @@
 FIRST read `AGENTS.md`, `agents_repo.md` (+ repo part `repo_commands.md`), this file, and
 Part 2 of the approved design `.opencode/proposals/approved/2026-09-12_loop-tool-batch.md`.
 
-Branch: `fst_work` (HEAD at launch = `6e29c29`; T1 is verified on top: probe 80/80,
-pytest 459 + 1 known #10 warning, ruff F=0 — all planner-re-measured). Commit on
-`fst_work`. META task (no FST python code).
+Branch: `fst_work` (HEAD at launch = `010c257`; the spec was written at `6e29c29` —
+since then only meta-only bookkeeping commits landed, baselines unchanged). T1 is
+verified on top: probe 80/80, pytest 459 + 1 known #10 warning, ruff F=0 — all
+planner-re-measured. Commit on `fst_work`. META task (no FST python code).
 
 ## Goal
 A new custom tool `.opencode/tools/ctx_gauge.ts` an agent fires DIRECTLY for the
@@ -69,7 +70,7 @@ plus the probe extension that pins it (new S12 section, append-only).
    output (the byte-identity requirement).
 4. **Bookkeeping** per your commit routine: summary →
    `.opencode/handover/handover_task_to_planner.md`, your loop-log lines
-   (`agent_readme_loop.md` §Loop log — role `worker-10`, your session id from the
+   (`agent_readme_loop.md` §Loop log — role `worker-11`, your session id from the
    injected `ctx:` line, model verbatim), `todo_inbox.md` only for discrepancies.
 
 ## Definition of done
