@@ -72,6 +72,11 @@ class FakeFST(SimpleNamespace):
         self.remove_all_callback = MagicMock()
         self.check_result = MagicMock()
 
+    def surface_config_error(self, error):
+        # delegate to the real FST_Keyboard implementation so the guard's
+        # surfacing path (toast vs print) is exercised rather than a copy
+        FST_Keyboard.surface_config_error(self, error)
+
 
 @pytest.fixture(autouse=True)
 def restore_constants():
