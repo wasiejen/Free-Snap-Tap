@@ -1,1 +1,2 @@
 2026-09-12_20-57 -->START worker-1 unknown Qwen3.8-27B-IQ4KT-120K compact_memory plugin build (approved v2 proposal Parts 1-4): new plugin-registered tool + v1 retirement + probe S13
+2026-09-13_03-29 -->START planner-1 ses_f67a11c76ffefRAoV2y5POe92A Qwen3.8-27B-IQ4KT-120K compaction test (maintainer): sub-agent compact_memory x2 + planner compact_memory; sessions ses_f67a00d9 / ses_f679ef19 verified compaction
