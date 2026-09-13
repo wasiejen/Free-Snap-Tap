@@ -387,7 +387,7 @@ async function resolveModel(
 export default async function CompactMemoryPlugin(ctx: any) {
   return {
     tool: {
-      compact_memory: tool({
+      compact_memory_test: tool({
         description: "Triggers immediate session compaction to free context space. Budget is per-session and per-model quant-class (CPU models are excluded — see the classifier in this plugin).",
         args: {
           sessionID: tool.schema.string().optional().describe("Session ID to compact (defaults to the calling session; an explicit id compacts ANOTHER session)"),
@@ -395,121 +395,60 @@ export default async function CompactMemoryPlugin(ctx: any) {
           keepMessages: tool.schema.number().optional().describe("Number of recent messages to retain (e.g. 6 or 12)"),
           message: tool.schema.string().optional().describe("Post-compaction continuation message for the target session. Usage: 1-3 lines: what to resume + which files to re-read. ABSENT → the default reload directive is returned."),
         },
-        async execute(args: any, c: any) {
-          try {
-            // 1. resolve the session id (Part 1)
-            const sessionID = args?.sessionID ?? c?.sessionID;
-            if (typeof sessionID !== "string" || sessionID === "") {
-              return "Compaction request failed: no session id available (pass the sessionID argument or a context session id).";
-            }
+        async execute(_args: any, c: any) {
+          const sessionID = c?.sessionID
+          const client = ctx?.client
+          const keepTokens = _args?.keepTokens ?? 30000;
+          const keepMessages = _args?.keepMessages ?? 12;
+          const providerID = c?.extra?.model.providerID
+          const modelID = c?.extra?.model.id
 
-            const root = resolveRoot(c);
-            const isSelf = args?.sessionID == null || (typeof c?.sessionID === "string" && args.sessionID === c.sessionID);
-
-            // 2. resolve the model + the quant-class cap AT CALL TIME (Part 2)
-            const { model, providerID, note: modelNote } = await resolveModel(ctx?.client, c, sessionID, isSelf);
-            const { cap, label } = classifyQuantClass(model);
-
-            // 3. the budget gate — BEFORE any compact call: denial has ZERO
-            //    side effects (no increment, no compact call, no COMPACT line)
-            const count = budgetCount(root, sessionID);
-            if (count >= cap) {
-              return (
-                `Compaction refused: the compaction budget for ${sessionID} is exhausted — ` +
-                `model class ${label} (cap ${cap}), used ${count}/${cap}. ` +
-                `Hand over and start fresh — write the handover summary and let the loop restart with a fresh session.` +
-                (modelNote !== "" ? `\n${modelNote}` : "")
-              );
-            }
-
-           // 4. resolve the client call path (Part 1) — typeof detection
-            //    (the SDK methods live on the prototype). A FAILURE here
-            //    returns immediately: NO increment, NO COMPACT line (the
-            //    2026-09-12 live no-op was a FAILURE reported as a success —
-            //    it burned a budget slot for a compaction that never ran).
-            let keepNote = "";
-            const client = ctx?.client;
-            if (typeof client?.session?.compact === "function") {
-              // v2: FLAT parameters — the generated v2 types mark the options
-              // body `never` (no keep fields)
-              let result: any;
-              try {
-                result = await client.session.compact({ sessionID });
-              } catch (err: any) {
-                return `Compaction request failed: ${errorMessage(err)}` + (modelNote !== "" ? `\n${modelNote}` : "");
-              }
-              const error = compactionFailure(result);
-              if (error !== "") {
-                return `Compaction request failed: ${error}` + (modelNote !== "" ? `\n${modelNote}` : "");
-              }
-            } else if (typeof client?.session?.summarize === "function") {
-              // v1 — THE ACTIVE PATH ON THIS BUILD: the body MUST carry
-              // providerID + modelID (REQUIRED by the server payload schema);
-              // keep fields in the body WHEN GIVEN; 404/missing-key →
-              // retry ONCE without the keep fields
-              if (model === "" || providerID === "") {
-                return (
-                  `Compaction request failed: no resolvable model for ${sessionID} (the server requires providerID + modelID in the summarize body) — the request was NOT sent.` +
-                  (modelNote !== "" ? `\n${modelNote}` : "")
-                );
-              }
-              const keep: Record<string, number> = {};
-              if (args?.keepTokens != null) keep.tokens = args.keepTokens;
-              if (args?.keepMessages != null) keep.messages = args.keepMessages;
-              // const request = await callSummarize(
-              //   client,
-              //   sessionID,
-              //   { providerID, modelID: model },
-              //   Object.keys(keep).length > 0 ? keep : undefined,
-              // );
-              //
-              const request = client.session.summarize({
-                path: {
-                  id: sessionID
-                },
-                body: {
-                  providerID: providerID,
-                  modelID: model,
-                },
-
-              })
-              //async catch to not block - unknown if set keepTokens and keepMessages are respected
-              void request.catch((err: unknown) => {
-                const { note, error } = request
-                console.error("Background compaction failed:", err)
-                if (error !== "") {
-                  return `Compaction request failed: ${error}` + [modelNote, note].filter((s) => s !== "").join("\n");
-                }
-                keepNote = note;
-              })
-
-
-            } else {
-              const compactType = typeof client?.session?.compact;
-              const summarizeType = typeof client?.session?.summarize;
-              return `Compaction request failed: no usable client — probed ctx.client?.session?.compact (type ${compactType}) and ctx.client?.session?.summarize (type ${summarizeType}); neither is a function (the client is not wired for this host build). No compaction was performed.`;
-            }
-
-            // 5. success only: persist the increment + write the COMPACT line
-            //    (both best-effort — the compaction itself already happened)
-            recordSuccess(root, sessionID, model);
-            const tokensToKeep = args?.keepTokens ?? DEFAULT_KEEP_TOKENS;
-            const messagesToKeep = args?.keepMessages ?? DEFAULT_KEEP_MESSAGES;
-            appendCompactLine(root, c, sessionID, model, tokensToKeep, messagesToKeep);
-
-            // 6. the response (Parts 1/3): message ABSENT → the v1 success
-            //    line + directive BYTE-IDENTICAL; GIVEN → the message + the
-            //    ONE-LINE trailer (the reload invariant survives)
-            const note = [modelNote, keepNote].filter((s) => s !== "").join("; ");
-            const response =
-              typeof args?.message === "string" && args.message !== ""
-                ? `${args.message}\n${POST_COMPACTION_TRAILER}`
-                : `Context successfully compacted: kept last ${messagesToKeep} messages / ${tokensToKeep} tokens.\n\n${COMPACTION_RELOAD_DIRECTIVE}`;
-            return note !== "" ? `${response}\n${note}` : response;
-          } catch (err: any) {
-            return `Compaction request failed: ${err?.message ?? err}`;
+          const result = {
+            sessionID,
+            ctxKeys: Object.keys(ctx ?? {}),
+            clientKeys: Object.keys(client ?? {}),
+            sessionKeys: Object.keys(client?.session ?? {}),
+            compact: typeof client?.session?.compact,
+            summarize: typeof client?.session?.summarize,
           }
-        },
+
+        // v2 does not work here it seems
+          if (typeof client?.session?.compact === "function") {
+            await client.session.compact({
+              sessionID,
+            })
+
+            return JSON.stringify({
+              ...result,
+              invoked: "compact",
+            }, null, 2)
+          }
+
+          if (typeof client?.session?.summarize === "function") {
+            const request = client.session.summarize({
+              path: {
+                id: sessionID
+              },
+              body: {
+                providerID: "llama-swap",
+                modelID: modelID,
+              },
+
+            })
+            void request.catch((err: unknown) => {
+              console.error("Background compaction failed:", err)
+              //return request
+            })
+
+            return "Compaction requested asynchronously."
+
+          }
+          return `summarize returned: ${JSON.stringify(result)}`
+          return JSON.stringify({
+            ...result,
+            invoked: null,
+          }, null, 2)
+        }
       }),
     },
   };

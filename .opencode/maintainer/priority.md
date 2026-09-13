@@ -45,21 +45,14 @@
     - needed for agents to help identify their last run
   - need to define if an emergency compaction can extend the max compaction?
 
-
 # 3
 - nap size reduction
 
-
-# smoke harness and all the files that are needed to test the plugins and tools should be saved in the repo.
-  - just read the comment from a worker that is only lives in the scatchpad - mind have been my decision but it extended in scope it is an acnhor of functionality.
-  - make a proposal to save them in a good place in the repo (plugin|tools/tests?) and rewire as needed.
-    - the files should be easily attributable to the tested tools - so same name convention
-    - on shared code create a base testing file (choose appropiate name - just an example)
-
+prompt additions/edits/rewrites:
 # 4
 - small addition to the planner prompt for a ready made grep command to find maintainer attention markers in repo
   - planner often tries mutliple times to discover discepencies in the command formulation
-  - connected to # 7
+  - connected to .opencode\maintainer\inbox_planner\snippet_collection.md
 
 # 5
 - addition in the agents.md, that general knowledge - actionable items,code,facts that helped to solve a problem should be sorted into the agent/knowledge section - file may be created to fit the general topic
@@ -73,5 +66,15 @@
     - when reading a large file be smart about it and analyse it first and try as best to only read the relevant sections. grep for keywords might even save the read.
     - m
 
-# 7 make a collection of ready made grep snippets (or other tools to navigate, find string, in files and folders)
-- for easier reference and less testing out the specific parameters
+#7 small knowledge / use addition - or more likely do-not addition? 
+- do we need explicit coding guidelines?
+- The edit tool chokes on non-ASCII chars in oldString (planner working on code failed multiple times to use the code due to this an neede to write a script to replace a textstring - tool block_transfer would be a solution for this case)
+  - so do not use non-ASCII chars if possible
+
+#8 test the block_transfer tool:
+- does it acutally do what is intended?
+- how to improve it to use it effectively?
+  - you can freely adapt it to the need
+- can it go in live usage?
+- writing a usage guide and include it with usage guides to the other tools - i think best place in repo_custom_tools and instrution as other parts to read as needed?
+- do what you can without approvel and for the rest make a proposal
