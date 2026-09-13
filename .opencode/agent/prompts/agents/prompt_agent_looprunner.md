@@ -29,10 +29,20 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
 - Act per AGENTS.md §Interaction-contract: `restart` (new planner launch) / `resume`
   (task_id) / `ask_maintainer` (pause) / `stop`.
 
+## End of loop (autorun_summary skill)
+- On `stop` (goal reached / unrecoverable / maintainer-gated), before closing
+  the loop, launch a Q4-model agent (e.g. `agent_Q4_120K` - do NOT switch the
+  backend model) via the Task tool with exactly this instruction: "Read
+  `.opencode/agent/prompts/skill/skill_autorun_summary.md` and follow it for
+  the loop folder `.opencode/loop/<current autorun folder>`." It writes
+  `_overall_summary.md` into the loop run folder and reports the path. If the
+  launch fails or your budget is too low, log a `-WARNING` line (loop_log
+  tool) and close without the summary.
+
 ## Maintainer messages (routing)
 - No prefix, or `--planner`: for the planner — append to the next launch, verbatim (including --main or --maintainer prefix).
 - `--loop` / `--looprunner`: for you — take effect at the next closing; acknowledge now.
-- Attention markers (`--main`, `--now`, `--todo`, `--deferred`, `--wip`) ride VERBATIM with the messages — the looprunner does not interpret them.
+- Attention markers (`--main`, `--now`, `--todo`, `--deferred`, `--wip`, `--comment`) ride VERBATIM with the messages — the looprunner does not interpret them.
 - 
 - After an `ask_maintainer` pause, the next un-prefixed message is the answer — append it to
   the next launch.

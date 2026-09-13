@@ -158,17 +158,19 @@ one at 90 %.
   | `--todo` | capture | add a self-contained `TODO.md` entry (standard fields, next ID); no immediate work |
   | `--deferred` (alias `--defer`) | not for now | DEFERRED-flagged `TODO.md` entry; picked up only when nothing else is open |
   | `--wip` | file live-edited by the maintainer | READ ok, EDIT NO — if a task requires editing that file, stop and flag it in the summary/NAP; the marker is removed only by the maintainer |
+  | `--comment` | maintainer COMMENTARY on the content (NOT an instruction — contrast `--maintainer` = he did/directs something) | read + acknowledge; act only if it contains an explicit request; never remove (owner: maintainer) |
   | (no marker) | background | queue; small items (≤ a few lines of effect) may be done inline |
 - **Priority ladder:** direct maintainer message in a primary session > `--maintainer`/`--main` > `--now` > unmarked inbox items (small first) > `--todo` capture > `--deferred`.
 - **Inbox cadence:** the session-start scan = TRIAGE by the ladder, not execution; an
   inbox item is handled when nothing more important is pending; small items (≤ a few
   lines of effect) may be handled inline.
 - **Marker removal:** after a marker item is handled, remove the marker line (the
-  `--main` rule, generalized) — EXCEPT `--wip`, which agents never remove (owner:
-  maintainer).
+  `--main` rule, generalized) — EXCEPT `--wip` and `--comment`, which agents never
+  remove (owner: maintainer).
 - At session start (and after any maintainer touch) grep the repo for the markers —
   `--main` (the pattern matches `--maintainer` too), `--now`, `--todo`, `--defer`
-  (matches `--deferred`), `--wip` — he may be pointing your attention to something.
+  (matches `--deferred`), `--wip`, `--comment` — he may be pointing your attention
+  to something.
   (Verified 2026-09-12: no clash with FST product content for any marker — all grep
   hits live in `.opencode/**` docs/agent files; re-verify before relying on a sweep
   if a marker ever collides with product content.)

@@ -25,19 +25,6 @@
    NAP (not here). The maintainer erases entries in `_past_priorities.md`
    whenever he wants — it is his log.
 
-# 1 compact_memory plugin that also exposes a tool 
-  - agents need the ability to self compact if context limit is too small
-  - add a differiating on allowed compacts per session_id for models based on its quant
-    - CPU models excluded from compaction for now
-    - pattern for Qwen3.8 models
-      - quant 4 models allowed to compact 3 times 
-        - IQ4 or Q4 notation in name
-      - quant 3 models only 1 time (or may be excluded in future)
-        - IQ3 or Q3 notation in name
-    - for all other models for now allow 1 compaction prelimiary
-  - important is to get the tool working to enabled longer unsupervised runs - compact_memory tool as priority to emergency plugin function right now
-  - let us include an optional field for direct instruction after compaction - this will replace the default set message and may include more specific instructions what files to load back into context. e.g. explude nap or only read nap line 500-600, so preserve context window.
-
 # 2
 - when compact_memory tool works need a guideline for its usage. e.g. in readme_compact_memory.md and to read as needed?
   - or replace/add/rewrite the direct threadhold section in the agent prompts to enable compacting and know what that means and its limited application enforced by the tool 
