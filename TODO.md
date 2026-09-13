@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #51, new
-entries start at #52 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #54, new
+entries start at #55 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -168,125 +168,7 @@ reenabled, that is the call.
 - **Scope:** the probe header (comment), `.opencode/package.json`.
 - **Status:** OPEN — maintainer call.
 
-## 52. `compact_memory` fails in the current host build — connection error on both paths (2026-09-12, planner ses_f6b7c5242ffeZpNl0Ar8mILWua)
-
-- **Problem / evidence:** firing the `compact_memory` tool returns
-  "Compaction request failed: Unable to connect. Is the computer able to
-  access the url?" in the current host build (verified live 2026-09-12).
-  Diagnosis (same session, measured): the only opencode process
-  (`opencode.exe`) listens on NO TCP port at all; `OPENCODE_PORT` is empty
-  → the HTTP fallback targets `localhost:4096`, where nothing listens.
-  Definitive key dump (maintainer's `get_context_keys` probe, 2026-09-12):
-  contextKeys = sessionID, abort, messageID, callID, extra, agent, messages,
-  metadata, ask, directory, worktree — **NO `client` key** (clientKeys /
-  sessionKeys empty). So `context.client` IS absent from the tool context in
-  this build (the earlier throw was `client` itself being undefined, not a
-  missing `.app`). The failure came from the HTTP fallback (no usable client
-  + no listener on 4096). The failure did NOT consume the
-  per-session compaction budget (no `.opencode/temp/compact_budget.json`
-  — increment-on-success holds).
-  Installed-SDK evidence (2026-09-12, grepped from
-  `.opencode/node_modules/@opencode-ai/sdk/dist/`): **v1** generated types
-  expose only `session.summarize` (url `/session/{id}/summarize`) — NO
-  `compact` method; **v2** exposes both `summarize` and `compact`
-  (`compact` url `/api/session/{sessionID}/compact`, FLAT `parameters`
-  shape). Consequences: (a) the tool's current call
-  `client.session.compact({path:{id}, body:{keep}})` mixes generations —
-  v1 has no `compact`, v2's `compact` takes flat parameters, so even WITH a
-  wired client the call shape is suspect; (b) the HTTP fallback hits
-  `/api/session/compact` with the sessionId IN THE BODY — matches NEITHER
-  typed endpoint (both are session-ID-in-path); (c) the `context.api`
-  fallback is dubious per the maintainer's knowledge doc (not necessarily
-  SDK-client-interchangeable).
-- **Outcome (goal):** `compact_memory` compacts a live session in the
-  current host build via the path this build actually exposes (client
-  wiring decision = maintainer domain); if no path exists in this build,
-  the tool reports WHICH path was attempted and why it failed (client
-  absent / HTTP no-listener / endpoint mismatch) instead of the generic
-  "Unable to connect".
-- **Acceptance:** a live fire in a session → success (COMPACT line in
-  `.opencode/temp/ctx.log` + budget increment), or a maintainer decision
-  on the supported host configuration. The chosen call shape must match
-  the installed SDK `.d.ts` (grep-verified against
-  `sdk/dist/{gen,v2/gen}`); if the HTTP fallback stays, its endpoint is
-  `/api/session/{sessionID}/compact` and it only applies when a server is
-  actually listening.
-- **Scope:** `.opencode/tools/compact_memory.ts` (resolution chain:
-  `context.sessionID` first per the knowledge doc; `context.client` only —
-  drop the silent `context.api` equivalence; error reporting),
-  `.opencode/node_modules/@opencode-ai/sdk/dist/{gen,v2/gen}/*.d.ts`
-  (installed types — the authority for the call shape), the host-side
-  client/URL wiring (maintainer domain), the v2 test notes
-  (`maintainer/done/compact_memory_v2test.ts` +
-  `compaction_warning.md`), the knowledge doc
-  (`maintainer/done/knowledge_opencode_tools_plugins.md`).
-  Related: the loop_log-v2 proposal's Part A context probe (which context
-  fields the host wires — `sessionID`/`agent` confirmed, model open); the
-  installed plugin package DOES expose the
-  `experimental.session.compacting` hook (candidate alternative design:
-  inject durable context AT compaction instead of triggering it).
-- **Solution paths (2026-09-12, maintainer Q&A + this session):**
-  (1) **Plugin-registered compact tool** — the clean architecture: the
-  custom-tool context is clientless BY DESIGN, so a client-needing tool
-  must be registered FROM a plugin (plugin `ctx` carries the SDK/RPC
-  access; plugins can register tools; the tool's execute still gets
-  sessionID/agent). I.e. move `compact_memory` to a plugin-registered
-  tool (registration = maintainer domain; the call shape must still match
-  the installed SDK `.d.ts` per the evidence above).
-  (2) **Compaction hook plugin** (prompt-level) — the maintainer's WIP
-  `inbox_planner/custom_compaction.ts` sets `output.prompt` in
-  `experimental.session.compacting` to a swarm-oriented resume prompt
-  (shape verified against installed plugin types 2026-09-12). Complements
-  (1): compaction stays host-triggered (maintainer compacts manually in a
-  direct session); the plugin shapes the resulting prompt.
-  (Source: `maintainer/done/plugin_exposed_custom_tool.md`.)
-- **Status:** LANDED (2026-09-12, worker-2) — the build landed per the
-  approved v2 proposal (plugin-registered `compact_memory` at
-  `.opencode/plugin/compact_memory.ts`; v1 retired to `plugin/deactivated/`;
-  probe S13 checks 86-99, 98/98; live acceptance PENDING: the maintainer's
-  registration in `opencode.jsonc` + restart, proposal Acceptance 2-4).
-  Design agreed with the maintainer (2026-09-12): plugin-registered tool
-  (client via captured plugin ctx; v1 `summarize` path ACTIVE on this build
-  + v2 `compact` hedge; keep args optional in the body with a 400-retry;
-  cross-session via `sessionID` arg; HTTP fallback + compaction hook
-  retired). Proposal:
-  `proposals/approved/2026-09-12_compact_memory_plugin.md` (APPROVED).
-  Probe evidence: `.opencode/plugin/dev_probe_ctx.ts` (client present in
-  plugin ctx; summarize=function, compact=undefined; session methods on
-  the prototype → detect with typeof; registration via the `plugins` array;
-  the file IS the worked example of a plugin-registered tool — the
-   registration shape is verified live).
-  - **2026-09-13 (direct session ses_f692e1071ffevodtnJTET0DEEs):** live
-    no-op bug FIXED — root cause: the server's `summarize` payload schema
-    REQUIRES `providerID` + `modelID` (binary: the handler
-    `SessionHttpApi.summarize` reads both from the body; a missing body /
-    missing key is a schema rejection → HTTP 404 JSON `{name:"BadRequest"}`
-    + a logged WARN "schema rejection" — 6 in the server log, one per fired
-    tool, both test sessions). The handler never ran → NO compaction; and
-    the host client does NOT throw on the 404 (it resolves) → the old code
-    reported a false success and burned a budget slot. Fix: the body ALWAYS
-    carries the resolved model pair (self: `extra.model.{id, providerID}`;
-    cross: the last message's info, assistant `modelID`+`providerID` / user
-    `model` object); an unresolvable pair → the request is NOT sent (clear
-    failure, no increment, no COMPACT line); the resolved result is VERIFIED
-    (success = the handler's boolean `true`; a resolved 404 JSON is a
-    failure carrying the server's message). Probe re-pinned (S13: the retry
-    2nd body keeps the pair, the failing-RPC path no-sends) + the S11 RC
-    import REPOINTED to `plugin/deactivated/context_recovery.ts` (the
-    maintainer's cleanup 4b44d8c moved the file without repointing the
-    probe — the probe was broken at HEAD). Gates: probe 98/98, smoke 23/23.
-    Live acceptance STILL PENDING: a real fire must show the compaction
-    part + the `time_compacting` flag in the DB (verify with
-    `Temp/opencode/sesdata.cjs` or `compaudit.cjs`).
-- **2026-09-12 (direct session ses_f6976031bffeRa8gNNcpy5FoYj):** model
-  field RESOLVED — it is nested, not top-level: `context.extra.model.id`
-  (live capture `tools/dev/hot_loaded_tool.ts` + maintainer `--todo` note in
-  the loop_log-v2 approval; the earlier key dump listed top-level keys
-  only). Feeds the Part 4 quant-class classification (priority.md #1) and
-  loop_log-v2 Part A. `priority.md` #1 (his `--wip` item) extends this
-  design with the per-model quant-class budget: Q4→3, Q3→1, other→1
-  preliminary, CPU models excluded — design grounded in the NAP, awaiting
-  his ruling (approval path + CPU- prefix confirmation).
+## 52. (closed 2026-09-13, see todo_records.md) — `compact_memory` fails in the current host build — connection error on both paths (2026-09-12) — LANDED (2026-09-12, worker-2, per the approved v2 proposal) + live acceptance DONE (2026-09-13, iteration 1: compaction part + directive + budget 1/3 + COMPACT line verified in the DB); the resume-overflow finding → `proposals/2026-09-13_compact_memory-findings.md` (AWAITING APPROVAL).
 
 ## Closed entries
 
