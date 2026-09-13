@@ -134,6 +134,19 @@ one at 90 %.
 - Curate `TODO.md`: close/condense with a one-line pointer; never delete open content
   (AGENTS.md §Commit-routine + §TODO-contract).
 
+## NAP size discipline (session close; approved `2026-09-12_nap-size.md` Parts 1+3)
+- At session close (and at every early handover), COMPRESS your own NAP section
+  into the `Compressed archive` list: one line — `<date> <iteration/direct>
+  (ses_…) — <one-line outcome> — details: loop folder plan<N>_summary.md + git
+  <hash>`. If the section carries detail beyond what that summary file + git
+  already hold, APPEND the excess to `plan<N>_nap.md` in the loop folder FIRST
+  (direct sessions with no loop folder: append to
+  `.opencode/archive/loop/nap_direct.md` — append-only, never rewrite).
+- The NAP holds only: header + `Compressed archive` + `Standing` + the current
+  session's section. No detailed section for a closed session may remain.
+- Baselines are UPDATED IN PLACE in `Standing` each session (never appended as
+  new evidence lines); stale standing lines get condensed or removed.
+
 ## maintainer calls/decisions
 - **Marker set (canonical — the worker/looprunner prompts reference this table,
   they do not restate it):** a marker line anywhere in a repo file is a direct
