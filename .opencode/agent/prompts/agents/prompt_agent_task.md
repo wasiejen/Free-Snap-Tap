@@ -60,6 +60,16 @@ unit ahead and the readout ≥80 % → run `compact_memory` BEFORE starting it;
 ≥90 % → compact now, keeping back to the task spec; if the tool refuses
 (session budget exhausted) → hand over per the stop line.
 
+## compact_memory (live on this host)
+- The `compact_memory` tool is registered and ACTIVE. Firing it compacts the
+  session and the session ENDS after the compaction — the reload message is
+  attached to the compaction summary.
+- BEFORE firing: commit a handover checkpoint (Early-handover rule at full
+  force — after the compaction you resume from files, not memory).
+- ON RESUME (the planner restarts the SAME session): first read
+  `agent_readme_post_compaction.md` and follow it, then continue from the
+  committed state — not from the compaction summary.
+
 ## Early handover (maintainer protocol, 2026-09-12)
 Do not wait for the stop line to write the handover. When the readout reaches
 ≥70 % — or the current unit clearly cannot finish before the stop line — PAUSE

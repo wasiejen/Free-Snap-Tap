@@ -1,0 +1,1 @@
+2026-09-13_04-27 -->START planner-1 ses_f676f6a82ffe960mvrZD9W0DjQ Qwen3.8-27B-IQ4KT-120K plan1: codify compaction-resume protocol (maintainer instr) + live compact_memory acceptance via worker self-compact

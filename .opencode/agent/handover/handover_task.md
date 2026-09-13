@@ -1,75 +1,70 @@
-# TASK (RESUME) — compact_memory plugin: finish from the WIP (units 1-4)
+# TASK — live acceptance of compact_memory (worker self-compact + resume)
 
-Worker: `worker_Q4_120K` (resuming the dead session
-`ses_f691b7802ffe2wMtz7svBy36Ya` — his thought dump is the reference below).
+Worker: `worker_Q4_120K`. One goal, two phases (pre-compact / post-resume).
 
-## State at resume (planner-verified at launch — do not re-derive)
-- The WIP plugin is COMMITTED: `.opencode/plugin/compact_memory.ts` (332
-  lines). Read it in full — it is your starting point; its architecture is
-  smoke-verified (registration shape, summarize path, cross-model read,
-  retry-once, no-client error, CPU denial, message+trailer, COMPACT line).
-- Smoke harness: `C:\Users\Wasiejen\AppData\Local\Temp\opencode\qc_smoke\
-  smoke.mjs` (23 checks; `node` from anywhere; its sandbox state sits beside
-  it — delete the sandbox `qc_smoke/.opencode` before re-runs if state
-  interferes). RE-RUN IT FIRST. Planner-measured failures at launch: **8**
-  (clf IQ4 / clf Q4KM / clf trap / gate-3rd-4th / retry note / fail-no-
-  increment / v2 schema / lenient v1 read).
-- ROOT CAUSE of the 4 classifier failures (planner-verified): the quant
-  rules lack the `i` flag — `compact_memory.ts:71-72` (`/iq4|q4/`,
-  `/iq3|q3/`) do not match the UPPERCASE live names (`Qwen3.8-27B-IQ4KT-
-  120K`); the `^cpu` rule has the flag. `clf IQ3` passed only trivially
-  (default cap == q3 cap == 1).
-- Probe green **84/84** at the resume HEAD (the WIP touched no probe file).
-- Thought dump (dead worker's pre-write planning): `.opencode/agent/handover/
-  dump_ses_f691b7802ffe2wMtz7svBy36Ya.md` (921 raw lines, NO headings).
-  **BOUNDED READS ONLY** — grep for a specific question or read a tail/head
-  range; NEVER the whole file. Its tail already settled the commit strategy
-  (below) — do not re-deliberate it.
+## Goal
+Prove the compact_memory fix LIVE on this host (the NAP's pending live
+acceptance): a real self-compact must produce (a) a compaction part in the
+DB, (b) the `time_compacting` flag set on the session row, (c) the reload
+directive attached to the compaction summary, (d) budget increment 1/3 +
+COMPACT line — and the planner's resume protocol (same sessionID via
+`task_id`) must let you continue from committed state.
 
-## Contract (unchanged from the original spec at `git show a162f2a:.opencode/
-agent/handover/handover_task.md` — same scope, same DoD, same DO-NOT-TOUCH)
-The approved proposal `proposals/approved/2026-09-12_compact_memory_plugin.md`
-stays the design authority; read it for TARGETED questions only (you do not
-need to re-read the v1 tool or dev_probe_ctx — the WIP already embodies them).
+## Verified facts (planner-measured 2026-09-13 — do NOT re-research)
+- The tool is registered + ACTIVE on this host (maintainer launch message).
+  Firing it compacts the session and the session ENDS after the compaction;
+  the reload message is attached to the summary (maintainer Q&A:
+  `maintainer/inbox_planner/context_async_compaction.md`).
+- The default (no-args) directive already contains the post-compaction
+  pointer: `.opencode/plugin/compact_memory.ts:102`.
+- Budget store: `.opencode/temp/compact_budget.json` (per-session count,
+  increment-on-success; your model class Q4 → cap 3).
+- COMPACT line: `.opencode/temp/ctx.log`.
+- Read-only DB helpers (scratchpad, `node <file> <sessionID>`):
+  `C:\Users\Wasiejen\AppData\Local\Temp\opencode\compaudit.cjs` (compaction
+  parts + user messages) and `sesdata.cjs` (session row incl.
+  `time_compacting` + slim message dump). DB: `C:/Users/Wasiejen/.local/
+  share/opencode/opencode.db` (the helpers open it `readOnly`).
+- Your session id = the `SESSION=` field of the injected `ctx:` line.
+- Carried baselines (no re-run needed — this task changes no code):
+  probe 98/98, smoke 23/23, pytest 459+1#10, ruff F=0.
 
-## Work (resume units)
-1. **Fix the 8 smoke failures** until the harness is fully green: the
-   classifier `i` flags; the retry-note wording (Part 1: report "keep not
-   accepted by this build", not a raw `err.message` = "null"); the smoke's
-   OWN mock bug in `fail no increment` (`spec.summarizeError is not a
-   function` — the harness is yours to fix); the v2-schema model field +
-   the lenient v1 read (read the smoke's exact assertions first).
-2. **Retire v1**: `git mv .opencode/tools/compact_memory.ts .opencode/plugin/
-   deactivated/compact_memory_v1.ts` + the two frozen header lines + the probe
-   S10 `TOOL_TS` re-point (line ~1420) + its section-header comment — ALL IN
-   ONE COMMIT (the move alone breaks S10 → probe red).
-3. **Probe S13** appended after the check-85 block, before S5-hygiene (86+):
-   the fixture list from the original spec's unit 3 (git show above) = the
-   proposal's Part 4 probe bullet; direct import, SANDBOX-steered, no hook
-   fires; fresh `ses_qc_*` ids ADDED to the FINGERPRINT array (check 43);
-   header section map updated (line 271) with `S13=<n>` + new total.
-4. **Bookkeeping**: `TODO.md` #52 one-line status + your summary to
-   `.opencode/agent/handover/handover_task_to_planner.md` (measured gates,
-   the commit list incl. the WIP-rescue hashes, failures found+fixed) — the
-   FINAL commit.
+## Phase A (before firing)
+1. `loop_log` tool: START line (role `worker-1`, model verbatim, your
+   session id).
+2. Write `handover_task_to_planner.md` marked **PRE-COMPACT CHECKPOINT**:
+   your session id, "about to fire compact_memory (no args)", the 4
+   acceptance points (a-d) with the exact helper commands, and the note
+   "planner resumes the SAME session via task_id after compaction".
+3. COMMIT (handover file + loop log line only).
+4. Fire `compact_memory` with NO arguments. Do not plan to do anything
+   after this call — the session ends.
 
-## Commit strategy (settled by the dead worker's dump-tail decision — keep it)
-Green checkpoint commit per unit; unit 2's move + re-point together; the
-final commit carries TODO + the summary. Document all hashes in the summary.
+## Phase B (after resume — same session, planner re-launched you)
+5. Follow `.opencode/agent/prompts/agent_readme_post_compaction.md`
+   (STEP 1 parallel batch read; files beat the summary).
+6. Verify acceptance points (quote measured values VERBATIM):
+   - (a) compaction part exists — run `compaudit.cjs <sessionID>`.
+   - (b) `time_compacting` set — run `sesdata.cjs <sessionID>` (session row).
+   - (c) reload directive text attached to the summary message (quote it).
+   - (d) `compact_budget.json` → your session count == 1; last COMPACT line
+     in `ctx.log` (quote both).
+7. Write the FINAL `handover_task_to_planner.md` (executive summary: a-d
+   with quoted evidence, whether the resume worked per protocol — did the
+   reload message land, could you rebuild from committed state — commit
+   hashes, carried baselines, what you did not do).
+8. `loop_log` DONE line (gauge readout verbatim — `ctx_gauge` tool). COMMIT.
 
-## DoD (measured end states)
-- Smoke harness: all checks PASS under node (record the final N/N; if you
-  ADD checks to the harness, say so in the summary).
-- `node .opencode/plugin/probes/handover_probe.mjs` → `PROBE handover:
-  <84+n>/<84+n> PASS`, exit 0.
-- pytest **459 + 1 #10**, ruff **F=0**.
-- `git status`: scope = plugin file + retirement move + probe + bookkeeping;
-  the v1 move a 100% rename (two header lines only).
-- `rg "tools/compact_memory" .opencode/plugin/probes/handover_probe.mjs` →
-  0 hits.
+## Definition of done
+- Committed final summary reporting a-d with VERBATIM measured values
+  (not "looks fine").
+- Loop log START + DONE lines present for your session.
+- Commit scope: handover/loop files ONLY.
 
-## DO-NOT-TOUCH (carried)
-`opencode.jsonc` (his live registration file), `.opencode/plugin/
-context_recovery.ts`, `.opencode/maintainer/**`, `proposals/**`, `archive/**`,
-the S1-S12 check bodies (the S10 re-point is the only permitted edit there),
-FST code.
+## Approval boundary / DO-NOT-touch
+- Firing `compact_memory` on your OWN session: explicitly pre-approved
+  (it is the task). Read-only DB access via the scratchpad helpers:
+  pre-approved.
+- DO-NOT-touch: FST product code, `.opencode/plugin/**`,
+  `.opencode/agent/prompts/**`, `.opencode/maintainer/**`,
+  `opencode.jsonc`, `TODO.md` (findings → `todo_inbox.md` instead).

@@ -109,6 +109,12 @@ planning. Plan against a defined goal, not a list of chores.
   implementation, explorer for audit/map).
 - On the worker's return, **verify** against `git log` + the test baseline — never assume the
   summary is true. Update the NAP, then continue.
+- **Compacted worker = resume, not relaunch:** when a worker's session was
+  compacted (its result/handover says so, or its loop log shows START without
+  DONE and the DB carries a compaction part for that session), RESUME the same
+  session via the Task tool's `task_id` and instruct it to follow the
+  post-compaction protocol (`agent_readme_post_compaction.md`) — do not launch
+  a fresh worker for the same task.
 
 ## Context-budget trigger (L3)
 Standing rule on top of the stop line (AGENTS.md §Context budget): with a big
