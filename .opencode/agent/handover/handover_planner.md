@@ -19,27 +19,31 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   updated IN PLACE in Standing). The AGENTS.md mirror hunk stays queued for the
   AGENTS.md copy flow (bundled with proposal-B items: gauge-lag hint + #5
   knowledge rule + #6 grep-limit rule — exact text owed in the proposal).
-- **nap-size Part 2 DELEGATED (this session):** fresh `planner_Q4_120K` in
-  PLANNER-AS-TEXT-WORKER mode (instructed to IGNORE its planner prompt; spec =
-  `handover_task.md` = loop-folder copy `plan3_ho_task.md`): compress ALL closed
-  session sections (the sections below THIS one at spec time, 23 of them, lines
-  ≈5-1259) into `## Compressed archive` one-liners (`<date> <iter/direct>
-  (ses_…) — <one-line outcome> — details: <pointer>`); over-long detail →
-  `plan<N>_nap.md` in the loop folder / `archive/loop/nap_direct.md` for direct
-  sessions; Standing baselines updated IN PLACE (probe 98/98, smoke 23/23,
-  pytest 459+1#10, ruff F=0) + stale standing lines condensed; knowledge
-  CANDIDATES listed in the handover only (NOT written into the knowledge base —
-  I land them after verification). DO-NOT-TOUCH: THIS iteration-3 section, the
-  loop log/summaries, proposals, TODO.md. Acceptance: NAP ≤ 150 lines
-  (script-checked), no information loss, every compressed line resolves
-  (I spot-check 3 lines myself).
-- **On return (me):** verify against git log + diff + line count + 3-line
-  spot-check; land any knowledge candidates (small, my edits); copy the worker
-  summary in as `plan3_ho_task_to_planner.md`; then, IF BUDGET ALLOWS:
-  priority #4 (one-line ready-made marker-grep command in the planner prompt) +
-  `snippet_collection.md` → done/ (replier: marker line landed; the full
-  recipe collection merges into the queued helper-scripts explorer task);
-  NAP section current + `plan3_summary.md` + action line.
+- **nap-size Part 2 DELEGATED → LAUNCH DIED (this session):** spec committed
+  `a018f49` (= loop-folder `plan3_ho_task.md`); launch of fresh
+  `planner_Q4_120K` in PLANNER-AS-TEXT-WORKER mode DIED: session
+  `ses_f67324bf4ffeEeQMPWJBhFGRya` ran ~16 steps (read phase — NAP + supporting
+  files) then `context_length_exceeded` ×6 host retries over 13 min (server log
+  `~/.local/share/opencode/log/opencode.log`), ZERO artifacts (no writes, no
+  commits) — the T2 pattern with no WIP to rescue. The overflow at ~16 steps /
+  ~50K content on a 120K window is UNSOLVED (my own session on the SAME
+  agent/model runs fine at 80 %) — host-side quirk, do not re-diagnose from
+  scratch next session. RETRY ORDER (next session): (1) fresh
+  `planner_Q3_120k_mtp` text-worker, same spec; (2) if that dies the same way →
+  `planner_Q4_120K` once more; (3) if BOTH die → STOP burning iterations: flag
+  it as a host-side launch defect in the findings-proposal queue / a new short
+  proposal (subagent launch context overflow on this host) and fall back to
+  doing the compression myself in a fresh session with bounded reads (sections
+  in chunks of ~150 lines, compressed line written per chunk to a scratch file
+  in the scratchpad, final splice at the end).
+- **On worker return (verification checklist, carried):** verify against git
+  log + diff + line count (≤150) + 3-line spot-check; land any knowledge
+  candidates (small, my edits); copy the worker summary in as
+  `plan3_ho_task_to_planner.md`; then, IF BUDGET ALLOWS: priority #4 (one-line
+  ready-made marker-grep command in the planner prompt) + `snippet_collection.md`
+  → done/ (replier: marker line landed; the full recipe collection merges into
+  the queued helper-scripts explorer task); NAP section current +
+  `plan3_summary.md` + action line.
 - **NEXT (in order, carried):** 1. HIS rulings on the findings proposal
   (item-1 threshold edit lands on approval — it changes L3 behavior of every
   role prompt). 2. Priority #2 (compact_memory usage guideline + return-value
