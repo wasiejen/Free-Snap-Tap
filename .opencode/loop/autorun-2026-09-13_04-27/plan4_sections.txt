@@ -1,0 +1,31 @@
+5: ## 2026-09-13 (iteration 3; ses_f674587ecffeaYLsKgST57D0ve) — nap-size build: Part 1 LANDED (`81a47d9`); Part 2 cleanup delegated (text-worker); #52 CLOSED (`4db7505`)
+59: ## 2026-09-13 (iteration 1; ses_f676f6a82ffe960mvrZD9W0DjQ) — compaction-resume protocol codified; live acceptance DONE (rescued); resume-overflow finding → proposal
+117: ## 2026-09-13 (direct session; ses_f692e1071ffevodtnJTET0DEEs) — compact_memory live no-op bug FIXED (commit follows this section)
+164: ## 2026-09-12 (direct session; ses_f692e1071ffevodtnJTET0DEEs) — priority #1 BUILD DELEGATED: compact_memory plugin (approved proposal v2, Parts 1-4)
+260: ## 2026-09-12 (direct session; ses_f6976031bffeRa8gNNcpy5FoYj) — attention-keywords close-out; priority #1 (compact_memory quant-class budget) design grounded — awaiting his ruling
+343: ## 2026-09-12 (direct session; ses_f6a0d11ebffed36PDKoTeWxddD) — .opencode restructure, Part 1 LANDED: agent-side home; host restart required
+406: ## 2026-09-12 (direct session; ses_f6a42cb49ffev8w5ITrdSkUpPd) — merge `fst_work`→`opencode_test` done (`ef2f05b`); inbox handled: 5 proposals filed, 6 items → done; sweep PENDING
+413: ## 2026-09-12 (iteration 14; ses_f6bd63bf9ffeirBsm422kPUj2q) — relaunch after iter-13 `stop`; state unchanged, NO new non-gated work; re-issue `stop`
+422: ## 2026-09-12 (iteration 13; ses_f6c036282ffe2qh5zQFPeyh6Wa) — T3 LANDED + verified (`6ebe288`, loop_log tool); 3-item tool batch CLOSED (verdict + `approved/`→`implemented/`; Part 2/3 prompt lines applied); no non-gated work left — loop goal reached
+431: ## 2026-09-12 (iteration 10+1; ses_f6c4471a3ffeaQ9rXpnmUTg2AS) — T2 LANDED via rescue (worker launch died at context_length_exceeded after partial run); gates 84/84; T3 (loop_log tool) next
+442: ## 2026-09-12 (iteration 10; ses_f6c6ed7feffe9cGQ2bykHaKMJ0) — 3-item tool batch proposal FILED + approved (pre-approval); inbox → done; T1 (block_transfer sandbox) spec committed, worker-10 launched
+453: ## 2026-09-12 (iteration 9; ses_f6cbb0797ffe71FAx40bQyURTr) — FST batch COMPLETE on `fst_work` (units A+B verified); proposal → `implemented/`; 6 TODO entries closed
+464: ## 2026-09-12 (iteration 7; ses_f6cee5235ffeTa34Ob0pHMrmg6) — maintainer rulings landed; compact_memory v2 integrated (maintainer marker, planner-direct); FST batch delegated on the new `fst_work` branch
+474: ## 2026-09-12 (iteration 6; ses_f6d1d3627ffeSDD7HoxQuvlmCu) — T5 re-verified (probe 80/80, WIP→task commit `14af171`); maintainer directives landed (early-handover protocol, task-spec index trigger)
+487: ## 2026-09-12 (iteration 5; ses_f6d394ee1ffeE49CoI3UdAUCbl) — T5 re-verify gate NOT met (compact_memory.ts still uncommitted); re-verify spec made execution-ready; loop blocked on maintainer
+496: ## 2026-09-12 (iteration 4; ses_f6d472e56ffeJUAKrfcs4BOjYN) — maintainer marker handled: block_transfer.ts → tool() form (planner-direct); T5 still blocked; early handover per maintainer
+507: ## 2026-09-11 (iteration 3; ses_f6e137295ffeH81n9i8wLI3cz7) — T4 landed (planner-direct); T5 spec/launch
+594: ## 2026-09-11 (iteration 2; ses_f6eb9cab5ffebLGhxdSs8jBrGI) — maintainer prototypes landed; spec re-decomposed T1–T5; T1 launched
+711: ## 2026-09-11 (new looprun, iteration 1; ses_f6ef5418effeloEwm4zr53XpXa) — approval moves landing; #17/#30/#35 closed; Cycle-1 + rename build
+777: ## 2026-09-11 (same direct run, post-compaction chat segment; ses_f6fd8a0caffedqEYeUMCq0x12f) — compaction-lifecycle design agreed + proposal written
+801: ## 2026-09-11 (DIRECT planner run; ses_f6fd8a0caffedqEYeUMCq0x12f) — inbox 11-11 handled: loop.log v2 + loop/ reorg + #50 + decision proposals
+872: ## 2026-09-11 (looprun 3, iteration 5; ses_f714b3128ffeILuAaWp2YUqnLt) — TODO curation + #48 delegated
+914: ## 2026-09-11 (looprun 3, iteration 4; ses_f71d36a2affeVrJfwDARNwG7lo) — deferred pair in order: loop.log prompt task, then the re-scoped plugin task
+958: ## 2026-09-10 (looprun 3, iteration 3; ses_f7210e535ffe3ac5bYAzqFwQe5) — todo_inbox curated; date sweep LANDED + verified; loop.log/plugin deferred
+1009: ## 2026-09-11 (new looprun 3, iteration 2 per launch; ses_f725ba15effe6Od7tQ9XO2QuYE) — inbox 01-16/031 handled; #49 closed; split build LAUNCHED
+1105: ## 2026-09-10 (new looprun, iteration 1 per launch; ses_f729fdeecffeL1itaHiEEsKjYG) — inbox feedback given; loop paused for approval
+1135: ## 2026-09-10 (looprun 2, iteration 6b — FRESH restart of the interrupted iter 6) — part 3 LANDED + verified; P02 saga CLOSED; gauge moved
+1195: ## 2026-09-10 (looprun 2, iteration 5) — P02 + P08 LANDED + verified; P01 re-test PASSED; maintainer meta batch processed
+1265: ## 2026-09-10 (looprun 2, iteration 4) — P09+P07 applied to the LIVE looprunner prompt + #47 CLOSED
+1314: ## Compressed archive (one line each — details in git log + TODO/records)
+1345: ## Standing
