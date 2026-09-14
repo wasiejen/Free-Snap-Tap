@@ -2004,19 +2004,21 @@ const qcTick = async () => {
     JSON.stringify(caps),
   );
 }
-
-// 88 — the summarize path (THE ACTIVE BUILD SHAPE): called with path.id +
-//      body.keep WHEN GIVEN; the default response (the message arg ABSENT) is
-//      BYTE-EXACT — the v1 success line + the reload directive
+// 88 — the summarize path (THE ACTIVE BUILD SHAPE, SELF dispatch): called
+//      with path.id + body.keep WHEN GIVEN; the response (the message arg
+//      ABSENT) is the dispatch line BYTE-EXACT — NO success claim; the
+//      budget increment + the COMPACT line land ASYNCHRONOUSLY (the tick)
 {
   const { rec, res } = await qcExec({ summarize: true }, { keepTokens: 42000, keepMessages: 7 });
+  await qcTick();
   check(
     "88",
     "S13",
-    "summarize path (the ACTIVE build shape): called with path.id + body.keep; the default response BYTE-EXACT (the v1 success line + the reload directive)",
+    "summarize path (the ACTIVE build shape, SELF dispatch): called with path.id + body.keep; the response is the dispatch line BYTE-EXACT; the budget increment lands after the tick",
     rec.summarize.length === 1 && rec.summarize[0]?.path?.id === "ses_qc_self" &&
       rec.summarize[0]?.body?.keep?.tokens === 42000 && rec.summarize[0]?.body?.keep?.messages === 7 &&
-      res === `Context successfully compacted: kept last 7 messages / 42000 tokens.\n\n${QC_DIRECTIVE}`,
+      res === `Compaction dispatched for ses_qc_self (background, fire-and-forget) — the summarize call was sent (model: Qwen3.8-27B-IQ4KT-120K); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.` &&
+      qcStore().sessions.ses_qc_self?.count === 1,
     JSON.stringify({ calls: rec.summarize, res: String(res).slice(0, 120) }),
   );
 }
@@ -2048,11 +2050,17 @@ const qcTick = async () => {
 //      compact({sessionID}) with FLAT parameters, summarize NOT called
 {
   const { rec, res } = await qcExec({ summarize: true, compact: true }, { keepTokens: 5, keepMessages: 2, sessionID: "ses_qc_flat" });
+  await qcTick();
   check(
     "90",
     "S13",
-    "compact flat path (compact present): compact({sessionID}) FLAT, summarize NOT called",
-    rec.compact.length === 1 && rec.compact[0]?.sessionID === "ses_qc_flat" && rec.summarize.length === 0 && /compacted/i.test(res),
+    "compact flat path (compact present): compact({sessionID}) FLAT, summarize NOT called; the response is the dispatch line BYTE-EXACT; the budget increment lands after the tick",
+    rec.compact.length === 1 &&
+      rec.compact[0]?.sessionID === "ses_qc_flat" &&
+      !("path" in (rec.compact[0] ?? {})) &&
+      rec.summarize.length === 0 &&
+      qcStore().sessions.ses_qc_flat?.count === 1 &&
+      res === `Compaction dispatched for ses_qc_flat (background, fire-and-forget) — the compact call was sent (model: Qwen3.8-27B-IQ4KT-120K); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.\ncross-session model read unavailable (no client.session.messages) — the calling session's model is used for the budget class`,
     JSON.stringify({ compact: rec.compact, res: String(res).slice(0, 120) }),
   );
 }
