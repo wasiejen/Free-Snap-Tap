@@ -18,7 +18,7 @@
     },
     "buffer": 2000
   },
-
+  "shell": "C:/Program Files/Git/bin/bash.exe",
   "provider": {
     "llama-swap": {
       "name": "llama-swap-v2",
@@ -115,6 +115,10 @@
     },
   "subagent_depth": 2,
   "agent": {
+    "compaction": {
+      "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
+      "temperature": 0.1
+    },
     "looprunner_Q4_120k": {
       "description": "Just restarts the Planner in autnomous mode, same model als planner_Q4_120K for fast switching",
       "mode": "primary",
