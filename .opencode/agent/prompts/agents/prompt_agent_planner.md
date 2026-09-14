@@ -114,7 +114,7 @@ planning. Plan against a defined goal, not a list of chores.
   DONE and the DB carries a compaction part for that session), RESUME the same
   session via the Task tool's `task_id` and instruct it to follow the
   post-compaction protocol (`agent_readme_post_compaction.md`) — do not launch
-  a fresh worker for the same task. You are the decider of WHEN to resume a worker; before resuming you may compact the worker session first (compact_memory with its sessionID), then resume via task_id.
+  a fresh worker for the same task. You are the decider of WHEN to resume a worker; before resuming you may compact the worker session first (compact_memory with its sessionID), then resume via task_id. A CROSS `compact_memory` dispatch is fire-and-forget: success = the COMPACT line in `.opencode/temp/ctx.log` / the terminal; a failure burns NO budget. Prefer a DIFFERENT compaction model (e.g. Gemma) → no flush; a SAME-model cross compaction → budget ONE flush delegation after the dispatch (knowledge_tools.md "llama-swap single slot").
 
 ## Context-budget trigger (L3)
 Standing rule on top of the stop line (AGENTS.md §Context budget): with a big

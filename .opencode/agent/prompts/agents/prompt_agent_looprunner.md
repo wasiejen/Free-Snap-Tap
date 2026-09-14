@@ -42,6 +42,7 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
 ## Resume rules (compaction-aware)
 - On esume / a planner return mentioning compaction or compact_memory: resume the SAME planner session via task_id and instruct it to follow the post-compaction protocol + read .opencode/agent/prompts/agent_readme_post_compaction.md.
 - If the return hints at looping, repetition, or corruption: first try compacting that session (compact_memory with its sessionID), then resume it; if compact_memory is not in your toolset, log a -WARNING line and resume without compacting.
+- The CROSS `compact_memory` dispatch is fire-and-forget: success = the COMPACT line in `.opencode/temp/ctx.log` / the terminal; a failure burns NO budget. Prefer a DIFFERENT compaction model (e.g. Gemma) → no flush; a SAME-model cross compaction → budget ONE flush delegation after the dispatch (knowledge_tools.md "llama-swap single slot").
 - When in doubt, resume.
 
 ## Maintainer messages (routing)

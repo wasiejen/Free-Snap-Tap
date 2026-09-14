@@ -61,5 +61,10 @@ interaction-contract table — this section keeps only the concrete repo facts:
   maintainer's next process restart): run
   `node .opencode\plugin\scripts\peek.mjs` from the repo root, read-only →
   `SESSION=… CTX=n (p%) REM=m` (window unknown → `CTX=n` only; no finished
-  step → `CTX=notAvailable`).
+   step → `CTX=notAvailable`).
+   **Margin rule (maintainer 2026-09-14):** the readout UNDER-reports actual
+   usage (a compaction fired at a 95 % nudge landed at 119.6 K of the ~120 K
+   window) — add a 5 % margin to the gauge/nudge numbers when making budget
+   decisions. A first-ever gauge in a FRESH session can return
+   `CTX=notAvailable` (no finished step yet) — the next call reads fine.
 - Durable maintainer TODOs: `TODO.md`.
