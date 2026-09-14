@@ -1,0 +1,8 @@
+# Line-ending policy (2026-09-15): all text files LF in the working tree.
+# Windows batch scripts keep CRLF (the cmd.exe parser is LF-fragile).
+* text=auto eol=lf
+*.bat eol=crlf
+*.cmd eol=crlf
+*.ps1 eol=crlf
+*.png binary
+*.ico binary
