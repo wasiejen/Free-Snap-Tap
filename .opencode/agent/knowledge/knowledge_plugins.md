@@ -115,3 +115,25 @@ Gained, verified knowledge for opencode plugins. Format per the README:
   `maintainer/done/plugin_exposed_custom_tool.md`; TODO #52.
 - **Keys:** experimental.session.compacting, output.prompt, compaction,
   resume prompt, swarm, durable state.
+
+## compact_memory verified working again + Gemma is the DEFAULT compaction model
+- **Do:** compact_memory is back to a working state — use the cross-session
+  contract as documented (SELF sync / CROSS fire-and-forget; success = the
+  COMPACT line in `.opencode/temp/ctx.log` + the budget increment). The
+  DEFAULT compaction model is now Gemma (`opencode.jsonc`
+  `agent.compaction.model` = `llama-swap/Gemma4-12B-Q4KXL-MTP-128K`, set
+  2026-09-15) → the default cross-compact runs on a DIFFERENT model → no
+  flush budget. The summarize body STILL requires `providerID` + `modelID`
+  (server payload schema) — pass the explicit pair for cross compaction
+  rather than relying on the auto-resolve (the plugin REFUSES to send when
+  the pair cannot be resolved).
+- **Why (evidence):** maintainer short test 2026-09-15 — cross-session
+  compact of `ses_f5dedec39ffeYhwWJNGbjHa4U0` "triggered as expected":
+  COMPACT line in `.opencode/temp/ctx.log` 00:38 (tokens=30000 messages=12),
+  the target's next read shows 0%/119K (post-compact reset).
+- **Ref:** `opencode.jsonc` L12-20 (top-level compaction: auto=false) +
+  L118-120 (agent.compaction.model); `compact_memory.ts` L37 / L281 /
+  L517-524; `.opencode/temp/ctx.log` 2026-09-15; planner verification
+  (2026-09-15, direct session).
+- **Keys:** compact_memory, gemma default, agent.compaction.model,
+  providerID, modelID, summarize, COMPACT line, verified working.

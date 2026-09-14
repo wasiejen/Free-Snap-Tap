@@ -149,7 +149,10 @@ instructions/protocol — facts that save lookups. Format per the README:
   model — `Gemma4-12B-Q4KXL-MTP-128K` runs ~4× faster on this host (his
   numbers: prefill ~3400 vs ~1200 t/s; generation ~200 vs ~47 t/s) with a
   131K window → the provider switches on request, the compaction lands in
-  the call window, NO flush needed; (2) if compaction model == the target's
+  the call window, NO flush needed (2026-09-15: Gemma is now the DEFAULT
+  compaction model — `agent.compaction.model` in `opencode.jsonc` — so the
+  default cross-compact already gets this; the flush budget applies only
+  when the pair names the target's own model); (2) if compaction model == the target's
   active model (the single slot can't start the compaction until the session
   switch frees it), budget ONE FLUSH delegation after the dispatch — the
   first post-dispatch delegation can be consumed by the compaction routine;
