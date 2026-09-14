@@ -425,45 +425,43 @@ export default async function CompactMemoryPlugin(ctx: any) {
             // }
 
             //--comment asked another llm to help me with this xD
-            // 1. Declare variables up front so they are accessible everywhere below
-            let sessionID;
-            let providerID;
-            let model;
-            let modelNote;
-
-            // 2. Branch A: Explicit session ID passed via args
-            if (args?.sessionID) {
-              sessionID = args.sessionID;
-              providerID = args.providerID;
-              model = args.modelID;
-              modelNote = "cross session compaction detected";
+           // 1. resolve the session id (Part 1): an explicit id compacts
+            //    ANOTHER session (or itself); absent → the calling session
+            const explicitID =
+              typeof args?.sessionID === "string" && args.sessionID !== "" ? args.sessionID : null;
+            const ctxID = typeof c?.sessionID === "string" && c.sessionID !== "" ? c.sessionID : null;
+            const sessionID = explicitID ?? ctxID;
+            if (sessionID == null) {
+              return "Compaction request failed: no session id available (pass the sessionID argument or a context session id).";
             }
-            // 3. Branch B: Fall back to context session ID
-            else {
-              sessionID = c?.sessionID;
+            const isSelf = sessionID === c?.sessionID;
 
-              // Validation step
-              if (typeof sessionID !== "string" || sessionID === "") {
-                return "Compaction request failed: no session id available (pass the sessionID argument or a context session id).";
-              }
-
-              // Resolve model via API call
-              const isSelf = args?.sessionID == null || (typeof c?.sessionID === "string" && args.sessionID === c.sessionID)
+            // 2. resolve the model pair — an EXPLICIT providerID+modelID pair
+            //    (BOTH given, non-empty) is an OVERRIDE (the maintainer's
+            //    round-2 tested cross path); otherwise resolveModel (self:
+            //    extra.model; cross: the messages-RPC read of the LAST entry —
+            //    never a throw, a NOTE on degradation)
+            const explicitProvider = typeof args?.providerID === "string" ? args.providerID.trim() : "";
+            const explicitModel = typeof args?.modelID === "string" ? args.modelID.trim() : "";
+            let model = "";
+            let providerID = "";
+            let modelNote = "";
+            if (explicitProvider !== "" && explicitModel !== "") {
+              providerID = explicitProvider;
+              model = explicitModel;
+            } else {
               const resolved = await resolveModel(ctx?.client, c, sessionID, isSelf);
-
               model = resolved.model;
               providerID = resolved.providerID;
               modelNote = resolved.note;
             }
 
-
             const root = resolveRoot(c);
 
-            // 2. resolve the model + the quant-class cap AT CALL TIME (Part 2)
+            // 3. the quant-class cap + the budget gate — BEFORE any compact
+            //    call: denial has ZERO side effects (no increment, no compact
+            //    call, no COMPACT line)
             const { cap, label } = classifyQuantClass(model);
-
-            // 3. the budget gate — BEFORE any compact call: denial has ZERO
-            //    side effects (no increment, no compact call, no COMPACT line)
             const count = budgetCount(root, sessionID);
             if (count >= cap) {
               return (
@@ -474,16 +472,22 @@ export default async function CompactMemoryPlugin(ctx: any) {
               );
             }
 
-           // 4. resolve the client call path (Part 1) — typeof detection
-            //    (the SDK methods live on the prototype). A FAILURE here
-            //    returns immediately: NO increment, NO COMPACT line (the
-            //    2026-09-12 live no-op was a FAILURE reported as a success —
-            //    it burned a budget slot for a compaction that never ran).
-            let keepNote = "";
+            // 4. the client call path (Part 1) — typeof detection (the SDK
+            //    methods live on the prototype). Keep fields go in the body
+            //    WHEN GIVEN; on a 404/missing-key/unexpected-field rejection
+            //    callSummarize retries ONCE without them.
             const client = ctx?.client;
+            const keep: Record<string, number> = {};
+            if (args?.keepTokens != null) keep.tokens = args.keepTokens;
+            if (args?.keepMessages != null) keep.messages = args.keepMessages;
+            const keepObj = Object.keys(keep).length > 0 ? keep : undefined;
+            const tokensToKeep = args?.keepTokens ?? DEFAULT_KEEP_TOKENS;
+            const messagesToKeep = args?.keepMessages ?? DEFAULT_KEEP_MESSAGES;
+
             if (typeof client?.session?.compact === "function") {
               // v2: FLAT parameters — the generated v2 types mark the options
-              // body `never` (no keep fields)
+              // body `never` (no keep fields). SYNCHRONOUS + verified (the v2
+              // client is hypothetical on this host — no hang evidence).
               let result: any;
               try {
                 result = await client.session.compact({ sessionID });
@@ -494,70 +498,80 @@ export default async function CompactMemoryPlugin(ctx: any) {
               if (error !== "") {
                 return `Compaction request failed: ${error}` + (modelNote !== "" ? `\n${modelNote}` : "");
               }
+              recordSuccess(root, sessionID, model);
+              appendCompactLine(root, c, sessionID, model, tokensToKeep, messagesToKeep);
+              const response =
+                typeof args?.message === "string" && args.message !== ""
+                  ? `${args.message}\n${POST_COMPACTION_TRAILER}`
+                  : `Context successfully compacted: kept last ${messagesToKeep} messages / ${tokensToKeep} tokens.\n\n${COMPACTION_RELOAD_DIRECTIVE}`;
+              return modelNote !== "" ? `${response}\n${modelNote}` : response;
             } else if (typeof client?.session?.summarize === "function") {
               // v1 — THE ACTIVE PATH ON THIS BUILD: the body MUST carry
-              // providerID + modelID (REQUIRED by the server payload schema);
-              // keep fields in the body WHEN GIVEN; 404/missing-key →
-              // retry ONCE without the keep fields
+              // providerID + modelID (REQUIRED by the server payload schema)
               if (model === "" || providerID === "") {
                 return (
                   `Compaction request failed: no resolvable model for ${sessionID} (the server requires providerID + modelID in the summarize body) — the request was NOT sent.` +
                   (modelNote !== "" ? `\n${modelNote}` : "")
                 );
               }
-              const keep: Record<string, number> = {};
-              if (args?.keepTokens != null) keep.tokens = args.keepTokens;
-              if (args?.keepMessages != null) keep.messages = args.keepMessages;
-              // const request = await callSummarize(
-              //   client,
-              //   sessionID,
-              //   { providerID, modelID: model },
-              //   Object.keys(keep).length > 0 ? keep : undefined,
-              // );
-              //
-              const request = client.session.summarize({
-                path: {
-                  id: sessionID
-                },
-                body: {
-                  providerID: providerID,
-                  modelID: model,
-                },
-
-              })
-              //async catch to not block - unknown if set keepTokens and keepMessages are respected
-              void request.catch((err: unknown) => {
-                const { note, error } = request
-                console.error("Background compaction failed:", err)
+              if (isSelf) {
+                // SELF = SYNCHRONOUS + verified (the spec / live-acceptance
+                // shape — a self compaction completes within the turn, no
+                // hang risk). Success claims + side effects ONLY on a
+                // verified result (the 2026-09-12 no-op rule).
+                const { note: keepNote, error } = await callSummarize(
+                  client,
+                  sessionID,
+                  { providerID, modelID: model },
+                  keepObj,
+                );
                 if (error !== "") {
-                  return `Compaction request failed: ${error}` + [modelNote, note].filter((s) => s !== "").join("\n");
+                  return `Compaction request failed: ${error}` + [modelNote, keepNote].filter((s) => s !== "").join("\n");
                 }
-                keepNote = note;
-              })
-
-
+                recordSuccess(root, sessionID, model);
+                appendCompactLine(root, c, sessionID, model, tokensToKeep, messagesToKeep);
+                const note = [modelNote, keepNote].filter((s) => s !== "").join("; ");
+                const response =
+                  typeof args?.message === "string" && args.message !== ""
+                    ? `${args.message}\n${POST_COMPACTION_TRAILER}`
+                    : `Context successfully compacted: kept last ${messagesToKeep} messages / ${tokensToKeep} tokens.\n\n${COMPACTION_RELOAD_DIRECTIVE}`;
+                return note !== "" ? `${response}\n${note}` : response;
+              }
+              // CROSS = fire-and-forget DISPATCH (the maintainer's round-2
+              // design — the same-model hang case: llama-swap has ONE slot, a
+              // same-model cross compaction cannot start until the session
+              // switch frees it, which may not happen until a later turn).
+              // VERIFIED ASYNCHRONOUSLY: the budget increment + the COMPACT
+              // line land ONLY in the verified-success callback
+              // (increment-on-verified-success); a failure logs to the
+              // terminal and burns no budget.
+              void callSummarize(client, sessionID, { providerID, modelID: model }, keepObj)
+                .then(({ note, error }) => {
+                  if (error !== "") {
+                    console.error(`compact_memory: background compaction FAILED for ${sessionID}: ${error}`);
+                    return;
+                  }
+                  if (note !== "") console.log(`compact_memory (${sessionID}): ${note}`);
+                  recordSuccess(root, sessionID, model);
+                  appendCompactLine(root, c, sessionID, model, tokensToKeep, messagesToKeep);
+                })
+                .catch((err: unknown) =>
+                  console.error(
+                    `compact_memory: background compaction rejected for ${sessionID}:`,
+                    err instanceof Error ? err.message : String(err),
+                  ),
+                );
+              const dispatch =
+                `Compaction dispatched for ${sessionID} (background, fire-and-forget) — the summarize call was sent ` +
+                `(model: ${model}); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.`;
+              const body =
+                typeof args?.message === "string" && args.message !== "" ? `${args.message}\n${dispatch}` : dispatch;
+              return modelNote !== "" ? `${body}\n${modelNote}` : body;
             } else {
               const compactType = typeof client?.session?.compact;
               const summarizeType = typeof client?.session?.summarize;
               return `Compaction request failed: no usable client — probed ctx.client?.session?.compact (type ${compactType}) and ctx.client?.session?.summarize (type ${summarizeType}); neither is a function (the client is not wired for this host build). No compaction was performed.`;
             }
-
-            // 5. success only: persist the increment + write the COMPACT line
-            //    (both best-effort — the compaction itself already happened)
-            recordSuccess(root, sessionID, model);
-            const tokensToKeep = args?.keepTokens ?? DEFAULT_KEEP_TOKENS;
-            const messagesToKeep = args?.keepMessages ?? DEFAULT_KEEP_MESSAGES;
-            appendCompactLine(root, c, sessionID, model, tokensToKeep, messagesToKeep);
-
-            // 6. the response (Parts 1/3): message ABSENT → the v1 success
-            //    line + directive BYTE-IDENTICAL; GIVEN → the message + the
-            //    ONE-LINE trailer (the reload invariant survives)
-            const note = [modelNote, keepNote].filter((s) => s !== "").join("; ");
-            const response =
-              typeof args?.message === "string" && args.message !== ""
-                ? `${args.message}\n${POST_COMPACTION_TRAILER}`
-                : `Context successfully compacted: kept last ${messagesToKeep} messages / ${tokensToKeep} tokens.\n\n${COMPACTION_RELOAD_DIRECTIVE}`;
-            return note !== "" ? `${response}\n${note}` : response;
           } catch (err: any) {
             return `Compaction request failed: ${err?.message ?? err}`;
           }

@@ -257,20 +257,25 @@
 //      (85) hook restore (cf. check 39): the global db path is back where
 //          S12 found it; a global read and an explicit-path read of the
  //          restored path agree byte-exact (no drift left by S12)
-//   S13 compact_memory plugin tool (14) — the approved v2 proposal (the
+//   S13 compact_memory plugin tool (15) — the approved v2 proposal + the
+//      2026-09-14 maintainer adaptation (explicit pair override; SELF sync,
+//      CROSS fire-and-forget dispatch — see the spec's revision note) (the
 //      plugin-registered compact_memory, quant-class budget; supersedes the
 //      v1 pinned by S10): the plugin file is imported DIRECT (type-stripped)
 //      — no hook fires (S5 tallies unaffected); ALL fs writes steered into
 //      the sandbox via directory=SANDBOX; fake client records
 //      summarize/compact/messages; fresh ses_qc_* ids (in the FINGERPRINT):
-//      (86) registration shape; (87) classifier fixtures incl. the trap;
-//      (88) summarize path + default response BYTE-EXACT; (89) keep
-//          retry-once; (90) compact flat; (91) no-client error naming both
-//          probes; (92) gate (cap−1 allowed, cap denied, zero side effects);
-//      (93) CPU always denied; (94) increment-on-success only; (95) v2 store
-//          schema on disk (model populated); (96) COMPACT line WITH model;
-//      (97) message + one-line trailer; (98) cross-session model read (the
-//          LAST entry); (99) failing RPC (default cap + note, no throw)
+//      (86) registration shape (6 args incl. the explicit pair); (87)
+//      classifier fixtures incl. the trap; (88) summarize path (SELF sync) +
+//          default response BYTE-EXACT; (89) keep retry-once (cross dispatch,
+//          async-verified); (90) compact flat; (91) no-client error naming
+//          both probes; (92) gate (cap−1 dispatched, cap denied, zero side
+//          effects); (93) CPU always denied; (94) increment-on-verified-
+//          success only (cross dispatch); (95) v2 store schema on disk (model
+//          populated); (96) COMPACT line WITH model; (97) message + dispatch
+//          line (cross, NO trailer); (98) cross-session model read (the LAST
+//          entry, pair-less); (100) explicit pair override (verbatim body,
+//          NO messages RPC); (99) failing RPC (default cap + note, no throw)
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -283,7 +288,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=14 S5=6  →  "PROBE handover: 98/98 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S5=6  →  "PROBE handover: 99/99 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -1906,7 +1911,7 @@ const dbPathBeforeS12 = getDbPath(); // the hook-restore capture (cf. check 39)
   );
 }
 
-// ------------------------------------------------------------------ S13 compact_memory plugin tool (14) — the approved v2 proposal
+// ------------------------------------------------------------------ S13 compact_memory plugin tool (15) — the approved v2 proposal + the 2026-09-14 maintainer adaptation (explicit pair; SELF sync / CROSS dispatch)
 //
 // The plugin-registered compact_memory (quant-class budget, approved proposal
 // .opencode/proposals/approved/2026-09-12_compact_memory_plugin.md, supersedes
@@ -1953,6 +1958,13 @@ const qcExec = async (spec, args, over) => {
   return { rec, res };
 };
 const qcStore = () => JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "temp", "compact_budget.json"), "utf8"));
+// Drains the event loop twice (macrotasks) — the CROSS fire-and-forget path
+// verifies its call and lands the side effects (increment + COMPACT line) in
+// a promise chain; the setImmediate ticks fire after that chain settles.
+const qcTick = async () => {
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+};
 
 // 86 — the registration shape: the default factory (the plugin ctx capture)
 //      returns tool.compact_memory — description + the 4 optional args
@@ -1964,9 +1976,9 @@ const qcStore = () => JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "t
   check(
     "86",
     "S13",
-    "registration shape: default factory → tool.compact_memory (description + args [sessionID, keepTokens, keepMessages, message] as zod schemas + execute)",
+    "registration shape: default factory → tool.compact_memory (description + args [sessionID, providerID, modelID, keepTokens, keepMessages, message] as zod schemas + execute)",
     t != null && typeof t.description === "string" && typeof t.execute === "function" &&
-      JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "keepTokens", "keepMessages", "message"]) &&
+      JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "providerID", "modelID", "keepTokens", "keepMessages", "message"]) &&
       Object.values(t.args).every((s) => s != null && typeof s.safeParse === "function"),
     JSON.stringify({ tools: Object.keys(reg?.tool ?? {}), args: Object.keys(t?.args ?? {}) }),
   );
@@ -2009,21 +2021,25 @@ const qcStore = () => JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "t
   );
 }
 
-// 89 — the keep retry-once: a 400/unexpected-field error on the FIRST call →
-//      the call is retried ONCE WITHOUT the keep fields (the 2nd body keeps
-//      providerID + modelID and drops the keep fields) and the response
-//      reports "keep not accepted by this build"
+// 89 — the keep retry-once (cross dispatch): a 404/unexpected-field error on
+//      the FIRST call → the call is retried ONCE WITHOUT the keep fields
+//      (the 2nd body keeps providerID + modelID and drops the keep fields) —
+//      the CROSS path is fire-and-forget, so the retry + the budget increment
+//      are verified ASYNCHRONOUSLY after the tick; the response is the
+//      dispatch line (NO "keep not accepted" — that note lands in the
+//      terminal log)
 {
-  const boom = Object.assign(new Error("400 unexpected field"), { status: 400 });
+  const boom = Object.assign(new Error("400 unexpected field"), { status: 404 });
   const { rec, res } = await qcExec({ summarize: true, summarizeError: (n) => (n === 1 ? boom : null) }, { keepTokens: 101, keepMessages: 3, sessionID: "ses_qc_retry" });
+  await qcTick();
   check(
     "89",
     "S13",
-    "keep retry-once: 400/unexpected-field → the 2nd call keeps providerID+modelID and drops the keep fields; the response reports keep not accepted by this build",
+    "keep retry-once (cross dispatch): 404/unexpected-field → the 2nd call keeps providerID+modelID and drops the keep fields; the response is the dispatch line; the budget lands after the tick",
     rec.summarize.length === 2 && rec.summarize[0]?.body?.keep?.tokens === 101 &&
       rec.summarize[1]?.body?.keep == null && rec.summarize[1]?.body?.providerID === "llama-swap" &&
       rec.summarize[1]?.body?.modelID === "Qwen3.8-27B-IQ4KT-120K" &&
-      String(res).includes("keep not accepted by this build") && /compacted/i.test(res),
+      /dispatched/i.test(res) && qcStore().sessions.ses_qc_retry?.count === 1,
     JSON.stringify({ n: rec.summarize.length, res: String(res).slice(0, 160) }),
   );
 }
@@ -2055,24 +2071,27 @@ const qcStore = () => JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "t
   );
 }
 
-// 92 — the gate (IQ4 cap 3, increment-on-success): count=cap−1 (the 3rd
-//      call) is ALLOWED; count=cap (the 4th) is DENIED naming class+cap+
-//      count with ZERO side effects (no compact call, no increment, no line)
+// 92 — the gate (IQ4 cap 3, increment-on-verified-success): count=cap−1 (the
+//      3rd call) is DISPATCHED; count=cap (the 4th) is DENIED naming
+//      class+cap+count with ZERO side effects (no compact call, no
+//      increment, no line); the cross increments land in the background
+//      chain (the tick drains it before the 4th call sees count=cap)
 {
   const { client, rec } = qcMakeClient({ summarize: true });
   const t = (await qcMod.default({ client })).tool.compact_memory;
-  const run = (args) => t.execute(args, qcCtx({}));
+  const run = async (args) => { const r = await t.execute(args, qcCtx({})); await qcTick(); return r; };
   await run({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" });
   await run({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" });
-  const res3 = await run({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" }); // count=cap−1 → allowed
+  const res3 = await run({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" }); // count=cap−1 → dispatched
   const callsBefore4 = rec.summarize.length;
-  const res4 = await run({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" }); // count=cap → denied
+  const res4 = await t.execute({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" }, qcCtx({})); // count=cap → denied
   const st = qcStore();
   check(
     "92",
     "S13",
-    "gate (IQ4 cap 3): count=cap−1 allowed (the 3rd); count=cap DENIED (the 4th) naming class+cap+count with ZERO side effects (no call, no increment, no line)",
-    /compacted/i.test(res3) && rec.summarize.length === callsBefore4 && /refused/.test(res4) && res4.includes("cap 3") && res4.includes("3/3") &&
+    "gate (IQ4 cap 3, cross dispatch): count=cap−1 dispatched (the 3rd); count=cap DENIED (the 4th) naming class+cap+count with ZERO side effects; the increments land only on the verified background success",
+    /dispatched/i.test(res3) && rec.summarize.length === 3 && rec.summarize.length === callsBefore4 &&
+      /refused/.test(res4) && res4.includes("cap 3") && res4.includes("3/3") &&
       st.sessions.ses_qc_gate?.count === 3,
     JSON.stringify({ calls: rec.summarize.length, res4: String(res4).slice(0, 160) }),
   );
@@ -2092,17 +2111,20 @@ const qcStore = () => JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "t
   );
 }
 
-// 94 — increment-on-success ONLY: a FAILING summarize (a plain error, not a
-//      keep-rejection) → the error note (no throw) and the budget is NOT
-//      consumed (no store entry)
+// 94 — increment-on-verified-success ONLY (cross dispatch): a FAILING
+//      summarize (a plain error, not a keep-rejection) → the dispatch
+//      response (NO success claim — the outcome is verified asynchronously),
+//      the budget is NOT consumed (no store entry after the tick; the
+//      failure lands in the terminal log — "background compaction FAILED")
 {
   const { rec, res } = await qcExec({ summarize: true, summarizeError: new Error("boom-qc") }, { keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_fail" });
+  await qcTick();
   const st = qcStore();
   check(
     "94",
     "S13",
-    "increment-on-success only: a failing summarize → the error note (no throw), NO increment (no store entry)",
-    /Compaction request failed/.test(res) && res.includes("boom-qc") && rec.summarize.length === 1 && st.sessions.ses_qc_fail == null,
+    "increment-on-verified-success only (cross dispatch): a failing summarize → the dispatch response (no success claim), NO increment after the tick",
+    /dispatched/i.test(res) && rec.summarize.length === 1 && st.sessions.ses_qc_fail == null,
     JSON.stringify({ res: String(res).slice(0, 160) }),
   );
 }
@@ -2135,33 +2157,58 @@ const qcStore = () => JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "t
   );
 }
 
-// 97 — the message response shape (the message arg GIVEN): the message +
-//      EXACTLY ONE trailer line containing the reload pointer (the reload
-//      invariant survives whatever the caller writes)
+// 97 — the message response shape (cross dispatch, the message arg GIVEN):
+//      the message + the dispatch line (NO reload trailer — the CALLER's
+//      context is untouched; the trailer belongs to the SELF path, where the
+//      caller's own context is the compacted one)
 {
   const { res } = await qcExec({ summarize: true, messages: [{ info: { modelID: "IQ4-x", providerID: "llama-swap" } }] }, { message: "resume unit-3", sessionID: "ses_qc_msg" });
-  const trailer = "Post-compaction reminder: re-read .opencode/agent/prompts/agent_readme_post_compaction.md before continuing.";
   check(
     "97",
     "S13",
-    "message response: the message + exactly ONE trailer line with the pointer (byte-exact)",
-    res === `resume unit-3\n${trailer}`,
+    "message response (cross dispatch): the message + the dispatch line, NO trailer (byte-exact)",
+    res === `resume unit-3\nCompaction dispatched for ses_qc_msg (background, fire-and-forget) — the summarize call was sent (model: IQ4-x); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.`,
     JSON.stringify(res),
   );
 }
 
-// 98 — the cross-session model read: the target's model is NOT in context →
-//      session.messages({path:{id}}) → the LAST entry's info.modelID (the
-//      assistant message) resolves the budget class + the stored model
+// 98 — the cross-session model read (pair-less cross): the target's model is
+//      NOT in context → session.messages({path:{id}}) → the LAST entry's
+//      info.modelID (the assistant message) resolves the budget class + the
+//      stored model; the dispatch verifies asynchronously (the tick)
 {
   const { rec, res } = await qcExec({ summarize: true, messages: [{ info: { model: "user-x" } }, { info: { modelID: "Qwen3.8-27B-IQ3KT-210K", providerID: "llama-swap" } }] }, { keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_cross" });
+  await qcTick();
   const st = qcStore();
   check(
     "98",
     "S13",
-    "cross-session model read: the LAST entry's info.modelID resolves the target's model (stored, count 1)",
-    rec.messages[0]?.path?.id === "ses_qc_cross" && st.sessions.ses_qc_cross?.model === "Qwen3.8-27B-IQ3KT-210K" && st.sessions.ses_qc_cross?.count === 1 && /compacted/i.test(res),
+    "cross-session model read (pair-less cross): the LAST entry's info.modelID resolves the target's model (stored after the tick, count 1)",
+    rec.messages[0]?.path?.id === "ses_qc_cross" && st.sessions.ses_qc_cross?.model === "Qwen3.8-27B-IQ3KT-210K" && st.sessions.ses_qc_cross?.count === 1 && /dispatched/i.test(res),
     JSON.stringify(st.sessions.ses_qc_cross),
+  );
+}
+
+// 100 — the explicit pair OVERRIDE (the maintainer's round-2 path): BOTH
+//      providerID+modelID given → used VERBATIM in the summarize body, the
+//      messages RPC is NOT called (the pair IS the answer — no model read),
+//      the cap classifies the EXPLICIT model, the budget tracks the TARGET
+//      session (the stored model = the explicit summarizer model)
+{
+  const { rec, res } = await qcExec(
+    { summarize: true, messages: [] },
+    { sessionID: "ses_qc_pair", providerID: "llama-swap", modelID: "Gemma4-12B-Q4KXL-MTP-128K", keepTokens: 1, keepMessages: 1 },
+  );
+  await qcTick();
+  const st = qcStore();
+  check(
+    "100",
+    "S13",
+    "explicit pair override: BOTH given → verbatim in the body, the messages RPC NOT called, the budget tracks the TARGET session (count 1, the explicit model stored)",
+    rec.messages.length === 0 && rec.summarize.length === 1 &&
+      rec.summarize[0]?.body?.providerID === "llama-swap" && rec.summarize[0]?.body?.modelID === "Gemma4-12B-Q4KXL-MTP-128K" &&
+      /dispatched/i.test(res) && st.sessions.ses_qc_pair?.count === 1 && st.sessions.ses_qc_pair?.model === "Gemma4-12B-Q4KXL-MTP-128K",
+    JSON.stringify({ messages: rec.messages.length, res: String(res).slice(0, 120), st: st.sessions.ses_qc_pair }),
   );
 }
 
@@ -2248,7 +2295,7 @@ const qcStore = () => JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "t
   const postLog = POST["plugin.log"] ?? "";
   const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
   const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
-  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non", "ses_qc_self", "ses_qc_retry", "ses_qc_flat", "ses_qc_nocli", "ses_qc_gate", "ses_qc_cpu", "ses_qc_fail", "ses_qc_msg", "ses_qc_cross", "ses_qc_rpc"];
+  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non", "ses_qc_self", "ses_qc_retry", "ses_qc_flat", "ses_qc_nocli", "ses_qc_gate", "ses_qc_cpu", "ses_qc_fail", "ses_qc_msg", "ses_qc_cross", "ses_qc_rpc", "ses_qc_pair"];
   const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`) || l.includes(`"sess":"${fid}"`)));
   check(
     "43",
