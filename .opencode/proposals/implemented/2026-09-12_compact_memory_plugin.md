@@ -1,6 +1,6 @@
 # Proposal: `compact_memory` as a plugin-registered tool (unified compaction + quant-class budget)
 
-Status: REWRITTEN v2 (2026-09-12) — AWAITING APPROVAL.
+Status: REWRITTEN v2 (2026-09-12) — APPROVED; REVISED + ADOPTED (2026-09-14) — IMPLEMENTED (see the Revision section; live acceptance done).
 
 ## Rulings (maintainer, 2026-09-12, direct session)
 - **Rewrite the proposal** (fresh revision, not an append to v1). This file is
@@ -150,6 +150,50 @@ plugin — makes state tracking much easier").
 4. Budget-denied fire → clear denial naming class + cap + count, no side
    effects; a `CPU-` model session → always denied (cap 0).
 
+## Revision (2026-09-14, direct session ses_f5f0689d9 — the maintainer adaptation, adopted)
+
+The maintainer's working-tree adaptation (explicit `providerID`/`modelID` args;
+validated by his round-2 live cross-session run — the scaffold worker
+`ses_f5f2…` compacted cross-session and resumed) is ADOPTED with fixes,
+probe-verified (commit `22268de`):
+
+- **Explicit pair = OVERRIDE:** BOTH `providerID` + `modelID` given
+  (non-empty) → used VERBATIM in the summarize body and the messages-RPC
+  model read is SKIPPED (the pair IS the answer); otherwise the pair-less
+  path falls back to `resolveModel` (self: `extra.model`; cross: the
+  messages RPC + note) — the model read is restored for pair-less cross
+  compactions. The cap classifies the EFFECTIVE (sent) model — known
+  nuance: with an override pair, the OVERRIDING model sets the cap, not
+  the target session's model (the round-1 flag (b) stands, folded into
+  the usage guideline).
+- **SELF = synchronous + verified** (the spec behavior: byte-identical
+  success line + directive; live-acceptance evidence: a self compaction
+  completes within the turn — no hang risk).
+- **CROSS = fire-and-forget DISPATCH** (the maintainer's design — the
+  same-model hang case: llama-swap has ONE slot, a same-model cross
+  compaction cannot start until the session switch frees it, which may
+  not happen until a later turn). The call is sent; success is verified
+  ASYNCHRONOUSLY in the callback; the budget increment + the COMPACT line
+  land ONLY on verified success (increment-on-verified-success); a
+  failure → a `console.error` note (the terminal), NO budget burned, NO
+  line written.
+- **Response contract:** SELF → the spec's byte-identical success line +
+  directive (or `message` + the one-line trailer); CROSS →
+  `Compaction dispatched for <sid> (background, fire-and-forget) — … land
+  ONLY on verified success` (NO success claim; `message` GIVEN → the
+  message + the dispatch line, NO reload trailer — the caller's context
+  is untouched).
+- The draft's broken `void request.catch(...)` block (it destructured the
+  PROMISE — no-op on this host) is REMOVED; `keep` is sent in the body via
+  `callSummarize` (the retry-once-on-rejection survives — on THIS host the
+  server schema has no keep key, so the keep rejection fires and the
+  retry drops the fields; the observed compaction floor is server-side
+  behavior, not the keep args).
+- **Probe:** S13 = 15 checks (NEW 100: the explicit-pair override — verbatim
+  body, NO messages RPC, budget tracks the TARGET session; 89/92/94/97/98
+  re-pinned to the dispatch contract + the `qcTick` drain); header total
+  98→99.
+
 ## Status
 REWRITTEN v2 (2026-09-12, direct session ses_f6976031bffeRa8gNNcpy5FoYj) per
 the maintainer's rulings (rewrite; `CPU-` prefix exclusion confirmed with the
@@ -158,3 +202,8 @@ as the final revision. Moved to `approved/`.
 
 - approved (2026-09-12, maintainer chat, direct session
   ses_f6976031bffeRa8gNNcpy5FoYj: "yes fold it in and i now approve it")
+- revised + adopted (2026-09-14, direct session ses_f5f0689d9; commit
+  `22268de`): the maintainer's explicit-pair adaptation fixed and landed
+  (SELF sync / CROSS fire-and-forget dispatch, increment-on-verified-
+  success); LIVE ACCEPTANCE COMPLETE (self 2026-09-13 `bdc4504`; cross
+  round 2 2026-09-14 — his scaffold-worker run). Moved to `implemented/`.

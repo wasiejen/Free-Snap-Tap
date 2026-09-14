@@ -124,3 +124,48 @@ instructions/protocol — facts that save lookups. Format per the README:
   fixture-based so a probe never mutates real state.
 - **Ref:** `handover_probe.mjs` S10/S12; ctx_gauge probe.
 - **Keys:** probe, fixture, import fresh, shape, header total, S10, S12.
+
+## compact_memory: the cross-session contract (SELF sync / CROSS dispatch)
+- **Do:** cross-compact ANOTHER session with an explicit `providerID` +
+  `modelID` pair (the OVERRIDE — no model read; the pair goes verbatim in
+  the summarize body). Pair-less cross reads the target's model via the
+  messages RPC. The budget is tracked per TARGET session (not the initiator).
+  SELF compaction is synchronous + verified (byte-identical success line);
+  CROSS is a fire-and-forget DISPATCH — the response says "dispatched", the
+  budget increment + the COMPACT line land ONLY on verified success, and a
+  failed cross compaction burns no budget (check the terminal for
+  "background compaction FAILED" / `ctx.log`).
+- **Why (evidence):** the maintainer's round-2 live run (2026-09-14, scaffold
+  worker cross-compact + resume) + probe S13 (15 checks, 98→99): the
+  same-model hang case is real (llama-swap single slot) → the dispatch
+  avoids blocking the controller's turn.
+- **Ref:** `proposals/implemented/2026-09-12_compact_memory_plugin.md`
+  (Revision 2026-09-14); `handover_probe.mjs` S13; commit `22268de`.
+- **Keys:** compact_memory, cross-session, dispatch, fire-and-forget,
+  explicit pair, budget, target session, increment-on-verified-success.
+
+## llama-swap single slot: the flush rhythm + the compaction model choice
+- **Do:** when compacting ANOTHER session: (1) PREFER a DIFFERENT compaction
+  model — `Gemma4-12B-Q4KXL-MTP-128K` runs ~4× faster on this host (his
+  numbers: prefill ~3400 vs ~1200 t/s; generation ~200 vs ~47 t/s) with a
+  131K window → the provider switches on request, the compaction lands in
+  the call window, NO flush needed; (2) if compaction model == the target's
+  active model (the single slot can't start the compaction until the session
+  switch frees it), budget ONE FLUSH delegation after the dispatch — the
+  first post-dispatch delegation can be consumed by the compaction routine;
+  (3) NEVER use keepTokens/keepMessages 0 (usage ruling 2026-09-14: the
+  compaction run still costs the full summarize time/energy — a fresh worker
+  session gives the same result cheaper); (4) the keep args ARE sent in the
+  body, but this host's server schema has no keep key → the retry-once
+  drops them; the observed compaction floor is server-side behavior, not the
+  keep args.
+- **Why (evidence):** the maintainer's round-2 experiment (2026-09-14, his
+  report `maintainer/done/cross_session_compaction_summary.md`): round 2
+  (queued, same model) — the first delegation was consumed by the compaction;
+  rounds 3/5 (synchronous) — the task ran directly. Provider-level
+  observation: the model swap is SEQUENTIAL (controller model unloaded →
+  named model booted → control returned) — no parallelism needed.
+- **Ref:** `maintainer/done/cross_session_compaction_summary.md`; the NAP
+  section 2026-09-14 (the 2nd-exchange bullet).
+- **Keys:** flush, delegation, single slot, llama-swap, Gemma, compaction
+  model, keep, zero-keep, 131K, sequential swap.
