@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #54, new
-entries start at #55 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #55, new
+entries start at #56 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -203,3 +203,29 @@ All those IDs stay reserved — see the numbering rule in the header.
   AGENTS.md (maintainer's call — it is his file).
 - **Status:** open — maintainer call 2026-09-12 (wording per his direct-session
   instructions).
+
+## 55. (open, maintainer call 2026-09-15) — `compact_memory` needs a dump function of the current session
+
+- **Problem / evidence:** compaction (host default AND `compact_memory`) irreversibly
+  destroys the fine-grained session context — the pre-compaction messages are gone once
+  the summarize lands. A post-compaction dump of that session would miss EXACTLY the
+  content that was destroyed. Maintainer 2026-09-15 (direct session, chat mode):
+  "moment when we compact, we destroy exactly this ... i have only access to the
+  default compact and this would irreversible destroy some part of the sessions
+  context. mark this down: compact_memory needs a dump function of the current
+  session." Related: the session-corpus discussion 2026-09-15 (readable dumps of all
+  sessions from the opencode DB — 130 sessions / 6,125 messages / 27,003 parts verified
+  in `~/.local/share/opencode/opencode.db` — as the consolidation basis; a post-hoc
+  dump script by session_id was the interim idea).
+- **Desired outcome:** `compact_memory` (and eventually the host auto-compaction path)
+  dumps the session's FULL pre-compaction content into the session corpus BEFORE the
+  compaction runs — so the corpus stays complete even for compacted sessions.
+- **Acceptance criteria:** after any compaction of session X via `compact_memory`,
+  `.opencode/archive/sessions/<date>_<X>.md` exists and contains the pre-compaction
+  messages; the dump runs BEFORE the summarize dispatch; a dump failure does not block
+  the compaction (note/WARNING logged); probe stays green (append-only checks).
+- **Suggested scope:** `.opencode/plugin/compact_memory.ts` (dump hook before
+  summarize); the session-dump script shared with the backfill idea (read-only DB →
+  markdown, tool outputs condensed); `.opencode/archive/sessions/`.
+- **Status:** open (DEFERRED — behind the session-dump script; the dump function
+  reuses it). Maintainer: "material for later thought."
