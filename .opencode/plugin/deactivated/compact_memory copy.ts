@@ -391,77 +391,30 @@ export default async function CompactMemoryPlugin(ctx: any) {
         description: "Triggers immediate session compaction to free context space. Budget is per-session and per-model quant-class (CPU models are excluded — see the classifier in this plugin).",
         args: {
           sessionID: tool.schema.string().optional().describe("Session ID to compact (defaults to the calling session; an explicit id compacts ANOTHER session)"),
-          providerID: tool.schema.string().optional().describe("ProviderID to be submitted when using a sessionID - has to be the ID corresponding to the SessionID - in doubt 'llama-swap'"),
-          modelID: tool.schema.string().optional().describe("modelID to be submitted when using a sessionID - has to be the ID corresponding to the SessionID - in doubt 'llama-swap'"),
           keepTokens: tool.schema.number().optional().describe("Number of recent tokens to retain (e.g. 10000 or 30000)"),
           keepMessages: tool.schema.number().optional().describe("Number of recent messages to retain (e.g. 6 or 12)"),
           message: tool.schema.string().optional().describe("Post-compaction continuation message for the target session. Usage: 1-3 lines: what to resume + which files to re-read. ABSENT → the default reload directive is returned."),
-
         },
         async execute(args: any, c: any) {
           try {
-
-            //--comment my first try at java script ... i am frustrated with this progamming lanuage - why not clean python!
-            // // 1. resolve the session id (Part 1)
-            // let sessionID
-            // let providerI
-            // let model
-            // let note
-            // let modelNote
-
-            // if (args?.sessionID) {
-            //   const sessionID = args.sessionID;
-            //   const providerID = args.providerID
-            //   const model = args.modelID
-            //   const note = "cross sesseion compaction detected"
-            //   const modelNote = note
-            // } else {
-            //   const sessionID = c.sessionID
-            //   if (typeof sessionID !== "string" || sessionID === "") {
-            //   return "Compaction request failed: no session id available (pass the sessionID argument or a context session id).";
-            // }
-            //   const isSelf = args?.sessionID == null || (typeof c?.sessionID === "string" && args.sessionID === c.sessionID);
-            //   const { model, providerID, note: modelNote } = await resolveModel(ctx?.client, c, sessionID, isSelf);
-            // }
-
-            //--comment asked another llm to help me with this xD
-            // 1. Declare variables up front so they are accessible everywhere below
-            let sessionID;
-            let providerID;
-            let model;
-            let modelNote;
-
-            // 2. Branch A: Explicit session ID passed via args
-            if (args?.sessionID) {
-              sessionID = args.sessionID;
-              providerID = args.providerID;
-              model = args.modelID;
-              modelNote = "cross session compaction detected";
-            }
-            // 3. Branch B: Fall back to context session ID
-            else {
-              sessionID = c?.sessionID;
-
-              // Validation step
+            if (typeof args?.sessionID === "string") {
+              const sessionID = args?.sessionID
+              const model = ctx?.extra?.model?.id
+              const providerID = ctx?.extra?.model?.providerID
+              const note: modelNote = "compaction via direct sessionID overwrite"
+            } else {
+              const sessionID = args?.sessionID ?? c?.sessionID;
               if (typeof sessionID !== "string" || sessionID === "") {
                 return "Compaction request failed: no session id available (pass the sessionID argument or a context session id).";
               }
-
-              // Resolve model via API call
-              const isSelf = args?.sessionID == null || (typeof c?.sessionID === "string" && args.sessionID === c.sessionID)
-              const resolved = await resolveModel(ctx?.client, c, sessionID, isSelf);
-
-              model = resolved.model;
-              providerID = resolved.providerID;
-              modelNote = resolved.note;
+              const isSelf = args?.sessionID == null || (typeof c?.sessionID === "string" && args.sessionID === c.sessionID);
+              const { model, providerID, note: modelNote } = await resolveModel(ctx?.client, c, sessionID, isSelf);
             }
 
-
+            // 1. resolve the session id (Part 1)
             const root = resolveRoot(c);
-
             // 2. resolve the model + the quant-class cap AT CALL TIME (Part 2)
             const { cap, label } = classifyQuantClass(model);
-
             // 3. the budget gate — BEFORE any compact call: denial has ZERO
             //    side effects (no increment, no compact call, no COMPACT line)
             const count = budgetCount(root, sessionID);

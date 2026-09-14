@@ -394,14 +394,26 @@ export default async function CompactMemoryPlugin(ctx: any) {
           keepTokens: tool.schema.number().optional().describe("Number of recent tokens to retain (e.g. 10000 or 30000)"),
           keepMessages: tool.schema.number().optional().describe("Number of recent messages to retain (e.g. 6 or 12)"),
           message: tool.schema.string().optional().describe("Post-compaction continuation message for the target session. Usage: 1-3 lines: what to resume + which files to re-read. ABSENT → the default reload directive is returned."),
+          modelID: tool.schema.string().optional().describe("modelID of the model used for compaction"),
+
         },
         async execute(_args: any, c: any) {
-          const sessionID = c?.sessionID
+          // const sessionID = c?.sessionID
+          if (_args?.sessionID) {
+            const sessionID = _args.sessionID
+          } else {
+            const sessionID = c?.sessionID
+          }
           const client = ctx?.client
           const keepTokens = _args?.keepTokens ?? 30000;
           const keepMessages = _args?.keepMessages ?? 12;
           const providerID = c?.extra?.model.providerID
-          const modelID = c?.extra?.model.id
+
+          if (_args?.modelID) {
+            const modelID = _args.modelID
+          } else {
+            const modelID = c?.extra?.model.id
+          }
 
           const result = {
             sessionID,

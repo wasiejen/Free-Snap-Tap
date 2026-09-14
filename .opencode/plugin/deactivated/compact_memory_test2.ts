@@ -13,7 +13,7 @@ export default async function CompactMemoryPlugin(ctx: any) {
 
       console.log("Compaction completed:", sessionID)
 
-      await new Promise((resolve) => setTimeout(resolve, 250))
+      await new Promise((resolve) => setTimeout(resolve, 30000))
 
       await ctx.client.session.prompt({
         path: { id: sessionID },
@@ -29,15 +29,20 @@ export default async function CompactMemoryPlugin(ctx: any) {
     },
 
     tool: {
-      compact_memory: tool({
+      compact_memory_cross_session: tool({
         description: "Compact the current session",
         args: {
+          sessionID: tool.schema.string(),
           providerID: tool.schema.string(),
           modelID: tool.schema.string(),
         },
 
         async execute(args: any, callContext: any) {
-          const sessionID = callContext.sessionID
+          if (args?.sessionID) {
+            const sessionID = args.sessionID;
+          } else {
+            const sessionID = callContext.sessionID
+          }
 
           setTimeout(() => {
             void ctx.client.session.summarize({
@@ -46,8 +51,10 @@ export default async function CompactMemoryPlugin(ctx: any) {
                 providerID: args.providerID,
                 modelID: args.modelID,
               },
-            }).catch(console.error)
-          }, 0)
+            }).catch(console.error) {
+              return `Compaction request failed: ${err?.message ?? err}`;
+            }
+          }, 15000)
 
           return "Compaction scheduled."
         },
