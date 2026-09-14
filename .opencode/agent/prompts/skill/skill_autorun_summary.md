@@ -19,11 +19,17 @@ Bounded reads everywhere: limit output lines on first greps (~30), never
 top-to-bottom a big file, never re-derive facts the committed files state —
 cite them.
 
-## Output sections, in order
-- Header: run name, iteration count, planner session ids (from the loop log),
-  HEAD at start/end.
-- Done: one line per plan/unit — what landed, commit hash, verification
-  status (green / rescued / died).
+## Output format — proposal-grade
+The maintainer reads this INSTEAD of the git diffs, so each entry must carry
+the WHY, not just the what. Markdown, structured: `#` title with the run name
++ iteration count + planner session ids + HEAD start/end; one `##` section per
+item below (in this order); `###` subtitles where a section has subgroups;
+short bold lead-ins per item; tables where they improve scannability (e.g. a
+Done table: | plan | goal (why) | what landed | commits | status |).
+
+## Sections, in order
+- Done: one row per plan/unit — the goal (why), what landed, commit hash,
+  verification status (green / rescued / died).
 - Feedback trail: the run's frictions — launch deaths (cause + session id),
   retries, compactions, stop-line wind-downs, discrepancies, what slowed the
   loop. One entry per friction point with an evidence pointer (file/line or

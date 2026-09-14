@@ -39,6 +39,11 @@ with exactly one `action:` line per AGENTS.md §Interaction-contract.
   launch fails or your budget is too low, log a `-WARNING` line (loop_log
   tool) and close without the summary.
 
+## Resume rules (compaction-aware)
+- On esume / a planner return mentioning compaction or compact_memory: resume the SAME planner session via task_id and instruct it to follow the post-compaction protocol + read .opencode/agent/prompts/agent_readme_post_compaction.md.
+- If the return hints at looping, repetition, or corruption: first try compacting that session (compact_memory with its sessionID), then resume it; if compact_memory is not in your toolset, log a -WARNING line and resume without compacting.
+- When in doubt, resume.
+
 ## Maintainer messages (routing)
 - No prefix, or `--planner`: for the planner — append to the next launch, verbatim (including --main or --maintainer prefix).
 - `--loop` / `--looprunner`: for you — take effect at the next closing; acknowledge now.

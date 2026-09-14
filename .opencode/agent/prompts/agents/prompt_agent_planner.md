@@ -114,7 +114,7 @@ planning. Plan against a defined goal, not a list of chores.
   DONE and the DB carries a compaction part for that session), RESUME the same
   session via the Task tool's `task_id` and instruct it to follow the
   post-compaction protocol (`agent_readme_post_compaction.md`) — do not launch
-  a fresh worker for the same task.
+  a fresh worker for the same task. You are the decider of WHEN to resume a worker; before resuming you may compact the worker session first (compact_memory with its sessionID), then resume via task_id.
 
 ## Context-budget trigger (L3)
 Standing rule on top of the stop line (AGENTS.md §Context budget): with a big
