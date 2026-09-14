@@ -154,3 +154,9 @@ prompt additions/edits/rewrites:
 - can it go in live usage?
 - writing a usage guide and include it with usage guides to the other tools - i think best place in repo_custom_tools and instrution as other parts to read as needed?
 - do what you can without approvel and for the rest make a proposal
+
+#9 2026-09-14-_14-38
+ctx_gauge and inline tool replay gauge runs late 2 tool calls. e.g. ctx_gauge must fired 2 times to show the impact of a large context increas through e.g. reading
+- the consequence is that planner and worker consistently misjugdge how close they are to the end of context window and run into the limit.
+  - generally 5k lower messure of ctx_gauge
+  - the more tool calls with low thinking the more exact the information
