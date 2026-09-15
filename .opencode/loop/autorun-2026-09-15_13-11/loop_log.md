@@ -13,3 +13,8 @@
 2026-09-15_19-29 DONE<--- worker_Q4_120K ses_f59f7cff0ffer37uRICTRFiyS0 Qwen3.8-27B-IQ4KT-120K script collection complete — 8 scripts (binary/db/log) + READMEs + grep_snippets + INVENTORY; gate green (459+1w, F=0, probe 99/99); handover committed d352e4a; SESSION=ses_f59f7cff0ffer37uRICTRFiyS0 CTX=99652 (83%) REM=20348
 2026-09-15_19-42 -RETURN- planner-3 ses_f5a01190cffehd0OO4TDPSrwvy Qwen3.8-27B-IQ4KT-120K worker-3 ses_f59f7cff0ffer37uRICTRFiyS0 worker_Q4_120K
 2026-09-15_19-45 DONE<--- planner-3 ses_f5a01190cffehd0OO4TDPSrwvy Qwen3.8-27B-IQ4KT-120K 84%/18K
+2026-09-15_19-46 -RETURN- looprunner ses_f5b507a66ffegia0ZZifYeRD2l Qwen3.8-27B-IQ4KT-120K planner-3 ses_f5a01190cffehd0OO4TDPSrwvy planner_Q4_120K
+2026-09-15_19-55 -->START planner-4 ses_f59d27449ffeEFeV4vaQ6NlqTs Qwen3.8-27B-IQ4KT-120K plan4: #55 compact_memory pre-compaction dump hook (worker) + #8 tail (usage-guide part) + #9 tail (gauge-lag prompt lines)
+2026-09-15_20-06 -->START worker-4 ses_f59c0d40affePju49VV2U179cp Qwen3.8-27B-IQ4KT-120K compact_memory pre-compaction dump hook build (TODO.md #152 dump function) + no-overwrite dump naming (S14) + knowledge entry + README/TODO updates
+2026-09-15_21-16 -WARNING planner-4 ses_f59d27449ffeEFeV4vaQ6NlqTs Qwen3.8-27B-IQ4KT-120K worker-4 ses_f59c0d40affePju49VV2U179cp hit context_length_exceeded after a manual-style compaction (no COMPACT line in ctx.log, no budget entry); task_id resume failed with the same error; cross-compact (Gemma) + one retry ordered
+2026-09-15_21-22 DONE<--- planner-4 ses_f59d27449ffeEFeV4vaQ6NlqTs Qwen3.8-27B-IQ4KT-120K 97%/3K (stop-line exit: spec landed 2f4a5c4; worker-4 rescue cross-compact dispatched; tails #8/#9 + nudge item queued — see plan4_summary.md + NAP plan4 section)
