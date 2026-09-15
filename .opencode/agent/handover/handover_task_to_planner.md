@@ -1,66 +1,35 @@
-# WORKER SUMMARY — compact_memory live acceptance (RESCUED planner-direct)
+# Worker handover — NAP Part-2 cleanup (text-worker run, 2026-09-15)
 
-Worker session `ses_f6765a68bffeudOXmVzLROTYk6` (worker_Q4_120K) executed
-Phase A fully (loop START, checkpoint commit `c89646e`, fired
-`compact_memory` no-args, session ended after compaction). RESUME via
-`task_id` FAILED: `the request exceeds the available context size` — the
-post-compact session still exceeds the 120K window. Phase B was therefore
-RESCUED planner-direct (planner-1 `ses_f676f6a82ffe960mvrZD9W0DjQ`, the
-established T2 rescue pattern): all acceptance points are DB/file facts,
-verified below.
+**Commit:** `b36d4c7` "NAP: Part-2 cleanup complete — 32 sections compressed (no-loss rule), Standing to measured baselines" — 8 files (NAP + 7 targets), +460/−1438.
+**Final NAP wc -l:** **68** (DoD ≤150). Archive block = 42 lines (32 strict section lines + 1 kept `ses_f601cfc5` line verbatim + 8 folded legacy lines).
 
-## Acceptance results (VERBATIM evidence, measured 2026-09-13)
-- **(a) compaction part — PRESENT.** Part `prt_0989b3bb1001BOaL89rlDAXOmT`
-  (msg `msg_0989b3bb0001Ofl3cOTgt1kdz6`, t=1789266705329):
-  `{"type":"compaction","auto":false}`. Companion assistant message
-  `msg_0989b3cca0014UfEP30hIKe0gT` (mode=compaction, agent=compaction,
-  summary=true) carries the generated summary text (3649 chars, structured
-  Objective/Next Move/Relevant Files — it references
-  `agent_readme_post_compaction.md` in its content).
-- **(b) `time_compacting` — NULL on the session row** (sesdata.cjs,
-  post-completion). Finding: the flag is not persisted after completion
-  (transient live flag, or not set for manual compaction) — surfaced to
-  maintainer (proposal A, item 2). The compaction PART is the durable
-  record.
-- **(c) reload directive — PRESENT in the tool output** (verbatim from the
-  compact_memory call part):
-  `Context successfully compacted: kept last 12 messages / 30000 tokens.`
-  + `[SYSTEM CONTEXT DIRECTIVE]` +
-  `Context was compacted. Read .opencode\agent\prompts\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.`
-  The summary message is attached to the session (the reload content the
-  resumed agent would see). Note: the directive travels in the tool
-  response, not inside the DB summary text.
-- **(d) budget + COMPACT line — PRESENT.**
-  `.opencode/temp/compact_budget.json` (version 2):
-  `ses_f6765a68bffeudOXmVzLROTYk6: {count: 1, updated: 2026-09-13T02:31:45.315Z, model: "Qwen3.8-27B-IQ4KT-120K"}`
-  `.opencode/temp/ctx.log` line 1701:
-  `2026-09-13_04-31 Qwen3.8-27B-IQ4KT-120K COMPACT ses_f6765a68bffeudOXmVzLROTYk6 tokens=30000 messages=12`
+## Phase A — the 7 appends (all verified: exact section header present once per target)
+| target | tail -n 3 (last line) |
+|---|---|
+| `archive/loop/autorun-2026-09-10_03-05/plan4_nap.md` | "the plugin build)." (baselines 448/F=0/52-52, meta tasks) |
+| `archive/loop/autorun-2026-09-10_03-05/plan3_nap.md` | "needs a full session." (STOPPED at 81% CTX) |
+| `archive/loop/autorun-2026-09-10_23-07/plan2_nap.md` | "oldest open work)." (FST behavior batch) |
+| `archive/loop/autorun-2026-09-10-0/plan1_nap.md` | "oldest open work)." (FST behavior batch) |
+| `archive/loop/autorun-2026-09-10/plan6b_nap.md` | "touched this iteration)." (448/F=0 meta-only) |
+| `archive/loop/autorun-2026-09-10/plan5_nap.md` | "one line with the maintainer)." (4 next steps) |
+| `archive/loop/autorun-2026-09-10/plan4_nap.md` | "default SKIP)." (#17 v1.3 rebaseline) |
 
-## The resume failure (headline finding)
-- Resume of the SAME session via the Task tool `task_id` was rejected:
-  `the request exceeds the available context size` (opencode.jsonc limit
-  for the model = 120K context). The session had 40 messages at fire time
-  (heavy prefill). The tool reports keep 12 msgs / 30K tokens, but the
-  server's summarize schema carries NO keep key (NAP open question,
-  confirmed in practice) → the server likely retained far more than the
-  requested keep, so post-compact request = system + (largely) full
-  history + summary > 120K.
-- Consequence: the codified resume protocol works mechanically (the resume
-  call is the right one), but SELF-COMPACTING near the top of the window
-  makes the session UNRESUMABLE. Mitigation options → proposal A, item 1
-  (lower the worker self-compact trigger well below 80 %, and/or server
-  keep support).
-- The worker's budget was consumed (1/3) — the session is dead for this
-  task regardless.
+TSV = **32 rows** (`Temp/opencode/nap_line_data.tsv`; snapshot of the prior 26 rows kept at `nap_line_data_prev.tsv`). Script fixed per spec: added the `ses_f71d36a2 → 03-05/plan4_nap.md` mapping + idempotent exact-header skip (run result: 7 appended, 26 skipped, exactly as expected).
 
-## Commits
-- `c89646e` — worker-1 Phase A checkpoint (START loop line + handover).
-- This file + the proposal/NAP/plan1 bookkeeping ride the planner commit.
+## Measured baselines (2026-09-15, all three gates run)
+- probe: **99/99 PASS** (`node .opencode/plugin/probes/handover_probe.mjs`)
+- pytest: **459 passed, 1 warning** — verified to be the known #10 coroutine warning (`fst_keyboard.py:786`, matches `todo_records.md:260`)
+- ruff: **F=0** ("All checks passed!")
 
-## Carried baselines (no re-run — task changed no code)
-probe 98/98, smoke 23/23, pytest 459+1#10, ruff F=0.
+Standing block updated in place to these values; the stale `opencode.jsonc uncommitted BY DESIGN` line dropped; gauge line now bash form.
 
-## Deliberately not done
-- No retry of the resume (deterministic overflow; burning the worker's
-  remaining budget 2/3 on it would not change the server-side keep
-  behavior) — surfaced instead as proposal A.
+## Folded legacy — example line
+`- 2026-09-10 iter 1 (legacy, no-ses) — maintainer rulings applied to TODO; proposals channel + 9 drafts P01–P09 created; P01 \`limit.context\` applied (opencode.jsonc left uncommitted by design); batch spec committed, launch deferred to iter 2 (stop line) — details: git d077de2`
+
+## Could not resolve / notes
+1. **L865 chat-segment section has no hash in its body** (TSV hash `none`). I sourced `dc3f137` "Compaction-lifecycle design proposal (agreed with maintainer in chat)" — machine-verified same date (2026-09-12) as the section header and matching its outcome ("proposal written"). Judgment call, spec's fallback chain exhausted.
+2. **4 legacy entries cite no hash** (iter 1, session 3/2/1). Dates taken from machine-verified representative commits: iter 1 → `d077de2` (2026-09-10), session 3 → `2cf5f33` (2026-09-09), session 2 → `ff86d9b` (2026-09-09), session 1 → `2a4996c` (2026-09-08). The hashes in those 4 details fields are these representative commits, not original-entry hashes (none existed).
+3. Legacy entry session 5 cites hash `6c2151` (6 chars; not a prefix of git's `6c215b1`) — kept verbatim from the entry, presumed original typo; not corrected.
+4. Spec said "26 of 32 sections already appended (checkpoint 1f5ccf8)" — confirmed: checkpoint committed 17 files (1047 lines) covering those 26; all 7 new targets were brand-new files (created by this run).
+5. Working tree carries maintainer live edits (`maintainer/**`, `proposals/2026-09-11_contradiction-block-decision.md`) — NOT staged, per spec.
+6. This handover file was committed separately from the task commit (spec restricted staging to NAP + 7 targets).
