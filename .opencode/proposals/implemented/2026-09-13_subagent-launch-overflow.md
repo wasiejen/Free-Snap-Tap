@@ -1,7 +1,7 @@
 # 2026-09-13 — subagent launch context overflow on this host (planner-flagged)
 
-Status: AWAITING APPROVAL (host-side — maintainer's domain: llama-swap allocation /
-opencode config).
+Status: RESOLVED (2026-09-15, maintainer check + planner verdict) — moved to
+implemented/; see the verdict at the end of the file.
 
 ## Problem
 Task-tool subagent launches on this host fail at the REQUEST level with
@@ -47,3 +47,13 @@ failing the request)? If yes, that also re-opens the worker-prompt launches
 --comment: can be moved to rejected? or better implemented i guess
 - checked on the settings and context-shift is already active. limits are correct. if in limit there is nothing to shift anymore. around 500-1000 tokens or so can be shifted to end a tool or write, but not more. then there is nothing to be done except compaction
   - see cross-compaction
+
+## Verdict (2026-09-15, planner-1)
+His check resolved the open question: context-shift IS active, the
+`limit.context` values are correct, and at the limit there is nothing left to
+shift beyond the ~500-1000-token tail. The remedy for a session at the limit
+= compaction — the CROSS-compaction protocol now codified in both role
+prompts (2026-09-15 stop/compaction protocol: order-stop → pre-compaction
+dump → cross `compact_memory` → `task_id` resume). The planner-direct
+bounded-read fallback stays as the emergency path. Nothing left to rule on
+→ moved to implemented/ per his comment.

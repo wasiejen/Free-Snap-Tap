@@ -1,6 +1,8 @@
 # 2026-09-13 compact_memory findings (live acceptance, iteration 1)
 
-Status: AWAITING APPROVAL (two independent items; rulings per item)
+Status: REVISED 2026-09-15 (back to root) — Item 1 SUPERSEDED by the 2026-09-15
+stop/compaction protocol (no approval owed); Item 2 stays your ruling;
+see the revision at the end.
 
 Live acceptance of the compact_memory fix ran this iteration via
 worker-1 (session `ses_f6765a68bffeudOXmVzLROTYk6`, self-compact, then
@@ -51,3 +53,18 @@ and one semantic question:
 --comment: this is also no longer up to date
 - in my experience compaction works in context limit - never failed. with cross-session compaction this should be no longer a problem
   - i honestly do not understand ## Item 2
+
+## Revision (2026-09-15, planner-1 — his comment above kept verbatim)
+- **Item 1 (resume overflow): SUPERSEDED.** His ruling: compaction at the
+  context limit never failed in his experience; cross-session compaction
+  avoids the trap. The 2026-09-15 stop/compaction protocol (stop line ≈90 %
+  gauge; order the worker to stop early; pre-compaction dump; cross
+  `compact_memory`; `task_id` resume) is now codified in both role prompts —
+  it subsumes the old recommendation (a) (lower the trigger to 50-60 %), so
+  no further prompt change is made.
+- **Item 2 (`time_compacting` NULL): stays his ruling** (server-side
+  semantics). Operational acceptance is unchanged and already in use: the
+  compaction PART in the DB + the COMPACT line in `temp/ctx.log` are the
+  durable evidence; the flag is NOT required.
+- Nothing left to approve — his one-move closure (implemented/ or rejected/)
+  per his #0 backlog-reduction.
