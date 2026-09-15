@@ -1,8 +1,8 @@
 # Smoke harness home — save the plugin/tool smoke tests in the repo
 
-Status: AWAITING APPROVAL (2026-09-15). Maintainer confirmed the target area
-`plugin/tests/` in the 2026-09-15 direct session; this is the formal proposal for
-the inbox item `save_all_plugin_took_testing_files.md`.
+Status: APPROVED (2026-09-15). Maintainer confirmed the target area `plugin/tests/`
+in the 2026-09-15 direct session; formal proposal for the inbox item
+`save_all_plugin_took_testing_files.md` (moved to `maintainer/done/`).
 
 ## Problem
 The smoke tests for the custom plugin tools live ONLY in the scratchpad

@@ -109,7 +109,25 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   `_smoke_base.mjs`; rewire hardcoded absolute paths; green-from-repo acceptance.
   Inbox item `save_all_plugin_took_testing_files.md` → `maintainer/done/`
   (content untouched).
-- Open for his ruling (see closing message): the communication readout format
-  (it is a proposal inside the rework); the smoke-harness proposal (approval);
-  the `loop_log`/`compact_memory` tool availability in his live jsonc (his fix).
+- **Continuation (same session, his replies):** (1) communication readout
+  APPROVED as FULL (his first look when returning to a run); looprunner read
+  restriction removed by him (now broad read incl. `temp/ctx.log` — he may
+  re-restrict). Prompt reworked AGAIN: new §AFK mode (`afk on`/`afk off`,
+  immediate effect, every would-end-the-loop condition → fresh planner launch,
+  spiral INFO at 3x same cause, own 85% line still binds) + new §Delegation
+  status (every launch/resume carries a `--loop [looprunner]` labeled status
+  block — never confused with maintainer instructions) + Access Gating
+  restated (edit tools denied, broad read).
+- **Smoke-harness APPROVED + BUILT + VERIFIED:** he moved the proposal to
+  `approved/` (his live reorg of `proposals/` — his other moves left
+  uncommitted); worker-16 (`ses_f5baf84c7`) built `plugin/tests/` (7 smokes +
+  `_smoke_base.mjs` + README) — the worker was COMPACTED mid-task (6/7 green,
+  IN-PROGRESS handover committed at `f4de326`) → RESUMED via task_id per
+  protocol → final `109ddff` (compact_memory smoke, folded cm_v2+qc, adapted to
+  the fire-and-forget build). VERIFIED: new smoke self-run 42/42; commit stat
+  + TODO close-note present; gates per its handover (99/99, 459+1#10, F=0).
+- His looprunner config change (tools block active) — I flagged TWO issues in
+  the closing message (his to fix): `block_tansfer` typo (registered name =
+  `block_transfer`) and `"*": false` polarity (deny-all — his intent "all but
+  the editors" needs `"*": true`). Open: his ruling if he disagrees.
 
