@@ -1,70 +1,99 @@
-# Task spec — NAP Part-2 cleanup (approved `2026-09-12_nap-size.md`)
+# Task spec — NAP Part-2 continuation (PIPELINE-ONLY; approved `2026-09-12_nap-size.md`)
 
 **Role:** planner-as-text-worker — IGNORE the planner prompt; act as a plain
 text worker on this spec (no NAP ownership, no delegation, no loop driving).
-**Shell:** git-bash (unix idioms; `workdir` param for dirs).
+**Shell:** git-bash (unix idioms). **Working dir:** repo root.
+**PIPELINE-ONLY RULE:** NEVER read the NAP section bodies. Your only NAP
+content reads: the header lines (`grep '^## '` output) and the archive+
+Standing block (L1402-1460, ~60 lines). Everything else goes through scripts.
 
-## Goal
-Apply the approved Part-1 format to the existing NAP
-`.opencode/agent/handover/handover_planner.md` (verified today: **1451 lines**):
-compress the 26 detailed session sections (L5–1392) + re-format the 7 legacy
-`**iter N:**` / `**session N:**` entries (in the `## Compressed archive`
-section, L1393+) into strict one-line entries; refresh `## Standing` (L1425+)
-to measured baselines. NO information may be lost.
+## Verified state (planner-measured 2026-09-15 — do NOT re-derive)
+- NAP `handover_planner.md` = **1460 lines**: 32 detail sections (headers at
+  L5..L1353), `## Compressed archive` at L1402 (1 line already in new format,
+  L1403 `ses_f601cfc5`; + 8 legacy multi-line entries L1404-1432),
+  `## Standing` L1434-1460 (STALE baselines).
+- 26 of 32 sections are ALREADY no-loss-appended to pointer files (checkpoint
+  `1f5ccf8`). `Temp/opencode/nap_line_data.tsv` holds their data (26 rows:
+  date, label, ses, hash, pointer). **POINTER (col 5) + HASH (col 4) are
+  usable; label + ses columns are partly mangled** (ses truncated at the first
+  uppercase — take the full ses id from the header line instead).
+- Full pre-cleanup NAP backup is committed (`3446f75`) — backup condition MET,
+  do not redo it.
+- 7 sections remain un-appended (NAP header line → target pointer file):
+  L1002 `ses_f71d36a2` → `archive/loop/autorun-2026-09-10_03-05/plan4_nap.md`
+  L1046 `ses_f7210e535` → `.../autorun-2026-09-10_03-05/plan3_nap.md`
+  L1097 `ses_f725ba15` → `.../autorun-2026-09-10_23-07/plan2_nap.md`
+  L1193 `ses_f729fdee` → `.../autorun-2026-09-10-0/plan1_nap.md`
+  L1223 looprun2-iter6b (no ses) → `.../autorun-2026-09-10/plan6b_nap.md`
+  L1283 looprun2-iter5 (no ses) → `.../autorun-2026-09-10/plan5_nap.md`
+  L1353 looprun2-iter4 (no ses) → `.../autorun-2026-09-10/plan4_nap.md`
+- Planner-measured baselines (this session): probe **99/99**, pytest
+  **459 passed + 1 warning (#10 known)**, ruff **F=0**.
 
-## Part-1 line format (the proposal L26-31 is the rule)
-`- <date> <iteration/direct> (ses_…) — <one-line outcome> — details: <pointer> + git <hash>`
-Every line carries: date, iteration/direct + session id, one-line outcome,
-pointer (loop-folder file and/or `.opencode/archive/loop/nap_direct.md`), git hash.
+## Phase A — append the remaining 7 (script-driven)
+1. Edit `Temp/opencode/nap_append.sh`:
+   a. add the missing mapping in `resolve()`:
+      `ses_f71d36a2) echo "$A/autorun-2026-09-10_03-05/plan4_nap.md" ;;`
+   b. idempotency: before appending a section, if the target already contains
+      the section's exact `## ` header line → print `skip <header>` and do not
+      append; still write its TSV row (for skipped sections, reuse the
+      existing TSV row for that section if present, else re-derive).
+   c. keep the append header byte-exact as it is now:
+      `## COMPRESSED 2026-09-15 (Part-2 cleanup, ses_f5d9e86a6) — verbatim section text (no-loss rule)`
+2. Run it. Expect exactly **7 appends** + a TSV of **32 rows**. If a section
+   you expected appended is reported `skip` (or vice versa), STOP and write
+   the discrepancy to the handover — do not guess.
+3. Verify each of the 7 targets: `tail -n 3` shows the appended section
+   header; `grep -c 'COMPRESSED 2026-09-15'` per target is sane (≥1).
 
-## Steps (order matters)
-0. **BACKUP FIRST (maintainer condition):** copy the full current NAP verbatim
-   to `.opencode/archive/nap_backup_2026-09-15_pre-cleanup.md` and COMMIT it
-   alone (`backup: full NAP verbatim before Part-2 cleanup`). Plain file —
-   the maintainer reads files, not git.
-1. For EACH of the 26 sections + 7 legacy entries:
-   a. Locate its detail: loop folders live in `.opencode/loop/autorun-*/`
-      (current: `autorun-2026-09-13_04-27`) and `.opencode/archive/loop/autorun-*`
-      (09-10/09-11); sections carry date + iteration + ses id in their header —
-      grep the ses id / iteration inside the matching folder. Detail = that
-      folder's `plan<N>_summary.md` + `loop_log.md`; direct sessions →
-      `.opencode/archive/loop/nap_direct.md`.
-   b. **NO-LOSS RULE:** if the section holds facts NOT covered by those files
-      (baselines, hashes, rulings, findings) — APPEND the excess to the folder's
-      `plan<N>_nap.md` (create if absent) BEFORE compressing; for sections with
-      NO loop folder at all (several 09-12 sessions) or direct sessions: append
-      the full detail to `.opencode/archive/loop/nap_direct.md` under a
-      `## <date> <iter/direct> (ses_…)` header, then compress.
-   c. Replace the section with its one-line entry in `## Compressed archive`.
-   d. Fold the 7 legacy entries into the same strict format (date/ses from the
-      corresponding section headers before you delete them).
-2. **Standing — update IN PLACE (Part 3):** replace baselines with MEASURED
-   values (run them, do not trust memory):
-   - probe: `node .opencode/plugin/probes/handover_probe.mjs`
-   - tests: `./.venv/Scripts/python.exe -m pytest -q`
-   - lint: `./.venv/Scripts/ruff.exe check --select F .`
-   Fix known-stale lines: `opencode.jsonc` is now COMMITTED (drop the
-   "uncommitted BY DESIGN" line); gauge fallback in bash form
-   (`node .opencode/plugin/scripts/peek.mjs`); condense lines that are pure
-   history. Keep lines that are still load-bearing.
-3. Keep L1 title + `## Compressed archive` + `## Standing` headers. Do NOT add
-   a 2026-09-15 session section — the planner adds it after verifying you.
+## Phase B — rewrite the NAP (header-line driven)
+4. `grep '^## ' .opencode/agent/handover/handover_planner.md` → the 32 header
+   lines (plus the archive/standing headers). This is your only NAP read
+   besides step 5's existing archive/standing text.
+5. Build the new NAP (write the full new file, replacing the old):
+   - keep the first 3 lines (title + FIRST-read line) verbatim.
+   - `## Compressed archive (one line each — details in git log + TODO/records)`
+     — one line per section, newest first, strict Part-1 format:
+     `- <date> <label> (ses_<full id>) — <outcome, verbatim from the header after the em dash> — details: <pointer> + git <hash>`
+     pointer from TSV col 5 (or the mapping above for the 7 new ones); hash
+     from TSV col 4 (or the first hash found in the appended text). No ses in
+     the header → `(no-ses)`.
+   - keep the existing L1403 line (ses_f601cfc5, already new format).
+   - fold the 8 legacy entries (L1404-1432: iter 3/2/1, session 5/4/3/2/1)
+     into the same strict one-line form: date via
+     `git log -1 --format='%ad' --date=short <first hash in the entry>`;
+     ses = `(legacy, no-ses)`; outcome condensed to one line keeping the key
+     facts (hashes, TODO ids, verdicts); pointer = `git <hashes>`.
+   - `## Standing` — update IN PLACE:
+     - baselines = YOUR measured values (run all three; expected 99/99,
+       459+1#10, F=0 — report actuals):
+       probe `node .opencode/plugin/probes/handover_probe.mjs`;
+       pytest `./.venv/Scripts/python.exe -m pytest -q`;
+       ruff `./.venv/Scripts/ruff.exe check --select F .`
+     - DROP the stale `opencode.jsonc uncommitted BY DESIGN` line (now
+       committed); gauge line in bash form
+       (`node .opencode/plugin/scripts/peek.mjs`).
+     - condense pure-history lines; keep the still load-bearing ones (inbox
+       convention, delegation rules, disclosure line, P02 clobber rule,
+       TODO curation rule).
+6. Do NOT add a 2026-09-15 current-session section — the planner adds it
+   after verifying you.
 
 ## Definition of done
-- `wc -l` of the NAP **≤ 150** (script-checked, report the number).
-- Every compressed line matches the Part-1 format (date + ses/iter + outcome +
-  pointer + hash); 3 lines of your choice re-verified: the pointer file exists
-  and contains the detail.
-- Backup committed (separate commit) BEFORE the cleanup commit.
-- Baselines in Standing = your measured numbers (report them).
-- One green commit for the cleanup: `NAP: Part-2 cleanup — 26 sections compressed (no-loss rule), Standing to measured baselines`.
+- `wc -l` of the NAP **≤ 150** (report the number).
+- every archive line in strict format; 3 lines of your choice re-verified:
+  pointer file exists and contains that section's detail.
+- TSV = 32 rows; the 7 appends verified per step 3.
+- one green commit staging ONLY the NAP + the 7 target pointer files:
+  `NAP: Part-2 cleanup complete — 32 sections compressed (no-loss rule), Standing to measured baselines`
 
 ## DO-NOT-touch
 `.opencode/maintainer/**`, `opencode.jsonc`, product code (`fst_*`, `tests/`),
-`.opencode/agent/prompts/**`, `knowledge/**`, `TODO.md`, `loop_log.md` files
-(read-only for you), `.opencode/loop/autorun-2026-09-13_04-27/loop_log.md`.
+`.opencode/agent/prompts/**`, `knowledge/**`, `TODO.md`, `loop_log.md` files,
+the NAP section bodies (they move only via the script), the backup file
+`archive/nap_backup_2026-09-15_pre-cleanup.md`.
 
 ## Handover
-Write `handover_task_to_planner.md`: backup path + commit, per-section map
-(section → pointer file, note where excess was appended), measured baselines,
-final wc -l, cleanup commit hash, anything you could not resolve.
+Write `handover_task_to_planner.md`: the 7 appends (target + verified tail),
+final wc -l, measured baselines, commit hash, one folded legacy line as
+example, anything you could not resolve.
