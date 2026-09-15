@@ -149,10 +149,10 @@
 //      plugin is re-initialized with a status-aware fake client (a mutable
 //      S9_STATUS drives the busy/idle check — direct-map and SDK fields-style
 //      shapes):
-//      (54) known window: output byte-exact `tool body\n(35%/78K)` + ctx log
-//          line 1 `<dt> probe-model-120K_MTP task (35%/78K)`, below rung 1
+//      (54) known window: output byte-exact `tool body\n(35% used, 78K left)` + ctx log
+//          line 1 `<dt> probe-model-120K_MTP task (35% used, 78K left)`, below rung 1
 //      (55) unknown window on a trailing-newline output `x\n`: direct concat
-//          byte-exact `x\n(46K)` + ctx log line 2 WITH the model + tool
+//          byte-exact `x\n(46K used)` + ctx log line 2 WITH the model + tool
 //      (56) no-total (in-flight step, no finish): NO append / NO log /
 //          no nudge line
 //      (57) missing session (not in the db): per-session read no-total → same
@@ -170,9 +170,9 @@
 //          0 calls after the tick
 //      (63) IDLE (fields-style): exactly 1 call after the tick
 //      (65) ctx log tool-name field PRESENT: byte-shape
- //          `<dt> CPU-Qwen3-0.6B task (46K)` (the fake tool name)
+ //          `<dt> CPU-Qwen3-0.6B task (46K used)` (the fake tool name)
  //      (66) ctx log tool-name field OMITTED: payload without a `tool` key →
- //          byte-shape `<dt> CPU-Qwen3-0.6B (46K)`
+ //          byte-shape `<dt> CPU-Qwen3-0.6B (46K used)`
  //   S10 compact_memory v1 tool (9) — the L2 approved design (the
   //      compaction-lifecycle proposal): the RETIRED v1 tool file
   //      .opencode/plugin/deactivated/compact_memory_v1.ts is imported DIRECT
@@ -311,7 +311,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S5=6 S14=7  →  "PROBE handover: 106/106 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 hygiene=6  →  "PROBE handover: 106/106 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -1200,9 +1200,9 @@ const RO_ROW = (sid, ctx, model) => ({
 });
 const FX_RO = path.join(SANDBOX, "fx_ro.db");
 buildFixtureDb(FX_RO, [
-  RO_ROW("ses_ro_k", 42_012, "probe-model-120K_MTP"), // known window → (35%/78K), below rung 1
-  RO_ROW("ses_ro_u", 45_678, "CPU-Qwen3-0.6B"), // no window marker → (46K)
-  RO_ROW("ses_ro_nom", 24_056, null), // model NULL → (24K) (the model-FIELD-omitted log shape; built per the locked fixture spec)
+  RO_ROW("ses_ro_k", 42_012, "probe-model-120K_MTP"), // known window → (35% used, 78K left), below rung 1
+  RO_ROW("ses_ro_u", 45_678, "CPU-Qwen3-0.6B"), // no window marker → (46K used)
+  RO_ROW("ses_ro_nom", 24_056, null), // model NULL → (24K used) (the model-FIELD-omitted log shape; built per the locked fixture spec)
   { id: "ses_ro_empty", time_updated: 3000, model: JSON.stringify({ id: "probe-model-120K_MTP", providerID: "fx" }), messages: [{ time_created: 20, data: INFLIGHT }] }, // no finish → no-total
   RO_ROW("ses_ro_n1", 61_020, "probe-model-120K_MTP"), // rung 1 ×5 — the deferred-delivery sessions
   RO_ROW("ses_ro_n2", 61_030, "probe-model-120K_MTP"),
@@ -1236,7 +1236,7 @@ const DT = "\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}";
 const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
 
 // 54 — known window: the append is BYTE-EXACT + the ctx log line 1 is
-//      byte-shape `<YYYY-MM-DD_HH-MM> probe-model-120K_MTP task (35%/78K)`
+//      byte-shape `<YYYY-MM-DD_HH-MM> probe-model-120K_MTP task (35% used, 78K left)`
 //      (the tool-name field is present — the probe's fake tool name)
 {
   const pre = ctxLogLines().length; // S8's feeds already wrote entries (consumer 3 is unconditional) — delta-based
@@ -1247,14 +1247,14 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
   check(
     "54",
     "S9",
-    "known window: output byte-exact `tool body\\n(35%/78K)` + NEW ctx log line `<dt> probe-model-120K_MTP task (35%/78K)`, below rung 1 (no nudge)",
-    out.output === "tool body\n(35%/78K)" && ll.length === pre + 1 && new RegExp(`^${DT} probe-model-120K_MTP task \\(35%/78K\\)$`).test(last) && s9Nudge("ses_ro_k").length === 0,
+    "known window: output byte-exact `tool body\\n(35% used, 78K left)` + NEW ctx log line `<dt> probe-model-120K_MTP task (35% used, 78K left)`, below rung 1 (no nudge)",
+    out.output === "tool body\n(35% used, 78K left)" && ll.length === pre + 1 && new RegExp(`^${DT} probe-model-120K_MTP task \\(35% used, 78K left\\)$`).test(last) && s9Nudge("ses_ro_k").length === 0,
     JSON.stringify({ out: out.output, ll }),
   );
 }
 
 // 55 — unknown window on a TRAILING-NEWLINE output: direct concat byte-exact
-//      `x\n(46K)` + the ctx log line 2 carries the model (CPU-Qwen3-0.6B) +
+//      `x\n(46K used)` + the ctx log line 2 carries the model (CPU-Qwen3-0.6B) +
 //      the tool name
 {
   const pre = ctxLogLines().length;
@@ -1265,8 +1265,8 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
   check(
     "55",
     "S9",
-    "unknown window (trailing-newline output): byte-exact `x\\n(46K)` direct concat + NEW ctx log line `<dt> CPU-Qwen3-0.6B task (46K)` (model + tool carried)",
-    out.output === "x\n(46K)" && ll.length === pre + 1 && new RegExp(`^${DT} CPU-Qwen3-0.6B task \\(46K\\)$`).test(last),
+    "unknown window (trailing-newline output): byte-exact `x\\n(46K used)` direct concat + NEW ctx log line `<dt> CPU-Qwen3-0.6B task (46K used)` (model + tool carried)",
+    out.output === "x\n(46K used)" && ll.length === pre + 1 && new RegExp(`^${DT} CPU-Qwen3-0.6B task \\(46K used\\)$`).test(last),
     JSON.stringify({ out: out.output, ll }),
   );
 }
@@ -1342,7 +1342,7 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
     "59",
     "S9",
     "deferred delivery (status unknown): 0 sync promptAsync calls + synchronous nudge line (byte-exact formatGauge readout); exactly 1 call after tick (synthetic payload) + append + log entry",
-    syncOk && out.output === "n1 body\n(50%/59K)" && s9Calls.length === 1 && c?.path?.id === "ses_ro_n1" && c.body.parts.length === 1 && p0?.type === "text" && p0?.synthetic === true && textOk && ctxLogLines().length === lBefore + 1,
+    syncOk && out.output === "n1 body\n(50% used, 59K left)" && s9Calls.length === 1 && c?.path?.id === "ses_ro_n1" && c.body.parts.length === 1 && p0?.type === "text" && p0?.synthetic === true && textOk && ctxLogLines().length === lBefore + 1,
     JSON.stringify({ syncCalls: s9Calls.length, c }),
   );
 }
@@ -1361,7 +1361,7 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
     "60",
     "S9",
     "busy (direct-map status): evidence line fired, readout appended + log entry written, 0 promptAsync calls after tick (silent skip, no new reason)",
-    fired && out.output === "n2 body\n(50%/59K)" && ctxLogLines().length === lBefore + 1 && s9Calls.length === 1,
+    fired && out.output === "n2 body\n(50% used, 59K left)" && ctxLogLines().length === lBefore + 1 && s9Calls.length === 1,
     JSON.stringify({ fired, out: out.output, calls: s9Calls.length, log: ctxLogLines().length }),
   );
 }
@@ -1377,7 +1377,7 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
     "61",
     "S9",
     "status absent (fn returns undefined): deferral alone still delivers — exactly 1 call after tick",
-    s9Calls.length === 2 && s9Calls[1]?.path?.id === "ses_ro_n3" && out.output === "n3 body\n(50%/59K)",
+    s9Calls.length === 2 && s9Calls[1]?.path?.id === "ses_ro_n3" && out.output === "n3 body\n(50% used, 59K left)",
     JSON.stringify({ calls: s9Calls.length }),
   );
 }
@@ -1393,7 +1393,7 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
     "62",
     "S9",
     "busy (SDK fields-style {data:{…}}): 0 promptAsync calls after tick; evidence line fired",
-    s9Calls.length === 2 && s9Nudge("ses_ro_n4").length === 1 && out.output === "n4 body\n(50%/59K)",
+    s9Calls.length === 2 && s9Nudge("ses_ro_n4").length === 1 && out.output === "n4 body\n(50% used, 59K left)",
     JSON.stringify({ calls: s9Calls.length }),
   );
 }
@@ -1409,14 +1409,14 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
     "63",
     "S9",
     "idle (fields-style status): exactly 1 call after tick (idle delivers)",
-    s9Calls.length === 3 && s9Calls[2]?.path?.id === "ses_ro_n5" && out.output === "n5 body\n(50%/59K)",
+    s9Calls.length === 3 && s9Calls[2]?.path?.id === "ses_ro_n5" && out.output === "n5 body\n(50% used, 59K left)",
     JSON.stringify({ calls: s9Calls.length }),
   );
 }
 
 // 65 — ctx log tool-name field PRESENT: the probe's fake tool name (`task`,
 //      carried by the afterFeed payload) appears on the line — byte-shape
-//      `<dt> CPU-Qwen3-0.6B task (46K)`
+//      `<dt> CPU-Qwen3-0.6B task (46K used)`
 {
   const out = { title: "t", output: "f13 body", metadata: {} };
   const pre = ctxLogLines().length;
@@ -1426,15 +1426,15 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
   check(
     "65",
     "S9",
-    "ctx log tool-name field PRESENT: NEW line `<dt> CPU-Qwen3-0.6B task (46K)` (the fake tool `task` from the payload)",
-    ll.length === pre + 1 && new RegExp(`^${DT} CPU-Qwen3-0.6B task \\(46K\\)$`).test(last) && out.output === "f13 body\n(46K)",
+    "ctx log tool-name field PRESENT: NEW line `<dt> CPU-Qwen3-0.6B task (46K used)` (the fake tool `task` from the payload)",
+    ll.length === pre + 1 && new RegExp(`^${DT} CPU-Qwen3-0.6B task \\(46K used\\)$`).test(last) && out.output === "f13 body\n(46K used)",
     JSON.stringify({ out: out.output, ll }),
   );
 }
 
 // 66 — ctx log tool-name field OMITTED: a payload WITHOUT the `tool` key (the
 //      hook called directly, afterFeed minus the tool) → the field is absent
-//      (mirroring the model-field convention) — byte-shape `<dt> CPU-Qwen3-0.6B (46K)`
+//      (mirroring the model-field convention) — byte-shape `<dt> CPU-Qwen3-0.6B (46K used)`
 {
   const out = { title: "t", output: "f14 body", metadata: {} };
   const pre = ctxLogLines().length;
@@ -1444,8 +1444,8 @@ const s9Nudge = (sid) => nudgeLines().filter((o) => o.session === sid);
   check(
     "66",
     "S9",
-    "ctx log tool-name field OMITTED (no tool in the payload): NEW line `<dt> CPU-Qwen3-0.6B (46K)`",
-    ll.length === pre + 1 && new RegExp(`^${DT} CPU-Qwen3-0.6B \\(46K\\)$`).test(last) && out.output === "f14 body\n(46K)",
+    "ctx log tool-name field OMITTED (no tool in the payload): NEW line `<dt> CPU-Qwen3-0.6B (46K used)`",
+    ll.length === pre + 1 && new RegExp(`^${DT} CPU-Qwen3-0.6B \\(46K used\\)$`).test(last) && out.output === "f14 body\n(46K used)",
     JSON.stringify({ out: out.output, ll }),
   );
 }
@@ -1530,17 +1530,17 @@ const cmExec = (args, extra) => cmTool.execute(args, cmCtx(extra));
 
 // 70 — the COMPACT line after success, the best-effort model + pre-readout
 //      fields PRESENT (the context carries them): byte-shape
-//      `<dt> probe-model-120K_MTP COMPACT ses_cm_line tokens=50123 messages=9 (87%/52K)`
+//      `<dt> probe-model-120K_MTP COMPACT ses_cm_line tokens=50123 messages=9 (87% used, 52K left)`
 {
   const pre = ctxLogLines().length;
-  await cmExec({ keepTokens: 50123, keepMessages: 9, sessionID: "ses_cm_line" }, { modelId: "probe-model-120K_MTP", preReadout: "87%/52K" });
+  await cmExec({ keepTokens: 50123, keepMessages: 9, sessionID: "ses_cm_line" }, { modelId: "probe-model-120K_MTP", preReadout: "87% used, 52K left" });
   const ll = ctxLogLines();
   const last = ll.length > 0 ? ll[ll.length - 1] : "";
   check(
     "70",
     "S10",
-    "COMPACT line after success (model + pre-readout PRESENT): `<dt> probe-model-120K_MTP COMPACT ses_cm_line tokens=50123 messages=9 (87%/52K)`",
-    ll.length === pre + 1 && new RegExp(`^${DT} probe-model-120K_MTP COMPACT ses_cm_line tokens=50123 messages=9 \\(87%/52K\\)$`).test(last),
+    "COMPACT line after success (model + pre-readout PRESENT): `<dt> probe-model-120K_MTP COMPACT ses_cm_line tokens=50123 messages=9 (87% used, 52K left)`",
+    ll.length === pre + 1 && new RegExp(`^${DT} probe-model-120K_MTP COMPACT ses_cm_line tokens=50123 messages=9 \\(87% used, 52K left\\)$`).test(last),
     JSON.stringify({ pre, ll: ll.slice(-1) }),
   );
 }

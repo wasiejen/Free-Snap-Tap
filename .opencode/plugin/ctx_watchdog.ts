@@ -139,14 +139,15 @@
 // existing v2.6 mechanic) per `tool.execute.after` feeds THREE consumers from the SAME read —
 // the readout is no longer threshold-controlled, it fires on EVERY tool result:
 //   (1) READOUT APPEND (031 option 2 — mutate the tool result: linear, cache-safe, no second
-//       message): the MINIMAL form appended to `output.output` IN PLACE — `(NN%/NNNK)` for a
-//       known window (pct = the exact formatGauge pct formula, remK = REM in whole K rounded,
-//       floored at 0), `(NNNK)` for an unknown window; no-total / db-error → append NOTHING
-//       (silent, never throw, NO per-failure log line — the chat.message gauge lines stay the
-//       failure channel); non-string output.output (defensive — the SDK declares string) →
-//       silent skip, the object untouched. Append rule: empty string → readout alone; string
-//       ending `\n` → direct concat; else → `\n` + readout. The tool.after log line is written
-//       FIRST (byte-stable vs v2.7 — it logs the PRE-APPEND output).
+//       message): the MINIMAL form appended to `output.output` IN PLACE — `(NN% used, NNNK
+//       left)` for a known window (pct = the exact formatGauge pct formula, remK = REM in
+//       whole K rounded, floored at 0), `(NNNK used)` for an unknown window (the SPEAKING
+//       forms — v2.8.1 below); no-total / db-error → append NOTHING (silent, never throw,
+//       NO per-failure log line — the chat.message gauge lines stay the failure channel);
+//       non-string output.output (defensive — the SDK declares string) → silent skip, the
+//       object untouched. Append rule: empty string → readout alone; string ending `\n` →
+//       direct concat; else → `\n` + readout. The tool.after log line is written FIRST
+//       (byte-stable vs v2.7 — it logs the PRE-APPEND output).
 //   (2) LADDER (rungs / dedup / kind:"nudge" evidence unchanged) + RACE-FREE DELIVERY (031
 //       option 1): `deliverNudge` NEVER calls promptAsync synchronously — it schedules
 //       `setImmediate`; INSIDE the deferred fn: a session busy/idle check FIRST (the 031 race —
@@ -175,6 +176,15 @@
 // default fields-style result carries the map under `.data` (the 031 sketch's
 // `status({path:{id}})` is NOT the SDK signature — no path argument). The `promptAsync`
 // payload shape is UNCHANGED (one options object, one synthetic text part).
+//
+// v2.8.1 (2026-09-15, SPEAKING minimal readout — maintainer inbox
+// nudge_gauge_unclarity.md): the minimal readout (consumer 1 + consumer 3) is re-pinned to
+// SPEAKING forms — the old unlabeled minimal forms let the K number be misread (known
+// window: it is REMAINING; unknown window: it is USED — the two forms disagreed in what
+// the K meant): known window → `(NN% used, NNNK left)`, unknown window → `(NNNK used)`.
+// Same numbers, same formulas (the formatGauge pct / remK), same triggers, same silence
+// rules — only the labels. The FULL formatGauge readout (nudge rungs / the chat.message
+// ctx: line) is UNCHANGED — it already spoke.
 
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { appendFileSync, mkdirSync, readFileSync } from "node:fs";
@@ -478,18 +488,20 @@ async function sessionStatus(
   return typeof entry === "object" && entry != null ? (entry as { type?: unknown }) : undefined;
 }
 
-// v2.8 — the MINIMAL readout (consumer 1, the v2.8 header block): `(NN%/NNNK)` for a known
-// window (pct = the exact formatGauge pct formula; remK = REM in whole K, rounded, floored
-// at 0), `(NNNK)` for an unknown window; a non-ok read (no-total / db-error) → undefined
-// (append NOTHING — silent, never throw, NO per-failure log line).
+// v2.8.1 — the MINIMAL readout (consumer 1, the v2.8 header block + the v2.8.1 note):
+// SPEAKING forms — `(NN% used, NNNK left)` for a known window (pct = the exact formatGauge
+// pct formula; remK = REM in whole K, rounded, floored at 0), `(NNNK used)` for an unknown
+// window (the K is the USED ctx — the old bare `(NNNK)` said nothing); a non-ok read
+// (no-total / db-error) → undefined (append NOTHING — silent, never throw, NO per-failure
+// log line).
 function minimalReadout(g: { ok?: boolean; kind?: string; ctx?: number; window?: number }): string | undefined {
   if (g.kind !== "ok" || g.ok !== true) return undefined;
   const ctx = g.ctx ?? 0;
   const w = g.window;
-  if (w == null || w <= 0) return `(${Math.round(ctx / 1000)}K)`;
+  if (w == null || w <= 0) return `(${Math.round(ctx / 1000)}K used)`;
   const pct = Math.floor((ctx * 100) / w);
   const remK = Math.max(0, Math.round((w - ctx) / 1000));
-  return `(${pct}%/${remK}K)`;
+  return `(${pct}% used, ${remK}K left)`;
 }
 
 // Consumer 1 — append the readout to the tool result IN PLACE (the SDK's `output` object is
