@@ -78,6 +78,9 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   + `worker_Q4_120K` roster; a comparison notes file in the loop folder.
 - **Status:** DEFERRED — picked up only when the maintainer lifts the
   `--defer` marker in `priority.md` (# 3 3) or re-prioritizes it.
+--comment: can be done when nothing other is actionable. look for a direct session if you want to test and try different goals for the workers to analyse them. 
+- but you may as well do some maintenance and curation on knowledge files. repo prompt files, nap, explore new script we could need, ... :-) if you are bored look in my ideas and make some proposels or research how to do this. 
+- an option is also; fuzzy name resolution search on read or when searching in files. or num_to_word autoreplace as intercept plugin on hook.execute.before to combine both and make tools calls more reliable even with bitshifts in numbers. worthwhile thing to research. but dont save research in your nap. make e.g. a agent/research folder if you want. see ideas #5 #6 #7
 
 ## 39. (closed 2026-09-10, see todo_records.md) — Looprunner prompt v2 proposal — applied + smoke test clean (2026-09-10)
 
@@ -110,6 +113,7 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Acceptance:** header and package.json agree; probe green.
 - **Scope:** the probe header (comment), `.opencode/package.json`.
 - **Status:** OPEN — maintainer call.
+--comment: I do not know when i added this. but it was a test to activate a plugin I believe. this plugin "opencode-context-meter" seem to be not in the repo any more. so it might be possible to remove it. the current state is thus stale and not the intended state. you can remove it and we will see on next restart if opencode has something to say about it :-)
 
 ## 52. (closed 2026-09-13, see todo_records.md) — `compact_memory` fails in the current host build — connection error on both paths (2026-09-12) — LANDED (2026-09-12, worker-2, per the approved v2 proposal) + live acceptance DONE (2026-09-13, iteration 1: compaction part + directive + budget 1/3 + COMPACT line verified in the DB); the resume-overflow finding → `proposals/2026-09-13_compact_memory-findings.md` (Item 1 superseded by the 2026-09-15 protocol; Item 2 ruling bundled in 2026-09-15_backlog-decisions.md, Decision 3).
 
@@ -148,6 +152,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   AGENTS.md (maintainer's call — it is his file).
 - **Status:** open — maintainer call 2026-09-12 (wording per his direct-session
   instructions).
+--comment: approved
 
 ## 55. (open, maintainer call 2026-09-15) — `compact_memory` needs a dump function of the current session
 
@@ -202,6 +207,7 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Status:** OPEN — maintainer call (the fix changes observable behavior for
   INVALID input only: today = error + source modified; after = error only).
   Planner recommendation: hoist the check (obvious bug fix).
+--comment: approved: you are free to improve the tool. goal is to prevent unintended destruction of data. when in doubt it saves it in buffer - or might be better to append it to buffer? do we have a buffer clear function if needed? can you write a short feedback in maintainer/feedback folder what the current status of the tool is? adaptions of tools you use are generally approved. if they have the potential to work outside of sandbox definition then these sandbox safeguards need to be implemented. (the same rule apply to the scripts - everything than can change data needs a sandbox safeguard - maybe just a shared scriptlet that every script imports and checks the given paths? do only one script to maintain of these safeguards need adaptation) (sry idle thoughts :-) )
 
 ## 58. (open, 2026-09-15, script-collection worker, curated plan3) — standard gate definition lacks the probe command
 
@@ -218,6 +224,7 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Suggested scope:** `.opencode/agent/prompts/repo/repo_commands.md`
   (maintainer-owned file — he edits it or tasks the planner).
 - **Status:** OPEN — maintainer (his file).
+--commment: approved. you work with the commands. add to them as need be - but curate them to not dublicate. (a worker also mentioned that tmp is not longer available as path shorthand - could be due to the switch to git bash as shell - might be good idea to include $TMP/opencode as temp path variable in git bash - works for me at least)
 
 ## 59. (open, 2026-09-15, script-collection worker, curated plan3) — session-corpus refresh cadence
 

@@ -63,3 +63,21 @@ export default ParameterCorrectionPlugin;
 quote: "
 Implementation Checklist for Lower-Quant ModelsWorkspace Crawling: For your fuzzy search, you will want to cache or dynamically crawl ctx.workspace.rootPath using standard Node.js fs module operations to match the LLM's hallucinated string against actual existing paths.Number Word Mapping: Implement a simple regex map (e.g., /\bone\b/g -> "1") to cleanly swap word tokens back into digits before running the path match.To help refine the logic or write the helper functions, could you tell me:What programming language or environment do you plan to use for your utility helpers (e.g., standard TypeScript, or do you have a preferred fuzzy search library like fuse.js)?What specific OS or environment constraints do you need to handle (e.g., relative vs. absolute paths, Windows vs. POSIX slashes)?
 "
+
+
+copied from done/info.md as context
+
+# also do not try to calc in your hand, by eye or in your head with numbers. try to use numwords instead
+  - fourtyfour is as clear as 44 (i presume?)
+  - all the workers struggled with the old 94/94 line and had trouble with it ninetyfour/ninetyfour is also ok
+  - maybe add <ninetyfour> to make it easier for later automatic replacement in all the files via replace
+
+  - maybe we should add the rule. if there is doubt about a number write them both: the number and the numberword (in doubt the number word has priority - because i guess bitshift in numberwords is not as prevalent? - but it is just a guess - needs to be observed)
+  - e.g. for the todo update the start of the file with both number and numberword to be sure. so the informatin lives i two places and if there is a mismatch then it is at least clear that their is one.
+
+  - observed one planner having some problems with bitshifts in githashes or commit references. i can not say if these we correctly written our or not.
+    - word_to_num tool would be helpful here
+      - e.g "file-four.txt" -> "file-4.txt" 
+      - but also applicable for commits like "b<six>c<eigth><six><one>d" -> "b6c861d"
+
+  - this is al based on the assumption that numberwords have less bitdrift

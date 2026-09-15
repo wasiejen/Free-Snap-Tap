@@ -31,10 +31,10 @@
 
 
   
-agents constantly get confused about the nudge ctx (<X>%/<Y>K) and interpret Y as used tokens like the % display the used percentage. we should make this more clear with a bit more speaking output.
+# 4 agents constantly get confused about the nudge ctx (<X>%/<Y>K) and interpret Y as used tokens like the % display the used percentage. we should make this more clear with a bit more speaking output.
 
 
-idea collection - for discussion in direct session
+# 5 idea collection - for discussion in direct session
 
 fuzzy search for reading files per name?
 - to medigate the bitshift tendency of some numbers 
@@ -45,20 +45,11 @@ fuzzy search matchin in files to read specific lines?
 
 - instruction if you calculate in head use words and not numbers
 
-is it possible to create a small general function that translates numberwords into numbers as output that is usable from anywhere in the shell or at least in the scope of node or python?
+# 5 is it possible to create a small general function that translates numberwords into numbers as output that is usable from anywhere in the shell or at least in the scope of node or python?
 num(five) -> 5, num([five,five]) -> 55
 to include in e.g. f-strings in python to convert wordnumbers in real number in instructions?
 or part of every scipt that it will automaically replace strings in the input string for e.g. a path to replace <five> with 5 dynamically.
 
-lets remove the verbatim output printout of looprunner. formatting is butchered by the transfer and the token are filling up
+# 6 lets remove the verbatim output printout of looprunner. formatting is butchered by the transfer and the token are filling up
 
---maintainer clarification on compaction usage
-reasoning of planner ses_f59d27449ffeEFeV4vaQ6NlqTs:
-Cross-compact + resume attempts = starting more work past the line... The stop line says "don't start new work past the line." But this is finishing up the current unit (the worker rescue is in progress, and the alternative is to leave the unit in a broken state). The early handover protocol says to PAUSE the unit and bring the NAP up to date.
-- compaction enables further work. stop line no work means no work BEFORE a compaction! this stop line means no work was before compaction was contrallable available.
-
---comment: was the cross compaction deliberate?
-planner ses_f59d27449ffeEFeV4vaQ6NlqTs wanted to self-compact but has done a cross compaction instead of self compaction by providing all values session, provider and modelid
-used:
-⚙compact_memory [sessionID=ses_f59c0d40affePju49VV2U179cp, providerID=llama-swap, modelID=Gemma4-12B-Q4KXL-MTP-128K]
-- self compaction is tool use without parameters
+# 7 - but you may as well do some maintenance and curation on knowledge files. repo prompt files, nap, explore new script we could need, ... :-) if you are bored look in my ideas and make some proposels or research how to do this. fuzzy search on read or when searching in files. or num_to_word autoreplace as intercept plugin on hook.execute.before to combine both and make tools calls more reliable even with bitshifts in numbers. worthwhile thing to research. but dont save research in your nap. make e.g. a agent/research folder if you want.
