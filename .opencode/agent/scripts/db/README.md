@@ -11,7 +11,7 @@ The host DB is LIVE and big (~1.9 GB). Every script here opens it
 | `sesinspect.cjs` | no arg → message/session columns + 10 most recent sessions; `<sid>` → session row + last 14 messages (slim) | `node .opencode/agent/scripts/db/sesinspect.cjs ses_f59f7cff0ffer37uRICTRFiyS0` → `SESSION: {...}` + `message count: 43` + slim lines, exit 0 |
 | `sesdata.cjs` | `<sid>` → session row + one slim JSON line per message (role/mode/agent/summary/finish/error/tokens/modelID/providerID) | `node .opencode/agent/scripts/db/sesdata.cjs ses_f59f7cff0ffer37uRICTRFiyS0` → `SESSION: {...}` + `message count: 43` + slim lines, exit 0 |
 | `compact_dir.cjs` | `<sid>` → compaction markers: assistant `mode=compaction` summary + user summary message (full data) + parts (4000-char cap) | `node .opencode/agent/scripts/db/compact_dir.cjs ses_f6819fba7ffehzefuX23UIM11O` → `=== message ... ===` blocks, exit 0 |
-| `dump_session.cjs` | `<sid>` → full-detail dump into the repo corpus `.opencode/archive/sessions/<sid>.md`; `--all [--slim\|--full]` corpus backfill. **Writes repo files** (corpus), read-only on the DB | `node .opencode/agent/scripts/db/dump_session.cjs ses_f5d03802affekevrhzPdvLFaHQ` → `dumped ... messages=65 parts=304`, exit 0 |
+| `dump_session.cjs` | `<sid>` → full-detail dump into the repo corpus `.opencode/archive/sessions/<sid>.md`; `<sid> --out <relpath>` → full dump to `OUT_DIR/<relpath>` (single-session only; relpath must be relative, no `..`, safe chars — else exit 2); `--all [--slim\|--full]` corpus backfill. **Writes repo files** (corpus), read-only on the DB | `node .opencode/agent/scripts/db/dump_session.cjs ses_f5d03802affekevrhzPdvLFaHQ` → `dumped ... messages=65 parts=304`, exit 0 |
 
 Usage examples (one each):
 
@@ -21,7 +21,14 @@ node .opencode/agent/scripts/db/sesinspect.cjs                    # recent sessi
 node .opencode/agent/scripts/db/sesdata.cjs ses_f59f7cff0ffer37uRICTRFiyS0
 node .opencode/agent/scripts/db/compact_dir.cjs ses_f6819fba7ffehzefuX23UIM11O
 node .opencode/agent/scripts/db/dump_session.cjs <sessionID>      # pre-compaction corpus dump
+node .opencode/agent/scripts/db/dump_session.cjs <sessionID> --out compaction_dumps/ses_x_c0.md   # to a custom relpath
 ```
+
+Note (2026-09-15, the dump-hook build): the single-session `<sid>` mode keeps
+its plain "current state" semantics — re-dumping refreshes (may overwrite)
+`<sid>.md`. The compaction-aware no-overwrite naming lives in the PLUGIN hook
+(`compact_memory.ts` `preCompactionDump` → the `compaction_dumps/` namespace,
+see `knowledge_tools.md`), not in this script.
 
 Note: `sesinspect.cjs` slim lines are parsed from `message.data` JSON (the
 scratchpad original read the slim keys off the DB row, which only matched

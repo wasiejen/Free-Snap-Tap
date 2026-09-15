@@ -172,12 +172,16 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Suggested scope:** `.opencode/plugin/compact_memory.ts` (dump hook before
   summarize); the session-dump script shared with the backfill idea (read-only DB →
   markdown, tool outputs condensed); `.opencode/archive/sessions/`.
-- **Status:** APPROVED + BUILDABLE (maintainer ruling 2026-09-15, direct session:
-  "todo 55 can be done and will be activated before the next autorun"). The dump
-  HOOK (before summarize) reuses `.opencode/agent/scripts/dump_session.cjs`
-  (read-only, single-session FULL mode); the maintainer activates it (host
-  restart) before the next autorun. NOTE 2026-09-15: the corpus
-  `.opencode/archive/sessions/` was backfilled (137 sessions).
+- **Status:** BUILD LANDED (plan4, 2026-09-15): the hook is in
+  `compact_memory.ts` (`preCompactionDump`, fires before ANY dispatch,
+  no-overwrite `compaction_dumps/<sid>_c<count>.md` naming), `dump_session.cjs`
+  gained `--out`, probe S14 (101-107) green. Live acceptance PENDING the
+  maintainer's host restart — a single compact_memory call must then produce
+  `.opencode/archive/sessions/compaction_dumps/<sid>_c0.md`. Still OPEN.
+  History: APPROVED + BUILDABLE (maintainer ruling 2026-09-15, direct session:
+  "todo 55 can be done and will be activated before the next autorun"); NOTE
+  2026-09-15: the corpus `.opencode/archive/sessions/` was backfilled
+  (137 sessions).
 
 ## 57. (open, 2026-09-15, worker T1 block_transfer sandbox, curated plan3) — block_transfer MOVE silently deletes a block when `dstFile` is missing
 

@@ -5,11 +5,17 @@
 //   node dump_session.cjs <sessionID>       full-detail dump of ONE session
 //                                           (pre-compaction mode: metadata line(s)
 //                                           + every message with its text/reasoning)
+//   node dump_session.cjs <sessionID> --out <relpath>
+//                                           full dump of ONE session written to
+//                                           OUT_DIR/<relpath> instead of <sessionID>.md
+//                                           (single-session ONLY; <relpath> must be
+//                                           relative, no `..`, safe chars — else exit 2)
 //   node dump_session.cjs --all             corpus backfill, SLIM lines (default)
 //   node dump_session.cjs --all --slim      corpus backfill, slim (explicit)
 //   node dump_session.cjs --all --full      corpus backfill, full detail
 //
 // Output: <repoRoot>/.opencode/archive/sessions/<sessionID>.md
+//         (or OUT_DIR/<relpath> when `--out <relpath>` is given)
 // The host DB is LIVE: it is opened readOnly: true and is NEVER written.
 // No dependencies beyond node:sqlite / node:fs / node:path.
 "use strict";
@@ -25,9 +31,12 @@ const OUT_DIR = path.resolve(__dirname, "..", "..", "..", "archive", "sessions")
 function usage(code) {
   console.log(
     "usage:\n" +
-      "  node dump_session.cjs <sessionID>      full dump of one session\n" +
-      "  node dump_session.cjs --all [--slim]   corpus backfill (slim lines, default)\n" +
-      "  node dump_session.cjs --all --full     corpus backfill (full detail)\n" +
+      "  node dump_session.cjs <sessionID>               full dump of one session\n" +
+      "  node dump_session.cjs <sessionID> --out <relpath>   full dump to OUT_DIR/<relpath>\n" +
+      "                                                      (single-session only; relpath relative,\n" +
+      "                                                       no `..`, safe chars — else exit 2)\n" +
+      "  node dump_session.cjs --all [--slim]            corpus backfill (slim lines, default)\n" +
+      "  node dump_session.cjs --all --full              corpus backfill (full detail)\n" +
       "  env OPENCODE_DB overrides the DB path"
   );
   process.exit(code);
@@ -53,6 +62,17 @@ function safeFile(sid) {
   if (!/^[A-Za-z0-9_-]+$/.test(sid)) throw new Error("unsafe session id for filename: " + sid);
   return sid + ".md";
 }
+// Validate a `--out` relpath: relative (no leading `/`, no backslash), no `.` /
+// `..` / empty segments (no traversal), safe chars only. Returns true when safe.
+function safeRelPath(rel) {
+  if (typeof rel !== "string" || rel.length === 0) return false;
+  if (rel.startsWith("/") || rel.includes("\\")) return false;
+  for (const s of rel.split("/")) {
+    if (s === "" || s === "." || s === "..") return false;
+    if (!/^[A-Za-z0-9_.-]+$/.test(s)) return false;
+  }
+  return true;
+}
 function modelName(v) {
   if (!v) return "?";
   if (typeof v === "string") return v;
@@ -62,12 +82,18 @@ function modelName(v) {
 
 // ---------- parse args ----------
 const argv = process.argv.slice(2);
-let wantAll = false, wantFull = false, wantSlim = false, target = null;
-for (const a of argv) {
+let wantAll = false, wantFull = false, wantSlim = false, target = null, outRel = null;
+for (let i = 0; i < argv.length; i++) {
+  const a = argv[i];
   if (a === "--all") wantAll = true;
   else if (a === "--full") wantFull = true;
   else if (a === "--slim") wantSlim = true;
   else if (a === "-h" || a === "--help") usage(0);
+  else if (a === "--out") {
+    i++;
+    outRel = argv[i];
+    if (outRel == null || outRel === "") { console.error("--out requires a <relpath> argument"); usage(2); }
+  }
   else if (a.startsWith("-")) { console.error("unknown flag: " + a); usage(2); }
   else {
     if (target) { console.error("multiple session IDs given"); process.exit(2); }
@@ -75,7 +101,12 @@ for (const a of argv) {
   }
 }
 if (wantAll && target) { console.error("--all and a session ID are mutually exclusive"); process.exit(2); }
+if (wantAll && outRel != null) { console.error("--out is single-session mode only (cannot combine with --all)"); process.exit(2); }
 if (!wantAll && !target) usage(2);
+if (target && outRel != null && !safeRelPath(outRel)) {
+  console.error("unsafe --out relpath (must be relative, no `..`, safe chars only): " + outRel);
+  process.exit(2);
+}
 const fullCorpus = wantFull && !wantSlim; // corpus full detail is opt-in
 
 // ---------- open DB read-only (LIVE) ----------
@@ -175,17 +206,19 @@ function renderSession(sid, isFull) {
   return { text: L.join("\n") + "\n", nmsg: msgs.length, npart: parts.length };
 }
 
-function writeOne(sid, isFull) {
+function writeOne(sid, isFull, outRel) {
   const r = renderSession(sid, isFull);
-  fs.mkdirSync(OUT_DIR, { recursive: true });
-  const file = path.join(OUT_DIR, safeFile(sid));
+  // default: OUT_DIR/<sid>.md (the "current state" refresh — refreshes may
+  // overwrite it by design); --out: OUT_DIR/<relpath> (validated at parse).
+  const file = outRel != null ? path.join(OUT_DIR, outRel) : path.join(OUT_DIR, safeFile(sid));
+  fs.mkdirSync(path.dirname(file), { recursive: true });
   fs.writeFileSync(file, r.text, "utf8");
   return { file, bytes: r.text.length, nmsg: r.nmsg, npart: r.npart };
 }
 
 // ---------- main ----------
 if (target) {
-  const r = writeOne(target, true);
+  const r = writeOne(target, true, outRel);
   console.log(
     "dumped " + target + " messages=" + r.nmsg + " parts=" + r.npart +
       " bytes=" + r.bytes + " -> " + r.file

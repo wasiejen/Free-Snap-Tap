@@ -14,7 +14,10 @@
 // the probe loads the tool) + EXTENDED 2026-09-12 (T2 loop-tool-batch part
 // 2: the ctx_gauge custom tool — the new S12 section, checks 82-85; the
 // tool file is imported DIRECT, type-stripped, the same way the probe
-// loads the tool): the pre-rebuild probe
+// loads the tool) + EXTENDED 2026-09-15 (T4: the compact_memory
+// pre-compaction dump hook, TODO #152 — the new S14 section, checks 101-107;
+// the dump script's --out flag; the S13 preamble places a stub dump script so
+// the byte-exact dispatch responses stay clean): the pre-rebuild probe
 // (v2.2.1 era) targeted the DELETED handover.ts, the retired
 // experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
 // all void with the shell gauge. PERMANENT repo tooling: RE-RUN, never rebuild
@@ -276,6 +279,26 @@
 //          line (cross, NO trailer); (98) cross-session model read (the LAST
 //          entry, pair-less); (100) explicit pair override (verbatim body,
 //          NO messages RPC); (99) failing RPC (default cap + note, no throw)
+//   S14 compact_memory pre-compaction dump hook (7) — TODO #152 (approved
+//      2026-09-15): BEFORE ANY dispatch the hook dumps the target session's
+//      full pre-compaction content into the corpus via the dump script
+//      (<root>/.opencode/agent/scripts/db/dump_session.cjs <sid> --out
+//      <relpath>); NO-OVERWRITE naming keyed on the budget count
+//      (compaction_dumps/<sid>_c<count>.md, a timestamp suffix when the name
+//      already exists); best-effort — a failure appends DUMP-FAIL to the
+//      ctx.log + a WARNING to the dispatch response (UNCHANGED on success):
+//      (101) preCompactionDumpName byte-exact (the normal c0/c7 case);
+//      (102) preCompactionDumpName byte-exact (the stamped fallback, fixed
+//          stamp — NO clock inside the function);
+//      (103) preCompactionDump is a function (the exported hook);
+//      (104) sandbox root WITHOUT the script → no throw, {ok:false}, a
+//          DUMP-FAIL line appended to the sandbox ctx.log;
+//      (105) the FAKE script (mimicking the real one's __dirname OUT_DIR +
+//          --out handling): hook call #1 (count 0) creates
+//          compaction_dumps/<sid>_c0.md with the marker content;
+//      (106) hook call #2 (same count) → the base name EXISTS now → the
+//          STAMPED name (<sid>_c0_<YYYYMMDDTHHmmss>.md) is created instead;
+//      (107) no-overwrite proof: file #1 is BYTE-IDENTICAL after call #2
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -288,7 +311,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S5=6  →  "PROBE handover: 99/99 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S5=6 S14=7  →  "PROBE handover: 106/106 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -1965,6 +1988,31 @@ const qcTick = async () => {
   await new Promise((r) => setImmediate(r));
   await new Promise((r) => setImmediate(r));
 };
+// The pre-compaction dump hook (S14, TODO #152) fires on EVERY dispatch below
+// (just before the client call). The stub dump script at the sandbox script
+// path keeps the S13 dispatch responses BYTE-EXACT — a dump SUCCESS appends
+// nothing to the response (a missing script would append a WARNING and break
+// the byte-exact checks 87/90/97). S14 removes and re-places the stub to
+// exercise the hook directly.
+const QC_FAKE_DUMP = `// probe fake dump — mimics dump_session.cjs's __dirname OUT_DIR + --out
+"use strict";
+const fs = require("node:fs");
+const path = require("node:path");
+const OUT_DIR = path.resolve(__dirname, "..", "..", "..", "archive", "sessions");
+const argv = process.argv.slice(2);
+let sid = null, rel = null;
+for (let i = 0; i < argv.length; i++) {
+  if (argv[i] === "--out") { rel = argv[++i]; }
+  else if (!argv[i].startsWith("-")) { sid = argv[i]; }
+}
+if (!sid || rel == null) { console.error("fake-dump: need <sid> --out <rel>"); process.exit(2); }
+const file = path.join(OUT_DIR, rel);
+fs.mkdirSync(path.dirname(file), { recursive: true });
+fs.writeFileSync(file, "FAKE DUMP of " + sid + "\\n");
+`;
+const QC_DUMP_SCRIPT = path.join(SANDBOX, ".opencode", "agent", "scripts", "db", "dump_session.cjs");
+mkdirSync(path.dirname(QC_DUMP_SCRIPT), { recursive: true });
+writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
 
 // 86 — the registration shape: the default factory (the plugin ctx capture)
 //      returns tool.compact_memory — description + the 4 optional args
@@ -2245,6 +2293,121 @@ const qcTick = async () => {
   );
 }
 
+// ------------------------------------------------------------------ S14 compact_memory pre-compaction dump hook (7) — TODO #152 (approved 2026-09-15): the no-overwrite corpus dump before ANY dispatch
+//
+// Reuses S13's type-stripped plugin import (qcMod — the SAME import
+// mechanism, a fresh module instance of the real plugin file). The hook is
+// driven DIRECT (not via the tool path): preCompactionDump steers ALL its fs
+// writes through its root parameter (here SANDBOX — the dump script is FAKE,
+// the repo corpus is NEVER touched).
+let s14File1 = null;
+let s14Body1 = null;
+
+// 101 — preCompactionDumpName BYTE-EXACT, the normal case (stamp = null):
+//      compaction_dumps/<sid>_c<count>.md
+{
+  check(
+    "101",
+    "S14",
+    "preCompactionDumpName byte-exact (normal, stamp null): compaction_dumps/<sid>_c<count>.md (count 0 and 7)",
+    qcMod.preCompactionDumpName("ses_pc_name", 0, null) === "compaction_dumps/ses_pc_name_c0.md" &&
+      qcMod.preCompactionDumpName("ses_pc_name", 7, null) === "compaction_dumps/ses_pc_name_c7.md",
+    JSON.stringify([qcMod.preCompactionDumpName("ses_pc_name", 0, null), qcMod.preCompactionDumpName("ses_pc_name", 7, null)]),
+  );
+}
+
+// 102 — preCompactionDumpName BYTE-EXACT, the stamped fallback: the stamp is
+//      a CALLER-supplied string (NO clock inside the function — byte-exact
+//      pinning is possible)
+{
+  check(
+    "102",
+    "S14",
+    "preCompactionDumpName byte-exact (stamp supplied): compaction_dumps/<sid>_c<count>_<stamp>.md",
+    qcMod.preCompactionDumpName("ses_pc_name", 3, "20260915T131530") === "compaction_dumps/ses_pc_name_c3_20260915T131530.md",
+    JSON.stringify(qcMod.preCompactionDumpName("ses_pc_name", 3, "20260915T131530")),
+  );
+}
+
+// 103 — the exported hook: preCompactionDump is a function
+{
+  check(
+    "103",
+    "S14",
+    "preCompactionDump is a function (the exported hook the probe drives directly)",
+    typeof qcMod.preCompactionDump === "function",
+    String(typeof qcMod.preCompactionDump),
+  );
+}
+
+// 104 — the no-script case: the S13 stub is REMOVED from the sandbox script
+//      path → the hook must NOT throw, returns { ok:false, error }, and
+//      appends a DUMP-FAIL line to the sandbox ctx.log (best-effort logging)
+{
+  rmSync(QC_DUMP_SCRIPT, { force: true });
+  let r = null;
+  let threw = false;
+  try {
+    r = qcMod.preCompactionDump(SANDBOX, "ses_pc_noscript", 0);
+  } catch {
+    threw = true;
+  }
+  const ctxLog = readFileSync(path.join(SANDBOX, ".opencode", "temp", "ctx.log"), "utf8");
+  check(
+    "104",
+    "S14",
+    "sandbox root WITHOUT the script → NO throw, {ok:false} with an error, a DUMP-FAIL line appended to the sandbox ctx.log",
+    !threw && r != null && r.ok === false && r.error != null && /DUMP-FAIL ses_pc_noscript/.test(ctxLog),
+    JSON.stringify({ threw, r, dumpFailTail: ctxLog.split("\n").filter((l) => l.includes("DUMP-FAIL")).slice(-1) }),
+  );
+}
+
+// 105 — the FAKE dump script (mimicking the real one's __dirname-derived
+//      OUT_DIR + --out handling) is placed at the sandbox script path →
+//      hook call #1 (count 0): { ok:true } + compaction_dumps/ses_pc_ok_c0.md
+//      created WITH the marker content
+{
+  writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
+  const r1 = qcMod.preCompactionDump(SANDBOX, "ses_pc_ok", 0);
+  s14File1 = path.join(SANDBOX, ".opencode", "archive", "sessions", "compaction_dumps", "ses_pc_ok_c0.md");
+  s14Body1 = existsSync(r1?.file ?? "") ? readFileSync(r1.file, "utf8") : null;
+  check(
+    "105",
+    "S14",
+    "FAKE script in place: hook call #1 (count 0) → {ok:true} + compaction_dumps/ses_pc_ok_c0.md created with the marker content",
+    r1.ok === true && r1.file === s14File1 && existsSync(s14File1) && s14Body1 === "FAKE DUMP of ses_pc_ok\n",
+    JSON.stringify({ r1, expected: s14File1, body1: s14Body1 }),
+  );
+}
+
+// 106 — hook call #2 (SAME count 0): the base name EXISTS on disk now → the
+//      name is STAMPED → the hook creates a DIFFERENT file,
+//      ses_pc_ok_c0_<YYYYMMDDTHHmmss>.md
+{
+  const r2 = qcMod.preCompactionDump(SANDBOX, "ses_pc_ok", 0);
+  const stampRe = /^ses_pc_ok_c0_\d{8}T\d{6}\.md$/;
+  check(
+    "106",
+    "S14",
+    "hook call #2 (same count 0): base name exists → the STAMPED name ses_pc_ok_c0_<YYYYMMDDTHHmmss>.md is created (a different file)",
+    r2.ok === true && r2.file != null && r2.file !== s14File1 && stampRe.test(path.basename(r2.file)) && existsSync(r2.file),
+    JSON.stringify({ r2, base: s14File1 }),
+  );
+}
+
+// 107 — the NO-OVERWRITE proof: file #1 (ses_pc_ok_c0.md) is BYTE-IDENTICAL
+//      after the stamped call #2 — one dump never overwrites another
+{
+  const body1Now = existsSync(s14File1) ? readFileSync(s14File1, "utf8") : null;
+  check(
+    "107",
+    "S14",
+    "no-overwrite proof: file #1 (ses_pc_ok_c0.md) is BYTE-IDENTICAL after the stamped call #2",
+    body1Now !== null && body1Now === s14Body1 && s14Body1 === "FAKE DUMP of ses_pc_ok\n",
+    JSON.stringify({ now: body1Now, before: s14Body1 }),
+  );
+}
+
 // ------------------------------------------------------------------ S5 hygiene (6)
 
 // 40 — every sandbox plugin.log line parses as JSON (no stray/blank/garbled lines)
@@ -2303,7 +2466,7 @@ const qcTick = async () => {
   const postLog = POST["plugin.log"] ?? "";
   const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
   const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
-  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non", "ses_qc_self", "ses_qc_retry", "ses_qc_flat", "ses_qc_nocli", "ses_qc_gate", "ses_qc_cpu", "ses_qc_fail", "ses_qc_msg", "ses_qc_cross", "ses_qc_rpc", "ses_qc_pair"];
+  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non", "ses_qc_self", "ses_qc_retry", "ses_qc_flat", "ses_qc_nocli", "ses_qc_gate", "ses_qc_cpu", "ses_qc_fail", "ses_qc_msg", "ses_qc_cross", "ses_qc_rpc", "ses_qc_pair", "ses_pc_noscript", "ses_pc_ok"];
   const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`) || l.includes(`"sess":"${fid}"`)));
   check(
     "43",

@@ -60,6 +60,7 @@
 // fallback is the GRANDPARENT of the file's directory.
 
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { tool } from "@opencode-ai/plugin";
@@ -211,6 +212,77 @@ function appendCompactLine(root: string, context: any, sessionID: string, model:
     appendFileSync(p, line, "utf8");
   } catch {
     // best effort — never break the tool over a write failure
+  }
+}
+
+// ------------------------------------------------------------------ the pre-compaction dump hook
+//
+// TODO #152 (the "dump function" entry, approved 2026-09-15): before ANY
+// compaction dispatch, dump the target session's FULL pre-compaction content
+// into the corpus (`.opencode/archive/sessions/`) so the corpus stays complete
+// for compacted sessions. The dump is the repo script
+// `.opencode/agent/scripts/db/dump_session.cjs <sid> --out <relpath>` (the
+// script opens the LIVE host DB `readOnly:true` — it is NEVER written). The
+// hook is BEST-EFFORT: it NEVER throws and NEVER blocks the tool — a failure
+// appends a DUMP-FAIL line to the ctx log and the dispatch response carries a
+// WARNING (the response is UNCHANGED on success — smoke stability).
+//
+// NO-OVERWRITE naming (the maintainer's --comment): dumps of the same session
+// id across compactions are keyed on the tracked compaction budget count
+// (`compaction_dumps/<sid>_c<count>.md`); if that exact file already exists on
+// disk, a timestamp suffix is added (`..._<YYYYMMDDTHHmmss>.md`) so one dump
+// never overwrites another.
+
+// The dump stamp `YYYYMMDDTHHmmss` — computed by the CALLER so the name
+// function stays pure / clock-free (the probe pins it byte-exact).
+function dumpStamp(): string {
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}T${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
+}
+
+// The pure dump-file NAME (no clock inside): `compaction_dumps/<sid>_c<count>.md`,
+// or `compaction_dumps/<sid>_c<count>_<stamp>.md` when a stamp is supplied (the
+// no-overwrite fallback). Exported for the probe (byte-exact pinning).
+export function preCompactionDumpName(sessionID: string, count: number, stamp: string | null): string {
+  const core = `compaction_dumps/${sessionID}_c${count}`;
+  return stamp != null ? `${core}_${stamp}.md` : `${core}.md`;
+}
+
+// Best-effort append of a DUMP-FAIL line to the ctx log (same append style as
+// appendCompactLine — never throws).
+function appendDumpFailLine(root: string, sessionID: string, error: string): void {
+  try {
+    const dir = tempDir(root);
+    mkdirSync(dir, { recursive: true });
+    const p = path.join(dir, "ctx.log");
+    const oneLine = String(error).replace(/\s+/g, " ").trim();
+    appendFileSync(p, `${localStamp()} DUMP-FAIL ${sessionID} ${oneLine}\n`, "utf8");
+  } catch {
+    // best effort — never break the tool over a write failure
+  }
+}
+
+// The hook: run the dump script for the target session. Returns { ok, file } on
+// success or { ok:false, error } on ANY failure (NEVER throws, NEVER blocks).
+// The no-overwrite rule: if the base-name target already exists on disk, the
+// name is STAMPED so this dump lands in a fresh file.
+export function preCompactionDump(root: string, sessionID: string, count: number): { ok: boolean; file?: string; error?: string } {
+  const scriptPath = path.join(root, ".opencode", "agent", "scripts", "db", "dump_session.cjs");
+  const archiveDir = path.join(root, ".opencode", "archive", "sessions");
+  const baseName = preCompactionDumpName(sessionID, count, null);
+  const baseTarget = path.join(archiveDir, baseName);
+  const stamp = existsSync(baseTarget) ? dumpStamp() : null;
+  const name = preCompactionDumpName(sessionID, count, stamp);
+  const target = path.join(archiveDir, name);
+  try {
+    execFileSync(process.execPath, [scriptPath, sessionID, "--out", name], { timeout: 60_000, stdio: "pipe" });
+    return { ok: true, file: target };
+  } catch (err: any) {
+    const error =
+      typeof err?.message === "string" && err.message !== "" ? err.message : err != null ? String(err) : "dump script failed";
+    appendDumpFailLine(root, sessionID, error);
+    return { ok: false, error };
   }
 }
 
@@ -463,6 +535,14 @@ export default async function CompactMemoryPlugin(ctx: any) {
               );
             }
 
+            // Pre-compaction dump hook (TODO #152): before ANY dispatch, dump
+            // the target session's full pre-compaction content into the corpus
+            // so it stays complete for compacted sessions. Best-effort — NEVER
+            // throws / NEVER blocks; on failure the dispatch response carries a
+            // WARNING (the response is UNCHANGED on success).
+            const dump = preCompactionDump(root, sessionID, count);
+            const dumpWarning = dump.ok ? "" : `\nWARNING: pre-compaction dump failed for ${sessionID} (${dump.error})`;
+
             // 4. the client call path (Part 1) — typeof detection (the SDK
             //    methods live on the prototype). Keep fields go in the body
             //    WHEN GIVEN; on a 404/missing-key/unexpected-field rejection
@@ -508,7 +588,8 @@ export default async function CompactMemoryPlugin(ctx: any) {
                 );
               const dispatch =
                 `Compaction dispatched for ${sessionID} (background, fire-and-forget) — the compact call was sent ` +
-                `(model: ${model}); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.`;
+                `(model: ${model}); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.` +
+                dumpWarning;
               const body =
                 typeof args?.message === "string" && args.message !== "" ? `${args.message}\n${dispatch}` : dispatch;
               return modelNote !== "" ? `${body}\n${modelNote}` : body;
@@ -539,7 +620,8 @@ export default async function CompactMemoryPlugin(ctx: any) {
                 );
               const dispatch =
                 `Compaction dispatched for ${sessionID} (background, fire-and-forget) — the summarize call was sent ` +
-                `(model: ${model}); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.`;
+                `(model: ${model}); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.` +
+                dumpWarning;
               const body =
                 typeof args?.message === "string" && args.message !== "" ? `${args.message}\n${dispatch}` : dispatch;
               return modelNote !== "" ? `${body}\n${modelNote}` : body;

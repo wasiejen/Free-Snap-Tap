@@ -186,3 +186,27 @@ instructions/protocol — facts that save lookups. Format per the README:
   incident (real wall ≈ 90% gauge reading, see NAP Standing).
 - **Keys:** ctx_gauge, gauge, lag, context window, stop line, 90%,
   margin, REM.
+
+## compact_memory: the pre-compaction dump hook (no-overwrite corpus naming)
+- **Do:** the hook fires BEFORE ANY compaction dispatch (just before the
+  client call, after the budget gate): `preCompactionDump(root, sessionID,
+  count)` runs `dump_session.cjs <sid> --out <relpath>` via execFileSync
+  (timeout 60 s, best-effort — NEVER throws / blocks). The name is
+  `compaction_dumps/<sid>_c<count>.md` (count = the budget count at dispatch
+  time); if that exact file already exists, a `_<YYYYMMDDTHHmmss>` stamp is
+  added (BEFORE the `.md`) — one dump never overwrites another. On failure a
+  `DUMP-FAIL <sid> <error>` line goes to `.opencode/temp/ctx.log` and the
+  dispatch response gains a WARNING line; on success the response is
+  UNCHANGED. The dump script's plain `<sid>` mode keeps "current state"
+  semantics (refresh may overwrite) — compaction awareness lives ONLY in the
+  hook's `compaction_dumps/` namespace.
+- **Why (evidence):** TODO #152 (approved 2026-09-15) + the maintainer's
+  --comment (no-overwrite across compactions of the same sid); probe S14
+  (checks 101-107, 106/106 green 2026-09-15) pins the name function
+  byte-exact + the no-overwrite proof; the S13 preamble places a stub dump
+  script in the sandbox so the byte-exact dispatch responses stay clean (a
+  missing script would append a WARNING).
+- **Ref:** `.opencode/plugin/compact_memory.ts` (`preCompactionDumpName` /
+  `preCompactionDump`); `handover_probe.mjs` S14; `dump_session.cjs` `--out`.
+- **Keys:** compact_memory, pre-compaction dump, compaction_dumps, no
+  overwrite, --out, DUMP-FAIL, S14, naming.

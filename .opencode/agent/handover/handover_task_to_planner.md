@@ -1,73 +1,91 @@
-# handover_task_to_planner — worker_Q4_120K (DONE — final)
+# handover_task_to_planner — worker-4 (DONE — final)
 
-Task: helper-script collection per spec 4a72c30 (maintainer #10 + #4 inbox).
-Session ses_f59f7cff0ffer37uRICTRFiyS0, iter-3 launch.
+Task: compact_memory pre-compaction dump hook (plan4), spec
+`handover_task.md` (loop copy `plan4_ho_task.md`). Session
+ses_f59c0d40affePju49VV2U179cp (resumed once after a cross-compact; post-
+compaction protocol followed, all 8 instruction files re-read).
 
-## Result: COMPLETE — all acceptance criteria met, gate green
+## Result: COMPLETE — all DoD criteria met, gates green
 
-### Commits (on `fst_work2`, see below for the branch discrepancy)
-| commit | content |
-|---|---|
-| `2933dd0` | unit 1: 8 curated scripts in `binary/` `db/` `log/` + `dump_session.cjs` moved into `db/` (git mv, content unchanged) |
-| `7f7f61c` | fix: `dump_session.cjs` OUT_DIR after the db/ move (the idempotency test caught a stray write to `.opencode/agent/archive/`; stray file removed) |
-| `b3a34d8` | unit 2: top-level README (rewritten), per-category READMEs, `grep_snippets.md`, machine-generated `INVENTORY.md` |
-| final | this file + `todo_inbox.md` findings |
+### Files changed (the exact spec scope)
+- `.opencode/plugin/compact_memory.ts` — the hook (spec design implemented
+  verbatim):
+  - `preCompactionDumpName(sessionID, count, stamp)` — pure, clock-free,
+    exported for the probe: `compaction_dumps/<sid>_c<count>.md`, stamp
+    (caller-supplied `YYYYMMDDTHHmmss`) inserted BEFORE the `.md`.
+  - `preCompactionDump(root, sessionID, count)` — runs
+    `dump_session.cjs <sid> --out <name>` via execFileSync (60 s timeout);
+    no-overwrite: if the base target exists on disk, the name is stamped;
+    best-effort — NEVER throws; on failure appends
+    `DUMP-FAIL <sid> <one-line error>` to `<root>/.opencode/temp/ctx.log`
+    (same append style as `appendCompactLine`) and returns
+    `{ok:false, error}`.
+  - Call site at the shared hook point (after the budget gate, just before
+    the client-call comment): `preCompactionDump(root, sessionID, count)`
+    with `count = budgetCount(root, sessionID)` (line 528). On `!ok`, a
+    `\nWARNING: pre-compaction dump failed for <sid> (<error>)` line is
+    appended to BOTH dispatch responses (compact + summarize branches); on
+    success the response is UNCHANGED. Dispatch itself untouched.
+- `.opencode/agent/scripts/db/dump_session.cjs` — the new optional
+  `--out <relpath>` flag (single-session only): writes to
+  `OUT_DIR/<relpath>` (parent dirs created); relpath validated (relative,
+  no leading `/`, no backslash, no `.`/`..`/empty segments, safe chars —
+  else exit 2); `--all` + `--out` → exit 2; usage text + header updated.
+  Default `<sid>` mode and the `readOnly:true` DB open are unchanged.
+- `.opencode/plugin/probes/handover_probe.mjs` — append-only S14 section
+  (checks 101-107) + header total line (106/106) + header comment + the
+  S13-preamble stub (see deviation below) + 2 new FINGERPRINT ids
+  (`ses_pc_noscript`, `ses_pc_ok`).
+- `.opencode/agent/scripts/db/README.md` — `--out` in the dump_session.cjs
+  row + a usage example + a note that the no-overwrite awareness lives in
+  the plugin hook, not the script.
+- `.opencode/agent/knowledge/knowledge_tools.md` — new entry (Do/Why/Ref/
+  Keys): the pre-compaction dump hook contract + the no-overwrite naming.
+- `TODO.md` — the line-152 entry (#55) Status → BUILD LANDED (plan4); the
+  entry stays OPEN; no other TODO entry touched.
 
-### Collection (`.opencode/agent/scripts/`)
-- `binary/`: `binwin.cjs` (needle→context window, ≤3 hits/needle),
-  `binhits.cjs` (all offsets + tiny context, cap 60), `binoff.cjs` (raw
-  offset window). exe: `--exe` flag > env `OPENCODE_EXE` > host default.
-- `db/`: `probe_schema.cjs` (columns+counts, no data; now enumerates ALL
-  tables instead of a hardcoded list), `sesinspect.cjs` (recent sessions /
-  session+last 14 msgs), `sesdata.cjs` (slim per-message JSON lines),
-  `compact_dir.cjs` (compaction summary + parts, 4000-char cap),
-  `dump_session.cjs` (corpus dump, moved here). DB: env `OPENCODE_DB` >
-  host default; all `readOnly: true`.
-- `log/`: `logctx.cjs` (±3-line window/380-char lines per hit; needle +
-  maxHits now argv, log via env `OPENCODE_LOG`).
-- Not promoted (dedup/superseded, recorded in INVENTORY.md): `findbin.ps1`
-  (PowerShell twin of binwin), `find_ctx*.mjs` (superseded by binary/),
-  `dump_session.py` (python twin of db/dump_session.cjs).
-- One deliberate deviation, documented in `db/README.md`: `sesinspect.cjs`
-  slim lines now parse `message.data` (the scratchpad original read the slim
-  keys off the DB row, matching only id/timestamps — near-empty output).
+### Verification (measured, this session, from the repo root)
+- `node .opencode/plugin/probes/handover_probe.mjs` →
+  **`PROBE handover: 106/106 PASS`**, exit 0.
+  N = 94 (the true baseline — machine-verified in this session by running
+  a temp copy of the HEAD probe: 94 checks, the baseline header total
+  matches its runtime count) + 7 (S14 checks 101-107, the only ids added —
+  machine-verified id-set diff: ADDED = 101..107 exactly, nothing removed,
+  no duplicates). The spec's baseline line "94/94" is the reconciled typo
+  noted in the launch (the baseline is 94/94); the DoD formula N = 94 + 7
+  = 106 holds exactly.
+- `./.venv/Scripts/python.exe -m pytest -q` → **459 passed, 1 warning**
+  (baseline match).
+- `./.venv/Scripts/ruff.exe check --select F .` → **All checks passed
+  (F=0)** (baseline match).
+- `git diff --stat` scope = exactly the six named files (+ this summary);
+  the maintainer's live edits (`.opencode/maintainer/ideas.md`,
+  `my_todos.md`) and the loop log are present in the tree but NOT staged.
+- The live host DB was never opened write: the script opens
+  `readOnly:true` (unchanged); the probe runs the FAKE script in its
+  sandbox only.
 
-### Verification (measured, 2026-09-15, from repo root)
-- Every script: exit 0 + expected output shape (test command + result per
-  script in its category README). Notable: binwin/binhits hit-path proven
-  on the live opencode.exe (179 982 488 bytes); logctx against the live
-  log (20 hits capped, 64193 lines); compact_dir hit-path on a
-  compacted session (8 compaction msgs); probe_schema all-tables (21).
-- Gate: `pytest -q` → **459 passed, 1 warning** (baseline match);
-  `ruff check --select F .` → **All checks passed (F=0)** (baseline match);
-  `node .opencode/plugin/probes/handover_probe.mjs` → **99/99 PASS**
-  (baseline match — the probe is named in the launch baseline; it is NOT
-  in the spec's gate commands nor in repo_commands.md, flagged in
-  todo_inbox).
-- dump_session idempotency test: re-dump of an existing corpus session
-  showed session GROWTH (59→65 msgs, final tool status
-  running→completed), not script drift → the script is correct; the corpus
-  file is stale (see todo_inbox). I reverted the re-dump (out of scope).
-
-### Acceptance checklist
-- [x] Scratchpad inventory documented — `INVENTORY.md` (140 scripts +
-  purpose, 7 dirs, 45 non-script files), machine-generated.
-- [x] Every selected script: in repo, generalized (no hardcoded host paths
-  beyond env-overridable defaults), tested from the repo, command+result
-  in its README.
-- [x] `grep_snippets.md`: marker sweep (verbatim from planner prompt
-  §maintainer calls/decisions) + 7 output-limited navigation recipes.
-- [x] No product code touched; no `.opencode/agent/prompts/**` touched
-  (no edit-deny block hit — I never attempted it); no scratchpad original
-  deleted.
-- [x] Standard gate green, numbers above.
+### One deliberate deviation (documented)
+The S13 PREAMBLE now places a stub `dump_session.cjs` at the SANDBOX
+script path before the S13 dispatches run. Why: the hook fires on EVERY
+dispatch; a dump SUCCESS appends nothing to the response (byte-exact
+checks 87/90/97 stay green), but a MISSING script would append the
+WARNING and break those three byte-exact checks. S14 removes the stub
+(check 104, the no-script/DUMP-FAIL case) and re-places it (checks
+105-107, the fake-script no-overwrite proof). The stub mimics the real
+script's `__dirname`-derived OUT_DIR + `--out` handling; it only ever
+writes inside the sandbox.
 
 ### Deliberately NOT done
-- Scratchpad originals left in place (maintainer's call per spec).
-- No prompt edits (the one-line "look here for helper scripts" role-prompt
-  pointers are planner-side per the spec Notes).
-- Corpus refresh (stale `ses_f5d03802...` + general backfill cadence) —
-  flagged in `todo_inbox.md`, planner/maintainer call.
-- `TODO.md` untouched: no maintainer-calls or blocked items found; the
-  three findings went to `todo_inbox.md` (branch-name mismatch in the
-  launch message, stale corpus, "probe 99/99" gate-definition gap).
+- Host-side activation (the maintainer's domain): `opencode.jsonc`
+  untouched; the hook takes effect at his next host restart.
+- Live acceptance is PENDING that restart: a single compact_memory call
+  must then produce
+  `.opencode/archive/sessions/compaction_dumps/<sid>_c0.md` (recorded in
+  the TODO #55 status).
+- No corpus refresh, no FST product code, no prompt edits, no scratchpad
+  originals touched.
+
+### Commit
+The commit that stages this file: six named files + `TODO.md` + the two
+handover files (find it via `git log` for "pre-compaction dump hook").
