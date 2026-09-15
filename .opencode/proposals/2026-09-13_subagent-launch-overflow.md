@@ -42,3 +42,8 @@ Should `opencode.jsonc` `limit.context` values be set to the models' ACTUAL
 effective windows (so the host can context-shift/compact instead of hard-
 failing the request)? If yes, that also re-opens the worker-prompt launches
 (died the same way at the compact_memory build, cf. the iter-1/iter-3 records).
+
+
+--comment: can be moved to rejected? or better implemented i guess
+- checked on the settings and context-shift is already active. limits are correct. if in limit there is nothing to shift anymore. around 500-1000 tokens or so can be shifted to end a tool or write, but not more. then there is nothing to be done except compaction
+  - see cross-compaction

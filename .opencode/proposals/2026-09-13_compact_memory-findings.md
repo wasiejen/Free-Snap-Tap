@@ -47,3 +47,7 @@ and one semantic question:
   live-acceptance criteria follow.
 - **Recommendation:** treat the compaction part as the durable
   acceptance criterion (the flag's semantics are your ruling).
+
+--comment: this is also no longer up to date
+- in my experience compaction works in context limit - never failed. with cross-session compaction this should be no longer a problem
+  - i honestly do not understand ## Item 2

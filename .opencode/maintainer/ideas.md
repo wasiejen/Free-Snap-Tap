@@ -6,7 +6,7 @@
 - block_tranfer //when working
 - compact_memory
 
-#2 tool erase message from seesion
+# 2 tool erase message from seesion
 - a tool to make it possible to remove the tail to a specific message and replace it by e.g. a summary
   - or directly remove a message or a list of messages identified by heir messageID from the session
   - usage: on ingesion of large files -e.g webfetch or log/dump reads summarise the useful parts and then remove it from context

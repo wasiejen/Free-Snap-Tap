@@ -7,7 +7,7 @@
 - look in the opencode/Temp folder and analyse the scripts there and collect the ideas in these to find common usage cases
 
 
-e.g. copied from a planner that looked for documentation very efficiently:
+-comment copied from a planner that looked for documentation very efficiently:
 
 Wrote ~\AppData\Local\Temp\opencode\binwin.cjs
 // Window-extractor: find strings in the opencode binary, print a small
