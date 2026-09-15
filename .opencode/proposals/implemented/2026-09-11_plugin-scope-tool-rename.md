@@ -30,3 +30,10 @@ the plugin loading from its new path.
 
 **Status:** awaiting maintainer go/no-go (my recommendation: GO on both,
 one cycle).
+
+
+Planner verdict (2026-09-15, plan2, per maintainer #0 backlog reduction):
+- Item 1: custom gauge tool LANDED (ctx_gauge — in-process, per-session read).
+- Item 2: plugin rename LANDED (.opencode/plugin/ctx_watchdog.ts is the live
+plugin). This was the first custom tool slot only in the sense that
+compact_memory preceded it — see the compaction-lifecycle file.

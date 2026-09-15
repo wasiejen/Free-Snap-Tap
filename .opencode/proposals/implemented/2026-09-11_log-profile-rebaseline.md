@@ -28,3 +28,10 @@ entries close; (2) grep-clean `peek.py`/`ctxgauge` references in live doc
 surface.
 
 **Status:** awaiting maintainer call (default for item 1: SKIP).
+
+
+Planner verdict (2026-09-15, plan2, per maintainer #0 backlog reduction):
+- Item 1: the one-shot read was executed + recorded in the NAP (2026-09-10,
+maintainer-approved); TODO #17 CLOSED. Item 2: #34 doc purge closed (2026-09-10);
+grep-clean of peek.py/ctxgauge in the live doc surface (one intentional
+historical pointer in repo_map.md).

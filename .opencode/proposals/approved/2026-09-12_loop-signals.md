@@ -45,3 +45,9 @@
 
 ## Status
 awaiting approval (prompt/protocol change = maintainer-gated)
+
+
+Planner note (2026-09-15, plan2): Part 3 (AFK) SUPERSEDED - the maintainer's 09-15
+looprunner rework shipped AFK in a different form (afk on/off, immediate
+effect, --loop status blocks). Parts 1/2/4 unimplemented. Open ruling bundled
+in proposals/2026-09-15_backlog-decisions.md (Decision 2).

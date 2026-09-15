@@ -34,3 +34,21 @@ good compare of gemma4 models
 - looprunner prompt needs rework
   - inclusion of afk mode 
   - and compaction protokol for in context limit sitting planner
+
+- check if there are better ways to name folders/use dates that do not lead agents into the dense numerical/data trap
+  - misreading constantly of 2026-09-11 -> 2026-09-12
+  - these are friction points i want feedback in their summaries :-)
+
+260915-1400:
+potential models for compaction/text/destillation work
+- quant 6 of gemma4-12b might be worthwhile test
+-  UD-IQ4_XS 13.6 GB unsloth/gemma-4-26B-A4B-it-GGUF might fit also very well. could be even faster and more intelligent at the same time
+  - but low quant might be a problem in MOE architechture of this model
+  - MOE works also good with fit and only a part of the experts in the vram 
+    - have to test this
+- tiny 3.0 in a higher quant maybe? the 4bit quant was not very good. but in general it is seen as very good 
+  - so confilicting experience with community exp
+  - size?
+- unsloth/Qwen3.6-35B-A3B-GGUF or thireus strong candidate - but very big and needs to be offloaded to ram
+  - speed? A3B is very small so could be fast non the less
+  - prefill will degrade under ram usage i quess - not good for destillation

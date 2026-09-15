@@ -484,3 +484,25 @@
   mode + --all corpus) + 137-session backfill; verified count 137==137, gates green.
 - Queued at close (his order): # 3 3 distillation (gemma4) -> # 4-# 7 prompt/knowledge
   additions -> # 8 block_transfer test -> # 10 script collection.
+
+## 2026-09-15 (direct, ses_f5ce87718 — closing detail for the compressed NAP section)
+- His --comment rulings (session message) handled + acknowledged: (1) autorun
+  postponed one round; (2) TODO #55 APPROVED + BUILDABLE (compact_memory dump
+  hook reuses agent/scripts/dump_session.cjs; he activates via host restart
+  before the next autorun); (3) per-session NAP backup = ONE cp at the close
+  commit (Standing rule, no double write); (4) smoke-harness home =
+  plugin/tests/ (formal proposal filed).
+- Looprunner prompt reworked (a41ffc3, then 67f68f6): new Communication
+  readout block, Resume & recovery with the context-limit procedure
+  (WARNING -> cross compact_memory fire-and-forget -> task_id RESUME ->
+  fallback restart), AFK mode (afk on/off, immediate effect), Delegation
+  status blocks, Access Gating restated; text damage fixed; his ** directives
+  kept verbatim.
+- Smoke-harness: worker-16 (ses_f5baf84c7) built plugin/tests (7 smokes +
+  _smoke_base.mjs + README); worker COMPACTED mid-task at 6/7 (IN-PROGRESS
+  handover f4de326) -> RESUMED via task_id per protocol -> final 109ddff
+  (compact_memory smoke folded cm_v2+qc, fire-and-forget build). VERIFIED:
+  self-run 42/42; gates 99/99 + 459 passed + ruff F=0.
+- His looprunner config change (tools block) flagged with TWO issues (his to
+  fix): "block_tansfer" typo (registered name block_transfer) and
+  "*": false polarity (deny-all; "all but the editors" needs "*": true).

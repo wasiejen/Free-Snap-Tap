@@ -107,3 +107,10 @@ file as the place to record it):
   silence discipline (no NEW gauge-failure reasons, no per-tool plugin.log
   growth beyond the existing tool.after line) stay as-is. Build: the v2.8
   header block in `.opencode/plugin/handover_v2.4.ts` + probe S9.
+
+
+Planner note (2026-09-15, plan2): SUPERSEDED — ctx.log readout + COMPACT line
+(2026-09-15), the compaction-lifecycle L4 design (built, deactivated), and the
+manual stop/compaction protocol cover detection + logging; the compaction
+NUDGE was deliberately not built (nudge deleted per compaction-lifecycle L3).
+Left in this folder (closed / needs revisit).

@@ -153,3 +153,14 @@ item survives there; folder moves stay maintainer-side.
 
 maintainer:
 - both cycles approved
+
+
+Planner verdict (2026-09-15, plan2, per maintainer #0 backlog reduction):
+- Cycle 1 LANDED: compact_memory tool + COMPACT line + L3 standing trigger rule
+(per approved v2 proposal 2026-09-12_compact_memory_plugin.md, now implemented/).
+- Cycle 2 BUILT + DEACTIVATED: deactivated/context_recovery.ts (L5 activation
+flag OFF; smoke-pinned with attribution).
+- The 2026-09-15 stop/compaction protocol (order-stop -> dump -> cross
+compact_memory -> task_id resume, both role prompts) is the operational
+superset of L4; the gauge custom-tool go/no-go superseded by the ctx_gauge
+build.

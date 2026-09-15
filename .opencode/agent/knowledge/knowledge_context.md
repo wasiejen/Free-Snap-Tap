@@ -39,3 +39,17 @@ Format per the README: **Do** / **Why (evidence)** / **Ref** / **Keys**.
   e8200da); `.opencode/agent/scripts/README.md`.
 - **Keys:** pipeline-only, bounded reads, context budget, dump, corpus,
   pointer, no-loss, compressed sections.
+
+## Dense date strings in filenames / edits: script-resolve, never retype
+- **Do:** for dated filenames (YYYY-MM-DD_slug) and dated text lines: never
+type the date into a path or an edit oldString - resolve the name
+programmatically (readdir + filter by a non-date key) and do replacements
+with a script that captures the date via regex; verify via git status.
+- **Why (evidence):** 2026-09-15 (ses_f5b1f19...): three separate ENOENT /
+oldString-mismatch incidents on 2026-09-1x dates (proposal filenames,
+TODO.md line) - the digits kept being perceived one apart; a readdir +
+codepoint dump showed the typed name and the real name differed in exactly
+the date digits.
+- **Ref:** plan2 of looprun autorun-2026-09-15_13-11.
+- **Keys:** ENOENT, oldString not found, dated filename, readdir, codepoint,
+retyping, script capture.

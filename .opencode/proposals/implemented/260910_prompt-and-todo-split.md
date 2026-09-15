@@ -87,3 +87,11 @@ Planner replies (2026-09-10, iteration 6 — part 3 already shipped: `854bb68`,
 aproved 1. **Per-feature instruction files**  and 2. **Split `agents_repo.md`**, 3. and 4. already approved. 5. **todo_inbox.md** approved, skip todo.wip
 
 move the split repo into system_prompts folder of .opencode and update references accordingly
+
+
+Planner verdict (2026-09-15, plan2, per maintainer #0 backlog reduction):
+- ALL parts LANDED: Part 1 per-feature instruction files (agent_readme_*.md +
+index in both role prompts); Part 2 agents_repo.md split into the repo/ parts
+under .opencode/agent/prompts/ (moved into the prompts folder per his note);
+Parts 3+4 per his approval; Part 5 todo_inbox.md in use (AGENTS.md APPEND rule).
+Moved out of unclear_if_implemented.

@@ -3,6 +3,7 @@
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 ## Compressed archive (one line each — details in git log + TODO/records)
+- 2026-09-15 direct session (ses_f5ce87718ffedT6ngBjJN3LEhH) — his --comment rulings handled (autorun postponed; #55 APPROVED; NAP-backup rule; smoke-harness home = plugin/tests/); looprunner prompt reworked (a41ffc3/67f68f6: readout, context-limit procedure, AFK, status blocks); smoke-harness BUILT + VERIFIED via worker-16 compact/resume cycle (f4de326→109ddff, smoke 42/42, gates 99/99+459+F=0); his config issues flagged (block_tansfer typo, "*" polarity) — details: .opencode/archive/loop/nap_direct.md
 - 2026-09-15 looprun 1, iteration 1 (ses_f5b3bf425ffesUdbQYxpvk0Z4t) — maintainer priority batch: stop/compaction protocol (90 % gauge stop line + dump-before-compact) codified in both prompts; marker grep command + context-discipline + marker rulings in prompts; knowledge_inbox + session_scan skill built; proposal backlog pass (subagent-overflow → implemented/, findings → root revised, smoke-harness → implemented/); 4 inbox items triaged → done/; TODO #56 (deferred distillation); script-collection spec WRITTEN + ready to launch — details: loop folder plan1_summary.md + git b3435d9
 - 2026-09-15 direct session (ses_f5d75a58fffeDLp7CGLqqZP8EQ) — Part-2 NAP cleanup COMPLETE + verified (`b36d4c7`); `# 3 2` dump script + 137-session corpus backfill delegated + verified (`ab1451d`, `e877364`); dense-content question answered (knowledge entries); his re-prioritization triaged (`60d61b8`..merge `23eb24c`) — details: .opencode/archive/loop/nap_direct.md + git 1d98075
 - 2026-09-15 direct session (ses_f5df3e30cffeCpv0iy41ybL6iA) — bash switch verified; compact_memory re-verified (Gemma now default compaction model); NAP-size discussion: memory folder + consolidation + session-dump designed, Part-2 cleanup APPROVED (backup condition) and delegated — details: .opencode/archive/loop/nap_direct.md + git b4a6b93
@@ -86,54 +87,13 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   closed entries in `todo_records.md` (formalized by split proposal part 3).
 - **Disclosure (dc3f137):** the `git add -A` there also staged the maintainer's live `opencode.jsonc` (compaction.keep now system:true / tokens:60000 / messages:20) and his new draft `draft/compact_memory/compact_memory.ts` (72 lines) - both were in the working tree at commit time. Nothing was reverted; maintainer decides whether that belongs in the git record.
 
-## 2026-09-15 (direct session; ses_f5ce87718ffedT6ngBjJN3LEhH, post-compaction of ses_f5d75a58) — his `--comment` rulings handled; looprunner prompt reworked; smoke-harness proposal filed
-- His `--comment` (session message) handled + acknowledged: (1) **autorun postponed
-  one round** — noted, no loop work this session; (2) **TODO #55 APPROVED**
-  ("can be done and will be activated before the next autorun") →
-  `TODO.md` #55 status → APPROVED + BUILDABLE (dump HOOK reuses
-  `agent/scripts/dump_session.cjs`; he activates via host restart before the next
-  autorun); (3) **per-session NAP backup**: YES if one efficient cp → Standing rule
-  (single `cp` at the close commit, no double write; emergency compaction must be
-  enough); (4) **smoke-harness home** = `plugin/tests/` → formal proposal filed.
-- **Looprunner prompt REWORKED** (`agent/prompts/agents/prompt_agent_looprunner.md`):
-  new §Communication (the better-communication proposal — fixed readout block per
-  iteration close: planner/action/summary-printed/next; loop start; failure +
-  recovery line; message ack line); new §Resume & recovery with the explicit
-  **context-limit procedure** (WARNING → session id from error/return or last
-  `-->START` line → cross `compact_memory` (provider/model if known else
-  `llama-swap`; fire-and-forget; success = COMPACT line in `temp/ctx.log`; host
-  compaction model Gemma ≠ planner model → no flush) → task_id RESUME with the
-  post-compaction protocol → fallback `restart`); STRONG `loop_log` tool reminder
-  (tool = the only write path; his config-side tool access is HIS part to fix —
-  his commit `a58d375` added `loop_log` to the tools block; the LIVE jsonc has the
-  tools block commented out = all tools available). Text damage fixed ("On/esume"
-  split, stray `- ` line, "interation" typo); his `**` directives kept VERBATIM;
-  Access Gating restated against the config (read-gated, no write access).
-- **Smoke-harness proposal FILED** (`proposals/2026-09-15_smoke-harness-home.md`):
-  home `.opencode/plugin/tests/` + README (layout rule); same-name attribution
-  table (8 scratchpad files → `<tool>.smoke.mjs` + behavior suffix); shared
-  `_smoke_base.mjs`; rewire hardcoded absolute paths; green-from-repo acceptance.
-  Inbox item `save_all_plugin_took_testing_files.md` → `maintainer/done/`
-  (content untouched).
-- **Continuation (same session, his replies):** (1) communication readout
-  APPROVED as FULL (his first look when returning to a run); looprunner read
-  restriction removed by him (now broad read incl. `temp/ctx.log` — he may
-  re-restrict). Prompt reworked AGAIN: new §AFK mode (`afk on`/`afk off`,
-  immediate effect, every would-end-the-loop condition → fresh planner launch,
-  spiral INFO at 3x same cause, own 85% line still binds) + new §Delegation
-  status (every launch/resume carries a `--loop [looprunner]` labeled status
-  block — never confused with maintainer instructions) + Access Gating
-  restated (edit tools denied, broad read).
-- **Smoke-harness APPROVED + BUILT + VERIFIED:** he moved the proposal to
-  `approved/` (his live reorg of `proposals/` — his other moves left
-  uncommitted); worker-16 (`ses_f5baf84c7`) built `plugin/tests/` (7 smokes +
-  `_smoke_base.mjs` + README) — the worker was COMPACTED mid-task (6/7 green,
-  IN-PROGRESS handover committed at `f4de326`) → RESUMED via task_id per
-  protocol → final `109ddff` (compact_memory smoke, folded cm_v2+qc, adapted to
-  the fire-and-forget build). VERIFIED: new smoke self-run 42/42; commit stat
-  + TODO close-note present; gates per its handover (99/99, 459+1#10, F=0).
-- His looprunner config change (tools block active) — I flagged TWO issues in
-  the closing message (his to fix): `block_tansfer` typo (registered name =
-  `block_transfer`) and `"*": false` polarity (deny-all — his intent "all but
-  the editors" needs `"*": true`). Open: his ruling if he disagrees.
-
+## 2026-09-15 looprun 2 (autorun-2026-09-15_13-11), iteration 2 (ses_f5b1f19...planner-2) — plan2: maintainer #0 backlog reduction
+- New maintainer directives (uncommitted at start; committed with this bookkeeping): his "# 0 focus on proposals + open inbox items - reduce the open backlog, combine adjacent items" plus a --defer line on the # 3 3 distillation (TODO #56 status already matches — no change).
+- Inbox scan: inbox_planner + inbox_worker EMPTY (README only). Backlog state at audit: 3 root proposals (pending), 7 approved/ (5 done + 1 unimplemented build + 1 partially superseded), 2 unclear_if_implemented.
+- CLOSED (verdict note + moved to implemented/): nap-size, loop_log-v2 (T3 6ebe288), compaction-lifecycle (both cycles; L4 superseded by the 09-15 manual protocol), log-profile-rebaseline (#17 + #34), plugin-scope-tool-rename (ctx_gauge + ctx_watchdog.ts rename) + prompt-and-todo-split (from unclear_if_implemented).
+- Status notes (files stay): loop-signals (Part 3 AFK superseded by his 09-15 rework; Parts 1/2/4 open); plugin-compaction-detection (superseded — ctx.log + COMPACT line + L4).
+- FILED consolidated decision "2026-09-15_backlog-decisions.md" (4 decisions: 1) #11 A/B; 2) loop-signals Part 2 vs retire 1+4; 3) compact_memory-findings Item 2 + one-move closure; 4) AGENTS.md paste action). The --comment marker line removed from contradiction-block (acknowledged, quoted in the decision file).
+- TODO.md curation: maintainer-calls list compressed (#11 the only open call + one record line); #33 condensed to a closed one-liner; #35/#52 stale tails corrected.
+- DELEGATED: fst-rebind-repeat (approved proposal) to worker_Q4_120K on branch fst_work — spec = handover_task.md (verified facts: marker regions 631/699/703/761-776; units A 4b93d37 + B 2891dab are ancestors of fst_work HEAD 6cbe4a8; baseline measured by worker at checkout). Loop folder copy: plan2_ho_task.md.
+- Knowledge: dense-date-string entry added to knowledge_context.md (3 ENOENT/oldString incidents this session).
+- OPEN: worker verification + gates on fst_work; on green: #0 line -> _past_priorities.md with reply; plan2_summary.md; DONE line; action line.

@@ -34,6 +34,10 @@ stop/compaction protokol for now 95% - this means explicityl around 90% gauge wi
 
 --comment: when the session dumping addition is done to the compact_memory tool, how is the dumping of the same session_id before and after compaction handled? will the tool automaically create a seperate folder for the dump after compaction based on the tracked compaction budget? if this is handled without overwriting and thus loosing session info then good - if not include such a function please. thanks :-)
 
+# 0 focus on proposals and open inbox items for now. lets reduce the open backlog
+ - combine adjacent items when possible
+
+--defer # 3 3 destillation worker runs for now - to much work right now. 
 # 3 3
 - you are free to test out different destillation workers on some session dumps. try to use the gemma4 worker ... i need to enable this before (worker_gemma_Q4_128K, agent_gemma_Q4_128K are available again)... he is a lot faster. so you can put more workers in the same time and experiment with different goals/tasks more.
   - create some roles/skillsets for this if needed to keep track of them and try to find a wide range of different perspectives that could scan the sessions.

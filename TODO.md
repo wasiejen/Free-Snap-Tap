@@ -7,29 +7,15 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 
 ## Maintainer calls (open, in order)
 
-1. ~~v1.3 log-growth confirmation~~ — RESOLVED 2026-09-11 (maintainer approved the
-   one-shot read in `approved/2026-09-11_log-profile-rebaseline.md`; executed + recorded
-   in the NAP) → #17 CLOSED.
-2. **#11 contradiction prevention** — held on the maintainer's LIVE test: the `XXX 241016-1101`
+1. **#11 contradiction prevention** — held on the maintainer's LIVE test (ruling bundled
+   in `proposals/2026-09-15_backlog-decisions.md`, Decision 1): the `XXX 241016-1101`
    pin at `fst_keyboard.py` ≈821 is his find-marker — do not touch → #11.
-3. **v2.5 nudge target scope — RESOLVED 2026-09-10 (maintainer ruling):** the readout must
-   reach EVERY acting session — blind spots unacceptable for an action (the #18
-   most-recently-updated-session caveat stays acceptable for reminder text only); read
-   mechanic (session id in the readout vs per-session readout) = build worker's call under
-   that invariant → #33.
-4. ~~**Deferred FST behavior batch**~~ — RESOLVED 2026-09-12 (maintainer ruled in
-   `approved/2026-09-11_fst-behavior-batch-decisions.md`: all 5 Recs approved; #6 = KEEP
-   `fst_keyboard.py:302-303` until more testing; branch directive: new `fst_work` branch)
-   → ALL LANDED on branch `fst_work` (iter-9: unit A `4b93d37` + unit B `2891dab`); the proposal moved to `implemented/` with the verdict.
-5. ~~Schedule~~ — RESOLVED 2026-09-12 (iter-14 curation): the #30 de-peek + #33 v2.5 schedule
-   is fully landed — #30 CLOSED + #33 LANDED (see their entries); the v1.3 log-profile
-   re-baseline tail resolved 2026-09-10 (one-shot read, approved/2026-09-11_log-profile-rebaseline.md).
-   No further build scheduled.
-6. ~~`handover_task.md` worktree/HEAD conflict~~ — RESOLVED 2026-09-11: maintainer fixed
-   the git mess directly (`b6dc3e7` — restored lost updates; the HEAD split-build spec is
-   canonical, tree clean) → #49 CLOSED; the split build is the iteration-2 launch.
-7. ~~Apply the Looprunner prompt v2 proposal~~ — RESOLVED 2026-09-10: applied + smoke test
-   clean → #39 CLOSED (session 4).
+2. Resolved calls (records): v1.3 log-growth confirmation → #17 CLOSED (one-shot read
+   executed); v2.5 nudge target scope ruling → #33 (per-session read); Deferred FST
+   behavior batch → all 5 Recs approved + LANDED on `fst_work` (unit A `4b93d37` +
+   unit B `2891dab`, proposal in `implemented/`); build schedule → complete;
+   `handover_task.md` worktree conflict → #49 CLOSED (`b6dc3e7`); Looprunner prompt
+   v2 → #39 CLOSED.
 
 ## FST behavior decisions (open — maintainer calls unless noted)
 
@@ -118,64 +104,11 @@ reenabled, that is the call.
 
 ## 37. (closed 2026-09-10, see todo_records.md) — Production plugin host lacks `node:sqlite` — the ctx nudge never lands in production (2026-09-10)
 
-## 33. v2.5 auto-nudge ladder build (folded in: the former TOP-of-file note) — STATUS: APPROVED — NEXT BUILD
-
-- **Problem / evidence:** the chat.message ctx line only covers USER messages — an
-  unsupervised agent gets no mid-run context signal and walks blindly into its limit
-  (self-peek is the only mid-run signal today). The former top-of-file note (2026-09-10)
-  added: at <5k REM the agent is nudged with the VERBATIM self-gauge
-  `CTX=… REM=… — stop-line reached` (working past the line is a rule violation — the
-  planner decides continuation) → the FINAL 5 k rung of the ladder.
-- **Outcome (goal — approved design):** a per-session nudge ladder fired from
-  `tool.execute.after` (the plugin is agent-independent — ALL agents, planner + workers),
-  rungs **50 % (generic) → 70 % / REM ≤30k → 80 % / ≤20k (wind-down — just before the 85 %
-  line) → 90 % / ≤10k (critical — commit + write the NAP NOW)** — condition = pct OR REM,
-  whichever first, ≤1 nudge per rung per session — PLUS the final 5 k rung above,
-  requesting further approval. Delivered via `client.session.promptAsync(...)` synthetic
-  text part (fire-and-forget; queues as the next turn at idle; the TUI never renders it
-  as the maintainer's message). Evidence: `kind:"nudge"` log lines — SILENT otherwise
-  (the v1.x skip-set log-growth discipline applies). The chat.message ctx line STAYS.
-- **Target-scope pre-build call — RESOLVED 2026-09-10 (maintainer ruling):** the readout
-  must reach EVERY acting session (blind spot unacceptable for an action — the #18
-  most-recently-updated-session caveat stays acceptable for reminder text only); the read
-  mechanic (session id carried in the readout vs a per-session read) is the build worker's
-  call under that invariant.
-- **Full design:** NAP `## v2.4.1 LIVE + v2.5 NUDGE LADDER spec` + `## Live status` blocks
-  (09-10); #32 holds the root-cause record. **Discrepancy (2026-09-10, session 4):** those
-  NAP blocks are GONE from the live NAP (lost in the session-3 rewrite) — the approved
-  design is fully restated in this entry's Outcome block and in the session-4 task spec
-  (`.opencode/handover_task.md`); treat THAT as the design of record.
-- **Acceptance:** the ladder fires per rung (probe: extend the bun probe — fake client +
-  fake shell); one maintainer restart + a forced high-readout scenario shows the first
-  nudge land; no NEW gauge-failure reasons (the silent path stays silent);
-  `kind:"nudge"` evidence lines only.
-- **Status:** LANDED (2026-09-10, T2 #33) — the v2.6 ladder is in
-  `handover_v2.4.ts` (per-session read mechanic, rungs 50/70/80/90/5k, dedup per rung,
-  `promptAsync` synthetic-part delivery fire-and-forget, `kind:"nudge"` evidence only,
-  silent otherwise); probe extended with S8 (checks 46-53) → 52/52 PASS, exit 0; suite
-   434/434 + ruff F=0. **2026-09-10 (looprun 2, iteration 1) — PRODUCTION EVIDENCE
-   LANDED:** the 50% rung nudge fired in this planner session (readout CTX=64687
-   (53%), genuine per-session read; the nudge text reached the session as the next
-   message; 70%/80% rungs also observed). The #30/#31/#33 production-evidence tail
-   is COMPLETE; only the v1.3 log-profile rebaseline (call 1, default SKIP) remains.
-- **Read-mechanic half (built by T1): NOT landed (2026-09-10)** — T1 stopped at the context
-  stop-line (#35): the session-gated readout is designed, and its read form + the honest
-  unknown-window / notAvailable forms + `SESSION=<sid>` carry landed in the committed shared
-  core (`ctxgauge/gauge.mjs`); the PLUGIN wiring (v2.5 match-only post) is NOT landed — the
-  live plugin is unchanged (its old shell readout now points at the deleted peek file → a
-  restart before v2.5 lands yields kind:gauge no-ctx-output failure lines — no ctx: line for
-  agents, never a throw). The ladder
-  (T2) remains pending as scheduled — it now also waits on the #30-core plugin wiring.
-  - **Discrepancy (2026-09-09, shell-doc lab):** self-peek `node .opencode\ctxgauge\peek.mjs`
-    reports the wrong window — `CTX=58271 (582%) REM=-47771` on this 120k-window session
-    (window read ≈10.5k; pct/REM both nonsense, negative REM). The plugin's `chat.message`
-    ctx line computed the SAME session correctly at the same time (`CTX=24187 (20%) REM=95813`
-    ⇒ 120k window). Shared gauge core / peek window read needs a fix before self-peek
-    numbers are trusted; the true readout here was ≈`CTX=58271 (~49%) REM≈62k`.
+## 33. (closed 2026-09-12, see todo_records.md) — v2.5 auto-nudge ladder — LANDED (T2: per-session read, rungs 50/70/80/90/5k, dedup per rung, `promptAsync` synthetic-part delivery, `kind:"nudge"` evidence only; probe 52/52) + production evidence complete (50/70/80 % rungs fired in live planner sessions; the per-session read mechanic reached EVERY acting session per the maintainer's target-scope ruling); the v1.3 log-profile tail resolved via the executed one-shot read (#17 CLOSED). The stale 09-10 "NOT landed" note referred to the pre-wiring state; both T1 (de-peek, #35) and T2 (ladder) are landed.
 
 ## 38. (closed 2026-09-10, see todo_records.md) — (TEST) explorer smoke test — jill gemmaQ4-256K first launch
 
-## 35. (closed 2026-09-11, see todo_records.md) — T1 de-peek build — LANDED (continuation 2); tail open: v1.3 log-profile re-baseline (call 1) + #34 residual doc refs (2026-09-10)
+## 35. (closed 2026-09-11, see todo_records.md) — T1 de-peek build — LANDED (continuation 2); tail closed: v1.3 log-profile re-baseline executed (one-shot read → #17) + #34 residual doc refs (closed)
 
 ## 51. Stale probe header vs `.opencode/package.json` "type" field (2026-09-11, T3 worker flag)
 
@@ -191,7 +124,7 @@ reenabled, that is the call.
 - **Scope:** the probe header (comment), `.opencode/package.json`.
 - **Status:** OPEN — maintainer call.
 
-## 52. (closed 2026-09-13, see todo_records.md) — `compact_memory` fails in the current host build — connection error on both paths (2026-09-12) — LANDED (2026-09-12, worker-2, per the approved v2 proposal) + live acceptance DONE (2026-09-13, iteration 1: compaction part + directive + budget 1/3 + COMPACT line verified in the DB); the resume-overflow finding → `proposals/2026-09-13_compact_memory-findings.md` (AWAITING APPROVAL).
+## 52. (closed 2026-09-13, see todo_records.md) — `compact_memory` fails in the current host build — connection error on both paths (2026-09-12) — LANDED (2026-09-12, worker-2, per the approved v2 proposal) + live acceptance DONE (2026-09-13, iteration 1: compaction part + directive + budget 1/3 + COMPACT line verified in the DB); the resume-overflow finding → `proposals/2026-09-13_compact_memory-findings.md` (Item 1 superseded by the 2026-09-15 protocol; Item 2 ruling bundled in 2026-09-15_backlog-decisions.md, Decision 3).
 
 ## Closed entries
 

@@ -27,4 +27,3 @@ green.
 **Status:** awaiting maintainer ruling (your live test is the deciding
 input).
 
---comment: still had no time to test it yet if the current behavior is the intented or not. i changed sometimes the way it works to test things out - but seemed to work fine.
