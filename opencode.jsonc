@@ -128,7 +128,8 @@
       "tools": {
           "read_file": true,
           "list_dir": true,
-          "glob": true
+          "glob": true,
+          "loop_log" : true
         },
       "permission": {
         "*": "deny",
