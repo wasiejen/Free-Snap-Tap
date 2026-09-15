@@ -29,6 +29,10 @@
 
 
 
-20-26-09-14_14-22
---comment: replay to the reaction of a planner to my instruction of preserving the state of the loop folder was "(You told me to preserve that folder, so I didn't guess.)"
-my answer to this: your comment is very helpful for me and this is a good example on how i am not certain what even such a simple comment of my will have for consequences in your actions. my instructions are not to be read verbatim in general - you are intelligent and do not have to accept everything what i say as law or rule. these are my best attempts at directing you and the other agents - but sometimes a badly worded line causes an entirely different outcome becomes my words were taken litterally and not the intention behind them. this is good act in the best interpretation of my intention. by preserve the folder i meant to not add to the loop.log, start a new autorun folder or yes generally change anything UNTIL we have discussed some and i have a better idea. but writing takes time for me and sometimes only the beginning of my intention i acutally write out and trust it will be interpreted correctly. (see another idle thought). my goal is collaboration and not blind adherence to what i write/say. you can and should make it obvious if an instruction/prompt is unclear. in direct session i want that you make this clear fast and not work a long time and then discover that my wording had unintented consequences and i got an output i did not want. or have to revert with a slighly reworded prompt to see what i will get.
+# 2 adding emergency compaction option to the tool that automatically trigger on context_limit
+  - optional toggable via the same json file that stores the compaction numbers for each sessionID
+
+# 3 emergency overwrite of max compact per session option
+  - a planner should be able to overwrite the limit for the sessionid of a worker
+    - e.g. if sessionID given into the tool is not the current ctx.sessionID then the limits do not apply? or raised by one temporarily?
+      - to keep track who starts who is i think to much managerial effort - it is an emergency tool, to be there when needed
