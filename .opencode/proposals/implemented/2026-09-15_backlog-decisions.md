@@ -48,3 +48,14 @@ your AGENTS.md: (1) the ≈90 % stop line + worker dump protocol replacing the
 Both items are ALREADY LIVE in the role prompts; pasting makes AGENTS.md
 agree with them. Then the prompts' "overrides AGENTS.md" notes can be
 retired in a later cleanup.
+
+
+D1 A approved
+D2 1 drop
+D2 2 approved
+D3 move to implemented
+D4 approved
+
+Handled (2026-09-15, plan2, iteration 2 resume): D1-A applied (comment below the untouched pin + #11 closed); D2: 1+4 retired, Part 2 approved — prompt build in progress; D3 done; D4 done (his paste pending).
+
+All decisions handled (2026-09-15, plan2 iter-2 resume): D1-A applied, D2 Part 2 landed (Parts 1+4 retired), D3 moved, D4 moved to approved/ (his AGENTS.md paste still pending — the approved/ file is the text of record). Done.

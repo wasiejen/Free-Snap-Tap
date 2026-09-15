@@ -51,3 +51,9 @@ Planner note (2026-09-15, plan2): Part 3 (AFK) SUPERSEDED - the maintainer's 09-
 looprunner rework shipped AFK in a different form (afk on/off, immediate
 effect, --loop status blocks). Parts 1/2/4 unimplemented. Open ruling bundled
 in proposals/2026-09-15_backlog-decisions.md (Decision 2).
+
+
+Maintainer ruling (2026-09-15, D2): "1 drop, 2 approved" — Parts 1 + 4 RETIRED (superseded by the current state machine + the 09-15 looprunner rework); Part 2 APPROVED for build (counter mismatch: keep the bigger iteration number, never clobber plan<N>_* files; the --request: lines between planner and looprunner). Closed to implemented/ once the Part 2 prompt edits land.
+
+
+Landed (2026-09-15, plan2 iter-2 resume): Part 2 prompt edits in all three files (looprunner Launch, planner autonomous mode, agent_readme_loop.md Iteration semantics). Parts 1+4 retired per the D2 ruling. Done.

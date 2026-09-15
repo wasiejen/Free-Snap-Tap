@@ -9,6 +9,13 @@ them.
 - Launch the planner (`planner_Q4_120K`) via the Task tool.
 - Put the iteration number N (1-based, counts across this looprun) at the TOP of the task
   message. (When in doubt start with 1)
+- **Counter mismatch (loop-signals Part 2, approved 2026-09-15):** before launching,
+  compare your N with the last `planner-N` in the current `loop_log.md`; if yours
+  is smaller, KEEP THE BIGGER — never clobber `plan<N>_*` files; log it as a
+  `--INFO--` line.
+- **`--request:` lines (loop-signals Part 2):** a `--request:` line in YOUR launch
+  message addresses the planner; a `--request:` line in the planner's closing
+  message addresses you — relay it verbatim, no interpretation.
 - The task body is the planner-launch text below. Append any maintainer messages /
   `ask_maintainer` answers VERBATIM after the closing quote — never interpret or paraphrase.
 - The autonomous BEHAVIOR (resume-from-NAP, inbox scan, archive copies, closing summary) is
@@ -86,6 +93,12 @@ planners and their error text, retried launches, loop anomalies you observed.
 - On `resume` / a planner return mentioning compaction or compact_memory: resume the SAME
   planner session via task_id and instruct it to follow the post-compaction protocol — read
   `.opencode/agent/prompts/agent_readme_post_compaction.md`.
+- **Self-compaction dump (convention, 2026-09-15):** when a planner's closing message is a
+  Work State dump (Completed / Active / Blocked / Next Move) WITHOUT an `action:` line,
+  that session self-compacted at its L3 stop line — RESUME the SAME session via
+  `task_id` with the post-compaction protocol; do NOT restart. A normal closing always
+  ends with exactly ONE `action:` line (AGENTS.md §Interaction-contract), so the two
+  forms are unambiguous.
 - **Planner context-limit error** (`context_length_exceeded` or similar — the session died
   at the window limit) → COMPACT + RESUME, in order:
   1. Log a `-WARNING` via the loop_log tool: content = the failed planner's `session_id`

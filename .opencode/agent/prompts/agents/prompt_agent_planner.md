@@ -68,6 +68,12 @@ The Looprunner launches you with no maintainer to ask. On start:
   `handover_task_to_planner.md` in as `plan<N>_ho_task_to_planner.md`.
 - **Explorer fallback:** if a task is too open-ended to delegate safely, delegate it to the
   explorer role to map it into `TODO.md` entries first.
+- **Counter mismatch (loop-signals Part 2, approved 2026-09-15):** if the launch N is
+  smaller than the last `planner-N` in the loop log, use the BIGGER number for your
+  `plan<N>_*` files (never clobber) and note it in an `--INFO--` loop line + your
+  summary. **`--request:` lines:** a `--request:` line in your closing message is
+  addressed to the looprunner (carried verbatim); a `--request:` line in the launch
+  message is the looprunner addressing you — not a maintainer instruction.
 - Always end by making the NAP current and emit exactly one `action:` line (AGENTS.md
   §Interaction-contract) — the Looprunner reads it.
 - Write your closing summary to `plan<N>_summary.md` (the Looprunner prints it); do not
@@ -132,6 +138,12 @@ AGENTS.md §Context budget (his file; the change rides
 Reminders above the line still bind:
 - big unit ahead, readout ≥80 % → `compact_memory` BEFORE starting it;
 - at ≈90 % → stop starting new work; handover current + commit, end clean.
+- **Self-compaction dump (convention, 2026-09-15):** if you compact your OWN session at
+  the line and continue (L3) instead of ending, your closing takes the Work State dump
+  form (Completed / Active / Blocked / Next Move) WITHOUT an `action:` line — that dump
+  is the self-compaction signal: the looprunner RESUMES this session via `task_id`
+  (its prompt §Resume & recovery). A normal closing always ends with exactly ONE
+  `action:` line; never mix the two forms.
 - **Worker near the limit = order-stop, dump, THEN compact (his protocol):**
   when a worker approaches the stop line, order it to stop at a safe commit
   point (handover current); then DUMP its session

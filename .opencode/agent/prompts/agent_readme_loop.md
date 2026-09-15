@@ -7,6 +7,14 @@ not here.
 ## Iteration semantics
 - N is 1-based and counts across the whole looprun (it does not reset per
   planner session); it is given at the top of the launch message.
+- **Counter mismatch (loop-signals Part 2, approved 2026-09-15):** if the launch
+  N is smaller than the last `planner-N` in the loop log, use the BIGGER
+  number for the `plan<N>_*` files — never clobber existing ones; the planner
+  notes it in an `--INFO--` loop line and in its summary.
+- **`--request:` lines (loop-signals Part 2):** a `--request:` line in the
+  planner's closing message is addressed to the looprunner; a `--request:`
+  line in the launch message is the looprunner addressing the planner — both
+  carried verbatim, no interpretation.
 
 ## Action line
 - The vocabulary (`restart` / `resume` / `ask_maintainer` / `stop`) lives in

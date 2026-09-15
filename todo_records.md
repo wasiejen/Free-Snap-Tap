@@ -5,7 +5,7 @@ One-line records; resolution lives in the file / git log. Moved out of `TODO.md`
 from the live file).
 
 **Numbering rule:** every ID used here is RESERVED and never reused — new entries in
-`TODO.md` continue from the last used ID (currently #51, next = #52).
+`TODO.md` continue from the last used ID (currently #56, next = #57).
 
 ## 2. Fix the 6 ruff `F` findings — CLOSED (worker, `cdbbdcd`, 2026-09-10) — all six F sites removed (incl. the cascaded dead `cube_distance`); ruff F 6→0; pytest 434→434, 13 warnings same profile.
 ## 5. Lint baseline 6 → 8 at `ca61a26` — CLOSED (`0025a57`, 2026-09-08) — the three unused `SimpleNamespace` imports removed — the 6-finding baseline restored (later → 0 via #2).
@@ -874,3 +874,4 @@ canonical, tree clean) → closed; the split build launched per the committed sp
   `proposals/2026-09-13_compact_memory-findings.md` (AWAITING APPROVAL;
   item 1: lower the self-compact trigger + server keep support as the
   durable fix; item 2: `time_compacting` semantics ruling).
+## 11. General contradiction prevention disabled (XXX 241016-1101) — CLOSED (maintainer ruling D1-A, 2026-09-15) — kept OFF as an intentional decision; decision comment below the untouched pin; pinning tests unchanged.

@@ -47,3 +47,6 @@ obvious. Suggested wording (one short section):
 Paste both (Item 1 first — the prompts already override AGENTS.md's stop line
 until it lands; Item 2 codifies what the prompts already do). Then the
 prompts' "overrides AGENTS.md" notes can be retired in a later cleanup.
+
+
+Maintainer ruling (2026-09-15, D4): approved — the paste is his action on his AGENTS.md; this file moves to approved/ as the text of record until the paste lands, then to implemented/.

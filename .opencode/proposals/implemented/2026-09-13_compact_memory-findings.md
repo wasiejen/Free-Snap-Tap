@@ -68,3 +68,6 @@ and one semantic question:
   durable evidence; the flag is NOT required.
 - Nothing left to approve — his one-move closure (implemented/ or rejected/)
   per his #0 backlog-reduction.
+
+
+Maintainer ruling (2026-09-15, in 2026-09-15_backlog-decisions.md, D3): "move to implemented" — Item 1 superseded by the 2026-09-15 protocol; Item 2 closed per the recommendation (the compaction PART in the DB + the COMPACT line in temp/ctx.log are the durable acceptance criterion; the flag is NOT required).

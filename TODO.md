@@ -7,9 +7,7 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 
 ## Maintainer calls (open, in order)
 
-1. **#11 contradiction prevention** — held on the maintainer's LIVE test (ruling bundled
-   in `proposals/2026-09-15_backlog-decisions.md`, Decision 1): the `XXX 241016-1101`
-   pin at `fst_keyboard.py` ≈821 is his find-marker — do not touch → #11.
+1. (none open as of 2026-09-15 — the #11 call was resolved by his ruling D1-A in the consolidated decision file)
 2. Resolved calls (records): v1.3 log-growth confirmation → #17 CLOSED (one-shot read
    executed); v2.5 nudge target scope ruling → #33 (per-session read); Deferred FST
    behavior batch → all 5 Recs approved + LANDED on `fst_work` (unit A `4b93d37` +
@@ -34,18 +32,7 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 ## 6. (closed 2026-09-12 by maintainer ruling — KEEP, full text in todo_records.md) — `fst_keyboard.py` 302-303 (mixed-Key rebind conversion) RULING-KEEP ("keep this until I can test a bit more"): the `###XXX 241022-1341` block stays and is DO-NOT-TOUCH; the triage class correction stays maintainer-side per #4.
 
 
-## 11. General contradiction prevention disabled (`XXX 241016-1101`, `fst_keyboard.py` ≈821) — HOLDING (2026-09-08)
-
-`###XXX 241016-1101 general contradiction prevention disabled to test` — the ≈821-840
-contradiction block of `_win32_event_filter` no longer suppresses (`to_be_suppressed` is
-not set), and the Phase-5 tests (`tests/test_filter_simulated.py`) now pin that
-non-suppression. Clarify + document as final decision: if it stays off, reword the
-XXX/"to test" comment so it reads as an intentional decision; if it was meant to be
-reenabled, that is the call.
-
-- **Status:** HOLDING — the maintainer's LIVE test decides (DECISION); the
-  `XXX 241016-1101` pin at ≈821 is HIS find-marker — do not remove or reword it on his
-  behalf. Content verbatim from the 2026-09-08 record.
+## 11. (closed 2026-09-15, see todo_records.md) — General contradiction prevention — maintainer ruling D1-A (2026-09-15_backlog-decisions.md): kept OFF as an intentional decision (no re-enable); decision comment added below the untouched XXX 241016-1101 pin in fst_keyboard.py; the pinning tests stay the semantic pin.
 
 ## 48. (closed 2026-09-11, first commit after `00bc24f`, see todo_records.md) — Packed-word equality checks in the mouse filter: X-button mouseData + LLKHF flags (2026-09-10, #42 report-back)
 

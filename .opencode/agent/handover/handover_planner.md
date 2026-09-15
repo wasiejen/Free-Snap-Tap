@@ -97,3 +97,28 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - DELEGATED: fst-rebind-repeat (approved proposal) to worker_Q4_120K on branch fst_work — spec = handover_task.md (verified facts: marker regions 631/699/703/761-776; units A 4b93d37 + B 2891dab are ancestors of fst_work HEAD 6cbe4a8; baseline measured by worker at checkout). Loop folder copy: plan2_ho_task.md.
 - Knowledge: dense-date-string entry added to knowledge_context.md (3 ENOENT/oldString incidents this session).
 - OPEN: worker verification + gates on fst_work; on green: #0 line -> _past_priorities.md with reply; plan2_summary.md; DONE line; action line.
+- POST-COMPACTION (resumed via task_id after my L3 self-compaction — the looprunner
+  recognized the Work State dump closing as the self-compaction signal):
+- Maintainer INSTRUCTION codified: the self-compaction dump convention (Work State dump
+  WITHOUT an action: line = self-compaction -> looprunner RESUMEs via task_id, not
+  restart) added to BOTH prompts (planner L3 section + looprunner Resume & recovery).
+- HIS RULINGS (appended to the consolidated decision file): D1 A (keep the contradiction
+  block OFF as a documented decision) / D2: 1 drop, 2 approved / D3: move findings to
+  implemented / D4 approved. ALL HANDLED:
+  * D1-A: decision comment below the untouched XXX 241016-1101 pin in fst_keyboard.py
+    (opencode_test); #11 closed (todo_records.md); contradiction-block file -> implemented/.
+  * D2: loop-signals Parts 1+4 RETIRED; Part 2 LANDED in all three prompt files
+    (counter mismatch: keep the bigger N, never clobber plan<N>_*; --request: lines
+    planner <-> looprunner) -> implemented/.
+  * D3: compact_memory-findings -> implemented/ (per the recommendation: DB part +
+    COMPACT line = acceptance criterion; the flag not required).
+  * D4: agents-knowledge-stopline -> approved/ (his AGENTS.md paste pending; the file
+    is the text of record).
+  * consolidated decision file itself -> implemented/ (all handled).
+- Proposals backlog after the pass: approved/ = fst-rebind-repeat (delegated) +
+  agents-knowledge-stopline (his paste); root = clean (README only).
+- Disclosure: `git add -A` at the plan2 bookkeeping commit (1cf55f6) also staged his
+  live `maintainer/my_todos.md` (unstaged in between, re-staged by the second add).
+- NEXT: launch worker_Q4_120K per the committed spec (handover_task.md, copy
+  plan2_ho_task.md) on fst_work; verify; then #0 -> _past_priorities.md with reply;
+  plan2_summary.md; DONE line; action line.

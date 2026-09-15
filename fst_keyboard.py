@@ -820,6 +820,10 @@ class FST_Keyboard():
                                 break
 
             ###XXX 241016-1101 general contradiction prevention disabled to test
+            # 2026-09-15 maintainer ruling (D1-A, proposals/2026-09-15_backlog-decisions.md):
+            # kept OFF as an intentional decision (no re-enable); the pin above is retained
+            # as his find-marker and stays untouched; tests/test_filter_simulated.py pins
+            # the non-suppression.
             # # intercept simulated releases of keys that are still pressed
             if not key_is_in_tap_groups and not is_keydown:
                 if CONSTANTS.DEBUG2:
