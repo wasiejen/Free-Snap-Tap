@@ -252,6 +252,28 @@ All those IDs stay reserved — see the numbering rule in the header.
   `.opencode/tools/{block_transfer,loop_log}.ts` (read-only reference).
 - **Status:** OPEN — delegate-able (worker task, medium).
 
+## 63. (open, 2026-09-15, worker-5 finding, planner plan5) — compact_memory smoke: 4 failures at HEAD (dump-hook sandbox gap)
+
+- **Problem / evidence:** `node .opencode/plugin/tests/compact_memory.smoke.mjs`
+  → 4 failures that EXIST at clean HEAD (proven by the worker via `git stash`
+  before his commit `28783a7`). Suspect cause: the pre-compaction dump hook
+  (TODO #55 build, `4512fe6`) writes dump files, and the smoke sandbox /
+  mocks do not account for that path (or vice versa). NOTE: the smoke tests
+  are NOT in the standard gate (pytest + ruff + probe) — this is why the
+  failures went undetected through plan4.
+- **Desired outcome:** the 4 smoke failures fixed (either the hook respects
+  the smoke sandbox, or the smoke fixtures/mocks are updated for the hook);
+  `node .opencode/plugin/tests/compact_memory.smoke.mjs` green.
+- **Acceptance criteria:** all plugin smoke tests green (`node
+  .opencode/plugin/tests/<name>.smoke.mjs` for each); standard gates
+  unchanged (probe 106/106, pytest 459+1w, ruff F=0).
+- **Suggested scope:** `.opencode/plugin/compact_memory.ts` (the dump-hook
+  call site), `.opencode/plugin/tests/compact_memory.smoke.mjs`,
+  `.opencode/agent/scripts/db/dump_session.cjs` (read-only reference).
+- **Status:** OPEN — delegate-able (worker task, small-medium). DECISION
+  NEEDED (optional): should the smoke suite join the standard gate in
+  repo_commands.md? (relates to #58's gate-definition entry.)
+
 ## 62. (open, 2026-09-15, maintainer info.md, planner plan5) — compaction-clarity + 90/95 rules in BOTH role prompts
 
 - **Problem / evidence:** agents keep running PAST 95 % (worker-4 AND
