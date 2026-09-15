@@ -466,3 +466,21 @@
   open work); then delegate the approved builds. Next autonomous launch
   handles the loop-folder rollover per §Loop folder if it is iteration 1.
   Standing: `opencode.jsonc` uncommitted by design; baselines as carried.
+
+## 2026-09-15 (direct, ses_f5d75a58 — closing detail for the compressed NAP section)
+- Part-2 NAP cleanup verified details: text worker ses_f5d60b90 (planner_Q4_120K,
+  pipeline-only spec e8200da); 7 sections appended to pointer files; NAP 68 lines;
+  worker's 3 judgment calls accepted (dc3f137 hash for the 09-10 chat segment;
+  legacy dates via git; `6c2151` confirmed NOT a git prefix — presumed original
+  typo, kept verbatim).
+- Maintainer triage commits: 60d61b8/ac020fb/ef044e9/a58d375/merge 23eb24c
+  (loop folders -> archive/loop, priority.md restructured `# 3 1..3 3` + `# 4..# 10`,
+  6 inbox items mapped, marker rulings).
+- Dense-content answer (1) PIPELINE-ONLY rule worked 7/7 + machine counts + anchors
+  over absolute lines + emit dense list at most once; (2) compacted sections:
+  pointers over inline detail, verify via script. -> knowledge_context.md (new) +
+  knowledge_tools.md (gauge lag).
+- # 3 2: worker ses_f5d03802 (worker_Q4_120K) — dump_session.cjs (readOnly, FULL
+  mode + --all corpus) + 137-session backfill; verified count 137==137, gates green.
+- Queued at close (his order): # 3 3 distillation (gemma4) -> # 4-# 7 prompt/knowledge
+  additions -> # 8 block_transfer test -> # 10 script collection.

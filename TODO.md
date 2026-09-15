@@ -227,8 +227,9 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Suggested scope:** `.opencode/plugin/compact_memory.ts` (dump hook before
   summarize); the session-dump script shared with the backfill idea (read-only DB →
   markdown, tool outputs condensed); `.opencode/archive/sessions/`.
-- **Status:** open (DEFERRED — behind the session-dump script; the dump function
-  reuses it). Maintainer: "material for later thought." NOTE 2026-09-15: the
-  session-dump script now exists (`.opencode/agent/scripts/dump_session.cjs`,
-  read-only) and the corpus `.opencode/archive/sessions/` was backfilled (137
-  sessions). Remaining: the `compact_memory` dump HOOK before summarize.
+- **Status:** APPROVED + BUILDABLE (maintainer ruling 2026-09-15, direct session:
+  "todo 55 can be done and will be activated before the next autorun"). The dump
+  HOOK (before summarize) reuses `.opencode/agent/scripts/dump_session.cjs`
+  (read-only, single-session FULL mode); the maintainer activates it (host
+  restart) before the next autorun. NOTE 2026-09-15: the corpus
+  `.opencode/archive/sessions/` was backfilled (137 sessions).
