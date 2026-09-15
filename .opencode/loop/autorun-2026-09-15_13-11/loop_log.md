@@ -29,3 +29,4 @@
 2026-09-15_23-53 DONE<--- planner-5 ses_f5978ea6affe6oCCcpZsyN6hEl Qwen3.8-27B-IQ4KT-120K plan5 CLOSED: worker-4 rescue OK (4512fe6) + tails #8/#9 (0761e42) + nudge-clarity DONE+verified (28783a7, v2.8.1 speaking readout); maintainer info.md -> TODO #62; TODO #60/#61/#63 curated; gates re-run green (probe 106/106, pytest 459+1w, ruff F=0)
 2026-09-15_23-54 -RETURN- looprunner ses_f5b507a66ffegia0ZZifYeRD2l Qwen3.8-27B-IQ4KT-120K planner-5 ses_f5978ea6affe6oCCcpZsyN6hEl planner_Q4_120K
 2026-09-15_23-59 -->START planner-6 ses_f58eea7eaffefmb0hOoPK5dUiP Qwen3.8-27B-IQ4KT-120K iteration 6 — priority order: #62 compaction-clarity+90/95 in both role prompts (planner-direct), #63 compact_memory smoke fix (delegate), #60 block_transfer+loop_log probe pins (delegate)
+2026-09-16_00-31 DONE<--- planner-6 ses_f58eea7eaffefmb0hOoPK5dUiP Qwen3.8-27B-IQ4KT-120K 90%/11K
