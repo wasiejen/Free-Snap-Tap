@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #55, new
-entries start at #56 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #56, new
+entries start at #57 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -82,6 +82,29 @@ reenabled, that is the call.
 ## Loop & coordination (open)
 
 ## 53. Agent-feedback protocol: mandatory close-down step + small write-tool (DEFERRED 2026-09-12, maintainer `deferred:do_later` in `inbox_planner/feedback_protol_tool.md`) — the optional `agent_feedback.md` entries get discarded by the early-close-at-stop-line discipline; make it a NON-optional part of the close-down phase (directly before the closing message), full date_time on each entry, and a small tool that writes the entry (no file fiddling / accidental reads). Proposal owed when the deferral lifts.
+
+## 56. (DEFERRED 2026-09-15, maintainer `--defer` in priority.md) — Distillation worker runs over the session dumps (his # 3 3 mandate)
+
+- **Problem / evidence:** the 137-session corpus (`.opencode/archive/sessions/`,
+  backfilled 2026-09-15) is the basis for distilling session history; the
+  maintainer deferred the runs 2026-09-15 ("to much work right now") while
+  focusing on the proposal/inbox backlog (his #0).
+- **Desired outcome (his # 3 3, verbatim gist):** test different distillation
+  workers on session dumps — gemma4 workers (`worker_gemma_Q4_128K` /
+  `agent_gemma_Q4_128K`, much faster, parallelizable) with a WIDE range of
+  scanning perspectives, compared against qwen runs (4x slower); roles/
+  skillsets to keep track of them; document what is found; also usable to
+  recover the last messages of a failed worker.
+- **Acceptance criteria:** when the deferral lifts — ≥2 perspectives run on
+  the same dump with ≥1 gemma and ≥1 qwen model; a written comparison (what
+  each model found, quality, cost); findings worth keeping in the knowledge
+  base; the skillset/roles documented for reuse.
+- **Suggested scope:** `skill_session_scan.md` (ALREADY BUILT, plan1 —
+  perspectives P1 FRICTION / P2 DECISIONS / P3 KNOWLEDGE + output format);
+  `.opencode/archive/sessions/` (read-only dumps); the `worker_gemma_Q4_128K`
+  + `worker_Q4_120K` roster; a comparison notes file in the loop folder.
+- **Status:** DEFERRED — picked up only when the maintainer lifts the
+  `--defer` marker in `priority.md` (# 3 3) or re-prioritizes it.
 
 ## 39. (closed 2026-09-10, see todo_records.md) — Looprunner prompt v2 proposal — applied + smoke test clean (2026-09-10)
 

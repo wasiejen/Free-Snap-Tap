@@ -3,6 +3,7 @@
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 ## Compressed archive (one line each — details in git log + TODO/records)
+- 2026-09-15 looprun 1, iteration 1 (ses_f5b3bf425ffesUdbQYxpvk0Z4t) — maintainer priority batch: stop/compaction protocol (90 % gauge stop line + dump-before-compact) codified in both prompts; marker grep command + context-discipline + marker rulings in prompts; knowledge_inbox + session_scan skill built; proposal backlog pass (subagent-overflow → implemented/, findings → root revised, smoke-harness → implemented/); 4 inbox items triaged → done/; TODO #56 (deferred distillation); script-collection spec WRITTEN + ready to launch — details: loop folder plan1_summary.md + git b3435d9
 - 2026-09-15 direct session (ses_f5d75a58fffeDLp7CGLqqZP8EQ) — Part-2 NAP cleanup COMPLETE + verified (`b36d4c7`); `# 3 2` dump script + 137-session corpus backfill delegated + verified (`ab1451d`, `e877364`); dense-content question answered (knowledge entries); his re-prioritization triaged (`60d61b8`..merge `23eb24c`) — details: .opencode/archive/loop/nap_direct.md + git 1d98075
 - 2026-09-15 direct session (ses_f5df3e30cffeCpv0iy41ybL6iA) — bash switch verified; compact_memory re-verified (Gemma now default compaction model); NAP-size discussion: memory folder + consolidation + session-dump designed, Part-2 cleanup APPROVED (backup condition) and delegated — details: .opencode/archive/loop/nap_direct.md + git b4a6b93
 - 2026-09-14 direct session (ses_f5f0689d9ffe0G0Uhvz0AIr5Vh) — cross-session compaction round 2: WORKS — his explicit-pair fix supersedes round 1; `cross_session_compaction_summary.md` handled → done/ — details: .opencode/archive/loop/nap_direct.md + git 22268de
@@ -56,6 +57,11 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - Context wall (his protocol 2026-09-15): the real wall sits ≈ **90% gauge reading**
   (a session hit the actual limit at a ~90-96% readout); the gauge lags ~2 tool
   calls (his # 9 — plan with ~5k margin against the injected `ctx:` line).
+- **Stop line (his ruling 2026-09-15, priority.md top): ≈90 % gauge** (= 95 %
+  true wall) — codified in both role prompts; worker protocol = order-stop →
+  pre-compaction dump (`dump_session.cjs`) → cross `compact_memory` → `task_id`
+  resume. AGENTS.md (his file) still says 85 % — the change rides
+  `proposals/2026-09-15_agents-knowledge-stopline.md` until he pastes it.
 - NAP session section: write + COMMIT it BEFORE the stop line (incident
   2026-09-15: session lost at the limit mid-edit, the next planner had no
   orientation). Full pre-cleanup NAP backup: `archive/nap_backup_2026-09-15_pre-cleanup.md`.
