@@ -232,8 +232,10 @@ All those IDs stay reserved — see the numbering rule in the header.
   scripts README); the corpus refreshable via one documented command
   (`node .opencode/agent/scripts/db/dump_session.cjs --all --slim`).
 - **Suggested scope:** the decision record; `.opencode/archive/sessions/`.
-- **Status:** OPEN — cadence is the maintainer/planner call; the refresh
-  command itself is ready (tested).
+- **Status:** CLOSED (planner call, plan6 2026-09-16) — cadence recorded in
+  the NAP Standing: refresh BEFORE the #56 distillation runs start + after
+  heavy loopruns; command `node .opencode/agent/scripts/db/dump_session.cjs
+  --all --slim`.
 
 ## 60. (open, 2026-09-15, planner plan5) — `block_transfer` + `loop_log` lack probe pinning
 
@@ -274,37 +276,19 @@ All those IDs stay reserved — see the numbering rule in the header.
   NEEDED (optional): should the smoke suite join the standard gate in
   repo_commands.md? (relates to #58's gate-definition entry.)
 
-## 62. (open, 2026-09-15, maintainer info.md, planner plan5) — compaction-clarity + 90/95 rules in BOTH role prompts
+## 62. (closed 2026-09-16, planner plan6) — LANDED (planner-direct): all three lines present in BOTH role prompts — (1) compaction is NOT a restart (recent messages INTACT, summary auto-created, re-read only the named head files), (2) above 90 % → EMERGENCY handover + commit + self-compact IF budget available, (3) above 95 % → commit + self-compact, DO NOT DELIBERATE while budget remains (`keepMessages` keeps the last N messages INTACT) — in `prompt_agent_planner.md` §Context-budget trigger and `prompt_agent_task.md` §Context-budget trigger + §compact_memory. Adjacent stale-ref fixes rode the same commit: stopline proposal name → `2026-09-15_agents-knowledge-stopline.md`, `dump_session.cjs` path → `scripts/db/`.
 
-- **Problem / evidence:** agents keep running PAST 95 % (worker-4 AND
-  worker-5 both died at the limit mid-task this looprun); root misconception:
-  compaction ≈ complete restart. Maintainer info.md (2026-09-15): "they will
-  not stop despite knowing they are over 95%".
-- **Desired outcome:** both role prompts
-  (`.opencode/agent/prompts/agents/prompt_agent_{planner,task}.md`) carry:
-  (1) compaction is NOT a restart — it reduces OLD history; recent messages
-  stay INTACT, a summary is auto-created; only the dropped head files need
-  re-reading (post-compaction protocol already names them);
-  (2) above 90 % → emergency handover + commit + self-compact IF budget is
-  available;
-  (3) above 95 % → commit current status + self-compact, DO NOT DELIBERATE
-  while budget remains (`keepMessages` keeps the last N messages intact).
-- **Acceptance criteria:** all three lines present in both prompts; probe
-  gates unchanged; committed.
-- **Suggested scope:** the two role prompt files (planner-direct; workers
-  are edit-denied there).
-- **Status:** OPEN — planner-direct (prompt text work). NOTE: the numwords /
-  `<ninetyfour>` placeholder convention (info.md tail) is a RELATED but
-  separate idea — direct session (`dense_numbers.md` --wip), NOT part of
-  this entry.
+## 61. (closed 2026-09-15, planner plan5; title reworded plan6) — probe baseline corrected: post-S14 baseline is one-zero-six, not the plan3/plan4-era nine-four
 
-## 61. (closed 2026-09-15, planner plan5) — probe baseline corrected: 94/94, not 94/94
-
-The probe's SELF-COUNTED baseline was 94/94 (ninetyfour — machine-verified
-plan5: the old probe executed 94 checks); the header ANNOTATION ("94/94",
-per-section list sum) was stale by the 5 hygiene checks (40–43/45/64) — the
-plan3/plan4 "94/94" baseline line took the stale annotation. After S14
-(plan4 build `4512fe6`) the self-counted baseline is 106/106 (hundred six).
-The annotation drift fix rides the plan5 speaking-readout spec (same probe
-file). NUMWORDS NOTE: the 94↔94 numeral pair is a dense-string trap —
-write these as words in prose.
+The plan3/plan4 NAP baseline line said ninetyfour — the plan3-era probe,
+whose header annotation and per-section list sum AGREED at ninetyfour
+(machine-verified plan6 at `a15828c`). After S14 (plan4 build `4512fe6`,
+checks 101-107) the self-counted baseline is one-zero-six
+(one-zero-six/one-zero-six); annotation and self-count agree at HEAD
+(machine-verified plan6; plan5 gate one-zero-six PASS). The original
+"annotation stale by 5 hygiene checks (40–43/45/64)" narrative is NOT
+corroborated by the commits — the annotation was self-consistent at every
+commit checked (`a15828c`/`4512fe6`/`4340043`/HEAD); superseded, original
+text recoverable in git (`0761e42`/`4b4153f`). NUMWORDS NOTE retained:
+dense X/X numeral pairs are a transcription trap — write them as words in
+prose.

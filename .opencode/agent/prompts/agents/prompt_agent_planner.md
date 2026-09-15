@@ -149,13 +149,27 @@ planning. Plan against a defined goal, not a list of chores.
 **Stop line: gauge readout ≈90 %** (his "95 % true wall" with the gauge's
 lagging value included) — this OVERRIDES the 85 % / REM ≤15 k line in
 AGENTS.md §Context budget (his file; the change rides
-`proposals/2026-09-15_stop-compaction-protocol.md` until he lands it).
+`proposals/2026-09-15_agents-knowledge-stopline.md` until he lands it).
 Reminders above the line still bind:
+- **Compaction is NOT a restart (clarity, 2026-09-15):** it reduces OLD
+  history only — the recent messages stay INTACT and a summary of the
+  dropped head is auto-created; on resume you re-read only the head files
+  the post-compaction protocol names. Never treat a compaction as a lost
+  session and never re-plan from scratch.
 - **Gauge-lag rule (maintainer #9, 2026-09-14):** the readout lags the TRUE
   context by ≈2 tool calls (~5k) — plan with margin; treat a displayed readout
   as optimistic (the truth can already be higher).
 - big unit ahead, readout ≥80 % → `compact_memory` BEFORE starting it;
-- at ≈90 % → stop starting new work; handover current + commit, end clean.
+- above 90 % → EMERGENCY handover: stop starting new work, bring the NAP
+  current + COMMIT, then self-compact IF the session budget is available
+  (DUMP your own session first — `dump_session.cjs` — if the pre-compaction
+  hook is not live yet; Work State dump form below — the looprunner RESUMES
+  the session; compaction ENABLES further work, it does not end it); if the
+  tool refuses (budget exhausted) → end clean per the stop line;
+- above 95 % → commit the current status + self-compact, and DO NOT
+  DELIBERATE while budget remains — `keepMessages` keeps the last N messages
+  INTACT, so the recent work survives; deliberation burns the budget that
+  funds the compaction.
 - **Self-compaction dump (convention, 2026-09-15):** if you compact your OWN session at
   the line and continue (L3) instead of ending, your closing takes the Work State dump
   form (Completed / Active / Blocked / Next Move) WITHOUT an `action:` line — that dump
@@ -164,9 +178,10 @@ Reminders above the line still bind:
   `action:` line; never mix the two forms.
 - **Worker near the limit = order-stop, dump, THEN compact (his protocol):**
   when a worker approaches the stop line, order it to stop at a safe commit
-  point (handover current); then DUMP its session
-  (`node .opencode/agent/scripts/dump_session.cjs <sid>`, full mode) BEFORE
-  the compaction destroys the fine-grained content; then CROSS
+  point (handover current); then DUMP its session BEFORE the compaction
+  destroys the fine-grained content
+  (`node .opencode/agent/scripts/db/dump_session.cjs <sid>`, full mode);
+  then CROSS
   `compact_memory` (fire-and-forget) and resume via `task_id` with the
   post-compaction protocol. Dump-before-compact keeps the corpus complete —
   the no-overwrite dump naming lands with the #55 build.

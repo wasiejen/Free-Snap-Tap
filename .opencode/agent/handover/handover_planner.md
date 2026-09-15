@@ -3,6 +3,7 @@
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 ## Compressed archive (one line each — details in git log + TODO/records)
+- 2026-09-15 looprun 2, iteration 5 (ses_f5978ea6affe6oCCcpZsyN6hEl, planner-5) — plan5: worker-4 RESCUE succeeded (dump hook `4512fe6`); worker-5 speaking-readout build `28783a7` verified by the planner (probe 106/106, gates green); #8 custom-tools repo part + #9 gauge-lag one-liners; maintainer stop-line semantics + info.md rulings recorded; baseline corrected + TODO #60-62 filed — details: loop folder plan5_summary.md + git 84421c8
 - 2026-09-15 looprun 2, iteration 4 (ses_f59d27449ffeEFeV4vaQ6NlqTs, planner-4) — plan4: dump-hook spec LANDED (`2f4a5c4`); worker-4 ran to `context_length_exceeded` mid-build (no COMPACT line, no budget entry); cross-compact (Gemma) dispatched + stop-line handover; inbox triage (`compact_memory.md` --comment ruling recorded → done/; `dense_numbers.md` --wip left) — details: loop folder plan4_summary.md + git 810a558/e537e4b
 - 2026-09-15 looprun 2, iteration 3 (ses_f5a01..., planner-3) — plan3: maintainer context-limit failure-message info codified (planner+looprunner prompts + knowledge); script collection LANDED + verified (worker 2933dd0..d352e4a; gates 459+1w / F=0 / 99/99); corpus refreshed to 147 sessions; helper-script prompt pointers + "Branch truth" bullet; loop re-aligned to opencode_test (fst_work2 stays the parked rebuild branch); TODO #57-59 curated — details: loop folder plan3_summary.md + git a15828c
 - 2026-09-15 looprun 2, iteration 2 (ses_f5b1f19..., planner-2) — plan2: maintainer #0 backlog reduction — 6 proposals closed with verdicts, consolidated decision file (his rulings D1-D4 all handled), fst-rebind-repeat spec delegated then PARKED for his direct session (spec preserved at loop folder plan2_ho_task.md; tap-group ruling absorbed), worker-kill incident interpretation corrected (context overflows, not provider unload) — details: loop folder plan2_summary.md + git f09ff56/5bdce2a
@@ -52,48 +53,45 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - 2026-09-09 session 2 (legacy, no-ses) — looprunner-prompt optimization proposal (consolidated verdicts; adopted closing action protocol `action: restart/ask_maintainer/stop`) — details: git ff86d9b
 - 2026-09-08 session 1 (legacy, no-ses) — agents_repo roster synced to live opencode.jsonc; #38 explorer smoke test (PASSED w/ fabricated-gauge caveat); #37 gauge build LANDED (backend chain node:sqlite → bun:sqlite → spawn sqlite3.exe) — details: git 2a4996c
 
-## plan5 (iteration 5, ses_f5978ea6affe6oCCcpZsyN6hEl, planner Q4-120K)
-- worker-4 RESCUED + verified: COMPACT line confirmed (Gemma, session→45 %);
-  task_id resume w/ post-compaction protocol SUCCEEDED — dump hook landed
-  `4512fe6`; I re-ran the gates: probe 106/106 PASS, pytest 459+1w, ruff F=0,
-  diff scope clean (maintainer live files untouched); handover loop-copied
-  (`plan5_ho_task_to_planner.md`).
-- Tails LANDED (planner-direct, `0761e42`): #8 usage guide = new repo part
-  `repo_custom_tools.md` (block_transfer/ctx_gauge/loop_log/compact_memory) +
-  index lines (repo_overview + both role prompts); #9 gauge-lag one-liner in
-  planner + worker prompts.
-- NUDGE-CLARITY (speaking minimal readout) **DONE + VERIFIED**: worker-5
-  `ses_f594ba57effeJP9cGt9BI15iDt` died at 95 %/6K (2nd limit death);
-  rescued via cross-compact (Gemma COMPACT line 23:18) + task_id resume with
-  the 90/95 protocol in the launch msg — SUCCEEDED. Build `28783a7`
-  (ctx_watchdog.ts v2.8.1 speaking readout + probe re-pins). I re-ran the
-  gates myself: probe 106/106 PASS, pytest 459+1w, ruff F=0, `grep "%/"`
-  clean, annotation machine-summed from the file = 106. Documented
-  deviation CORRECT: annotation term is `hygiene=6` (the spec's `5` was my
-  miscount). NEW FINDING curated → TODO #63: compact_memory smoke has 4
-  failures at HEAD (dump-hook sandbox gap; smokes are NOT in the standard
-  gate — that is why it went undetected).
-- MAINTAINER handled (`--maintainer` msg + `info.md` + ideas.md
-  clarifications; his files committed by HIM as `4340043`): stop-line
-  semantics = no NEW work past the line BEFORE compaction was controllably
-  available — compaction ENABLES further work; info.md items SCHEDULED →
-  TODO #62 (compaction-is-not-a-restart + 90/95 rules in BOTH role prompts,
-  planner-direct); numwords/`<ninetyfour>` idea = direct session
-  (`dense_numbers.md` --wip, LEFT UNTOUCHED); experimental 145K ceiling
-  (opencode NOT restarted — settings still 120K) under observation;
-  his `--comment` "was the cross compaction deliberate?" (ideas.md) =
-  ANSWERED in the summary: YES, deliberate worker-4 rescue, not a
-  self-compact; markers left in his file for his cleanup.
-- Baseline CORRECTION (machine-verified): the probe SELF-COUNT baseline was
-  **94/94 (ninetyfour)** — the header ANNOTATION ("94/94", per-section list)
-  was stale by 5 hygiene checks (40–43/45/64); that stale annotation seeded
-  the plan3/plan4 "94/94" baseline line. The 94↔94 pair is a dense-numeral
-  trap (I garbled it myself this session — numwords in prose, per his
-  info.md). TODO #61 record + the annotation fix ride the nudge task
-  (TODO #60 = the block_transfer/loop_log probe-pin gap).
+
+## plan6 (iteration 6, ses_f58eea7eaffefmb0hOoPK5dUiP, planner Q4-120K)
+- #62 LANDED (planner-direct): compaction-clarity + 90/95 rules in BOTH role
+  prompts — planner §Context-budget trigger: NOT-a-restart bullet + above-90
+  EMERGENCY handover (NAP current + commit + self-compact IF budget, dump
+  first if the hook is not live) + above-95 commit-and-DO-NOT-DELIBERATE;
+  task §Context-budget trigger rewritten the same way + §compact_memory
+  NOT-a-restart bullet. Grep-verified: 3 lines × 2 prompts. Adjacent stale-ref
+  fixes in the same commit: stopline proposal name →
+  `2026-09-15_agents-knowledge-stopline.md`; `dump_session.cjs` path →
+  `scripts/db/`.
+- Curation: #62 + #59 CLOSED (#59 cadence → Standing); #61 reworded —
+  machine verification REFUTED the "annotation stale by 5 hygiene checks"
+  narrative (annotation self-consistent at a15828c/4512fe6/4340043/HEAD;
+  endpoints ninetyfour → one-zero-six); original text recoverable in git
+  (0761e42/4b4153f). Flagged for his direct session (does not block).
+- NEXT (priority order): #63 compact_memory smoke fix (delegate,
+  small-medium; NOTE the smokes are NOT in the standard gate — run them
+  explicitly), then #60 block_transfer+loop_log probe pins (delegate,
+  medium; probe total grows, header annotation updated). Spec first per
+  `agent_readme_task_spec.md`; workers are edit-denied on prompts.
+- MAINTAINER-OVERRIDE NOTE: ask_maintainer does NOT pause the loop (his
+  ruling) — open questions are recorded here, never issued as ask actions.
+- ANSWERED (priority.md --comment, pre/post-compaction dumps): the #55 hook
+  already handles it WITHOUT overwriting — separate folder
+  `.opencode/archive/sessions/compaction_dumps/`, no-overwrite naming
+  `<sid>_c<count>.md` (count = the tracked per-session compaction budget);
+  dump fires BEFORE the summarize dispatch; a dump failure never blocks the
+  compaction. Hook live-acceptance still PENDING (no `compaction_dumps/`
+  exists yet at plan6 — the host may not have reloaded the tool).
 
 ## Standing
-- Baselines (measured 2026-09-15, plan5): probe **106/106** (hundred six, SELF-COUNTED — the header per-section annotation is stale by 5 hygiene checks; the fix rides the nudge task; see TODO #61 for the old ninetyfour/ninetyfour pair); pytest **459 passed + 1 warning (the known #10 coroutine warning)**; ruff **F=0**.
+- Baselines (measured 2026-09-15, plan5): probe **106/106** (one-zero-six —
+  self-count AND header annotation agree at HEAD, machine-verified plan6;
+  the plan3-era baseline was ninetyfour — TODO #61); pytest **459 passed +
+  1 warning (the known #10 coroutine warning)**; ruff **F=0**.
+- Corpus refresh cadence (planner call, plan6 — TODO #59 CLOSED): refresh
+  BEFORE the #56 distillation runs + after heavy loopruns —
+  `node .opencode/agent/scripts/db/dump_session.cjs --all --slim`.
 - Per-session full NAP backup (his ruling 2026-09-15): ONE `cp handover_planner.md
   .opencode/archive/nap_backup_<date>_<ses>.md` at the close commit — a single cp
   (no double write); the emergency-compaction method has to be enough — no further

@@ -69,8 +69,16 @@ instead of arguing from the armchair.
 lagging value included) — overrides the 85 % / REM ≤15 k line in AGENTS.md
 §Context budget (his file; the change rides the proposal carried in the
 planner prompt). With a big unit ahead and the readout ≥80 % →
-`compact_memory` BEFORE starting it; at ≈90 % → stop starting new work:
-commit a handover checkpoint and end clean. The planner may ORDER an early
+`compact_memory` BEFORE starting it; above 90 % → EMERGENCY handover: stop
+starting new work, write + COMMIT the handover checkpoint (marked IN
+PROGRESS), then fire `compact_memory` yourself IF the session budget is
+available (DUMP your session first — `dump_session.cjs` — if the
+pre-compaction hook is not live yet; you resume via the post-compaction
+protocol, §compact_memory below — compaction ENABLES further work, it does
+not end it); if the budget is gone / the tool refuses → end clean. Above
+95 % → commit the current status + fire `compact_memory`, and DO NOT
+DELIBERATE while budget remains — `keepMessages` keeps the last N messages
+INTACT, so the recent work survives. The planner may ORDER an early
 stop before the line so it can DUMP your session (pre-compaction) and then
 cross-compact you — obey that order at the next safe commit point (canonical
 protocol: planner prompt §Context-budget trigger). **Gauge-lag rule (maintainer
@@ -79,6 +87,11 @@ plan with margin; treat a displayed readout as optimistic (the truth can
 already be higher).
 
 ## compact_memory (live on this host)
+- **Compaction is NOT a restart (clarity, 2026-09-15):** it reduces OLD
+  history only — the recent messages stay INTACT and a summary of the
+  dropped head is auto-created; on resume you re-read only the head files
+  the post-compaction protocol names. Never treat a compaction as a lost
+  session.
 - The `compact_memory` tool is registered and ACTIVE. Firing it compacts the
   session and the session ENDS after the compaction — the reload message is
   attached to the compaction summary.
