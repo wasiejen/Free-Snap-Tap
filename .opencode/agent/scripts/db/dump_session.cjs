@@ -19,7 +19,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const DB = process.env.OPENCODE_DB || "C:/Users/Wasiejen/.local/share/opencode/opencode.db";
-const OUT_DIR = path.resolve(__dirname, "..", "..", "archive", "sessions");
+const OUT_DIR = path.resolve(__dirname, "..", "..", "..", "archive", "sessions");
 
 // ---------- tiny helpers ----------
 function usage(code) {
