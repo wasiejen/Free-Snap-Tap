@@ -99,8 +99,10 @@ planners and their error text, retried launches, loop anomalies you observed.
   `task_id` with the post-compaction protocol; do NOT restart. A normal closing always
   ends with exactly ONE `action:` line (AGENTS.md §Interaction-contract), so the two
   forms are unambiguous.
-- **Planner context-limit error** (`context_length_exceeded` or similar — the session died
-  at the window limit) → COMPACT + RESUME, in order:
+- **Planner context-limit error** (`context_length_exceeded`, or the Task tool's
+  `Task cancelled` / `the request exceeds the available context size` — maintainer info
+  2026-09-15: these are context-limit hits in a running session, NOT failed starts — the
+  session died at the window limit) → COMPACT + RESUME, in order:
   1. Log a `-WARNING` via the loop_log tool: content = the failed planner's `session_id`
      + cause.
   2. Get that `session_id`: from the error/return, or the last `-->START planner-N` line of

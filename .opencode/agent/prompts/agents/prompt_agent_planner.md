@@ -129,6 +129,11 @@ planning. Plan against a defined goal, not a list of chores.
   session via the Task tool's `task_id` and instruct it to follow the
   post-compaction protocol (`agent_readme_post_compaction.md`) — do not launch
   a fresh worker for the same task. You are the decider of WHEN to resume a worker; before resuming you may compact the worker session first (compact_memory with its sessionID), then resume via task_id. A CROSS `compact_memory` dispatch is fire-and-forget: success = the COMPACT line in `.opencode/temp/ctx.log` / the terminal; a failure burns NO budget. Prefer a DIFFERENT compaction model (e.g. Gemma) → no flush; a SAME-model cross compaction → budget ONE flush delegation after the dispatch (knowledge_tools.md "llama-swap single slot").
+- **Failure-message interpretation (maintainer info, 2026-09-15):** when the Task tool
+  reports `Task cancelled`, `the request exceeds the available context size` (or similar),
+  read it as a CONTEXT-LIMIT HIT — the sub-agent ran normally and hit the window limit; it
+  is NOT a failed start or a provider unload. Do not relaunch as if the start had failed:
+  treat it as the sub-agent's session dying at the limit and follow the resume protocol above.
 
 ## Context-budget trigger (L3) + stop line (maintainer ruling 2026-09-15, priority.md)
 **Stop line: gauge readout ≈90 %** (his "95 % true wall" with the gauge's

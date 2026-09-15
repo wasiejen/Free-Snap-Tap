@@ -52,4 +52,21 @@ codepoint dump showed the typed name and the real name differed in exactly
 the date digits.
 - **Ref:** plan2 of looprun autorun-2026-09-15_13-11.
 - **Keys:** ENOENT, oldString not found, dated filename, readdir, codepoint,
-retyping, script capture.
+  retyping, script capture.
+
+## Task failure messages: context-limit hits, not failed starts
+- **Do:** when the Task tool reports `Task cancelled`,
+  `the request exceeds the available context size` (or similar), read it as the
+  sub-agent having RUN NORMALLY and hit the context window limit — not as a failed
+  launch / provider unload. Diagnose from the loop log (START without DONE for that
+  role-N) + the session before treating it as a start failure; recover with the
+  compact + `task_id`-resume protocol, never a fresh relaunch of the same task.
+- **Why (evidence):** 2026-09-15 plan2 (ses_f5b1f19): two worker launches reporting
+  `Task cancelled` and `the request exceeds the available context size` were misread
+  as a provider unload / failed starts; the maintainer corrected (direct session +
+  inbox_planner/context_limit.md) that both were normal context overflows in running
+  sessions (worker2 had reached design + drafted pinning tests before the limit).
+- **Ref:** maintainer inbox `context_limit.md` (moved to `done/`, plan3 2026-09-15);
+  plan2 NAP CORRECTION block; loop log autorun-2026-09-15_13-11.
+- **Keys:** Task cancelled, request exceeds the available context size, context
+  limit, failed start, provider unload, misread, resume, task_id.

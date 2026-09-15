@@ -146,3 +146,26 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - NEXT (iteration 3+): the direct session when he engages; meanwhile the loop can take
   the plan1 script-collection spec (maintainer #10, committed, ready) or other clear
   backlog. Provider/model-load health should be a light check before any worker launch.
+
+## 2026-09-15 looprun 2 (autorun-2026-09-15_13-11), iteration 3 (ses_f5a01190cffehd0OO4TDPSrwvy, planner-3) — plan3: script-collection delegation
+- MAINTAINER INFO (inbox_planner/context_limit.md, `--maintainer info:`, top of the
+  ladder): Task-tool failure messages (`Task cancelled` / `the request exceeds the
+  available context size`) = context-limit hit in a RUNNING session, NOT a failed start
+  / provider unload → codified in: planner prompt (new bullet after "Compacted worker"),
+  looprunner prompt §Resume & recovery (extended the "Planner context-limit error" line
+  with the two surface strings), knowledge entry in knowledge_context.md. File moved to
+  `maintainer/done/` content-untouched.
+- DELEGATED: script-collection (maintainer #10, spec written in plan1) to worker_Q4_120K
+  per `handover_task.md` (= `plan3_ho_task.md`; spec unchanged from
+  `plan1_ho_task_scripts.md`). Preconditions re-verified before launch: scripts/ dir
+  (README + dump_session.cjs), both `done/` source files, scratchpad scripts present.
+- NOTE: `handover_task.md` previously held the PARKED fst-rebind-repeat spec — it is
+  preserved at `plan2_ho_task.md` (the starting point for the maintainer's direct
+  session when he engages).
+- Loop-log glitch: my START line landed with session id `unknown` (loop_log tool
+  `session` param omitted) — corrected via an `--INFO--` line; session =
+  ses_f5a01190cffehd0OO4TDPSrwvy.
+- NEXT: worker return → verify (git log + gates), copy the worker summary to
+  `plan3_ho_task_to_planner.md`, add the one-line "look here for helper scripts"
+  pointers to the role prompts (planner-side work per the spec's Notes), TODO curation,
+  plan3_summary.md, DONE line, action line.

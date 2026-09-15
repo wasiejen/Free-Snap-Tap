@@ -5,3 +5,7 @@
 2026-09-15_13-42 -RETURN- looprunner ses_f5b507a66ffegia0ZZifYeRD2l Qwen3.8-27B-IQ4KT-120K planner-1 ses_f5b3bf425ffesUdbQYxpvk0Z4t planner_Q4_120K
 2026-09-15_13-56 -->START planner-2 ses_f5b1f1994ffeh6lLruXAY0bRTW Qwen3.8-27B-IQ4KT-120K plan2: maintainer #0 backlog reduction — close 6 done proposals, consolidate pending decisions, delegate approved fst-rebind-repeat build, TODO curation
 2026-09-15_14-19 -RETURN- looprunner ses_f5b507a66ffegia0ZZifYeRD2l Qwen3.8-27B-IQ4KT-120K planner-2 ses_f5b1f1994ffeh6lLruXAY0bRTW planner_Q4_120K
+2026-09-15_18-54 DONE<--- planner-2 unknown Qwen3.8-27B-IQ4KT-120K 92%/9K
+2026-09-15_18-55 -RETURN- looprunner ses_f5b507a66ffegia0ZZifYeRD2l Qwen3.8-27B-IQ4KT-120K planner-2 ses_f5b1f1994ffeh6lLruXAY0bRTW planner_Q4_120K
+2026-09-15_19-01 -->START planner-3 unknown Qwen3.8-27B-IQ4KT-120K plan3: maintainer info (Task failure messages = context-limit hits, not failed starts) codified in prompts + knowledge; script-collection spec (plan1) delegated to worker_Q4_120K
+2026-09-15_19-01 --INFO-- planner-3 ses_f5a01190cffehd0OO4TDPSrwvy Qwen3.8-27B-IQ4KT-120K planner-3 session id (the START line above carries 'unknown' — tool session param omitted): ses_f5a01190cffehd0OO4TDPSrwvy
