@@ -26,3 +26,11 @@
 
 good compare of gemma4 models
 ![](image.bmp)
+
+260915-0505: check permissions and tools for looprunner
+- he can not see the loop_log tool even if it is enabled
+- also very likely he has no access to the compact_memory tool
+  - so the fallback of compacting a context_limit sitting planner is not possible atm
+- looprunner prompt needs rework
+  - inclusion of afk mode 
+  - and compaction protokol for in context limit sitting planner

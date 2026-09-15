@@ -32,8 +32,10 @@ stop/compaction protokol for now 95% - this means explicityl around 90% gauge wi
     - and then to compact the as crosscompaction before dumping their session
     - compaction seems to work quite good so far
 
+--comment: when the session dumping addition is done to the compact_memory tool, how is the dumping of the same session_id before and after compaction handled? will the tool automaically create a seperate folder for the dump after compaction based on the tracked compaction budget? if this is handled without overwriting and thus loosing session info then good - if not include such a function please. thanks :-)
+
 # 3 3
-- you are free to test out different destillation workers on some session dumps. try to use the gemma4 worker ... i need to enable this before (agent_gemma_Q4_128K is available again)... he is a lot faster. so you can put more workers in the same time and experiment with different goals/tasks more.
+- you are free to test out different destillation workers on some session dumps. try to use the gemma4 worker ... i need to enable this before (worker_gemma_Q4_128K, agent_gemma_Q4_128K are available again)... he is a lot faster. so you can put more workers in the same time and experiment with different goals/tasks more.
   - create some roles/skillsets for this if needed to keep track of them and try to find a wide range of different perspectives that could scan the sessions.
     - you are free to experiment and document what you find
       - e.g. let multiple gemma workers with different settings run over the same session and compare this to a run with qwen model (remember 4 times slower)

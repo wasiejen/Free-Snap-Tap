@@ -123,24 +123,31 @@
       "description": "Just restarts the Planner in autnomous mode, same model als planner_Q4_120K for fast switching",
       "mode": "primary",
       "model": "llama-swap/Qwen3.8-27B-IQ4KT-120K:chat",
-      "temperature": 0.1,
+      "temperature": 0.6, // set a bit higher - was really a bit easy to confuse with low temp
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_looprunner.md}",
       "tools": {
-          "read_file": true,
-          "list_dir": true,
-          "glob": true,
-          "loop_log" : true
-        },
+        "*": true,
+        "write_file": false,
+        "edit": false,
+        "bash": false,
+        "block_transfer": false,
+      },
+
+      // "tools": { // without tools listing generally all tools available
+      //     "read_file": true,
+      //     "list_dir": true,
+      //
+      //
+      //
+      //   },
       "permission": {
         "*": "deny",
         "task": "allow",
-        "read": {
-          ".opencode/loop/*": "allow",
-          ".opencode/loop": "allow",
-          ".opencode/archive/loop/*": "allow",
-          ".opencode/archive/loop": "allow",
-          ".opencode/agent/prompts/agent_readme_loop.md": "allow"
-        },
+        "read": "allow",
+        "list_dir": "allow",
+        "glob": "allow",
+        "loop_log" : "allow",
+        "compact_memory" : "allow",
       },
       "options": {
         "load_project_docs": false,
@@ -182,11 +189,11 @@
       },
       "color": "accent"
     },
-    "agent_gemma_Q4_128K": {
+    "worker_gemma_Q4_128K": {
       "description": "intelligent, fast, 120k context, medium precision due to 3bit Quant",
       "mode": "all",
       "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
-      //"prompt": "{}",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_explorer.md}",
       "temperature": 0.6,
       "permission": {
         //"task": "allow",
@@ -222,7 +229,6 @@
       },
       "color": "accent"
     },
-
     "worker_Q3_120K_mtp": {
       "description": "intelligent, fast, 120k context, medium precision due to 3bit Quant",
       "mode": "all",
@@ -289,6 +295,28 @@
       },
       "color": "accent"
     },
+    "agent_gemma_Q4_128K": {
+      "description": "intelligent, fast, 120k context, medium precision due to 3bit Quant",
+      "mode": "all",
+      "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
+      "prompt": "",
+      "temperature": 0.6,
+      "permission": {
+        //"task": "allow",
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          "AGENTS.md": "deny",
+           ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "#ff6b6b"
+    },
     "agent_Q3_210K": {
       "description": "intelligent, slow, big 210k context - for very long and complex tasks, no worker prompt, medium precision due to 3bit Quant",
       "mode": "all",
@@ -311,8 +339,6 @@
       },
       "color": "#ff6b6b"
     },
-
-
     "agent_Q3_120K_mtp": {
       "description": "intelligent, fast, 120k context, no worker prompt, medium precision due to 3bit Quant",
       "mode": "all",
