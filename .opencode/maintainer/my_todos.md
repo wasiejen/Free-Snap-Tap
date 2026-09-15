@@ -10,3 +10,19 @@
     - might be prodent to name all new folders with prefix _ to prevent clashes with opencode
 
 260914-1422 (need to update my fst macro for date) it is still outputting the old format
+
+260915-0325: look for models that might better suited for compaction.
+- gemma4-12b is a bit dated but still very solid and fast
+- tiny3.0 flash
+- Qwen3.6 35B A3B - a bit tooo big for my hardware,
+- gemma4 26b A4B - higher in articial rating, but larger in overall size
+  - what is its context size?
+    - Context Length 	256K tokens
+    - Vocabulary Size 	262K
+    - Expert Count 	8 active / 128 total and 1 shared
+- gemma4 12b should have 256k xontext size
+  - why does my version only supper 128k?
+
+
+good compare of gemma4 models
+![](image.bmp)

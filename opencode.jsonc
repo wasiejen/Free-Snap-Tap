@@ -181,7 +181,28 @@
       },
       "color": "accent"
     },
-
+    "agent_gemma_Q4_128K": {
+      "description": "intelligent, fast, 120k context, medium precision due to 3bit Quant",
+      "mode": "all",
+      "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
+      //"prompt": "{}",
+      "temperature": 0.6,
+      "permission": {
+        //"task": "allow",
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          "AGENTS.md": "deny",
+           ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
+    },
     "worker_explorer_Q3_120K_mtp": {
       "description": "intelligent, fast generation, 120K context window, to be used to explore code base - to be checked",
       "mode": "all",

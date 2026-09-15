@@ -26,10 +26,27 @@
    whenever he wants — it is his log.
 
 
+stop/compaction protokol for now 95% - this means explicityl around 90% gauge with lagging value
+- compact workers as needed but try to dump there session if possible before
+  - might need to order workers to just stop before running into context limit
+    - and then to compact the as crosscompaction before dumping their session
+    - compaction seems to work quite good so far
 
-# 3
+# 3 1
 - nap size reduction
 
+# 3 2
+- create scripts for session dumping, easy to use for before compact dumping
+  - needs to be done fast because i am about to start an autorun and thus cannot activate plugin/tool updates this would enable them.
+
+# 3 3
+- you are free to test out different destillation workers on some session dumps. try to use the gemma4 worker ... i need to enable this before (agent_gemma_Q4_128K is available again)... he is a lot faster. so you can put more workers in the same time and experiment with different goals/tasks more.
+  - create some roles/skillsets for this if needed to keep track of them and try to find a wide range of different perspectives that could scan the sessions.
+    - you are free to experiment and document what you find
+      - e.g. let multiple gemma workers with different settings run over the same session and compare this to a run with qwen model (remember 4 times slower)
+        - if the gemma models are underperforming then use other models (agents might be best for testing? your choice)
+  - create different tools/scripts to work with the dumps. how to best extract what you and the agents might need and what the workers might need.
+- this could also be used to get the last messages of a failed worker to see what happened and to dump them into a new worker (idle though) - but might be just better to just compact and resume them 
 
 prompt additions/edits/rewrites:
 # 4
