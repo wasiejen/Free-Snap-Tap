@@ -24,7 +24,9 @@ function no longer behaved as before. The previous diff (inspect with
    the current event there IS the replacement key, so suppressing it likely breaks
    rebinds inside tap groups (planner's read; verify against the actual flow).
 Treat that as the KNOWN-BAD reference: your implementation must not reproduce the
-tap regression. The tap-group edge case is the RISK AREA — get it right and pin it.
+regression. CLARIFICATION from the maintainer (2026-09-15): the regression was the
+TAP-GROUP TESTS failing (his observation of the worker's last session), not a confirmed
+live-behavior change. The tap-group interaction is the RISK AREA — get it right and pin it.
 
 ## Branch (IMPORTANT)
 - Work on a NEW branch **`fst_work2`** created from `opencode_test` (current checkout,
@@ -46,9 +48,19 @@ tap regression. The tap-group edge case is the RISK AREA — get it right and pi
   "to allow repeated keys from hold" allowance ≈ 761–776; the D1-A decision comment
   block ≈ 821-825. Identify the regions by these MARKERS/COMMENTS, not by raw line
   numbers.
-- The proposal's design paragraph + its 4 edge cases (rebind→`SUPPRESS_CODE`; key that
+- The proposal's design paragraph + its edge cases (rebind→`SUPPRESS_CODE`; key that
   is BOTH rebind and macro trigger; rebind key in a TAP GROUP; press-state
   bookkeeping across repeats) are the WHAT. HOW is yours inside that.
+- **MAINTAINER RULING on the tap-group edge case (2026-09-15, inbox_worker
+  `tap_groups_behaviour.md` — SUPERSEDES the proposal's "tap-group repeat
+  behaviour unchanged" recommendation):** rebind repeat should NOT work for
+  tap-group keys. A rebind trigger key that is ALSO in a tap group must keep
+  the current (suppressed) repeat behaviour — it must NOT auto-repeat its
+  replacement. Rationale (his): rebind+tap-group combos are very unlikely; tap
+  groups are really only valuable for a/d and w/s pairs, and those should not
+  repeat. So: the repeat-let-through path applies ONLY to rebind triggers that
+  are NOT in any tap group. This is the conservative, safe choice and removes
+  the exact double-input risk the first attempt hit.
 - The `XXX 241016-1101` block stays untouched (decision comment lives below it —
   do not edit it).
 
@@ -56,9 +68,10 @@ tap regression. The tap-group edge case is the RISK AREA — get it right and pi
 1. Baseline (measured in step 2) + NEW pinning tests all green on `fst_work2`;
    ruff F count UNCHANGED vs baseline.
 2. 3–5 new pinning tests in the keyboard-level test file (your choice of file;
-   follow the mocked pattern, no live listeners) covering the 4 edge cases — the
-   tap-group case MUST pin both: the source key behavior AND the replacement key
-   flowing through (the exact area the first attempt broke).
+   follow the mocked pattern, no live listeners) covering the edge cases — the
+   tap-group case MUST pin, per the maintainer ruling: a rebind trigger that is
+   in a tap group does NOT repeat (repeats stay suppressed, no repeated
+   replacement sent) — the exact area the first attempt broke.
 3. One commit on `fst_work2` (code + tests + TODO.md note + your handover file).
 4. `handover_task_to_planner.md`: executive summary, measured baseline + final gate
    numbers, commit hash, the edge-case → test mapping, how your tap-group handling

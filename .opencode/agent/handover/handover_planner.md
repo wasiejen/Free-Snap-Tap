@@ -122,3 +122,27 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - NEXT: launch worker_Q4_120K per the committed spec (handover_task.md, copy
   plan2_ho_task.md) on fst_work; verify; then #0 -> _past_priorities.md with reply;
   plan2_summary.md; DONE line; action line.
+- CORRECTION (maintainer, 18:3x): the "provider unload" reading was wrong — both worker
+  deaths were normal CONTEXT OVERFLOWS in running sessions. What I received:
+  launch #1 (ses_f5aefe9e) -> tool said exactly "Task cancelled" (I misread as start
+  failure/unload); launch #2 (ses_f5a27f9c, "worker2") -> "Subagent failed (task_id:
+  ses_f5a27f9c2ffev2SyYx11QQseVX): the request exceeds the available context size".
+  worker2 reached the design + drafted pinning tests (its last thinking blocks ~20k tokens,
+  identifying edge cases) before the limit; the regression was the TAP-GROUP TESTS
+  failing in worker1's last session (not a confirmed live-behavior change). His inbox
+  nudge to worker2 never reached it (long thinking blocks, no gauge checks). His export:
+  export-worker2-session-ses_f5a2.md (repo root).
+- NEW MAINTAINER RULING (inbox_worker tap_groups_behaviour.md, absorbed into the spec,
+  file moved to done/): rebind repeat should NOT work for tap-group keys — a rebind
+  trigger in a tap group keeps the suppressed repeat behavior (supersedes the proposal's
+  "tap-group repeat unchanged" recommendation; rationale: rebind+tap combos unlikely,
+  tap groups = a/d, w/s only). The spec (handover_task.md + plan2_ho_task.md) now carries
+  this ruling + the correction.
+- HIS PROPOSAL: the rebind build "might need a direct session with interaction between us"
+  (the rebind/tap/macro/toggle interaction is complicated). BUILD PARKED for that direct
+  session — the updated spec is the ready starting point; no further delegation this
+  iteration. Codification request (dump convention) was ALREADY done in bdd7031 (planner
+  L3 + looprunner Resume&recovery sections).
+- NEXT (iteration 3+): the direct session when he engages; meanwhile the loop can take
+  the plan1 script-collection spec (maintainer #10, committed, ready) or other clear
+  backlog. Provider/model-load health should be a light check before any worker launch.
