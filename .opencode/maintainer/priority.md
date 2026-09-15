@@ -32,9 +32,6 @@ stop/compaction protokol for now 95% - this means explicityl around 90% gauge wi
     - and then to compact the as crosscompaction before dumping their session
     - compaction seems to work quite good so far
 
-# 3 1
-- nap size reduction
-
 # 3 2
 - create scripts for session dumping, easy to use for before compact dumping
   - needs to be done fast because i am about to start an autorun and thus cannot activate plugin/tool updates this would enable them.

@@ -7,9 +7,9 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - 2026-09-14 direct session (ses_f5f0689d9ffe0G0Uhvz0AIr5Vh) — cross-session compaction round 2: WORKS — his explicit-pair fix supersedes round 1; `cross_session_compaction_summary.md` handled → done/ — details: .opencode/archive/loop/nap_direct.md + git 22268de
 - **2026-09-14 direct (ses_f601cfc5):** state rebuild from his uncommitted additions; today's `--comment` (meta-feedback) acknowledged; #02 autorun_summary re-run delegated + verified (`02388a9`); gauge/nudge consistency + mid-turn context reconstruction measured (post-compaction floor ≈ system prompt + keep); cross-session compaction ROUND 1 (old cross path: no resolvable pair → no send; test2 fire-and-forget error swallowing mapped; model-serialization hypothesis) — SUPERSEDED by round 2 (next section, ses_f5f0689d9); detail: `archive/loop/nap_direct.md` + git `663a184`.
 - 2026-09-13 direct session (ses_f652ea3d0ffeblu0lAc5a0w27p) — priority #01: cleanup (old #1 → past); `--comment` marker codified; skillsets built (autorun_summary + feedback) — details: .opencode/archive/loop/nap_direct.md + git 61622b2
-- 2026-09-13 iteration 4 relaunch (ses_f6653f01fffevE1LCJvK8J0Ld4) — plan4 continued: dead predecessor ADOPTED (loop log + escalation proposal committed); retry order EXHAUSTED; self-fallback queued + prepped; stop line before the compression unit — details: .opencode/loop/autorun-2026-09-13_04-27/plan4_nap.md + git 6af5f9a
-- 2026-09-13 iteration 3 (ses_f674587ecffeaYLsKgST57D0ve) — nap-size build: Part 1 LANDED (`81a47d9`); Part 2 cleanup delegated (text-worker); #52 CLOSED (`4db7505`) — details: .opencode/loop/autorun-2026-09-13_04-27/plan3_nap.md + git 81a47d9
-- 2026-09-13 iteration 1 (ses_f676f6a82ffe960mvrZD9W0DjQ) — compaction-resume protocol codified; live acceptance DONE (rescued); resume-overflow finding → proposal — details: .opencode/loop/autorun-2026-09-13_04-27/plan1_nap.md + git 1cf5dc0
+- 2026-09-13 iteration 4 relaunch (ses_f6653f01fffevE1LCJvK8J0Ld4) — plan4 continued: dead predecessor ADOPTED (loop log + escalation proposal committed); retry order EXHAUSTED; self-fallback queued + prepped; stop line before the compression unit — details: .opencode/archive/loop/autorun-2026-09-13_04-27/plan4_nap.md + git 6af5f9a
+- 2026-09-13 iteration 3 (ses_f674587ecffeaYLsKgST57D0ve) — nap-size build: Part 1 LANDED (`81a47d9`); Part 2 cleanup delegated (text-worker); #52 CLOSED (`4db7505`) — details: .opencode/archive/loop/autorun-2026-09-13_04-27/plan3_nap.md + git 81a47d9
+- 2026-09-13 iteration 1 (ses_f676f6a82ffe960mvrZD9W0DjQ) — compaction-resume protocol codified; live acceptance DONE (rescued); resume-overflow finding → proposal — details: .opencode/archive/loop/autorun-2026-09-13_04-27/plan1_nap.md + git 1cf5dc0
 - 2026-09-13 direct session (ses_f692e1071ffevodtnJTET0DEEs) — compact_memory live no-op bug FIXED (commit follows this section) — details: .opencode/archive/loop/nap_direct.md + git 4b44d8c
 - 2026-09-12 direct session (ses_f692e1071ffevodtnJTET0DEEs) — priority #1 BUILD DELEGATED: compact_memory plugin (approved proposal v2, Parts 1-4) — details: .opencode/archive/loop/nap_direct.md + git b684894
 - 2026-09-12 direct session (ses_f6976031bffeRa8gNNcpy5FoYj) — attention-keywords close-out; priority #1 (compact_memory quant-class budget) design grounded — awaiting his ruling — details: .opencode/archive/loop/nap_direct.md + git 6b51fe2
@@ -48,6 +48,14 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 ## Standing
 - Baselines (measured 2026-09-15, Part-2 cleanup): probe **99/99**; pytest **459 passed + 1 warning (the known #10 coroutine warning)**; ruff **F=0**.
+- Context wall (his protocol 2026-09-15): the real wall sits ≈ **90% gauge reading**
+  (a session hit the actual limit at a ~90-96% readout); the gauge lags ~2 tool
+  calls (his # 9 — plan with ~5k margin against the injected `ctx:` line).
+- NAP session section: write + COMMIT it BEFORE the stop line (incident
+  2026-09-15: session lost at the limit mid-edit, the next planner had no
+  orientation). Full pre-cleanup NAP backup: `archive/nap_backup_2026-09-15_pre-cleanup.md`.
+- Markers (his ruling 2026-09-15, priority.md): `--comment` MAY be removed once
+  acted on/acknowledged; `--wip` may be ignored when it blocks work (afk/autorun).
 - Maintainer-inbox handling: move the file to `maintainer/done/` CONTENT-UNTOUCHED;
   the reply/feedback is recorded in the NAP + summary (the `proposals/maintainer/feedback/` folder no longer exists).
 - The maintainer's live files (prompt set, `proposals/files/` drafts) — never stage/flag;
@@ -66,3 +74,35 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - TODO.md curation: open items + one-line records in TODO.md; full text of
   closed entries in `todo_records.md` (formalized by split proposal part 3).
 - **Disclosure (dc3f137):** the `git add -A` there also staged the maintainer's live `opencode.jsonc` (compaction.keep now system:true / tokens:60000 / messages:20) and his new draft `draft/compact_memory/compact_memory.ts` (72 lines) - both were in the working tree at commit time. Nothing was reverted; maintainer decides whether that belongs in the git record.
+
+## 2026-09-15 (direct session; ses_f5d75a58fffeDLp7CGLqqZP8EQ) — Part-2 cleanup COMPLETE + verified; his re-prioritization triaged; dense-content question answered
+- Part-2 continuation done via the pipeline-only spec (`e8200da`; text worker
+  `ses_f5d60b90`, planner_Q4_120K): 7 remaining sections appended to pointer
+  files + NAP rewritten → **68 lines**, archive 32 section lines + kept
+  `ses_f601cfc5` line + 8 folded legacy lines, Standing to measured baselines —
+  commit `b36d4c7` (+ handover `09789dd`). VERIFIED against git: stat (NAP +
+  exactly the 7 targets, his files unstaged), TSV complete, date histogram
+  matches the backup, spot-checks on pointer files. Worker's 3 flagged
+  judgment calls accepted (dc3f137 hash for the 09-10 chat segment; legacy
+  dates derived via git; `6c2151` confirmed NOT a git prefix — presumed
+  original typo, kept verbatim).
+- Maintainer triage (commits `60d61b8`/`ac020fb`/`ef044e9`/`a58d375`/merge
+  `23eb24c`): loop folders moved → `archive/loop/` (NAP pointers fixed here);
+  `priority.md` restructured (`# 3 1..3 3` + `# 4..# 10`); 6 inbox items
+  (block_transfer ↔ #8; snippet_collection ↔ #4/#10; analyse_helper_scripts ↔
+  #10; save_all_plugin_took_testing_files = smoke-harness-in-repo proposal;
+  summary_summary = "use the summary skillset on each autorun";
+  dense_content_warning = his questions on my list-loop); marker rulings
+  (→ Standing). `# 3 1` (nap size) handled → `_past_priorities.md`.
+- Dense-content question (answered in the closing summary; lesson →
+  `knowledge_tools.md`): the PIPELINE-ONLY rule worked (7/7 correct appends,
+  zero section bodies read); machine counts over in-context counts; anchors
+  over absolute line numbers; pointer over inline detail for compressed
+  sections. My own failure mode: re-reading the same dense list ("scroll up"
+  loop) — stop and script it instead.
+- Queued (his priority order): **`# 3 2` session-dump script + backfill —
+  URGENT (he starts an autorun; no restart possible meanwhile)**; `# 3 3`
+  distillation experiments (gemma4); `# 4` planner-prompt grep command;
+  `# 5`/`# 6` knowledge + output-limit rules; `# 7` non-ASCII note; `# 8`
+  block_transfer test; `# 9` gauge lag (→ Standing); `# 10` script collection;
+  smoke-harness proposal.
