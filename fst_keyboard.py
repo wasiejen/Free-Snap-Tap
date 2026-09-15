@@ -629,9 +629,18 @@ class FST_Keyboard():
                     if any(current_ke.vk_code == trigger.vk_code
                            and current_ke.is_press == trigger.is_press
                            for trigger in self._all_trigger_events):
+                        # a repeated REBIND trigger is let through: the rebind loop
+                        # below re-fires the replacement on every repeat, while the
+                        # real_input_repeated guard keeps macro/toggle single-shot
+                        # (approved proposal 2026-09-12_fst-rebind-repeat.md)
+                        is_rebind_trigger = any(
+                            current_ke.vk_code == tg.get_trigger().vk_code
+                            and current_ke.is_press == tg.get_trigger().is_press
+                            for tg in self._rebind_triggers)
                         if CONSTANTS.DEBUG3:
                             print(f"repeated key supressed: {current_ke}")
-                        to_be_suppressed = True
+                        if not is_rebind_trigger:
+                            to_be_suppressed = True
                         trigger_key_repeated = True
                     real_input_repeated = True
             else:
@@ -763,6 +772,10 @@ class FST_Keyboard():
                             if CONSTANTS.DEBUG:
                                 print(f"D1: tap group {vk_code}")
                             if key_replaced is True:
+                                # a rebind replacement consumed by the tap group:
+                                # suppress the source so the original key does not
+                                # also pass through (prevents double input on repeats)
+                                to_be_suppressed = True
                                 key_replaced = False
                             tap_group.update_tap_states(vk_code, is_keydown)
 

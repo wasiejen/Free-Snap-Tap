@@ -90,13 +90,99 @@ class TestRebindFiring:
         assert kb_env_ns.kb_mock.release.call_count == 0
         kb._listener.suppress_event.assert_called_once_with()
 
-    def test_repeated_trigger_key_is_suppressed_without_refiring(self, kb_env_ns):
+    def test_repeated_rebind_key_auto_repeats_target(self, kb_env_ns):
         kb = kb_env_ns.kb
         build(kb, rebinds=[['(r)', [['a'], 'b']]])
         down(kb, VK_A, 1000)
-        down(kb, VK_A, 1500)  # OS auto-repeat of an already pressed trigger
-        assert kb_env_ns.kb_mock.press.call_count == 1
+        down(kb, VK_A, 1500)  # OS auto-repeat of the rebind trigger
+        # the replacement key b is re-fired on every repeat; the source a is
+        # suppressed both times (approved proposal 2026-09-12_fst-rebind-repeat.md)
+        assert kb_env_ns.kb_mock.press.call_count == 2
+        assert kb_env_ns.kb_mock.release.call_count == 0
         assert kb._listener.suppress_event.call_count == 2
+
+
+class TestRebindRepeat:
+    """Pinning tests for the approved proposal 2026-09-12_fst-rebind-repeat.md:
+    a held REBIND key auto-repeats its target, while macro/toggle
+    repeat-suppression stays unchanged. All listeners mocked - no live input."""
+
+    def test_repeated_rebind_to_suppress_stays_suppressed(self, kb_env_ns):
+        # edge case 1: a rebind to SUPPRESS_CODE stays suppressed on repeat
+        # (same as the first press - nothing is ever sent)
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['a'], 'suppress']]])
+        down(kb, VK_A, 1000)
+        down(kb, VK_A, 1500)
+        down(kb, VK_A, 2000)
+        assert kb_env_ns.kb_mock.press.call_count == 0
+        assert kb_env_ns.kb_mock.release.call_count == 0
+        assert kb._listener.suppress_event.call_count == 3
+
+    def test_repeated_both_rebind_and_macro_fires_target_not_macro(self, kb_env_ns, monkeypatch):
+        # edge case 2: a key that is BOTH a rebind trigger and a macro trigger:
+        # first press = rebind (rebind loop runs first); repeats = target-key
+        # repeats only, the macro never fires (real_input_repeated guard)
+        kb = kb_env_ns.kb
+        fired = []
+        monkeypatch.setattr(FST_Keyboard, 'start_macro_playback',
+                            lambda self, alias, seq: fired.append((alias, seq)))
+        build(kb, rebinds=[['(r)', [['a'], 'b']]],
+              macros=[['(m)', [['a'], ['c']]]])
+        down(kb, VK_A, 1000)
+        # first press: rebind wins, target b sent, macro does not fire
+        assert kb_env_ns.kb_mock.press.call_count == 1
+        assert fired == []
+        down(kb, VK_A, 1500)
+        down(kb, VK_A, 2000)
+        # repeats: target b re-fired each time, the macro never fires
+        assert kb_env_ns.kb_mock.press.call_count == 3
+        assert kb_env_ns.kb_mock.release.call_count == 0
+        assert fired == []
+        assert kb._listener.suppress_event.call_count == 3
+
+    def test_repeated_rebind_into_tap_group_unchanged(self, kb_env_ns):
+        # edge case 3: a rebind whose target is in a TAP GROUP keeps the
+        # tap-group repeat behaviour (trigger_key_repeated stays set) and does
+        # not double-input: the tap group holds the key, the source stays
+        # suppressed - identical to holding the tap-group key directly
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['c'], 'a']]], taps=[['(TAP_1)', ['a']]])
+        down(kb, VK_C, 1000)
+        # first press: a sent via the tap group, c suppressed
+        assert kb_env_ns.kb_mock.press.call_count == 1
+        assert kb._listener.suppress_event.call_count == 1
+        down(kb, VK_C, 1500)
+        down(kb, VK_C, 2000)
+        # repeats: the tap group holds a (no re-send), c stays suppressed
+        assert kb_env_ns.kb_mock.press.call_count == 1
+        assert kb_env_ns.kb_mock.release.call_count == 0
+        assert kb._listener.suppress_event.call_count == 3
+
+    def test_rebind_repeat_press_state_tracks_target(self, kb_env_ns):
+        # edge case 4: press-state bookkeeping on repeats (remove source,
+        # re-add target) stays consistent - set semantics make it idempotent
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['a'], 'b']]])
+        down(kb, VK_A, 1000)
+        down(kb, VK_A, 1500)
+        down(kb, VK_A, 2000)
+        assert kb.state_manager.get_key_press_state(VK_B) is True
+        assert kb.state_manager.get_key_press_state(VK_A) is False
+
+    def test_repeated_macro_trigger_still_suppressed(self, kb_env_ns, monkeypatch):
+        # macro/toggle repeat-suppression stays UNCHANGED: a held macro trigger
+        # fires once; its OS auto-repeats are suppressed and never re-fire
+        kb = kb_env_ns.kb
+        fired = []
+        monkeypatch.setattr(FST_Keyboard, 'start_macro_playback',
+                            lambda self, alias, seq: fired.append((alias, seq)))
+        build(kb, macros=[['(m)', [['a'], ['c']]]])
+        down(kb, VK_A, 1000)
+        down(kb, VK_A, 1500)
+        down(kb, VK_A, 2000)
+        assert len(fired) == 1
+        assert kb._listener.suppress_event.call_count == 3
 
 
 class TestToggle:
