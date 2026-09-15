@@ -52,3 +52,10 @@ potential models for compaction/text/destillation work
 - unsloth/Qwen3.6-35B-A3B-GGUF or thireus strong candidate - but very big and needs to be offloaded to ram
   - speed? A3B is very small so could be fast non the less
   - prefill will degrade under ram usage i quess - not good for destillation
+
+260915-1740:
+a fucking completions request seems to have booted my model out of llama-swap and broken the loop (tid 21740 whoever you are - pid 4 system - so i can not see who send it)
+  - INFO [      log_server_request] request | tid="24292" timestamp=1789475771 remote_addr="127.0.0.1" remote_port=54795 status=200 method="POST" path="/v1/chat/completions" params={}
+  - Get-Process | Select-Object Name, Id, @{Name="TID"; Expression={(Get-Process -Id $_.Id).Threads.Id}} | Where-Object {$_.TID -contains 21740} -> System  4 {12, 16, 20, 24…}
+- remove zed connection to llama-swap DONE
+- deactivate any completions features like auto title generation in opencode DONE (as far as i am aware)
