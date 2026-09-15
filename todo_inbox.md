@@ -50,5 +50,25 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   paths (T1 approval boundary: allowed-path semantics must stay
   byte-identical — the planner decides). Fix would be: move the
   `!args.dstFile` check to the top of the anchor-extraction section, before
-  any write. File: `.opencode/tools/block_transfer.ts`. Recorded as an open
-  item in the worker summary.
+   any write. File: `.opencode/tools/block_transfer.ts`. Recorded as an open
+   item in the worker summary.
+
+## 2026-09-15 — worker_Q4_120K (script collection, spec 4a72c30)
+- Launch message said "stay on `opencode_test` (current checkout)" but the
+  actual checkout was `fst_work2` (cut from `opencode_test`, carries the FST
+  batch + spec commit 4a72c30). I stayed on the current checkout (fst_work2)
+  — the spec hash lives there, and switching was forbidden. Looprunner/planner:
+  align launch messages with the real checkout (branch names drift across
+  loopruns). No repo impact.
+- Stale corpus entry: `.opencode/archive/sessions/ses_f5d03802affekevrhzPdvLFaHQ.md`
+  was dumped mid-session (59 msgs; the DB now has 65 — the final bash call's
+  status changed running->completed). My dump_session idempotency test
+  re-dumped it (126 ins/7 del), which I REVERTED as out-of-scope. A
+  `node .opencode/agent/scripts/db/dump_session.cjs --all --slim` (or full)
+  refresh would bring the whole corpus current — planner/maintainer call on
+  cadence (the pre-compaction dump convention already covers new sessions).
+- The launch "standard gate" baseline mentioned "probe 99/99" beyond the two
+  named commands (pytest + ruff, both matched baseline: 459 passed + 1
+  warning, ruff F=0). No probe command was defined in the spec or
+  repo_commands.md, so I did not run it — if it is part of the gate, add the
+  command to repo_commands.md.

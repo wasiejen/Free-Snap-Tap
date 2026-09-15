@@ -1,65 +1,73 @@
-# handover_task_to_planner — worker-16 (DONE — final)
+# handover_task_to_planner — worker_Q4_120K (DONE — final)
 
-Task: smoke-harness build per `.opencode/agent/handover/handover_task.md`
-+ approved proposal `2026-09-15_smoke-harness-home.md`.
+Task: helper-script collection per spec 4a72c30 (maintainer #10 + #4 inbox).
+Session ses_f59f7cff0ffer37uRICTRFiyS0, iter-3 launch.
 
-## Result: COMPLETE — all 7 smokes green, all gates green
-Final commit: the one landing after `f4de326` (contains the last smoke +
-`TODO.md` close-note + this file; see `git log`).
+## Result: COMPLETE — all acceptance criteria met, gate green
 
-### What landed in `.opencode/plugin/tests/` (commits 6c38fd4 → final)
-| file | origin (scratchpad, read-only) | result |
-|---|---|---|
-| `_smoke_base.mjs` | new (Part 3 of the proposal) | shared boilerplate: REPO_ROOT from file location, SCRATCHPAD runtime fixture path (as-is, documented in README), `loadRepo` type-stripped import, `freshSandbox`, `makeChecker` |
-| `README.md` | new | purpose / what goes here / what doesn't (≤20 lines) |
-| `gauge_core.smoke.mjs` | `pw_test.mjs` | ALL PASS (10 window + 3 model-id cases) |
-| `loop_log.smoke.mjs` | `loop_log_smoke.mjs` | 24/24 |
-| `block_transfer.smoke.mjs` | `bt_smoke.mjs` | 20/20 |
-| `block_transfer.sandbox.smoke.mjs` | `bt_sandbox_smoke.mjs` | 52/52 (ALLOW + REJECT matrices) |
-| `compact_memory.smoke.mjs` | FOLD of `cm_v2_smoke.mjs` + `qc_smoke/smoke.mjs` (fold allowed by the proposal) | 42/42 |
-| `context_recovery.smoke.mjs` | `t5_smoke.mjs` | ALL PASS |
-| `ctx_gauge.smoke.mjs` | `ctx_gauge_smoke.mjs` | 3/3 (LIVE db) |
+### Commits (on `fst_work2`, see below for the branch discrepancy)
+| commit | content |
+|---|---|
+| `2933dd0` | unit 1: 8 curated scripts in `binary/` `db/` `log/` + `dump_session.cjs` moved into `db/` (git mv, content unchanged) |
+| `7f7f61c` | fix: `dump_session.cjs` OUT_DIR after the db/ move (the idempotency test caught a stray write to `.opencode/agent/archive/`; stray file removed) |
+| `b3a34d8` | unit 2: top-level README (rewritten), per-category READMEs, `grep_snippets.md`, machine-generated `INVENTORY.md` |
+| final | this file + `todo_inbox.md` findings |
 
-### Key adaptations (all test-side — NO tool/plugin source touched)
-1. **compact_memory** — adapted to the 2026-09-14 FIRE-AND-FORGET build:
-   `execute` returns the dispatch line (never a success claim); budget
-   increment + COMPACT line land in the async success callback → the smoke
-   drains (~25 ms) before side-effect assertions; the retry-keep note and
-   the background failure go to console.log/console.error (captured); the
-   six-key arg shape is pinned (providerID/modelID — the explicit-pair
-   override case replaces cm_v2's retired context.api/context.session.id
-   source checks); cm_v2's no-client core (never throws / names the probes
-   / zero side effects) folded in; stale success/directive strings replaced
-   by the exact dispatch-line form.
-2. **context_recovery** — import rewired to
-   `.opencode/plugin/deactivated/context_recovery.ts`; attribution verified
-   at build time (it IS the T5 emergency hook, behavior matches all
-   assertions); the activation flag is a SANDBOX opencode.jsonc fixture —
-   the live config is never read.
-3. **gauge_core** — stale `.opencode/ctxgauge/gauge.mjs` ref rewired to
-   `.opencode/plugin/scripts/gauge.mjs`; the smoke gained an explicit
-   `process.exit` (the original only printed).
-4. **sandbox hygiene** — every smoke now cleans its scratchpad subdir on
-   start (`freshSandbox`), so re-runs are idempotent (the originals were
-   not); the block_transfer sandbox smoke's outside-dir is now
-   `path.dirname(REPO_ROOT)` (computed, not hardcoded).
+### Collection (`.opencode/agent/scripts/`)
+- `binary/`: `binwin.cjs` (needle→context window, ≤3 hits/needle),
+  `binhits.cjs` (all offsets + tiny context, cap 60), `binoff.cjs` (raw
+  offset window). exe: `--exe` flag > env `OPENCODE_EXE` > host default.
+- `db/`: `probe_schema.cjs` (columns+counts, no data; now enumerates ALL
+  tables instead of a hardcoded list), `sesinspect.cjs` (recent sessions /
+  session+last 14 msgs), `sesdata.cjs` (slim per-message JSON lines),
+  `compact_dir.cjs` (compaction summary + parts, 4000-char cap),
+  `dump_session.cjs` (corpus dump, moved here). DB: env `OPENCODE_DB` >
+  host default; all `readOnly: true`.
+- `log/`: `logctx.cjs` (±3-line window/380-char lines per hit; needle +
+  maxHits now argv, log via env `OPENCODE_LOG`).
+- Not promoted (dedup/superseded, recorded in INVENTORY.md): `findbin.ps1`
+  (PowerShell twin of binwin), `find_ctx*.mjs` (superseded by binary/),
+  `dump_session.py` (python twin of db/dump_session.cjs).
+- One deliberate deviation, documented in `db/README.md`: `sesinspect.cjs`
+  slim lines now parse `message.data` (the scratchpad original read the slim
+  keys off the DB row, matching only id/timestamps — near-empty output).
 
-### Gates (measured, all green)
-- `node .opencode/plugin/probes/handover_probe.mjs` → **99/99 PASS**
-- `./.venv/Scripts/python.exe -m pytest -q` → **459 passed, 1 warning** (the
-  known #10 ResourceWarning pattern)
-- `./.venv/Scripts/ruff.exe check --select F .` → **All checks passed (F=0)**
-- all 7 smokes run exit-0 from the repo root (compact_memory verified
-  idempotent on a second run)
+### Verification (measured, 2026-09-15, from repo root)
+- Every script: exit 0 + expected output shape (test command + result per
+  script in its category README). Notable: binwin/binhits hit-path proven
+  on the live opencode.exe (179 982 488 bytes); logctx against the live
+  log (20 hits capped, 64193 lines); compact_dir hit-path on a
+  compacted session (8 compaction msgs); probe_schema all-tables (21).
+- Gate: `pytest -q` → **459 passed, 1 warning** (baseline match);
+  `ruff check --select F .` → **All checks passed (F=0)** (baseline match);
+  `node .opencode/plugin/probes/handover_probe.mjs` → **99/99 PASS**
+  (baseline match — the probe is named in the launch baseline; it is NOT
+  in the spec's gate commands nor in repo_commands.md, flagged in
+  todo_inbox).
+- dump_session idempotency test: re-dump of an existing corpus session
+  showed session GROWTH (59→65 msgs, final tool status
+  running→completed), not script drift → the script is correct; the corpus
+  file is stale (see todo_inbox). I reverted the re-dump (out of scope).
 
-### TODO
-- One-line close-note appended to `TODO.md` `Closed entries` (no ID — the
-  task was proposal-driven, not a numbered entry): "closed 2026-09-15, the
-  first commit after f4de326, worker-16".
+### Acceptance checklist
+- [x] Scratchpad inventory documented — `INVENTORY.md` (140 scripts +
+  purpose, 7 dirs, 45 non-script files), machine-generated.
+- [x] Every selected script: in repo, generalized (no hardcoded host paths
+  beyond env-overridable defaults), tested from the repo, command+result
+  in its README.
+- [x] `grep_snippets.md`: marker sweep (verbatim from planner prompt
+  §maintainer calls/decisions) + 7 output-limited navigation recipes.
+- [x] No product code touched; no `.opencode/agent/prompts/**` touched
+  (no edit-deny block hit — I never attempted it); no scratchpad original
+  deleted.
+- [x] Standard gate green, numbers above.
 
 ### Deliberately NOT done
-- No scratchpad file was deleted (read-only zone — the originals stay there).
-- No tool/plugin source edit (the adaptation was entirely in the smokes).
-- No `--wip`/maintainer file touched; `opencode.jsonc`, `proposals/`,
-  `.opencode/maintainer/`, `.opencode/agent/prompts/`, the NAP and
-  `.opencode/loop/` untouched.
+- Scratchpad originals left in place (maintainer's call per spec).
+- No prompt edits (the one-line "look here for helper scripts" role-prompt
+  pointers are planner-side per the spec Notes).
+- Corpus refresh (stale `ses_f5d03802...` + general backfill cadence) —
+  flagged in `todo_inbox.md`, planner/maintainer call.
+- `TODO.md` untouched: no maintainer-calls or blocked items found; the
+  three findings went to `todo_inbox.md` (branch-name mismatch in the
+  launch message, stale corpus, "probe 99/99" gate-definition gap).
