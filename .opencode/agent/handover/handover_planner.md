@@ -51,6 +51,40 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - 2026-09-09 session 2 (legacy, no-ses) — looprunner-prompt optimization proposal (consolidated verdicts; adopted closing action protocol `action: restart/ask_maintainer/stop`) — details: git ff86d9b
 - 2026-09-08 session 1 (legacy, no-ses) — agents_repo roster synced to live opencode.jsonc; #38 explorer smoke test (PASSED w/ fabricated-gauge caveat); #37 gauge build LANDED (backend chain node:sqlite → bun:sqlite → spawn sqlite3.exe) — details: git 2a4996c
 
+## plan4 (iteration 4, ses_f59d27449ffeEFeV4vaQ6NlqTs, planner Q4-120K) — STOPPED AT STOP LINE (94%/7K)
+- Dump-hook spec (the TODO.md line-152 "dump function" entry, approved) committed
+  `2f4a5c4` (spec + loop copy `plan4_ho_task.md`). NOTE: spec's baseline line said
+  "94/94" = TYPO — true probe baseline is 94/94 (machine-verified, section sum).
+  Worker already reconciled to the measured value.
+- worker-4 `ses_f59c0d40affePju49VV2U179cp` (worker_Q4_120K): ran long, hit
+  `context_length_exceeded` AFTER a manual-style compaction part (auto:false) —
+  NO COMPACT line in ctx.log, NO budget entry (origin unclear: tool dispatch
+  whose verification never landed, or host-side). Uncommitted partial edits in
+  the working tree: `compact_memory.ts` + `dump_session.cjs` (NO commits yet).
+  task_id resume FAILED (same error). Rescue: cross-compact DISPATCHED (Gemma
+  pair, fire-and-forget) at close — verify `ctx.log` COMPACT line + budget
+  entry before acting.
+- NEXT (order): (1) check the cross-compact landed → resume worker-4 via
+  task_id with the post-compaction protocol, ELSE fallback: fresh
+  worker_Q4_120K continuing from `git diff` (uncommitted partial work) + the
+  spec; (2) then the unstarted tails: #8 (create repo part
+  `repo_custom_tools.md` usage guides, his suggested home + index line in
+  repo_overview.md) and #9 (one-line gauge-lag rule in planner+worker prompts:
+  readout lags ~2 tool calls / ~5k, plan with margin); (3) triage the queued
+  inbox item `nudge_gauge_unclarity.md` (agents misread the nudge `<Y>K` as
+  USED — he wants more speaking output; small plugin+probe text task,
+  delegate).
+- Inbox 4 handled: `compact_memory.md` (--comment) — design ruling recorded:
+  compaction-awareness lives ONLY in the plugin hook (`compaction_dumps/`
+  namespace, no-overwrite); the dump script keeps plain `<sid>.md`
+  current-state semantics (refreshes may overwrite it; fine-grained content is
+  protected by the separate dump files) — file moved to done/ content-untouched.
+  `dense_numbers.md` (--wip, "for discussion in direct session") — LEFT
+  UNTOUCHED, not moved. His num() word-number idea is relevant (dense-number
+  transcription friction is real — hit this session twice on the probe
+  baseline numeral).
+- No gate re-run this session (stop line); baselines stand from plan3.
+
 ## Standing
 - Baselines (measured 2026-09-15, Part-2 cleanup): probe **99/99**; pytest **459 passed + 1 warning (the known #10 coroutine warning)**; ruff **F=0**.
 - Per-session full NAP backup (his ruling 2026-09-15): ONE `cp handover_planner.md
