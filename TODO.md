@@ -228,4 +228,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   summarize); the session-dump script shared with the backfill idea (read-only DB →
   markdown, tool outputs condensed); `.opencode/archive/sessions/`.
 - **Status:** open (DEFERRED — behind the session-dump script; the dump function
-  reuses it). Maintainer: "material for later thought."
+  reuses it). Maintainer: "material for later thought." NOTE 2026-09-15: the
+  session-dump script now exists (`.opencode/agent/scripts/dump_session.cjs`,
+  read-only) and the corpus `.opencode/archive/sessions/` was backfilled (137
+  sessions). Remaining: the `compact_memory` dump HOOK before summarize.
