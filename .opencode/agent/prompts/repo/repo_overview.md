@@ -17,3 +17,6 @@ Parts (read when …):
   the input pipeline (no live listeners).
 - `repo_gotchas.md` — read when debugging odd behavior, or before editing code
   in the areas named there.
+- `repo_custom_tools.md` — read when using (or delegating) the host-specific
+  opencode tools (block_transfer, ctx_gauge, loop_log, compact_memory) or
+  when one of their behaviors surprises you.

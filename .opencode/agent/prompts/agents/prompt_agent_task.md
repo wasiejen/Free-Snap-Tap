@@ -25,6 +25,9 @@ All paths below are relative to `.opencode/agent/prompts/`.
   touching the input pipeline (no live listeners).
 - `repo/repo_gotchas.md` — read when debugging odd behavior, or before editing
   code in the areas named there.
+- `repo/repo_custom_tools.md` — read when using the host-specific opencode
+  tools (block_transfer, ctx_gauge, loop_log, compact_memory) or when one of
+  their behaviors surprises you.
 - `agent_readme_todo.md` — read when appending findings to `todo_inbox.md`.
 - `agent_readme_loop.md` — §Loop log defines the activity-log lines you write at
   session start and task completion (write them via the `loop_log` tool when it
@@ -70,7 +73,10 @@ planner prompt). With a big unit ahead and the readout ≥80 % →
 commit a handover checkpoint and end clean. The planner may ORDER an early
 stop before the line so it can DUMP your session (pre-compaction) and then
 cross-compact you — obey that order at the next safe commit point (canonical
-protocol: planner prompt §Context-budget trigger).
+protocol: planner prompt §Context-budget trigger). **Gauge-lag rule (maintainer
+#9, 2026-09-14):** the readout lags the TRUE context by ≈2 tool calls (~5k) —
+plan with margin; treat a displayed readout as optimistic (the truth can
+already be higher).
 
 ## compact_memory (live on this host)
 - The `compact_memory` tool is registered and ACTIVE. Firing it compacts the

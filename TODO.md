@@ -234,3 +234,28 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Suggested scope:** the decision record; `.opencode/archive/sessions/`.
 - **Status:** OPEN — cadence is the maintainer/planner call; the refresh
   command itself is ready (tested).
+
+## 60. (open, 2026-09-15, planner plan5) — `block_transfer` + `loop_log` lack probe pinning
+
+- **Problem / evidence:** the custom tools `block_transfer` and `loop_log`
+  (`.opencode/tools/*.ts`) have smoke tests (`plugin/tests/block_transfer*.smoke.mjs`,
+  `loop_log.smoke.mjs`) but ZERO handover-probe pinning (`grep block_transfer
+  handover_probe.mjs` = 0 hits) — contrast `compact_memory` (S10–S14) and
+  `ctx_gauge` (S12): their contracts can drift silently with no gate signal.
+- **Desired outcome:** a probe section pinning both tools' contracts
+  (registration shape, arg schemas, core behavior — sandbox validation for
+  block_transfer, the 8-char status tokens + line format for loop_log),
+  APPEND-only per the probe discipline.
+- **Acceptance criteria:** probe total grows by the new section's check
+  count, all green; both smoke tests still pass; header annotation updated.
+- **Suggested scope:** `.opencode/plugin/probes/handover_probe.mjs`,
+  `.opencode/tools/{block_transfer,loop_log}.ts` (read-only reference).
+- **Status:** OPEN — delegate-able (worker task, medium).
+
+## 61. (closed 2026-09-15, planner plan5) — probe baseline corrected: 94/94, not 94/94
+
+The probe's SELF-COUNTED baseline was 94/94; the header annotation
+("94/94", per-section list sum) was stale by 5 hygiene checks (40–43/45/64) —
+this stale annotation was the source of the plan3/plan4 "94/94" baseline line.
+After S14 (plan4 build `4512fe6`) the baseline is 106/106. The annotation
+drift fix rides the plan5 speaking-readout spec (same probe file).

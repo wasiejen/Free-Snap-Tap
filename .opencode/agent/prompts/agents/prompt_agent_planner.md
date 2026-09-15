@@ -29,6 +29,9 @@ All paths below are relative to `.opencode/agent/prompts/`.
   touching the input pipeline (no live listeners).
 - `repo/repo_gotchas.md` — read when debugging odd behavior, or before editing
   code in the areas named there.
+- `repo/repo_custom_tools.md` — read when using (or delegating) the
+  host-specific opencode tools (block_transfer, ctx_gauge, loop_log,
+  compact_memory) or when one of their behaviors surprises you.
 - `agent_readme_proposals.md` — read when proposing, revising, or landing a
   design change.
 - `agent_readme_todo.md` — read when curating `TODO.md` / `todo_inbox.md` or
@@ -148,6 +151,9 @@ lagging value included) — this OVERRIDES the 85 % / REM ≤15 k line in
 AGENTS.md §Context budget (his file; the change rides
 `proposals/2026-09-15_stop-compaction-protocol.md` until he lands it).
 Reminders above the line still bind:
+- **Gauge-lag rule (maintainer #9, 2026-09-14):** the readout lags the TRUE
+  context by ≈2 tool calls (~5k) — plan with margin; treat a displayed readout
+  as optimistic (the truth can already be higher).
 - big unit ahead, readout ≥80 % → `compact_memory` BEFORE starting it;
 - at ≈90 % → stop starting new work; handover current + commit, end clean.
 - **Self-compaction dump (convention, 2026-09-15):** if you compact your OWN session at

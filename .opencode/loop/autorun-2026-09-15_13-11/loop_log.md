@@ -18,3 +18,7 @@
 2026-09-15_20-06 -->START worker-4 ses_f59c0d40affePju49VV2U179cp Qwen3.8-27B-IQ4KT-120K compact_memory pre-compaction dump hook build (TODO.md #152 dump function) + no-overwrite dump naming (S14) + knowledge entry + README/TODO updates
 2026-09-15_21-16 -WARNING planner-4 ses_f59d27449ffeEFeV4vaQ6NlqTs Qwen3.8-27B-IQ4KT-120K worker-4 ses_f59c0d40affePju49VV2U179cp hit context_length_exceeded after a manual-style compaction (no COMPACT line in ctx.log, no budget entry); task_id resume failed with the same error; cross-compact (Gemma) + one retry ordered
 2026-09-15_21-22 DONE<--- planner-4 ses_f59d27449ffeEFeV4vaQ6NlqTs Qwen3.8-27B-IQ4KT-120K 97%/3K (stop-line exit: spec landed 2f4a5c4; worker-4 rescue cross-compact dispatched; tails #8/#9 + nudge item queued — see plan4_summary.md + NAP plan4 section)
+2026-09-15_21-23 -RETURN- looprunner ses_f5b507a66ffegia0ZZifYeRD2l Qwen3.8-27B-IQ4KT-120K planner-4 ses_f59d27449ffeEFeV4vaQ6NlqTs planner_Q4_120K
+2026-09-15_21-27 --START planner-5 ses_f5978ea6affe6oCCcpZsyN6hEl Qwen3.8-27B-IQ4KT-120K plan5: worker-4 cross-compact CONFIRMED (Gemma COMPACT line 21:17, session at 45%) -> task_id resume w/ post-compaction protocol; tails #8/#9 + nudge item queued after
+2026-09-15_21-30 -->START worker-4 ses_f59c0d40affePju49VV2U179cp Qwen3.8-27B-IQ4KT-120K resume after cross-compact (plan5) — finishing pre-compaction dump hook
+2026-09-15_21-54 DONE<--- worker-4 ses_f59c0d40affePju49VV2U179cp Qwen3.8-27B-IQ4KT-120K 94%/7K — dump hook landed: commit 4512fe6, probe 106/106 PASS, pytest 459+1, ruff F=0
