@@ -252,10 +252,37 @@ All those IDs stay reserved — see the numbering rule in the header.
   `.opencode/tools/{block_transfer,loop_log}.ts` (read-only reference).
 - **Status:** OPEN — delegate-able (worker task, medium).
 
+## 62. (open, 2026-09-15, maintainer info.md, planner plan5) — compaction-clarity + 90/95 rules in BOTH role prompts
+
+- **Problem / evidence:** agents keep running PAST 95 % (worker-4 AND
+  worker-5 both died at the limit mid-task this looprun); root misconception:
+  compaction ≈ complete restart. Maintainer info.md (2026-09-15): "they will
+  not stop despite knowing they are over 95%".
+- **Desired outcome:** both role prompts
+  (`.opencode/agent/prompts/agents/prompt_agent_{planner,task}.md`) carry:
+  (1) compaction is NOT a restart — it reduces OLD history; recent messages
+  stay INTACT, a summary is auto-created; only the dropped head files need
+  re-reading (post-compaction protocol already names them);
+  (2) above 90 % → emergency handover + commit + self-compact IF budget is
+  available;
+  (3) above 95 % → commit current status + self-compact, DO NOT DELIBERATE
+  while budget remains (`keepMessages` keeps the last N messages intact).
+- **Acceptance criteria:** all three lines present in both prompts; probe
+  gates unchanged; committed.
+- **Suggested scope:** the two role prompt files (planner-direct; workers
+  are edit-denied there).
+- **Status:** OPEN — planner-direct (prompt text work). NOTE: the numwords /
+  `<ninetyfour>` placeholder convention (info.md tail) is a RELATED but
+  separate idea — direct session (`dense_numbers.md` --wip), NOT part of
+  this entry.
+
 ## 61. (closed 2026-09-15, planner plan5) — probe baseline corrected: 94/94, not 94/94
 
-The probe's SELF-COUNTED baseline was 94/94; the header annotation
-("94/94", per-section list sum) was stale by 5 hygiene checks (40–43/45/64) —
-this stale annotation was the source of the plan3/plan4 "94/94" baseline line.
-After S14 (plan4 build `4512fe6`) the baseline is 106/106. The annotation
-drift fix rides the plan5 speaking-readout spec (same probe file).
+The probe's SELF-COUNTED baseline was 94/94 (ninetyfour — machine-verified
+plan5: the old probe executed 94 checks); the header ANNOTATION ("94/94",
+per-section list sum) was stale by the 5 hygiene checks (40–43/45/64) — the
+plan3/plan4 "94/94" baseline line took the stale annotation. After S14
+(plan4 build `4512fe6`) the self-counted baseline is 106/106 (hundred six).
+The annotation drift fix rides the plan5 speaking-readout spec (same probe
+file). NUMWORDS NOTE: the 94↔94 numeral pair is a dense-string trap —
+write these as words in prose.

@@ -22,3 +22,4 @@
 2026-09-15_21-27 --START planner-5 ses_f5978ea6affe6oCCcpZsyN6hEl Qwen3.8-27B-IQ4KT-120K plan5: worker-4 cross-compact CONFIRMED (Gemma COMPACT line 21:17, session at 45%) -> task_id resume w/ post-compaction protocol; tails #8/#9 + nudge item queued after
 2026-09-15_21-30 -->START worker-4 ses_f59c0d40affePju49VV2U179cp Qwen3.8-27B-IQ4KT-120K resume after cross-compact (plan5) — finishing pre-compaction dump hook
 2026-09-15_21-54 DONE<--- worker-4 ses_f59c0d40affePju49VV2U179cp Qwen3.8-27B-IQ4KT-120K 94%/7K — dump hook landed: commit 4512fe6, probe 106/106 PASS, pytest 459+1, ruff F=0
+2026-09-15_22-14 -->START worker-5 ses_f594ba57effeJP9cGt9BI15iDt Qwen3.8-27B-IQ4KT-120K task5: make minimal gauge readout speaking in ctx_watchdog.ts minimalReadout() + re-pin probe byte-exact pins + fix probe header section-sum annotation
