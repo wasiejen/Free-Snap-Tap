@@ -32,10 +32,6 @@ stop/compaction protokol for now 95% - this means explicityl around 90% gauge wi
     - and then to compact the as crosscompaction before dumping their session
     - compaction seems to work quite good so far
 
-# 3 2
-- create scripts for session dumping, easy to use for before compact dumping
-  - needs to be done fast because i am about to start an autorun and thus cannot activate plugin/tool updates this would enable them.
-
 # 3 3
 - you are free to test out different destillation workers on some session dumps. try to use the gemma4 worker ... i need to enable this before (agent_gemma_Q4_128K is available again)... he is a lot faster. so you can put more workers in the same time and experiment with different goals/tasks more.
   - create some roles/skillsets for this if needed to keep track of them and try to find a wide range of different perspectives that could scan the sessions.

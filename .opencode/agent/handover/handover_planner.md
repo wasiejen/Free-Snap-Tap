@@ -100,8 +100,23 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   over absolute line numbers; pointer over inline detail for compressed
   sections. My own failure mode: re-reading the same dense list ("scroll up"
   loop) — stop and script it instead.
-- Queued (his priority order): **`# 3 2` session-dump script + backfill —
-  URGENT (he starts an autorun; no restart possible meanwhile)**; `# 3 3`
+- `# 3 2` DONE (this session, before the stop line): dump script + corpus
+  via worker `ses_f5d03802` (worker_Q4_120K) — `.opencode/agent/scripts/
+  dump_session.cjs` (read-only DB; single-session FULL mode = the
+  pre-compaction dump; `--all` corpus mode) + backfill 137 sessions →
+  `.opencode/archive/sessions/` — commits `ab1451d` + `e877364`. VERIFIED:
+  file count 137 == session count, `readOnly: true` in the code, gates green
+  (99/99, 459+1#10, F=0), his files unstaged, TODO #55 already annotated
+  (unblocked — the `compact_memory` dump HOOK remains his call).
+- Dense-content question ANSWERED (inbox item → `done/`; reply here + in
+  knowledge): (1) mitigation = the PIPELINE-ONLY rule (worked: 7/7 appends
+  with zero section bodies read) + machine counts over in-context counts +
+  anchors over absolute line numbers + emit a dense list at most once; (2)
+  compacted sections: pointers (file + git hash) over inline detail, verify
+  via script, never re-read the stale inline copy. Lessons →
+  `knowledge/knowledge_context.md` (new file) + gauge-lag fact →
+  `knowledge_tools.md`.
+- Queued (his priority order): `# 3 3`
   distillation experiments (gemma4); `# 4` planner-prompt grep command;
   `# 5`/`# 6` knowledge + output-limit rules; `# 7` non-ASCII note; `# 8`
   block_transfer test; `# 9` gauge lag (→ Standing); `# 10` script collection;

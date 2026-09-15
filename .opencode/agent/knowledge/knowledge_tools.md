@@ -172,3 +172,17 @@ instructions/protocol — facts that save lookups. Format per the README:
   section 2026-09-14 (the 2nd-exchange bullet).
 - **Keys:** flush, delegation, single slot, llama-swap, Gemma, compaction
   model, keep, zero-keep, 131K, sequential swap.
+
+## ctx_gauge / `ctx:` lines lag ~2 tool calls — plan with margin
+- **Do:** treat any gauge readout as a LOWER bound of real usage — plan
+  with ~5k margin; trust the freshest reading plus your own tool-call
+  count since it. More tool calls (low thinking) between readouts = a more
+  exact value.
+- **Why (evidence):** maintainer-measured 2026-09-15 (priority.md # 9):
+  `ctx_gauge` and the inline `ctx:` replay lag a large context increase by
+  ~2 tool calls — planner and worker consistently misjudge how close they
+  are to the window end.
+- **Ref:** priority.md # 9 (2026-09-15); the same session's stop-line
+  incident (real wall ≈ 90% gauge reading, see NAP Standing).
+- **Keys:** ctx_gauge, gauge, lag, context window, stop line, 90%,
+  margin, REM.
