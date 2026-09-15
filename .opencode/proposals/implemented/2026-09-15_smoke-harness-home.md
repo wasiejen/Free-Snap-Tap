@@ -53,3 +53,7 @@ They are the anchor of the tested functionality (maintainer 2026-09-15).
 ## Scope (suggested)
 `.opencode/plugin/tests/` (new), the scratchpad source files (read-only),
 `plugin/tests/README.md`.
+
+
+## Verdict (2026-09-15, plan1)
+LANDED + verified (worker-16 build, resumed post-compaction): `plugin/tests/` = 7 smokes + `_smoke_base.mjs` + README, all green from the repo (42/42 on the new smoke self-run); gates 99/99 + 459 passed + 1#10 + ruff F=0. Part 5 (scratchpad originals) stays his call — untouched. Commits: 6c38fd4..109ddff.

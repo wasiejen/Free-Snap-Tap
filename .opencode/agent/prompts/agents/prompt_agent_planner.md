@@ -38,8 +38,12 @@ All paths below are relative to `.opencode/agent/prompts/`.
 - `agent_readme_loop.md` — read when driving the loop (autonomous launch).
 - `.opencode/agent/knowledge/` (repo-root-relative, NOT under agent/prompts) —
   the knowledge base (gained findings, not instructions): read the area file
-  (`knowledge_tools.md` / `knowledge_plugins.md`) when entering that area; add an
-   entry when you gain verified, actionable knowledge (format in its README).
+  when entering that area; when searching for a solution, grep the folder FIRST
+  (output-limited: `grep -n -i "<keyword>" .opencode/agent/knowledge/ | head -30`);
+  when you gain verified, actionable knowledge, append it — `knowledge_inbox.md`
+  (append-only inbox; the planner cures it into the area files) when the
+  placement is unclear, or the area file directly when it is obvious (format in
+  the folder README).
 
 ## .opencode layout
 - Creating a new sub-folder under `.opencode/` requires its README (≤20 lines:
@@ -107,6 +111,10 @@ planning. Plan against a defined goal, not a list of chores.
   FIRST (mandatory, per the Instruction index). Procedure is a suggestion, not a protocol.
 - Pick the worker per the roster in `.opencode/agent/prompts/repo/repo_map.md` (worker for
   implementation, explorer for audit/map).
+- **Context discipline on delegation (his #6, 2026-09-15):** context is the
+  precious resource — the spec names the AREA in big files (file + bounded
+  line range / grep keyword), never "read the whole file"; first greps carry
+  an output limit (`| head -30`); a worker reads only the relevant sections.
 - On the worker's return, **verify** against `git log` + the test baseline — never assume the
   summary is true. Update the NAP, then continue.
 - **Compacted worker = resume, not relaunch:** when a worker's session was
@@ -116,12 +124,22 @@ planning. Plan against a defined goal, not a list of chores.
   post-compaction protocol (`agent_readme_post_compaction.md`) — do not launch
   a fresh worker for the same task. You are the decider of WHEN to resume a worker; before resuming you may compact the worker session first (compact_memory with its sessionID), then resume via task_id. A CROSS `compact_memory` dispatch is fire-and-forget: success = the COMPACT line in `.opencode/temp/ctx.log` / the terminal; a failure burns NO budget. Prefer a DIFFERENT compaction model (e.g. Gemma) → no flush; a SAME-model cross compaction → budget ONE flush delegation after the dispatch (knowledge_tools.md "llama-swap single slot").
 
-## Context-budget trigger (L3)
-Standing rule on top of the stop line (AGENTS.md §Context budget): with a big
-unit ahead and the readout ≥80 % → run `compact_memory` BEFORE starting it;
-≥90 % → compact now, keeping back to the last verified state (NAP current,
-committed); if the tool refuses (session budget exhausted) → hand over per the
-stop line.
+## Context-budget trigger (L3) + stop line (maintainer ruling 2026-09-15, priority.md)
+**Stop line: gauge readout ≈90 %** (his "95 % true wall" with the gauge's
+lagging value included) — this OVERRIDES the 85 % / REM ≤15 k line in
+AGENTS.md §Context budget (his file; the change rides
+`proposals/2026-09-15_stop-compaction-protocol.md` until he lands it).
+Reminders above the line still bind:
+- big unit ahead, readout ≥80 % → `compact_memory` BEFORE starting it;
+- at ≈90 % → stop starting new work; handover current + commit, end clean.
+- **Worker near the limit = order-stop, dump, THEN compact (his protocol):**
+  when a worker approaches the stop line, order it to stop at a safe commit
+  point (handover current); then DUMP its session
+  (`node .opencode/agent/scripts/dump_session.cjs <sid>`, full mode) BEFORE
+  the compaction destroys the fine-grained content; then CROSS
+  `compact_memory` (fire-and-forget) and resume via `task_id` with the
+  post-compaction protocol. Dump-before-compact keeps the corpus complete —
+  the no-overwrite dump naming lands with the #55 build.
 
 ## Early handover (maintainer protocol, 2026-09-12)
 Do not wait for the stop line to write the handover. When the readout reaches
@@ -157,23 +175,29 @@ one at 90 %.
   | `--now` | important, but the current unit finishes first | act after the current verified unit, before other queued work |
   | `--todo` | capture | add a self-contained `TODO.md` entry (standard fields, next ID); no immediate work |
   | `--deferred` (alias `--defer`) | not for now | DEFERRED-flagged `TODO.md` entry; picked up only when nothing else is open |
-  | `--wip` | file live-edited by the maintainer | READ ok, EDIT NO — if a task requires editing that file, stop and flag it in the summary/NAP; the marker is removed only by the maintainer |
-  | `--comment` | maintainer COMMENTARY on the content (NOT an instruction — contrast `--maintainer` = he did/directs something) | read + acknowledge; act only if it contains an explicit request; never remove (owner: maintainer) |
+  | `--wip` | file live-edited by the maintainer | READ ok, EDIT NO — if a task requires editing that file, stop and flag it in the summary/NAP; in afk/autorun it MAY BE IGNORED when it blocks work (his ruling 2026-09-15); the marker is removed only by the maintainer |
+  | `--comment` | maintainer COMMENTARY on the content (NOT an instruction — contrast `--maintainer` = he did/directs something) | read + acknowledge; act only if it contains an explicit request; MAY BE REMOVED once acted on / acknowledged (his ruling 2026-09-15 — supersedes the earlier never-remove) |
   | (no marker) | background | queue; small items (≤ a few lines of effect) may be done inline |
 - **Priority ladder:** direct maintainer message in a primary session > `--maintainer`/`--main` > `--now` > unmarked inbox items (small first) > `--todo` capture > `--deferred`.
 - **Inbox cadence:** the session-start scan = TRIAGE by the ladder, not execution; an
   inbox item is handled when nothing more important is pending; small items (≤ a few
   lines of effect) may be handled inline.
 - **Marker removal:** after a marker item is handled, remove the marker line (the
-  `--main` rule, generalized) — EXCEPT `--wip` and `--comment`, which agents never
-  remove (owner: maintainer).
-- At session start (and after any maintainer touch) grep the repo for the markers —
-  `--main` (the pattern matches `--maintainer` too), `--now`, `--todo`, `--defer`
-  (matches `--deferred`), `--wip`, `--comment` — he may be pointing your attention
-  to something.
-  (Verified 2026-09-12: no clash with FST product content for any marker — all grep
-  hits live in `.opencode/**` docs/agent files; re-verify before relying on a sweep
-  if a marker ever collides with product content.)
+  `--main` rule, generalized) — EXCEPT `--wip` (owner: maintainer, never removed
+  by agents); `--comment` MAY be removed once acted on / acknowledged (his
+  ruling 2026-09-15).
+- At session start (and after any maintainer touch) sweep the markers with the
+  READY-MADE command (do not re-derive the pattern — `--main` matches
+  `--maintainer` too, `--defer` matches `--deferred` too; the filter removes
+  known non-live references, not his live files):
+  ```
+  grep -rn -- "--main\|--now\|--todo\|--defer\|--wip\|--comment" \
+    --include="*.md" .opencode/ TODO.md README.md WIKI.md 2>/dev/null \
+    | grep -v "_past_priorities\|/done/\|agent_feedback\|nap_direct\|archive/"
+  ```
+  He may be pointing your attention to something. (Verified 2026-09-12: no
+  clash with FST product content for any marker — re-verify before relying on
+  a sweep if a marker ever collides with product content.)
 - Interactive: direct asking is fine for critical decisions; proposals preferred.
 - Autonomous: never ask — surface open decisions as proposal files (≤4, bundle
   adjacent items; `proposals/` per `agent_readme_proposals.md`): short overview

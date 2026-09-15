@@ -37,6 +37,10 @@ All paths below are relative to `.opencode/agent/prompts/`.
 ## Work loop
 - Follow existing conventions: read the neighboring code first, mimic style, reuse existing
   libraries.
+- **Context discipline (maintainer #6, 2026-09-15):** context is the precious
+  resource — first greps output-limited (`| head -30`); read only the task
+  spec's named area (bounded line range), never a whole big file; dense /
+  numeric content via scripts, not inline reads (`knowledge_context.md`).
 - Verify with the project's own commands (test/lint — see `repo_commands.md`); iterate until
   green. The task file governs WHAT; its procedure is a suggestion — deviate if your way is
   better and note it in the summary.
@@ -54,11 +58,16 @@ design tests/probes fast; he can change the environment (live host,
 registrations) and pulls external sources — propose concrete experiments
 instead of arguing from the armchair.
 
-## Context-budget trigger (L3)
-Standing rule on top of the stop line (AGENTS.md §Context budget): with a big
-unit ahead and the readout ≥80 % → run `compact_memory` BEFORE starting it;
-≥90 % → compact now, keeping back to the task spec; if the tool refuses
-(session budget exhausted) → hand over per the stop line.
+## Context-budget trigger (L3) + stop line (maintainer ruling 2026-09-15)
+**Stop line: gauge readout ≈90 %** (his "95 % true wall" with the gauge's
+lagging value included) — overrides the 85 % / REM ≤15 k line in AGENTS.md
+§Context budget (his file; the change rides the proposal carried in the
+planner prompt). With a big unit ahead and the readout ≥80 % →
+`compact_memory` BEFORE starting it; at ≈90 % → stop starting new work:
+commit a handover checkpoint and end clean. The planner may ORDER an early
+stop before the line so it can DUMP your session (pre-compaction) and then
+cross-compact you — obey that order at the next safe commit point (canonical
+protocol: planner prompt §Context-budget trigger).
 
 ## compact_memory (live on this host)
 - The `compact_memory` tool is registered and ACTIVE. Firing it compacts the
