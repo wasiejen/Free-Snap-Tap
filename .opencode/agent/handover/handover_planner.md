@@ -165,7 +165,36 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - Loop-log glitch: my START line landed with session id `unknown` (loop_log tool
   `session` param omitted) — corrected via an `--INFO--` line; session =
   ses_f5a01190cffehd0OO4TDPSrwvy.
-- NEXT: worker return → verify (git log + gates), copy the worker summary to
-  `plan3_ho_task_to_planner.md`, add the one-line "look here for helper scripts"
-  pointers to the role prompts (planner-side work per the spec's Notes), TODO curation,
-  plan3_summary.md, DONE line, action line.
+- WORKER-3 RETURN + VERIFIED (ses_f59f7cff0ffer37uRICTRFiyS0, worker_Q4_120K):
+  script collection LANDED — 8 curated scripts in `.opencode/agent/scripts/
+  {binary,db,log}/` (dump_session moved to db/, OUT_DIR fixed), per-category
+  READMEs + rewritten top README, `grep_snippets.md` (marker sweep + 7 recipes),
+  machine-generated `INVENTORY.md` (140 scratchpad scripts). Commits
+  `2933dd0`→`7f7f61c`→`b3a34d8`→`d352e4a`. GATES VERIFIED BY ME: pytest
+  **459 passed + 1 warning**, ruff **F=0**, probe **99/99** (the worker's
+  todo_inbox "did not run the probe" line contradicted its own handover — the
+  probe WAS run; moot after my own run). Diff scope checked: meta files only.
+- BRANCH RE-ALIGNED: the loop had been running on `fst_work2` since plan2
+  (5bdce2a + 4a72c30 landed there; `opencode_test` was 5 commits behind).
+  `opencode_test` fast-forwarded to `d352e4a` and checked out (the standing
+  "loop runs on opencode_test"); `fst_work2` stays at the same commit as the
+  rebind-build branch (the rebind spec's "check if it exists first" step
+  handles it). Cause: my launch message wrongly claimed the checkout was
+  `opencode_test` — codified the "Branch truth" bullet in my prompt.
+- CORPUS REFRESH (planner-direct, pre-approved meta): `dump_session.cjs
+  --all --slim` → 147 sessions, 0 failures (was 137; +9 new sessions incl.
+  today's). Cadence decision stays open as TODO #59.
+- TODO CURATION: new entries **#57** (block_transfer MOVE missing-`dstFile`
+  silent block loss — maintainer call, rec: hoist the check), **#58** (probe
+  command missing from the repo_commands.md gate definition — his file),
+  **#59** (corpus refresh cadence); header → up to #59 / next #60;
+  todo_records.md sync line updated; todo_inbox trimmed to a curation record
+  (all prior blocks already curated).
+- PROMPT POINTERS (planner-side per spec Notes): one-line helper-script
+  pointers added to the worker, explorer, and planner prompts; "Branch truth"
+  bullet added to the planner prompt.
+- NEXT (future iterations): open items are maintainer-gated (#51, #54, #57,
+  #58 + #53/#56 deferred + the parked rebind build + his AGENTS.md paste for
+  the stopline proposal). Clear backlog from his priority.md remains: the
+  #8 block_transfer usage-guide/test tail (check `implemented/` first) and the
+  #9 gauge-lag consequence follow-ups — triage by the next planner.

@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 180150/20352/0
 # messages: 114  parts: 311
-# dumped: 2026-09-15T03:05:46.417Z  mode=slim
+# dumped: 2026-09-15T17:36:43.215Z  mode=slim
 
 2026-09-12T23:13:49.158Z | {"role":"user","agent":"build","summary":{"diffs":[]}}
 2026-09-12T23:13:49.184Z | {"role":"assistant","mode":"build","agent":"build","error":"{\"name\":\"MessageAbortedError\",\"data\":{\"message\":\"Aborted\"}}","tokens":"{\"input\":0,\"output\":0,\"reasoning\":0,\"cache\":{\"read\":0,\"write\":0}}","modelID":"Gemma4-12B-Q4KXL-MTP-128K","providerID":"llama-swap"}

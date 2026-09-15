@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #56, new
-entries start at #57 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #59, new
+entries start at #60 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -178,3 +178,55 @@ All those IDs stay reserved — see the numbering rule in the header.
   (read-only, single-session FULL mode); the maintainer activates it (host
   restart) before the next autorun. NOTE 2026-09-15: the corpus
   `.opencode/archive/sessions/` was backfilled (137 sessions).
+
+## 57. (open, 2026-09-15, worker T1 block_transfer sandbox, curated plan3) — block_transfer MOVE silently deletes a block when `dstFile` is missing
+
+- **Problem / evidence:** in `.opencode/tools/block_transfer.ts`, MOVE mode
+  extracts the source block (CUT) BEFORE the `'dstFile' is required for MOVE
+  mode.` check runs — so a MOVE with `dstFile` missing deletes the block from
+  the source file and only THEN errors: silent data loss of the yanked block.
+  Pre-existing (pre-T1). Recorded by worker-10 (2026-09-12).
+- **Desired outcome:** the `dstFile` requirement is checked before ANY source
+  write — a missing `dstFile` yields the error with the source file untouched.
+  Valid-input semantics stay byte-identical.
+- **Acceptance criteria:** a smoke/assertion proves MOVE with missing
+  `dstFile` → error + source file unchanged; the existing block_transfer
+  smokes stay green.
+- **Suggested scope:** `.opencode/tools/block_transfer.ts` (hoist the
+  `!args.dstFile` check to the top of the anchor-extraction section, before
+  any write); a smoke in `.opencode/plugin/tests/`.
+- **Status:** OPEN — maintainer call (the fix changes observable behavior for
+  INVALID input only: today = error + source modified; after = error only).
+  Planner recommendation: hoist the check (obvious bug fix).
+
+## 58. (open, 2026-09-15, script-collection worker, curated plan3) — standard gate definition lacks the probe command
+
+- **Problem / evidence:** the standing gate baseline mentions "probe 99/99",
+  but the probe command is not defined in `repo_commands.md` §Run / test
+  (pytest + ruff only) — the worker had to infer it from the launch baseline
+  (worker script-collection, 2026-09-15).
+- **Desired outcome:** the gate definition lists all three commands
+  (`pytest -q`, `ruff check --select F .`,
+  `node .opencode/plugin/probes/handover_probe.mjs`) so "standard gate" is
+  unambiguous for every spec/launch.
+- **Acceptance criteria:** `repo_commands.md` §Run / test names the probe
+  command with the current baseline (99/99 as of 2026-09-15).
+- **Suggested scope:** `.opencode/agent/prompts/repo/repo_commands.md`
+  (maintainer-owned file — he edits it or tasks the planner).
+- **Status:** OPEN — maintainer (his file).
+
+## 59. (open, 2026-09-15, script-collection worker, curated plan3) — session-corpus refresh cadence
+
+- **Problem / evidence:** the corpus `.opencode/archive/sessions/` goes stale
+  between backfills (e.g. `ses_f5d03802...` was dumped mid-session: 59 msgs
+  vs 65 in the DB); the pre-compaction dump hook covers new sessions only.
+  PLAN3 (2026-09-15) ran a one-off `dump_session.cjs --all --slim` refresh
+  (147 sessions, 0 failures).
+- **Desired outcome:** a documented cadence / trigger for corpus refreshes
+  (suggestion: before the #56 distillation runs start; after heavy loopruns).
+- **Acceptance criteria:** the cadence decision recorded (NAP Standing or the
+  scripts README); the corpus refreshable via one documented command
+  (`node .opencode/agent/scripts/db/dump_session.cjs --all --slim`).
+- **Suggested scope:** the decision record; `.opencode/archive/sessions/`.
+- **Status:** OPEN — cadence is the maintainer/planner call; the refresh
+  command itself is ready (tested).

@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 75576/30505/0
 # messages: 59  parts: 282
-# dumped: 2026-09-15T03:05:46.328Z  mode=slim
+# dumped: 2026-09-15T17:36:42.796Z  mode=slim
 
 2026-09-12T02:27:11.201Z | {"role":"user","agent":"worker_Q4_120K","summary":{"diffs":[{"file":".opencode/handover/handover_task_to_planner.md","patch":"Index: .opencode/handover/handover_task_to_planner.md\n===================================================================\n--- .opencode/handover/handover_task_to_planner.md\t\n+++ .opencode/handover/handover_task_to_planner.md\t\n@@ -1,66 +1,122 @@\n-# Worker summary — FST unit A (TODO #1): ...
 2026-09-12T02:27:11.218Z | {"role":"assistant","mode":"worker_Q4_120K","agent":"worker_Q4_120K","finish":"tool-calls","tokens":"{\"total\":10925,\"input\":10802,\"output\":123,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":0}}","modelID":"Qwen3.8-27B-IQ4KT-120K","providerID":"llama-swap"}

@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 55001/45900/0
 # messages: 56  parts: 259
-# dumped: 2026-09-15T03:05:46.074Z  mode=slim
+# dumped: 2026-09-15T17:36:41.512Z  mode=slim
 
 2026-09-09T21:16:44.533Z | {"role":"user","agent":"planner_120k_mtp","summary":{"diffs":[{"file":".opencode/ctxgauge/gauge.mjs","patch":"Index: .opencode/ctxgauge/gauge.mjs\n===================================================================\n--- .opencode/ctxgauge/gauge.mjs\t\n+++ .opencode/ctxgauge/gauge.mjs\t\n@@ -1,168 +1,227 @@\n // =============================================================================\n-// Shared context-gauge cor...
 2026-09-09T21:16:44.601Z | {"role":"assistant","mode":"planner_120k_mtp","agent":"planner_120k_mtp","finish":"tool-calls","tokens":"{\"total\":9396,\"input\":9300,\"output\":96,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":0}}","modelID":"Qwen3.8-27B-IQ4KT-100K","providerID":"llama-swap"}

@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 52598/34078/0
 # messages: 70  parts: 291
-# dumped: 2026-09-15T03:05:46.046Z  mode=slim
+# dumped: 2026-09-15T17:36:41.392Z  mode=slim
 
 2026-09-09T05:33:39.417Z | {"role":"user","agent":"build","summary":{"diffs":[{"file":".opencode/plugin/deactivated/handover_v2.4.ts","patch":"Index: .opencode/plugin/deactivated/handover_v2.4.ts\n===================================================================\n--- .opencode/plugin/deactivated/handover_v2.4.ts\t\n+++ .opencode/plugin/deactivated/handover_v2.4.ts\t\n@@ -1,429 +1,458 @@\n // Handover plugin v2 — deterministic handover file o...
 2026-09-09T05:33:39.423Z | {"role":"assistant","mode":"build","agent":"build","finish":"tool-calls","tokens":"{\"total\":13557,\"input\":1184,\"output\":85,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":12288}}","modelID":"Qwen3.8-27B-IQ3KT-120K_MTP","providerID":"llama-swap"}

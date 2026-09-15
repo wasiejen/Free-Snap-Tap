@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 126750/21448/0
 # messages: 34  parts: 161
-# dumped: 2026-09-15T03:05:46.158Z  mode=slim
+# dumped: 2026-09-15T17:36:42.002Z  mode=slim
 
 2026-09-10T14:17:51.946Z | {"role":"user","agent":"worker_Q4_120K","summary":{"diffs":[{"file":".opencode/plugin/handover_v2.4.ts","patch":"Index: .opencode/plugin/handover_v2.4.ts\n===================================================================\n--- .opencode/plugin/handover_v2.4.ts\t\n+++ .opencode/plugin/handover_v2.4.ts\t\n@@ -1,576 +1,560 @@\n // Handover plugin v2 — deterministic handover file ownership, built on the unchanged v1/v1....
 2026-09-10T14:17:51.963Z | {"role":"assistant","mode":"worker_Q4_120K","agent":"worker_Q4_120K","finish":"tool-calls","tokens":"{\"total\":9339,\"input\":9227,\"output\":112,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":0}}","modelID":"Qwen3.8-27B-IQ4KT-120K","providerID":"llama-swap"}

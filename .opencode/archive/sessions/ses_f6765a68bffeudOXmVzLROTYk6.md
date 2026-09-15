@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 81718/17331/0
 # messages: 40  parts: 165
-# dumped: 2026-09-15T03:05:46.429Z  mode=slim
+# dumped: 2026-09-15T17:36:43.268Z  mode=slim
 
 2026-09-13T02:30:47.416Z | {"role":"user","agent":"worker_Q4_120K","summary":{"diffs":[{"file":".opencode/agent/handover/handover_task_to_planner.md","patch":"Index: .opencode/agent/handover/handover_task_to_planner.md\n===================================================================\n--- .opencode/agent/handover/handover_task_to_planner.md\t\n+++ .opencode/agent/handover/handover_task_to_planner.md\t\n@@ -1,101 +1,31 @@\n-# WORKER SUMMARY ...
 2026-09-13T02:30:47.433Z | {"role":"assistant","mode":"worker_Q4_120K","agent":"worker_Q4_120K","finish":"tool-calls","tokens":"{\"total\":12834,\"input\":12744,\"output\":90,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":0}}","modelID":"Qwen3.8-27B-IQ4KT-120K","providerID":"llama-swap"}

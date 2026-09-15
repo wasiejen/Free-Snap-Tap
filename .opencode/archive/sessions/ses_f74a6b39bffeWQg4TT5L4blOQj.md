@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 36644/18309/0
 # messages: 28  parts: 134
-# dumped: 2026-09-15T03:05:46.140Z  mode=slim
+# dumped: 2026-09-15T17:36:41.889Z  mode=slim
 
 2026-09-10T12:44:40.425Z | {"role":"user","agent":"agent_Q4_120K","summary":{"diffs":[{"file":".opencode/handover_task_to_planner.md","patch":"Index: .opencode/handover_task_to_planner.md\n===================================================================\n--- .opencode/handover_task_to_planner.md\t\n+++ .opencode/handover_task_to_planner.md\t\n@@ -1,127 +1,78 @@\n-# WORKER SUMMARY — #47 §3 docs (PARTIAL — context stop line hit after chunk 1)...
 2026-09-10T12:44:40.442Z | {"role":"assistant","mode":"agent_Q4_120K","agent":"agent_Q4_120K","finish":"tool-calls","tokens":"{\"total\":10093,\"input\":9993,\"output\":100,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":0}}","modelID":"Qwen3.8-27B-IQ4KT-120K","providerID":"llama-swap"}

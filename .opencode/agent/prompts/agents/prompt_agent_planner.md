@@ -121,6 +121,13 @@ planning. Plan against a defined goal, not a list of chores.
   precious resource — the spec names the AREA in big files (file + bounded
   line range / grep keyword), never "read the whole file"; first greps carry
   an output limit (`| head -30`); a worker reads only the relevant sections.
+  For bounded DB / binary / log inspection, point the worker at the curated
+  helper collection `.opencode/agent/scripts/` (README + INVENTORY.md) instead
+  of letting it re-derive throwaway scripts.
+- **Branch truth (plan3 lesson):** never name a working branch in a launch
+  message or task spec from memory — verify the actual checkout first
+  (`git branch -v`) and say "stay on the current checkout" only when that is
+  what you mean.
 - On the worker's return, **verify** against `git log` + the test baseline — never assume the
   summary is true. Update the NAP, then continue.
 - **Compacted worker = resume, not relaunch:** when a worker's session was

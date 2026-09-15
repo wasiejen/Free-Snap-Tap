@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 140673/41457/0
 # messages: 45  parts: 203
-# dumped: 2026-09-15T03:05:46.191Z  mode=slim
+# dumped: 2026-09-15T17:36:42.174Z  mode=slim
 
 2026-09-10T22:11:22.522Z | {"role":"user","agent":"planner_Q4_120K","summary":{"diffs":[]}}
 2026-09-10T22:11:22.538Z | {"role":"assistant","mode":"planner_Q4_120K","agent":"planner_Q4_120K","finish":"tool-calls","tokens":"{\"total\":9915,\"input\":9695,\"output\":220,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":0}}","modelID":"Qwen3.8-27B-IQ4KT-120K","providerID":"llama-swap"}

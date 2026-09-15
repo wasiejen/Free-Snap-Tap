@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 86994/39508/0
 # messages: 30  parts: 146
-# dumped: 2026-09-15T03:05:46.106Z  mode=slim
+# dumped: 2026-09-15T17:36:41.675Z  mode=slim
 
 2026-09-10T07:45:34.751Z | {"role":"user","agent":"worker_Q4_120K","summary":{"diffs":[{"file":"README.md","patch":"Index: README.md\n===================================================================\n--- README.md\t\n+++ README.md\t\n@@ -1,263 +1,263 @@\n # Free Snap Tap: Universal Keyboard Snap Tap with Tap Groups, Rebinds (Key Replacements), Macros (Aliases) and custom adjustable delay for each key.\r\n \r\n **Works as of V0.8.0 without t...
 2026-09-10T07:45:34.767Z | {"role":"assistant","mode":"worker_Q4_120K","agent":"worker_Q4_120K","finish":"tool-calls","tokens":"{\"total\":9232,\"input\":9136,\"output\":96,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":0}}","modelID":"Qwen3.8-27B-IQ4KT-120K","providerID":"llama-swap"}

@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 242914/63899/0
 # messages: 52  parts: 206
-# dumped: 2026-09-15T03:05:46.062Z  mode=slim
+# dumped: 2026-09-15T17:36:41.458Z  mode=slim
 
 2026-09-09T16:32:55.911Z | {"role":"user","agent":"planner_120k_mtp","summary":{"diffs":[{"file":"SCRATCH_PAD.md","patch":"Index: SCRATCH_PAD.md\n===================================================================\n--- SCRATCH_PAD.md\t\n+++ SCRATCH_PAD.md\t\n@@ -1,395 +1,406 @@\n # SCRATCH PAD — maintainer's personal notebook (NOT a changelog)\r\n \r\n Free-form running tally: what I did, ideas I had, bugs I tracked. Not an\r\n authoritative r...
 2026-09-09T16:32:55.994Z | {"role":"assistant","mode":"planner_120k_mtp","agent":"planner_120k_mtp","finish":"tool-calls","tokens":"{\"total\":9147,\"input\":8778,\"output\":369,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":0}}","modelID":"Qwen3.8-27B-IQ3KT-120K_MTP:chat","providerID":"llama-swap"}

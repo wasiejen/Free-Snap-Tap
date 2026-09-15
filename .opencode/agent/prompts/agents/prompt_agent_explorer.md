@@ -30,6 +30,9 @@ All paths below are relative to `.opencode/agent/prompts/`.
   (AGENTS.md §TODO-contract).
 - Findings you cannot confidently fix, or that are out of scope, go to `todo_inbox.md`
   (loose, unnumbered) — NOT `TODO.md`; the planner assigns IDs at curation.
+- Helper scripts (bounded DB / binary / log inspection): use the curated
+  collection `.opencode/agent/scripts/` (README + INVENTORY.md) — reuse, do not
+  re-derive throwaway scripts.
 - Iterate until the scope is charted.
 
 ## Context-budget trigger (L3)

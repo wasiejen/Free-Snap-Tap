@@ -10,65 +10,15 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
 - Entry shape: `## <YYYY-MM-DD> — <role>` + problem/evidence + files + why it
   matters.
 
-## 2026-09-10 — planner curation (iter 3)
-- Worker block (2026-09-10) curated: the two `repo_map.md` findings → `TODO.md`
-  **#50** (repo-map refresh; maintainer-owned file). The 02-03 loop.log item was
-  already ruled in the NAP iter-2 block (separate prompt-only task; both file
-  copies in `maintainer/done/`) — no further action.
-
-## 2026-09-10 — worker (date-convention sweep)
-- (curated iter 4, 2026-09-11) Process note, no repo file to fix: future sweep
-  specs use a broader name-scan regex / lookaround (the `\b26\d{4}\b` DoD regex
-  misses M-prefixed names). Recorded in the NAP iter-3 deviation block; not a
-  TODO entry.
-
-## 2026-09-11 — worker (T3, compact_memory)
-- (curated 2026-09-11, iter-2) → `TODO.md` **#51** (stale probe header vs
-  package.json "type" field — maintainer call).
-
-## 2026-09-12 — worker (T5 re-verify)
-- (curated 2026-09-12, iter-6) Stale plugin "byte-identical" comment →
-  comment-only fix in `context_recovery.ts` (the stale claim corrected; the
-  runtime directive string is UNCHANGED, probe-pinned by check 78) + the
-  looprunner-line keep/remove decision surfaced at
-  `proposals/2026-09-12_recovery-directive-looprunner-line.md` (maintainer
-  call; recommendation: keep). No TODO.md entry.
-- (curated 2026-09-12, iter-6) Spec delta (the re-verify spec assumed
-  `args` is a zod object; committed reality: a PLAIN object of NAME → zod
-  schema — opencode tool() convention) → process note, no TODO entry: the
-  probe is aligned to the committed reality (`Object.keys(cmTool.args ?? {})`
-  + per-value `safeParse` guard); the fact is recorded in the NAP iter-6
-  block (spec-discipline lesson: verify the committed shape before prescribing
-  the probe access in a spec).
-
-## 2026-09-12 — worker-10 (T1, block_transfer sandbox)
-- MOVE mode with `dstFile` missing: the block is CUT from the source BEFORE
-  the `'dstFile' is required for MOVE mode.` check runs (the check sits in
-  the later MOVE section, after the src write), so the block is silently
-  LOST from the source file. Pre-existing (not introduced by T1). I did NOT
-  hoist the check because that changes observable behavior for allowed
-  paths (T1 approval boundary: allowed-path semantics must stay
-  byte-identical — the planner decides). Fix would be: move the
-  `!args.dstFile` check to the top of the anchor-extraction section, before
-   any write. File: `.opencode/tools/block_transfer.ts`. Recorded as an open
-   item in the worker summary.
-
-## 2026-09-15 — worker_Q4_120K (script collection, spec 4a72c30)
-- Launch message said "stay on `opencode_test` (current checkout)" but the
-  actual checkout was `fst_work2` (cut from `opencode_test`, carries the FST
-  batch + spec commit 4a72c30). I stayed on the current checkout (fst_work2)
-  — the spec hash lives there, and switching was forbidden. Looprunner/planner:
-  align launch messages with the real checkout (branch names drift across
-  loopruns). No repo impact.
-- Stale corpus entry: `.opencode/archive/sessions/ses_f5d03802affekevrhzPdvLFaHQ.md`
-  was dumped mid-session (59 msgs; the DB now has 65 — the final bash call's
-  status changed running->completed). My dump_session idempotency test
-  re-dumped it (126 ins/7 del), which I REVERTED as out-of-scope. A
-  `node .opencode/agent/scripts/db/dump_session.cjs --all --slim` (or full)
-  refresh would bring the whole corpus current — planner/maintainer call on
-  cadence (the pre-compaction dump convention already covers new sessions).
-- The launch "standard gate" baseline mentioned "probe 99/99" beyond the two
-  named commands (pytest + ruff, both matched baseline: 459 passed + 1
-  warning, ruff F=0). No probe command was defined in the spec or
-  repo_commands.md, so I did not run it — if it is part of the gate, add the
-  command to repo_commands.md.
+## 2026-09-15 — planner curation (plan3)
+- Trimmed all prior blocks (2026-09-10..2026-09-15): the 09-10/09-11/09-12
+  blocks were already curated when they landed (records in the NAP history +
+  this file's prior state in git log).
+- Worker-10 (09-12) block_transfer MOVE/`dstFile` block-loss finding →
+  `TODO.md` **#57**.
+- Script-collection worker (09-15): branch-name mismatch in the launch
+  message → handled (planner prompt "Branch truth" bullet, plan3; the loop
+  branches were re-aligned, `opencode_test` fast-forwarded to the loop HEAD);
+  stale corpus → one-off `--all --slim` refresh executed (plan3) + cadence
+  decision → `TODO.md` **#59**; missing probe command in the gate definition
+  → `TODO.md` **#58**.

@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 173204/53749/0
 # messages: 72  parts: 308
-# dumped: 2026-09-15T03:05:46.241Z  mode=slim
+# dumped: 2026-09-15T17:36:42.411Z  mode=slim
 
 2026-09-11T11:08:14.534Z | {"role":"user","agent":"planner_Q4_120K","summary":{"diffs":[{"file":".opencode/archive/autorun-2026-09-10-0/plan1_summary.md","patch":"Index: .opencode/archive/autorun-2026-09-10-0/plan1_summary.md\n===================================================================\n--- .opencode/archive/autorun-2026-09-10-0/plan1_summary.md\t\n+++ .opencode/archive/autorun-2026-09-10-0/plan1_summary.md\t\n@@ -1,73 +0,0 @@\n-# plan...
 2026-09-11T11:08:14.562Z | {"role":"assistant","mode":"planner_Q4_120K","agent":"planner_Q4_120K","finish":"tool-calls","tokens":"{\"total\":11195,\"input\":11089,\"output\":106,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":0}}","modelID":"Qwen3.8-27B-IQ4KT-120K","providerID":"llama-swap"}

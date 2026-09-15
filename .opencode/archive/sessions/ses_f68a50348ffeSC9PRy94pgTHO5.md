@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 114943/3741/0
 # messages: 44  parts: 131
-# dumped: 2026-09-15T03:05:46.414Z  mode=slim
+# dumped: 2026-09-15T17:36:43.195Z  mode=slim
 
 2026-09-12T20:41:57.701Z | {"role":"user","agent":"planner_Q4_120K","summary":{"diffs":[]}}
 2026-09-12T20:41:57.726Z | {"role":"assistant","mode":"planner_Q4_120K","agent":"planner_Q4_120K","error":"{\"name\":\"APIError\",\"data\":{\"message\":\"Not Found: no router for requested model\",\"statusCode\":404,\"isRetryable\":false,\"responseHeaders\":{\"content-length\":\"60\",\"content-type\":\"application/json\",\"date\":\"Sat, 12 Sep 2026 20:41:57 GMT\"},\"responseBody\":\"{\\\"error\\\":\\\"no router for requested model\\\",\\\"src\...

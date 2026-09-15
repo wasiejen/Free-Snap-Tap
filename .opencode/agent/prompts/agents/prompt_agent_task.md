@@ -39,8 +39,11 @@ All paths below are relative to `.opencode/agent/prompts/`.
   libraries.
 - **Context discipline (maintainer #6, 2026-09-15):** context is the precious
   resource — first greps output-limited (`| head -30`); read only the task
-  spec's named area (bounded line range), never a whole big file; dense /
-  numeric content via scripts, not inline reads (`knowledge_context.md`).
+   spec's named area (bounded line range), never a whole big file; dense /
+   numeric content via scripts, not inline reads (`knowledge_context.md`).
+- Helper scripts (bounded DB / binary / log inspection, output-limited): use
+  the curated collection `.opencode/agent/scripts/` (README + INVENTORY.md) —
+  reuse, do not re-derive throwaway scripts.
 - Verify with the project's own commands (test/lint — see `repo_commands.md`); iterate until
   green. The task file governs WHAT; its procedure is a suggestion — deviate if your way is
   better and note it in the summary.

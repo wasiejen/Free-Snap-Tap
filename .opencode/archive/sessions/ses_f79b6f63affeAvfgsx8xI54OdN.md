@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 193715/60035/0
 # messages: 59  parts: 270
-# dumped: 2026-09-15T03:05:46.050Z  mode=slim
+# dumped: 2026-09-15T17:36:41.415Z  mode=slim
 
 2026-09-09T13:08:48.760Z | {"role":"user","agent":"planner_120k_mtp","summary":{"diffs":[{"file":".opencode/handover_planner.md","patch":"Index: .opencode/handover_planner.md\n===================================================================\n--- .opencode/handover_planner.md\t\n+++ .opencode/handover_planner.md\t\n@@ -1,157 +1,186 @@\n # HANDOVER PLANNER — Phase 6: opencode planner/worker workflow (Tier 1 + Tier 2)\n \n FIRST read `AGENTS.m...
 2026-09-09T13:08:48.922Z | {"role":"assistant","mode":"planner_120k_mtp","agent":"planner_120k_mtp","finish":"tool-calls","tokens":"{\"total\":8787,\"input\":8596,\"output\":191,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":0}}","modelID":"Qwen3.8-27B-IQ3KT-120K_MTP:chat","providerID":"llama-swap"}

@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 35393/16093/0
 # messages: 43  parts: 200
-# dumped: 2026-09-15T03:05:46.276Z  mode=slim
+# dumped: 2026-09-15T17:36:42.532Z  mode=slim
 
 2026-09-11T18:04:23.099Z | {"role":"user","agent":"worker_Q4_120K","summary":{"diffs":[{"file":".opencode/handover/handover_task_to_planner.md","patch":"Index: .opencode/handover/handover_task_to_planner.md\n===================================================================\n--- .opencode/handover/handover_task_to_planner.md\t\n+++ .opencode/handover/handover_task_to_planner.md\t\n@@ -1,72 +1,87 @@\n-# EXECUTIVE SUMMARY — TODO #48: mouse filt...
 2026-09-11T18:04:23.135Z | {"role":"assistant","mode":"worker_Q4_120K","agent":"worker_Q4_120K","finish":"tool-calls","tokens":"{\"total\":9935,\"input\":9861,\"output\":74,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":0}}","modelID":"Qwen3.8-27B-IQ4KT-120K","providerID":"llama-swap"}

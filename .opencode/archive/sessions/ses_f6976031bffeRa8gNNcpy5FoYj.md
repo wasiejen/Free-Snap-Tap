@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 79288/43301/0
 # messages: 66  parts: 279
-# dumped: 2026-09-15T03:05:46.391Z  mode=slim
+# dumped: 2026-09-15T17:36:43.084Z  mode=slim
 
 2026-09-12T16:53:40.719Z | {"role":"user","agent":"planner_Q4_120K","summary":{"diffs":[{"file":".opencode/agent/handover/handover_planner.md","patch":"Index: .opencode/agent/handover/handover_planner.md\n===================================================================\n--- .opencode/agent/handover/handover_planner.md\t\n+++ .opencode/agent/handover/handover_planner.md\t\n@@ -1,1033 +1,1081 @@\n # HANDOVER PLANNER — Phase 6 (post-T1; autono...
 2026-09-12T16:53:40.733Z | {"role":"assistant","mode":"planner_Q4_120K","agent":"planner_Q4_120K","finish":"tool-calls","tokens":"{\"total\":14326,\"input\":13932,\"output\":394,\"reasoning\":0,\"cache\":{\"write\":0,\"read\":0}}","modelID":"Qwen3.8-27B-IQ4KT-120K","providerID":"llama-swap"}
