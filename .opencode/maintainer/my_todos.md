@@ -27,17 +27,15 @@
 good compare of gemma4 models
 ![](image.bmp)
 
-260915-0505: check permissions and tools for looprunner
-- he can not see the loop_log tool even if it is enabled
-- also very likely he has no access to the compact_memory tool
-  - so the fallback of compacting a context_limit sitting planner is not possible atm
-- looprunner prompt needs rework
-  - inclusion of afk mode 
-  - and compaction protokol for in context limit sitting planner
-
 - check if there are better ways to name folders/use dates that do not lead agents into the dense numerical/data trap
   - misreading constantly of 2026-09-11 -> 2026-09-12
   - these are friction points i want feedback in their summaries :-)
+  - number 55 is trumblesome - one agent -> 56, another -> 54
+  - "49 + 6: 49 + 1 = 50. 49 + 6 = 50 + 5 = 54? No: 50 + 5 = 54?? 50+5: 50+5 = 54. 50+5 = 54. Aaaarg"
+- reference proposal: every number needs a reference like a line number to be included -> double setting makes it more likely to be found when mislabeld
+- allowance to just write unknown with line number e.g. - to prevent to often attempts to handcalculate
+  - no handcalc in general
+  - might need to dump my convo with perplexity AI here about this exact topic - lets see what sticks to the planner in a direct session
 
 260915-1400:
 potential models for compaction/text/destillation work
@@ -52,6 +50,9 @@ potential models for compaction/text/destillation work
 - unsloth/Qwen3.6-35B-A3B-GGUF or thireus strong candidate - but very big and needs to be offloaded to ram
   - speed? A3B is very small so could be fast non the less
   - prefill will degrade under ram usage i quess - not good for destillation
+
+
+
 
 260915-1740:
 a fucking completions request seems to have booted my model out of llama-swap and broken the loop (tid 21740 whoever you are - pid 4 system - so i can not see who send it)
