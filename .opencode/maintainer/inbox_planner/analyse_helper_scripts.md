@@ -5,6 +5,13 @@
   - sitting in agent/scripts folder? usage for agent as meaning of folder hierachy? possible. has nothing to do with tool or plugin scripts.
   - can be in many programming languages
 - look in the opencode/Temp folder and analyse the scripts there and collect the ideas in these to find common usage cases
+- select good overall scripts are that do one particular thing very well and test them out, so they behave es expected
+  - then move them into the repo. e.g. agent/scripts or helper/scripts sorted by area/category in subfolders and a self explaining name
+  - document the scripts in one or more file (if more then one category folder) and make references in the appropiate prompt files for the agents to know were to look for if they need specialized tools.
+  - if these agents need to adapt them, they should make a copy and then are free to adapt them, but recommended to use the tested scripts to reduce possibility of unintended sideeffects
+
+- especially important are scripts to deal with dense content
+  - see .opencode\maintainer\inbox_planner\example_for_dense_content_warning.md
 
 
 -comment copied from a planner that looked for documentation very efficiently:
