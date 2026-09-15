@@ -12,3 +12,4 @@
 2026-09-15_19-12 -->START worker_Q4_120K ses_f59f7cff0ffer37uRICTRFiyS0 Qwen3.8-27B-IQ4KT-120K helper-script collection: curate scratchpad scripts into .opencode/agent/scripts/ (spec 4a72c30, iter-3)
 2026-09-15_19-29 DONE<--- worker_Q4_120K ses_f59f7cff0ffer37uRICTRFiyS0 Qwen3.8-27B-IQ4KT-120K script collection complete — 8 scripts (binary/db/log) + READMEs + grep_snippets + INVENTORY; gate green (459+1w, F=0, probe 99/99); handover committed d352e4a; SESSION=ses_f59f7cff0ffer37uRICTRFiyS0 CTX=99652 (83%) REM=20348
 2026-09-15_19-42 -RETURN- planner-3 ses_f5a01190cffehd0OO4TDPSrwvy Qwen3.8-27B-IQ4KT-120K worker-3 ses_f59f7cff0ffer37uRICTRFiyS0 worker_Q4_120K
+2026-09-15_19-45 DONE<--- planner-3 ses_f5a01190cffehd0OO4TDPSrwvy Qwen3.8-27B-IQ4KT-120K 84%/18K
