@@ -88,11 +88,24 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   toggle), #57 (feedback file
   `maintainer/feedback/2026-09-16_block_transfer_status.md` — answers his
   buffer/sandbox/shared-scriptlet questions).
-- Queued next iterations (all approved): (1) 5.3 functional prototype
-  (log-only intercept, separate plugin + log) — spec per addendum scope;
-  (2) #55 compact_memory approved improvements; (3) repo-split
-  research/proposal (priority.md); (4) corpus scan of adder-deconstruction
-  attempts (addendum C5 — feeds #56 when the deferral lifts).
+- **5.3 functional prototype LANDED + verified** (worker-2
+  ses_f55bd6887ffeeIRO1FXrplLr78 per handover): `plugin/intercept_observer.ts` (518 lines,
+  `tool.execute.before`, ALL tools, log-only — NEVER mutates
+  output.args / NEVER blocks; observations: dense-digit, numword tokens
+  via the ONE shared `numwords.json` (no second copy), `|`-pair
+  left/right check, doubled segments, out-of-sandbox NOTE) + 24-check
+  smoke + probe S18 (21 checks) → gate 169/169. GATE RE-RUN BY ME: probe
+  169/169, smoke 24/24, pytest 459+1w, ruff F=0; spot-check verdicts
+  (4|four → observed-redundancy-ok + path-anomaly; 4|fourex →
+  no-candidate; C7 8-field shape + verdict vocabulary exact). Documented
+  deviation: unknown-word pair → `no-candidate` (the C7 vocabulary has no
+  observed-only verdict). Live activation RESTART-GATED (#51/#55 pattern):
+  one restart = acceptance; first `intercept.log` lines are the live
+  evidence (check at the next restart).
+- Queued next iterations (all approved): (1) #55 compact_memory approved
+  improvements; (2) repo-split research/proposal (priority.md); (3) corpus
+  scan of adder-deconstruction attempts (addendum C5 — feeds #56 when the
+  deferral lifts).
 - §5.4 mutation-channel one-shot: NOT in his approval scope (5.3 approved
   WITHOUT correction) — stays addendum open question 3 (needs a restart +
   his call).
@@ -113,10 +126,10 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 ## Standing
 - Baselines (re-verified 2026-09-16, plan1, gates re-run by the planner
-  after worker-1): probe **148/148** (S17 added 26 numword pins; the header
-  annotation total is DIGIT-form — worker-1 code-wins flag); pytest **459
-  passed + 1 warning (the known #10 coroutine warning)**; ruff **F=0**.
-  All 7 smokes green.
+  after worker-2): probe **169/169** (S17=26 numword pins, S18=21
+  intercept-observer pins; the header annotation total is DIGIT-form);
+  pytest **459 passed + 1 warning (the known #10 coroutine warning)**;
+  ruff **F=0**. All 8 smokes green (7 + intercept_observer 24/24).
 - Corpus refresh cadence (planner call, plan6 — TODO #59 CLOSED): refresh
   BEFORE the #56 distillation runs + after heavy loopruns —
   `node .opencode/agent/scripts/db/dump_session.cjs --all --slim`.
