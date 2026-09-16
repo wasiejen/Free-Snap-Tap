@@ -41,6 +41,8 @@ All paths below are relative to `.opencode/agent/prompts/`.
    `[left:right]` pairs, where the form applies): read when you pass dense
    numerals (paths, ids, totals, dates). The `decision-record.md` next to it
    is LARGE (~10k tokens) — grep it by section, do not read it whole.
+   TEMPORARY (until R1 lands): form in prose/commit text only — NOT in tool
+   arguments (unresolved forms pass through raw and break the call).
 
 ## Work loop
 - Follow existing conventions: read the neighboring code first, mimic style, reuse existing

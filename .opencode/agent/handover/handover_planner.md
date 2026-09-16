@@ -141,9 +141,16 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - **Primer landed (his request, session end):** `research/fuzzy-numword/
   primer.md` (short usage form: when/forms/where/observer-behavior/do-nots,
   with the "grep the 10k record, don't read it" guard) + Instruction-index
-  pointer lines in planner AND worker prompts (need-based read). His AGENTS.md
-  paste (§4 draft) still pending — once pasted, the prompt lines can shrink
-  to a one-line pointer (de-dupe).
+  pointer lines in planner AND worker prompts (need-based read).
+- **R1 LAUNCHED** (this session, worker_Q4_140K): spec in
+  `handover/handover_task.md` (launch header + plan2 baseline 180/180).
+  His AGENTS.md paste CONFIRMED committed (bf18f14, matches §4 draft) — the
+  permanent rule now lives in 3 carriers (AGENTS.md + primer + prompt index
+  lines); his call: the redundancy "sticks better for the beginning".
+  **Live-state guard** (TEMPORARY, remove when R1 lands): until R1 the
+  observer does NOT resolve forms in tool args (raw pass-through breaks the
+  call) — guard line in primer + both prompt index entries. R2 approval
+  still pending from him.
 
 ## Standing
 - Baselines (re-verified 2026-09-16, plan2, gates re-run by the planner

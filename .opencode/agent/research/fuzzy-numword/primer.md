@@ -32,9 +32,11 @@ strings drift. In doubt, use a pair.
 - read-scope: fuzzy-resolves mistyped `read` paths (d<=2, gap>=2) and (from
   R1) resolves `[left:right]` in `read` args; write tools are never touched
   (R2 pending).
-- pair detection switches to the `[left:right]` form with R1; until then a
-  pair arg may simply not be logged — the convention is still the right
-  thing to write.
+- pair detection switches to the `[left:right]` form with R1.
+- **TEMPORARY (until R1 lands):** the observer does NOT yet resolve forms in
+  tool arguments — a form in a tool arg passes through RAW and the call
+  breaks (e.g. a read path containing `[8-6-1]` = ENOENT). Until R1: use the
+  form in prose / commit text / TODO only — NOT in tool arguments.
 
 ## Do not
 Write the form into code; invent new delimiters or separators; add words to

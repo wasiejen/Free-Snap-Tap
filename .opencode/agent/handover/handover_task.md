@@ -1,107 +1,77 @@
-# TASK — worker: make intercept_observer loadable + implement the read-scope fuzzy read function
+# R1 spec — read-scope `[left:right]` pair resolution + form switch + sandbox fix
 
-Worker: `worker_Q4_140K`. Stay on the current checkout (opencode_test).
+STATUS: LAUNCHED 2026-09-16, direct session ses_f5476dc3affeVynFjtGEdnXQO4 —
+approvals: maintainer "go for read-scope" + "so lets start with R1 then"
+(2026-09-16). Stay on the current checkout (opencode_test). The baseline
+below is plan2-committed green — at start, re-verify the self-annotation
+against the probe file (machine-read). Design source (read this BEFORE the
+code — the reasoning is there, do not re-derive):
+`.opencode/agent/research/fuzzy-numword/decision-record.md` §2.
 
-**PATH DISCIPLINE (a previous launch died on this):** your working directory
-IS the repo root. Use RELATIVE paths everywhere (bash, read, edit, git).
-NEVER retype the absolute repo root — the previous worker drifted into a
-doubled path (`...Projects\OpenCodeProjects\OpenCodeProjects\...`) and hit a
-permission rejection that killed the launch. If any call is rejected on a
-path, retry with a relative form — do not retype absolute paths.
-Baseline (re-verified by the planner 2026-09-16, plan2): probe **169/169**
-(`node .opencode/plugin/probes/handover_probe.mjs`), pytest **459 passed +
-1 warning** (`.venv`), ruff **F=0** (`.venv/Scripts/ruff.exe check --select F .`),
-smokes green incl. `intercept_observer.smoke.mjs` 24/24.
+## Goal
+The intercept observer resolves the redundancy pair in READ scope and the
+pair grammar switches from the old tight `digit|word` pipe form to
+`[left:right]`.
 
-## Verified planner facts (do not re-derive)
+## Verified facts (measured at spec time — build on these, do not re-verify)
+- Baseline: probe 180/180 (self-annotation is the source, `handover_probe.mjs`
+  line ~452; S18 = 32 checks at line ~3111). Loader contract: the plugin file
+  must keep `grep -c ^export` = 1 (default export only — pinned by S18).
+- Current pair detector: `PAIR_RE` at `intercept_observer_core.ts` line 262,
+  `\b(\d{1,12})\|([a-z][a-z-]*)` (tight digit|word). All eight verdicts are
+  frozen in `VERDICTS` (line ~103) and probe-pinned — a NEW verdict means a
+  new probe pin.
+- Read-scope mutation already exists for fuzzy (`intercept_observer.ts` line
+  ~240: `if (tool === "read")`); the pair work plugs into the same hook.
+- Word map (single home, read by plugin + scriptlets):
+  `.opencode/agent/scripts/numword/numwords.json` — do NOT add words.
+- Smoke: `.opencode/plugin/tests/intercept_observer.smoke.mjs` (29/29).
 
-- The opencode plugin loader (verified in the installed binary's minified
-  source): a plugin module is normalized by iterating `Object.values(module)`
-  and EVERY value must be a function (or an object with a function
-  `.server`) — else `TypeError("Plugin export is not a function")` at load.
-  `intercept_observer.ts` exports ~16 named constants/functions, so it FAILS
-  to load in the live host (opencode.log run of 2026-09-16:
-  `error="Plugin export is not a function"`); `ctx_watchdog.ts` (default
-  export ONLY, line 719) loads fine. **Root cause confirmed — this is the
-  small fix the maintainer anticipated.**
-- The pure core (all named exports: `loadNumwordMap`, `resolveNumword`,
-  `classifyContext`, `observeDense/Pairs/Numword/PathAnomaly/Sandbox`,
-  `observeArg`, `flattenField`, `underRoot`, the `VERDICTS`/`VERDICT_RANK`/
-  constants/regexes) is fully pinned by probe S18 (checks 150–170, section
-  starts at line ~3086 in `handover_probe.mjs`) and smoke (24 checks). The
-  probe imports the plugin file direct (`OBS_TS`, line ~3098) and uses
-  `ioMod.<named>` + `ioMod.default`; the smoke uses `mod.default` only.
-- Design source for the read function: research doc
-  `.opencode/agent/research/2026-09-16_fuzzy-and-numword-tool-reliability.md`
-  §2.2–2.7 (matcher: exact → normalize (case/slash/trim) → Levenshtein over
-  FULL relative paths; accept d<=2 AND gap to second-best >= 2; else
-  fail-closed with top-N candidate log; corpus cached, TTL-bounded) and
-  §2.3 scope rule (READ-ONLY tools only — writes/edit/delete NEVER fuzzy).
-- The plugin must stay RESTART-GATED for live acceptance (hooks load at
-  registration). Do NOT try to prove liveness — pin + gate green is the DoD.
+## Scope (what to build)
+1. **Pair grammar switch** (core): `[left:right]`, NO inner spaces, exactly
+   one `:`. left ∈ digit-as-seen `[0-9]+` | adder `\d+(\+\d+)*` | numword
+   dash-form (map words, `fourty` alias, `-`-separated single units); right =
+   numword dash-form ONLY. Right side unresolved (unknown word) →
+   `no-candidate`, never a guess. Multiple pairs per arg → independent
+   resolution, one log line each. Old tight `digit|word` form: no longer
+   detected (the form is dead — his ruling 2026-09-16).
+2. **Read-scope resolution**: `read` + string `filePath` containing a pair →
+   resolve the pair to the canonical digits (adder-left = sum; right-wins on
+   left/right mismatch — the canonical is ALWAYS the right-derived value;
+   mismatch additionally flagged in the evidence field) → EXISTENCE GATE:
+   mutate `output.args.filePath` only if the canonical path exists AND the
+   pair-containing path does not (both/neither → fail-closed, original arg,
+   gate evidence logged). New verdict `pair-resolved` (added to `VERDICTS` +
+   pinned). Non-read tools: pair logging ONLY (existing
+   `observed-redundancy-ok` / `redundancy-mismatch` / `no-candidate`
+   verdicts on the NEW form).
+3. **Sandbox allowed roots**: out-of-sandbox check accepts repo root +
+   `C:/Users/Wasiejen/AppData/Local/Temp/opencode` (scratchpad — approved
+   external dir; today it flags noise on every scratchpad use, measured).
+4. **Probe** (S18 extension or new S19 — worker's call, pin the choice in
+   the self-annotation): grammar (match / mismatch→right-wins / adder-sum /
+   unknown-right / multi-pair / old-form-no-longer-detected), read mutation
+   (canonical exists → mutated + `pair-resolved`; canonical absent →
+   fail-closed), non-read tool = no mutation, scratchpad NOT
+   out-of-sandbox. Update the self-annotation total (machine-check, never
+   retype the digits).
+5. **Smoke**: pair-resolution round-trip case added.
 
-## Unit 1 — export fix (core split)
+## Definition of done
+- Probe green at the NEW self-annotation total; smoke green; `pytest` and
+  `ruff` unchanged-green; plugin `grep -c ^export` = 1; standard gate per
+  `repo_commands.md` all green; handover summary with measured numbers.
 
-1. New file `.opencode/plugin/intercept_observer_core.ts`: moves ALL named
-   exports out of the plugin file (types, constants, regexes, pure functions)
-   — the file is a pure module, default export NOT required (it is never
-   loaded by the host loader directly).
-2. `intercept_observer.ts` keeps ONLY the hook plumbing (dir/map state,
-   getModel, appendRaw/appendObservation/appendError, onToolBefore) and
-   `export default (async (input) => {...}) satisfies Plugin;` importing the
-   core. **Zero other `export` statements** (verify:
-   `grep -c "^export" .opencode/plugin/intercept_observer.ts` = 1).
-3. Probe S18 + smoke: import the named core from the core file, `default`
-   from the plugin file. Keep every existing check semantically identical.
+## Approval boundary
+- PRE-APPROVED: read-scope resolution, form switch, sandbox fix (this spec).
+- DO-NOT-TOUCH: write/edit/delete args (R2, separately approved),
+  `ctx_watchdog.ts`, `numwords.json` (no new words), AGENTS.md + the
+  repo-parts + anything under `.opencode/maintainer/` (maintainer files),
+  the research/FB docs (read-only basis), `prompt_*` files (edit-deny).
+- Spec paths are REPO-RELATIVE in every command — no doubled absolute paths
+  (the launch-death lesson; the observer would have flagged it).
+- Log file + C7 line shape unchanged (8 fields); new verdicts only.
 
-## Unit 2 — read-scope fuzzy resolution (the "read functionality", approved)
-
-In the CORE (pure, pinned):
-- `buildCorpus(root)`: relative paths under root, skip `.git`/`node_modules`,
-  cap 20k entries; cache with TTL (60s) in the plugin layer or a simple
-  cache arg — your call; fail-safe: empty corpus → never resolves.
-- `resolveReadPath(argPath, corpus)`: arg → relative form (against root);
-  exact after normalize → `{kind:"exact"}`; else Levenshtein over full
-  relative paths → `{kind:"resolved", path, d, gap}` iff d<=2 AND gap>=2;
-  else `{kind:"rejected", cands: top3 [path,d], reason}` (d>2 / gap<2).
-
-In the plugin hook (wiring):
-- Scope: `input.tool === "read"` with a string `output.args.filePath` ONLY
-  (glob/grep/section-anchors = NOT this unit — queue them in your handover).
-- `resolved` → MUTATE `output.args.filePath` to the resolved absolute path.
-- Extend `VERDICTS`/`VERDICT_RANK` with two new tokens (existing six stay
-  byte-identical): `fuzzy-resolved` (evidence:
-  `fuzzy orig=<arg> -> <resolved> d=<n> gap=<g>`) and `fuzzy-rejected`
-  (evidence: `fuzzy orig=<arg> cands=<p1 d1,p2 d2,p3 d3> reason=<r>`),
-  same C7 8-field line shape to `.opencode/temp/intercept.log`.
-- Log BOTH outcomes (addendum C6: conservative + both logged); NEVER touch
-  write/edit tool args.
-
-Live-acceptance fixtures (5.4 one-shot, tear-down stays in for the verdict):
-- Pre-create the sentinel twin pair in the scratchpad
-  (`C:/Users/Wasiejen/AppData/Local/Temp/opencode/fuzzy_accept/`):
-  `file-four.txt` (sentinel: word-form name, content `ORIGINAL`) and
-  `file-4.txt` (twin, content `TWIN`). Do NOT delete — the acceptance at the
-  next restart reads the sentinel with a d<=2 mistyped path and checks the
-  returned content + the log line (mutation channel LIVE or NOT).
-
-## Verification (DoD, all must hold)
-
-- `grep -c "^export" .opencode/plugin/intercept_observer.ts` = 1 and the
-  module's every `Object.values` entry is a function
-  (`node -e` import check on the type-stripped file).
-- Probe green with the NEW self-annotated total (S18 grows by the new
-  fixtures: resolveReadPath exact/normalize/d1/d2/gap<2/d>2/cand-shape,
-  hook mutation on sandbox read, fail-closed no-mutation + log line,
-  both new verdicts' line shape). Machine-check the annotation like S18.
-- Smoke green (extend with the sandbox read-resolution flow; keep the
-  live-log-unchanged guard).
-- Standard gate: pytest 459+1w, ruff F=0, all other smokes unchanged.
-- Handover to `handover_task_to_planner.md` (what changed, measured
-  verification, commits, queue items, what was NOT done).
-
-## DO-NOT-touch
-`.opencode/maintainer/**`, `AGENTS.md`, `opencode.jsonc`, the watchdog
-plugin, the numword scriptlet (`scripts/numword/`), the live
-`.opencode/temp/intercept.log`, `numwords.json`. Commit per the routine
-(code + TODO.md + handover in one commit).
+## Worker
+`worker_Q4_140K` (roster default for 140K-era builds; this is a
+focused single-plugin change — one context, no research mandate).
