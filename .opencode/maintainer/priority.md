@@ -52,22 +52,10 @@ stop/compaction protokol for now 95% - this means explicityl around 90% gauge wi
 - --wip if it prevents work can also be ignored because i am afk/autorun mode :-)
 
 prompt additions/edits/rewrites:
-# 4
-- small addition to the planner prompt for a ready made grep command to find maintainer attention markers in repo
-  - planner often tries mutliple times to discover discepencies in the command formulation
-  - connected to .opencode\maintainer\inbox_planner\snippet_collection.md
-
 # 5
 - addition in the agents.md, that general knowledge - actionable items,code,facts that helped to solve a problem should be sorted into the agent/knowledge section - file may be created to fit the general topic
   - when looking for solutions one of the first things should be to grep the knowledge folder for relevant hits (remember to limit outputted lines for first grep call or similar)
     - maybe just an knowledge inbox.md to append to to not reduce cognitive load in analysing where it should go.
-
-# 6
-- remember to limit outputted lines for e.g. first grep tools or similar 
-  - context is the precious resource everyone needs to protect :-)
-    - this should be a general rule. if you know what the relevant sections in large files are and delegate, then communicate the area by lines in it 
-    - when reading a large file be smart about it and analyse it first and try as best to only read the relevant sections. grep for keywords might even save the read.
-    - m
 
 # 7 small knowledge / use addition - or more likely do-not addition? 
 - do we need explicit coding guidelines?
@@ -82,16 +70,4 @@ prompt additions/edits/rewrites:
 - writing a usage guide and include it with usage guides to the other tools - i think best place in repo_custom_tools and instrution as other parts to read as needed?
 - do what you can without approvel and for the rest make a proposal
 
-# 9 2026-09-14-_14-38
-ctx_gauge and inline tool replay gauge runs late 2 tool calls. e.g. ctx_gauge must fired 2 times to show the impact of a large context increas through e.g. reading
-- the consequence is that planner and worker consistently misjugdge how close they are to the end of context window and run into the limit.
-  - generally 5k lower messure of ctx_gauge
-  - the more tool calls with low thinking the more exact the information
 
-# 10 script collection
-go throw the temp/opencode folder and check out all the script that were created to interact with different problems/task. e.g. db access
-- create an overview of the most useful tools and make some categories to group them
-- collect the best ideas and colelct scirpt (not opencode tools) in the repo for direct usage
-  - e.g scirpts to intelligently interact with the DB
-- create a new readme for scripts. if to many than group them in different folders with each a readme explaining their usage
-- general goal is to reduce
