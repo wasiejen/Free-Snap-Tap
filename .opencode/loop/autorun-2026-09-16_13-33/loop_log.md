@@ -1,1 +1,2 @@
 2026-09-16_13-33 -->START planner-1 ses_f5605f805ffeElHB9mgtksjye1 Qwen3.8-27B-IQ4KT-140K plan1 (new looprun, rollover from closed 2026-09-15_13-11): maintainer --comments handled — research addendum (his comment responses, separate file) + approved 5.1/5.2/5.3-func-prot builds queued; #55 dump live-acceptance + #56 comment triage
+2026-09-16_13-49 -->START worker-1 ses_f55f99299ffe6LtURACkgXKuTD Qwen3.8-27B-IQ4KT-140K numword scriptlet (lane 5.2): shared numwords.json + node CLI/module + python w2n + probe S17 fixture pins
