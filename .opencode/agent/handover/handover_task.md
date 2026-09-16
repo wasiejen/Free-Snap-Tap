@@ -1,104 +1,100 @@
-# Task spec — 5.3 intercept observer plugin (log-only functional prototype)
+# TASK — worker: make intercept_observer loadable + implement the read-scope fuzzy read function
 
-Approved scope: research doc `2026-09-16_fuzzy-and-numword-tool-reliability.md`
-540–549 + addendum `.opencode/agent/research/2026-09-16_fuzzy-numword-addendum.md`
-§"Scope after the comments" item 3 (read it — it is the design source).
+Worker: `worker_Q4_140K`. Stay on the current checkout (opencode_test).
+Baseline (re-verified by the planner 2026-09-16, plan2): probe **169/169**
+(`node .opencode/plugin/probes/handover_probe.mjs`), pytest **459 passed +
+1 warning** (`.venv`), ruff **F=0** (`.venv/Scripts/ruff.exe check --select F .`),
+smokes green incl. `intercept_observer.smoke.mjs` 24/24.
 
-## Goal
-A SEPARATE opencode plugin that observes tool calls and LOGS suspicious
-dense-digit / numword / redundancy / path anomalies. It NEVER mutates
-`output.args` and NEVER blocks — log-only (the mutation channel is unproven,
-§5.4 pending; this prototype must survive being permanently log-only).
+## Verified planner facts (do not re-derive)
 
-## What to build
-1. **NEW** `.opencode/plugin/intercept_observer.ts` (name may vary, keep the
-   concept): `tool.execute.before` hook, active for ALL tools (read/glob/
-   grep/bash + write/edit observed too). Conventions to follow (verified
-   facts, do not re-research):
-   - Hook shape (installed SDK, `@opencode-ai/plugin/dist/index.d.ts`
-     ~235–241): `("tool.execute.before", async (input: {tool, sessionID,
-     callID}, output: {args: any}) => …)` — returned from the default-export
-     plugin function, same registration shape as `ctx_watchdog.ts` /
-     `compact_memory.ts` (both tracked in `.opencode/plugin/`, auto-loaded
-     at host restart — do NOT touch `opencode.jsonc`).
-   - Best-effort, never-throw: any internal error → at most one
-     `kind:"intercept-error"`-style line to the log, the hook returns
-     silently. The watchdog header (ctx_watchdog.ts lines 1–20) states the
-     house rule.
-   - **Single numword map home (addendum C3):** at plugin start, read
-     `.opencode/agent/scripts/numword/numwords.json` (ONE shared map — never
-     embed a second copy). If the read fails, numword checks are
-     silently off (other checks still run).
-   - Observations (fire a log line only when at least one fires; cap lines
-     per call, cap field length — worker's call, document in file header):
-     a) dense-digit args (long digit runs / dates / session-id shapes);
-     b) numword tokens present in args (map hit → value; unknown tokens
-        like `twozero` are NOT hits — they are not in the map);
-     c) `<digit>|<word>` redundancy pairs: left/right check via the map
-        (agreement / mismatch / ambiguous);
-     d) path sanity: doubled segments (`users\users` shape);
-     e) out-of-sandbox path NOTE (the workspace root = the PluginInput
-        project directory; note only, no enforcement).
-   - Log file: `.opencode/temp/intercept.log` (git-ignored, verified).
-     Line shape (addendum C7 — byte-exact, pipe-separated 8 fields):
-     `<timestamp> | <session_id> | <model_id> | <tool> | <original-arg> |
-     <candidates + distances OR gate evidence> | <context: what the arg is —
-     path / commit-ref / date / session-id> | <verdict>` with verdict ∈
-     {observed-redundancy-ok, redundancy-mismatch, no-candidate,
-     ambiguous, out-of-sandbox, path-anomaly}. `model_id`: obtain the same
-     way the watchdog gets model info (its transform cache / session DB
-     pattern — peek at how ctx_watchdog.ts fills the `ctx:` line model);
-     if unavailable, literal `unknown` (never throw, never spawn
-     unbounded).
-   - Export the detection core as a NAMED export (pure function(s) over
-     arg strings + the map) so the probe can pin fixtures WITHOUT a full
-     PluginInput harness (the loop_log smoke shows the alternative).
-2. **NEW** smoke `.opencode/plugin/tests/intercept_observer.smoke.mjs` —
-   established pattern: `_smoke_base.mjs` (`freshSandbox`, `loadRepo`,
-   `makeChecker`); reference `loop_log.smoke.mjs` (simplest). Sandbox must
-   point the log at a sandbox temp dir — NEVER the live
-   `.opencode/temp/intercept.log` (DO-NOT-touch), and the numword map
-   must be the REAL shared file (read-only).
-3. **APPEND** probe section S18 to `.opencode/plugin/probes/handover_probe.mjs`
-   (insert like S17 did — before the S5 hygiene section, existing sections
-   untouched): pin ~15–25 checks on the NAMED-export core — each
-   observation class has pass + negative fixtures (dense-digit; numword map
-   hit; `twozero`-style unknown → no numword hit; `|`-pair agree /
-   mismatch / ambiguous; doubled segment; out-of-sandbox; clean arg → NO
-   line), plus: hook returns without mutating `output.args` (byte-identical
-   before/after), hook never throws (garbage input → silent), log line
-   byte-shape (8 pipe-separated fields, verdict vocabulary). Update the
-   header annotation total (machine-checked, digit form — the S17
-   precedent; the total is currently 148).
-4. **DOCS:** `.opencode/plugin/README.md` gains one line (the new plugin);
-   `repo_custom_tools.md` or the plugin file header carries the usage note
-   (restart-gated activation; log location; verdict vocabulary).
+- The opencode plugin loader (verified in the installed binary's minified
+  source): a plugin module is normalized by iterating `Object.values(module)`
+  and EVERY value must be a function (or an object with a function
+  `.server`) — else `TypeError("Plugin export is not a function")` at load.
+  `intercept_observer.ts` exports ~16 named constants/functions, so it FAILS
+  to load in the live host (opencode.log run of 2026-09-16:
+  `error="Plugin export is not a function"`); `ctx_watchdog.ts` (default
+  export ONLY, line 719) loads fine. **Root cause confirmed — this is the
+  small fix the maintainer anticipated.**
+- The pure core (all named exports: `loadNumwordMap`, `resolveNumword`,
+  `classifyContext`, `observeDense/Pairs/Numword/PathAnomaly/Sandbox`,
+  `observeArg`, `flattenField`, `underRoot`, the `VERDICTS`/`VERDICT_RANK`/
+  constants/regexes) is fully pinned by probe S18 (checks 150–170, section
+  starts at line ~3086 in `handover_probe.mjs`) and smoke (24 checks). The
+  probe imports the plugin file direct (`OBS_TS`, line ~3098) and uses
+  `ioMod.<named>` + `ioMod.default`; the smoke uses `mod.default` only.
+- Design source for the read function: research doc
+  `.opencode/agent/research/2026-09-16_fuzzy-and-numword-tool-reliability.md`
+  §2.2–2.7 (matcher: exact → normalize (case/slash/trim) → Levenshtein over
+  FULL relative paths; accept d<=2 AND gap to second-best >= 2; else
+  fail-closed with top-N candidate log; corpus cached, TTL-bounded) and
+  §2.3 scope rule (READ-ONLY tools only — writes/edit/delete NEVER fuzzy).
+- The plugin must stay RESTART-GATED for live acceptance (hooks load at
+  registration). Do NOT try to prove liveness — pin + gate green is the DoD.
 
-## Definition of done
-- `node .opencode/plugin/probes/handover_probe.mjs` → `PROBE handover:
-  <new total>/<new total> PASS` agreeing with the header annotation.
-- All 8 smokes green (7 existing + the new one), each
-  `node .opencode/plugin/tests/<name>.smoke.mjs` exit 0.
-- `./.venv/Scripts/python.exe -m pytest -q` → 459 passed, 1 warning
-  (UNCHANGED — no FST product code touched).
-- `./.venv/Scripts/ruff.exe check --select F .` → All checks passed.
-- `git status` clean at the end (the live `opencode.jsonc` maintainer edit
-  is NOT yours — leave it uncommitted if present).
-- Commits: one per unit (plugin / smoke / probe / docs) or a single
-  coherent commit — your call, message per the git conventions.
-- Worker handover to `.opencode/agent/handover/handover_task_to_planner.md`
-  (what changed, measured verification, deviations, deliberately not done).
+## Unit 1 — export fix (core split)
+
+1. New file `.opencode/plugin/intercept_observer_core.ts`: moves ALL named
+   exports out of the plugin file (types, constants, regexes, pure functions)
+   — the file is a pure module, default export NOT required (it is never
+   loaded by the host loader directly).
+2. `intercept_observer.ts` keeps ONLY the hook plumbing (dir/map state,
+   getModel, appendRaw/appendObservation/appendError, onToolBefore) and
+   `export default (async (input) => {...}) satisfies Plugin;` importing the
+   core. **Zero other `export` statements** (verify:
+   `grep -c "^export" .opencode/plugin/intercept_observer.ts` = 1).
+3. Probe S18 + smoke: import the named core from the core file, `default`
+   from the plugin file. Keep every existing check semantically identical.
+
+## Unit 2 — read-scope fuzzy resolution (the "read functionality", approved)
+
+In the CORE (pure, pinned):
+- `buildCorpus(root)`: relative paths under root, skip `.git`/`node_modules`,
+  cap 20k entries; cache with TTL (60s) in the plugin layer or a simple
+  cache arg — your call; fail-safe: empty corpus → never resolves.
+- `resolveReadPath(argPath, corpus)`: arg → relative form (against root);
+  exact after normalize → `{kind:"exact"}`; else Levenshtein over full
+  relative paths → `{kind:"resolved", path, d, gap}` iff d<=2 AND gap>=2;
+  else `{kind:"rejected", cands: top3 [path,d], reason}` (d>2 / gap<2).
+
+In the plugin hook (wiring):
+- Scope: `input.tool === "read"` with a string `output.args.filePath` ONLY
+  (glob/grep/section-anchors = NOT this unit — queue them in your handover).
+- `resolved` → MUTATE `output.args.filePath` to the resolved absolute path.
+- Extend `VERDICTS`/`VERDICT_RANK` with two new tokens (existing six stay
+  byte-identical): `fuzzy-resolved` (evidence:
+  `fuzzy orig=<arg> -> <resolved> d=<n> gap=<g>`) and `fuzzy-rejected`
+  (evidence: `fuzzy orig=<arg> cands=<p1 d1,p2 d2,p3 d3> reason=<r>`),
+  same C7 8-field line shape to `.opencode/temp/intercept.log`.
+- Log BOTH outcomes (addendum C6: conservative + both logged); NEVER touch
+  write/edit tool args.
+
+Live-acceptance fixtures (5.4 one-shot, tear-down stays in for the verdict):
+- Pre-create the sentinel twin pair in the scratchpad
+  (`C:/Users/Wasiejen/AppData/Local/Temp/opencode/fuzzy_accept/`):
+  `file-four.txt` (sentinel: word-form name, content `ORIGINAL`) and
+  `file-4.txt` (twin, content `TWIN`). Do NOT delete — the acceptance at the
+  next restart reads the sentinel with a d<=2 mistyped path and checks the
+  returned content + the log line (mutation channel LIVE or NOT).
+
+## Verification (DoD, all must hold)
+
+- `grep -c "^export" .opencode/plugin/intercept_observer.ts` = 1 and the
+  module's every `Object.values` entry is a function
+  (`node -e` import check on the type-stripped file).
+- Probe green with the NEW self-annotated total (S18 grows by the new
+  fixtures: resolveReadPath exact/normalize/d1/d2/gap<2/d>2/cand-shape,
+  hook mutation on sandbox read, fail-closed no-mutation + log line,
+  both new verdicts' line shape). Machine-check the annotation like S18.
+- Smoke green (extend with the sandbox read-resolution flow; keep the
+  live-log-unchanged guard).
+- Standard gate: pytest 459+1w, ruff F=0, all other smokes unchanged.
+- Handover to `handover_task_to_planner.md` (what changed, measured
+  verification, commits, queue items, what was NOT done).
 
 ## DO-NOT-touch
-- `.opencode/maintainer/**`, `opencode.jsonc`, `ctx_watchdog.ts`,
-  `compact_memory.ts`, `TODO.md` / `todo_inbox.md` (append findings to
-  `todo_inbox.md` only if you hit real blockers), the research docs,
-  `tests/` (FST), `playground/`, the live `.opencode/loop/` +
-  `.opencode/temp/` contents (smoke writes sandbox-only).
-- NO mutation of `output.args` anywhere — the whole point is log-only.
-
-## Context budget for you
-Spec names the areas; first greps carry `| head -30`; read file sections,
-not whole files (the watchdog header is history — read lines 1–20 + grep
-for the hook keys, not all 732 lines). Branch truth: you are on
-`opencode_test` — stay there. Standard gate before each commit.
+`.opencode/maintainer/**`, `AGENTS.md`, `opencode.jsonc`, the watchdog
+plugin, the numword scriptlet (`scripts/numword/`), the live
+`.opencode/temp/intercept.log`, `numwords.json`. Commit per the routine
+(code + TODO.md + handover in one commit).

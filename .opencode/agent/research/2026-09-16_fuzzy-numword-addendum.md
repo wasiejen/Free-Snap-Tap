@@ -138,3 +138,16 @@ us measure both sides later).
    restart — if the mutation channel is NOT live, 5.3 stays a log-only
    observer permanently (still useful: the incident data stream), and the
    redundancy-naming route (Q1/Q2) becomes the primary hardening path.
+
+Maintainer rulings (2026-09-16, via `--comment` on this file — the open
+questions above are ANSWERED):
+1. **Redundancy naming: YES** — single-digit numbers seem not to be the
+   problem, but in general yes (adopt the redundant digit|word form for
+   loop/plan file names). Prompt/loop-protocol codification queued (plan2).
+2. **`|`-redundancy as name format: YES**, refined — use `<4|four>` with
+   angle-bracket delimitation to separate the pair from the rest of the
+   string (makes resolving git ids / session ids easier if needed).
+3. **Roadmap: read AND write scope, one step after the other** — "this
+   functionality is too useful to degrade to observer permanently". The
+   read-scope build (plan2, approved) is step 1; write-scope follows after
+   the mutation-channel verdict + its own approval.

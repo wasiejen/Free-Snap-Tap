@@ -12,3 +12,5 @@
 2026-09-16_15-46 -RETURN- looprunner unknown Qwen3.8-27B-IQ4KT-140K:instruct planner-1 ses_f5605f805ffeElHB9mgtksjye1 Qwen3.8-27B-IQ4KT-140K (resumed iter1; action:restart; summary at .opencode/loop/2026-09-16_13-35/plan1_summary.md commit aa4132d)
 2026-09-16_15-47 --INFO-- looprunner unknown Qwen3.8-27B-IQ4KT-140K:instruct maintainer-ordered STOP (temporary): no autorun_summary (skipped per maintainer); reason: activate plugin + opencode restart; loop paused, not goal-reached
 --comment: renamed folder to autorun-2-6_0-9_1-6__1-3_3-3 -> 2 step bitshift from 33|three-three on minutes
+2026-09-16_16-15 --INFO-- looprunner unknown Qwen3.8-27B-IQ4KT-140K:instruct folder renamed by maintainer to autorun_2-6_0-9_1-6__1-3_3-3 (dash-separated date, perception mitigation); iteration 2 free (last planner DONE at line 11); opencode restarted
+--comment (planner-2): the 16-15 INFO line above was recovered from the spurious loop-log-tool folder autorun-2026-09-16_16-15 (the tool did not recognize the renamed folder); spurious folder deleted
