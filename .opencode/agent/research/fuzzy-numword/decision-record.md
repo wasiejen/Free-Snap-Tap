@@ -214,12 +214,20 @@ paste, like the stop-line change):
 ```
 
 ## 5. Roadmap R1-R5 (specs in this folder; gates explicit)
-- **R1 — read-scope pair resolution + form switch** (`spec_R1_*.md`,
-  LAUNCH-READY): observer resolves `[l:r]` in `read` args (existence-gated,
-  right-wins, `pair-resolved` verdict), pair grammar switches from the old
-  `<d|word>` tight form to `[l:r]` (logging for ALL tools switches too),
-  scratchpad allowed-root fix, probe/smoke pins. Approved: his "go for
-  read-scope" (this session) + the research-doc 5.3 approval.
+- **R1 — read-scope pair resolution + form switch** (`spec_R1_*.md`) —
+  **GREEN 2026-09-16, commit 96bb173** (probe 193/193 S19, smoke 31/31,
+  pytest 459, ruff clean, export=1): observer resolves `[l:r]` in `read`
+  args (existence-gated, right-wins, `pair-resolved` verdict), pair grammar
+  switches from the old tight `digit|word` pipe form to `[l:r]` (logging for
+  ALL tools switches too), scratchpad allowed-root fix, probe/smoke pins.
+  Liveness RESTART-GATED (the running host still runs pre-R1 pair detection
+  until restart; one-shot acceptance = the 5.4 scratchpad sentinel pair on
+  the same restart). **Grammar interpretation adjudicated (worker note,
+  accepted):** pair sides accept a single MAP WORD (units/tens/teens incl.
+  `fourty`) OR dash-separated single units — NO tens+unit composition on
+  pair sides (`ninetyfour` → `no-candidate`); composition stays the
+  scriptlet/observer w2n surface (§2.2 vs the §2.5 pair mini-grammar).
+  Pinned S19-187 / S18-160.
 - **R2 — write-scope** (`spec_R2_*.md`, staged): form/fuzzy resolution on
   write/edit/delete/block_transfer args under the existence gate;
   fail-closed on pair-mismatch in write scope (no corrupting the wrong file

@@ -41,8 +41,9 @@ All paths below are relative to `.opencode/agent/prompts/`.
    `[left:right]` pairs, where the form applies): read when you pass dense
    numerals (paths, ids, totals, dates). The `decision-record.md` next to it
    is LARGE (~10k tokens) — grep it by section, do not read it whole.
-   TEMPORARY (until R1 lands): form in prose/commit text only — NOT in tool
-   arguments (unresolved forms pass through raw and break the call).
+   TEMPORARY (until the host restarts with the R1 code, 96bb173): form in
+   prose/commit text only — NOT in tool arguments (unresolved forms pass
+   through raw and break the call).
 
 ## Work loop
 - Follow existing conventions: read the neighboring code first, mimic style, reuse existing
@@ -59,6 +60,9 @@ All paths below are relative to `.opencode/agent/prompts/`.
   better and note it in the summary.
 - Findings you cannot confidently fix, or that are out of scope, go to `todo_inbox.md`
   (loose, unnumbered) — NOT `TODO.md`; the planner assigns IDs at curation.
+  APPEND ONLY: never edit, trim, or delete existing inbox entries — curation
+  (and trimming) is the planner's job (the R1 incident, 2026-09-16: a worker
+  trimmed it and the content had to be recovered from git).
 - `--wip` guard: files marked `--wip` are live-edited by the maintainer — READ ok, never EDIT; if the task requires editing one, stop and flag it in the summary (canonical marker table: planner prompt §maintainer calls/decisions).
 
 ## Direct session (interactive)

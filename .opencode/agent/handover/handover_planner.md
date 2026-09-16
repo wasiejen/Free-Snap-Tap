@@ -142,15 +142,32 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   primer.md` (short usage form: when/forms/where/observer-behavior/do-nots,
   with the "grep the 10k record, don't read it" guard) + Instruction-index
   pointer lines in planner AND worker prompts (need-based read).
-- **R1 LAUNCHED** (this session, worker_Q4_140K): spec in
-  `handover/handover_task.md` (launch header + plan2 baseline 180/180).
-  His AGENTS.md paste CONFIRMED committed (bf18f14, matches §4 draft) — the
-  permanent rule now lives in 3 carriers (AGENTS.md + primer + prompt index
+- **R1 GREEN — VERIFIED** (worker-13, ses_f5467718…, commit `96bb173`):
+  probe 193/193 (new S19, 13 checks), smoke 31/31, pytest 459, ruff clean,
+  export=1 — matches the handover's measured numbers (I verified against
+  git + the committed handover, not the Task return, which was a stale
+  mid-session snapshot). Grammar interpretation adjudicated: NO tens+unit
+  composition on pair sides (worker's mini-grammar reading accepted — see
+  decision-record §5 R1). Baseline now 193/193 (self-annotation).
+- His AGENTS.md paste CONFIRMED committed (bf18f14, matches §4 draft) — the
+  permanent rule lives in 3 carriers (AGENTS.md + primer + prompt index
   lines); his call: the redundancy "sticks better for the beginning".
-  **Live-state guard** (TEMPORARY, remove when R1 lands): until R1 the
-  observer does NOT resolve forms in tool args (raw pass-through breaks the
-  call) — guard line in primer + both prompt index entries. R2 approval
-  still pending from him.
+- **Live-state guard** (TEMPORARY, remove at his next host RESTART): the
+  RUNNING observer still has pre-R1 pair detection until restart — guard
+  lines in primer + both prompt index entries say "form in prose/commit
+  text only, NOT tool args" until the restart. One-shot liveness acceptance
+  (pair channel, 5.4 scratchpad sentinel) happens on that restart.
+- **INBOX INCIDENT (worker role slip):** worker-13 TRIMMED `todo_inbox.md`
+  (deleted header + 2 uncurated blocks) instead of appending — recovered
+  from git (aaf6b03) and curated properly (worker-8 → confirm-with-him;
+  worker-9 → superseded; R1 entry → folded into #71). Defensive worker-prompt
+  line added ("APPEND ONLY — never touch existing entries").
+- TODO: #69 CLOSED (acceptance met); #68 gates → R1 satisfied, ONLY his
+  write-scope approval remains; #71 refreshed (193).
+- **Next moves:** (1) his R2 approval → launch R2; (2) his host restart →
+  pair-channel one-shot acceptance + guard removal; (3) confirm worker-8's
+  feedback-file ask is handled (FB_2026-09-16_block_transfer_status.md
+  exists — his reorg).
 
 ## Standing
 - Baselines (re-verified 2026-09-16, plan2, gates re-run by the planner

@@ -7,7 +7,8 @@ the code — the reasoning is there, do not re-derive):
 
 ## Goal
 The intercept observer resolves the redundancy pair in READ scope and the
-pair grammar switches from the old `<d|word>` tight form to `[left:right]`.
+pair grammar switches from the old tight `digit|word` pipe form to
+`[left:right]`.
 
 ## Verified facts (measured at spec time — build on these, do not re-verify)
 - Baseline: probe 180/180 (self-annotation is the source, `handover_probe.mjs`

@@ -6,21 +6,6 @@ slowed them down, caused doubt, overthinking, or wasted context. It is for the
 **maintainer only**, to improve the agent setup. It is not read by other agents
 during their work.
 
-## How to append (for agents)
-- Append **only** when friction materially affected the work AND your main task
-  is complete AND the token budget allows. Never interrupt work to write here.
-- Append **without reading prior entries below the divider** — your report must
-  be your own independent signal, not influenced by what other agents wrote.
-  Duplicates across agents are fine (they are stronger signal); the maintainer
-  dedups. You may read only the header/template above the divider to use the
-  format; do not read entries below it before appending.
-- Use this structured format (one block per entry):
-
-  ### <short title> — <role> <date>
-  - **Friction:** what rule / file / limit / tool caused the problem
-  - **Cost:** what it cost (context, time, a wrong path, doubt / overthinking)
-  - **Suggested change:** a concrete improvement (if you have one)
-
 ## What's worth reporting
 - A rule that forced overthinking or doubt where a simpler directive would do.
 - A convention that conflicted with the code or with another instruction.
@@ -265,3 +250,14 @@ Friction points from this session (honest and concrete):
 5. The Object.keys gotcha (technical): prototype methods aren't enumerated — this is recorded in knowledge; as friction: I initially interpreted sessionKeys: ["_client"] as "session doesn't expose methods" — the typeof check would have caught this earlier. (Actually this is already in knowledge — skip or one line?)
 6. Positive feedback: the get_context_keys / dev_probe_ctx probe pattern was the session's workhorse — small probe tools > armchair reasoning. Worth one positive line.
 7. compact_memory being broken (TODO #52) forced a stop-line handoff twice — the proposal now fixes this; note that the session ended at the stop line twice due to #52.
+
+### Task-tool return was a stale mid-session snapshot, not the final message - planner 2026-09-16 (direct session, R1 launch)
+The worker session compacted mid-task; the Task tool returned the compaction
+point's state dump (open "Active/Next Move" items, NO commit hash), while the
+session actually continued, finished, and committed green. Reading the
+return at face value would have mis-triggered the resume protocol.
+Lesson baked into my behavior: a worker return that lacks the handover
+pointer/commit hash is a SNAPSHOT, not a verdict — verify `git log` + the
+committed `handover_task_to_planner.md` first; only resume on task_id if the
+committed record shows the task incomplete. Suggestion: the Task result
+could mark "session compacted, result may be stale" when it detects this.

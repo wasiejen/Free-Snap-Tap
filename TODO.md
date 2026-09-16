@@ -191,10 +191,9 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Acceptance:** approved spec + landed build + gate green (per spec).
 - **Scope:** research doc §2.3/§3.4/§4.2 as the design source; staged spec
   `research/fuzzy-numword/spec_R2_write_scope.md`.
-- **Status:** OPEN (spec drafted this session; #66 verdict LIVE 2026-09-16).
-  Gates to launch: R1 (read-scope pair, spec_R1) green first, then his
-  explicit write-scope approval — the spec is NOT launchable before that
-  ruling.
+- **Status:** OPEN (spec staged `spec_R2_write_scope.md`; #66 verdict LIVE
+  2026-09-16; R1 GREEN 96bb173 — the "R1 green first" gate is SATISFIED).
+  ONLY remaining gate: his explicit write-scope approval.
 
 ## 69. Redundancy form codification: `[left:right]` (SUPERSEDES the `<4|four>` Q2 form; 2026-09-16 direct session)
 - **Problem / evidence:** the addendum Q2 form `<4|four>` (angle brackets +
@@ -216,10 +215,11 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   planner/worker/looprunner prompts.
 - **Scope:** AGENTS.md (maintainer), spec_R1 build, `prompt_agent_*.md`
   pointer lines.
-- **Status:** OPEN (form ruled 2026-09-16; waiting on his paste + R1).
-  NOTE: ALL FB-file comments are acted on and recorded in the decision
-  record (§6.5) — do not re-act the `--comment` markers there (they are
-  his input record).
+- **Status:** CLOSED 2026-09-16 — acceptance fully met: AGENTS.md paste
+  landed (bf18f14); R1 GREEN (96bb173, probe 193/193); pointer lines in
+  planner+worker prompt index (3e0406c). NOTE: ALL FB-file comments are
+  acted on and recorded in the decision record (§6.5) — do not re-act the
+  `--comment` markers there (they are his input record).
 
 ## 70. compact_memory rework: cross-compact by session_id only + Gemma worker compaction + no-wait flow (2026-09-16, new priority.md item)
 - **Problem / evidence:** maintainer priority.md addition: context_limit
@@ -254,7 +254,8 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Acceptance:** section reads the pointer; no duplicated total.
 - **Scope:** `repo_commands.md` §Run/test (maintainer or an explicitly
   tasked agent).
-- **Status:** OPEN (maintainer-file flag).
+- **Status:** OPEN (maintainer-file flag; refreshed at R1 — the stale prose
+  now reads 193/193 off; worker-13 R1 inbox entry folded in, 2026-09-16).
 
 ## Closed entries
 
