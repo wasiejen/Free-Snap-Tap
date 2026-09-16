@@ -104,7 +104,7 @@
 //   bash git-ref (R2): mutated → `... gate=ref-mutated run=<hexrun>`
 //   (pair-resolved); gate failed → `... gate=ref-rejected run=<hexrun>`;
 //   the ref run < 4 hex chars → the bare log-only form above (no gate
-//   token — the rev-parse gate is not even attempted)
+//   token — the ref-existence gate is not even attempted)
 //   no-candidate: `pair=[<l>:<r>] gate=right-unknown|left-unknown`
 //
 // CAPS (documented per the task spec — worker's call):

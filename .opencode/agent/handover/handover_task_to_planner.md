@@ -1,134 +1,101 @@
-# Worker summary — R2 write-scope pair/fuzzy resolution (IN PROGRESS — compaction checkpoint)
+# Worker summary — R2 write-scope pair/fuzzy resolution (COMPLETE)
 
-STATUS: IN PROGRESS (compaction checkpoint #2 — ALL CODE WRITTEN, gate NOT yet
-run). Resume: (1) run `node .opencode/plugin/probes/handover_probe.mjs` (expect
-206/206 — the S20 section is new, checks 195-207) +
-`node .opencode/plugin/tests/intercept_observer.smoke.mjs` (expect 35/35 —
-section 8f new) + the standard gate (pytest + ruff per repo_commands.md);
-(2) fix any red (most likely S20 pin details / evidence bytes);
-(3) ONE commit: code + smoke + probe + this handover + the todo_inbox hazard
-note (item 5) with measured numbers; (4) loop_log DONE with the final gauge
-readout. Design below is as implemented.
+STATUS: COMPLETE — full standard gate green (measured below). Code commits:
+`f0b857a` (WRITE_FUZZY_MAX_D constant + checkpoint) and `deb4927` (channels, S20
+probe pins, smoke 8f); this file + the todo_inbox entries + the loop log ride
+the FINAL bookkeeping commit (see `git log` — the commit right after `deb4927`).
+Branch: `opencode_test`. Read scope + all R1 pins FROZEN and green.
 
-## Baseline (verified by RUNNING before any edit)
-- probe `node .opencode/plugin/probes/handover_probe.mjs` → **193/193 PASS** (twice —
-  once pre-edit, once after the `WRITE_FUZZY_MAX_D` constant addition; still 193/193).
-- smoke `node .opencode/plugin/tests/intercept_observer.smoke.mjs` → **31/31 ALL PASS**.
-- `grep -c ^export .opencode/plugin/intercept_observer.ts` → **1**.
+## Measured verification (full standard gate, run after all edits)
+- probe `node .opencode/plugin/probes/handover_probe.mjs` → **206/206 PASS**
+  (self-annotation section sum machine-verified = 206; S20 = 13 new checks,
+  labels 195-207, all green; every R1 pin — incl. [167]/[169]/[189]/[192] —
+  stays byte-exact green).
+- smoke `node .opencode/plugin/tests/intercept_observer.smoke.mjs` →
+  **35/35 ALL PASS** (31 baseline + 4 new in section 8f).
+- `./.venv/Scripts/python.exe -m pytest -q` → **459 passed**, 1 warning.
+- `./.venv/Scripts/ruff.exe check --select F .` → **All checks passed**.
+- `grep -c ^export .opencode/plugin/intercept_observer.ts` → **1** (export
+  contract; also pinned by the smoke).
+- Baseline before edits (previous session, run twice): probe 193/193,
+  smoke 31/31.
 
-## What is done (committed)
-- `intercept_observer_core.ts`: added `export const WRITE_FUZZY_MAX_D = 1` (write-scope
-  fuzzy bar, tighter than read's d<=2). Nothing else yet.
+## The DoD controlled scratchpad write (end-to-end audit)
+smoke 8f: fixture `proj/wfx/file-4.txt`; hook `write` with
+`{filePath: …\wfx\file-[4:four].txt, content: "R2-WRITE"}` → `filePath`
+MUTATED to `…\wfx\file-4.txt`; the simulated tool lands the content at the
+MUTATED path; asserted: file content == `R2-WRITE`, the pair-form path
+absent, and the log line (8 fields) carries field 5 = the ORIGINAL pair-form
+arg and field 6 = `pair=[4:four] canon=4 dist=0 gate=mutated`, verdict
+pair-resolved. **The resolved write lands exactly where the log says it
+lands.**
 
-## Design decisions (settled — pin these in the final handover)
-1. **Verdicts stay the nine** (byte-identical, `VERDICTS.length === 9` pinned at probe
-   171 + smoke). Write-scope REUSES existing verdicts + evidence tokens:
-   - write-path pair line: `pair=[l:r] canon=N dist=d gate=mutated|both-exist|none-exist`
-     (same form as read R1); write MISMATCH → `... gate=fail-closed` (new token, FAIL-CLOSED,
-     never mutate — the asymmetry vs read [191]).
-   - fuzzy write line: `fuzzy scope=write orig=... -> ... d=1 gap=...` /
-     `fuzzy scope=write orig=... cands=... reason=...` (explicit `scope=write` flag per spec).
-   - bash git-ref line: mutated → `pair=[l:r] canon=N dist=0 gate=ref-mutated run=<hexrun>`
-     (pair-resolved); gate failed → `... gate=ref-rejected run=<hexrun>` (observed-
-     redundancy-ok, no mutation); run < 4 hex chars → **bare R1 log-only form**
-     `pair=[l:r] canon=N dist=0` (no gate token — keeps probe [192] byte-exact green).
-   - bash mismatch → bare R1 form `pair=[l:r] canon=N dist=d` (redundancy-mismatch, no
-     gate attempt — fail-closed).
-2. **Ownership (no double-logging):** for `write`/`edit`/`block_transfer` the write
-   channel owns ALL pair lines of the call: path fields (write/edit `filePath`,
-   block_transfer `srcFile`+`dstFile`) get the gate channel; every OTHER string field
-   (`content`, `oldString`, `newString`, `bufferName`, ...) gets the observation-form
-   pair line (no gate, no mutation — the content-scope guard: mutation is scope, not
-   grammar; `args[1:one]` in content → log line only). `observeArg` then runs with
-   skipPairs=true for the whole call. For bash, the git-ref channel owns the pair lines
-   only when `args.command` is a string (object form); raw-string bash args keep R1
-   observation behavior (no ref-channel mutation of unstructured strings).
-3. **Channel line cap:** 3 (MAX_LINES_PER_CALL) for write-channel pair lines (path
-   fields first, then content fields); fuzzy: at most one line per path field.
-4. **Hook logging order (channel-first):** channel pair/ref lines → observation lines →
-   fuzzy lines, for ALL tools. Read order stays compatible (no read pin constrains
-   obs-vs-pair relative order; [189] has empty obs). REQUIRED for the smoke pin
-   "priority order (pair before dense)" (bash `ls [4:four] 20260916` → the pair line now
-   comes from the channel and must log before the dense obs line) and probe [167]/[169]
-   (2 lines total, verdict vocab on the first).
-5. **Write-path pair gate** (runPairWrite): per path field — any MISMATCH in the field
-   → the whole field FAILS CLOSED (no mutation; mismatch lines gate=fail-closed, ok
-   lines also gate=fail-closed, no-candidate lines keep gate=left/right-unknown); else
-   canonical = all resolved pairs replaced (right-wins), mutate iff canonical EXISTS and
-   the pair-form path does NOT (read-scope semantics; both/none → no mutation + gate
-   evidence).
-6. **Fuzzy write channel** (runFuzzyWrite): runs on the (possibly pair-mutated) result,
-   per path field; existsSync fast-path (existing target → no line); `resolveWritePath`
-   (new core fn) = the SAME matcher as resolveReadPath with maxD=1 (gap rule unchanged
-   FUZZY_MIN_GAP=2, corpus unchanged) → resolved: mutate + fuzzy-resolved scope=write;
-   rejected: fuzzy-rejected scope=write (top-3 cands + reason).
-7. **Git-ref channel** (runGitRefBash, bash `{command}` strings): checkPairs; any
-   mismatch → fail-closed (bare lines); else for each ok pair: substitute into a
-   candidate command, extract the maximal hex run spanning the pair's canonical digits
-   (scan left/right of the canonical span); run < 4 → bare line; run >= 4 →
-   `spawnSync("git", ["rev-parse","--verify",run], {cwd: dir, stdio:"ignore",
-   timeout: 2500})` (never throws → false); MUTATE iff ALL ok pairs' runs verify
-   (atomic, all-or-nothing for the command); mutated → command = fully substituted,
-   lines pair-resolved gate=ref-mutated run=...; else lines gate=ref-rejected run=...
-   (for >=4 runs) / bare (for <4).
-8. **Core matcher refactor:** `resolveReadPath` body → internal `matchNearPath(argRel,
-   corpus, maxD)`; `resolveReadPath` = matchNearPath(…, FUZZY_MAX_D) (byte-identical
-   behavior, pins 172-178 safe); new exported `resolveWritePath` = matchNearPath(…,
-   WRITE_FUZZY_MAX_D). `checkPairs`/`PairCheck` reused unchanged (no pair-math
-   re-derivation).
-9. **Probe S20 (13 checks, 195-207, APPENDED after S19, before S5 hygiene — no
-   renumbering):** setup = `git init` at the SANDBOX root + one seed commit (via
-   `git -c user.name -c user.email`) + a 40-hex tag `1234abcd5678ef901234abcd5678ef901234abcd`
-   (ref resolution via tag name is deterministic — a 40-char hex string resolves only as
-   that exact tag/sha; the fail ref `9234…` is 1-char-off → deterministic reject).
-   Pins: 195 write gate exists→mutated; 196 gate none-exist→2 lines (pair +
-   fuzzy-rejected scope=write); 197 both-exist→1 line gate=both-exist; 198 mismatch→
-   fail-closed (NOT mutated even though file-8.txt exists — the asymmetry pin);
-   199 block_transfer srcFile pair→mutated (dstFile = existing clean path, no line);
-   200 write fuzzy d=1 (dedicated `pf/wf/` single-sibling corpus)→mutated +
-   fuzzy-resolved scope=write d=1 gap=inf; 201 write fuzzy d=2→fuzzy-rejected
-   scope=write reason=d-too-high; 202 write content guard (`content` carries
-   `args[1:one]`)→1 log line, args byte-identical; 203 edit content guard
-   (`oldString` `a[2:two]b`)→1 log line, args byte-identical; 204 bash ref gate PASS
-   (`git log [1:one]234abcd…`→mutated, gate=ref-mutated run=…); 205 bash ref gate FAIL
-   (`[9:nine]…`→gate=ref-rejected, no mutation); 206 bash ref mismatch→bare mismatch
-   line, no mutation; 207 bash ref no-candidate (`[4:foour]`→gate=right-unknown, no
-   mutation). Update: tally line 490 → `S19=13 S20=13 hygiene=6 → "PROBE handover:
-   206/206 PASS"` + a S20 entry in the WHAT-IT-RUNS block (after the S19 entry at
-   ~line 478) + one `EXTENDED 2026-09-16 (R2…)` line in the file header.
-10. **Smoke extension (section 10, before the LIVE-log check):** the DoD controlled
-    scratchpad write — fixture `proj/wfx/file-4.txt` (content TWIN); hook `write`
-    `{filePath: proj\wfx\file-[4:four].txt, content: "R2-WRITE"}` → mutated to
-    `file-4.txt`; the smoke then writes the content to the MUTATED path (simulating the
-    tool landing) and asserts: file content == "R2-WRITE", pair-form file absent,
-    log line 8 fields tool=write, field 5 = the ORIGINAL arg (pair form), field 6 =
-    `pair=[4:four] canon=4 dist=0 gate=mutated`, verdict pair-resolved; plus a
-    write-fuzzy d=1 check and a content-guard check. New total 31 + ~6 checks —
-    report the final count in the handover.
+## What changed (as implemented)
+- `intercept_observer_core.ts`: `WRITE_FUZZY_MAX_D = 1`; the read matcher
+  body refactored into internal `matchNearPath(argRel, corpus, maxD)` with
+  `resolveReadPath` (maxD=2, byte-identical behavior) and new exported
+  `resolveWritePath` (maxD=1); header evidence-forms extended
+  (`gate=fail-closed|ref-mutated|ref-rejected run=…`, `fuzzy scope=write …`).
+- `intercept_observer.ts`: `WRITE_PATH_FIELDS` (write/edit `filePath`,
+  block_transfer `srcFile`+`dstFile`); `runPairWrite` (per path field:
+  mismatch FAILS CLOSED — `gate=fail-closed`, never a mutated write target;
+  else mutate iff canonical exists AND pair-form path does not — same strict
+  gate as read; content/other string fields get the observation-form pair
+  line ONLY, never mutated — the content-scope guard, the `args[1:one]`
+  python-slice collision); `runFuzzyWrite` (d<=1, `scope=write` evidence
+  flag); `runGitRefBash` + `gitRefExists` (see deviation 1); hook ownership
+  (write tools own ALL pair lines of the call; bash owns them when
+  `command` is a string — `observeArg` skipPairs; raw-string args keep R1
+  behavior) and channel-first logging order (channel → obs → fuzzy).
+  The nine VERDICTS stay byte-identical (pinned).
+- probe S20 (13 checks, appended, no renumbering): write gate
+  exists→mutated / none-exist→2 lines / both-exist→1 line / mismatch
+  fail-closed asymmetry / block_transfer srcFile; write fuzzy d=1→mutated +
+  d=2→rejected (`scope=write`); content guards (write `content`, edit
+  `oldString`); bash ref gate PASS/FAIL, mismatch, no-candidate.
+- smoke 8f (4 checks): the controlled write audit above, the content-scope
+  guard, the write-fuzzy d=1.
 
-## Frozen pins that MUST stay green (regression gate)
-- probe [192]: bash `echo [4:four]` → exactly ONE line, evidence byte-exact
-  `pair=[4:four] canon=4 dist=0`, verdict observed-redundancy-ok, args byte-identical
-  (the run<4 → bare-form rule exists FOR this pin).
-- probe [167]/[169]: bash `{filePath, command:"ls [4:four] 20260916"}` → args NOT
-  mutated, exactly 2 lines total.
-- smoke check (2): pair line BEFORE dense line for that bash arg (channel-first order).
-- smoke (1): exactly 2 lines; [189]-style read pins (pair line gate tokens, fuzzy
-  lines byte-exact `fuzzy orig=…` WITHOUT scope flag); VERDICTS = 9 (probe 171, smoke).
-- read-scope behavior FROZEN: runPairRead/runFuzzyRead untouched.
+## Deviations from the pre-compaction design (discovered during the gate run)
+1. **The ref gate is `git for-each-ref --format=%(refname:short)` +
+   membership, NOT `git rev-parse --verify`.** Measured: git parses a pure
+   40-hex string as an OBJECT name — `rev-parse --verify <40hex>` exits 0
+   for ANY 40-hex string (even a non-existent sha) and never consults a ref
+   whose name is exactly 40 hex chars; `^{}`/`^{commit}` peels do not fix
+   it (the ref is ignored, with an ambiguity warning). The for-each-ref
+   membership check is a true existence test (covers all namespaces),
+   fail-closed on any spawn failure, bounded (2500 ms timeout). All
+   comments/docs updated to match.
+2. **The S20 tag constants were regenerated machine-side**: the first
+   hand-typed hex literals bit-drifted to 48 chars (and contained a
+   6-digit run that fired the OBS dense channel — a second log line). The
+   final tags (`1b2c3d4a…` / `9b2c3d4a…`, 40 chars, 1-char diff, no 6+
+   digit run) were built and verified by a node script (lengths,
+   suffix==TAG.slice(1), diff count) and the probe file patched by script —
+   no further dense-string retyping. Probe comment records the 6-digit-run
+   constraint.
+3. Smoke grew 31→35 (+4, not ~6 as estimated pre-compaction — the
+   controlled write is two asserts on one fixture, not three).
 
-## Remaining work
-1. core: matcher refactor (item 8) + header comment update (evidence forms incl.
-   `gate=fail-closed|ref-mutated|ref-rejected run=…` and `fuzzy scope=write …`).
-2. plugin: `WRITE_PATH_FIELDS`, `runPairWrite`, `runFuzzyWrite`, `runGitRefBash`,
-   `gitRevParseVerify` (spawnSync), hook wiring (ownership + channel-first order),
-   header doc update. Import spawnSync from node:child_process; resolveWritePath +
-   MAX_LINES_PER_CALL from the core.
-3. probe S20 per item 9; smoke per item 10.
-4. Gate: probe + ALL smokes + pytest + ruff (standard gate). Commit (code + TODO +
-   handover in ONE commit). Handover with MEASURED numbers (new probe total 206?,
-   smoke total, gate status, the controlled write result).
-5. todo_inbox.md: append the residual-hazard note — a `write` of a NEW file with a d<=1
-   existing sibling is re-targeted onto the sibling (over-write risk); the spec's strict
-   existence gate cannot distinguish "intended new file" from "drifted target" (design
-   question for the maintainer, approved-as-is for R2).
+## TODO / inbox entries (APPENDED, unnumbered — planner curates)
+- `todo_inbox.md` (2026-09-17, worker): the residual hazard of the approved
+  design — a `write` to a NEW file whose name is a d<=1 near-miss of an
+  existing sibling gets re-targeted onto the sibling (over-write risk); the
+  strict existence gate cannot distinguish intended-new from drifted-target;
+  the `fuzzy scope=write`/`gate=mutated` lines carry the original arg
+  (auditable after the fact, not preventable at hook level). Pinned as
+  behavior (probe S20 200/201, smoke 8f), not bug.
+- `todo_inbox.md` (same entry, second bullet): the rev-parse 40-hex
+  measurement note (why the gate is for-each-ref) for the research record.
+- The stale `repo_commands.md` probe-total prose is already tracked as
+  TODO #71 (maintainer-file flag) — the total moved again (193→206);
+  flagged only, not edited (maintainer file).
+
+## Deliberately NOT done
+- No live/host run against the target app — plugin-level verification only
+  (sandboxed probe/smoke), per the repo safety limits.
+- Read scope untouched (frozen); glob/grep/section-anchors still queued
+  (out of R2 scope).
+- No fix for the new-file near-miss hazard (design question for the
+  maintainer; appended to the inbox).
+- No NAP edits (planner-owned); no pushes (maintainer-only).

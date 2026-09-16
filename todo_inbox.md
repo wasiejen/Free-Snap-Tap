@@ -65,3 +65,27 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
 - INCIDENT: worker-13 (R1) TRIMMED this file instead of appending (deleted
   header + 2 uncurated blocks, recovered from git aaf6b03 before curation).
   Worker-prompt line added: append-only, never touch existing entries.
+
+## 2026-09-17 — worker (R2 write-scope pair/fuzzy, looprun autorun-2026-09-16_21-21)
+- Residual hazard of the APPROVED write-scope design (flagged only, no fix
+  in scope): the write-fuzzy channel (and the pair gate) cannot distinguish
+  "a mistyped path to an EXISTING file" from "a deliberately NEW filename
+  that happens to sit within d<=1 of an existing sibling". Consequence: a
+  legitimate `write` to a new path whose name is a d<=1 near-miss of an
+  existing file (e.g. intending to create `file-5.txt` next to
+  `file-4.txt`) gets MUTATED to the existing sibling and the new content
+  overwrites it. The read scope has no such hazard (reads are
+  non-destructive); the mitigation would need an intent signal the
+  interceptor does not have (e.g. the agent confirming the log line before
+  the write lands — the `fuzzy scope=write` / `gate=mutated` audit lines
+  carry the ORIGINAL arg, so the re-targeting is verifiable after the fact,
+  but not preventable at the hook level). Pinned as behavior, not bug:
+  probe S20 (checks 200/201) + smoke 8f.
+- Measurement note for the ref-gate design (why `git for-each-ref` and not
+  `git rev-parse --verify`): git parses a pure 40-hex string as an OBJECT
+  name — `rev-parse --verify <40hex>` exits 0 for ANY 40-hex string
+  (including a non-existent sha) and never consults a ref whose name is
+  exactly 40 hex chars; `^{}`/`^{commit}` peels do not fix it (the ref is
+  ignored for the same reason, with an ambiguity warning). The gate is
+  therefore `git for-each-ref --format=%(refname:short)` + membership
+  (measured 2026-09-17, git on this host).

@@ -480,7 +480,7 @@
 //      research doc §2.3/§3.4): the strict existence gate at the MUTATING
 //      surface + the mismatch fail-closed asymmetry + the d<=1 write-fuzzy
 //      bar (scope=write flag — the nine verdicts stay byte-identical) + the
-//      content-scope guard + the bash git-ref gate (git rev-parse --verify):
+//      content-scope guard + the bash git-ref gate (git for-each-ref existence):
 //      (195) HOOK write pair gate: canonical exists + pair-form absent →
 //          filePath MUTATED + pair-resolved gate=mutated (byte-exact);
 //      (196) HOOK write pair gate fail-closed: canonical absent → NOT
@@ -3948,7 +3948,7 @@ let n19 = 182;
 // never a mutated write target), the d<=1 write-fuzzy bar (the `scope=write`
 // evidence flag — the nine VERDICTS stay byte-identical), the content-scope
 // guard (pairs in content args → log line ONLY, never mutated), and the
-// git-ref gate (git rev-parse --verify — MANDATORY; a ref run < 4 hex chars
+// git-ref gate (git for-each-ref — MANDATORY; a ref run < 4 hex chars
 // → the bare log-only form, the gate is not even attempted).
 
 // git repo at the SANDBOX root: one seed commit + a 40-hex TAG — the
@@ -3959,8 +3959,11 @@ execFileSync("git", ["init", "-q"], { cwd: SANDBOX, stdio: "ignore" });
 writeFileSync(path.join(SANDBOX, "s20-seed.txt"), "s20\n", "utf8");
 execFileSync("git", ["add", "s20-seed.txt"], { cwd: SANDBOX, stdio: "ignore" });
 execFileSync("git", ["-c", "user.name=probe", "-c", "user.email=probe@probe", "commit", "-q", "-m", "s20 seed"], { cwd: SANDBOX, stdio: "ignore" });
-const TAG40 = "1234abcd5678ef901234abcd5678ef901234abcd";
-const FAILREF = "9234abcd5678ef901234abcd5678ef901234abcd";
+// NOTE: the tags carry NO 6+ digit run — a dense run in the command string
+// would fire the OBS dense channel (a second line) and break the "exactly
+// one line" pins (measured: 1234abcd…ef901234… contains the run 901234)
+const TAG40 = "1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a";
+const FAILREF = "9b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a";
 execFileSync("git", ["tag", TAG40], { cwd: SANDBOX, stdio: "ignore" });
 // the write-fuzzy fixture: a dedicated single-sibling dir (gap=inf — no
 // second-best to narrow the gap)
@@ -4168,10 +4171,10 @@ let n20 = 195;
 }
 
 // 204 — the HOOK bash git-ref gate PASS: the pair → digit, the maximal hex
-//      run (the 40-hex tag) rev-parse-verifies → the command is MUTATED +
+//      run (the 40-hex tag) exists as a ref → the command is MUTATED +
 //      pair-resolved 'gate=ref-mutated run=<tag>' (byte-exact)
 {
-  const g1 = { command: `git log [1:one]234abcd5678ef901234abcd5678ef901234abcd` };
+  const g1 = { command: `git log [1:one]b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a` };
   const nL10 = ioReadLines().length;
   await ioBefore({ tool: "bash", sessionID: "ses_fx_io2", callID: "c204" }, { args: g1 });
   const g1Lines = ioReadLines();
@@ -4189,11 +4192,11 @@ let n20 = 195;
 }
 
 // 205 — the HOOK bash git-ref gate FAIL: the 1-char-off ref does NOT
-//      rev-parse-verify → NOT mutated (byte-identical) + the pair line
+//      ref does not exist → NOT mutated (byte-identical) + the pair line
 //      'gate=ref-rejected run=<failref>' (observed-redundancy-ok — the gate
 //      is mandatory, research §3.4)
 {
-  const g2 = { command: `git log [9:nine]234abcd5678ef901234abcd5678ef901234abcd` };
+  const g2 = { command: `git log [9:nine]b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a` };
   const g2Before = JSON.stringify(g2);
   const nL11 = ioReadLines().length;
   await ioBefore({ tool: "bash", sessionID: "ses_fx_io2", callID: "c205" }, { args: g2 });
@@ -4214,7 +4217,7 @@ let n20 = 195;
 //      log-only line (no gate attempt, no mutation; the mismatch evidence
 //      carries both values — the agent decides)
 {
-  const g3 = { command: `git log [9:eight]234abcd5678ef901234abcd5678ef901234abcd` };
+  const g3 = { command: `git log [9:eight]b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a` };
   const g3Before = JSON.stringify(g3);
   const nL12 = ioReadLines().length;
   await ioBefore({ tool: "bash", sessionID: "ses_fx_io2", callID: "c206" }, { args: g3 });

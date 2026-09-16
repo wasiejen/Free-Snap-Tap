@@ -54,11 +54,14 @@
 //       `fuzzy-resolved`/`fuzzy-rejected` with the `scope=write` flag in
 //       the evidence (the nine verdicts stay byte-identical).
 //   (3c) GIT REFS in the bash `command` string: pair → digit (right-wins),
-//       gated on `git rev-parse --verify` (research §3.4 — the gate is
-//       MANDATORY): the maximal hex run spanning the pair's canonical
-//       digits is the candidate ref; run < 4 hex chars → bare log-only
-//       line (gate not attempted); run >= 4 → the ref verifies or the
-//       command is left untouched (`gate=ref-rejected`); mutation is
+//       gated on ref EXISTENCE (research §3.4 — the gate is MANDATORY):
+//       the maximal hex run spanning the pair's canonical digits is the
+//       candidate ref; run < 4 hex chars → bare log-only line (gate not
+//       attempted); run >= 4 → the ref exists in `git for-each-ref`
+//       (--format=%(refname:short) membership — NOT rev-parse --verify,
+//       which accepts any 40-hex string as an object name and never
+//       consults a 40-hex-named ref; measured 2026-09-17) or the command
+//       is left untouched (`gate=ref-rejected`); mutation is
 //       all-or-nothing across the command's pairs (`gate=ref-mutated`).
 //   Channel lines log BEFORE the observation lines (pair-before-dense
 //   order); the nine VERDICTS stay byte-identical (core VERDICTS).
@@ -467,30 +470,38 @@ function runFuzzyWrite(output: { args?: unknown }, tool: string): Observation[] 
 }
 
 // The MANDATORY gate for bash git-ref resolution (research §3.4): a
-// candidate ref is trusted only if `git rev-parse --verify` accepts it.
-// Bounded spawn (hard 2500 ms timeout, stdio ignored); ANY failure
-// (missing git, timeout, non-zero exit) → false (fail-closed, never throw).
-function gitRevParseVerify(ref: string): boolean {
+// candidate ref is trusted only if it EXISTS in the repository's ref
+// namespace — `git for-each-ref --format=%(refname:short)` + membership.
+// NOT `git rev-parse --verify` (measured 2026-09-17): git parses a pure
+// 40-hex string as an OBJECT name, not a ref — `rev-parse --verify`
+// accepts ANY 40-hex string (even a non-existent sha, exit 0) and never
+// consults the ref when the ref name is exactly 40 hex chars; the `^{}` /
+// `^{commit}` peel does not help (the ref is ignored for the same reason).
+// Bounded spawn (hard 2500 ms timeout); ANY failure (missing git, timeout,
+// non-zero exit, non-repo dir) → false (fail-closed, never throw).
+function gitRefExists(run: string): boolean {
   try {
-    const r = spawnSync("git", ["rev-parse", "--verify", ref], {
+    const r = spawnSync("git", ["for-each-ref", "--format=%(refname:short)"], {
       cwd: dir || undefined,
-      stdio: "ignore",
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
       timeout: 2500,
     });
-    return r.status === 0;
+    if (r.status !== 0 || typeof r.stdout !== "string") return false;
+    return r.stdout.split("\n").map((l) => l.trim()).includes(run);
   } catch {
     return false;
   }
 }
 
 // BASH git-ref channel: commit ids in the bash `command` string —
-// pair/numword → digit, gated on `git rev-parse --verify` (the gate is
+// pair/numword → digit, gated on ref EXISTENCE (gitRefExists — the gate is
 // MANDATORY). Every `[left:right]` pair resolves independently (right-wins);
 // the candidate command replaces the resolved pairs; the REF is the maximal
 // hex run spanning each pair's canonical digits (scan left/right in the
 // candidate). run < 4 hex chars → the bare log-only line (the gate is not
-// even attempted — the `echo [4:four]` form); run >= 4 → rev-parse gate;
-// MUTATE (all pairs, all-or-nothing) only when EVERY run verifies. A
+// even attempted — the `echo [4:four]` form); run >= 4 → the ref-existence
+// gate; MUTATE (all pairs, all-or-nothing) only when EVERY run exists. A
 // MISMATCH fails closed (bare mismatch lines, no gate attempt). Never
 // throws.
 function runGitRefBash(output: { args?: unknown }): Observation[] {
@@ -533,7 +544,7 @@ function runGitRefBash(output: { args?: unknown }): Observation[] {
     runs.push({ pc, run: full.slice(a, b) });
     shift += (pc.canonical ?? "").length - pc.raw.length;
   }
-  const allVerified = runs.every(({ run }) => run.length >= 4 && gitRevParseVerify(run));
+  const allVerified = runs.every(({ run }) => run.length >= 4 && gitRefExists(run));
   if (allVerified) (args as { command: string }).command = full;
   return runs.map(({ pc, run }) =>
     run.length < 4
