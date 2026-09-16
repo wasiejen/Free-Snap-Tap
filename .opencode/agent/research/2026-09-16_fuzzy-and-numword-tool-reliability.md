@@ -545,5 +545,20 @@ approval:
 - generally everything you can do via scripts that improve this are approved to test (write only in temp) and if tested also to use as first test in live work on read actions
   - so 5.1, 5.2 approved, 5.3 as general intercept plugin without correction is also approved as functional test to work for all relevant tools (or all if possible). + logging mechanism
     - functional prototyp for the intercept
-    - seperate from watchdog (functional seperation)
-    - seperate log file (functional seperation also as reason )
+     - seperate from watchdog (functional seperation)
+     - seperate log file (functional seperation also as reason )
+
+---
+
+## Dated verdict (2026-09-16) — §5.4 one-shot: mutation channel LIVE
+
+Restart acceptance (TODO #66) at the 2026-09-16 restart (direct session
+ses_f54ee6ba8): (1) `intercept.log` lines appeared — observer LOADED;
+(2) mutation verdict: a mistyped read `…fuzzy_accept/file-4.tx` logged
+`fuzzy orig=…file-4.tx -> file-4.txt d=1 gap=4 | fuzzy-resolved` and the
+tool returned the TWIN fixture content → **a mutated `output.args` reaches
+tool execution**. The §5.3 intercept is fully viable; the Q3 roadmap (read
+→ write scope) is executable. The scratchpad sentinel was torn down per
+§5.4 step 4. Full record, the convention decisions of the direct session
+(`[left:right]` form, right-wins semantics, R1-R5 roadmap), and the staged
+specs: `.opencode/agent/research/fuzzy-numword/decision-record.md`.

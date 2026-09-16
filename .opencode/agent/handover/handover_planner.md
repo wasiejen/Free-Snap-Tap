@@ -106,6 +106,32 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   feedback-file comment.
 - Loop folder this run: `autorun_2-6_0-9_1-6__1-3_3-3` (his rename).
 
+## Direct session (2026-09-16, ses_f54ee6ba8ffeeoFUc1zptUtsb5) — fuzzy/numword topic: verdict + convention + staged specs
+- **#66 CLOSED: mutation channel LIVE** at this restart (intercept.log live;
+  mistyped read → `fuzzy-resolved d=1 gap=4` → TWIN content). Verdict in
+  research doc dated section + decision record §1; sentinel torn down.
+- **Convention ruled with him** (full reasoning in
+  `research/fuzzy-numword/decision-record.md` — the basis doc): pair form
+  `[left:right]` (SUPERSEDES `<4|four>` — measured bash table: `<`/`|`
+  fatal, `[]`+`:` survives), single-digit dash form recommended, full map =
+  accepted fallback, candidates only inside delimiters, right-wins on
+  mismatch, adder-left = incident signal, no letter-fuzzy/aliases yet
+  (his misspellings ≠ agent drift), scratchpad = allowed sandbox root.
+  Pipeline: pair resolution first, fuzzy second, read-scope mutation.
+- **Topic folder created** `research/fuzzy-numword/` (README + decision
+  record + specs R1 launch-ready, R2/R3/R4 staged with gates; R5 no spec).
+- **His pending actions:** AGENTS.md paste (draft in decision-record §4 —
+  the rule's compaction-surviving home, his "direct answer to Loop Pattern
+ 5") + the R2 write-scope approval.
+- **Live incidents (measured, this session):** the subject matter bit the
+  planner — a doubled `OpenCodeProjects` write path (machine-detected
+  pre-commit, fixed) + one perception drift of my own path arg (perceived
+  path ≠ generated path; machine-checked). Spurious loop folder
+  `autorun-2026-09-16_13-33` (3rd #65 occurrence) consolidated + removed.
+  His FB files relocated by him to `research/` (`FB_` prefix) — his
+  reorg, left untracked.
+- TODO #65-69 amended (67→R3, 68→R2 gates, 69 form superseded + ruled).
+
 ## Standing
 - Baselines (re-verified 2026-09-16, plan2, gates re-run by the planner
   after worker-13): probe **180/180** (S17=26 numword pins, S18=32

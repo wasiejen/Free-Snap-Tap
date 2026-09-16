@@ -138,9 +138,12 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   folder's loop_log.md; no spurious folder on the next looprun; probe/smoke
   green.
 - **Scope:** `.opencode/tools/loop_log.ts` (+ its smoke if any). Restart-gated.
-- **Status:** OPEN (planned).
+- **Status:** OPEN (planned). 3rd occurrence 2026-09-16 18-27
+  (`autorun-2026-09-16_13-33`, lines already consolidated in the real log;
+  planner removed the folder) — the looprunner's INFO line in the real
+  loop_log.md confirms the tool still mis-detects the renamed folder.
 
-## 66. 5.3+5.4 restart acceptance (PENDING — next maintainer restart; 2026-09-16, plan2)
+## 66. 5.3+5.4 restart acceptance (CLOSED 2026-09-16 direct session; verdict LIVE)
 - **Problem / evidence:** the observer plugin failed to LOAD on the first
   live check ("Plugin export is not a function" — fixed by the core split,
   `4719cc5`); the read-scope mutation channel (5.4 one-shot) is still
@@ -172,7 +175,9 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   standard gate unchanged.
 - **Scope:** `intercept_observer_core.ts` + `intercept_observer.ts` + probe
   S18 section.
-- **Status:** OPEN (planned, after #66 verdict).
+- **Status:** OPEN (this is the scope of staged spec R3,
+  `research/fuzzy-numword/spec_R3_arg_scope_extension.md`; gated on R1 + R2
+  green + R4 log-volume data).
 
 ## 68. Write-scope fuzzy (step 2 of the Q3 roadmap; GATED; 2026-09-16)
 - **Problem / evidence:** maintainer ruling (addendum Q3, 2026-09-16): read
@@ -184,29 +189,37 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Outcome:** spec for write-scope resolution (scope rule, existence gate,
   correction log, fail-closed) → maintainer approval → build.
 - **Acceptance:** approved spec + landed build + gate green (per spec).
-- **Scope:** research doc §2.3/§3.4/§4.2 as the design source.
-- **Status:** DEFERRED (gated on #66 verdict + his approval).
+- **Scope:** research doc §2.3/§3.4/§4.2 as the design source; staged spec
+  `research/fuzzy-numword/spec_R2_write_scope.md`.
+- **Status:** OPEN (spec drafted this session; #66 verdict LIVE 2026-09-16).
+  Gates to launch: R1 (read-scope pair, spec_R1) green first, then his
+  explicit write-scope approval — the spec is NOT launchable before that
+  ruling.
 
-## 69. Redundancy naming + `<4|four>` delimitation codification (Q1/Q2 rulings, 2026-09-16)
-- **Problem / evidence:** maintainer rulings (addendum Q1: YES — redundant
-  digit|word form for loop/plan file names, single digits probably fine but
-  general yes; Q2: YES with refinement — `<4|four>` angle-bracket
-  delimitation to separate the pair from the rest of the string, eases
-  git-id/session-id resolution). Not yet codified anywhere in prompts/
-  protocol; the observer's `PAIR_RE` currently only matches tight
-  `digit|word` (no `< >` form).
-- **Outcome:** codify the naming convention (loop/plan file names:
-  digit|word) in the loop protocol + planner/looprunner prompts; extend the
-  observer pair detection to the `<d|word>` form; probe pins for the new
-  form.
-- **Acceptance:** prompts updated (planner-direct), observer `<d|word>`
-  detection pinned in the probe, gate green.
-- **Scope:** `prompt_agent_looprunner.md`, `prompt_agent_planner.md`,
-  `agent_readme_loop.md`, `intercept_observer_core.ts` (PAIR_RE) + probe.
-- **Status:** OPEN (planned). NOTE: his live feedback-file comment on the
-  w2n `<8-6-1>`/`<6|six>` grammar ideas is marked "to be discussed in
-  direct session" — the grammar part waits for that discussion; the
-  NAMING convention does not.
+## 69. Redundancy form codification: `[left:right]` (SUPERSEDES the `<4|four>` Q2 form; 2026-09-16 direct session)
+- **Problem / evidence:** the addendum Q2 form `<4|four>` (angle brackets +
+  pipe) was REJECTED by measurement 2026-09-16 (direct session): unquoted
+  in Git-Bash, `<...>` = syntax error (exit 2) and `|` = pipe break (exit
+ 127) — both measured; `[left:right]` survives (exit 0) with one known
+  glob edge (single-char cwd file) mitigated by a quote-when-bash rule.
+  Full table + reasoning: `research/fuzzy-numword/decision-record.md` §2.4.
+  His FB grammar comments (`<8-6-1>` fallback, adder-left `[800+50+11:…]`,
+  right-wins, "to be discussed in direct session") were DISCUSSED and
+  ruled: single-digit dash form recommended, full map = accepted fallback,
+  pair-left ∈ {as-seen | adder | numword}, right = numword, right-wins.
+- **Outcome:** codify the convention where it survives compaction of ANY
+  agent: (a) AGENTS.md — maintainer PASTE (draft in decision-record §4,
+  his action); (b) the observer form switch + read-scope resolution =
+  spec_R1 (launch-ready); (c) role-prompt pointer lines (planner-direct or
+  planner-as-text-worker, after R1 — worker edit-deny on prompts/).
+- **Acceptance:** his AGENTS.md paste landed + R1 green + pointer lines in
+  planner/worker/looprunner prompts.
+- **Scope:** AGENTS.md (maintainer), spec_R1 build, `prompt_agent_*.md`
+  pointer lines.
+- **Status:** OPEN (form ruled 2026-09-16; waiting on his paste + R1).
+  NOTE: ALL FB-file comments are acted on and recorded in the decision
+  record (§6.5) — do not re-act the `--comment` markers there (they are
+  his input record).
 
 ## 70. compact_memory rework: cross-compact by session_id only + Gemma worker compaction + no-wait flow (2026-09-16, new priority.md item)
 - **Problem / evidence:** maintainer priority.md addition: context_limit
