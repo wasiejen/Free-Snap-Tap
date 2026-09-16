@@ -1,9 +1,14 @@
 # Worker summary — R2 write-scope pair/fuzzy resolution (IN PROGRESS — compaction checkpoint)
 
-STATUS: IN PROGRESS (compaction checkpoint 2026-09-16; baseline green, design settled,
-implementation started). Resume: re-read this file + the task spec
-(`.opencode/agent/handover/handover_task.md`) + `intercept_observer_core.ts` /
-`intercept_observer.ts`; the design below is the committed intent.
+STATUS: IN PROGRESS (compaction checkpoint #2 — ALL CODE WRITTEN, gate NOT yet
+run). Resume: (1) run `node .opencode/plugin/probes/handover_probe.mjs` (expect
+206/206 — the S20 section is new, checks 195-207) +
+`node .opencode/plugin/tests/intercept_observer.smoke.mjs` (expect 35/35 —
+section 8f new) + the standard gate (pytest + ruff per repo_commands.md);
+(2) fix any red (most likely S20 pin details / evidence bytes);
+(3) ONE commit: code + smoke + probe + this handover + the todo_inbox hazard
+note (item 5) with measured numbers; (4) loop_log DONE with the final gauge
+readout. Design below is as implemented.
 
 ## Baseline (verified by RUNNING before any edit)
 - probe `node .opencode/plugin/probes/handover_probe.mjs` → **193/193 PASS** (twice —

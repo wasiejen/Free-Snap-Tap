@@ -1,6 +1,8 @@
 // intercept_observer.smoke.mjs — the 5.3 log-only intercept observer + the
-// 5.4 read-scope fuzzy resolution (.opencode/plugin/intercept_observer.ts +
-// _core.ts). The plugin factory is called with a SCRATCHPAD sandbox
+// 5.4 read-scope fuzzy resolution + the R2 write-scope pair/fuzzy resolution
+// (2026-09-16: the controlled scratchpad write audit, the content-scope
+// guard, the d<=1 write-fuzzy bar) (.opencode/plugin/intercept_observer.ts
+// + _core.ts). The plugin factory is called with a SCRATCHPAD sandbox
 // `directory` — the intercept.log lands in the sandbox
 // (.opencode/temp/intercept.log under the sandbox project), NEVER the live
 // .opencode/temp/ (DO-NOT-touch); the numword map is the REAL shared file
@@ -210,6 +212,50 @@ try {
     JSON.stringify(argsQ) === argsQBefore && lQ.length === countQ + 2 &&
       fQpair.length === 8 && fQpair[7] === "observed-redundancy-ok" && fQpair[5] === `pair=[3:three] canon=3 dist=0 gate=none-exist` &&
       fQ.length === 8 && fQ[7] === "fuzzy-rejected", JSON.stringify([fQpair, fQ]));
+
+  // ---- (8f) the WRITE-SCOPE resolution (R2, 2026-09-16): the DoD
+  //      controlled scratchpad write — the resolved write lands where the
+  //      log says (end-to-end audit: field 5 = the ORIGINAL pair-form arg,
+  //      field 6 = the gate evidence) + the content-scope guard (the
+  //      `args[1:one]` python-slice collision → log line ONLY) + the d<=1
+  //      write-fuzzy bar (scope=write evidence flag)
+  fs.mkdirSync(path.join(proj, "wfx"), { recursive: true });
+  fs.writeFileSync(path.join(proj, "wfx", "file-4.txt"), "TWIN", "utf-8");
+  const argsW = { filePath: proj + "\\wfx\\file-[4:four].txt", content: "R2-WRITE" };
+  const argsWBefore = JSON.stringify(argsW);
+  const countW = readLines().length;
+  await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c10c" }, { args: argsW });
+  // the tool lands the write at the (mutated) path — simulating the host
+  fs.writeFileSync(argsW.filePath, argsW.content, "utf-8");
+  const lW = readLines();
+  const fW = split8(lW[lW.length - 1]);
+  chk("write pair gate → filePath MUTATED + the write lands where the log says (file-4.txt = R2-WRITE, pair-form path absent)",
+    argsW.filePath === proj + "\\wfx\\file-4.txt" &&
+      fs.readFileSync(path.join(proj, "wfx", "file-4.txt"), "utf-8") === "R2-WRITE" &&
+      !fs.existsSync(proj + "\\wfx\\file-[4:four].txt"), argsW.filePath);
+  chk("write pair gate → audit line (8 fields; field 5 = ORIGINAL pair-form arg; field 6 = gate evidence; pair-resolved)",
+    lW.length === countW + 1 && fW.length === 8 && fW[3] === "write" && fW[7] === "pair-resolved" &&
+      fW[4] === argsWBefore && fW[5] === "pair=[4:four] canon=4 dist=0 gate=mutated", JSON.stringify(fW));
+
+  const argsC = { filePath: proj + "\\wfx\\file-4.txt", content: "x = args[1:one] + y" };
+  const argsCBefore = JSON.stringify(argsC);
+  const countC = readLines().length;
+  await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c10d" }, { args: argsC });
+  const lC = readLines();
+  const fC = split8(lC[lC.length - 1]);
+  chk("write content-scope guard: pair in content → log line ONLY, args byte-identical (the args[1:one] collision)",
+    JSON.stringify(argsC) === argsCBefore && lC.length === countC + 1 && fC[7] === "observed-redundancy-ok" &&
+      fC[5] === "pair=[1:one] canon=1 dist=0", JSON.stringify(fC));
+
+  const argsF = { filePath: proj + "\\wfx\\file-9.txt" };
+  const argsFBefore = JSON.stringify(argsF);
+  const countF = readLines().length;
+  await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c10e" }, { args: argsF });
+  const lF = readLines();
+  const fF = split8(lF[lF.length - 1]);
+  chk("write fuzzy d=1 → MUTATED to the existing sibling + fuzzy-resolved scope=write (d=1 gap=inf)",
+    argsF.filePath === proj + "\\wfx\\file-4.txt" && lF.length === countF + 1 && fF[7] === "fuzzy-resolved" &&
+      fF[5].includes("fuzzy scope=write orig=") && fF[5].includes("-> file-4.txt d=1 gap=inf"), JSON.stringify(fF));
 
   // ---- (9) the LIVE log is untouched by this smoke
   const liveAfter = fs.existsSync(LIVE_LOG) ? fs.statSync(LIVE_LOG).size : null;

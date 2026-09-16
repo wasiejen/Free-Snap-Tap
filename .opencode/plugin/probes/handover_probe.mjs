@@ -475,6 +475,40 @@
 //      (193) SCRATCHPAD_ROOT: constant pin + slash/backslash-case/deep
 //          scratchpad paths → no out-of-sandbox; C:\Windows control fires;
 //      (194) HOOK scratchpad: bash arg under the scratchpad → zero lines.
+//   S20 write-scope pair/fuzzy (13) — the R2 pin (approved 2026-09-16;
+//      design source: research/fuzzy-numword/decision-record.md §2 +
+//      research doc §2.3/§3.4): the strict existence gate at the MUTATING
+//      surface + the mismatch fail-closed asymmetry + the d<=1 write-fuzzy
+//      bar (scope=write flag — the nine verdicts stay byte-identical) + the
+//      content-scope guard + the bash git-ref gate (git rev-parse --verify):
+//      (195) HOOK write pair gate: canonical exists + pair-form absent →
+//          filePath MUTATED + pair-resolved gate=mutated (byte-exact);
+//      (196) HOOK write pair gate fail-closed: canonical absent → NOT
+//          mutated + gate=none-exist + fuzzy-rejected scope=write on the
+//          result (the fixed pipeline order);
+//      (197) HOOK write pair gate both-exist → NOT mutated + gate=both-exist
+//          (one line, the fuzzy fast-paths the existing original);
+//      (198) HOOK write MISMATCH ASYMMETRY: [7:eight] + file-8.txt exists →
+//          NOT mutated + redundancy-mismatch gate=fail-closed (contrast the
+//          read scope, S19 pin 191) + fuzzy-rejected scope=write;
+//      (199) HOOK block_transfer: srcFile pair MUTATED + dstFile
+//          byte-identical;
+//      (200) HOOK write fuzzy d=1 (single-sibling dir, gap=inf) → MUTATED +
+//          fuzzy-resolved scope=write d=1 gap=inf;
+//      (201) HOOK write fuzzy d=2 → NOT mutated + fuzzy-rejected scope=write
+//          reason=d-too-high (the d<=1 write bar — read accepts d=2);
+//      (202) content-scope guard (write): pair in content → log line ONLY,
+//          args byte-identical (the `args[1:one]` python-slice collision);
+//      (203) content-scope guard (edit): pair in oldString → log line ONLY,
+//          args byte-identical;
+//      (204) HOOK bash git-ref gate PASS: 40-hex tag ref verifies → command
+//          MUTATED + pair-resolved gate=ref-mutated run=<tag> (byte-exact);
+//      (205) HOOK bash git-ref gate FAIL: 1-char-off ref unverified → NOT
+//          mutated + gate=ref-rejected run=<failref>;
+//      (206) HOOK bash git-ref mismatch → NOT mutated + bare mismatch line
+//          (no gate attempt);
+//      (207) HOOK bash git-ref no-candidate ([4:foour]) → gate=right-unknown,
+//          NOT mutated (gate not attempted).
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -487,7 +521,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 hygiene=6  →  "PROBE handover: 193/193 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=13 hygiene=6  →  "PROBE handover: 206/206 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -3902,6 +3936,320 @@ let n19 = 182;
     `n=${ioReadLines().length - nLines6}`,
   );
   n19++;
+}
+
+// ------------------------------------------------------------------ S20 write-scope pair/fuzzy (13)
+//
+// The R2 (2026-09-16) write-scope pair/fuzzy resolution + the bash git-ref
+// channel (spec: the R2 task; design source: research/fuzzy-numword/
+// decision-record.md §2 + the research doc §2.3/§3.4): the strict existence
+// gate at the mutating surface (write/edit/block_transfer path fields), the
+// MISMATCH fail-closed asymmetry (a wrong write is not self-correcting —
+// never a mutated write target), the d<=1 write-fuzzy bar (the `scope=write`
+// evidence flag — the nine VERDICTS stay byte-identical), the content-scope
+// guard (pairs in content args → log line ONLY, never mutated), and the
+// git-ref gate (git rev-parse --verify — MANDATORY; a ref run < 4 hex chars
+// → the bare log-only form, the gate is not even attempted).
+
+// git repo at the SANDBOX root: one seed commit + a 40-hex TAG — the
+// ref-gate pins resolve via the tag name (deterministic: a 40-char hex
+// string resolves only as that exact tag/sha; the 1-char-off fail ref is a
+// deterministic reject regardless of the seed commit's sha)
+execFileSync("git", ["init", "-q"], { cwd: SANDBOX, stdio: "ignore" });
+writeFileSync(path.join(SANDBOX, "s20-seed.txt"), "s20\n", "utf8");
+execFileSync("git", ["add", "s20-seed.txt"], { cwd: SANDBOX, stdio: "ignore" });
+execFileSync("git", ["-c", "user.name=probe", "-c", "user.email=probe@probe", "commit", "-q", "-m", "s20 seed"], { cwd: SANDBOX, stdio: "ignore" });
+const TAG40 = "1234abcd5678ef901234abcd5678ef901234abcd";
+const FAILREF = "9234abcd5678ef901234abcd5678ef901234abcd";
+execFileSync("git", ["tag", TAG40], { cwd: SANDBOX, stdio: "ignore" });
+// the write-fuzzy fixture: a dedicated single-sibling dir (gap=inf — no
+// second-best to narrow the gap)
+const ioWfDir = path.join(ioPfDir, "wf");
+mkdirSync(ioWfDir, { recursive: true });
+writeFileSync(path.join(ioWfDir, "file-4.txt"), "x", "utf8");
+let n20 = 195;
+
+// 195 — the HOOK write-scope pair gate: canonical EXISTS + pair-form path
+//      absent → filePath MUTATED + a pair-resolved line (byte-exact gate
+//      evidence; field 5 = the ORIGINAL pair-form arg)
+{
+  const w1 = { filePath: ioPfDir + "\\file-[4:four].txt" };
+  const nL1 = ioReadLines().length;
+  await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c195" }, { args: w1 });
+  const w1Lines = ioReadLines();
+  const w1f = w1Lines[w1Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "hook write pair gate: canonical exists → filePath MUTATED + pair-resolved 'gate=mutated' (field 5 = original arg)",
+    w1.filePath === ioPfDir + "\\file-4.txt" && w1Lines.length === nL1 + 1 && w1f.length === 8 &&
+      w1f[3] === "write" && w1f[4] === JSON.stringify({ filePath: ioPfDir + "\\file-[4:four].txt" }) &&
+      w1f[5] === "pair=[4:four] canon=4 dist=0 gate=mutated" && w1f[7] === "pair-resolved",
+    JSON.stringify({ after: w1.filePath, n: w1Lines.length - nL1, f: w1f }),
+  );
+  n20++;
+}
+
+// 196 — the HOOK write-scope pair gate FAIL-CLOSED: canonical ABSENT → NOT
+//      mutated (byte-identical) + the pair line gate=none-exist + the fuzzy
+//      channel still runs on the result (d>1 → fuzzy-rejected, scope=write)
+{
+  const w2 = { filePath: ioPfDir + "\\file-[7:seven].txt" };
+  const w2Before = JSON.stringify(w2);
+  const nL2 = ioReadLines().length;
+  await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c196" }, { args: w2 });
+  const w2Lines = ioReadLines();
+  const w2p = w2Lines[w2Lines.length - 2].split(" | ");
+  const w2f = w2Lines[w2Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "hook write pair gate fail-closed: canonical absent → NOT mutated + 'gate=none-exist' + fuzzy-rejected scope=write on the result",
+    JSON.stringify(w2) === w2Before && w2Lines.length === nL2 + 2 &&
+      w2p[7] === "observed-redundancy-ok" && w2p[5] === "pair=[7:seven] canon=7 dist=0 gate=none-exist" &&
+      w2f[7] === "fuzzy-rejected" && w2f[5].includes("scope=write"),
+    JSON.stringify({ argsAfter: JSON.stringify(w2), n: w2Lines.length - nL2, f: [w2p[5], w2f[5], w2f[7]] }),
+  );
+  n20++;
+}
+
+// 197 — the HOOK write-scope pair gate: BOTH the canonical and the pair-form
+//      path exist (brackets legal on-disk, S19 fixture) → the real file wins:
+//      NOT mutated + the pair line gate=both-exist (exactly ONE line — the
+//      fuzzy channel fast-paths the existing original)
+{
+  const w3 = { filePath: ioPfDir + "\\file-[2:two].txt" };
+  const w3Before = JSON.stringify(w3);
+  const nL3 = ioReadLines().length;
+  await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c197" }, { args: w3 });
+  const w3Lines = ioReadLines();
+  const w3f = w3Lines[w3Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "hook write pair gate both-exist: NOT mutated + 'gate=both-exist' (one line, no fuzzy line)",
+    JSON.stringify(w3) === w3Before && w3Lines.length === nL3 + 1 &&
+      w3f[5] === "pair=[2:two] canon=2 dist=0 gate=both-exist" && w3f[7] === "observed-redundancy-ok",
+    JSON.stringify({ argsAfter: JSON.stringify(w3), n: w3Lines.length - nL3, f: w3f }),
+  );
+  n20++;
+}
+
+// 198 — the HOOK write-scope MISMATCH ASYMMETRY (§2.3): [7:eight] mismatches
+//      and the canonical file-8.txt EXISTS — the write scope FAILS CLOSED
+//      (NOT mutated, gate=fail-closed; contrast the read scope which
+//      resolves on mismatch — the S19 pin 191) + the fuzzy channel still
+//      runs on the untouched result (fuzzy-rejected scope=write)
+{
+  const w4 = { filePath: ioPfDir + "\\file-[7:eight].txt" };
+  const w4Before = JSON.stringify(w4);
+  const nL4 = ioReadLines().length;
+  await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c198" }, { args: w4 });
+  const w4Lines = ioReadLines();
+  const w4m = w4Lines[w4Lines.length - 2].split(" | ");
+  const w4f = w4Lines[w4Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "hook write mismatch FAIL-CLOSED: [7:eight] + file-8.txt exists → NOT mutated + redundancy-mismatch 'gate=fail-closed' + fuzzy-rejected scope=write",
+    JSON.stringify(w4) === w4Before && w4Lines.length === nL4 + 2 &&
+      w4m[7] === "redundancy-mismatch" && w4m[5] === "pair=[7:eight] canon=8 dist=1 gate=fail-closed" &&
+      w4f[7] === "fuzzy-rejected" && w4f[5].includes("scope=write"),
+    JSON.stringify({ argsAfter: JSON.stringify(w4), n: w4Lines.length - nL4, f: [w4m[5], w4f[7]] }),
+  );
+  n20++;
+}
+
+// 199 — the HOOK block_transfer: the srcFile pair is gated (mutated); the
+//      clean dstFile (an existing path) stays byte-identical (no line)
+{
+  const b2 = { srcFile: ioPfDir + "\\file-[8:eight].txt", dstFile: ioPfDir + "\\file-4.txt" };
+  const b2Before = JSON.stringify(b2);
+  const nL5 = ioReadLines().length;
+  await ioBefore({ tool: "block_transfer", sessionID: "ses_fx_io2", callID: "c199" }, { args: b2 });
+  const b2Lines = ioReadLines();
+  const b2f = b2Lines[b2Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "hook block_transfer: srcFile pair MUTATED (gate=mutated) + dstFile byte-identical (one line)",
+    b2.srcFile === ioPfDir + "\\file-8.txt" && b2.dstFile === JSON.parse(b2Before).dstFile &&
+      b2Lines.length === nL5 + 1 && b2f[3] === "block_transfer" &&
+      b2f[5] === "pair=[8:eight] canon=8 dist=0 gate=mutated" && b2f[7] === "pair-resolved",
+    JSON.stringify({ after: b2, n: b2Lines.length - nL5, f: b2f }),
+  );
+  n20++;
+}
+
+// 200 — the HOOK write-scope FUZZY d<=1: a mistyped write path with a d=1
+//      existing sibling (single-sibling dir — gap=inf) → MUTATED to the real
+//      path + fuzzy-resolved with the `scope=write` flag (d=1 is the
+//      write-scope bar — read would accept d<=2)
+{
+  const f1 = { filePath: ioWfDir + "\\file-9.txt" };
+  const nL6 = ioReadLines().length;
+  await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c200" }, { args: f1 });
+  const f1Lines = ioReadLines();
+  const f1f = f1Lines[f1Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "hook write fuzzy d=1: file-9.txt → MUTATED to file-4.txt + fuzzy-resolved 'scope=write … d=1 gap=inf'",
+    f1.filePath === ioWfDir + "\\file-4.txt" && f1Lines.length === nL6 + 1 &&
+      f1f[7] === "fuzzy-resolved" && f1f[5].includes("fuzzy scope=write orig=") &&
+      f1f[5].includes("-> file-4.txt d=1 gap=inf"),
+    JSON.stringify({ after: f1.filePath, n: f1Lines.length - nL6, f: f1f }),
+  );
+  n20++;
+}
+
+// 201 — the HOOK write-scope FUZZY bar: d=2 is REJECTED in the write scope
+//      (the read scope accepts it — the d<=1 bar, the §2.3 hazard class) →
+//      NOT mutated + fuzzy-rejected scope=write reason=d-too-high
+{
+  const f2 = { filePath: ioWfDir + "\\file-56.txt" };
+  const f2Before = JSON.stringify(f2);
+  const nL7 = ioReadLines().length;
+  await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c201" }, { args: f2 });
+  const f2Lines = ioReadLines();
+  const f2f = f2Lines[f2Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "hook write fuzzy d=2: file-56.txt vs file-4.txt → NOT mutated + fuzzy-rejected scope=write reason=d-too-high",
+    JSON.stringify(f2) === f2Before && f2Lines.length === nL7 + 1 &&
+      f2f[7] === "fuzzy-rejected" && f2f[5].includes("scope=write") &&
+      f2f[5].includes("cands=file-4.txt 2") && f2f[5].includes("reason=d-too-high"),
+    JSON.stringify({ argsAfter: JSON.stringify(f2), n: f2Lines.length - nL7, f: f2f }),
+  );
+  n20++;
+}
+
+// 202 — the CONTENT-SCOPE GUARD (write): a grammar-valid pair in the CONTENT
+//      arg (`args[1:one]` — the python-slice collision, the maintainer's
+//      2026-09-16 case) → ONE log line ONLY, args byte-identical (no
+//      mutation — the guard is scope, not grammar)
+{
+  const c1 = { filePath: ioPfDir + "\\file-4.txt", content: "x = args[1:one] + y" };
+  const c1Before = JSON.stringify(c1);
+  const nL8 = ioReadLines().length;
+  await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c202" }, { args: c1 });
+  const c1Lines = ioReadLines();
+  const c1f = c1Lines[c1Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "content-scope guard (write): pair in content → log line ONLY (observation form), args byte-identical",
+    JSON.stringify(c1) === c1Before && c1Lines.length === nL8 + 1 &&
+      c1f[7] === "observed-redundancy-ok" && c1f[5] === "pair=[1:one] canon=1 dist=0",
+    JSON.stringify({ argsAfter: JSON.stringify(c1), n: c1Lines.length - nL8, f: c1f }),
+  );
+  n20++;
+}
+
+// 203 — the CONTENT-SCOPE GUARD (edit): a pair in oldString → ONE log line
+//      ONLY, args byte-identical (oldString/newString are NEVER mutated, ever)
+{
+  const c2 = { filePath: ioPfDir + "\\file-4.txt", oldString: "a[2:two]b", newString: "a2b" };
+  const c2Before = JSON.stringify(c2);
+  const nL9 = ioReadLines().length;
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io2", callID: "c203" }, { args: c2 });
+  const c2Lines = ioReadLines();
+  const c2f = c2Lines[c2Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "content-scope guard (edit): pair in oldString → log line ONLY, args byte-identical",
+    JSON.stringify(c2) === c2Before && c2Lines.length === nL9 + 1 &&
+      c2f[7] === "observed-redundancy-ok" && c2f[5] === "pair=[2:two] canon=2 dist=0",
+    JSON.stringify({ argsAfter: JSON.stringify(c2), n: c2Lines.length - nL9, f: c2f }),
+  );
+  n20++;
+}
+
+// 204 — the HOOK bash git-ref gate PASS: the pair → digit, the maximal hex
+//      run (the 40-hex tag) rev-parse-verifies → the command is MUTATED +
+//      pair-resolved 'gate=ref-mutated run=<tag>' (byte-exact)
+{
+  const g1 = { command: `git log [1:one]234abcd5678ef901234abcd5678ef901234abcd` };
+  const nL10 = ioReadLines().length;
+  await ioBefore({ tool: "bash", sessionID: "ses_fx_io2", callID: "c204" }, { args: g1 });
+  const g1Lines = ioReadLines();
+  const g1f = g1Lines[g1Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "hook bash git-ref gate PASS: ref verifies → command MUTATED + pair-resolved 'gate=ref-mutated run=<tag40>'",
+    g1.command === `git log ${TAG40}` && g1Lines.length === nL10 + 1 &&
+      g1f[3] === "bash" && g1f[5] === `pair=[1:one] canon=1 dist=0 gate=ref-mutated run=${TAG40}` &&
+      g1f[7] === "pair-resolved",
+    JSON.stringify({ after: g1.command, n: g1Lines.length - nL10, f: g1f }),
+  );
+  n20++;
+}
+
+// 205 — the HOOK bash git-ref gate FAIL: the 1-char-off ref does NOT
+//      rev-parse-verify → NOT mutated (byte-identical) + the pair line
+//      'gate=ref-rejected run=<failref>' (observed-redundancy-ok — the gate
+//      is mandatory, research §3.4)
+{
+  const g2 = { command: `git log [9:nine]234abcd5678ef901234abcd5678ef901234abcd` };
+  const g2Before = JSON.stringify(g2);
+  const nL11 = ioReadLines().length;
+  await ioBefore({ tool: "bash", sessionID: "ses_fx_io2", callID: "c205" }, { args: g2 });
+  const g2Lines = ioReadLines();
+  const g2f = g2Lines[g2Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "hook bash git-ref gate FAIL: ref unverified → NOT mutated + 'gate=ref-rejected run=<failref>'",
+    JSON.stringify(g2) === g2Before && g2Lines.length === nL11 + 1 &&
+      g2f[5] === `pair=[9:nine] canon=9 dist=0 gate=ref-rejected run=${FAILREF}` && g2f[7] === "observed-redundancy-ok",
+    JSON.stringify({ argsAfter: JSON.stringify(g2), n: g2Lines.length - nL11, f: g2f }),
+  );
+  n20++;
+}
+
+// 206 — the HOOK bash git-ref MISMATCH: [9:eight] fails closed — the bare
+//      log-only line (no gate attempt, no mutation; the mismatch evidence
+//      carries both values — the agent decides)
+{
+  const g3 = { command: `git log [9:eight]234abcd5678ef901234abcd5678ef901234abcd` };
+  const g3Before = JSON.stringify(g3);
+  const nL12 = ioReadLines().length;
+  await ioBefore({ tool: "bash", sessionID: "ses_fx_io2", callID: "c206" }, { args: g3 });
+  const g3Lines = ioReadLines();
+  const g3f = g3Lines[g3Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "hook bash git-ref mismatch: NOT mutated + bare 'redundancy-mismatch' line (no gate attempt)",
+    JSON.stringify(g3) === g3Before && g3Lines.length === nL12 + 1 &&
+      g3f[5] === "pair=[9:eight] canon=8 dist=1" && g3f[7] === "redundancy-mismatch",
+    JSON.stringify({ argsAfter: JSON.stringify(g3), n: g3Lines.length - nL12, f: g3f }),
+  );
+  n20++;
+}
+
+// 207 — the HOOK bash git-ref NO-CANDIDATE: [4:foour] (unknown word) →
+//      no-candidate gate=right-unknown, NOT mutated, the gate is not even
+//      attempted (no candidate ref exists)
+{
+  const g4 = { command: "git log [4:foour]234abcd" };
+  const g4Before = JSON.stringify(g4);
+  const nL13 = ioReadLines().length;
+  await ioBefore({ tool: "bash", sessionID: "ses_fx_io2", callID: "c207" }, { args: g4 });
+  const g4Lines = ioReadLines();
+  const g4f = g4Lines[g4Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "hook bash git-ref no-candidate: 'gate=right-unknown', NOT mutated (gate not attempted)",
+    JSON.stringify(g4) === g4Before && g4Lines.length === nL13 + 1 &&
+      g4f[5] === "pair=[4:foour] gate=right-unknown" && g4f[7] === "no-candidate",
+    JSON.stringify({ argsAfter: JSON.stringify(g4), n: g4Lines.length - nL13, f: g4f }),
+  );
+  n20++;
 }
 
 // ------------------------------------------------------------------ S5 hygiene (6)

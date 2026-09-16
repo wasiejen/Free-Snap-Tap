@@ -58,6 +58,14 @@
 // loss). The plugin hook wires this for `input.tool === "read"` with a
 // string `output.args.filePath` ONLY (glob/grep/section-anchors are NOT in
 // this unit).
+//
+// WRITE-SCOPED FUZZY (R2, 2026-09-16): the SAME matcher at the tighter
+// accept bar WRITE_FUZZY_MAX_D (1) — `resolveWritePath`. The plugin hook
+// wires it for the write-scope path fields (write/edit `filePath`,
+// block_transfer `srcFile`/`dstFile`) under the SAME strict existence gate
+// (mistyped path absent, candidate real — the corpus holds only real
+// paths); the verdict is `fuzzy-resolved`/`fuzzy-rejected` with an explicit
+// `scope=write` flag in the evidence (the nine verdicts stay byte-identical).
 //   Matcher (§2.2): exact after normalize (case/slash/trim) → `exact` (the
 //   caller leaves the arg untouched); else Levenshtein over the FULL
 //   relative paths of a bounded corpus → `resolved` iff d <= FUZZY_MAX_D
@@ -86,9 +94,17 @@
 // Fuzzy evidence forms (field 6):
 //   resolved: `fuzzy orig=<arg> -> <resolved-rel> d=<n> gap=<g|inf>`
 //   rejected: `fuzzy orig=<arg> cands=<p1 d1,p2 d2,p3 d3> reason=<r>`
+//   write scope (R2): the same + an explicit ` scope=write` after `fuzzy`
+//   (the verdicts stay the nine; the scope flag carries the write-scope fact)
 // Pair evidence forms (field 6):
 //   ok/mismatch: `pair=[<l>:<r>] canon=<right-derived> dist=<d>`
 //   read gate:   the same + ` gate=mutated|both-exist|none-exist`
+//   write gate (R2): the same gate tokens; a MISMATCH field FAILS CLOSED —
+//   the line carries ` gate=fail-closed` (never a mutated write target)
+//   bash git-ref (R2): mutated → `... gate=ref-mutated run=<hexrun>`
+//   (pair-resolved); gate failed → `... gate=ref-rejected run=<hexrun>`;
+//   the ref run < 4 hex chars → the bare log-only form above (no gate
+//   token — the rev-parse gate is not even attempted)
 //   no-candidate: `pair=[<l>:<r>] gate=right-unknown|left-unknown`
 //
 // CAPS (documented per the task spec — worker's call):
@@ -99,7 +115,8 @@
 //   CORPUS_TTL_MS       = 60_000 (corpus cache TTL, plugin layer — §2.7)
 //   CORPUS_MAX_ENTRIES  = 20_000 (corpus cap — fail-safe: empty → never
 //                              resolves)
-//   FUZZY_MAX_D         = 2    (accept bar, §2.4)
+//   FUZZY_MAX_D         = 2    (accept bar, §2.4 — read scope)
+//   WRITE_FUZZY_MAX_D   = 1    (accept bar — write scope, R2; §2.3 hazard)
 //   FUZZY_MIN_GAP       = 2    (gap-to-second-best accept bar, §2.4)
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -617,14 +634,15 @@ export function levenshtein(a: string, b: string): number {
   return prev[t.length];
 }
 
-// The PURE matcher (research §2.2/§2.5): exact after normalize → `exact`;
-// else Levenshtein over the FULL relative paths of the corpus → `resolved`
-// iff d <= FUZZY_MAX_D AND gap to the second-closest >= FUZZY_MIN_GAP; else
-// `rejected` with the top-3 [relPath, distance] candidates + reason
+// The PURE matcher body (research §2.2/§2.5): exact after normalize →
+// `exact`; else Levenshtein over the FULL relative paths of the corpus →
+// `resolved` iff d <= maxD AND gap to the second-closest >= FUZZY_MIN_GAP;
+// else `rejected` with the top-3 [relPath, distance] candidates + reason
 // (d-too-high / gap-too-small / empty-corpus / empty-arg). The corpus
 // entries are compared in normalized form; the `path` returned is the
-// corpus entry as stored (original case/spelling).
-export function resolveReadPath(argRel: string, corpus: string[]): ReadResolution {
+// corpus entry as stored (original case/spelling). `maxD` is the scope's
+// accept bar (read = FUZZY_MAX_D, write = WRITE_FUZZY_MAX_D — R2).
+function matchNearPath(argRel: string, corpus: string[], maxD: number): ReadResolution {
   const q = normPathForm(argRel);
   if (q === "" || corpus.length === 0) {
     return { kind: "rejected", cands: [], reason: corpus.length === 0 ? "empty-corpus" : "empty-arg" };
@@ -648,12 +666,24 @@ export function resolveReadPath(argRel: string, corpus: string[]): ReadResolutio
     }
   }
   scored.sort((x, y) => x[1] - y[1] || (x[0] < y[0] ? -1 : x[0] > y[0] ? 1 : 0));
-  if (best <= FUZZY_MAX_D && second - best >= FUZZY_MIN_GAP) {
+  if (best <= maxD && second - best >= FUZZY_MIN_GAP) {
     return { kind: "resolved", path: bestPath, d: best, gap: second === Infinity ? Infinity : second - best };
   }
   return {
     kind: "rejected",
     cands: scored.slice(0, 3),
-    reason: best > FUZZY_MAX_D ? "d-too-high" : "gap-too-small",
+    reason: best > maxD ? "d-too-high" : "gap-too-small",
   };
+}
+
+// READ scope (lane 5.4 — the accept bar FUZZY_MAX_D = 2).
+export function resolveReadPath(argRel: string, corpus: string[]): ReadResolution {
+  return matchNearPath(argRel, corpus, FUZZY_MAX_D);
+}
+
+// WRITE scope (R2, 2026-09-16 — the accept bar WRITE_FUZZY_MAX_D = 1, the
+// same strict gate semantics at the tighter bar; the caller still checks
+// the mistyped path absent first and the corpus holds only REAL paths).
+export function resolveWritePath(argRel: string, corpus: string[]): ReadResolution {
+  return matchNearPath(argRel, corpus, WRITE_FUZZY_MAX_D);
 }
