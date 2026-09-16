@@ -7,7 +7,11 @@ the knowledge base (verified, gained knowledge lives in `agent/knowledge/`).
 What goes here: ONE dated doc per research topic, named
 `YYYY-MM-DD_<topic>.md`. A research doc records: problem framing with short
 citations, reference design(s), feasibility in this build, risks, and ranked
-recommendations. It builds nothing.
+recommendations. It builds nothing. Every doc starts with a `Session_ID:` +
+`Agent:` header (maintainer ruling 2026-09-16) — the resume path for the
+session that produced it (or the archive lookup if it is gone). Addenda to an
+existing doc are separate dated files in the same folder; the source doc stays
+the untouched record.
 
 What does NOT go here:
 - implementation (code, plugins, prompts — the repo owns those)
