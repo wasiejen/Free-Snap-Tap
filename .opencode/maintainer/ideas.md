@@ -1,5 +1,10 @@
 --wip--defer
 
+- removal of loop warning of compaction, or reducing its scope
+- perception of models is correct in bitdrift, but they can not generate the value. so not a kv cache (memory) but a generation (weight) problem?
+  - "The two strings differ in a way I cannot see (Pattern 5)
+
+
 # 1 tool description list/prompt that explains the available costum tools to each agent
 - session_info
 - ctx_gauge
@@ -15,7 +20,7 @@
   - ARE these actually the context???
   - and when removed the context is recompiled???
 
-# 4 codify knowledge gain and how to save it
+# 3 codify knowledge gain and how to save it
   e.g. keywords to be easily searchable because the knowledge files could get very big
     specific instruction for retrieval
     - storage would be done in a knowledge inbox with recommendation for keywords
@@ -23,27 +28,10 @@
     - feedback needs to be again a mandatory step - needs to be easy and frictionless?
       - feedback_tool that just appends to the inbox???
 
-
-# 3 emergency overwrite of max compact per session option
+# 4 emergency overwrite of max compact per session option
   - a planner should be able to overwrite the limit for the sessionid of a worker
     - e.g. if sessionID given into the tool is not the current ctx.sessionID then the limits do not apply? or raised by one temporarily?
       - to keep track who starts who is i think to much managerial effort - it is an emergency tool, to be there when needed
-
-
-  
-# 4 agents constantly get confused about the nudge ctx (<X>%/<Y>K) and interpret Y as used tokens like the % display the used percentage. we should make this more clear with a bit more speaking output.
-
-
-# 5 idea collection - for discussion in direct session
-
-fuzzy search for reading files per name?
-- to medigate the bitshift tendency of some numbers 
-- when reading files this is not this dangerous to select the closest match e.g. in the path.
-
-fuzzy search matchin in files to read specific lines?
-- this could prevent the number shift also when trying to read specific sections
-
-- instruction if you calculate in head use words and not numbers
 
 # 5 is it possible to create a small general function that translates numberwords into numbers as output that is usable from anywhere in the shell or at least in the scope of node or python?
 num(five) -> 5, num([five,five]) -> 55
@@ -93,3 +81,19 @@ general on compaction in the current state with gemma4 as compaction model
   - default values for keepMessages loses context awareness
   - emergency is most often caused by a lot of work be done and thus AFTER likely many tool calls, the thinking and planning messages are further back in the history and on emergency compaction more likely to be dropped or compressed
     - based on the idea of dropping messages after keepMessages but i believe (no proof thus far observed) thinking blocks are not dropped but compressed via the compaction model -> it creates not only the summery for
+
+# 10 compaction prompt
+it is possible to customize the prompt the compaction model gets to e.g. summarize the session in a specific style, detail
+- e.g. what repo files are needed to load again
+- e.g. what sections of files to read again
+can be set to very verbose
+
+# 11 compaction message
+- the message that is added to can be set by the one starting the compaction
+  - e.g. action:resume could be written as default to make it clear for the looprunner or planner to continue 
+  - further thought could the agent costumize the prompt his compacted self gets via the message
+    - the things mentioned in # 10 e.g. would also be possible with this
+  - maybe better send as a message and not added to the summarization
+    - could we catch the summery and resend via message?
+      - the message will be queued and will grap the models attention as soon as the context is loaded in again
+        - way more effective then the passive addition in the "thinking block" of the compaction model, than is routinely not registered fully

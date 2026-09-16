@@ -54,3 +54,6 @@ T5 one hook), on which the workers ran focused and clean.
 5. **My own deviation:** T1 launched before its spec was committed (the
    spec rode the next bookkeeping commit) — the addition's "committed
    before launch" line closes this.
+
+--comment 26-09-16_15-17:
+- was is the current experience with the existing task definition? ok? is there friction. tendency of too large jobs? any hints in nap or summaries of autoruns so far?

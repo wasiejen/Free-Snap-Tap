@@ -34,14 +34,24 @@
     - generally the planner could use compact on his session more often? suggestion :-)
   - --wip/--deferred if it prevents work can also be ignored when on autorun 
     - e.g. proposals are always allowed to write, test implementations as scripts in tmp also
-  - in general all things you find that might lead to some general improvement or built up of actionable knowledge can be done
+  - in general all things you find that might lead to some general improvement or built up of actionable knowledge or helpful tools, etc can be done
     - e.g. research
       - you can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 
-  - 26-09-16_11-50 opencode restarted - changed plugin should now be active
+  - 2026_0-9_1-6__1-5_5-0 opencode restarted - (testing some date formats)
+    - changed name of the autorun folder. commented it in loop.log
+    - 2026 stayed since it seemed not not make problems yet 
+      - in doubt drop we could drop the 2026
+      - or shorten it to 0-9_1-6 and add the session_id of the looprunner ... but the session_is is AGAIN a dense string ...
+      - 0-9_1-6_loop-1 and if started more than one then 0-9_1-6_loop-<number>
+    - 2-0-2-6_0-9_1-6__1-5_5-0 is not easily readable for me
+      - 2-6_0-9_1-6__1-5_5-0 .. this could work. what do you say?
+        - and when appending to a name? autorun_2-6_0-9_1-6__1-5_5-0 underscore to diffeniate is more visually
 
-  - 26-09-16_12-57 needed to reset the last loop. because (1)(a planner used the wrong modelID for self-compaction) and manual compaction did confuse him and ignored maintainer messages in resume prompt
-    - moved autorun files restored
+
+# fuzzy research scripts + plugin
+-- see comments in research for direction/approval state
+- testing of log function.
 
 # compact_memory tool dump function ## 55 approved
 - compact count aware dump
@@ -51,9 +61,6 @@
   - on self-compaction the model should also be resolved from the opencode.json if in doubt. only explicit overwrite of the model will change the compaction model.
     - cross-compaction -> only needs session id of to be compacted session
     - self-compaction -> needs not parameters at all (parameter desciptions in compact_memory are likely descriped badly by me -> needs to reword this so it is clearer)
-
-# fuzzy research scripts + plugin
--- see comments in research for direction/approval state
 
 # repo split research/proposal
 - how best to seperate fst and the opencode_test branch into 2 independently trackable git repos

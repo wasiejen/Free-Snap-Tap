@@ -37,3 +37,15 @@ PASTE (named buffers, `bufferName`, default `default`) / DELETE / CLEAR.
 - **Live usage:** in active use by planner/worker sessions for moving
   multi-line blocks (NAP sections, TODO entries, prompt hunks) instead of
   write/edit — working as intended; no incident since the guard fix.
+
+--comment 26-09-16_15-03: 
+- "no incident since the guard fix"? and before? :-)
+
+- would an APPEND option to append to the buffer be useful?
+  - e.g. copiing multiple sections into the buffer to be then put into a new file. to e.g. create a specialised nap version for tasks or to copy together relevant sections of files into another file as handover_addition or compact_addition?
+
+or thinking the thought further
+- a COLLECT option that accepts list of:
+  - [[`path`, `startMarker`/`start_line_number`, `endMarker`/`start_line_number`], [`path`, `startMarker`/`start_line_number`, `endMarker`/`start_line_number`], ...] 
+  - to copy all sections with references included: "path:160:210\n + section \n" into buffer and copy them to the target file or target marker or marker pair?
+    - maybe also possibly accepts [`path`, [[`startMarker1`, `endMarker1`], [`startMarker2`, `endMarker2`], ...], ...]
