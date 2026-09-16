@@ -80,8 +80,6 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   + `worker_Q4_120K` roster; a comparison notes file in the loop folder.
 - **Status:** DEFERRED — picked up only when the maintainer lifts the
   `--defer` marker in `priority.md` (# 3 3) or re-prioritizes it.
---comment: can be done when nothing other is actionable. look for a direct session if you want to test and try different goals for the workers to analyse them. 
-- but you may as well do some maintenance and curation on knowledge files. repo prompt files, nap, explore new script we could need, ... :-) if you are bored look in my ideas and make some proposels or research how to do this. 
 - an option is also; fuzzy name resolution search on read or when searching in files. or num_to_word autoreplace as intercept plugin on hook.execute.before to combine both and make tools calls more reliable even with bitshifts in numbers. worthwhile thing to research. but dont save research in your nap. make e.g. a agent/research folder if you want. see ideas #5 #6 #7
 
 ## 39. (closed 2026-09-10, see todo_records.md) — Looprunner prompt v2 proposal — applied + smoke test clean (2026-09-10)
@@ -201,7 +199,10 @@ All those IDs stay reserved — see the numbering rule in the header.
   "todo 55 can be done and will be activated before the next autorun"); NOTE
   2026-09-15: the corpus `.opencode/archive/sessions/` was backfilled
   (137 sessions).
---comment: approved
+   NOTE 2026-09-16 (plan1): his approval comment on this entry handled — the
+   approval is recorded in the entry history + `priority.md` (#55 approved
+   block); the approved follow-up improvements (count-aware dump,
+   provider/model fallback, reworded params) are queued in the NAP.
 
 ## 57. (closed 2026-09-16, worker-8, plan7/iter7; 2026-09-15, worker T1 block_transfer sandbox, curated plan3) — block_transfer MOVE silently deletes a block when `dstFile` is missing
 
@@ -220,7 +221,10 @@ All those IDs stay reserved — see the numbering rule in the header.
   `!args.dstFile` check to the top of the anchor-extraction section, before
   any write); a smoke in `.opencode/plugin/tests/`.
 - **Status:** CLOSED (2026-09-16, worker-8, plan7/iter7) — guard hoisted pre-write: the `!args.dstFile` check now runs before the source-cut write (invalid-input-only change, exact error string kept); 2 new smoke assertions (22/22), gates 106/106 + 459 passed + ruff F=0; commit 733ca7a.
---comment: approved: you are free to improve the tool. goal is to prevent unintended destruction of data. when in doubt it saves it in buffer - or might be better to append it to buffer? do we have a buffer clear function if needed? can you write a short feedback in maintainer/feedback folder what the current status of the tool is? adaptions of tools you use are generally approved. if they have the potential to work outside of sandbox definition then these sandbox safeguards need to be implemented. (the same rule apply to the scripts - everything than can change data needs a sandbox safeguard - maybe just a shared scriptlet that every script imports and checks the given paths? do only one script to maintain of these safeguards need adaptation) (sry idle thoughts :-) )
+  NOTE 2026-09-16 (plan1): his approval comment on this entry handled — the
+  status feedback he requested is in
+  `.opencode/maintainer/feedback/2026-09-16_block_transfer_status.md`
+  (answers the buffer / sandbox / shared-scriptlet questions).
 
 ## 58. (closed 2026-09-16, plan8; 2026-09-15, script-collection worker, curated plan3) — standard gate definition lacks the probe command
 
