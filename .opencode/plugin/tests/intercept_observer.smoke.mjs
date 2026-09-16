@@ -47,11 +47,11 @@ try {
       typeof core.classifyContext === "function" && typeof core.loadNumwordMap === "function" &&
       typeof core.flattenField === "function" && typeof core.resolveReadPath === "function" &&
       typeof core.buildCorpus === "function" && Array.isArray(core.VERDICTS));
-  chk("VERDICTS vocabulary (exactly the eight: the six observation + the two fuzzy)",
+  chk("VERDICTS vocabulary (exactly the nine: the six observation + the two fuzzy + pair-resolved)",
     JSON.stringify([...core.VERDICTS]) === JSON.stringify([
       "observed-redundancy-ok", "redundancy-mismatch", "no-candidate",
       "ambiguous", "out-of-sandbox", "path-anomaly",
-      "fuzzy-resolved", "fuzzy-rejected",
+      "fuzzy-resolved", "fuzzy-rejected", "pair-resolved",
     ]));
 
   // ---- factory registration shape
@@ -62,7 +62,7 @@ try {
 
   // ---- (1) suspicious arg → lines in the SANDBOX log, args NOT mutated
   // (filePath stays UNDER the sandbox workspace root → no out-of-sandbox line)
-  const args1 = { filePath: proj + "\\sub\\file.txt", command: "ls 4|four 20260916" };
+  const args1 = { filePath: proj + "\\sub\\file.txt", command: "ls [4:four] 20260916" };
   const argsBefore = JSON.stringify(args1);
   await before({ tool: "bash", sessionID: "ses_smoke_io1", callID: "c1" }, { args: args1 });
   const argsAfter = JSON.stringify(args1);
@@ -80,16 +80,17 @@ try {
     chk("field 3 = model id (unknown for a non-existent smoke session)", typeof f[2] === "string" && f[2] !== "" && f[2] !== "undefined", f[2]);
     chk("field 4 = the tool name", f[3] === "bash", f[3]);
     chk("field 8 = a verdict from the vocabulary", core.VERDICTS.includes(f[7]), f[7]);
-    // this arg fires the pair (4|four → ok, rank 3) + dense (20260916 →
+    // this arg fires the pair ([4:four] → ok, rank 3) + dense (20260916 →
     // no-candidate, rank 5) → priority order: ok pair first, dense second
     chk("priority order (pair before dense)", f[7] === "observed-redundancy-ok" && l1[1].split(" | ")[7] === "no-candidate", JSON.stringify(l1.map((l) => l.split(" | ")[7])));
   }
 
   // ---- (2b) the 3-line cap + priority: this arg fires FIVE observations
-  //          (mismatch 5|four, doubled users, the c:\users\users\5 span is
-  //          out-of-sandbox, dense 20260916, numword four) — the cap keeps
-  //          the top-3 by rank: mismatch, path-anomaly, out-of-sandbox
-  await before({ tool: "bash", sessionID: "ses_smoke_io1", callID: "c1b" }, { args: "c:\\users\\users\\5|four.txt 20260916 four" });
+  //          (mismatch [5:four], doubled users, the c:\users\users\[5:four]
+  //          .txt span is out-of-sandbox, dense 20260916, numword four) —
+  //          the cap keeps the top-3 by rank: mismatch, path-anomaly,
+  //          out-of-sandbox
+  await before({ tool: "bash", sessionID: "ses_smoke_io1", callID: "c1b" }, { args: "c:\\users\\users\\[5:four].txt 20260916 four" });
   const l1b = readLines().slice(2);
   chk("3-line cap + priority (mismatch, path-anomaly, out-of-sandbox; 2 truncated)",
     l1b.length === 3 && l1b[0].split(" | ")[7] === "redundancy-mismatch" && l1b[1].split(" | ")[7] === "path-anomaly" &&
@@ -116,11 +117,12 @@ try {
   chk("garbage input → no spurious lines (null/undefined args)", readLines().length === countBefore);
 
   // ---- (5) " | " inside the arg → the line still splits into 8 fields
-  await before({ tool: "bash", sessionID: "ses_smoke_io1", callID: "c3" }, { args: { command: "echo a | b 9|nine" } });
+  //          (the pair [9:nine] has no pipe at all now — the form switch)
+  await before({ tool: "bash", sessionID: "ses_smoke_io1", callID: "c3" }, { args: { command: "echo a | b [9:nine]" } });
   const l5 = readLines();
   const last5 = l5[l5.length - 1];
   chk("arg containing ' | ' → line still byte-shape (8 fields)", split8(last5).length === 8, JSON.stringify(split8(last5).length));
-  chk("the pair 9|nine was still detected (verdict ok)", last5.split(" | ")[7] === "observed-redundancy-ok" && last5.includes("9|nine"), last5);
+  chk("the pair [9:nine] was still detected (verdict ok)", last5.split(" | ")[7] === "observed-redundancy-ok" && last5.includes("[9:nine]"), last5);
 
   // ---- (6) unknown numword token → no numword line (twozero is not in the map)
   const count6 = readLines().length;
@@ -177,6 +179,37 @@ try {
   const countE = readLines().length;
   await before({ tool: "read", sessionID: "ses_smoke_io1", callID: "c9" }, { args: argsE });
   chk("read exact existing path → untouched + no line", JSON.stringify(argsE) === argsEBefore && readLines().length === countE);
+
+  // (8d) the READ-SCOPE PAIR resolution (R1): a real file under the
+  //      sandbox; the [l:r] pair in the read arg → the canonical path
+  //      (right-wins); EXISTENCE GATE: the arg is mutated only when the
+  //      canonical path EXISTS and the pair-containing path does NOT
+  fs.mkdirSync(path.join(proj, "pr"), { recursive: true });
+  fs.writeFileSync(path.join(proj, "pr", "file-6.txt"), "x", "utf-8");
+  const argsP = { filePath: proj + "\\pr\\file-[6:six].txt" };
+  const argsPBefore = JSON.stringify(argsP);
+  const countP = readLines().length;
+  await before({ tool: "read", sessionID: "ses_smoke_io1", callID: "c10" }, { args: argsP });
+  const lP = readLines();
+  const fP = split8(lP[lP.length - 1]);
+  chk("read pair → filePath MUTATED to the canonical path + pair-resolved line (8 fields, byte-exact evidence)",
+    argsP.filePath === proj + "\\pr\\file-6.txt" && lP.length === countP + 1 && fP.length === 8 && fP[3] === "read" &&
+      fP[7] === "pair-resolved" && fP[5] === `pair=[6:six] canon=6 dist=0 gate=mutated`, JSON.stringify(fP));
+
+  // (8e) the pair gate FAIL-CLOSED: the canonical path does NOT exist →
+  //      args byte-identical + the pair line (gate=none-exist) + the fuzzy
+  //      channel still runs on the result (fuzzy-rejected, d>2)
+  const argsQ = { filePath: proj + "\\pr\\file-[3:three].txt" };
+  const argsQBefore = JSON.stringify(argsQ);
+  const countQ = readLines().length;
+  await before({ tool: "read", sessionID: "ses_smoke_io1", callID: "c10b" }, { args: argsQ });
+  const lQ = readLines();
+  const fQpair = split8(lQ[lQ.length - 2]);
+  const fQ = split8(lQ[lQ.length - 1]);
+  chk("read pair gate fail-closed (canonical absent) → NOT mutated + pair line gate=none-exist + fuzzy-rejected",
+    JSON.stringify(argsQ) === argsQBefore && lQ.length === countQ + 2 &&
+      fQpair.length === 8 && fQpair[7] === "observed-redundancy-ok" && fQpair[5] === `pair=[3:three] canon=3 dist=0 gate=none-exist` &&
+      fQ.length === 8 && fQ[7] === "fuzzy-rejected", JSON.stringify([fQpair, fQ]));
 
   // ---- (9) the LIVE log is untouched by this smoke
   const liveAfter = fs.existsSync(LIVE_LOG) ? fs.statSync(LIVE_LOG).size : null;

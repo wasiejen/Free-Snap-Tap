@@ -33,7 +33,14 @@
 // fuzzy resolution (lane 5.4) is pinned (matcher exact/normalize/d1/d2/
 // gap<2/d>2/cand-shape + the hook mutation / fail-closed / exact flows),
 // the numword map is the REAL shared file, the hook writes to a sandbox
-// project dir): the pre-rebuild
+// project dir) + EXTENDED 2026-09-16 (R1: the [left:right] pair pipeline —
+// the new S19 section, checks 182-194: the grammar switch (adder-sum /
+// right-wins / multi-pair / old-form-dead / form negatives / numword-left /
+// fourty), the read-scope pair mutation (existence gate: mutated /
+// fail-closed none-exist / fail-closed both-exist / right-wins mutation),
+// the non-read log-only rule, the SCRATCHPAD_ROOT sandbox allowance; S18's
+// pair pins 157-160/165/167 were switched to the new form and its VERDICTS
+// pin grew to 9): the pre-rebuild
 // probe
 // (v2.2.1 era) targeted the DELETED handover.ts, the retired
 // experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
@@ -437,6 +444,37 @@
 //          line; a d>2 read is FAIL-CLOSED (args byte-identical) + a
 //          fuzzy-rejected line (top-3 cands + reason); an exact existing
 //          path → untouched + no fuzzy line + the LIVE log still untouched.
+//   S19 [l:r] pair pipeline (13) — the R1 pin (approved 2026-09-16; design
+//      source: research/fuzzy-numword/decision-record.md §2.4-§2.6): the
+//      [left:right] grammar (no inner spaces, exactly one colon; left ∈
+//      digits-as-seen | adder-sum | numword form incl. the `fourty` alias;
+//      right = numword form ONLY; the OLD digit|word pipe form is dead) +
+//      the read-scope pair mutation (existence gate, right-wins canonical)
+//      + the non-read log-only rule + the SCRATCHPAD_ROOT allowance:
+//      (182) adder-left [800+50+11:eight-six-one] → ok (the SUM is the left
+//          value), byte-exact evidence;
+//      (183) mismatch right-wins [121:one-two-zero] → redundancy-mismatch,
+//          canon=120 (ALWAYS the right-derived value);
+//      (184) multi-pair per arg → 2 independent ok lines (one per pair);
+//      (185) form negatives: old pipe form (dead), inner spaces, 2-colon →
+//          none;
+//      (186) numword-left [four:four] → ok; unknown left [foour:four] →
+//          no-candidate gate=left-unknown;
+//      (187) the `fourty` alias on a pair side → [40:fourty] ok;
+//      (188) HOOK read gate: canonical exists + pair path absent → filePath
+//          MUTATED to the canonical + a pair-resolved 8-field line (exactly
+//          ONE line — no double-logging);
+//      (189) HOOK read gate fail-closed: canonical absent → NOT mutated +
+//          pair line gate=none-exist + the fuzzy channel still runs on the
+//          result (fuzzy-rejected — the fixed pipeline order);
+//      (190) HOOK read gate both-exist (brackets legal on-disk) → NOT
+//          mutated + pair line gate=both-exist;
+//      (191) HOOK read right-wins mutation: [7:eight] mismatch → MUTATED to
+//          file-8.txt + pair-resolved dist=1;
+//      (192) HOOK non-read (bash): pair logged ONLY, args byte-identical;
+//      (193) SCRATCHPAD_ROOT: constant pin + slash/backslash-case/deep
+//          scratchpad paths → no out-of-sandbox; C:\Windows control fires;
+//      (194) HOOK scratchpad: bash arg under the scratchpad → zero lines.
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -449,7 +487,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 hygiene=6  →  "PROBE handover: 180/180 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 hygiene=6  →  "PROBE handover: 193/193 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -3228,54 +3266,58 @@ n18++;
   n18++;
 }
 
-// 157 — observePairs agree: 4|four → observed-redundancy-ok (byte-exact evidence)
+// 157 — observePairs agree: [4:four] → observed-redundancy-ok (byte-exact
+//      evidence — the R1 form switch: [left:right], no inner spaces, exactly
+//      one colon; the OLD digit|word pipe form is dead)
 {
-  const p1 = ioCore.observePairs("4|four", ioMap);
+  const p1 = ioCore.observePairs("[4:four]", ioMap);
   check(
     String(n18),
     "S18",
-    "observePairs: 4|four → observed-redundancy-ok, evidence 'pair=4|four cand=4 dist=0'",
-    p1.length === 1 && p1[0].verdict === "observed-redundancy-ok" && p1[0].evidence === "pair=4|four cand=4 dist=0",
+    "observePairs: [4:four] → observed-redundancy-ok, evidence 'pair=[4:four] canon=4 dist=0'",
+    p1.length === 1 && p1[0].verdict === "observed-redundancy-ok" && p1[0].evidence === "pair=[4:four] canon=4 dist=0",
     JSON.stringify(p1),
   );
   n18++;
 }
 
-// 158 — observePairs mismatch: 5|four → redundancy-mismatch (dist=1)
+// 158 — observePairs mismatch: [5:four] → redundancy-mismatch (dist=1,
+//      right-wins — the canonical is the right-derived value)
 {
-  const p2 = ioCore.observePairs("5|four", ioMap);
+  const p2 = ioCore.observePairs("[5:four]", ioMap);
   check(
     String(n18),
     "S18",
-    "observePairs: 5|four → redundancy-mismatch, evidence 'pair=5|four cand=4 dist=1'",
-    p2.length === 1 && p2[0].verdict === "redundancy-mismatch" && p2[0].evidence === "pair=5|four cand=4 dist=1",
+    "observePairs: [5:four] → redundancy-mismatch, evidence 'pair=[5:four] canon=4 dist=1' (right-wins canon)",
+    p2.length === 1 && p2[0].verdict === "redundancy-mismatch" && p2[0].evidence === "pair=[5:four] canon=4 dist=1",
     JSON.stringify(p2),
   );
   n18++;
 }
 
-// 159 — observePairs unknown word: 4|foour → no-candidate gate=word-unknown
+// 159 — observePairs unknown word: [4:foour] → no-candidate gate=right-unknown
 {
-  const p3 = ioCore.observePairs("4|foour", ioMap);
+  const p3 = ioCore.observePairs("[4:foour]", ioMap);
   check(
     String(n18),
     "S18",
-    "observePairs: 4|foour (unresolvable) → no-candidate gate=word-unknown",
-    p3.length === 1 && p3[0].verdict === "no-candidate" && p3[0].evidence === "pair=4|foour gate=word-unknown",
+    "observePairs: [4:foour] (unresolvable right) → no-candidate gate=right-unknown",
+    p3.length === 1 && p3[0].verdict === "no-candidate" && p3[0].evidence === "pair=[4:foour] gate=right-unknown",
     JSON.stringify(p3),
   );
   n18++;
 }
 
-// 160 — observePairs negatives: a shell pipe (spaces around |) and a
-//      word-first order (four|4) are NOT redundancy pairs
+// 160 — observePairs negatives: the OLD tight digit|word pipe form is DEAD
+//      (no longer detected) and a word-first right ([four:4] — digits on the
+//      right are NOT the numword form) is not a pair
 {
-  const p4 = ioCore.observePairs("head -30 | grep x", ioMap);
-  const p5 = ioCore.observePairs("four|4", ioMap);
+  const p4 = ioCore.observePairs("4|four", ioMap);
+  const p5 = ioCore.observePairs("[four:4]", ioMap);
   check(
     String(n18),
     "S18",
-    "observePairs negatives: shell pipe '30 | grep' (spaces) and word-first 'four|4' → none",
+    "observePairs negatives: old pipe form '4|four' (dead) and digit-right '[four:4]' → none",
     p4.length === 0 && p5.length === 0,
     JSON.stringify([p4, p5]),
   );
@@ -3346,7 +3388,7 @@ n18++;
 
 // 165 — observeArg: FIVE firing classes → capped at 3, priority order
 {
-  const cap = ioCore.observeArg("c:\\users\\users\\5|four.txt 20260916 four", ioMap, "C:\\repo");
+  const cap = ioCore.observeArg("c:\\users\\users\\[5:four].txt 20260916 four", ioMap, "C:\\repo");
   check(
     String(n18),
     "S18",
@@ -3369,7 +3411,7 @@ n18++;
 // 167 — the HOOK: never mutates output.args (byte-identical before/after)
 //      and writes its lines to the SANDBOX project dir
 {
-  const ioArgs = { filePath: ioSandboxProj + "\\sub\\file.txt", command: "ls 4|four 20260916" };
+  const ioArgs = { filePath: ioSandboxProj + "\\sub\\file.txt", command: "ls [4:four] 20260916" };
   const ioArgsBefore = JSON.stringify(ioArgs);
   await ioBefore({ tool: "bash", sessionID: "ses_fx_io1", callID: "c1" }, { args: ioArgs });
   check(
@@ -3441,11 +3483,11 @@ n18++;
   check(
     String(n18),
     "S18",
-    "export fix: plugin module = default factory ONLY (every Object.values entry a function); named core in the core module (VERDICTS = 6 + 2 fuzzy)",
+    "export fix: plugin module = default factory ONLY (every Object.values entry a function); named core in the core module (VERDICTS = 6 + 2 fuzzy + pair-resolved)",
     ioVals.length === 1 && ioVals.every((v) => typeof v === "function") &&
       typeof ioMod.default === "function" &&
       typeof ioCore.resolveReadPath === "function" && typeof ioCore.buildCorpus === "function" &&
-      typeof ioCore.observeArg === "function" && Array.isArray(ioCore.VERDICTS) && ioCore.VERDICTS.length === 8,
+      typeof ioCore.observeArg === "function" && Array.isArray(ioCore.VERDICTS) && ioCore.VERDICTS.length === 9,
     JSON.stringify({ pluginKeys: Object.keys(ioMod), verdicts: ioCore.VERDICTS.length }),
   );
   n18++;
@@ -3610,6 +3652,256 @@ writeFileSync(path.join(ioFzDir, "file.txt"), "x", "utf8");
     JSON.stringify({ n: ioReadLines().length - nLines3, liveSame: liveIoBefore === liveIoAfter2 }),
   );
   n18++;
+}
+
+// ------------------------------------------------------------------ S19 [l:r] pair pipeline (13)
+//
+// The R1 (2026-09-16) read-scope [left:right] pair resolution + the form
+// switch + the sandbox scratchpad root (spec: the R1 task; design source:
+// research/fuzzy-numword/decision-record.md §2.4-§2.6). Extends S18 (which
+// stays the lane-5.3/5.4 pin): the grammar pins are core-level (checkPairs /
+// observePairs / resolvePairLeft over the REAL shared map); the read-mutation
+// pins use the same real factory + sandbox project dir as S18 (the pf/
+// fixture files are the existence-gate corpus — created BEFORE the checks so
+// every check sees the same four entries).
+
+const ioPfDir = path.join(ioSandboxProj, "pf");
+mkdirSync(ioPfDir, { recursive: true });
+writeFileSync(path.join(ioPfDir, "file-2.txt"), "x", "utf8");
+writeFileSync(path.join(ioPfDir, "file-4.txt"), "x", "utf8");
+writeFileSync(path.join(ioPfDir, "file-8.txt"), "x", "utf8");
+writeFileSync(path.join(ioPfDir, "file-[2:two].txt"), "x", "utf8"); // brackets are legal on NTFS — the both-exist case
+let n19 = 182;
+
+// 182 — checkPairs: the adder-left (form b) — the SUM is the left value
+{
+  const p = ioCore.observePairs("[800+50+11:eight-six-one]", ioMap);
+  check(
+    String(n19),
+    "S19",
+    "adder-left: [800+50+11:eight-six-one] → observed-redundancy-ok, evidence 'pair=[800+50+11:eight-six-one] canon=861 dist=0'",
+    p.length === 1 && p[0].verdict === "observed-redundancy-ok" && p[0].evidence === "pair=[800+50+11:eight-six-one] canon=861 dist=0",
+    JSON.stringify(p),
+  );
+  n19++;
+}
+
+// 183 — checkPairs: a mismatch is RIGHT-WINS — the canonical is ALWAYS the
+//      right-derived value (canon=120, NOT the drifted left 121)
+{
+  const p = ioCore.observePairs("[121:one-two-zero]", ioMap);
+  check(
+    String(n19),
+    "S19",
+    "mismatch right-wins: [121:one-two-zero] → redundancy-mismatch, evidence 'pair=[121:one-two-zero] canon=120 dist=1'",
+    p.length === 1 && p[0].verdict === "redundancy-mismatch" && p[0].evidence === "pair=[121:one-two-zero] canon=120 dist=1",
+    JSON.stringify(p),
+  );
+  n19++;
+}
+
+// 184 — multi-pair per arg → independent resolution, one observation each
+{
+  const p = ioCore.observePairs("[1:one] x [2:two]", ioMap);
+  check(
+    String(n19),
+    "S19",
+    "multi-pair: [1:one] x [2:two] → 2 independent ok lines (one per pair)",
+    p.length === 2 && p[0].verdict === "observed-redundancy-ok" && p[0].evidence === "pair=[1:one] canon=1 dist=0" &&
+      p[1].verdict === "observed-redundancy-ok" && p[1].evidence === "pair=[2:two] canon=2 dist=0",
+    JSON.stringify(p),
+  );
+  n19++;
+}
+
+// 185 — form negatives: the OLD tight digit|word pipe form is DEAD (not
+//      detected), inner spaces are rejected, and a second colon is rejected
+{
+  const p1 = ioCore.observePairs("4|four 30 | grep x", ioMap);
+  const p2 = ioCore.observePairs("[4 :four] [4: four] [4:four:two]", ioMap);
+  check(
+    String(n19),
+    "S19",
+    "form negatives: old pipe form (dead), inner-space forms, and a 2-colon form → none",
+    p1.length === 0 && p2.length === 0,
+    JSON.stringify([p1, p2]),
+  );
+  n19++;
+}
+
+// 186 — the numword LEFT form (a map word) + an unknown left → no-candidate
+//      gate=left-unknown (never a guess on either side)
+{
+  const p1 = ioCore.observePairs("[four:four]", ioMap);
+  const p2 = ioCore.observePairs("[foour:four]", ioMap);
+  check(
+    String(n19),
+    "S19",
+    "numword-left: [four:four] → ok canon=4; unknown left [foour:four] → no-candidate gate=left-unknown",
+    p1.length === 1 && p1[0].verdict === "observed-redundancy-ok" && p1[0].evidence === "pair=[four:four] canon=4 dist=0" &&
+      p2.length === 1 && p2[0].verdict === "no-candidate" && p2[0].evidence === "pair=[foour:four] gate=left-unknown",
+    JSON.stringify([p1, p2]),
+  );
+  n19++;
+}
+
+// 187 — the `fourty` alias (a map word on the tens side) resolves on a pair
+//      side — the spec grammar includes it
+{
+  const p = ioCore.observePairs("[40:fourty]", ioMap);
+  check(
+    String(n19),
+    "S19",
+    "fourty alias: [40:fourty] → observed-redundancy-ok, evidence 'pair=[40:fourty] canon=40 dist=0'",
+    p.length === 1 && p[0].verdict === "observed-redundancy-ok" && p[0].evidence === "pair=[40:fourty] canon=40 dist=0",
+    JSON.stringify(p),
+  );
+  n19++;
+}
+
+// 188 — the HOOK read-scope pair: the canonical path EXISTS and the
+//      pair-containing path does NOT → filePath MUTATED to the canonical +
+//      a pair-resolved 8-field line (byte-exact evidence); exactly ONE new
+//      line (the read channel owns the pair line — no double-logging)
+{
+  const r1 = { filePath: ioPfDir + "\\file-[4:four].txt" };
+  const nLines1 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io2", callID: "c188" }, { args: r1 });
+  const r1Lines = ioReadLines();
+  const r1f = r1Lines[r1Lines.length - 1].split(" | ");
+  check(
+    String(n19),
+    "S19",
+    "hook read pair gate: canonical exists → filePath MUTATED to the canonical path + pair-resolved line (8 fields, byte-exact)",
+    r1.filePath === ioPfDir + "\\file-4.txt" && r1Lines.length === nLines1 + 1 && r1f.length === 8 &&
+      ioStampRe.test(r1f[0]) && r1f[1] === "ses_fx_io2" && r1f[3] === "read" &&
+      r1f[4] === JSON.stringify({ filePath: ioPfDir + "\\file-[4:four].txt" }) &&
+      r1f[5] === "pair=[4:four] canon=4 dist=0 gate=mutated" &&
+      r1f[6] === "path" && r1f[7] === "pair-resolved",
+    JSON.stringify({ after: r1.filePath, n: r1Lines.length - nLines1, f: r1f }),
+  );
+  n19++;
+}
+
+// 189 — the HOOK read-scope pair gate FAIL-CLOSED: the canonical path does
+//      NOT exist → args byte-identical + the pair line (gate=none-exist) +
+//      the fuzzy channel STILL RUNS on the result (d>2 → fuzzy-rejected —
+//      the fixed pipeline order, decision-record §2.6)
+{
+  const r2 = { filePath: ioPfDir + "\\file-[7:seven].txt" };
+  const r2Before = JSON.stringify(r2);
+  const nLines2 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io2", callID: "c189" }, { args: r2 });
+  const r2Lines = ioReadLines();
+  const r2p = r2Lines[r2Lines.length - 2].split(" | ");
+  const r2f = r2Lines[r2Lines.length - 1].split(" | ");
+  check(
+    String(n19),
+    "S19",
+    "hook read pair gate fail-closed: canonical absent → NOT mutated (byte-identical) + pair line gate=none-exist + fuzzy-rejected on the result",
+    JSON.stringify(r2) === r2Before && r2Lines.length === nLines2 + 2 &&
+      r2p.length === 8 && r2p[7] === "observed-redundancy-ok" && r2p[5] === "pair=[7:seven] canon=7 dist=0 gate=none-exist" &&
+      r2f.length === 8 && r2f[7] === "fuzzy-rejected",
+    JSON.stringify({ argsAfter: JSON.stringify(r2), n: r2Lines.length - nLines2, f: [r2p[7], r2f[7]] }),
+  );
+  n19++;
+}
+
+// 190 — the HOOK read-scope pair gate FAIL-CLOSED: BOTH the canonical and
+//      the pair-containing path exist (brackets are legal on-disk) → the
+//      real file wins: NOT mutated + the pair line gate=both-exist
+{
+  const r3 = { filePath: ioPfDir + "\\file-[2:two].txt" };
+  const r3Before = JSON.stringify(r3);
+  const nLines3 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io2", callID: "c190" }, { args: r3 });
+  const r3Lines = ioReadLines();
+  const r3f = r3Lines[r3Lines.length - 1].split(" | ");
+  check(
+    String(n19),
+    "S19",
+    "hook read pair gate both-exist: canonical + pair path both on disk → NOT mutated + pair line gate=both-exist (1 line — fuzzy fast-path)",
+    JSON.stringify(r3) === r3Before && r3Lines.length === nLines3 + 1 && r3f.length === 8 &&
+      r3f[7] === "observed-redundancy-ok" && r3f[5] === "pair=[2:two] canon=2 dist=0 gate=both-exist",
+    JSON.stringify({ argsAfter: JSON.stringify(r3), n: r3Lines.length - nLines3, f: r3f }),
+  );
+  n19++;
+}
+
+// 191 — the HOOK read-scope pair RIGHT-WINS mutation: a mismatched pair
+//      ([7:eight] — left 7, right 8) mutates to the right-derived canonical
+//      (file-8.txt) + pair-resolved with dist=1 flagged in the evidence
+{
+  const r4 = { filePath: ioPfDir + "\\file-[7:eight].txt" };
+  const nLines4 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io2", callID: "c191" }, { args: r4 });
+  const r4Lines = ioReadLines();
+  const r4f = r4Lines[r4Lines.length - 1].split(" | ");
+  check(
+    String(n19),
+    "S19",
+    "hook read pair right-wins mutation: [7:eight] mismatch → MUTATED to file-8.txt + pair-resolved 'dist=1 gate=mutated'",
+    r4.filePath === ioPfDir + "\\file-8.txt" && r4Lines.length === nLines4 + 1 && r4f.length === 8 &&
+      r4f[7] === "pair-resolved" && r4f[5] === "pair=[7:eight] canon=8 dist=1 gate=mutated",
+    JSON.stringify({ after: r4.filePath, n: r4Lines.length - nLines4, f: r4f }),
+  );
+  n19++;
+}
+
+// 192 — the HOOK NON-READ tool: a pair in a bash arg → logged ONLY
+//      (observation channel), output.args NEVER mutated (the write/edit/
+//      delete scope rule extends to every non-read tool)
+{
+  const b1 = { command: "echo [4:four]" };
+  const b1Before = JSON.stringify(b1);
+  const nLines5 = ioReadLines().length;
+  await ioBefore({ tool: "bash", sessionID: "ses_fx_io2", callID: "c192" }, { args: b1 });
+  const b1Lines = ioReadLines();
+  const b1f = b1Lines[b1Lines.length - 1].split(" | ");
+  check(
+    String(n19),
+    "S19",
+    "hook non-read pair: bash [4:four] → observed-redundancy-ok line (log-only) + args byte-identical (no mutation)",
+    JSON.stringify(b1) === b1Before && b1Lines.length === nLines5 + 1 && b1f.length === 8 &&
+      b1f[3] === "bash" && b1f[7] === "observed-redundancy-ok" && b1f[5] === "pair=[4:four] canon=4 dist=0",
+    JSON.stringify({ argsAfter: JSON.stringify(b1), n: b1Lines.length - nLines5, f: b1f }),
+  );
+  n19++;
+}
+
+// 193 — the SANDBOX scratchpad root (R1): SCRATCHPAD_ROOT is the approved
+//      external dir; slash form, backslash+mixed-case form, and a deep path
+//      are NOT out-of-sandbox (noise removed — measured); a genuinely
+//      outside path still fires (the control)
+{
+  const s1 = ioCore.observeSandbox("C:/Users/Wasiejen/AppData/Local/Temp/opencode/x.txt", "C:\\repo");
+  const s2 = ioCore.observeSandbox("c:\\users\\wasiejen\\appdata\\local\\temp\\opencode\\y.txt", "C:\\repo");
+  const s3 = ioCore.observeSandbox("C:/Users/Wasiejen/AppData/Local/Temp/opencode/sub/deep/z.bin", "C:\\repo");
+  const s4 = ioCore.observeSandbox("C:\\Windows\\System32\\cmd.exe", "C:\\repo");
+  check(
+    String(n19),
+    "S19",
+    "sandbox scratchpad: SCRATCHPAD_ROOT constant + slash/backslash-case/deep scratchpad paths → no out-of-sandbox; C:\\Windows control still fires",
+    ioCore.SCRATCHPAD_ROOT === "C:/Users/Wasiejen/AppData/Local/Temp/opencode" &&
+      s1.length === 0 && s2.length === 0 && s3.length === 0 && s4.length === 1 && s4[0].verdict === "out-of-sandbox",
+    JSON.stringify({ root: ioCore.SCRATCHPAD_ROOT, n: [s1.length, s2.length, s3.length, s4.length] }),
+  );
+  n19++;
+}
+
+// 194 — the HOOK scratchpad: a bash arg under the scratchpad → NO lines at
+//      all (the out-of-sandbox noise is gone at the hook level, too)
+{
+  const nLines6 = ioReadLines().length;
+  await ioBefore({ tool: "bash", sessionID: "ses_fx_io2", callID: "c194" }, { args: "C:/Users/Wasiejen/AppData/Local/Temp/opencode/probe-sentinel.txt" });
+  check(
+    String(n19),
+    "S19",
+    "hook scratchpad: bash arg under the scratchpad → zero lines (no out-of-sandbox noise)",
+    ioReadLines().length === nLines6,
+    `n=${ioReadLines().length - nLines6}`,
+  );
+  n19++;
 }
 
 // ------------------------------------------------------------------ S5 hygiene (6)

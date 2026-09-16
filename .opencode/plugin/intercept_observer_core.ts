@@ -26,18 +26,29 @@
 //       they are not in the map (loud-unknown, never a guess). A token that
 //       is the word side of a `|`-pair is consumed by (c) and not double-
 //       logged here. Verdict: `no-candidate`.
-//   (c) `<digit>|<word>` redundancy pairs (tight form — no spaces around
-//       `|`, so a shell pipe `30 | grep` is NOT a pair; the word must be a
-//       full token): left/right check via the map → agreement / mismatch /
-//       ambiguous. Evidence carries candidates + numeric distance.
+//   (c) `[left:right]` redundancy pairs (R1, 2026-09-16 — the form switch:
+//       the OLD tight `digit|word` pipe form is DEAD, no longer detected):
+//       no inner spaces, exactly one colon. left ∈ digits as-seen | adder
+//       construction (`800+50+11` → the sum) | numword form (a single map
+//       word incl. the `fourty` alias, or dash-separated single units);
+//       right = numword form ONLY. Left/right check via the map →
+//       agreement / mismatch (right-wins: the canonical is ALWAYS the
+//       right-derived value) / no-candidate (a side unresolved — never a
+//       guess). Multiple pairs per arg → independent resolution, one
+//       observation each. In READ scope the pair channel also EXISTS-gates
+//       a mutation to the canonical path (the `pair-resolved` verdict).
 //       Verdicts: `observed-redundancy-ok` / `redundancy-mismatch` /
-//       `ambiguous` (multi-split) / `no-candidate` (word unresolvable).
+//       `no-candidate` (a side unresolvable) / `pair-resolved` (read
+//       mutation) — `ambiguous` (multi-split) is vocabulary-stable but
+//       unreachable for the new form (no composition on the pair sides).
 //   (d) path sanity: doubled segments (`users\users` shape).
 //       Verdict: `path-anomaly`.
 //   (e) out-of-sandbox path NOTE: absolute path spans not under the
-//       workspace root (the PluginInput project directory). NOTE ONLY, no
-//       enforcement (enforcement stays where it is today — addendum C6,
-//       maintainer point 403: one check, no stale duplicates).
+//       workspace root (the PluginInput project directory) AND not under
+//       the approved scratchpad root SCRATCHPAD_ROOT (R1, 2026-09-16 — the
+//       flag on it was pure noise, measured). NOTE ONLY, no enforcement
+//       (enforcement stays where it is today — addendum C6, maintainer
+//       point 403: one check, no stale duplicates).
 //       Verdict: `out-of-sandbox`.
 //
 // READ-SCOPED FUZZY RESOLUTION (lane 5.4 — the "read functionality",
@@ -67,12 +78,18 @@
 //
 // VERDICT VOCABULARY (the original six, byte-identical and in order, plus
 // the two read-scope fuzzy tokens appended — addendum C6: conservative,
-// BOTH outcomes logged):
+// BOTH outcomes logged — plus `pair-resolved`, the R1 read-scope pair
+// mutation token appended last):
 //   observed-redundancy-ok | redundancy-mismatch | no-candidate | ambiguous |
-//   out-of-sandbox | path-anomaly | fuzzy-resolved | fuzzy-rejected
+//   out-of-sandbox | path-anomaly | fuzzy-resolved | fuzzy-rejected |
+//   pair-resolved
 // Fuzzy evidence forms (field 6):
 //   resolved: `fuzzy orig=<arg> -> <resolved-rel> d=<n> gap=<g|inf>`
 //   rejected: `fuzzy orig=<arg> cands=<p1 d1,p2 d2,p3 d3> reason=<r>`
+// Pair evidence forms (field 6):
+//   ok/mismatch: `pair=[<l>:<r>] canon=<right-derived> dist=<d>`
+//   read gate:   the same + ` gate=mutated|both-exist|none-exist`
+//   no-candidate: `pair=[<l>:<r>] gate=right-unknown|left-unknown`
 //
 // CAPS (documented per the task spec — worker's call):
 //   MAX_LINES_PER_CALL  = 3  (priority-ordered, then truncated)
@@ -109,6 +126,7 @@ export const VERDICTS = Object.freeze([
   "path-anomaly",
   "fuzzy-resolved",
   "fuzzy-rejected",
+  "pair-resolved", // R1 (2026-09-16): the read-scope pair mutation verdict
 ]) as readonly string[];
 
 // Priority for the per-call line cap (index = rank; ties keep input order —
@@ -124,6 +142,7 @@ const VERDICT_RANK: Record<string, number> = {
   "no-candidate": 5,
   "fuzzy-resolved": 6,
   "fuzzy-rejected": 7,
+  "pair-resolved": 8, // documentary (the read channel logs it separately)
 };
 
 // ------------------------------------------------------------------ core types
@@ -255,29 +274,98 @@ export function observeDense(arg: string): Observation[] {
   return [{ verdict: "no-candidate", evidence: `dense ${parts.join(" ")}`, context: classifyContext(s) }];
 }
 
-// ------------------------------------------------------------------ | pairs (observation c)
+// ------------------------------------------------------------------ [l:r] pairs (observation c)
 
-// Tight pair form: digits, a bare `|` (no spaces — a shell pipe never
-// matches), a full word token (letters + dashes for the dense form).
-const PAIR_RE = /\b(\d{1,12})\|([a-z][a-z-]*)/gi;
-// The digit side of a pair, by index — used to keep (b) from double-logging
-// a word that is already the right side of a checked pair.
-const PAIR_LEFT_RE = /\b(\d{1,12})\|/g;
+// The `[left:right]` redundancy pair (R1, 2026-09-16; design source:
+// research/fuzzy-numword/decision-record.md §2.4/§2.5): NO inner spaces,
+// EXACTLY one colon — the left grammar (digits/`+`/letters/`-`) and the
+// right grammar (letters/`-`) never contain a colon, so the split is
+// unambiguous by construction (a second colon or an inner space kills the
+// match). left ∈ digits as-seen | adder construction `\d{1,12}(\+\d{1,12})*`
+// | numword form; right = numword form ONLY (never digits). The `i` flag
+// keeps the old word-case tolerance. The OLD tight `digit|word` pipe form
+// is DEAD (ruling 2026-09-16) — no longer detected (and a shell pipe
+// `30 | grep` is not a pair, and never was — it has no brackets).
+const PAIR_RE = /\[([0-9]{1,12}(?:\+[0-9]{1,12})*|[a-z][a-z-]*):([a-z][a-z-]*)\]/gi;
 
-interface PairMatch {
-  digits: string;
-  word: string;
-  start: number;
-  wordEnd: number;
+export interface PairCheck {
+  raw: string; // the matched `[left:right]`
+  left: string;
+  right: string;
+  start: number; // span in the source string — observeNumword skips the in-pair words
+  end: number;
+  leftVal: number | null;
+  rightVal: number | null;
+  verdict: "observed-redundancy-ok" | "redundancy-mismatch" | "no-candidate";
+  canonical: string | null; // the RIGHT-derived digit string (right-wins, §2.5)
+  dist: number | null; // |left - right| when both sides resolve
 }
 
-function pairMatches(s: string): PairMatch[] {
-  const out: PairMatch[] = [];
-  for (const m of s.matchAll(PAIR_RE)) {
-    // the `i`-flagged word class already consumes the maximal letter/dash
-    // run — a match IS a full token (`4|fourex` → word `fourex`, unknown →
-    // gate line; a shell pipe has spaces and never matches)
-    out.push({ digits: m[1], word: m[2], start: m.index!, wordEnd: m.index! + m[0].length });
+// The numword form of a pair side (R1): a single map word (units / tens /
+// teens, incl. the `fourty` alias) or dash-separated single units (every
+// part in map.units). NO tens+unit composition (`ninetyfour`) and NO
+// arithmetic on this side — that is the scriptlet's w2n surface. Unknown →
+// null, never a guess (loud-unknown discipline).
+export function resolvePairWord(raw: string, map: NumwordMap): number | null {
+  const s = String(raw).trim().toLowerCase();
+  if (s === "" || !/^[a-z-]+$/.test(s)) return null;
+  if (s.includes("-")) {
+    let digits = "";
+    for (const p of s.split("-")) {
+      if (p === "" || !(p in map.units)) return null;
+      digits += String(map.units[p]);
+    }
+    return parseInt(digits, 10);
+  }
+  if (s in map.units) return map.units[s];
+  if (s in map.tens) return map.tens[s];
+  if (s in map.teens) return map.teens[s];
+  return null;
+}
+
+// The LEFT value of a pair (R1): digits as-seen (form a — the drifted
+// state) | adder construction (form b — the SUM of the addends) | the
+// numword form (resolvePairWord).
+export function resolvePairLeft(raw: string, map: NumwordMap): number | null {
+  const s = String(raw).trim();
+  if (/^[0-9]+(?:\+[0-9]+)*$/.test(s)) {
+    let sum = 0;
+    for (const p of s.split("+")) sum += parseInt(p, 10);
+    return sum;
+  }
+  return resolvePairWord(s, map);
+}
+
+// Check EVERY `[left:right]` pair in the arg (up to 3 — the call's line
+// cap): independent resolution, one check per pair (the pipeline's "one
+// log line each"). Right-wins (§2.5): the canonical is ALWAYS the
+// right-derived value, even on a mismatch. Either side unresolved →
+// no-candidate (never a guess).
+export function checkPairs(s: string, map: NumwordMap | null): PairCheck[] {
+  if (map === null) return [];
+  const out: PairCheck[] = [];
+  for (const m of String(s ?? "").matchAll(PAIR_RE)) {
+    const leftVal = resolvePairLeft(m[1], map);
+    const rightVal = resolvePairWord(m[2], map);
+    let verdict: PairCheck["verdict"] = "no-candidate";
+    let dist: number | null = null;
+    if (leftVal !== null && rightVal !== null) {
+      dist = Math.abs(leftVal - rightVal);
+      verdict = dist === 0 ? "observed-redundancy-ok" : "redundancy-mismatch";
+    }
+    out.push({
+      raw: m[0],
+      left: m[1],
+      right: m[2],
+      start: m.index!,
+      end: m.index! + m[0].length,
+      leftVal,
+      rightVal,
+      verdict,
+      canonical: rightVal !== null ? String(rightVal) : null,
+      dist,
+    });
+    if (out.length === 3) break;
   }
   return out;
 }
@@ -287,27 +375,17 @@ export function observePairs(arg: string, map: NumwordMap | null): Observation[]
   const s = String(arg ?? "");
   const ctx = classifyContext(s);
   const obs: Observation[] = [];
-  for (const pm of pairMatches(s).slice(0, 2)) {
-    const left = parseInt(pm.digits, 10);
-    const res = resolveNumword(pm.word, map);
-    if (res.kind === "value") {
-      const cand = parseInt(res.value, 10);
-      const dist = Math.abs(left - cand);
+  for (const pc of checkPairs(s, map)) {
+    if (pc.verdict === "no-candidate") {
       obs.push({
-        verdict: dist === 0 ? "observed-redundancy-ok" : "redundancy-mismatch",
-        evidence: `pair=${pm.digits}|${pm.word} cand=${res.value} dist=${dist}`,
-        context: ctx,
-      });
-    } else if (res.kind === "ambiguous") {
-      obs.push({
-        verdict: "ambiguous",
-        evidence: `pair=${pm.digits}|${pm.word} cands=${res.candidates!.join(",")} gate=split-ambiguous`,
+        verdict: "no-candidate",
+        evidence: `pair=${pc.raw} gate=${pc.rightVal === null ? "right-unknown" : "left-unknown"}`,
         context: ctx,
       });
     } else {
       obs.push({
-        verdict: "no-candidate",
-        evidence: `pair=${pm.digits}|${pm.word} gate=word-unknown`,
+        verdict: pc.verdict,
+        evidence: `pair=${pc.raw} canon=${pc.canonical} dist=${pc.dist}`,
         context: ctx,
       });
     }
@@ -321,15 +399,12 @@ export function observeNumword(arg: string, map: NumwordMap | null): Observation
   if (map === null) return [];
   const s = String(arg ?? "");
   const lower = s.toLowerCase();
-  // the word side of each tight pair (with its start index) — those tokens
-  // belong to (c), not (b)
-  const consumed: number[] = [];
-  for (const m of lower.matchAll(PAIR_LEFT_RE)) {
-    consumed.push(m.index! + m[1].length + 1); // after the digit run + the `|`
-  }
+  // the word sides of each `[l:r]` pair (span) — those tokens belong to (c),
+  // not (b): skip any token that starts inside a pair span
+  const spans = checkPairs(s, map).map((pc) => [pc.start, pc.end] as const);
   const hits: string[] = [];
   for (const m of lower.matchAll(/[a-z]+(?:-[a-z]+)*/g)) {
-    if (consumed.includes(m.index!)) continue;
+    if (spans.some(([a, b]) => m.index! >= a && m.index! < b)) continue;
     const res = resolveNumword(m[0], map);
     if (res.kind === "value") {
       hits.push(`${m[0]}→${res.value}`);
@@ -364,6 +439,12 @@ const WIN_PATH_RE = /(^|[\s"'=({])([A-Za-z]:[\\/][^\s'"|]*)/g;
 const POSIX_PATH_RE = /(^|[\s"'=({])(\/[^\s\\'"|]+)/g;
 const UNC_PATH_RE = /(^|[\s"'=({])(\\\\[^\s|]+)/g;
 
+// The approved external scratchpad root (R1, 2026-09-16 — the flag on it
+// was pure noise, measured: the own acceptance test fired `out-of-sandbox`
+// on the scratchpad sentinel). Allowed alongside the workspace root in the
+// note-only sandbox check.
+export const SCRATCHPAD_ROOT = "C:/Users/Wasiejen/AppData/Local/Temp/opencode";
+
 export function underRoot(span: string, root: string): boolean {
   // normalize: backslashes → slashes, collapse separator runs (a JSON-
   // escaped `\\` in a stringified arg reads as `//`), lowercase, trim
@@ -387,7 +468,7 @@ export function observeSandbox(arg: string, workspaceRoot: string | null): Obser
     }
     if (spans.length >= 4) break;
   }
-  const outside = spans.filter((p) => !underRoot(p, workspaceRoot)).slice(0, 2);
+  const outside = spans.filter((p) => !underRoot(p, workspaceRoot) && !underRoot(p, SCRATCHPAD_ROOT)).slice(0, 2);
   if (outside.length === 0) return [];
   return [{ verdict: "out-of-sandbox", evidence: `path=${outside[0]} root=${workspaceRoot}`, context: ctx }];
 }
@@ -396,12 +477,20 @@ export function observeSandbox(arg: string, workspaceRoot: string | null): Obser
 
 // The pure core over ONE arg string: all observation classes, priority-
 // ordered, capped at MAX_LINES_PER_CALL. map = null → numword classes (b)/(c)
-// silently off. workspaceRoot = null → sandbox note (e) off.
-export function observeArg(arg: string, map: NumwordMap | null, workspaceRoot: string | null): Observation[] {
+// silently off. workspaceRoot = null → sandbox note (e) off. skipPairs =
+// the READ channel owns the pair line for this arg (a read with a string
+// filePath — the R1 read-scope pair channel logs it with the gate evidence;
+// the observation channel must not double-log the same pair).
+export function observeArg(
+  arg: string,
+  map: NumwordMap | null,
+  workspaceRoot: string | null,
+  skipPairs = false,
+): Observation[] {
   const s = typeof arg === "string" ? arg : "";
   if (s === "") return [];
   const obs = [
-    ...observePairs(s, map),
+    ...(skipPairs ? [] : observePairs(s, map)),
     ...observePathAnomaly(s),
     ...observeSandbox(s, workspaceRoot),
     ...observeDense(s),

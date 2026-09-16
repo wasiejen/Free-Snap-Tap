@@ -14,17 +14,28 @@
 // (addendum C7: the log proves an incident OCCURRED, not that a correction
 // was necessary).
 //
-// (2) READ-SCOPED FUZZY RESOLUTION (the 5.4 "read functionality", approved
-// 2026-09-16; research §2.2-§2.7): for `input.tool === "read"` with a STRING
-// `output.args.filePath` ONLY: exact / normalized-existing path → untouched
-// (no line); a Levenshtein match over the bounded corpus (d<=2 AND gap>=2) →
-// MUTATES `output.args.filePath` to the resolved absolute path + a
-// `fuzzy-resolved` line; anything else → FAIL-CLOSED (original arg, the
-// honest "not found" surfaces) + a `fuzzy-rejected` line with top-3
-// candidates + reason. Scope rule (§2.3): READ-ONLY tools ONLY — WRITE/EDIT/
-// DELETE args are NEVER touched. Both outcomes are logged (addendum C6:
-// conservative + both logged). glob / grep / section-anchors are NOT in this
-// unit (queued).
+// (2) READ-SCOPED RESOLUTION (the 5.4 "read functionality", approved
+// 2026-09-16; research §2.2-§2.7 + R1 the pair pipeline, 2026-09-16): for
+// `input.tool === "read"` with a STRING `output.args.filePath` ONLY, TWO
+// channels in FIXED ORDER (decision-record §2.6):
+//   (2a) PAIR RESOLUTION (R1): every `[left:right]` pair in the filePath
+//       resolves independently (right-wins canonical); EXISTENCE GATE —
+//       MUTATES `output.args.filePath` to the canonical path only when the
+//       canonical path EXISTS and the pair-containing path does NOT
+//       (both/neither → FAIL-CLOSED, original arg, gate evidence logged).
+//       One log line per pair; a mutation logs the `pair-resolved` verdict.
+//       In non-read tools the pair is LOGGED ONLY (observation channel).
+//   (2b) FUZZY RESOLUTION (lane 5.4): the matcher sees the (possibly
+//       pair-mutated) RESULT. Exact / normalized-existing path → untouched
+//       (no line); a Levenshtein match over the bounded corpus (d<=2 AND
+//       gap>=2) → MUTATES `output.args.filePath` to the resolved absolute
+//       path + a `fuzzy-resolved` line; anything else → FAIL-CLOSED
+//       (original arg, the honest "not found" surfaces) + a
+//       `fuzzy-rejected` line with top-3 candidates + reason.
+//   Scope rule (§2.3): READ-ONLY tools ONLY — WRITE/EDIT/DELETE args are
+//   NEVER touched. Both outcomes are logged (addendum C6: conservative +
+//   both logged). glob / grep / section-anchors are NOT in this unit
+//   (queued).
 //
 // EXPORT CONTRACT (the 2026-09-16 export fix — verified in the installed
 // binary's minified source): the plugin loader normalizes a plugin module
@@ -53,9 +64,13 @@
 //   path / commit-ref / date / session-id> | <verdict>
 // The fuzzy lines reuse the same shape; their field 6 is
 // `fuzzy orig=<arg> -> <resolved-rel> d=<n> gap=<g|inf>` (resolved) or
-// `fuzzy orig=<arg> cands=<p1 d1,p2 d2,p3 d3> reason=<r>` (rejected).
+// `fuzzy orig=<arg> cands=<p1 d1,p2 d2,p3 d3> reason=<r>` (rejected). The
+// read-scope pair lines (R1) use field 6
+// `pair=[<l>:<r>] canon=<right-derived> dist=<d> gate=mutated|both-exist|
+// none-exist` (mutated = `pair-resolved` verdict).
 // Verdict vocabulary: the six observation verdicts (core header) +
-// `fuzzy-resolved` / `fuzzy-rejected` + `error` (the intercept-error line).
+// `fuzzy-resolved` / `fuzzy-rejected` + `pair-resolved` + `error` (the
+// intercept-error line).
 //
 // MODEL ID: obtained the same way the watchdog fills its ctx-log model field
 // — readGauge(undefined, sessionID) from ./scripts/gauge.mjs (the shared
@@ -90,6 +105,7 @@ import {
   CORPUS_TTL_MS,
   MODEL_CACHE_TTL_MS,
   buildCorpus,
+  checkPairs,
   classifyContext,
   flattenField,
   loadNumwordMap,
@@ -188,6 +204,49 @@ function getCorpus(root: string): string[] {
   return entries;
 }
 
+// Read-scope PAIR resolution (R1, 2026-09-16 — the pipeline order,
+// decision-record §2.6: the pair channel runs FIRST, the fuzzy matcher then
+// sees the result). Every `[left:right]` pair in the read filePath resolves
+// independently (one log line each); right-wins — the canonical path
+// replaces each RESOLVED pair with its right-derived digits (an unresolved
+// pair stays in place → the gate fail-closes). EXISTENCE GATE: MUTATES
+// `output.args.filePath` to the canonical path only when the canonical path
+// EXISTS and the pair-containing path does NOT (both/neither → FAIL-CLOSED,
+// original arg, gate evidence logged). A mutation logs the new
+// `pair-resolved` verdict; a gate-fail logs the pair verdict (ok/mismatch)
+// with the gate evidence. Never throws.
+function runPairRead(output: { args?: unknown }): Observation[] {
+  const args = output?.args;
+  if (args == null || typeof args !== "object") return [];
+  const filePath = (args as { filePath?: unknown }).filePath;
+  if (typeof filePath !== "string" || filePath.trim() === "" || map === null) return [];
+  const checks = checkPairs(filePath, map);
+  if (checks.length === 0) return [];
+  const ctx = classifyContext(filePath);
+  // the canonical path: every resolved pair → its right-derived digits
+  let canon = filePath;
+  for (const pc of checks) if (pc.canonical !== null) canon = canon.split(pc.raw).join(pc.canonical);
+  const abs = (p: string) => (isAbsolute(p) ? p : join(dir || ".", p));
+  const canonExists = existsSync(abs(canon));
+  const origExists = existsSync(abs(filePath));
+  const mutate = canonExists && !origExists;
+  if (mutate) (args as { filePath: string }).filePath = canon;
+  const gate = mutate ? "mutated" : canonExists && origExists ? "both-exist" : "none-exist";
+  return checks.map((pc) =>
+    pc.verdict === "no-candidate"
+      ? {
+          verdict: "no-candidate",
+          evidence: `pair=${pc.raw} gate=${pc.rightVal === null ? "right-unknown" : "left-unknown"}`,
+          context: ctx,
+        }
+      : {
+          verdict: mutate ? "pair-resolved" : pc.verdict,
+          evidence: `pair=${pc.raw} canon=${pc.canonical} dist=${pc.dist} gate=${gate}`,
+          context: ctx,
+        },
+  );
+}
+
 // Read-scope ONLY (research §2.3 — the scope rule): a wrong fuzzy match on
 // a READ is self-correcting; on a WRITE it is data loss. Returns the fuzzy
 // Observation (null = untouched: not a read, no string filePath, or an
@@ -232,15 +291,26 @@ async function onToolBefore(
   try {
     sid = str(input?.sessionID);
     tool = str(input?.tool);
-    // captured BEFORE the fuzzy channel may mutate output.args (field 5 is
+    // captured BEFORE any read channel may mutate output.args (field 5 is
     // the ORIGINAL arg — what the model asked for)
     const argStr = argsToString(output?.args);
-    const obs = argStr === "" ? [] : observeArg(argStr, map, dir || null);
+    // the READ channel owns the pair line for a read with a string filePath
+    // (no double-logging — observeArg skips the pair class for that arg).
+    // Pipeline order (decision-record §2.6): pair FIRST (may mutate), then
+    // the fuzzy matcher on the (possibly mutated) result.
+    const readFilePath =
+      output?.args != null && typeof output.args === "object"
+        ? (output.args as { filePath?: unknown }).filePath
+        : undefined;
+    const pairOwned = tool === "read" && typeof readFilePath === "string";
+    const pairObs = pairOwned ? runPairRead(output) : [];
+    const obs = argStr === "" ? [] : observeArg(argStr, map, dir || null, pairOwned);
     let fuzzy: Observation | null = null;
     if (tool === "read") fuzzy = runFuzzyRead(output); // read-scope ONLY
-    if (obs.length === 0 && fuzzy === null) return; // nothing to log
+    if (obs.length === 0 && pairObs.length === 0 && fuzzy === null) return; // nothing to log
     model = await getModel(sid);
     for (const o of obs) appendObservation(sid, model, tool, argStr, o);
+    for (const o of pairObs) appendObservation(sid, model, tool, argStr, o);
     if (fuzzy !== null) appendObservation(sid, model, tool, argStr, fuzzy);
   } catch (e) {
     // at most ONE intercept-error line; the hook returns silently (the model
