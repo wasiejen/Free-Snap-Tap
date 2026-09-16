@@ -263,6 +263,17 @@ function appendDumpFailLine(root: string, sessionID: string, error: string): voi
   }
 }
 
+// Resolves the node executable for the dump-script spawn. The live opencode
+// host's execPath is the CLI binary, not a node runtime; a wrong spawn fails
+// the dump safely (WARNING) but the corpus dump would never happen. Plain
+// node runtimes (node / node.exe / nodejs.exe) pass through untouched;
+// anything else falls back to "node" (resolved from PATH — on Windows
+// PATHEXT finds node.exe). Exported for the smoke checks.
+export function resolveNodeExe(execPath: string = process.execPath): string {
+  const base = path.basename(execPath).toLowerCase();
+  return base.startsWith("node") ? execPath : "node";
+}
+
 // The hook: run the dump script for the target session. Returns { ok, file } on
 // success or { ok:false, error } on ANY failure (NEVER throws, NEVER blocks).
 // The no-overwrite rule: if the base-name target already exists on disk, the
@@ -276,7 +287,7 @@ export function preCompactionDump(root: string, sessionID: string, count: number
   const name = preCompactionDumpName(sessionID, count, stamp);
   const target = path.join(archiveDir, name);
   try {
-    execFileSync(process.execPath, [scriptPath, sessionID, "--out", name], { timeout: 60_000, stdio: "pipe" });
+    execFileSync(resolveNodeExe(), [scriptPath, sessionID, "--out", name], { timeout: 60_000, stdio: "pipe" });
     return { ok: true, file: target };
   } catch (err: any) {
     const error =

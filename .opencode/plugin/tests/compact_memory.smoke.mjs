@@ -90,6 +90,23 @@ chk("named export classifyQuantClass is a function", typeof mod.classifyQuantCla
   chk("clf trap Qwen3.8-27B-IQ4KT-120K -> 3 (not the 3-bit row)", c("Qwen3.8-27B-IQ4KT-120K").cap === 3);
 }
 
+// ---- the dump hook's node resolver (the live host's execPath is the opencode
+// CLI binary, not a node runtime — a wrong spawn fails the dump safely but the
+// corpus dump would never happen; plain node paths must pass through untouched)
+{
+  const r = mod.resolveNodeExe;
+  chk("resolveNodeExe: plain node path passes through unchanged",
+    r("C:\\Program Files\\nodejs\\node.exe") === "C:\\Program Files\\nodejs\\node.exe",
+    JSON.stringify(r("C:\\Program Files\\nodejs\\node.exe")));
+  chk("resolveNodeExe: opencode CLI binary falls back to the PATH 'node'",
+    r("C:\\x\\opencode.exe") === "node",
+    JSON.stringify(r("C:\\x\\opencode.exe")));
+  const live = r();
+  chk("resolveNodeExe(): live default basename starts with 'node' (plain-node smoke host)",
+    typeof live === "string" && path.basename(live).toLowerCase().startsWith("node"),
+    JSON.stringify(live));
+}
+
 // ---- client stubs (recording; error specs per call count)
 const makeClient = (spec = {}) => {
   const rec = { summarize: [], compact: [], messages: [] };
