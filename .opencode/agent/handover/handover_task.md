@@ -1,6 +1,13 @@
 # TASK — worker: make intercept_observer loadable + implement the read-scope fuzzy read function
 
 Worker: `worker_Q4_140K`. Stay on the current checkout (opencode_test).
+
+**PATH DISCIPLINE (a previous launch died on this):** your working directory
+IS the repo root. Use RELATIVE paths everywhere (bash, read, edit, git).
+NEVER retype the absolute repo root — the previous worker drifted into a
+doubled path (`...Projects\OpenCodeProjects\OpenCodeProjects\...`) and hit a
+permission rejection that killed the launch. If any call is rejected on a
+path, retry with a relative form — do not retype absolute paths.
 Baseline (re-verified by the planner 2026-09-16, plan2): probe **169/169**
 (`node .opencode/plugin/probes/handover_probe.mjs`), pytest **459 passed +
 1 warning** (`.venv`), ruff **F=0** (`.venv/Scripts/ruff.exe check --select F .`),
