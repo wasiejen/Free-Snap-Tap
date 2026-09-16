@@ -6,7 +6,7 @@
 # compacting: null  archived: null
 # tokens in/out/reasoning: 311617/58166/0
 # messages: 123  parts: 543
-# dumped: 2026-09-16T10:24:59.824Z  mode=full
+# dumped: 2026-09-16T10:25:07.645Z  mode=full
 
 ## msg_08c2e5ee4001vTEFw7uG3oUkSk | role=user | agent=worker_Q4_120K | model={"providerID":"llama-swap","modelID":"Qwen3.8-27B-IQ4KT-120K... | 2026-09-10T16:37:24.325Z
 meta: {"summary":{"diffs":[]}}

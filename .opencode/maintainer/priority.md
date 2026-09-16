@@ -40,9 +40,17 @@
 
   - 26-09-16_11-50 opencode restarted - changed plugin should now be active
 
+  - 26-09-16_12-57 needed to reset the last loop. because (1)(a planner used the wrong modelID for self-compaction) and manual compaction did confuse him and ignored maintainer messages in resume prompt
+    - moved autorun files restored
+
 # compact_memory tool dump function ## 55 approved
 - compact count aware dump
 - autocompact on context limit option, toggable via parameter in the budget file
+- (1)add a fallback to fetch the providerID and modelID as fallback for cross-session compaction (so only session_id needs to be set) 
+  - source is in line 119 of opencode.json defines as agent compaction. (a planner used the wrong modelID for self-compaction)
+  - on self-compaction the model should also be resolved from the opencode.json if in doubt. only explicit overwrite of the model will change the compaction model.
+    - cross-compaction -> only needs session id of to be compacted session
+    - self-compaction -> needs not parameters at all (parameter desciptions in compact_memory are likely descriped badly by me -> needs to reword this so it is clearer)
 
 # fuzzy research scripts + plugin
 -- see comments in research for direction/approval state
