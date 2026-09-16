@@ -30,3 +30,5 @@
 2026-09-15_23-54 -RETURN- looprunner ses_f5b507a66ffegia0ZZifYeRD2l Qwen3.8-27B-IQ4KT-120K planner-5 ses_f5978ea6affe6oCCcpZsyN6hEl planner_Q4_120K
 2026-09-15_23-59 -->START planner-6 ses_f58eea7eaffefmb0hOoPK5dUiP Qwen3.8-27B-IQ4KT-120K iteration 6 — priority order: #62 compaction-clarity+90/95 in both role prompts (planner-direct), #63 compact_memory smoke fix (delegate), #60 block_transfer+loop_log probe pins (delegate)
 2026-09-16_00-31 DONE<--- planner-6 ses_f58eea7eaffefmb0hOoPK5dUiP Qwen3.8-27B-IQ4KT-120K 90%/11K
+2026-09-16_01-54 -RETURN- looprunner ses_f5b507a66ffegia0ZZifYeRD2l Qwen3.8-27B-IQ4KT-120K planner-6 ses_f58eea7eaffefmb0hOoPK5dUiP planner_Q4_120K
+2026-09-16_01-57 -->START planner-7 ses_f5881492fffekCwsEwdfna4sge Qwen3.8-27B-IQ4KT-140K iteration 7 (new 140K model, first session on it) — priority order: #63 compact_memory smoke fix (delegate), then #60 block_transfer+loop_log probe pins (delegate); observing 140K bitshift/looping tendency per maintainer request

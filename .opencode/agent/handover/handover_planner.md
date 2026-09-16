@@ -54,35 +54,35 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - 2026-09-08 session 1 (legacy, no-ses) — agents_repo roster synced to live opencode.jsonc; #38 explorer smoke test (PASSED w/ fabricated-gauge caveat); #37 gauge build LANDED (backend chain node:sqlite → bun:sqlite → spawn sqlite3.exe) — details: git 2a4996c
 
 
-## plan6 (iteration 6, ses_f58eea7eaffefmb0hOoPK5dUiP, planner Q4-120K)
-- #62 LANDED (planner-direct): compaction-clarity + 90/95 rules in BOTH role
-  prompts — planner §Context-budget trigger: NOT-a-restart bullet + above-90
-  EMERGENCY handover (NAP current + commit + self-compact IF budget, dump
-  first if the hook is not live) + above-95 commit-and-DO-NOT-DELIBERATE;
-  task §Context-budget trigger rewritten the same way + §compact_memory
-  NOT-a-restart bullet. Grep-verified: 3 lines × 2 prompts. Adjacent stale-ref
-  fixes in the same commit: stopline proposal name →
-  `2026-09-15_agents-knowledge-stopline.md`; `dump_session.cjs` path →
-  `scripts/db/`.
-- Curation: #62 + #59 CLOSED (#59 cadence → Standing); #61 reworded —
-  machine verification REFUTED the "annotation stale by 5 hygiene checks"
-  narrative (annotation self-consistent at a15828c/4512fe6/4340043/HEAD;
-  endpoints ninetyfour → one-zero-six); original text recoverable in git
-  (0761e42/4b4153f). Flagged for his direct session (does not block).
-- NEXT (priority order): #63 compact_memory smoke fix (delegate,
-  small-medium; NOTE the smokes are NOT in the standard gate — run them
-  explicitly), then #60 block_transfer+loop_log probe pins (delegate,
-  medium; probe total grows, header annotation updated). Spec first per
-  `agent_readme_task_spec.md`; workers are edit-denied on prompts.
-- MAINTAINER-OVERRIDE NOTE: ask_maintainer does NOT pause the loop (his
-  ruling) — open questions are recorded here, never issued as ask actions.
-- ANSWERED (priority.md --comment, pre/post-compaction dumps): the #55 hook
-  already handles it WITHOUT overwriting — separate folder
-  `.opencode/archive/sessions/compaction_dumps/`, no-overwrite naming
-  `<sid>_c<count>.md` (count = the tracked per-session compaction budget);
-  dump fires BEFORE the summarize dispatch; a dump failure never blocks the
-  compaction. Hook live-acceptance still PENDING (no `compaction_dumps/`
-  exists yet at plan6 — the host may not have reloaded the tool).
+## plan7 (iteration 7, ses_f5881492fffekCwsEwdfna4sge, planner Q4-140K)
+- FIRST session on the new 140K model (maintainer renamed agents to
+  planner_Q4_140K / worker_Q4_140K; window 140K, provider real limit
+  one-four-ty-FIVE k (145k) — a built-in buffer). MAINTAINER REQUEST:
+  observe for increased looping tendency, bitshifting of dense data,
+  misremembered facts as side effects of the context increase → report in the
+  summary; `--INFO--` loop lines for concrete instances.
+- Inbox triage: `feedback_protol_tool.md` (--comment "moved up from done")
+  ACKNOWLEDGED → moved to `maintainer/done/` content-untouched (its content is
+  TODO #53, already self-contained + still DEFERRED — nothing to do now).
+  `dense_numbers.md` (--wip, "idea collection — for discussion in direct
+  session") LEFT UNTOUCHED (his live idea file).
+- #63 SPEC WRITTEN + committed (spec at handover_task.md). Root cause
+  MEASURED at spec time (not assumed): the dump hook (4512fe6) appends a
+  `WARNING: pre-compaction dump failed ...` line to the response in the smoke
+  sandbox (no `dump_session.cjs` there → MODULE_NOT_FOUND), breaking 4
+  byte-exact response checks; the probe already solves it via a stub script
+  (handover_probe.mjs 1983-2015) — the smoke mirrors that approach + gets ONE
+  new chk (dump file exists after a tool-path dispatch). Plugin behavior
+  untouched. worker-7 launched against the spec.
+- NEXT: verify worker-7 → then #60 block_transfer+loop_log probe pins
+  (delegate, medium; spec written AFTER #63 lands, against the fresh state).
+- OPEN (his direct session, non-blocking): #63's optional decision — should
+  the plugin smokes join the standard gate in repo_commands.md (relates #58,
+  both maintainer-owned)? #51's `type: module` ruling (--comment: likely
+  removable). fst-rebind-repeat still PARKED for his direct session.
+- MAINTAINER-OVERRIDE NOTE (carried from plan6): ask_maintainer does NOT
+  pause the loop — open questions are recorded here, never issued as ask
+  actions.
 
 ## Standing
 - Baselines (measured 2026-09-15, plan5): probe **106/106** (one-zero-six —
