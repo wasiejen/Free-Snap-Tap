@@ -95,11 +95,23 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   sandbox smoke 52/52, probe 106/106, pytest 459+1w, ruff F=0. His feedback
   questions answered in plan7_summary.md (CLEAR mode exists; feedback folder
   gone → answers ride NAP/summary).
-- #60 SPEC WRITTEN (S15 block_transfer + S16 loop_log probe pins, append-only;
-  spec carries the planner-measured contracts of both tools + the
-  machine-verify discipline for the check-numbering (labels max 107 vs
-  reported total 106 — the worker resolves by machine, not by eye) + the
-  adjacent stale "PowerShell 7" run-command comment fix). worker-9 launched.
+- #60 DONE + VERIFIED (worker-9, `75be075` + `3f94875`): S15 (10 checks) +
+  S16 (6 checks), labels 108-123, header annotation + run-command block
+  fixed. Planner re-ran green: probe **120+2/120+2**, all 7 smokes, pytest
+  459+1w, ruff F=0. **RESCUE:** worker-9's first launch died at
+  `context_length_exceeded` (uncommitted partial probe on disk) → dumped the
+  session (corpus, committed) → cross `compact_memory` (COMPACT line 03-49,
+  success) → `task_id` resume → completed at a 93 % gauge. The protocol
+  worked; the 140K window did NOT prevent a big task from hitting the wall
+  (the #60 spec + 2513-line probe file are heavy even at 140K).
+- **NEW FINDING (live #55 test, the first since the restart):** the dump
+  hook's spawn uses `process.execPath` (compact_memory.ts ~279) — on the LIVE
+  host that is the opencode CLI binary (`opencode.exe`), so the live dump
+  ALWAYS fails (CLI help output; WARNING + DUMP-FAIL line as designed — the
+  contract held, only the resolution is wrong). SPEC WRITTEN (node resolver
+  + 2-3 smoke chks, no probe pin — the fallback is unreachable under plain
+  node); worker-10 launched. Live acceptance of the fix = pending the
+  maintainer's NEXT host restart (plugin reload).
 - OPEN (his direct session, non-blocking): #63's optional decision — should
   the plugin smokes join the standard gate in repo_commands.md (folds into
   #58, which he has now approved for the agent)? fst-rebind-repeat still
