@@ -1,9 +1,30 @@
 --wip--defer
 
-- removal of loop warning of compaction, or reducing its scope
-- perception of models is correct in bitdrift, but they can not generate the value. so not a kv cache (memory) but a generation (weight) problem?
-  - "The two strings differ in a way I cannot see (Pattern 5)
+- message value from compact_memory do not arrive in the compacted sesssion. not as part of the summery or later
 
+- removal of loop warning of compaction, or reducing its scope DONE
+- perception of models is correct in bitdrift, but they can not generate the value. so not a kv cache (memory) but a generation (weight) problem?
+  - "The two strings differ in a way I cannot see (Pattern 5)" see might mean generate? or perceive - but they know the number but can not write it - so generate, in adder construction they can reliably reproduce the number or in numwords. so they know the number -> model weight-problem
+- increase default keepMessages to 20 with increaed window size
+- ctx needs a session_id and role to better attribute which measurement it is
+  - good place to track worker sessions and get session_id if needed
+  - only place to check after error of a sub-agent how full his context was
+  - add tools.execute.before in watchdog to just trigger ctx.gauge - not change in message to keep it more up to date
+
+would be much more helpful with session_id and role (modelid can drop - is implied with role)
+2026-09-16_17-43 Qwen3.8-27B-IQ4KT-140K edit (97% used, 3K left)
+2026-09-16_17-46 Qwen3.8-27B-IQ4KT-140K bash (99% used, 1K left)
+2026-09-16_17-49 Qwen3.8-27B-IQ4KT-140K ctx_gauge (74% used, 36K left)
+2026-09-16_17-50 Qwen3.8-27B-IQ4KT-140K compact_memory (74% used, 35K left)
+2026-09-16_17-51 Qwen3.8-27B-IQ4KT-140K bash (75% used, 34K left)
+2026-09-16_17-51 Qwen3.8-27B-IQ4KT-140K COMPACT ses_f55463549ffelXphfcDlDGMhPJ tokens=30000 messages=12
+
+
+# 8 write to buffer option?
+- so no direct writes can fail
+- if intercepts can not resolve a filepath it is buffered instead - but how to retrieve? special marker in write command? or just dump it into a file and inform agent?
+
+- my quess to path doubling is the double folder Free-Snap-Tap then might induce doubling in the path because of its double existence.
 
 # 1 tool description list/prompt that explains the available costum tools to each agent
 - session_info

@@ -49,3 +49,7 @@ or thinking the thought further
   - [[`path`, `startMarker`/`start_line_number`, `endMarker`/`start_line_number`], [`path`, `startMarker`/`start_line_number`, `endMarker`/`start_line_number`], ...] 
   - to copy all sections with references included: "path:160:210\n + section \n" into buffer and copy them to the target file or target marker or marker pair?
     - maybe also possibly accepts [`path`, [[`startMarker1`, `endMarker1`], [`startMarker2`, `endMarker2`], ...], ...]
+
+Block_transfer WRITE? 
+- replace section with direct input? 
+- so no DELETE and then extra write tool call?

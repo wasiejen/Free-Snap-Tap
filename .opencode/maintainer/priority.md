@@ -49,19 +49,25 @@
         - and when appending to a name? autorun_2-6_0-9_1-6__1-5_5-0 underscore to diffeniate is more visually
 
 
+
+
 # fuzzy research scripts + plugin
 -- see comments in research for direction/approval state
 - testing of log function.
 
 # compact_memory tool dump function ## 55 approved
-- compact count aware dump
 - autocompact on context limit option, toggable via parameter in the budget file
 - (1)add a fallback to fetch the providerID and modelID as fallback for cross-session compaction (so only session_id needs to be set) 
   - source is in line 119 of opencode.json defines as agent compaction. (a planner used the wrong modelID for self-compaction)
   - on self-compaction the model should also be resolved from the opencode.json if in doubt. only explicit overwrite of the model will change the compaction model.
     - cross-compaction -> only needs session id of to be compacted session
     - self-compaction -> needs not parameters at all (parameter desciptions in compact_memory are likely descriped badly by me -> needs to reword this so it is clearer)
-
+    - 
+# addition to system prompt of planner, 
+- context_limit error -> compaction of worker, use Gemma model for this. You do not have to wait, sleep or wait only waste time, this is serial working flow - only one can be active at each time (compaction active = planner inactiv). you are not active while it compacts. your session is inactive and you can only continue after the compact is through
+- cross-compact only needs session_id (after compact tool rework above) - repeated calling with own id
+  - rework of compact_memory parameter count of remove providerID and modelID from parameter list avaialble -> get them from opencode.json - see # # compact_memory tool dump function
+  - 
 # repo split research/proposal
 - how best to seperate fst and the opencode_test branch into 2 independently trackable git repos
   - goal is to seperate repo files from opencode and agent files

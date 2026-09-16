@@ -45,15 +45,6 @@ conflicts with the code or `repo_overview.md`, the code wins — but flag the di
 * *Concrete Example:* If a test fails twice with the same error, do not rewrite the code a
   third time. Append the failure to `TODO.md` and trigger the handover.
 
-**Pattern 4: The Compaction & Context Cliff**
-* **Symptom:** You receive a context compaction notification or your remaining token budget
-  (`REM`) crosses below 15k.
-* **Why it fails:** Compressed or overflowing context states corrupt logical continuity,
-  making loops mathematically inevitable.
-* **Required Action:** Abandon all remaining optimization goals. Write out an immediate,
-  unpolished handover file and stop. A rough draft saves the session; trying to finish the
-  task guarantees a corrupted state.
-
 **Pattern 5: The Dense Numeric String**
 * **Symptom:** comparing, transcribing, or counting inside long unbroken
   numeric strings (dense dates, session suffixes, version numbers).
@@ -64,6 +55,20 @@ conflicts with the code or `repo_overview.md`, the code wins — but flag the di
   machine do it (script-computed names; verify with `git status`/diff/grep).
 * *Concrete Example:* renaming dated files: derive new names in a script and
   verify via `git status` — never retype a date into a command.
+
+**Redundancy form (bit-drift-safe numerals):** when a dense numeral is at
+  risk, write the pair `[left:right]` — left = digits as seen OR an adder
+  construction (`[800+50+11]`), right = dash-separated single-digit numwords
+  (`[eight-six-one]`); the resolver takes the RIGHT side on mismatch. Short
+  dense form without a pair: `[8-6-1]`. The form is legal in tool args /
+  commit text / prose — NEVER inside code content, NEVER bare in prose, and
+  quote it when it passes through a bash command (`< >` and `|` are bash
+  metacharacters — measured). 
+  e.g. `b[6:six]c[861:eight-six-one]d -> b6c861d` 
+  e.g. `b[3+3:six]c[800+55+6:eight-six-one]d -> b6c861d` 
+  e.g. `b[six]c[eight-six-one]d -> b6c861d` 
+  e.g. `b[6]c[8-6-1]d -> b6c861d` 
+  e.g. `b[six]c[800+55+6]d -> b6c861d` 
 
 ## Role & interaction model
 
