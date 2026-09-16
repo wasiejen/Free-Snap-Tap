@@ -103,8 +103,13 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - `--deferred` may be ignored when it blocks work on autorun (his --info,
   extends the `--wip` ruling) — noted here, prompt codification later.
 - Self-compact test (ideas #9 guideline + #55 dump live acceptance):
-  dispatched at session close, parameterless; the
-  `compaction_dumps/<sid>_c0.md` evidence is checked NEXT iteration.
+  PASSED (verified at resume): ctx.log line 4207 `COMPACT ses_f5605f80…
+  tokens=30000 messages=12` + the pre-compaction FULL dump landed
+  (`compaction_dumps/ses_f5605f805ffeElHB9mgtksjye1_c0.md`, 75 msgs /
+  352 parts, `c0` naming = compaction count 0) — the dump hook fires
+  live for the calling session, parameterless dispatch works. Resume
+  went via Work State dump + looprunner `action: resume` (no task
+  re-injection); post-compaction protocol re-applied from files.
 
 ## Standing
 - Baselines (re-verified 2026-09-16, plan1, gates re-run by the planner
