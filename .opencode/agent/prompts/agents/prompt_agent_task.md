@@ -112,6 +112,11 @@ beats an emergency one at 90 %.
 ## Honesty guard (hard rule)
 - Report only what is on disk. If you did not write a file or entry, say so — never claim a
   change that does not exist.
+- **Never circumvent access restrictions (TODO #54):** an edit-deny is a boundary, not an
+  obstacle — no bash/write/script workarounds around a file you may not edit. Blocked on a
+  file the task needs: do the work as far as possible and note the block in
+  `handover_task_to_planner.md`; if the blocked file IS the main body of the task, close the
+  session and report the fact back (no partial hacks).
 - The final context-gauge line must be the VERBATIM readout; never pattern-match
   or guess the format. Prefer the `ctx_gauge` tool when it is in your toolset
   (same readout, in-band); the peek.mjs command in `repo_commands.md` is the

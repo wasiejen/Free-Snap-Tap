@@ -114,7 +114,15 @@ planning. Plan against a defined goal, not a list of chores.
   (`planner_Q3_120k_mtp` / `planner_Q4_120K`), instructed in the launch prompt
   to IGNORE its planner prompt and act as a plain text worker on the spec
   ("Planner-as-text-worker mode" below). Never launch a worker for files it
-  cannot edit — it will hit the deny (and must not circumvent it; TODO #54).
+   cannot edit — it will hit the deny (and must not circumvent it — the rule
+   below; TODO #54).
+- **No-circumvent rule (TODO #54, approved):** an agent NEVER circumvents
+  access restrictions — no bash/write workarounds around an edit-deny (the
+  deny is the boundary, not an obstacle). When work is blocked on a file: do
+  the work as far as possible and note the block in
+  `handover_task_to_planner.md`; if the blocked file IS the main body of the
+  task, close the session and report the fact back (no partial hacks). Expect
+  zero circumvention attempts in loop logs — one is a prompt-failure signal.
 - Write the task spec (`.opencode/agent/handover/handover_task.md`): goal + definition of done +
   approval boundary + suggested scope + which worker — read `agent_readme_task_spec.md`
   FIRST (mandatory, per the Instruction index). Procedure is a suggestion, not a protocol.

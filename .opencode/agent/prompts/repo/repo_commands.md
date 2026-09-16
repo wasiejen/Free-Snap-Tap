@@ -24,6 +24,9 @@ verified live in a direct session). Unix idioms work natively: `ls -la`,
   `./.venv/Scripts/ruff.exe`) — both verified working under bash.
 - **Env var**: `FST` = repo root **with trailing `\`** — `$FSTtests`
   composes (the trailing backslash joins into the next path segment).
+- **Temp**: git-bash `$TMP` = the user Windows temp dir (unix form) — the
+  pre-approved scratchpad for work outside the repo is `$TMP/opencode`
+  (= `C:/Users/Wasiejen/AppData/Local/Temp/opencode`).
 - **pwsh** 7.6 is still on PATH (`pwsh`) if ever needed — its old guidance
   (cmdlets, here-strings, `&` invocation) no longer applies to the default
   shell.
@@ -37,6 +40,14 @@ verified live in a direct session). Unix idioms work natively: `ls -la`,
 - Lint: `./.venv/Scripts/ruff.exe check --select F .` Current expected finding
   count is a moving baseline — see `.opencode/agent/handover/handover_planner.md` and
   relevant `TODO.md` entries.
+- Gate probe: `node .opencode/plugin/probes/handover_probe.mjs` (repo root; plain
+  system `node`, no venv; one `MODULE_TYPELESS_PACKAGE_JSON` warning on stderr is
+  expected and harmless — `.opencode/package.json` must NOT gain a "type" field,
+  TODO #51). **The "standard gate" = pytest + ruff + this probe.** The probe
+  self-annotates its total: the output line `PROBE handover: <t>/<t> PASS` must
+  agree with the header annotation (the section-sum line, currently ~376) — current
+  total one hundred twenty-two (plan7, S1–S16 + hygiene; the annotation is the
+  source, re-count it when the probe grows).
 
 ## Handover file paths
 Channel semantics (who writes/reads, canonicality) live in the `AGENTS.md`

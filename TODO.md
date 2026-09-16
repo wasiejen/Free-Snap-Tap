@@ -100,7 +100,7 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 
 ## 35. (closed 2026-09-11, see todo_records.md) — T1 de-peek build — LANDED (continuation 2); tail closed: v1.3 log-profile re-baseline executed (one-shot read → #17) + #34 residual doc refs (closed)
 
-## 51. Stale probe header vs `.opencode/package.json` "type" field (2026-09-11, T3 worker flag)
+## 51. (closed 2026-09-16, plan8; 2026-09-11, T3 worker flag) — Stale probe header vs `.opencode/package.json` "type" field
 
 - **Problem / evidence:** the probe "WHY THAT COMMAND" block
   (`handover_probe.mjs` ≈28) says `.opencode/package.json` "has no 'type'
@@ -112,8 +112,14 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   removed)?
 - **Acceptance:** header and package.json agree; probe green.
 - **Scope:** the probe header (comment), `.opencode/package.json`.
-- **Status:** OPEN — maintainer call.
---comment: I do not know when i added this. but it was a test to activate a plugin I believe. this plugin "opencode-context-meter" seem to be not in the repo any more. so it might be possible to remove it. the current state is thus stale and not the intended state. you can remove it and we will see on next restart if opencode has something to say about it :-)
+- **Status:** CLOSED (2026-09-16, plan8) — the stale `"type": "module"` field
+  removed from `.opencode/package.json` per his ruling; probe header and file now
+  agree (the expected `MODULE_TYPELESS_PACKAGE_JSON` warning is the pinned
+  post-state, header line ~45); gate green (probe 120+2/120+2 machine-verified
+  against the header annotation, pytest 459+1w, ruff F=0, all 7 smokes). Left
+  untouched (out of scope for his ruling): the `@opencode-ai/plugin` dep and the
+  stale `opencode-context-meter` package name — his call at the next restart if
+  opencode says anything.
 
 ## 52. (closed 2026-09-13, see todo_records.md) — `compact_memory` fails in the current host build — connection error on both paths (2026-09-12) — LANDED (2026-09-12, worker-2, per the approved v2 proposal) + live acceptance DONE (2026-09-13, iteration 1: compaction part + directive + budget 1/3 + COMPACT line verified in the DB); the resume-overflow finding → `proposals/2026-09-13_compact_memory-findings.md` (Item 1 superseded by the 2026-09-15 protocol; Item 2 ruling bundled in 2026-09-15_backlog-decisions.md, Decision 3).
 
@@ -135,7 +141,7 @@ All those IDs stay reserved — see the numbering rule in the header.
 
 ## 44. (closed 2026-09-10, see todo_records.md) — Stale/unknown focus name → uncaught KeyError in `apply_focus_groups` / `apply_start_args_by_focus_name` (the config is reloaded *before* the lookup) (2026-09-10, Audit 3b)
 
-## 54. (open, maintainer call 2026-09-12) — Rule: never circumvent access restrictions; blocked-file protocol for agents
+## 54. (closed 2026-09-16, plan8 planner-direct; maintainer call 2026-09-12) — Rule: never circumvent access restrictions; blocked-file protocol for agents
 
 - **Problem / evidence:** worker_Q4_120K (attention-keywords task, 2026-09-12) had no
   edit access to `.opencode/agent/prompts/**` (opencode.jsonc edit-deny) and tried to
@@ -150,9 +156,11 @@ All those IDs stay reserved — see the numbering rule in the header.
   circumvention attempts in subsequent loop logs.
 - **Suggested scope:** `prompt_agent_task.md`, `prompt_agent_planner.md`, possibly
   AGENTS.md (maintainer's call — it is his file).
-- **Status:** open — maintainer call 2026-09-12 (wording per his direct-session
-  instructions).
---comment: approved
+- **Status:** CLOSED (2026-09-16, plan8 planner-direct, approved 2026-09-15) —
+  the no-circumvent rule is codified in all three role prompts:
+  `prompt_agent_task.md` + `prompt_agent_explorer.md` (§Honesty guard) +
+  `prompt_agent_planner.md` (§Delegate vs. do) — grep-verifiable
+  (`rg -n circumvent .opencode/agent/prompts/agents/` → 5 hits).
 
 ## 55. (open, maintainer call 2026-09-15) — `compact_memory` needs a dump function of the current session
 
@@ -211,7 +219,7 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Status:** CLOSED (2026-09-16, worker-8, plan7/iter7) — guard hoisted pre-write: the `!args.dstFile` check now runs before the source-cut write (invalid-input-only change, exact error string kept); 2 new smoke assertions (22/22), gates 106/106 + 459 passed + ruff F=0; commit 733ca7a.
 --comment: approved: you are free to improve the tool. goal is to prevent unintended destruction of data. when in doubt it saves it in buffer - or might be better to append it to buffer? do we have a buffer clear function if needed? can you write a short feedback in maintainer/feedback folder what the current status of the tool is? adaptions of tools you use are generally approved. if they have the potential to work outside of sandbox definition then these sandbox safeguards need to be implemented. (the same rule apply to the scripts - everything than can change data needs a sandbox safeguard - maybe just a shared scriptlet that every script imports and checks the given paths? do only one script to maintain of these safeguards need adaptation) (sry idle thoughts :-) )
 
-## 58. (open, 2026-09-15, script-collection worker, curated plan3) — standard gate definition lacks the probe command
+## 58. (closed 2026-09-16, plan8; 2026-09-15, script-collection worker, curated plan3) — standard gate definition lacks the probe command
 
 - **Problem / evidence:** the standing gate baseline mentions "probe 99/99",
   but the probe command is not defined in `repo_commands.md` §Run / test
@@ -225,8 +233,16 @@ All those IDs stay reserved — see the numbering rule in the header.
   command with the current baseline (99/99 as of 2026-09-15).
 - **Suggested scope:** `.opencode/agent/prompts/repo/repo_commands.md`
   (maintainer-owned file — he edits it or tasks the planner).
-- **Status:** OPEN — maintainer (his file).
---commment: approved. you work with the commands. add to them as need be - but curate them to not dublicate. (a worker also mentioned that tmp is not longer available as path shorthand - could be due to the switch to git bash as shell - might be good idea to include $TMP/opencode as temp path variable in git bash - works for me at least)
+- **Status:** CLOSED (2026-09-16, plan8) — `repo_commands.md` §Run/test now
+  names the probe command and defines **"standard gate" = pytest + ruff +
+  probe** (the probe's total is self-annotated in its header — the annotation
+  is the source, no duplicated moving number); his temp-path note landed in
+  §Environment & shell as verified fact (git-bash `$TMP/opencode` =
+  `C:/Users/Wasiejen/AppData/Local/Temp/opencode`, the approved scratchpad).
+  His "add to them as need be — curate, don't duplicate" ruling is the standing
+  convention for this file. The #63 optional question (do the plugin smokes
+  join the standard gate?) was NOT decided unilaterally — it stays open for
+  his direct session.
 
 ## 59. (open, 2026-09-15, script-collection worker, curated plan3) — session-corpus refresh cadence
 
