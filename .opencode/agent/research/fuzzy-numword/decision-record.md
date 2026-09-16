@@ -246,12 +246,21 @@ paste, like the stop-line change):
   pair sides (`ninetyfour` → `no-candidate`); composition stays the
   scriptlet/observer w2n surface (§2.2 vs the §2.5 pair mini-grammar).
   Pinned S19-187 / S18-160.
-- **R2 — write-scope** (`spec_R2_*.md`, staged): form/fuzzy resolution on
-  write/edit/delete/block_transfer args under the existence gate;
-  fail-closed on pair-mismatch in write scope (no corrupting the wrong file
-  "helpfully"); correction log. GATE: R1 green + his explicit approval
-  (write-path behavior change = approval boundary; he pre-ruled "write scope
-  follows, one step after the other", the spec needs his sign-off).
+- **R2 — write-scope** (`spec_R2_*.md`) — **GREEN 2026-09-16, commit
+  35f8143** (probe 206/206 S20, smoke 35/35 incl. 8f controlled write
+  audit, pytest 459, ruff clean): form/fuzzy resolution on
+  write/edit/block_transfer path args under the strict existence gate;
+  fail-closed on pair-mismatch in write scope (no corrupting the wrong
+  file "helpfully"); fuzzy d<=1 with `scope=write` evidence; git refs in
+  bash args; content args NEVER mutated (the `args[1:one]` guard pin
+  landed, S20). **Deviation accepted (worker-measured, planner-approved):**
+  the ref gate is `git for-each-ref --format=%(refname:short)` membership,
+  NOT `rev-parse --verify` — git parses a pure 40-hex string as an OBJECT
+  name, so `rev-parse --verify <40hex>` exits 0 for ANY 40-hex string
+  (incl. non-existent) and never consults a 40-hex-named ref; the
+  spec's gate was vacuous for exactly the drift case (supersedes §3.4's
+  rev-parse formulation). LIVENESS: restart-gated (next host restart →
+  one-shot write-scope acceptance).
 - **R3 — arg-scope extension** (`spec_R3_*.md`, staged): glob/grep
   path+pattern args, section-anchor resolver (research §2.6), bash command
   args via `command.execute.before` (quoted forms), block_transfer anchors.

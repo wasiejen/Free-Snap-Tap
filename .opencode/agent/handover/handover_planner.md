@@ -177,9 +177,20 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   path args (strict existence gate, mismatch FAILS CLOSED), fuzzy d<=1 on
   write paths, git refs gated on rev-parse; read scope FROZEN (regression
   gate); content args never mutated.
-- **Next moves:** verify R2 against git + committed handover (NOT the Task
-  return — stale-snapshot precedent); one-shot write-scope acceptance at
-  the next restart; confirm worker-8's feedback-file ask is handled.
+- **R2 GREEN — VERIFIED** (35f8143; worker-14 compacted twice mid-task,
+  resumed via task_id both times, dumps archived — checkpoint protocol
+  worked): probe 206/206 (S20), smoke 35/35 (8f controlled write audit),
+  pytest 459, ruff clean; read scope frozen-green. Deviation ACCEPTED:
+  ref gate = `for-each-ref` membership (rev-parse vacuous for 40-hex —
+  worker-measured, decision-record §5 R2, supersedes §3.4). #68 CLOSED;
+  residual new-file near-miss hazard → #72 (his decision). His notes
+  this round: true ceiling ≈145K/103%; compact_memory `message` param is
+  NOT auto-delivered (manual copy into starting message) — #70 evidence;
+  his doubled-path init read (log 179-180) caught by out-of-sandbox.
+- **Next moves:** (1) his next restart → one-shot WRITE-scope acceptance
+  (sentinel: controlled scratchpad write, verify log says where it landed);
+  (2) his ruling on #72 (accept hazard vs intent-signal follow-on);
+  (3) confirm worker-8's feedback-file ask.
 
 ## Standing
 - Baselines (re-verified 2026-09-16, plan2, gates re-run by the planner

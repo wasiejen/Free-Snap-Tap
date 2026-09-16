@@ -191,9 +191,12 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Acceptance:** approved spec + landed build + gate green (per spec).
 - **Scope:** research doc §2.3/§3.4/§4.2 as the design source; staged spec
   `research/fuzzy-numword/spec_R2_write_scope.md`.
-- **Status:** OPEN (spec staged `spec_R2_write_scope.md`; #66 verdict LIVE
-  2026-09-16; R1 GREEN 96bb173 — the "R1 green first" gate is SATISFIED).
-  ONLY remaining gate: his explicit write-scope approval.
+- **Status:** CLOSED 2026-09-16 — approved ("R2 approved") + build landed
+  GREEN (35f8143: probe 206/206 S20, smoke 35/35 8f, pytest 459, ruff
+  clean); acceptance met per spec. Deviation accepted: ref gate =
+  `for-each-ref` membership (rev-parse --verify vacuous for 40-hex —
+  measured, decision-record §5). One-shot write-scope acceptance pending
+  his next host restart. Residual new-file near-miss hazard → #72.
 
 ## 69. Redundancy form codification: `[left:right]` (SUPERSEDES the `<4|four>` Q2 form; 2026-09-16 direct session)
 - **Problem / evidence:** the addendum Q2 form `<4|four>` (angle brackets +
@@ -256,6 +259,23 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   tasked agent).
 - **Status:** OPEN (maintainer-file flag; refreshed at R1 — the stale prose
   now reads 193/193 off; worker-13 R1 inbox entry folded in, 2026-09-16).
+
+## 72. Write-scope residual hazard: new-file near-miss (maintainer decision; 2026-09-17)
+- **Problem / evidence:** the write-fuzzy channel (and the pair gate) cannot
+  distinguish "a mistyped path to an EXISTING file" from "a deliberately
+  NEW filename that happens to sit within d<=1 of an existing sibling" —
+  a legitimate new-file write (e.g. creating `file-5.txt` next to
+  `file-4.txt`) can be mutated onto the sibling and overwrite it. Read
+  scope has no such hazard (non-destructive). Pinned as behavior: S20
+  checks 200/201 + smoke 8f (worker R2, commit 35f8143).
+- **Outcome (decision needed):** accept as designed (audit lines carry
+  the ORIGINAL arg — re-targeting verifiable after the fact), OR mitigate
+  later with an intent signal the interceptor does not currently have
+  (e.g. agent confirms the log line before the write lands — R6-era
+  surface).
+- **Acceptance:** your ruling recorded; if mitigate: spec'd as a follow-on
+  stage (R6-adjacent), not built before approval.
+- **Status:** OPEN (maintainer decision; flagged-only by design).
 
 ## Closed entries
 
