@@ -24,7 +24,11 @@
 // 2026-09-16 (lane 5.2: the numword scriptlet — the new S17 section, checks
 // 124-149; the shared numwords.json map + the node CLI spawned via
 // execFileSync + the python twin via the repo venv + the module required
-// DIRECT via createRequire): the pre-rebuild
+// DIRECT via createRequire) + EXTENDED 2026-09-16 (lane 5.3: the log-only
+// intercept observer — the new S18 section, checks 150-170; the plugin file
+// is imported DIRECT, type-stripped, the NAMED-export core pinned WITHOUT a
+// full PluginInput harness, the numword map is the REAL shared file, the
+// hook writes to a sandbox project dir): the pre-rebuild
 // probe
 // (v2.2.1 era) targeted the DELETED handover.ts, the retired
 // experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
@@ -383,6 +387,31 @@
 //      (148) the module: every reject fixture throws (loud);
 //      (149) numword_check: AGREE 20 (code 0) / DISAGREE 9 (code 1) /
 //          UNKNOWN eleventy (code 2) — machine-readable shell contract
+//   S18 intercept observer (21) — the lane-5.3 log-only pin (approved
+//      2026-09-16): the NAMED-export core (pure functions over arg strings +
+//      the ONE shared numword map — addendum C3) + the C7 8-field line
+//      shape + the never-mutates / never-throws hook discipline:
+//      (150-151) the ONE shared map home: the REAL numwords.json loads; a
+//          missing path → null (numword checks silently off);
+//      (152-154) resolveNumword: every 5.2 pass fixture → value; every 5.2
+//          reject fixture → unknown (loud, never a guess); a multi-split
+//          word (synthetic map) → ambiguous WITH candidates;
+//      (155-156) observeDense (>=6-digit run gate) + observeNumword (map hit
+//          → value; twozero unknown → none; map null → none);
+//      (157-160) observePairs: agree (dist=0) / mismatch (dist=1) / unknown
+//          word (gate=word-unknown) — byte-exact evidence; a shell pipe
+//          (spaces) and a word-first order are NOT pairs;
+//      (161-163) observePathAnomaly (doubled segment) + observeSandbox
+//          (outside/under/null root) + underRoot (JSON-escaped `\\` collapse,
+//          case-insensitive);
+//      (164) classifyContext: date / session-id / commit-ref / path / arg;
+//      (165-166) observeArg: 5 firing classes → capped at 3 lines in
+//          priority order; clean/empty arg → no line;
+//      (167-169) the HOOK (real factory, sandbox project dir): output.args
+//          byte-identical (never mutated); garbage input → never throws;
+//          the log line is EXACTLY 8 " | " fields (stamp/sid/model-unknown/
+//          tool/verdict vocabulary) + the LIVE log untouched;
+//      (170) the intercept log path is git-ignored
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -395,7 +424,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 hygiene=6  →  "PROBE handover: 148/148 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=21 hygiene=6  →  "PROBE handover: 169/169 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -3052,6 +3081,324 @@ for (const w of NW_REJECT) {
     JSON.stringify([c1, c2, c3]),
   );
   n17++;
+}
+
+// ------------------------------------------------------------------ S18 intercept observer (21)
+//
+// The lane-5.3 log-only intercept observer (.opencode/plugin/
+// intercept_observer.ts, approved 2026-09-16): the C7 8-field line-shape pin
+// + the NAMED-export core (pure functions over arg strings + the shared
+// numword map — pinned WITHOUT a full PluginInput harness; the hook-level
+// checks use the real factory against a SANDBOX project dir). The plugin
+// file is imported DIRECT, type-stripped (the S12/S13 load pattern); the
+// numword map is the REAL shared file (read-only — ONE map home, addendum
+// C3); the hook's intercept.log lands in the sandbox, never the live
+// .opencode/temp/.
+
+const OBS_TS = path.join(REPO_ROOT, ".opencode", "plugin", "intercept_observer.ts");
+const ioMod = await import(pathToFileURL(OBS_TS).href);
+const ioMap = ioMod.loadNumwordMap(NUMWORDS_JSON);
+const ioSandboxProj = path.join(SANDBOX, "obsproj");
+mkdirSync(ioSandboxProj, { recursive: true });
+const ioLogPath = path.join(ioSandboxProj, ".opencode", "temp", "intercept.log");
+const LIVE_IO_LOG = path.join(REPO_ROOT, ".opencode", "temp", "intercept.log");
+const liveIoBefore = existsSync(LIVE_IO_LOG) ? readFileSync(LIVE_IO_LOG, "utf8") : null;
+const ioHooks = await ioMod.default({ directory: ioSandboxProj });
+const ioBefore = ioHooks["tool.execute.before"];
+const ioStampRe = /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}$/;
+const ioReadLines = () => (existsSync(ioLogPath) ? readFileSync(ioLogPath, "utf8").split(/\r?\n/).filter((l) => l.length > 0) : []);
+let n18 = 150;
+
+// 150 — the ONE shared map home (C3): the plugin loads the REAL numwords.json
+{
+  check(
+    String(n18),
+    "S18",
+    "loadNumwordMap(real shared numwords.json) → the map with units/tens/teens (ONE map home)",
+    ioMap !== null && ioMap.units && ioMap.tens && ioMap.teens && ioMap.units.nine === 9 && ioMap.tens.fourty === 40,
+    JSON.stringify(ioMap === null ? null : Object.keys(ioMap)),
+  );
+  n18++;
+}
+
+// 151 — map read failure → null (numword checks silently off, never a throw)
+check(
+  String(n18),
+  "S18",
+  "loadNumwordMap(missing path) → null (numword checks silently off)",
+  ioMod.loadNumwordMap(path.join(SANDBOX, "no_such_numwords.json")) === null,
+);
+n18++;
+
+// 152 — resolveNumword agrees with every 5.2 pass fixture (shared C4 grammar)
+check(
+  String(n18),
+  "S18",
+  "resolveNumword: every 5.2 pass fixture → value (nine→9 … eleven→11)",
+  NW_PASS.every(([w, d]) => {
+    const r = ioMod.resolveNumword(w, ioMap);
+    return r.kind === "value" && r.value === d;
+  }),
+  JSON.stringify(NW_PASS.map(([w]) => ioMod.resolveNumword(w, ioMap))),
+);
+n18++;
+
+// 153 — resolveNumword: every 5.2 reject fixture → unknown (loud, never a guess)
+check(
+  String(n18),
+  "S18",
+  "resolveNumword: every 5.2 reject fixture (twozero/two+zero/foour/eleventy) → unknown",
+  NW_REJECT.every((w) => ioMod.resolveNumword(w, ioMap).kind === "unknown"),
+  JSON.stringify(NW_REJECT.map((w) => ioMod.resolveNumword(w, ioMap))),
+);
+n18++;
+
+// 154 — resolveNumword: a multi-split word → ambiguous WITH candidates
+//      (synthetic map — the real map has no ambiguous split)
+{
+  const ambMap = { units: { a: 1, aa: 5 }, tens: { a: 10, aa: 20 }, teens: {} };
+  const amb = ioMod.resolveNumword("aaa", ambMap);
+  check(
+    String(n18),
+    "S18",
+    "resolveNumword: multi-split → ambiguous with candidates [15,21] (never a guess)",
+    amb.kind === "ambiguous" && JSON.stringify(amb.candidates) === JSON.stringify(["15", "21"]),
+    JSON.stringify(amb),
+  );
+  n18++;
+}
+
+// 155 — observeDense: a >=6-digit run fires the gate line; 5 digits do not
+{
+  const d1 = ioMod.observeDense("20260916");
+  const d2 = ioMod.observeDense("12345");
+  check(
+    String(n18),
+    "S18",
+    "observeDense: 8-digit run → no-candidate gate line (8d=20260916); 5-digit run → none",
+    d1.length === 1 && d1[0].verdict === "no-candidate" && d1[0].evidence.includes("8d=20260916") && d2.length === 0,
+    JSON.stringify([d1, d2]),
+  );
+  n18++;
+}
+
+// 156 — observeNumword: map hit → value; twozero (unknown) → none; map null → none
+{
+  const n1 = ioMod.observeNumword("use four for plan", ioMap);
+  const n2 = ioMod.observeNumword("twozero plan", ioMap);
+  const n3 = ioMod.observeNumword("use four", null);
+  check(
+    String(n18),
+    "S18",
+    "observeNumword: map hit four→4; twozero (unknown) → none; map null → none",
+    n1.length === 1 && n1[0].verdict === "no-candidate" && n1[0].evidence.includes("four→4") && n2.length === 0 && n3.length === 0,
+    JSON.stringify([n1, n2, n3]),
+  );
+  n18++;
+}
+
+// 157 — observePairs agree: 4|four → observed-redundancy-ok (byte-exact evidence)
+{
+  const p1 = ioMod.observePairs("4|four", ioMap);
+  check(
+    String(n18),
+    "S18",
+    "observePairs: 4|four → observed-redundancy-ok, evidence 'pair=4|four cand=4 dist=0'",
+    p1.length === 1 && p1[0].verdict === "observed-redundancy-ok" && p1[0].evidence === "pair=4|four cand=4 dist=0",
+    JSON.stringify(p1),
+  );
+  n18++;
+}
+
+// 158 — observePairs mismatch: 5|four → redundancy-mismatch (dist=1)
+{
+  const p2 = ioMod.observePairs("5|four", ioMap);
+  check(
+    String(n18),
+    "S18",
+    "observePairs: 5|four → redundancy-mismatch, evidence 'pair=5|four cand=4 dist=1'",
+    p2.length === 1 && p2[0].verdict === "redundancy-mismatch" && p2[0].evidence === "pair=5|four cand=4 dist=1",
+    JSON.stringify(p2),
+  );
+  n18++;
+}
+
+// 159 — observePairs unknown word: 4|foour → no-candidate gate=word-unknown
+{
+  const p3 = ioMod.observePairs("4|foour", ioMap);
+  check(
+    String(n18),
+    "S18",
+    "observePairs: 4|foour (unresolvable) → no-candidate gate=word-unknown",
+    p3.length === 1 && p3[0].verdict === "no-candidate" && p3[0].evidence === "pair=4|foour gate=word-unknown",
+    JSON.stringify(p3),
+  );
+  n18++;
+}
+
+// 160 — observePairs negatives: a shell pipe (spaces around |) and a
+//      word-first order (four|4) are NOT redundancy pairs
+{
+  const p4 = ioMod.observePairs("head -30 | grep x", ioMap);
+  const p5 = ioMod.observePairs("four|4", ioMap);
+  check(
+    String(n18),
+    "S18",
+    "observePairs negatives: shell pipe '30 | grep' (spaces) and word-first 'four|4' → none",
+    p4.length === 0 && p5.length === 0,
+    JSON.stringify([p4, p5]),
+  );
+  n18++;
+}
+
+// 161 — observePathAnomaly: doubled segment → path-anomaly; clean path → none
+{
+  const a1 = ioMod.observePathAnomaly("c:\\users\\users\\x");
+  const a2 = ioMod.observePathAnomaly("c:\\users\\x");
+  check(
+    String(n18),
+    "S18",
+    "observePathAnomaly: users\\users → path-anomaly 'doubled=users'; clean path → none",
+    a1.length === 1 && a1[0].verdict === "path-anomaly" && a1[0].evidence === "doubled=users" && a2.length === 0,
+    JSON.stringify([a1, a2]),
+  );
+  n18++;
+}
+
+// 162 — observeSandbox: outside the root → out-of-sandbox; under → none;
+//      root null → none (note-only, no enforcement — addendum C6)
+{
+  const s1 = ioMod.observeSandbox("C:\\Windows\\System32\\cmd.exe", "C:\\repo");
+  const s2 = ioMod.observeSandbox("C:\\repo\\sub\\file.txt", "C:\\repo");
+  const s3 = ioMod.observeSandbox("C:\\Windows\\x", null);
+  check(
+    String(n18),
+    "S18",
+    "observeSandbox: outside root → out-of-sandbox; under root → none; root null → none",
+    s1.length === 1 && s1[0].verdict === "out-of-sandbox" && s2.length === 0 && s3.length === 0,
+    JSON.stringify([s1, s2, s3]),
+  );
+  n18++;
+}
+
+// 163 — underRoot: a JSON-escaped `\\` span collapses to single separators
+//      (case-insensitive; a JSON-stringified arg must not false the root)
+{
+  const u1 = ioMod.underRoot("C:\\\\Users\\\\Wasiejen\\\\proj\\\\x.txt", "C:/Users/Wasiejen/proj");
+  const u2 = ioMod.underRoot("C:\\\\Users\\\\other\\\\x.txt", "C:/Users/Wasiejen/proj");
+  check(
+    String(n18),
+    "S18",
+    "underRoot: JSON-escaped double-backslash span under the root (case-insensitive); different branch → false",
+    u1 === true && u2 === false,
+    JSON.stringify({ u1, u2 }),
+  );
+  n18++;
+}
+
+// 164 — classifyContext: date / session-id / commit-ref / path / arg
+{
+  const c1 = ioMod.classifyContext("2026-09-16");
+  const c2 = ioMod.classifyContext("ses_f5605f805ffeElHB9mgtksjye1");
+  const c3 = ioMod.classifyContext("a".repeat(40));
+  const c4 = ioMod.classifyContext("C:\\Users\\x\\y");
+  const c5 = ioMod.classifyContext("hello world");
+  check(
+    String(n18),
+    "S18",
+    "classifyContext: date / session-id / commit-ref / path / arg (first match wins)",
+    c1 === "date" && c2 === "session-id" && c3 === "commit-ref" && c4 === "path" && c5 === "arg",
+    JSON.stringify([c1, c2, c3, c4, c5]),
+  );
+  n18++;
+}
+
+// 165 — observeArg: FIVE firing classes → capped at 3, priority order
+{
+  const cap = ioMod.observeArg("c:\\users\\users\\5|four.txt 20260916 four", ioMap, "C:\\repo");
+  check(
+    String(n18),
+    "S18",
+    "observeArg: 5 firing classes → capped at 3 lines, priority mismatch → path-anomaly → out-of-sandbox",
+    cap.length === 3 && cap[0].verdict === "redundancy-mismatch" && cap[1].verdict === "path-anomaly" && cap[2].verdict === "out-of-sandbox",
+    JSON.stringify(cap.map((o) => o.verdict)),
+  );
+  n18++;
+}
+
+// 166 — observeArg clean: no firing class → no line (the log is quiet by default)
+check(
+  String(n18),
+  "S18",
+  "observeArg: clean arg → no lines; empty arg → no lines",
+  ioMod.observeArg("hello world", ioMap, "C:\\repo").length === 0 && ioMod.observeArg("", ioMap, "C:\\repo").length === 0,
+);
+n18++;
+
+// 167 — the HOOK: never mutates output.args (byte-identical before/after)
+//      and writes its lines to the SANDBOX project dir
+{
+  const ioArgs = { filePath: ioSandboxProj + "\\sub\\file.txt", command: "ls 4|four 20260916" };
+  const ioArgsBefore = JSON.stringify(ioArgs);
+  await ioBefore({ tool: "bash", sessionID: "ses_fx_io1", callID: "c1" }, { args: ioArgs });
+  check(
+    String(n18),
+    "S18",
+    "hook NEVER mutates output.args (byte-identical before/after) + writes the sandbox intercept.log",
+    JSON.stringify(ioArgs) === ioArgsBefore && existsSync(ioLogPath) && ioLogPath.startsWith(SANDBOX),
+    JSON.stringify({ argsAfter: JSON.stringify(ioArgs), log: ioLogPath }),
+  );
+  n18++;
+}
+
+// 168 — the HOOK: garbage input → never throws (best-effort house rule)
+{
+  let ioThrew = false;
+  try {
+    await ioBefore(undefined, undefined);
+    await ioBefore({ tool: null, sessionID: null }, { args: null });
+    await ioBefore({ tool: "x", sessionID: "s", callID: "c" }, { args: 42 });
+  } catch {
+    ioThrew = true;
+  }
+  check(
+    String(n18),
+    "S18",
+    "hook: garbage input (undefined/null/42) → never throws",
+    !ioThrew,
+  );
+  n18++;
+}
+
+// 169 — the log line BYTE-SHAPE (C7): 8 " | " fields, minute stamp, session,
+//      model (unknown for the non-existent probe session), tool, verdict
+//      vocabulary; the LIVE log stays byte-identical
+{
+  const ioLines = ioReadLines();
+  const ioF = ioLines.length >= 2 ? ioLines[0].split(" | ") : [];
+  const liveIoAfter = existsSync(LIVE_IO_LOG) ? readFileSync(LIVE_IO_LOG, "utf8") : null;
+  check(
+    String(n18),
+    "S18",
+    "log line: exactly 8 ' | ' fields, stamp/sid/model-unknown/tool/verdict-vocab; 2 lines for the fixture; live log untouched",
+    ioLines.length === 2 && ioF.length === 8 && ioStampRe.test(ioF[0]) && ioF[1] === "ses_fx_io1" && ioF[2] === "unknown" &&
+      ioF[3] === "bash" && ioMod.VERDICTS.includes(ioF[7]) && liveIoBefore === liveIoAfter,
+    JSON.stringify({ lines: ioLines.length, fields: ioF.length, live: [liveIoBefore, liveIoAfter].map((x) => (x === null ? null : x.length)) }),
+  );
+  n18++;
+}
+
+// 170 — the intercept log path is GIT-IGNORED (the `temp` entry — same as
+//      the ctx log; the separate-file ruling, addendum C7)
+{
+  let ioIgnored = true;
+  try {
+    execFileSync("git", ["check-ignore", "-q", ".opencode/temp/intercept.log"], { cwd: REPO_ROOT });
+  } catch {
+    ioIgnored = false;
+  }
+  check(String(n18), "S18", "the intercept log path is git-ignored (git check-ignore -q .opencode/temp/intercept.log)", ioIgnored);
+  n18++;
 }
 
 // ------------------------------------------------------------------ S5 hygiene (6)

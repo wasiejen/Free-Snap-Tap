@@ -270,10 +270,10 @@ interface PairMatch {
 function pairMatches(s: string): PairMatch[] {
   const out: PairMatch[] = [];
   for (const m of s.matchAll(PAIR_RE)) {
-    const wordEnd = m.index! + m[0].length;
-    const next = s[wordEnd];
-    if (next !== undefined && /[a-zA-Z]/.test(next)) continue; // not a full token
-    out.push({ digits: m[1], word: m[2], start: m.index!, wordEnd });
+    // the `i`-flagged word class already consumes the maximal letter/dash
+    // run — a match IS a full token (`4|fourex` → word `fourex`, unknown →
+    // gate line; a shell pipe has spaces and never matches)
+    out.push({ digits: m[1], word: m[2], start: m.index!, wordEnd: m.index! + m[0].length });
   }
   return out;
 }
