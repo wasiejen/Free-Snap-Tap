@@ -158,7 +158,11 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   removed from primer + both prompts (form fully re-enabled in tool args).
   Finding: 3/3 LATER pair-form attempts degraded to bare numerals at MY
   generation (fuzzy caught every one) — decision-record R1 block; R4
-  mining question logged (is the pair form a producer-level drift target?).
+  mining question logged. CORRECTION (his line-153 pointer): that log line
+  is MY BOOKKEEPING EDIT being pair-logged (non-read logging confirmed
+  live); the 3/3 read degradation stands, arg-level confirmed (log
+  146-149 field 5). Attribution rule (never attribute own args from
+  memory; log field 5 = authority) added to primer + friction line.
 - **INBOX INCIDENT (worker role slip):** worker-13 TRIMMED `todo_inbox.md`
   (deleted header + 2 uncurated blocks) instead of appending — recovered
   from git (aaf6b03) and curated properly (worker-8 → confirm-with-him;

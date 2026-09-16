@@ -261,3 +261,14 @@ pointer/commit hash is a SNAPSHOT, not a verdict — verify `git log` + the
 committed `handover_task_to_planner.md` first; only resume on task_id if the
 committed record shows the task incomplete. Suggestion: the Task result
 could mark "session compacted, result may be stale" when it detects this.
+
+### Self-arg attribution from memory; log line 153 misread - planner 2026-09-16 (post-restart acceptance)
+When the maintainer pointed at a log line (`pair=[5:four] redundancy-mismatch`)
+that seemed to contradict my "3/3 pair-form degradation" finding, I first
+guessed at which call it belonged to instead of reading the full log range —
+it was my OWN bookkeeping edit being pair-logged, not a test read. The
+deeper friction: I cannot introspect my generated args reliably (the
+post-mutation canonical path in the tool output contaminates recall of what
+I passed). Lesson now in the primer ("Attribution rule"): log field 5 is the
+only authority for what an arg actually was. Suggestion: none for the tooling
+— this is a discipline rule, and it is now written down.

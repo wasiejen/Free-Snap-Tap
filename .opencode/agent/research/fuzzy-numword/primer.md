@@ -34,6 +34,13 @@ strings drift. In doubt, use a pair.
   restart — pair channel, scratchpad allowed-root); write tools are never
   touched (R2 pending).
 
+## Attribution rule
+Never attribute YOUR OWN tool args from memory: the post-mutation output
+(canonical path) sits beside the arg in context and contaminates recall
+(measured 2026-09-16: a log line from my own bookkeeping edit was mistaken
+for a surviving test form). If in doubt what you actually passed: log field
+5 (original arg, captured pre-mutation) is the only authority.
+
 ## Do not
 Write the form into code; invent new delimiters or separators; add words to
 `.opencode/agent/scripts/numword/numwords.json` (one shared map, maintainer

@@ -229,7 +229,18 @@ paste, like the stop-line change):
   fresh call carried the form. Fuzzy caught every degradation (d=1) — the
   channels are complementary at producer level. Open question for R4
   log-mining: is the pair form itself a bit-drift target at producer level,
-  and does repetition (vs first use) increase the drift? **Grammar interpretation adjudicated (worker note,
+  and does repetition (vs first use) increase the drift?
+  **Correction + confirmation (maintainer pointer at log line 153, 2026-09-16
+  late):** the `pair=[5:four] ... redundancy-mismatch` line is my
+  BOOKKEEPING EDIT (the finding text itself) being pair-logged — NOT a
+  surviving test form. Non-read pair logging confirmed LIVE: my own edits
+  produced mismatch / ok / no-candidate pair lines with zero tool
+  interference. The 3/3 test-read degradation stands, arg-level confirmed
+  (log 146-149, field 5 = original arg captured pre-mutation).
+  **Attribution rule (lesson, applies to ALL agents):** never attribute
+  your own tool args from memory — the post-mutation output (canonical
+  path) sits beside the arg in context and contaminates recall; log field 5
+  is the only authority. **Grammar interpretation adjudicated (worker note,
   accepted):** pair sides accept a single MAP WORD (units/tens/teens incl.
   `fourty`) OR dash-separated single units — NO tens+unit composition on
   pair sides (`ninetyfour` → `no-candidate`); composition stays the
