@@ -1,77 +1,75 @@
-# R1 spec — read-scope `[left:right]` pair resolution + form switch + sandbox fix
+# R2 spec — write-scope pair/fuzzy resolution
 
-STATUS: LAUNCHED 2026-09-16, direct session ses_f5476dc3affeVynFjtGEdnXQO4 —
-approvals: maintainer "go for read-scope" + "so lets start with R1 then"
-(2026-09-16). Stay on the current checkout (opencode_test). The baseline
-below is plan2-committed green — at start, re-verify the self-annotation
-against the probe file (machine-read). Design source (read this BEFORE the
-code — the reasoning is there, do not re-derive):
-`.opencode/agent/research/fuzzy-numword/decision-record.md` §2.
+STATUS: LAUNCHED 2026-09-16, direct session ses_f5476dc3affeVynFjtGEdnXQO4.
+GATE SATISFIED: R1 green + planner-verified (96bb173, live-accepted) AND
+maintainer explicit approval "R2 approved" (2026-09-16). Stay on the current
+checkout (opencode_test). Design source: `decision-record.md` §2 + research
+doc §2.3/§3.4/§4.2 (read the named sections, grep by heading — the record is
+~10k tokens).
+
+## Verified facts (refreshed at launch, post-R1 — build on these)
+- Baseline: probe self-annotation **193/193** (S1–S19), smoke **31/31**,
+  plugin `grep -c ^export` = 1. Re-verify by RUNNING before any edit
+  (machine-read the self-annotation; if it does not match, STOP and report).
+- The codebase ALREADY contains R1 (96bb173): the `[l:r]` pair grammar +
+  `checkPairs`/`PairCheck` core surface in `intercept_observer_core.ts`, the
+  read-scope `runPairRead` channel in `intercept_observer.ts` (pair channel
+  runs FIRST in the read pipeline, then fuzzy), `SCRATCHPAD_ROOT`, the nine
+  VERDICTS incl. `pair-resolved`. Plug the write channel in ALONGSIDE
+  `runPairRead` (same hook); do not re-derive pair math — reuse `checkPairs`.
+- C7 log: same 8-field shape, field 5 = original arg captured pre-mutation.
+- Read-scope behavior is FROZEN: every R1 pin must stay green (regression
+  gate) — write-scope work must not change read behavior or existing pins.
 
 ## Goal
-The intercept observer resolves the redundancy pair in READ scope and the
-pair grammar switches from the old tight `digit|word` pipe form to
-`[left:right]`.
+The observer resolves pair forms (and, under the gate, fuzzy near-misses) in
+WRITE-scope tool args, so a drifted write target lands on the real file —
+with the corruption asymmetry of research §2.3 respected: a wrong write is
+not self-correcting.
 
-## Verified facts (measured at spec time — build on these, do not re-verify)
-- Baseline: probe 180/180 (self-annotation is the source, `handover_probe.mjs`
-  line ~452; S18 = 32 checks at line ~3111). Loader contract: the plugin file
-  must keep `grep -c ^export` = 1 (default export only — pinned by S18).
-- Current pair detector: `PAIR_RE` at `intercept_observer_core.ts` line 262,
-  `\b(\d{1,12})\|([a-z][a-z-]*)` (tight digit|word). All eight verdicts are
-  frozen in `VERDICTS` (line ~103) and probe-pinned — a NEW verdict means a
-  new probe pin.
-- Read-scope mutation already exists for fuzzy (`intercept_observer.ts` line
-  ~240: `if (tool === "read")`); the pair work plugs into the same hook.
-- Word map (single home, read by plugin + scriptlets):
-  `.opencode/agent/scripts/numword/numwords.json` — do NOT add words.
-- Smoke: `.opencode/plugin/tests/intercept_observer.smoke.mjs` (29/29).
+## Scope (design now, line numbers refreshed at launch)
+- Tools: `write`, `edit`, `bash` (file-bearing args), `block_transfer`
+  (srcFile/dstFile) — the mutating surface.
+- **Pair form in a path arg:** resolve → canonical digits (right-wins),
+  EXISTENCE GATE strict: canonical path exists AND the pair-form path does
+  NOT. On left/right MISMATCH in write scope: **fail-closed** (do NOT
+  "helpfully" write the mismatched target — log `redundancy-mismatch` with
+  both values; the agent sees the log and decides). Contrast: read scope
+  resolves on mismatch (a wrong read is self-correcting, §2.6).
+- **Fuzzy near-miss on a write path:** ONLY under the same strict existence
+  gate AND d<=1 (tighter than read's d<=2 — the hazard class is different);
+  verdict `fuzzy-resolved` with the write-scope flag in evidence.
+- Git refs (commit ids in bash args): pair/numword → digit, gated on
+  `git rev-parse --verify` (research §3.4 — the gate is mandatory).
+- Log: same C7 channel, same 8-field shape, new verdicts pinned in probe.
+- **Content-scope guard pin (maintainer's `args[1:one]` case, 2026-09-16):**
+  a grammar-VALID pair (digit-left, numword-right, e.g. the python slice
+  `args[1:one]`) sitting in a CONTENT arg of an in-scope mutating tool
+  (edit oldString / write content) → log line ONLY, byte-exact pass-through,
+  NO mutation. This pins that mutation is path/ref-arg-only even for
+  mutating-scope tools — the guard is scope, not grammar (the pair form
+  collides with python slice syntax in the string space).
 
-## Scope (what to build)
-1. **Pair grammar switch** (core): `[left:right]`, NO inner spaces, exactly
-   one `:`. left ∈ digit-as-seen `[0-9]+` | adder `\d+(\+\d+)*` | numword
-   dash-form (map words, `fourty` alias, `-`-separated single units); right =
-   numword dash-form ONLY. Right side unresolved (unknown word) →
-   `no-candidate`, never a guess. Multiple pairs per arg → independent
-   resolution, one log line each. Old tight `digit|word` form: no longer
-   detected (the form is dead — his ruling 2026-09-16).
-2. **Read-scope resolution**: `read` + string `filePath` containing a pair →
-   resolve the pair to the canonical digits (adder-left = sum; right-wins on
-   left/right mismatch — the canonical is ALWAYS the right-derived value;
-   mismatch additionally flagged in the evidence field) → EXISTENCE GATE:
-   mutate `output.args.filePath` only if the canonical path exists AND the
-   pair-containing path does not (both/neither → fail-closed, original arg,
-   gate evidence logged). New verdict `pair-resolved` (added to `VERDICTS` +
-   pinned). Non-read tools: pair logging ONLY (existing
-   `observed-redundancy-ok` / `redundancy-mismatch` / `no-candidate`
-   verdicts on the NEW form).
-3. **Sandbox allowed roots**: out-of-sandbox check accepts repo root +
-   `C:/Users/Wasiejen/AppData/Local/Temp/opencode` (scratchpad — approved
-   external dir; today it flags noise on every scratchpad use, measured).
-4. **Probe** (S18 extension or new S19 — worker's call, pin the choice in
-   the self-annotation): grammar (match / mismatch→right-wins / adder-sum /
-   unknown-right / multi-pair / old-form-no-longer-detected), read mutation
-   (canonical exists → mutated + `pair-resolved`; canonical absent →
-   fail-closed), non-read tool = no mutation, scratchpad NOT
-   out-of-sandbox. Update the self-annotation total (machine-check, never
-   retype the digits).
-5. **Smoke**: pair-resolution round-trip case added.
-
-## Definition of done
-- Probe green at the NEW self-annotation total; smoke green; `pytest` and
-  `ruff` unchanged-green; plugin `grep -c ^export` = 1; standard gate per
-  `repo_commands.md` all green; handover summary with measured numbers.
+## DoD
+Probe pins for every gate branch (exists/absent/both/mismatch/ref-gate),
+smoke green, standard gate green, correction log auditable end-to-end
+(one controlled write against a scratchpad fixture proving a resolved write
+lands where the log says it landed).
 
 ## Approval boundary
-- PRE-APPROVED: read-scope resolution, form switch, sandbox fix (this spec).
-- DO-NOT-TOUCH: write/edit/delete args (R2, separately approved),
-  `ctx_watchdog.ts`, `numwords.json` (no new words), AGENTS.md + the
-  repo-parts + anything under `.opencode/maintainer/` (maintainer files),
-  the research/FB docs (read-only basis), `prompt_*` files (edit-deny).
-- Spec paths are REPO-RELATIVE in every command — no doubled absolute paths
-  (the launch-death lesson; the observer would have flagged it).
-- Log file + C7 line shape unchanged (8 fields); new verdicts only.
+- APPROVED (his "R2 approved", 2026-09-16): pair resolution on
+  write/edit/block_transfer path args (strict existence gate, mismatch
+  FAILS CLOSED), fuzzy d<=1 on write paths under the same gate, git refs in
+  bash args gated on `git rev-parse --verify`, the content-scope guard pin.
+- DO-NOT-TOUCH: READ-scope behavior + all R1 pins (frozen regression gate),
+  CONTENT args (oldString/newString/write content — never mutated, ever),
+  `ctx_watchdog.ts`, `numwords.json` (no new words), AGENTS.md + repo parts +
+  anything under `.opencode/maintainer/`, the research/FB docs (read-only
+  basis), `prompt_*` files (edit-deny).
+- Verdicts: the nine stay byte-identical; new write-scope verdicts only with
+  explicit probe pins (or reuse an existing verdict + a `scope=write`
+  evidence flag — worker's call, pin the choice in the handover).
+- Spec paths are REPO-RELATIVE in every command — no doubled absolute paths.
 
 ## Worker
-`worker_Q4_140K` (roster default for 140K-era builds; this is a
-focused single-plugin change — one context, no research mandate).
+`worker_Q4_140K`.

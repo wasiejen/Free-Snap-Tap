@@ -170,9 +170,16 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   line added ("APPEND ONLY — never touch existing entries").
 - TODO: #69 CLOSED (acceptance met); #68 gates → R1 satisfied, ONLY his
   write-scope approval remains; #71 refreshed (193).
-- **Next moves:** (1) his R2 approval → launch R2 (write-scope, spec
-  staged, gates all satisfied); (2) confirm worker-8's feedback-file ask
-  is handled (FB_2026-09-16_block_transfer_status.md exists — his reorg).
+- **R2 LAUNCHED** (2026-09-16, his "R2 approved"; worker_Q4_140K): spec in
+  `handover/handover_task.md` (refreshed at launch: post-R1 baseline
+  193/193 + R1 codebase facts + approval boundary + the `args[1:one]`
+  content-scope guard pin). Write scope: pairs on write/edit/block_transfer
+  path args (strict existence gate, mismatch FAILS CLOSED), fuzzy d<=1 on
+  write paths, git refs gated on rev-parse; read scope FROZEN (regression
+  gate); content args never mutated.
+- **Next moves:** verify R2 against git + committed handover (NOT the Task
+  return — stale-snapshot precedent); one-shot write-scope acceptance at
+  the next restart; confirm worker-8's feedback-file ask is handled.
 
 ## Standing
 - Baselines (re-verified 2026-09-16, plan2, gates re-run by the planner
