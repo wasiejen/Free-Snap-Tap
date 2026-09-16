@@ -27,8 +27,8 @@
         "baseURL": "http://192.168.178.20:8033/v1"
       },
       "models": {
-        "Qwen3.8-27B-IQ4KT-140K:chat": {
-          "name": "Qwen3.8-27B-IQ4KT:chat",
+        "Qwen3.8-27B-IQ4KT-140K:instruct": {
+          "name": "Qwen3.8-27B-IQ4KT:instruct",
           "limit": {
             "context": 145000,
             "output": 145000
@@ -120,10 +120,10 @@
       "temperature": 0.1
     },
     "looprunner_Q4_140k": {
-      "description": "Just restarts the Planner in autnomous mode, same model als planner_Q4_140K for fast switching",
+      "description": "Just restarts the Planner in autonomous mode",
       "mode": "primary",
-      "model": "llama-swap/Qwen3.8-27B-IQ4KT-140K:chat",
-      "temperature": 0.6, // set a bit higher - was really a bit easy to confuse with low temp
+      "model": "llama-swap/Qwen3.8-27B-IQ4KT-140K:instruct",
+      "temperature": 0.1, // set a bit higher - was really a bit easy to confuse with low temp
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_looprunner.md}",
       "tools": {
         "*": true,
@@ -132,18 +132,21 @@
         "bash": false,
         "block_transfer": false,
       },
-
-      // "tools": { // without tools listing generally all tools available
-      //     "read_file": true,
-      //     "list_dir": true,
-      //
-      //
-      //
-      //   },
       "permission": {
         "*": "deny",
         "task": "allow",
-        "read": "allow",
+        "read": {
+          "*": "deny",
+          ".opencode/loop/**": "allow",
+          ".opencode/loop": "allow",
+          ".opencode/archive/loop/**": "allow",
+          ".opencode/archive/loop": "allow",
+          ".opencode/agent/prompts/agent_readme_loop.md": "allow",
+          ".opencode/agent/prompts/agent_readme_post_compaction.md": "allow",
+          ".opencode/temp/ctx.log": "allow",
+          ".opencode/agent/prompts/skill/skill_autorun_summary.md": "allow",
+          "opencode.jsonc": "allow",
+        },
         "list_dir": "allow",
         "glob": "allow",
         "loop_log" : "allow",
@@ -201,7 +204,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-           ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -241,7 +244,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-           ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -263,7 +266,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-           ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -285,7 +288,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-           ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -307,7 +310,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-           ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -329,7 +332,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-           ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -351,7 +354,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-           ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -373,7 +376,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-           ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"
@@ -395,7 +398,7 @@
           "*": "allow",
           "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
           "AGENTS.md": "deny",
-           ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
           ".git/**": "deny",
           ".github/**": "deny"

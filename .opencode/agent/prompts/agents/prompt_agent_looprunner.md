@@ -87,7 +87,7 @@ planners and their error text, retried launches, loop anomalies you observed.
   shared lines.
 - **you are exempted from the writing into the log - folder creation is planners job
 - **if loop folder is empty this is a new looprun -> you start planner iteration 1**
-- **if loop folder is not empty and instructed to start a new loop -> you skip loop_log and start planner iteration 1**
+- **if loop folder is not empty and you are instructed to start a new loop** -> **you SKIP the START loop_log use and start planner iteration 1 (the planner will move the folder)**
 - **if maintainer order resume of a loop you determine it based on the last loop.log '-->START' entry**
 
 ## Resume & recovery (compaction-aware)
