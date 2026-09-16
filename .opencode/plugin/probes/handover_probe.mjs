@@ -20,7 +20,11 @@
 // the byte-exact dispatch responses stay clean) + EXTENDED 2026-09-16 (#60:
 // the block_transfer + loop_log probe pins — the new S15 section, checks
 // 108-10.17, and the new S16 section, checks 10.18-123; both tool files
-// imported DIRECT, type-stripped, the S12/S13 load pattern): the pre-rebuild
+// imported DIRECT, type-stripped, the S12/S13 load pattern) + EXTENDED
+// 2026-09-16 (lane 5.2: the numword scriptlet — the new S17 section, checks
+// 124-149; the shared numwords.json map + the node CLI spawned via
+// execFileSync + the python twin via the repo venv + the module required
+// DIRECT via createRequire): the pre-rebuild
 // probe
 // (v2.2.1 era) targeted the DELETED handover.ts, the retired
 // experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
@@ -361,6 +365,24 @@
 //      (123) the SEVERAL-folders anomaly: the most-recently-MODIFIED
 //          folder is used + the byte-exact `ANOMALY:` note as the 3rd
 //          return line (the other folder untouched)
+//   S17 numword scriptlet (26) — the lane-5.2 pin (approved 2026-09-16): the
+//      ONE shared map (numwords.json) + the node entry point (CLI spawned,
+//      module required DIRECT) + the python twin (spawned via the repo venv
+//      python — the fixture run is LIVE in the probe):
+//      (124) the shared map is complete: units zero..nine, tens ten..ninety
+//          incl. the `fourty` alias → 40, teens eleven..nineteen EXPLICIT;
+//      (125-131) node CLI pass fixtures: nine→9, ninetyfour→94, fourty→40,
+//          one-zero-one→101, two-zero→20, one-zero-six→106, eleven→11
+//          (exit 0, digit string byte-exact);
+//      (132-135) node CLI reject fixtures: twozero / two+zero / foour /
+//          eleventy → exit 1 + `unknown` on stderr (loud, never guessed);
+//      (136-142) python w2n pass fixtures: the same 7, byte-exact stdout;
+//      (143-146) python w2n reject fixtures: the same 4 → ValueError (non-zero
+//          exit);
+//      (147) the module (node -e usable): w2n agrees with every pass fixture;
+//      (148) the module: every reject fixture throws (loud);
+//      (149) numword_check: AGREE 20 (code 0) / DISAGREE 9 (code 1) /
+//          UNKNOWN eleventy (code 2) — machine-readable shell contract
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -373,13 +395,14 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 hygiene=6  →  "PROBE handover: 122/122 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 hygiene=6  →  "PROBE handover: 148/148 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
 // =============================================================================
 
 import { execFileSync } from "node:child_process";
+import { createRequire } from "node:module";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -2878,6 +2901,157 @@ let llRetA = null;
       logBody !== null && lines[1] === `line: ${logBody.replace(/\n$/, "")}` && logBody.endsWith("\n") && !oldTouched,
     JSON.stringify({ lines, logBody, oldTouched, expectedAnomaly }),
   );
+}
+
+// ------------------------------------------------------------------ S17 numword scriptlet (26)
+//
+// The lane-5.2 scriptlet (.opencode/agent/scripts/numword/): ONE shared map
+// (numwords.json) read by BOTH entry points. The node CLI is SPAWNED (the
+// committed scriptlet IS the contract — no in-probe re-implementation), the
+// python twin is spawned via the repo venv python, and the module is required
+// DIRECT via createRequire (node -e usable). Grammar: research §3.2 +
+// addendum C4 — unknown input is LOUD, never a best-guess.
+
+const NUMWORD_DIR = path.join(REPO_ROOT, ".opencode", "agent", "scripts", "numword");
+const NUMWORD_JS = path.join(NUMWORD_DIR, "numword.cjs");
+const NUMWORDS_JSON = path.join(NUMWORD_DIR, "numwords.json");
+const VENV_PY = path.join(REPO_ROOT, ".venv", "Scripts", "python.exe");
+const runNumword = (args) => {
+  try {
+    const stdout = execFileSync(process.execPath, [NUMWORD_JS, ...args], { encoding: "utf8" });
+    return { code: 0, stdout, stderr: "" };
+  } catch (e) {
+    return { code: e.status ?? 1, stdout: String(e.stdout ?? ""), stderr: String(e.stderr ?? "") };
+  }
+};
+const runPyW2n = (word) => {
+  const code = "import sys; sys.path.insert(0, sys.argv[1]); from w2n import w2n; sys.stdout.write(w2n(sys.argv[2]))";
+  try {
+    const stdout = execFileSync(VENV_PY, ["-c", code, NUMWORD_DIR, word], { encoding: "utf8" });
+    return { code: 0, stdout, stderr: "" };
+  } catch (e) {
+    return { code: e.status ?? 1, stdout: String(e.stdout ?? ""), stderr: String(e.stderr ?? "") };
+  }
+};
+const NW_PASS = [
+  ["nine", "9"],
+  ["ninetyfour", "94"],
+  ["fourty", "40"],
+  ["one-zero-one", "101"],
+  ["two-zero", "20"],
+  ["one-zero-six", "106"],
+  ["eleven", "11"],
+];
+const NW_REJECT = ["twozero", "two+zero", "foour", "eleventy"];
+let n17 = 124;
+
+// 124 — the shared map is complete (the ONE source both entry points read)
+{
+  const m = JSON.parse(readFileSync(NUMWORDS_JSON, "utf8"));
+  const units = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+  const tens = ["ten", "twenty", "thirty", "forty", "fourty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+  const teens = ["eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
+  check(
+    "124",
+    "S17",
+    "shared numwords.json complete: units zero..nine, tens ten..ninety + fourty alias (40), teens eleven..nineteen (19)",
+    units.every((u) => u in m.units) && tens.every((t) => t in m.tens) && teens.every((t) => t in m.teens) &&
+      m.units.zero === 0 && m.units.nine === 9 && m.tens.forty === 40 && m.tens.fourty === 40 && m.teens.eleven === 11 && m.teens.nineteen === 19,
+    JSON.stringify(Object.keys(m)),
+  );
+  n17++;
+}
+
+// 125-131 — node CLI pass fixtures (exit 0, the digit string byte-exact)
+for (const [w, d] of NW_PASS) {
+  const r = runNumword([w]);
+  check(
+    String(n17),
+    "S17",
+    `node CLI ${w} → ${d} (exit 0)`,
+    r.code === 0 && r.stdout.trim() === d,
+    `code=${r.code} stdout='${r.stdout.trim()}' stderr='${r.stderr.trim().slice(0, 120)}'`,
+  );
+  n17++;
+}
+
+// 132-135 — node CLI reject fixtures (loud: non-zero exit + unknown on stderr)
+for (const w of NW_REJECT) {
+  const r = runNumword([w]);
+  check(
+    String(n17),
+    "S17",
+    `node CLI ${w} → LOUD reject (exit 1, unknown on stderr)`,
+    r.code === 1 && /unknown/i.test(r.stderr),
+    `code=${r.code} stdout='${r.stdout.trim()}' stderr='${r.stderr.trim().slice(0, 120)}'`,
+  );
+  n17++;
+}
+
+// 136-142 — python w2n pass fixtures (same map + grammar behavior)
+for (const [w, d] of NW_PASS) {
+  const r = runPyW2n(w);
+  check(
+    String(n17),
+    "S17",
+    `python w2n(${w}) → ${d}`,
+    r.code === 0 && r.stdout.trim() === d,
+    `code=${r.code} stdout='${r.stdout.trim()}' stderr='${r.stderr.trim().slice(0, 120)}'`,
+  );
+  n17++;
+}
+
+// 143-146 — python w2n reject fixtures (loud: ValueError, non-zero exit)
+for (const w of NW_REJECT) {
+  const r = runPyW2n(w);
+  check(
+    String(n17),
+    "S17",
+    `python w2n(${w}) → ValueError (loud)`,
+    r.code !== 0 && /ValueError/.test(r.stderr),
+    `code=${r.code} stdout='${r.stdout.trim()}' stderr='${r.stderr.trim().slice(0, 120)}'`,
+  );
+  n17++;
+}
+
+// 147-149 — the node module (node -e usable): w2n parity + loud throws +
+//      numword_check shell contract
+{
+  const nw = createRequire(import.meta.url)(NUMWORD_JS);
+  check(
+    String(n17),
+    "S17",
+    "module (node -e usable): w2n agrees with every pass fixture",
+    NW_PASS.every(([w, d]) => nw.w2n(w) === d),
+    JSON.stringify(NW_PASS.map(([w]) => [w, nw.w2n(w)])),
+  );
+  n17++;
+  check(
+    String(n17),
+    "S17",
+    "module: every reject fixture throws (loud, never guessed)",
+    NW_REJECT.every((w) => {
+      try {
+        nw.w2n(w);
+        return false;
+      } catch {
+        return true;
+      }
+    }),
+    JSON.stringify(NW_REJECT),
+  );
+  n17++;
+  const c1 = nw.numword_check("20", "two-zero");
+  const c2 = nw.numword_check("5", "nine");
+  const c3 = nw.numword_check("9", "eleventy");
+  check(
+    String(n17),
+    "S17",
+    "numword_check: AGREE 20 (code 0) / DISAGREE 9 (code 1) / UNKNOWN eleventy (code 2)",
+    c1.out === "AGREE 20" && c1.code === 0 && c2.out === "DISAGREE 9" && c2.code === 1 && c3.out === "UNKNOWN eleventy" && c3.code === 2,
+    JSON.stringify([c1, c2, c3]),
+  );
+  n17++;
 }
 
 // ------------------------------------------------------------------ S5 hygiene (6)

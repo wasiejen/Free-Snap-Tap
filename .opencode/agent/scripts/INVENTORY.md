@@ -17,6 +17,8 @@ the helper-script collection was curated from. **Originals are NOT deleted**
 | compact_dir.cjs | .opencode/agent/scripts/db/ |
 | probe_schema.cjs | .opencode/agent/scripts/db/ |
 | logctx.cjs | .opencode/agent/scripts/log/ |
+| numword.cjs | .opencode/agent/scripts/numword/ |
+| w2n.py | .opencode/agent/scripts/numword/ |
 
 Not promoted (dedup/superseded): `findbin.ps1` (PowerShell twin of binwin.cjs),
 `find_ctx*.mjs` (binary context one-shots superseded by binary/), `dump_session.py`

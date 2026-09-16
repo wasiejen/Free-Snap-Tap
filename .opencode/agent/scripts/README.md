@@ -15,6 +15,10 @@ ruling, `analyse_helper_scripts.md`).
 - [`db/`](db/README.md) — read-only inspectors for the live opencode DB
   (schema, sessions, message slim dumps, compaction summary, corpus dump).
 - [`log/`](log/README.md) — bounded context windows around needle lines in big logs.
+- [`numword/`](numword/) — word→digit for dense-number hygiene (lane 5.2): ONE
+  shared `numwords.json` map read by both entry points — `numword.cjs` (node CLI
+  + module: `w2n`, `numword_check`, CLI `check` subcommand) and `w2n.py`
+  (python twin, same grammar; unknown input → loud, never a guess).
 
 Env overrides: `OPENCODE_EXE`, `OPENCODE_DB`, `OPENCODE_LOG`
 (see each category README).
