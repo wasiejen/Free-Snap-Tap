@@ -17,15 +17,20 @@
 // loads the tool) + EXTENDED 2026-09-15 (T4: the compact_memory
 // pre-compaction dump hook, TODO #152 — the new S14 section, checks 101-107;
 // the dump script's --out flag; the S13 preamble places a stub dump script so
-// the byte-exact dispatch responses stay clean): the pre-rebuild probe
+// the byte-exact dispatch responses stay clean) + EXTENDED 2026-09-16 (#60:
+// the block_transfer + loop_log probe pins — the new S15 section, checks
+// 108-10.17, and the new S16 section, checks 10.18-123; both tool files
+// imported DIRECT, type-stripped, the S12/S13 load pattern): the pre-rebuild
+// probe
 // (v2.2.1 era) targeted the DELETED handover.ts, the retired
 // experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
 // all void with the shell gauge. PERMANENT repo tooling: RE-RUN, never rebuild
 // — exception: the plugin's hook surface changes.
 //
-// EXACT RUN COMMAND (from the repo root, PowerShell 7 — this IS the run
-// command, do not rediscover anything):
-//     node .opencode\plugin\probes\handover_probe.mjs
+// EXACT RUN COMMAND (from the repo root — the shell switched to Git-Bash on
+// 2026-09-15, so the command is the bash form; this IS the run command, do
+// not rediscover anything):
+//     node .opencode/plugin/probes/handover_probe.mjs
 //
 // WHY THAT COMMAND:
 //   - the probe runs under plain system `node` (v24.19.0 on this host — the
@@ -299,6 +304,63 @@
 //      (106) hook call #2 (same count) → the base name EXISTS now → the
 //          STAMPED name (<sid>_c0_<YYYYMMDDTHHmmss>.md) is created instead;
 //      (107) no-overwrite proof: file #1 is BYTE-IDENTICAL after call #2
+//   S15 block_transfer tool (10) — the #60 probe pin (part 1 of 2): the
+//      named-clipboard block mover (.opencode/tools/block_transfer.ts,
+//      post-#57) imported DIRECT (type-stripped, the S12/S13 load pattern);
+//      ONE loaded instance drives the whole section (the in-memory
+//      clipboardBuffers); all writes steered to the sandbox (directory=
+//      SANDBOX, inside TEMP — the tool's own allowed root):
+//      (108) registration shape: the tool() default export (description +
+//          the 7 args in order — the mode enum, 6 optional strings — async
+//          execute, NO name field);
+//      (109) COPY: the inclusive anchor span + the byte-exact `Copied`
+//          return + the source byte-identical;
+//      (10.10) PASTE round-trip (fresh dst, EOF append): byte-exact return +
+//          the dst carries the inclusive block byte-exact;
+//      (10.11) PASTE with targetMarker: the block lands RIGHT AFTER the
+//          target line (vs the EOF append of 10.10), byte-exact file;
+//      (10.12) the #57 post-fix pin: MOVE without dstFile → the exact
+//          `Error: 'dstFile' is required for MOVE mode.` + the source
+//          byte-identical (the guard is hoisted pre-write);
+//      (10.13) the sandbox guard: MOVE with an outside dst → the byte-exact
+//          `Error: '<path>' is outside the sandbox (allowed: <roots>)`
+//          BEFORE any fs access (source untouched, no file created);
+//      (10.14) the missing start marker → the byte-exact error naming the
+//          marker + the file;
+//      (10.15) the end marker present ONLY before the start → the byte-exact
+//          `... not found after start marker.` (the end search starts at the
+//          start line);
+//      (10.16) the buffer lifecycle end: the byte-exact CLEAR return + a
+//          PASTE of the cleared buffer → the byte-exact empty-buffer error
+//          (no file written);
+//      (10.17) MOVE success: byte-exact `Moved` return + the source cut to
+//          its byte-exact remainder + the dst carrying the inclusive block
+//   S16 loop_log tool (6) — the #60 probe pin (part 2 of 2): the looprun
+//      activity log as a directly-fired tool (.opencode/tools/loop_log.ts,
+//      T3 loop-tool-batch part 3) imported DIRECT (type-stripped); driven
+//      with sandbox roots (the created autorun-* folder + loop_log.md land
+//      in the sandbox, never the repo's real .opencode/loop/); the folder
+//      stamp is local-clock — pinned by FORMAT only (the AGENTS.md
+//      pattern-5 discipline):
+//      (10.18) registration shape: the tool() default export (description +
+//          the 5 args in order — role/model/content required strings, the
+//          status ENUM of the five 8-char tokens, session optional — async
+//          execute, NO name field);
+//      (10.19) the empty loop root → auto-created
+//          `autorun-<YYYY-MM-DD_HH-MM>` (stamp format pinned) + loop_log.md
+//          (one line); the return is EXACTLY `folder: <name>\nline: <line>`
+//          (no ANOMALY);
+//      (120) the line format `<stamp> <status> <role> <session|unknown>
+//          <model> <content>` (field order byte-exact) + the omitted session
+//          → the literal `unknown`;
+//      (121) the session passthrough (4th field) + append-only (the file
+//          gains EXACTLY one line per call) + the single-folder reuse (no
+//          ANOMALY);
+//      (122) the empty-string session → the literal `unknown` (the
+//          fallback covers omitted AND empty);
+//      (123) the SEVERAL-folders anomaly: the most-recently-MODIFIED
+//          folder is used + the byte-exact `ANOMALY:` note as the 3rd
+//          return line (the other folder untouched)
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -311,14 +373,14 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 hygiene=6  →  "PROBE handover: 106/106 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 hygiene=6  →  "PROBE handover: 122/122 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
 // =============================================================================
 
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -2405,6 +2467,416 @@ let s14Body1 = null;
     "no-overwrite proof: file #1 (ses_pc_ok_c0.md) is BYTE-IDENTICAL after the stamped call #2",
     body1Now !== null && body1Now === s14Body1 && s14Body1 === "FAKE DUMP of ses_pc_ok\n",
     JSON.stringify({ now: body1Now, before: s14Body1 }),
+  );
+}
+
+// ------------------------------------------------------------------ S15 block_transfer tool (10) — the #60 probe pin (part 1 of 2): the named-clipboard block mover
+//
+// The custom tool at .opencode/tools/block_transfer.ts (post-#57: the MOVE
+// dstFile requirement is hoisted PRE-WRITE): imported DIRECT from the repo
+// path (type-stripped, the S12/S13 load pattern — the tool file MUST load
+// that way). The module keeps its in-memory `clipboardBuffers` — ONE loaded
+// instance is driven across the section (the buffer-lifecycle checks build
+// on each other's state, as a real session does). All fs writes are steered
+// into the sandbox (context.directory=SANDBOX — the sandbox is inside TEMP,
+// which the tool's own sandbox check allows); the one deliberate outside
+// path (check 10.13) is rejected BEFORE any fs access. Plain tool() object:
+// no plugin hooks, no sandbox plugin.log lines — the S5 tallies are
+// unaffected.
+const BT_TOOL_TS = path.join(REPO_ROOT, ".opencode", "tools", "block_transfer.ts");
+const BT_CTX = { directory: SANDBOX };
+const BT_DIR = path.join(SANDBOX, "bt");
+mkdirSync(BT_DIR, { recursive: true });
+const btWrite = (name, body) => {
+  const p = path.join(BT_DIR, name);
+  writeFileSync(p, body);
+  return p;
+};
+let btTool;
+
+// 108 — the tool file imports (type-stripped, direct) and exposes the tool()
+//      default export: description (non-empty string) + the 7 args IN ORDER
+//      (mode = the 6-value enum, the other six OPTIONAL strings) + async
+//      execute + NO `name` field (the host names the tool by FILENAME)
+{
+  const toolMod = await import(pathToFileURL(BT_TOOL_TS).href);
+  btTool = toolMod.default;
+  const argKeys = Object.keys(btTool?.args ?? {});
+  const modeSch = btTool?.args?.mode;
+  const optionalStr = (k) => {
+    const s = btTool?.args?.[k];
+    return s != null && typeof s.safeParse === "function" && s.safeParse(undefined).success === true && s.safeParse(42).success === false;
+  };
+  check(
+    "108",
+    "S15",
+    "tool file imports (type-stripped, direct) and exposes the tool() default export (description + args [mode, srcFile, dstFile, startMarker, endMarker, targetMarker, bufferName] + async execute, NO name field)",
+    btTool != null && typeof btTool.description === "string" && btTool.description.length > 0 &&
+      JSON.stringify(argKeys) === JSON.stringify(["mode", "srcFile", "dstFile", "startMarker", "endMarker", "targetMarker", "bufferName"]) &&
+      modeSch != null && typeof modeSch.safeParse === "function" &&
+      modeSch.safeParse(undefined).success === false &&
+      ["MOVE", "COPY", "CUT", "PASTE", "DELETE", "CLEAR"].every((v) => modeSch.safeParse(v).success === true) &&
+      modeSch.safeParse("move").success === false && modeSch.safeParse("MOVE ").success === false && modeSch.safeParse("BOGUS").success === false &&
+      ["srcFile", "dstFile", "startMarker", "endMarker", "targetMarker", "bufferName"].every(optionalStr) &&
+      typeof btTool.execute === "function" && btTool.execute.constructor.name === "AsyncFunction" &&
+      !("name" in btTool),
+    JSON.stringify({ keys: argKeys, mode: ["MOVE", "move", "MOVE ", "BOGUS"].map((v) => modeSch?.safeParse?.(v)?.success), async: btTool?.execute?.constructor?.name, nameIn: "name" in (btTool ?? {}) }),
+  );
+}
+
+// 109 — COPY: the anchor span is INCLUSIVE (the start line through the end
+//      line) and the source is UNTOUCHED: the byte-exact `Copied 4 lines`
+//      return + the source file byte-identical after the call
+{
+  const src = btWrite("bt1.txt", "alpha\nBT-START block\nline-2\nline-3\nBT-END block\nomega");
+  const before = readFileSync(src, "utf8");
+  const res = await btTool.execute(
+    { mode: "COPY", srcFile: "bt/bt1.txt", startMarker: "BT-START", endMarker: "BT-END", bufferName: "bt1" },
+    BT_CTX,
+  );
+  check(
+    "109",
+    "S15",
+    "COPY: the inclusive anchor span (BT-START..BT-END = 4 lines) + byte-exact return `Copied 4 lines from 'bt/bt1.txt' into buffer 'bt1'` + source byte-identical",
+    res === "Copied 4 lines from 'bt/bt1.txt' into buffer 'bt1'." && readFileSync(src, "utf8") === before,
+    JSON.stringify({ res, changed: readFileSync(src, "utf8") !== before }),
+  );
+}
+
+// 10.10 — PASTE (the round-trip, fresh dst, targetMarker omitted → EOF
+//      append): the byte-exact `Pasted 4 lines` return + the dst carries the
+//      inclusive 4-line block BYTE-EXACT
+{
+  const res = await btTool.execute({ mode: "PASTE", dstFile: "bt/bt1-dst-eof.txt", bufferName: "bt1" }, BT_CTX);
+  const dst = path.join(BT_DIR, "bt1-dst-eof.txt");
+  const body = existsSync(dst) ? readFileSync(dst, "utf8") : null;
+  check(
+    "110",
+    "S15",
+    "PASTE round-trip (fresh dst, EOF): byte-exact return + dst content = the inclusive block byte-exact (`BT-START block`..`BT-END block`)",
+    res === "Pasted 4 lines from buffer 'bt1' into 'bt/bt1-dst-eof.txt'." &&
+      body === "BT-START block\nline-2\nline-3\nBT-END block",
+    JSON.stringify({ res, body }),
+  );
+}
+
+// 10.11 — PASTE with a targetMarker (an EXISTING dst): the block is inserted
+//      RIGHT AFTER the target line — the insertion point vs the EOF append of
+//      check 10.10: byte-exact resulting file + byte-exact return
+{
+  btWrite("bt1-dst-t.txt", "head\nBT-TARGET line\ntail");
+  const res = await btTool.execute(
+    { mode: "PASTE", dstFile: "bt/bt1-dst-t.txt", targetMarker: "BT-TARGET", bufferName: "bt1" },
+    BT_CTX,
+  );
+  const body = readFileSync(path.join(BT_DIR, "bt1-dst-t.txt"), "utf8");
+  check(
+    "111",
+    "S15",
+    "PASTE with targetMarker: the block lands RIGHT AFTER the target line (not at EOF) — byte-exact file + byte-exact return",
+    res === "Pasted 4 lines from buffer 'bt1' into 'bt/bt1-dst-t.txt'." &&
+      body === "head\nBT-TARGET line\nBT-START block\nline-2\nline-3\nBT-END block\ntail",
+    JSON.stringify({ res, body }),
+  );
+}
+
+// 10.12 — the #57 post-fix pin: MOVE with a MISSING dstFile → the exact byte
+//      string `Error: 'dstFile' is required for MOVE mode.` WITH THE SOURCE
+//      FILE UNTOUCHED (the check is hoisted pre-write — no partial cut)
+{
+  const src = btWrite("bt-move-nodst.txt", "x1\nBTM-START block\nx2\nBTM-END block\nx3");
+  const before = readFileSync(src, "utf8");
+  const res = await btTool.execute(
+    { mode: "MOVE", srcFile: "bt/bt-move-nodst.txt", startMarker: "BTM-START", endMarker: "BTM-END" },
+    BT_CTX,
+  );
+  check(
+    "112",
+    "S15",
+    "#57 pin: MOVE without dstFile → byte-exact `Error: 'dstFile' is required for MOVE mode.` + source byte-identical (the guard is hoisted pre-write)",
+    res === "Error: 'dstFile' is required for MOVE mode." && readFileSync(src, "utf8") === before,
+    JSON.stringify({ res, changed: readFileSync(src, "utf8") !== before }),
+  );
+}
+
+// 10.13 — the sandbox guard: MOVE with a dst OUTSIDE cwd+TEMP is rejected
+//      BEFORE any fs access (the pre-write guard): the byte-exact
+//      `Error: '<path>' is outside the sandbox (allowed: <roots>)` + the
+//      source byte-identical + the outside file never created
+{
+  const src = btWrite("bt-sandbox-src.txt", "s1\nBTE-START block\ns2\nBTE-END block\ns3");
+  const before = readFileSync(src, "utf8");
+  const OUTSIDE = path.join(path.dirname(os.tmpdir()), "bt_outside_probe.txt");
+  const roots = [SANDBOX, process.env.TEMP ?? process.env.TMP].filter((r) => typeof r === "string" && r.length > 0);
+  const res = await btTool.execute(
+    { mode: "MOVE", srcFile: "bt/bt-sandbox-src.txt", startMarker: "BTE-START", endMarker: "BTE-END", dstFile: OUTSIDE },
+    BT_CTX,
+  );
+  check(
+    "113",
+    "S15",
+    "sandbox rejection: MOVE with an outside dst → byte-exact `Error: '<path>' is outside the sandbox (allowed: <roots>)` BEFORE any fs access (source byte-identical, outside file absent)",
+    res === `Error: '${OUTSIDE}' is outside the sandbox (allowed: ${roots.join(", ")})` &&
+      readFileSync(src, "utf8") === before && !existsSync(OUTSIDE),
+    JSON.stringify({ res, outsideExists: existsSync(OUTSIDE) }),
+  );
+}
+
+// 10.14 — anchor errors, the missing start marker: COPY with a startMarker
+//      absent from the file → the byte-exact error naming the marker + the
+//      file
+{
+  btWrite("bt-err.txt", "p1\nZZ-END before\np3\nYY-START after\np5");
+  const res = await btTool.execute(
+    { mode: "COPY", srcFile: "bt/bt-err.txt", startMarker: "NOPE-MISSING", endMarker: "ZZ-END", bufferName: "bt-err" },
+    BT_CTX,
+  );
+  check(
+    "114",
+    "S15",
+    "missing start marker → byte-exact `Error: Start marker 'NOPE-MISSING' not found in bt/bt-err.txt.`",
+    res === "Error: Start marker 'NOPE-MISSING' not found in bt/bt-err.txt.",
+    JSON.stringify({ res }),
+  );
+}
+
+// 10.15 — anchor errors, the end-after-start rule: the endMarker EXISTS in
+//      the file but ONLY before the startMarker → the byte-exact
+//      `... not found after start marker.` error (the end search starts at
+//      the start line)
+{
+  const res = await btTool.execute(
+    { mode: "COPY", srcFile: "bt/bt-err.txt", startMarker: "YY-START", endMarker: "ZZ-END", bufferName: "bt-err" },
+    BT_CTX,
+  );
+  check(
+    "115",
+    "S15",
+    "end marker present ONLY before the start → byte-exact `Error: End marker 'ZZ-END' not found after start marker.` (the end search starts at the start line)",
+    res === "Error: End marker 'ZZ-END' not found after start marker.",
+    JSON.stringify({ res }),
+  );
+}
+
+// 10.16 — the buffer lifecycle end: CLEAR returns the byte-exact
+//      `Clipboard buffer 'bt1' cleared.` and a subsequent PASTE of the SAME
+//      (now empty) buffer → the byte-exact empty-buffer error (no file
+//      written)
+{
+  const r1 = await btTool.execute({ mode: "CLEAR", bufferName: "bt1" }, BT_CTX);
+  const r2 = await btTool.execute({ mode: "PASTE", dstFile: "bt/bt1-dst-cleared.txt", bufferName: "bt1" }, BT_CTX);
+  const created = existsSync(path.join(BT_DIR, "bt1-dst-cleared.txt"));
+  check(
+    "116",
+    "S15",
+    "buffer lifecycle end: byte-exact CLEAR return + PASTE of the cleared buffer → byte-exact empty-buffer error (no file written)",
+    r1 === "Clipboard buffer 'bt1' cleared." &&
+      r2 === "Error: Clipboard buffer 'bt1' is empty. Perform a COPY or CUT first." && !created,
+    JSON.stringify({ r1, r2, created }),
+  );
+}
+
+// 10.17 — MOVE (the full success path): the block is CUT from the source
+//      (byte-exact remainder) and inserted into a fresh dst at EOF
+//      (targetMarker omitted) with the byte-exact `Moved 3 lines` return
+{
+  btWrite("bt-move.txt", "m1\nBTMV-START block\nm2\nBTMV-END block\nm3");
+  const res = await btTool.execute(
+    { mode: "MOVE", srcFile: "bt/bt-move.txt", startMarker: "BTMV-START", endMarker: "BTMV-END", dstFile: "bt/bt-move-dst.txt" },
+    BT_CTX,
+  );
+  const srcBody = readFileSync(path.join(BT_DIR, "bt-move.txt"), "utf8");
+  const dstBody = readFileSync(path.join(BT_DIR, "bt-move-dst.txt"), "utf8");
+  check(
+    "117",
+    "S15",
+    "MOVE success: byte-exact `Moved 3 lines from 'bt/bt-move.txt' to 'bt/bt-move-dst.txt'` + source cut to `m1`+`m3` + dst = the inclusive block",
+    res === "Moved 3 lines from 'bt/bt-move.txt' to 'bt/bt-move-dst.txt'." &&
+      srcBody === "m1\nm3" && dstBody === "BTMV-START block\nm2\nBTMV-END block",
+    JSON.stringify({ res, srcBody, dstBody }),
+  );
+}
+
+// ------------------------------------------------------------------ S16 loop_log tool (6) — the #60 probe pin (part 2 of 2): the looprun activity log as a directly-fired tool
+//
+// The custom tool at .opencode/tools/loop_log.ts (T3, the loop-tool-batch
+// part 3): the loop-log line every agent used to hand-format, now
+// machine-formatted. Imported DIRECT (type-stripped, the S12/S13 load
+// pattern). The probe drives it with context.directory = sandbox roots —
+// the loop root <dir>/.opencode/loop, the created autorun-* folder, and the
+// loop_log.md all land in the sandbox (the repo's real .opencode/loop/ is
+// NEVER touched; S5 hygiene verifies zero writes outside the sandbox). The
+// folder stamp is local-clock, minute resolution — pinned by FORMAT (regex),
+// never the exact value (the AGENTS.md pattern-5 discipline). Plain tool()
+// object: no plugin hooks — the S5 tallies are unaffected.
+const LL_TOOL_TS = path.join(REPO_ROOT, ".opencode", "tools", "loop_log.ts");
+const LL_A = path.join(SANDBOX, "ll-a"); // the single-folder case (checks 10.19-122)
+const LL_MULTI = path.join(SANDBOX, "ll-multi"); // the several-folders anomaly case (check 123)
+const STAMP_RE = /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}$/;
+let llTool;
+let llFolderA = null;
+let llRetA = null;
+
+// 10.18 — the tool file imports (type-stripped, direct) and exposes the
+//      tool() default export: description (non-empty string) + the 5 args IN
+//      ORDER (role/model/content REQUIRED strings, the status ENUM of the
+//      five 8-char tokens — a bogus one fails safeParse, session OPTIONAL) +
+//      async execute + NO `name` field (the host names the tool by FILENAME)
+{
+  const toolMod = await import(pathToFileURL(LL_TOOL_TS).href);
+  llTool = toolMod.default;
+  const argKeys = Object.keys(llTool?.args ?? {});
+  const statusSch = llTool?.args?.status;
+  const reqStr = (k) => {
+    const s = llTool?.args?.[k];
+    return s != null && typeof s.safeParse === "function" && s.safeParse(undefined).success === false && s.safeParse("x").success === true;
+  };
+  const sessionSch = llTool?.args?.session;
+  check(
+    "118",
+    "S16",
+    "tool file imports (type-stripped, direct) and exposes the tool() default export (description + args [role, model, status, content, session?] + async execute, NO name field)",
+    llTool != null && typeof llTool.description === "string" && llTool.description.length > 0 &&
+      JSON.stringify(argKeys) === JSON.stringify(["role", "model", "status", "content", "session"]) &&
+      statusSch != null && typeof statusSch.safeParse === "function" &&
+      statusSch.safeParse(undefined).success === false &&
+      ["-->START", "DONE<---", "-RETURN-", "-WARNING", "--INFO--"].every((v) => statusSch.safeParse(v).success === true) &&
+      statusSch.safeParse("BOGUS").success === false && statusSch.safeParse("-->START ").success === false && statusSch.safeParse("").success === false &&
+      ["role", "model", "content"].every(reqStr) &&
+      sessionSch != null && typeof sessionSch.safeParse === "function" && sessionSch.safeParse(undefined).success === true && sessionSch.safeParse("ses_ll_01").success === true && sessionSch.safeParse(42).success === false &&
+      typeof llTool.execute === "function" && llTool.execute.constructor.name === "AsyncFunction" &&
+      !("name" in llTool),
+    JSON.stringify({ keys: argKeys, status: ["-->START", "BOGUS", ""].map((v) => statusSch?.safeParse?.(v)?.success), async: llTool?.execute?.constructor?.name, nameIn: "name" in (llTool ?? {}) }),
+  );
+}
+
+// 10.19 — the empty loop root: the tool CREATES `autorun-<YYYY-MM-DD_HH-MM>`
+//      (the stamp pinned by FORMAT — local clock, minute resolution, never
+//      the exact value) + its loop_log.md (exactly one line); the return is
+//      EXACTLY two lines `folder: <name>` + `line: <line>` (no ANOMALY for a
+//      fresh single folder)
+{
+  llRetA = await llTool.execute(
+    { role: "probe-s16", model: "probe-model", status: "-->START", content: "probe start line" },
+    { directory: LL_A },
+  );
+  const lines = String(llRetA).split("\n");
+  llFolderA = lines[0]?.startsWith("folder: ") ? lines[0].slice("folder: ".length) : null;
+  const logFile = path.join(LL_A, ".opencode", "loop", llFolderA ?? "", "loop_log.md");
+  const logBody = existsSync(logFile) ? readFileSync(logFile, "utf8") : null;
+  check(
+    "119",
+    "S16",
+    "empty loop root → auto-created `autorun-<YYYY-MM-DD_HH-MM>` (stamp format pinned) + loop_log.md (one line); return EXACTLY `folder: <name>\\nline: <line>` (no ANOMALY)",
+    lines.length === 2 && llFolderA !== null && llFolderA.startsWith("autorun-") && STAMP_RE.test(llFolderA.slice("autorun-".length)) &&
+      lines[1].startsWith("line: ") && !String(llRetA).includes("ANOMALY") &&
+      logBody !== null && logBody.endsWith("\n") && logBody.split("\n").filter((l) => l.length > 0).length === 1,
+    JSON.stringify({ lines, logBody }),
+  );
+}
+
+// 120 — the line format: `<stamp> <status> <role> <session|unknown>
+//      <model> <content>` (the field order byte-exact, the stamp the same
+//      format as the folder name; the session was OMITTED in the call → the
+//      literal `unknown` in the 4th field), and the return's `line:` field
+//      carries EXACTLY the line that landed in the file
+{
+  const logFile = path.join(LL_A, ".opencode", "loop", llFolderA ?? "", "loop_log.md");
+  const logBody = existsSync(logFile) ? readFileSync(logFile, "utf8") : null;
+  const lineOnly = logBody === null ? null : logBody.replace(/\n$/, "");
+  const lineRe = /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2} -->START probe-s16 unknown probe-model probe start line$/;
+  check(
+    "120",
+    "S16",
+    "line format `<stamp> <status> <role> <session|unknown> <model> <content>` (field order byte-exact; omitted session → literal `unknown`) + the return's `line:` field == the file's line (byte-exact)",
+    lineOnly !== null && lineRe.test(lineOnly) && STAMP_RE.test(lineOnly.slice(0, 16)) &&
+      llRetA != null && llRetA.split("\n")[1] === `line: ${lineOnly}`,
+    JSON.stringify({ lineOnly, retLine: llRetA?.split("\n")[1] }),
+  );
+}
+
+// 121 — the session passthrough + append-only + single-folder reuse: call
+//      #2 with an explicit session → the NEW line carries it in the 4th
+//      field (field order intact); the file gains EXACTLY one line; the SAME
+//      folder is used (the exactly-one-folder rule — still no ANOMALY)
+{
+  const logFile = path.join(LL_A, ".opencode", "loop", llFolderA ?? "", "loop_log.md");
+  const countLines = () => readFileSync(logFile, "utf8").split("\n").filter((l) => l.length > 0).length;
+  const beforeCount = countLines();
+  const res2 = await llTool.execute(
+    { role: "probe-s16", model: "probe-model", status: "DONE<---", content: "probe done line", session: "ses_ll_01" },
+    { directory: LL_A },
+  );
+  const lines2 = String(res2).split("\n");
+  const afterCount = countLines();
+  const allLines = readFileSync(logFile, "utf8").split("\n").filter((l) => l.length > 0);
+  const lastLine = allLines[allLines.length - 1] ?? "";
+  check(
+    "121",
+    "S16",
+    "call #2 (session `ses_ll_01` given): the new line carries it in the 4th field (field order byte-exact); the file gains EXACTLY one line; the SAME folder is reused (no ANOMALY)",
+    lines2.length === 2 && lines2[0] === `folder: ${llFolderA}` && !String(res2).includes("ANOMALY") &&
+      afterCount === beforeCount + 1 &&
+      /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2} DONE<--- probe-s16 ses_ll_01 probe-model probe done line$/.test(lastLine) &&
+      lines2[1] === `line: ${lastLine}`,
+    JSON.stringify({ lines2, beforeCount, afterCount, lastLine }),
+  );
+}
+
+// 122 — the empty-string session: `session: ""` → the 4th field is the
+//      literal `unknown` again (the fallback covers omitted AND empty); the
+//      file gains exactly one more line
+{
+  const logFile = path.join(LL_A, ".opencode", "loop", llFolderA ?? "", "loop_log.md");
+  const countLines = () => readFileSync(logFile, "utf8").split("\n").filter((l) => l.length > 0).length;
+  const beforeCount = countLines();
+  const res3 = await llTool.execute(
+    { role: "probe-s16", model: "probe-model", status: "-WARNING", content: "probe warning line", session: "" },
+    { directory: LL_A },
+  );
+  const afterCount = countLines();
+  const allLines = readFileSync(logFile, "utf8").split("\n").filter((l) => l.length > 0);
+  const lastLine = allLines[allLines.length - 1] ?? "";
+  check(
+    "122",
+    "S16",
+    "session: '' (empty) → the 4th field is the literal `unknown` (the fallback covers omitted AND empty); exactly one more line; the SAME folder",
+    String(res3).split("\n")[0] === `folder: ${llFolderA}` &&
+      afterCount === beforeCount + 1 &&
+      /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2} -WARNING probe-s16 unknown probe-model probe warning line$/.test(lastLine),
+    JSON.stringify({ res3, beforeCount, afterCount, lastLine }),
+  );
+}
+
+// 123 — the SEVERAL-folders anomaly: two dummy autorun-* dirs in a fresh
+//      loop root (their mtimes pinned explicitly — the probe never trusts
+//      the wall clock for the outcome) → the MOST-RECENTLY-MODIFIED folder
+//      is used AND the byte-exact ANOMALY note is the 3rd return line (the
+//      other folder stays untouched)
+{
+  const dOld = path.join(LL_MULTI, ".opencode", "loop", "autorun-2026-09-01_09-05");
+  const dNew = path.join(LL_MULTI, ".opencode", "loop", "autorun-2026-09-14_10-05");
+  mkdirSync(dOld, { recursive: true });
+  mkdirSync(dNew, { recursive: true });
+  utimesSync(dOld, Date.UTC(2026, 8, 1, 9, 5) / 1000, Date.UTC(2026, 8, 1, 9, 5) / 1000);
+  utimesSync(dNew, Date.UTC(2026, 8, 14, 10, 5) / 1000, Date.UTC(2026, 8, 14, 10, 5) / 1000);
+  const res = await llTool.execute(
+    { role: "probe-s16", model: "probe-model", status: "--INFO--", content: "probe anomaly line" },
+    { directory: LL_MULTI },
+  );
+  const lines = String(res).split("\n");
+  const expectedAnomaly =
+    "ANOMALY: 2 autorun-* folders exist in the loop dir; used the most-recently-modified (autorun-2026-09-14_10-05). The protocol invariant is EXACTLY ONE current looprun folder — rollover is planner work.";
+  const logFile = path.join(dNew, "loop_log.md");
+  const logBody = existsSync(logFile) ? readFileSync(logFile, "utf8") : null;
+  const oldTouched = existsSync(path.join(dOld, "loop_log.md"));
+  check(
+    "123",
+    "S16",
+    "SEVERAL autorun-* folders → the most-recently-MODIFIED one is used + the byte-exact ANOMALY note as the 3rd return line (the other folder untouched)",
+    lines.length === 3 && lines[0] === "folder: autorun-2026-09-14_10-05" && lines[2] === expectedAnomaly &&
+      logBody !== null && lines[1] === `line: ${logBody.replace(/\n$/, "")}` && logBody.endsWith("\n") && !oldTouched,
+    JSON.stringify({ lines, logBody, oldTouched, expectedAnomaly }),
   );
 }
 
