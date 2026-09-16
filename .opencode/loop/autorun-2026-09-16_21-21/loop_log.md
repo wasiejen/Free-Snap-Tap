@@ -1,1 +1,2 @@
 2026-09-16_21-21 --START worker-13 unknown Qwen3.8-27B-IQ4KT-140K R1 read-scope [left:right] pair resolution + form switch + sandbox fix (spec: handover_task.md) — baseline re-verified 180/180
+2026-09-16_21-47 DONE<--- worker-13 unknown Qwen3.8-27B-IQ4KT-140K R1 complete: commit 96bb173 green (probe 193/193, smoke 31/31, pytest 459, ruff clean, export=1); handover at .opencode/agent/handover/handover_task_to_planner.md — gauge SESSION=ses_f54677188ffeVjBr0O8pXp5cXT CTX=135826 (97%) REM=4174
