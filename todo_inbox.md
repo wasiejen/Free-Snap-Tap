@@ -60,3 +60,4 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   name-mangled prior folder `autorun_2-6_0-9_1-6__1-3_3-3/` (carries
   plan1/plan2 spec+summary copies). Rollover should move it into
   `.opencode/archive/loop/`; the mangled name suggests a failed machine-rename.
+- curated (2026-09-16, planner-2): repo_commands totals → TODO #71 (maintainer-file flag); loop-folder observation SUPERSEDED (the "mangled" folder is the maintainer's deliberate rename, perception mitigation — the real finding, loop_log creating spurious folders on it, → TODO #65).

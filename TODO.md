@@ -123,6 +123,126 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 
 ## 52. (closed 2026-09-13, see todo_records.md) — `compact_memory` fails in the current host build — connection error on both paths (2026-09-12) — LANDED (2026-09-12, worker-2, per the approved v2 proposal) + live acceptance DONE (2026-09-13, iteration 1: compaction part + directive + budget 1/3 + COMPACT line verified in the DB); the resume-overflow finding → `proposals/2026-09-13_compact_memory-findings.md` (Item 1 superseded by the 2026-09-15 protocol; Item 2 ruling bundled in 2026-09-15_backlog-decisions.md, Decision 3).
 
+## 65. loop_log tool folder-detection bug: spurious folders on the maintainer-renamed loop folder (2026-09-16, plan2)
+- **Problem / evidence:** the `loop_log` tool did not recognize the
+  maintainer-renamed folder `autorun_2-6_0-9_1-6__1-3_3-3` and created TWO
+  spurious date-stamped folders in one iteration (autorun-2026-09-16_16-15
+  [looprunner INFO], autorun-2026-09-16_17-20 [worker-13 START+DONE]); the
+  planner consolidated the lines into the real loop_log.md and deleted the
+  folders by hand (twice).
+- **Outcome:** folder detection accepts the current loop folder even when its
+  name does not match the date pattern (e.g. latest subfolder of
+  `.opencode/loop/` carrying a `loop_log.md`; refuse to create a second
+  candidate when one already exists).
+- **Acceptance:** a `loop_log` call in a renamed folder appends to THAT
+  folder's loop_log.md; no spurious folder on the next looprun; probe/smoke
+  green.
+- **Scope:** `.opencode/tools/loop_log.ts` (+ its smoke if any). Restart-gated.
+- **Status:** OPEN (planned).
+
+## 66. 5.3+5.4 restart acceptance (PENDING — next maintainer restart; 2026-09-16, plan2)
+- **Problem / evidence:** the observer plugin failed to LOAD on the first
+  live check ("Plugin export is not a function" — fixed by the core split,
+  `4719cc5`); the read-scope mutation channel (5.4 one-shot) is still
+  unproven. No `.opencode/temp/intercept.log` exists yet.
+- **Outcome:** at the next restart: (1) first `intercept.log` lines appear
+  (dense/numword/dense-date triggers — any session with dense args);
+  (2) the mutation-channel verdict: read the scratchpad sentinel
+  `C:/Users/Wasiejen/AppData/Local/Temp/opencode/fuzzy_accept/file-four.txt`
+  via a d<=2 mistyped path → if the tool result is the TWIN content
+  (`file-4.txt`) AND a `fuzzy-resolved` line is logged → mutation channel
+  LIVE (write-scope #68 unblocked); else NOT live (5.3 stays log-only,
+  redundancy-naming route #69 becomes primary). Record the verdict in
+  TODO + the research doc; then tear down the sentinel per §5.4.
+- **Acceptance:** verdict line in TODO.md + one line in the research doc
+  dated section; fixture state noted.
+- **Scope:** none (read the log + one controlled read) — planner at the
+  restart.
+- **Status:** PENDING RESTART.
+
+## 67. Fuzzy scope extension: glob / grep / section-anchor resolvers (2026-09-16, plan2 queue)
+- **Problem / evidence:** plan2 wired ONLY `read` (+string filePath) — the
+  core matcher (`resolveReadPath`, corpus cache) is corpus-root-agnostic and
+  ready for more read-scope tools (research §2.3/§2.6).
+- **Outcome:** extend the hook scope to `glob`/`grep` path args and add the
+  section-anchor resolver (anchor line-prefix → offset, exactly-one-match,
+  fail-closed on 0/≥2 — §2.6), fail-closed + both-outcomes logged, probe
+  pins per the established pattern.
+- **Acceptance:** probe green (self-annotation updated), smoke green,
+  standard gate unchanged.
+- **Scope:** `intercept_observer_core.ts` + `intercept_observer.ts` + probe
+  S18 section.
+- **Status:** OPEN (planned, after #66 verdict).
+
+## 68. Write-scope fuzzy (step 2 of the Q3 roadmap; GATED; 2026-09-16)
+- **Problem / evidence:** maintainer ruling (addendum Q3, 2026-09-16): read
+  AND write scope, one step after the other — "too useful to degrade to
+  observer permanently". Write-scope needs the mutation-channel verdict
+  (#66) AND its own approval (write-scope fuzzy on edit/write/delete is a
+  data-loss hazard per research §2.3 — the existence-gate + correction-log
+  discipline of §4.2 must be specced).
+- **Outcome:** spec for write-scope resolution (scope rule, existence gate,
+  correction log, fail-closed) → maintainer approval → build.
+- **Acceptance:** approved spec + landed build + gate green (per spec).
+- **Scope:** research doc §2.3/§3.4/§4.2 as the design source.
+- **Status:** DEFERRED (gated on #66 verdict + his approval).
+
+## 69. Redundancy naming + `<4|four>` delimitation codification (Q1/Q2 rulings, 2026-09-16)
+- **Problem / evidence:** maintainer rulings (addendum Q1: YES — redundant
+  digit|word form for loop/plan file names, single digits probably fine but
+  general yes; Q2: YES with refinement — `<4|four>` angle-bracket
+  delimitation to separate the pair from the rest of the string, eases
+  git-id/session-id resolution). Not yet codified anywhere in prompts/
+  protocol; the observer's `PAIR_RE` currently only matches tight
+  `digit|word` (no `< >` form).
+- **Outcome:** codify the naming convention (loop/plan file names:
+  digit|word) in the loop protocol + planner/looprunner prompts; extend the
+  observer pair detection to the `<d|word>` form; probe pins for the new
+  form.
+- **Acceptance:** prompts updated (planner-direct), observer `<d|word>`
+  detection pinned in the probe, gate green.
+- **Scope:** `prompt_agent_looprunner.md`, `prompt_agent_planner.md`,
+  `agent_readme_loop.md`, `intercept_observer_core.ts` (PAIR_RE) + probe.
+- **Status:** OPEN (planned). NOTE: his live feedback-file comment on the
+  w2n `<8-6-1>`/`<6|six>` grammar ideas is marked "to be discussed in
+  direct session" — the grammar part waits for that discussion; the
+  NAMING convention does not.
+
+## 70. compact_memory rework: cross-compact by session_id only + Gemma worker compaction + no-wait flow (2026-09-16, new priority.md item)
+- **Problem / evidence:** maintainer priority.md addition: context_limit
+  error → compact the worker (use the Gemma compaction model per
+  opencode.jsonc `agent.compaction`); the flow is SERIAL (compaction active
+  = planner inactive — no sleep/wait polling); cross-compaction needs only
+  the target session_id (providerID/modelID to be REMOVED from the
+  compact_memory parameter list — resolved from opencode.jsonc; the
+  parameter descriptions were "described badly" — #55 item). Plan2 hit the
+  friction live: the dispatch resolved the SUMMARIZER to the same model as
+  the target session (Qwen) and I had to wait for the single slot.
+- **Outcome:** compact_memory parameter rework (session_id-only cross
+  path; summarizer model from `agent.compaction` unless explicitly
+  overridden) + planner-prompt line (on context_limit: compact the worker
+  by session_id, do NOT wait/sleep — continue other work that needs no
+  model slot, resume via task_id after the COMPACT line).
+- **Acceptance:** param rework landed + probe/smoke green; prompt line in
+  `prompt_agent_planner.md`; a cross-compact dispatch in the next looprun
+  uses Gemma and needs only the session_id.
+- **Scope:** `.opencode/plugin/compact_memory.ts` (or tools/ home — verify
+  current location), `prompt_agent_planner.md`.
+- **Status:** OPEN (approved — rides the #55 approved-improvements batch).
+
+## 71. Stale probe totals in repo_commands.md (maintainer file — needs his tasking; 2026-09-16)
+- **Problem / evidence:** `repo_commands.md` §Run/test still quotes "~376"
+  and "one hundred twenty-two (plan7…)" — mutually inconsistent stale
+  numbers; the declared source (the probe's self-annotation) is 180/180
+  (plan2). Worker-13 flagged; the file is maintainer-maintained (agents do
+  not edit the repo parts directly).
+- **Outcome:** refresh the section to the curate-don't-duplicate pointer
+  (per #64 convention: point at the self-annotation, no moving number).
+- **Acceptance:** section reads the pointer; no duplicated total.
+- **Scope:** `repo_commands.md` §Run/test (maintainer or an explicitly
+  tasked agent).
+- **Status:** OPEN (maintainer-file flag).
+
 ## Closed entries
 
 Moved to `todo_records.md` on 2026-09-10 — one-line records, IDs 2, 5, 10, 12, 13, 14, 15,
