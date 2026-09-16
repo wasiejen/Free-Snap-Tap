@@ -89,8 +89,17 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   POST-FIX block_transfer contract (a pin written against the buggy behavior
   would need rework). Order: #57 (worker-8) → #60 (worker-9) → plan8:
   #54 + #51 + #58 (planner-direct batch).
-- #57 SPEC WRITTEN (guard hoist, byte-identical error string, 1 new smoke
-  assertion). worker-8 launched.
+- #57 DONE + VERIFIED (worker-8, `733ca7a` fix + `d067695` bookkeeping):
+  guard hoisted BEFORE the cut write, byte-identical error string, 2 new
+  smoke assertions (20→22); planner re-ran green: block_transfer 22/22,
+  sandbox smoke 52/52, probe 106/106, pytest 459+1w, ruff F=0. His feedback
+  questions answered in plan7_summary.md (CLEAR mode exists; feedback folder
+  gone → answers ride NAP/summary).
+- #60 SPEC WRITTEN (S15 block_transfer + S16 loop_log probe pins, append-only;
+  spec carries the planner-measured contracts of both tools + the
+  machine-verify discipline for the check-numbering (labels max 107 vs
+  reported total 106 — the worker resolves by machine, not by eye) + the
+  adjacent stale "PowerShell 7" run-command comment fix). worker-9 launched.
 - OPEN (his direct session, non-blocking): #63's optional decision — should
   the plugin smokes join the standard gate in repo_commands.md (folds into
   #58, which he has now approved for the agent)? fst-rebind-repeat still
