@@ -33,9 +33,14 @@ All paths below are relative to `.opencode/agent/prompts/`.
   session start and task completion (write them via the `loop_log` tool when it
   is in your toolset; the format description is the fallback).
 - `.opencode/agent/knowledge/` (repo-root-relative, NOT under agent/prompts) —
-  the knowledge base (gained findings, not instructions): read the area file for
-  your task's area (e.g. `knowledge_tools.md`) before starting; append an entry
-  when you gain verified, actionable knowledge (format in its README).
+   the knowledge base (gained findings, not instructions): read the area file for
+   your task's area (e.g. `knowledge_tools.md`) before starting; append an entry
+   when you gain verified, actionable knowledge (format in its README).
+ - `.opencode/agent/research/fuzzy-numword/primer.md` (repo-root-relative) —
+   the numeral convention (dense bit-drift-prone numerals: `[8-6-1]`,
+   `[left:right]` pairs, where the form applies): read when you pass dense
+   numerals (paths, ids, totals, dates). The `decision-record.md` next to it
+   is LARGE (~10k tokens) — grep it by section, do not read it whole.
 
 ## Work loop
 - Follow existing conventions: read the neighboring code first, mimic style, reuse existing

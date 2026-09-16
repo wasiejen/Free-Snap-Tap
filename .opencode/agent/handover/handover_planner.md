@@ -138,6 +138,12 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   journal). Observation-only → gates on R1, not R2. Design + reasoning:
   decision-record §8, spec staged `spec_R6_edit_hint_journal.md`. After-hook
   result-enrichment still UNVERIFIED (log-only fallback).
+- **Primer landed (his request, session end):** `research/fuzzy-numword/
+  primer.md` (short usage form: when/forms/where/observer-behavior/do-nots,
+  with the "grep the 10k record, don't read it" guard) + Instruction-index
+  pointer lines in planner AND worker prompts (need-based read). His AGENTS.md
+  paste (§4 draft) still pending — once pasted, the prompt lines can shrink
+  to a one-line pointer (de-dupe).
 
 ## Standing
 - Baselines (re-verified 2026-09-16, plan2, gates re-run by the planner

@@ -47,6 +47,12 @@ All paths below are relative to `.opencode/agent/prompts/`.
   (append-only inbox; the planner cures it into the area files) when the
   placement is unclear, or the area file directly when it is obvious (format in
   the folder README).
+- `.opencode/agent/research/fuzzy-numword/primer.md` (repo-root-relative) —
+  the numeral convention (dense bit-drift-prone numerals: `[8-6-1]`,
+  `[left:right]` pairs, where the form applies): read when you pass dense
+  numerals (paths, ids, totals, dates) or when writing a task spec whose
+  content carries them. The `decision-record.md` next to it is LARGE
+  (~10k tokens) — grep it by section, do not read it whole.
 
 ## .opencode layout
 - Creating a new sub-folder under `.opencode/` requires its README (≤20 lines:
