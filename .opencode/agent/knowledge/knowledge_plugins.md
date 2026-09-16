@@ -137,3 +137,20 @@ Gained, verified knowledge for opencode plugins. Format per the README:
   (2026-09-15, direct session).
 - **Keys:** compact_memory, gemma default, agent.compaction.model,
   providerID, modelID, summarize, COMPACT line, verified working.
+
+## Spawning a node script from a plugin: execPath is NOT a node runtime on the live host
+- **Do:** when a plugin `execFileSync`s a node script, resolve the executable
+  with `resolveNodeExe()` (exported from `compact_memory.ts`): basename
+  (lower-cased) starts with `node` → pass through; otherwise the literal
+  `"node"` (PATH resolution — on Windows PATHEXT finds node.exe).
+- **Why (evidence):** on the live opencode host `process.execPath` is the CLI
+  binary (`opencode.exe`), not a node runtime — spawning the dump script with
+  it ran `opencode.exe dump_session.cjs ...` (the CLI printed its help, the
+  dump failed, a WARNING rode every dispatch); the 2026-09-15 live #55 test
+  shows exactly this (DUMP-FAIL line + CLI help text); plain-node smokes/probe
+  could not catch it (their execPath IS a node runtime).
+- **Ref:** `compact_memory.ts` `resolveNodeExe` + the `preCompactionDump`
+  spawn site (commit 9fd7557, TODO #55 note 2026-09-16); plan7 spec
+  `#57-live`.
+- **Keys:** execPath, resolveNodeExe, execFileSync, opencode.exe, dump hook,
+  spawn, PATH, PATHEXT.

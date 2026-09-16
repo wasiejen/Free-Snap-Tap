@@ -183,7 +183,11 @@ All those IDs stay reserved — see the numbering rule in the header.
   gained `--out`, probe S14 (101-107) green. Live acceptance PENDING the
   maintainer's host restart — a single compact_memory call must then produce
   `.opencode/archive/sessions/compaction_dumps/<sid>_c0.md`. Still OPEN.
-  History: APPROVED + BUILDABLE (maintainer ruling 2026-09-15, direct session:
+   NOTE 2026-09-16 (worker-10, plan7/iter7): node-resolution fix landed (commit
+   9fd7557) — the dump hook spawns via `resolveNodeExe()` (the live host's
+   execPath is the CLI binary — the wrong spawn failed every dump with a
+   WARNING); live acceptance still pending the host restart.
+   History: APPROVED + BUILDABLE (maintainer ruling 2026-09-15, direct session:
   "todo 55 can be done and will be activated before the next autorun"); NOTE
   2026-09-15: the corpus `.opencode/archive/sessions/` was backfilled
   (137 sessions).
