@@ -98,6 +98,11 @@ SANDBOX — all file access (reads AND writes) is confined to the working direct
         if (moveViolation) return moveViolation;
       }
       if (!fs.existsSync(srcPath)) return `Error: Source file '${args.srcFile}' not found.`;
+      // MOVE: the missing-dst check runs BEFORE any write too — a missing dst must not
+      // leave the source already cut (no partial writes on rejection).
+      if (mode === "MOVE" && !args.dstFile) {
+        return "Error: 'dstFile' is required for MOVE mode.";
+      }
 
       const srcRaw = fs.readFileSync(srcPath, "utf-8");
       const srcLines = srcRaw.split(/\r?\n/);
@@ -138,7 +143,6 @@ SANDBOX — all file access (reads AND writes) is confined to the working direct
 
       // 4. IMMEDIATE MOVE (CUT + PASTE IN ONE STEP)
       if (mode === "MOVE") {
-        if (!args.dstFile) return "Error: 'dstFile' is required for MOVE mode.";
         const dstPath = path.resolve(cwd, args.dstFile);
         let dstLines: string[] = [];
         if (fs.existsSync(dstPath)) {

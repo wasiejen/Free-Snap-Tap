@@ -42,6 +42,11 @@ chk("src lost the block", fs.readFileSync(src, "utf-8") === "tail\n");
 chk("dst gained block at EOF (no target marker)", fs.readFileSync(dst, "utf-8") === "only-head\nAAA start\nline1\nline2\nZZZ end");
 const r4 = await t.execute({ mode: "PASTE", dstFile: dst, bufferName: "nope" }, ctx);
 chk("PASTE from empty buffer returns error note", /empty/.test(r4));
+// #57: MOVE with missing dstFile must error and leave the source byte-identical (no partial cut)
+fs.writeFileSync(src, "AAA start\nline1\nline2\nZZZ end\ntail\n");
+const r5 = await t.execute({ mode: "MOVE", srcFile: src, startMarker: "AAA", endMarker: "ZZZ" }, ctx);
+chk("MOVE without dstFile returns the exact error string", r5 === "Error: 'dstFile' is required for MOVE mode.");
+chk("MOVE without dstFile leaves source byte-identical", fs.readFileSync(src, "utf-8") === "AAA start\nline1\nline2\nZZZ end\ntail\n");
 fs.rmSync(dir, { recursive: true, force: true });
 
 finish();
