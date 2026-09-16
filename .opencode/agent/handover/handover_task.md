@@ -1,77 +1,108 @@
-# TASK SPEC — plan7: #55-live — dump hook node-resolution fix (live host breaks the dump)
+# TASK SPEC — plan9 (iteration 9): RESEARCH lane — fuzzy name resolution + numword tool-call hardening
 
-Worker: `worker_Q4_140K`
-Branch: stay on the current checkout (`opencode_test`).
+GOAL (approved research lane, maintainer ideas #5/#6/#7 in
+`.opencode/maintainer/inbox_planner/dense_numbers.md` — read it, it is the
+source; --wip, READ-ONLY, never edit): RESEARCH ONLY (no production build).
+Produce a dated research doc covering:
+(a) fuzzy name resolution on file read / section grep,
+(b) num_to_word / word_to_num auto-replace as an opencode intercept plugin
+(`tool.execute.before`), to make tool calls more reliable despite digit
+bitshifts in quantized models.
 
-## Goal
-The pre-compaction dump hook must spawn its dump script with a REAL node
-runtime. On the live opencode host `process.execPath` is the opencode CLI
-binary, so the spawn runs `opencode.exe dump_session.cjs ...` (the CLI prints
-its help, the dump always fails, a WARNING rides every dispatch response).
-On plain node (smokes/probe) it works — which is why the smokes stay green.
-Fix the resolution; keep the hook contract (dump failure → WARNING, never
-blocks) intact.
+## Output (definition of done — all in ONE commit)
+1. NEW folder `.opencode/agent/research/` with:
+   - `README.md` ≤ 20 lines: purpose (research docs only — dated findings on
+     ideas worth exploring; NOT instructions, NOT a TODO, NOT the knowledge
+     base), what goes here (one dated doc per research topic:
+     `YYYY-MM-DD_<topic>.md`), what does NOT (implementation, approved
+     proposals → `proposals/`, actionable findings → `knowledge/`).
+   - ONE dated research doc `2026-09-16_fuzzy-and-numword-tool-reliability.md`
+     (~150–300 lines) with these sections:
+     1. Problem framing: the dense-digit trap as MEASURED in this repo
+        (cite: TODO #61 NUMWORDS NOTE, the 94/94 counting incident from
+        dense_numbers.md, the plan8 `1-2-2` vs `120+2` loop-log INFO line in
+        `.opencode/loop/autorun-2026-09-15_13-11/loop_log.md`, the
+        106→120+2 label/counter alignment). Keep citations short.
+     2. Part A — fuzzy name resolution: feasibility in THIS build (facts
+        below are verified — do not re-derive), a reference design of the
+        matcher (algorithm options + thresholds), the safe-tool-scope
+        analysis (read-only tools first: read/glob/grep; why silently
+        rewriting write/edit paths is a data-loss hazard), section-grep-by-name
+        vs line-number offset design (anchor conventions + resolver shape),
+        ambiguity handling = fail-closed (keep original arg + log the
+        candidate, never pick a wrong match silently), perf (cache vs crawl).
+     3. Part B — numword: the assumption check (are numberwords really more
+        stable? evidence FOR: the digit bitshift incidents above; evidence
+        AGAINST: word drift exists too — "fourty"/"eigth" appear in the
+        maintainer's own notes; conclusion should be about cross-checking,
+        not replacement); the general-function idea from dense_numbers.md
+        lines 14–17 (`num(five) -> 5`, `num([five,five]) -> 55`, f-string /
+        input-string auto-replace, `<five>` markers): feasibility + recommended
+        shape (node + python + bash entry points) + map coverage incl. the
+        "fourty" alias; the intercept-plugin combination (word→digit replace
+        of tool args, gated on existence — e.g. only replace "file-four.txt"
+        when "file-4.txt" exists; commit refs only when `git rev-parse`
+        confirms).
+     4. Risks & non-recommendations (what must NOT be auto-replaced, where
+        the correction log should live).
+     5. Recommendations ranked (prompt-rule-only / scriptlet under
+        `.opencode/agent/scripts/` / plugin — for the maintainer's direct
+        session, NOT a build now) + a concrete live-host verification plan
+        (one-shot test of `tool.execute.before` args mutation at the next
+        restart, shaped like the #51/#55 pending-acceptance pattern).
+2. NOTHING else changes (no code, no plugin, no prompts).
 
-## Verified facts (planner-measured at spec time, HEAD 3f94875 — do NOT re-derive)
-- The spawn site: `.opencode/plugin/compact_memory.ts` line ~279 (inside
-  `preCompactionDump`):
-  `execFileSync(process.execPath, [scriptPath, sessionID, "--out", name], { timeout: 60_000, stdio: "pipe" });`
-- Live evidence (plan7, the worker-9 rescue compaction, 03-49): the dispatch
-  returned `WARNING: pre-compaction dump failed for ses_... (Command failed:
-  C:\Users\Wasiejen\AppData\Roaming\npm\node_modules\opencode-ai\bin\opencode.exe
-  C:\Users\...\dump_session.cjs ... <opencode CLI help text>)`; a `DUMP-FAIL`
-  line was appended to `.opencode/temp/ctx.log` (the failure-logging path
-  works); the compaction itself SUCCEEDED (COMPACT line in ctx.log). So the
-  hook contract holds; only the executable resolution is wrong.
-- The host's execPath basename here is `opencode.exe`; a plain node runtime's
-  is `node` / `node.exe` (also `nodejs.exe` on older Windows installs).
+## Verified facts (planner-verified at spec time — do not re-research)
+- `tool.execute.before` exists in `@opencode-ai/plugin` (types at
+  `.opencode/node_modules/@opencode-ai/plugin/dist/index.d.ts` line ~235):
+  input `{tool, sessionID, callID}`, output `{args: any}`; hook returns
+  `Promise<void>` — the passed `output.args` object is the mutation channel
+  (same pattern the ctx_watchdog header documents for `tool.execute.after`:
+  "the passed output object is the ONLY mutation channel").
+- `command.execute.before` (shell-command variant, d.ts line ~228) also
+  exists. `tool.execute.after` (d.ts line ~249) carries `args` in the input.
+- Existing in-repo hook usage to study (bounded reads):
+  `.opencode/plugin/ctx_watchdog.ts` header (lines ~1–180) — how hooks are
+  registered in this repo; `.opencode/plugin/README.md`.
+- `@opencode-ai/plugin` types are the authoritative surface:
+  `.opencode/node_modules/@opencode-ai/plugin/dist/index.d.ts` (320 lines —
+  read the hooks section, lines ~150–280, not the whole file).
+- Whether mutated `output.args` actually reaches tool execution CANNOT be
+  proven without a host restart (hooks load at plugin registration) — this
+  is the live-acceptance gap; the doc must name it (do not try to prove it
+  live in this run; design the one-shot verification for the next restart).
 
-## What to change (the scope)
-1. `.opencode/plugin/compact_memory.ts`:
-   - Add a small EXPORTED resolver next to the hook code:
-     `export function resolveNodeExe(execPath: string = process.execPath): string`
-     — returns `execPath` when its basename (lower-cased) STARTS WITH `node`
-     (covers node / node.exe / nodejs.exe), otherwise the literal `"node"`
-     (resolved from PATH by execFileSync — on Windows PATHEXT finds node.exe).
-     One comment: the live opencode host's execPath is the CLI binary, not a
-     node runtime; a wrong spawn fails the dump safely (WARNING) but the
-     corpus dump would never happen.
-   - Use `resolveNodeExe()` at the spawn site (line ~279). Nothing else in
-     `preCompactionDump` changes.
-2. `.opencode/plugin/tests/compact_memory.smoke.mjs` — add 2-3 chks on the
-   exported `resolveNodeExe`:
-   - `resolveNodeExe("C:\\Program Files\\nodejs\\node.exe")` returns that same
-     path;
-   - `resolveNodeExe("C:\\x\\opencode.exe")` returns `"node"`;
-   - `resolveNodeExe()` (the live default) returns a string whose basename
-     (lower-cased) starts with `node` (under plain-node smokes this is true;
-     do NOT pin the exact path).
-   Header comment: one line noting the resolver + why.
+## Context discipline (maintainer #6)
+- Fresh session; the WHOLE task must finish ≤ ~50 % of your window — budget
+  your reads: the files above with the named line ranges, `dense_numbers.md`
+  (83 lines, whole is fine), and nothing else at length. First greps carry
+  `| head -30`. Do not read the session corpus or DB.
+- You may run one-shot experiments in the scratchpad
+  (`C:/Users/Wasiejen/AppData/Local/Temp/opencode`) to sanity-check algorithm
+  sketches (e.g. a Levenshtein threshold study on real repo paths) — NOTHING
+  from the scratchpad gets committed; the repo diff is the two research
+  files only.
 
-## Definition of done (measured)
-- `node .opencode/plugin/tests/compact_memory.smoke.mjs` → ALL PASS, total =
-  old 43 + your new chk count.
-- ALL smokes in `.opencode/plugin/tests/` green (run each).
-- Standard gates UNCHANGED at the plan7 baseline:
-  - `node .opencode/plugin/probes/handover_probe.mjs` → 120+2/120+2 PASS (do NOT
-    add probe checks for this — the resolver fallback is not reachable under
-    plain node; a probe pin would test the wrong thing)
-  - `./.venv/Scripts/python.exe -m pytest -q` → 459 passed + 1 warning
-  - `./.venv/Scripts/ruff.exe check --select F .` → 0 findings
-- `git status` clean after your commit (code + smoke + TODO.md + handover).
+## DO-NOT-TOUCH
+`.opencode/agent/prompts/**`, `.opencode/maintainer/**` (read the one
+--wip file named above, never edit), `.opencode/plugin/**` +
+`.opencode/tools/**` (production code — read-only references only),
+`opencode.jsonc`, `AGENTS.md`, the live opencode host. NO production plugin
+file created, NO prompt edited.
 
-## TODO.md bookkeeping
-- This work realizes the APPROVED #55 design (its acceptance already requires
-  the live dump to land). Do NOT close #55 — its live acceptance is still
-  pending the maintainer's next host restart (the plugin reloads then; the
-  first post-restart compaction must produce
-  `.opencode/archive/sessions/compaction_dumps/<sid>_c0.md`). In #55 add a
-  one-line status note: node-resolution fix landed (commit hash); live
-  acceptance still pending the host restart.
-- `todo_inbox.md`: append any out-of-scope findings (dated + role-tagged).
+## Approval boundary
+Research-only: creating the `agent/research/` folder + its README + the one
+doc is pre-approved (meta/docs). Anything beyond that (a scriptlet, a
+plugin, a prompt rule) is a maintainer call — RECOMMEND it in the doc, do
+not build it.
 
-## DO-NOT-touch
-- The probe file; the two tool files (`.opencode/tools/*.ts`);
-  `ctx_watchdog.ts`; everything under `.opencode/agent/prompts/**` (edit-deny)
-  and `.opencode/maintainer/**`. No changes to the hook's failure contract
-  (WARNING on the response, DUMP-FAIL line, never throws, never blocks).
+## Procedure (suggestion, not protocol)
+1. Read `dense_numbers.md`, then the d.ts hooks section + ctx_watchdog
+   header (bounded).
+2. Draft the doc section by section; machine-check every citation (grep the
+   named line before citing it).
+3. Scratchpad experiment for the matcher thresholds if useful.
+4. Write README + doc, run the standard gate (it must stay unchanged —
+   proof nothing code-touching happened: pytest 459+1w, ruff F=0,
+   probe total as in repo_commands.md), commit (code+handover+TODO if any
+   discovery) per the commit routine, write `handover_task_to_planner.md`.
