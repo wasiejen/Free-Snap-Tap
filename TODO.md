@@ -242,7 +242,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   heavy loopruns; command `node .opencode/agent/scripts/db/dump_session.cjs
   --all --slim`.
 
-## 60. (open, 2026-09-15, planner plan5) — `block_transfer` + `loop_log` lack probe pinning
+## 60. (closed 2026-09-16, worker-9, plan7/iter7; 2026-09-15, planner plan5) — `block_transfer` + `loop_log` lack probe pinning
 
 - **Problem / evidence:** the custom tools `block_transfer` and `loop_log`
   (`.opencode/tools/*.ts`) have smoke tests (`plugin/tests/block_transfer*.smoke.mjs`,
@@ -257,7 +257,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   count, all green; both smoke tests still pass; header annotation updated.
 - **Suggested scope:** `.opencode/plugin/probes/handover_probe.mjs`,
   `.opencode/tools/{block_transfer,loop_log}.ts` (read-only reference).
-- **Status:** OPEN — delegate-able (worker task, medium).
+- **Status:** CLOSED 2026-09-16 (worker-9, plan7/iter7) — S15 (10 checks) + S16 (6 checks) appended; probe total 106 -> 120+2 all green (header annotation agrees with the reported total), all 7 smokes green, pytest 459+1 warning, ruff F=0; fix commit 75be075.
 
 ## 63. (closed 2026-09-16, plan7 worker-7; finding 2026-09-15 worker-5, planner plan5) — compact_memory smoke: 4 failures at HEAD (dump-hook sandbox gap)
 

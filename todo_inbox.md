@@ -32,3 +32,13 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   `.opencode/maintainer/feedback/`). The comment's idle-thoughts (shared
   sandbox scriptlet for scripts) are likewise not built — noted only, per the
   spec. Files: `TODO.md` #57 `--comment`, `.opencode/tools/block_transfer.ts`.
+
+## 2026-09-16 — worker-9 (plan7/iter7, #60 probe pins)
+- Factual note on the `handover_probe.mjs` label/counter alignment (machine-resolved
+  during #60, NOT fixed, per spec): HEAD e29e2da has 101 `check("NNN"` calls but the
+  reported total is 106 — the difference is 5 table labels (47-51) emitted via a
+  different call form (a naive `check("NNN"` grep misses them; the #60 spec predicted
+  this). The label range 1..107 has exactly one gap (44), so the reported total (106)
+  and the max label (107) can never be equal unless the gap is filled or the table
+  labels are counted. #60's new labels continue from the real max label: 108..123
+  (consecutive, machine-verified). Next free label = 124.
