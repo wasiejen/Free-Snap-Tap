@@ -22,3 +22,13 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   stale corpus → one-off `--all --slim` refresh executed (plan3) + cadence
   decision → `TODO.md` **#59**; missing probe command in the gate definition
   → `TODO.md` **#58**.
+
+## 2026-09-16 — worker-8 (plan7/iter7, #57 fix)
+- Unhandled maintainer ask from the #57 `--comment` (left in place per the
+  spec): "can you write a short feedback in maintainer/feedback folder what
+  the current status of the tool is?" — OUT OF SCOPE for the approved fix
+  (worker `maintainer/**` access is read-only; the spec's DO-NOT-touch covers
+  it). Not done here; the planner may delegate it (a small write into
+  `.opencode/maintainer/feedback/`). The comment's idle-thoughts (shared
+  sandbox scriptlet for scripts) are likewise not built — noted only, per the
+  spec. Files: `TODO.md` #57 `--comment`, `.opencode/tools/block_transfer.ts`.

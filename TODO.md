@@ -188,7 +188,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   2026-09-15: the corpus `.opencode/archive/sessions/` was backfilled
   (137 sessions).
 
-## 57. (open, 2026-09-15, worker T1 block_transfer sandbox, curated plan3) — block_transfer MOVE silently deletes a block when `dstFile` is missing
+## 57. (closed 2026-09-16, worker-8, plan7/iter7; 2026-09-15, worker T1 block_transfer sandbox, curated plan3) — block_transfer MOVE silently deletes a block when `dstFile` is missing
 
 - **Problem / evidence:** in `.opencode/tools/block_transfer.ts`, MOVE mode
   extracts the source block (CUT) BEFORE the `'dstFile' is required for MOVE
@@ -204,9 +204,7 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Suggested scope:** `.opencode/tools/block_transfer.ts` (hoist the
   `!args.dstFile` check to the top of the anchor-extraction section, before
   any write); a smoke in `.opencode/plugin/tests/`.
-- **Status:** OPEN — maintainer call (the fix changes observable behavior for
-  INVALID input only: today = error + source modified; after = error only).
-  Planner recommendation: hoist the check (obvious bug fix).
+- **Status:** CLOSED (2026-09-16, worker-8, plan7/iter7) — guard hoisted pre-write: the `!args.dstFile` check now runs before the source-cut write (invalid-input-only change, exact error string kept); 2 new smoke assertions (22/22), gates 106/106 + 459 passed + ruff F=0; commit 733ca7a.
 --comment: approved: you are free to improve the tool. goal is to prevent unintended destruction of data. when in doubt it saves it in buffer - or might be better to append it to buffer? do we have a buffer clear function if needed? can you write a short feedback in maintainer/feedback folder what the current status of the tool is? adaptions of tools you use are generally approved. if they have the potential to work outside of sandbox definition then these sandbox safeguards need to be implemented. (the same rule apply to the scripts - everything than can change data needs a sandbox safeguard - maybe just a shared scriptlet that every script imports and checks the given paths? do only one script to maintain of these safeguards need adaptation) (sry idle thoughts :-) )
 
 ## 58. (open, 2026-09-15, script-collection worker, curated plan3) — standard gate definition lacks the probe command
