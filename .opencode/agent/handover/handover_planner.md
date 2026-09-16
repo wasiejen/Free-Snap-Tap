@@ -152,11 +152,13 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - His AGENTS.md paste CONFIRMED committed (bf18f14, matches §4 draft) — the
   permanent rule lives in 3 carriers (AGENTS.md + primer + prompt index
   lines); his call: the redundancy "sticks better for the beginning".
-- **Live-state guard** (TEMPORARY, remove at his next host RESTART): the
-  RUNNING observer still has pre-R1 pair detection until restart — guard
-  lines in primer + both prompt index entries say "form in prose/commit
-  text only, NOT tool args" until the restart. One-shot liveness acceptance
-  (pair channel, 5.4 scratchpad sentinel) happens on that restart.
+- **R1 LIVE — guard removed** (2026-09-16 22:13, post-restart one-shot):
+  pair channel live (`pair-resolved gate=mutated canon=4`), fuzzy live
+  (3x d=1), scratchpad zero out-of-sandbox noise. TEMPORARY guard lines
+  removed from primer + both prompts (form fully re-enabled in tool args).
+  Finding: 3/3 LATER pair-form attempts degraded to bare numerals at MY
+  generation (fuzzy caught every one) — decision-record R1 block; R4
+  mining question logged (is the pair form a producer-level drift target?).
 - **INBOX INCIDENT (worker role slip):** worker-13 TRIMMED `todo_inbox.md`
   (deleted header + 2 uncurated blocks) instead of appending — recovered
   from git (aaf6b03) and curated properly (worker-8 → confirm-with-him;
@@ -164,10 +166,9 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   line added ("APPEND ONLY — never touch existing entries").
 - TODO: #69 CLOSED (acceptance met); #68 gates → R1 satisfied, ONLY his
   write-scope approval remains; #71 refreshed (193).
-- **Next moves:** (1) his R2 approval → launch R2; (2) his host restart →
-  pair-channel one-shot acceptance + guard removal; (3) confirm worker-8's
-  feedback-file ask is handled (FB_2026-09-16_block_transfer_status.md
-  exists — his reorg).
+- **Next moves:** (1) his R2 approval → launch R2 (write-scope, spec
+  staged, gates all satisfied); (2) confirm worker-8's feedback-file ask
+  is handled (FB_2026-09-16_block_transfer_status.md exists — his reorg).
 
 ## Standing
 - Baselines (re-verified 2026-09-16, plan2, gates re-run by the planner

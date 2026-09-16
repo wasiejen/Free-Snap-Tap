@@ -29,15 +29,10 @@ strings drift. In doubt, use a pair.
   `.opencode/temp/intercept.log`; fail-closed verdicts (`no-candidate`,
   `ambiguous`, `redundancy-mismatch`) are EVIDENCE, not errors — read them,
   re-issue the call corrected, never guess.
-- read-scope: fuzzy-resolves mistyped `read` paths (d<=2, gap>=2) and (from
-  R1) resolves `[left:right]` in `read` args; write tools are never touched
-  (R2 pending).
-- pair detection switches to the `[left:right]` form with R1.
-- **TEMPORARY (until the host RESTARTS with the R1 code — committed 96bb173,
-  2026-09-16):** the RUNNING observer still carries the pre-R1 pair detection
-  until that restart — a form in a tool arg passes through RAW and the call
-  breaks (e.g. a read path containing `[8-6-1]` = ENOENT). Until the restart:
-  use the form in prose / commit text / TODO only — NOT in tool arguments.
+- read-scope: fuzzy-resolves mistyped `read` paths (d<=2, gap>=2) and
+  resolves `[left:right]` in `read` args (R1 LIVE since the 2026-09-16
+  restart — pair channel, scratchpad allowed-root); write tools are never
+  touched (R2 pending).
 
 ## Do not
 Write the form into code; invent new delimiters or separators; add words to

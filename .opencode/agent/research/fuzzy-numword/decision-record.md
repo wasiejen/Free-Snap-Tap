@@ -220,9 +220,16 @@ paste, like the stop-line change):
   args (existence-gated, right-wins, `pair-resolved` verdict), pair grammar
   switches from the old tight `digit|word` pipe form to `[l:r]` (logging for
   ALL tools switches too), scratchpad allowed-root fix, probe/smoke pins.
-  Liveness RESTART-GATED (the running host still runs pre-R1 pair detection
-  until restart; one-shot acceptance = the 5.4 scratchpad sentinel pair on
-  the same restart). **Grammar interpretation adjudicated (worker note,
+  LIVENESS ACCEPTED 2026-09-16 22:13 (post-restart one-shot, scratchpad
+  sentinel): pair channel live (`pair=[4:four] canon=4 dist=0 gate=mutated`
+  → `pair-resolved`), fuzzy channel live (3x d=1 gap=3), scratchpad
+  zero out-of-sandbox noise. **Producer-level finding (measured this
+  round):** 3/3 LATER pair-form attempts degraded to bare numerals at the
+  planner's OWN generation (`file-[5:four].txt` -> `file-5.txt`); the first
+  fresh call carried the form. Fuzzy caught every degradation (d=1) — the
+  channels are complementary at producer level. Open question for R4
+  log-mining: is the pair form itself a bit-drift target at producer level,
+  and does repetition (vs first use) increase the drift? **Grammar interpretation adjudicated (worker note,
   accepted):** pair sides accept a single MAP WORD (units/tens/teens incl.
   `fourty`) OR dash-separated single units — NO tens+unit composition on
   pair sides (`ninetyfour` → `no-candidate`); composition stays the

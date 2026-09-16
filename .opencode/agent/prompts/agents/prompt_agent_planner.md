@@ -52,10 +52,7 @@ All paths below are relative to `.opencode/agent/prompts/`.
   `[left:right]` pairs, where the form applies): read when you pass dense
   numerals (paths, ids, totals, dates) or when writing a task spec whose
   content carries them. The `decision-record.md` next to it is LARGE
-  (~10k tokens) — grep it by section, do not read it whole.
-  TEMPORARY (until the host restarts with the R1 code, 96bb173): form in
-  prose/commit text only — NOT in tool arguments (unresolved forms pass
-  through raw and break the call).
+ (~10k tokens) — grep it by section, do not read it whole.
 
 ## .opencode layout
 - Creating a new sub-folder under `.opencode/` requires its README (≤20 lines:
