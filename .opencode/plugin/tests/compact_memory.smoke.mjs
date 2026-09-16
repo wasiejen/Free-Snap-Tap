@@ -12,6 +12,7 @@
 //   - the arg shape is SIX keys (providerID/modelID added for the maintainer's
 //     round-2 explicit-pair override — that case replaces cm_v2's retired
 //     context.api / context.session.id source checks).
+//   - the sandbox carries a stub dump_session.cjs so the pre-compaction dump hook (4512fe6) succeeds silently (a dump failure would append a WARNING line and break the byte-exact checks) — mirrors the probe S13 preamble.
 // Idempotent re-runs: the sandbox is a FRESH scratchpad subdir each run.
 // Run: node .opencode/plugin/tests/compact_memory.smoke.mjs (plain node, exit 0 iff green).
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -21,6 +22,31 @@ import { freshSandbox, loadRepo, makeChecker } from "./_smoke_base.mjs";
 const SANDBOX = freshSandbox("compact_memory");
 mkdirSync(path.join(SANDBOX, ".opencode", "temp"), { recursive: true });
 const { chk, finish } = makeChecker("COMPACT_MEMORY_SMOKE");
+
+// The pre-compaction dump hook (4512fe6, TODO #152) fires on EVERY dispatch
+// and spawns <SANDBOX>/.opencode/agent/scripts/db/dump_session.cjs. The stub
+// below (mirrors the probe S13 preamble) makes every dump SUCCEED, so the
+// hook appends nothing to the byte-exact response checks (a missing script
+// would append a WARNING line and break them).
+const FAKE_DUMP = `// probe fake dump — mimics dump_session.cjs's __dirname OUT_DIR + --out
+"use strict";
+const fs = require("node:fs");
+const path = require("node:path");
+const OUT_DIR = path.resolve(__dirname, "..", "..", "..", "archive", "sessions");
+const argv = process.argv.slice(2);
+let sid = null, rel = null;
+for (let i = 0; i < argv.length; i++) {
+  if (argv[i] === "--out") { rel = argv[++i]; }
+  else if (!argv[i].startsWith("-")) { sid = argv[i]; }
+}
+if (!sid || rel == null) { console.error("fake-dump: need <sid> --out <rel>"); process.exit(2); }
+const file = path.join(OUT_DIR, rel);
+fs.mkdirSync(path.dirname(file), { recursive: true });
+fs.writeFileSync(file, "FAKE DUMP of " + sid + "\\n");
+`;
+const DUMP_SCRIPT = path.join(SANDBOX, ".opencode", "agent", "scripts", "db", "dump_session.cjs");
+mkdirSync(path.dirname(DUMP_SCRIPT), { recursive: true });
+writeFileSync(DUMP_SCRIPT, FAKE_DUMP, "utf8");
 
 const drain = (ms = 25) => new Promise((r) => setTimeout(r, ms));
 // Captures console.log + console.error across an async fn (the fire-and-forget
@@ -118,6 +144,8 @@ const withClient = async (spec = {}) => {
   chk("budget increment-on-verified-success (count 1 after drain)", st.sessions.ses_sm_self?.count === 1, JSON.stringify(st.sessions.ses_sm_self));
   const line = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_self"));
   chk("COMPACT line written with model field + keep args", line != null && / COMPACT ses_sm_self tokens=42000 messages=7$/.test(line) && line.includes("Qwen3.8-27B-IQ4KT-120K"), JSON.stringify(line));
+  const dumpFile = path.join(SANDBOX, ".opencode", "archive", "sessions", "compaction_dumps", "ses_sm_self_c0.md");
+  chk("dump hook fired on the tool path: compaction_dumps/ses_sm_self_c0.md exists (the stub dump, no WARNING appended)", existsSync(dumpFile), dumpFile);
 }
 
 // ---- keep rejected once -> retried without keep (the note is console.log'd)

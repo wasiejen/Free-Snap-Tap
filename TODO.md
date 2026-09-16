@@ -261,7 +261,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   `.opencode/tools/{block_transfer,loop_log}.ts` (read-only reference).
 - **Status:** OPEN — delegate-able (worker task, medium).
 
-## 63. (open, 2026-09-15, worker-5 finding, planner plan5) — compact_memory smoke: 4 failures at HEAD (dump-hook sandbox gap)
+## 63. (closed 2026-09-16, plan7 worker-7; finding 2026-09-15 worker-5, planner plan5) — compact_memory smoke: 4 failures at HEAD (dump-hook sandbox gap)
 
 - **Problem / evidence:** `node .opencode/plugin/tests/compact_memory.smoke.mjs`
   → 4 failures that EXIST at clean HEAD (proven by the worker via `git stash`
@@ -279,9 +279,7 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Suggested scope:** `.opencode/plugin/compact_memory.ts` (the dump-hook
   call site), `.opencode/plugin/tests/compact_memory.smoke.mjs`,
   `.opencode/agent/scripts/db/dump_session.cjs` (read-only reference).
-- **Status:** OPEN — delegate-able (worker task, small-medium). DECISION
-  NEEDED (optional): should the smoke suite join the standard gate in
-  repo_commands.md? (relates to #58's gate-definition entry.)
+- **Status:** CLOSED (2026-09-16, plan7 worker-7) — fixed by the smoke stub: the sandbox now carries a byte-identical `dump_session.cjs` stub from the probe S13 preamble (handover_probe.mjs 1983-2015) so the dump hook (4512fe6) succeeds silently + 1 new chk pins the hook firing on the tool path (`compaction_dumps/ses_sm_self_c0.md`); smoke 43/43, all 7 smokes green, gates unchanged (probe 106/106, pytest 459+1w, ruff F=0); fix + this note ride the plan7 closing commit (subject "close #63: compact_memory smoke adapts to the pre-compaction dump hook"). DECISION NEEDED (optional): should the smoke suite join the standard gate in repo_commands.md? (relates to #58's gate-definition entry.)
 
 ## 62. (closed 2026-09-16, planner plan6) — LANDED (planner-direct): all three lines present in BOTH role prompts — (1) compaction is NOT a restart (recent messages INTACT, summary auto-created, re-read only the named head files), (2) above 90 % → EMERGENCY handover + commit + self-compact IF budget available, (3) above 95 % → commit + self-compact, DO NOT DELIBERATE while budget remains (`keepMessages` keeps the last N messages INTACT) — in `prompt_agent_planner.md` §Context-budget trigger and `prompt_agent_task.md` §Context-budget trigger + §compact_memory. Adjacent stale-ref fixes rode the same commit: stopline proposal name → `2026-09-15_agents-knowledge-stopline.md`, `dump_session.cjs` path → `scripts/db/`.
 

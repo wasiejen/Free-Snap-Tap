@@ -32,3 +32,5 @@
 2026-09-16_00-31 DONE<--- planner-6 ses_f58eea7eaffefmb0hOoPK5dUiP Qwen3.8-27B-IQ4KT-120K 90%/11K
 2026-09-16_01-54 -RETURN- looprunner ses_f5b507a66ffegia0ZZifYeRD2l Qwen3.8-27B-IQ4KT-120K planner-6 ses_f58eea7eaffefmb0hOoPK5dUiP planner_Q4_120K
 2026-09-16_01-57 -->START planner-7 ses_f5881492fffekCwsEwdfna4sge Qwen3.8-27B-IQ4KT-140K iteration 7 (new 140K model, first session on it) — priority order: #63 compact_memory smoke fix (delegate), then #60 block_transfer+loop_log probe pins (delegate); observing 140K bitshift/looping tendency per maintainer request
+2026-09-16_02-04 -->START worker-7 ses_f5878dd29ffebiDRSRQ3vq34hj Qwen3.8-27B-IQ4KT-140K plan7 #63 compact_memory smoke fix: add stub dump_session.cjs to smoke sandbox + 1 new chk
+2026-09-16_02-13 DONE<--- worker-7 ses_f5878dd29ffebiDRSRQ3vq34hj Qwen3.8-27B-IQ4KT-140K worker-7 ses_f5878dd29ffebiDRSRQ3vq34hj Qwen3.8-27B-IQ4KT-140K SESSION=ses_f5878dd29ffebiDRSRQ3vq34hj CTX=50668 (36%) REM=89332
