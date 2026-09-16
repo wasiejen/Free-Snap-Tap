@@ -275,7 +275,15 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   surface).
 - **Acceptance:** your ruling recorded; if mitigate: spec'd as a follow-on
   stage (R6-adjacent), not built before approval.
-- **Status:** OPEN (maintainer decision; flagged-only by design).
+- **Status:** RULING 2026-09-17 (direct session): **M1 approved** — restrict
+  the implicit write-fuzzy to `edit`/`block_transfer` (no new-file intent is
+  legal there → redirect is unambiguous); `write` loses the implicit channel
+  (new-file IS a legal intent → every degraded outcome becomes a visible
+  stray file, never a silent overwrite); the pair channel stays unchanged
+  (strict existence, fail-closed). Build unit queued: spec + S20 re-pin
+  (check 200 → not-mutated for `write`) + smoke 8f update. Follow-on
+  DISCUSSION (not yet approved, see NAP 2026-09-17 direct session): general
+  path repair — segment-level resolver + root re-anchoring.
 
 ## Closed entries
 

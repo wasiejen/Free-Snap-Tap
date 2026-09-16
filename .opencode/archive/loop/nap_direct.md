@@ -506,3 +506,89 @@
 - His looprunner config change (tools block) flagged with TWO issues (his to
   fix): "block_tansfer" typo (registered name block_transfer) and
   "*": false polarity (deny-all; "all but the editors" needs "*": true).
+
+## Direct session (2026-09-16, ses_f54ee6ba8ffeeoFUc1zptUtsb5) — fuzzy/numword topic: verdict + convention + staged specs
+- **#66 CLOSED: mutation channel LIVE** at this restart (intercept.log live;
+  mistyped read → `fuzzy-resolved d=1 gap=4` → TWIN content). Verdict in
+  research doc dated section + decision record §1; sentinel torn down.
+- **Convention ruled with him** (full reasoning in
+  `research/fuzzy-numword/decision-record.md` — the basis doc): pair form
+  `[left:right]` (SUPERSEDES `<4|four>` — measured bash table: `<`/`|`
+  fatal, `[]`+`:` survives), single-digit dash form recommended, full map =
+  accepted fallback, candidates only inside delimiters, right-wins on
+  mismatch, adder-left = incident signal, no letter-fuzzy/aliases yet
+  (his misspellings ≠ agent drift), scratchpad = allowed sandbox root.
+  Pipeline: pair resolution first, fuzzy second, read-scope mutation.
+- **Topic folder created** `research/fuzzy-numword/` (README + decision
+  record + specs R1 launch-ready, R2/R3/R4 staged with gates; R5 no spec).
+- **His pending actions:** AGENTS.md paste (draft in decision-record §4 —
+  the rule's compaction-surviving home, his "direct answer to Loop Pattern
+ 5") + the R2 write-scope approval.
+- **Live incidents (measured, this session):** the subject matter bit the
+  planner — a doubled `OpenCodeProjects` write path (machine-detected
+  pre-commit, fixed) + one perception drift of my own path arg (perceived
+  path ≠ generated path; machine-checked). Spurious loop folder
+  `autorun-2026-09-16_13-33` (3rd #65 occurrence) consolidated + removed.
+  His FB files relocated by him to `research/` (`FB_` prefix) — his
+  reorg, left untracked.
+- TODO #65-69 amended (67→R3, 68→R2 gates, 69 form superseded + ruled).
+- **R6 added (late, his proposal):** edit-scope hint channel + payload
+  journal (every write/edit dumped per-tool to temp; anchor-first content
+  locator; hints for not-found/multiple-matches; NEVER mutates content,
+  NEVER auto-retries — recovery = agent fires cp/block_transfer from the
+  journal). Observation-only → gates on R1, not R2. Design + reasoning:
+  decision-record §8, spec staged `spec_R6_edit_hint_journal.md`. After-hook
+  result-enrichment still UNVERIFIED (log-only fallback).
+- **Primer landed (his request, session end):** `research/fuzzy-numword/
+  primer.md` (short usage form: when/forms/where/observer-behavior/do-nots,
+  with the "grep the 10k record, don't read it" guard) + Instruction-index
+  pointer lines in planner AND worker prompts (need-based read).
+- **R1 GREEN — VERIFIED** (worker-13, ses_f5467718…, commit `96bb173`):
+  probe 193/193 (new S19, 13 checks), smoke 31/31, pytest 459, ruff clean,
+  export=1 — matches the handover's measured numbers (I verified against
+  git + the committed handover, not the Task return, which was a stale
+  mid-session snapshot). Grammar interpretation adjudicated: NO tens+unit
+  composition on pair sides (worker's mini-grammar reading accepted — see
+  decision-record §5 R1). Baseline now 193/193 (self-annotation).
+- His AGENTS.md paste CONFIRMED committed (bf18f14, matches §4 draft) — the
+  permanent rule lives in 3 carriers (AGENTS.md + primer + prompt index
+  lines); his call: the redundancy "sticks better for the beginning".
+- **R1 LIVE — guard removed** (2026-09-16 22:13, post-restart one-shot):
+  pair channel live (`pair-resolved gate=mutated canon=4`), fuzzy live
+  (3x d=1), scratchpad zero out-of-sandbox noise. TEMPORARY guard lines
+  removed from primer + both prompts (form fully re-enabled in tool args).
+  Finding: 3/3 LATER pair-form attempts degraded to bare numerals at MY
+  generation (fuzzy caught every one) — decision-record R1 block; R4
+  mining question logged. CORRECTION (his line-153 pointer): that log line
+  is MY BOOKKEEPING EDIT being pair-logged (non-read logging confirmed
+  live); the 3/3 read degradation stands, arg-level confirmed (log
+  146-149 field 5). Attribution rule (never attribute own args from
+  memory; log field 5 = authority) added to primer + friction line.
+- **INBOX INCIDENT (worker role slip):** worker-13 TRIMMED `todo_inbox.md`
+  (deleted header + 2 uncurated blocks) instead of appending — recovered
+  from git (aaf6b03) and curated properly (worker-8 → confirm-with-him;
+  worker-9 → superseded; R1 entry → folded into #71). Defensive worker-prompt
+  line added ("APPEND ONLY — never touch existing entries").
+- TODO: #69 CLOSED (acceptance met); #68 gates → R1 satisfied, ONLY his
+  write-scope approval remains; #71 refreshed (193).
+- **R2 LAUNCHED** (2026-09-16, his "R2 approved"; worker_Q4_140K): spec in
+  `handover/handover_task.md` (refreshed at launch: post-R1 baseline
+  193/193 + R1 codebase facts + approval boundary + the `args[1:one]`
+  content-scope guard pin). Write scope: pairs on write/edit/block_transfer
+  path args (strict existence gate, mismatch FAILS CLOSED), fuzzy d<=1 on
+  write paths, git refs gated on rev-parse; read scope FROZEN (regression
+  gate); content args never mutated.
+- **R2 GREEN — VERIFIED** (35f8143; worker-14 compacted twice mid-task,
+  resumed via task_id both times, dumps archived — checkpoint protocol
+  worked): probe 206/206 (S20), smoke 35/35 (8f controlled write audit),
+  pytest 459, ruff clean; read scope frozen-green. Deviation ACCEPTED:
+  ref gate = `for-each-ref` membership (rev-parse vacuous for 40-hex —
+  worker-measured, decision-record §5 R2, supersedes §3.4). #68 CLOSED;
+  residual new-file near-miss hazard → #72 (his decision). His notes
+  this round: true ceiling ≈145K/103%; compact_memory `message` param is
+  NOT auto-delivered (manual copy into starting message) — #70 evidence;
+  his doubled-path init read (log 179-180) caught by out-of-sandbox.
+- **Next moves:** (1) his next restart → one-shot WRITE-scope acceptance
+  (sentinel: controlled scratchpad write, verify log says where it landed);
+  (2) his ruling on #72 (accept hazard vs intent-signal follow-on);
+  (3) confirm worker-8's feedback-file ask.

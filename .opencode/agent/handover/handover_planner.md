@@ -3,6 +3,8 @@
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 ## Compressed archive (one line each — details in git log + TODO/records)
+- 2026-09-16/17 looprun 2, iteration 2 (ses_f556cadecffeH5P5uZNS33i20R, planner Qwen3.8-27B-IQ4KT-140K) — plan2: read-scope fuzzy + pair convention `[left:right]` ruled (supersedes pipe form); R1 (96bb173) + R2 (35f8143) landed + verified, gates 206/206 + 35/35 + 459+1w + F=0; TODO #65-72; details: loop folder plan2_nap.md + git 4030e01
+- 2026-09-16 direct (ses_f54ee6ba8ffeeoFUc1zptUtsb5) — fuzzy/numword topic: #66 LIVE verdict, pair convention + scratchpad-sandbox ruled (decision record), R1/R2 live acceptance, incidents (worker inbox trim, producer-drift 3/3, line-153 correction), R6 staged; details: nap_direct.md + research/fuzzy-numword/ + git d1c148b..4030e01
 - 2026-09-16 looprun 2, iteration 1 (ses_f5605f805ffeElHB9mgtksjye1, planner-1) — plan1: research addendum C1-C7 + 5.2 numword scriptlet (worker-1) + 5.3 log-only intercept observer (worker-2) landed+verified (baseline 169/169) + self-compact test PASSED — details: loop folder plan1_summary.md + git aa4132d
 - 2026-09-16 looprun 2, iteration 10 (ses_f579a961bffecIKwgeKvhtSVh3, planner-10) — plan10: fast no-actionable close (all real work maintainer-blocked); gates re-verified green (probe 122/122, pytest 459+1w, ruff F=0); priority.md #4/#6/#9/#10 (fully handled) moved to _past_priorities.md — details: loop folder plan10_summary.md + git 2608361
 - 2026-09-16 looprun 2, iteration 9 (ses_f57c84fbbffeaLDqNyuJzEw85G, planner-9) — plan9: approved research lane LANDED + verified (RESEARCH ONLY, no build): worker-13 `37b000d` delivered `.opencode/agent/research/` (README + 426-line fuzzy/numword tool-reliability doc ending in ranked §5.1-5.4 recommendations — maintainer call, content NOT in NAP per his instruction); TODO #64 (stale 84/84 baseline) handled planner-direct; two live 140K dense-digit incidents (subject matter bit back); OPEN (all maintainer-blocked, unchanged from plan8 + new §5.2/§5.3 decision) — details: loop folder plan9_summary.md + git 37b000d/e6564a1
@@ -60,137 +62,52 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
   re-injection); post-compaction protocol re-applied from files.
 
-## plan2 (iteration 2, ses_f556cadecffeH5P5uZNS33i20R, planner Qwen3.8-27B-IQ4KT-140K)
-- 5.3 live acceptance = NO on first check: the plugin FAILED TO LOAD in the
-  current run ("Plugin export is not a function", opencode.log run
-  9f0b3d78); root cause verified in the installed binary: the loader
-  iterates `Object.values(module)` — EVERY value must be a function (or
-  `.server`); the named non-fn exports kill the load (ctx_watchdog is
-  default-only → loads fine). No `.opencode/temp/intercept.log` existed.
-- The small fix + the READ FUNCTION (his conditional approval) LANDED +
-  verified (worker-13 ses_f55463549ffelXphfcDlDGMhPJ, `4719cc5`): core
-  split (`intercept_observer_core.ts`; plugin = default ONLY,
-  `grep -c ^export` = 1, pinned by probe 171) + read-scope fuzzy resolution
-  (`read` + string filePath ONLY; exact/normalize fast-path; d<=2 AND
-  gap>=2 → mutate filePath + `fuzzy-resolved` line; else fail-closed
-  `fuzzy-rejected` line w/ top-3 cands — C7 8-field shape; corpus TTL
-  cache). GATE RE-RUN BY ME: probe 180/180, smoke 29/29, pytest 459+1w,
-  ruff F=0.
-- Worker incidents (loop log): launch 1 died on a doubled-path permission
-  rejection (spec now carries the relative-path rule); launch 2 died at
-  context_length_exceeded (142k) → cross-compact (friction: summarizer
-  resolved to the SAME model — Qwen — not the Gemma compaction model →
-  #70) → COMPACT line verified → task_id resume → green.
-- Maintainer feedback delivered:
-  `maintainer/feedback/2026-09-16_number-w2n-convention.md` (one / multiple
-  / mixed-with-letters cases); he live-commented it (`--comment`, "to be
-  discussed in direct session": `<8-6-1>`→861 fallback, `<6|six>`
-  redundancy form — the grammar part waits for that discussion).
-- Addendum Q1-Q3 rulings folded in: Q1 redundancy naming YES (loop/plan
-  file names); Q2 `<4|four>` angle-bracket delimitation (name format);
-  Q3 roadmap = read THEN write scope, one step after the other.
-- TODO #65-71 filed (loop_log tool bug, restart acceptance, fuzzy
-  extension, write-scope gated, naming codification, compact_memory
-  rework, stale repo_commands totals).
-- **RESTART ACCEPTANCE PENDING (#66) — the FIRST check at the next
-  restart:** (1) `.opencode/temp/intercept.log` exists with lines;
-  (2) mutation-channel verdict: read the scratchpad sentinel
-  `C:/Users/Wasiejen/AppData/Local/Temp/opencode/fuzzy_accept/file-four.txt`
-  via a d<=2 mistyped path → TWIN content (`TWIN`) + `fuzzy-resolved` line
-  = mutation LIVE (→ #68 unblocked); else NOT live (5.3 stays log-only,
-  #69 naming route primary). Then record verdict (TODO + research doc) and
-  tear down the sentinel per §5.4.
-- Maintainer live files UNCOMMITTED (never stage): priority.md (new
-  compact_memory rework item → #70), ideas.md (bit-drift = GENERATION
-  problem not perception; ctx.log wants session_id+role attribution),
-  feedback-file comment.
-- Loop folder this run: `autorun_2-6_0-9_1-6__1-3_3-3` (his rename).
 
-## Direct session (2026-09-16, ses_f54ee6ba8ffeeoFUc1zptUtsb5) — fuzzy/numword topic: verdict + convention + staged specs
-- **#66 CLOSED: mutation channel LIVE** at this restart (intercept.log live;
-  mistyped read → `fuzzy-resolved d=1 gap=4` → TWIN content). Verdict in
-  research doc dated section + decision record §1; sentinel torn down.
-- **Convention ruled with him** (full reasoning in
-  `research/fuzzy-numword/decision-record.md` — the basis doc): pair form
-  `[left:right]` (SUPERSEDES `<4|four>` — measured bash table: `<`/`|`
-  fatal, `[]`+`:` survives), single-digit dash form recommended, full map =
-  accepted fallback, candidates only inside delimiters, right-wins on
-  mismatch, adder-left = incident signal, no letter-fuzzy/aliases yet
-  (his misspellings ≠ agent drift), scratchpad = allowed sandbox root.
-  Pipeline: pair resolution first, fuzzy second, read-scope mutation.
-- **Topic folder created** `research/fuzzy-numword/` (README + decision
-  record + specs R1 launch-ready, R2/R3/R4 staged with gates; R5 no spec).
-- **His pending actions:** AGENTS.md paste (draft in decision-record §4 —
-  the rule's compaction-surviving home, his "direct answer to Loop Pattern
- 5") + the R2 write-scope approval.
-- **Live incidents (measured, this session):** the subject matter bit the
-  planner — a doubled `OpenCodeProjects` write path (machine-detected
-  pre-commit, fixed) + one perception drift of my own path arg (perceived
-  path ≠ generated path; machine-checked). Spurious loop folder
-  `autorun-2026-09-16_13-33` (3rd #65 occurrence) consolidated + removed.
-  His FB files relocated by him to `research/` (`FB_` prefix) — his
-  reorg, left untracked.
-- TODO #65-69 amended (67→R3, 68→R2 gates, 69 form superseded + ruled).
-- **R6 added (late, his proposal):** edit-scope hint channel + payload
-  journal (every write/edit dumped per-tool to temp; anchor-first content
-  locator; hints for not-found/multiple-matches; NEVER mutates content,
-  NEVER auto-retries — recovery = agent fires cp/block_transfer from the
-  journal). Observation-only → gates on R1, not R2. Design + reasoning:
-  decision-record §8, spec staged `spec_R6_edit_hint_journal.md`. After-hook
-  result-enrichment still UNVERIFIED (log-only fallback).
-- **Primer landed (his request, session end):** `research/fuzzy-numword/
-  primer.md` (short usage form: when/forms/where/observer-behavior/do-nots,
-  with the "grep the 10k record, don't read it" guard) + Instruction-index
-  pointer lines in planner AND worker prompts (need-based read).
-- **R1 GREEN — VERIFIED** (worker-13, ses_f5467718…, commit `96bb173`):
-  probe 193/193 (new S19, 13 checks), smoke 31/31, pytest 459, ruff clean,
-  export=1 — matches the handover's measured numbers (I verified against
-  git + the committed handover, not the Task return, which was a stale
-  mid-session snapshot). Grammar interpretation adjudicated: NO tens+unit
-  composition on pair sides (worker's mini-grammar reading accepted — see
-  decision-record §5 R1). Baseline now 193/193 (self-annotation).
-- His AGENTS.md paste CONFIRMED committed (bf18f14, matches §4 draft) — the
-  permanent rule lives in 3 carriers (AGENTS.md + primer + prompt index
-  lines); his call: the redundancy "sticks better for the beginning".
-- **R1 LIVE — guard removed** (2026-09-16 22:13, post-restart one-shot):
-  pair channel live (`pair-resolved gate=mutated canon=4`), fuzzy live
-  (3x d=1), scratchpad zero out-of-sandbox noise. TEMPORARY guard lines
-  removed from primer + both prompts (form fully re-enabled in tool args).
-  Finding: 3/3 LATER pair-form attempts degraded to bare numerals at MY
-  generation (fuzzy caught every one) — decision-record R1 block; R4
-  mining question logged. CORRECTION (his line-153 pointer): that log line
-  is MY BOOKKEEPING EDIT being pair-logged (non-read logging confirmed
-  live); the 3/3 read degradation stands, arg-level confirmed (log
-  146-149 field 5). Attribution rule (never attribute own args from
-  memory; log field 5 = authority) added to primer + friction line.
-- **INBOX INCIDENT (worker role slip):** worker-13 TRIMMED `todo_inbox.md`
-  (deleted header + 2 uncurated blocks) instead of appending — recovered
-  from git (aaf6b03) and curated properly (worker-8 → confirm-with-him;
-  worker-9 → superseded; R1 entry → folded into #71). Defensive worker-prompt
-  line added ("APPEND ONLY — never touch existing entries").
-- TODO: #69 CLOSED (acceptance met); #68 gates → R1 satisfied, ONLY his
-  write-scope approval remains; #71 refreshed (193).
-- **R2 LAUNCHED** (2026-09-16, his "R2 approved"; worker_Q4_140K): spec in
-  `handover/handover_task.md` (refreshed at launch: post-R1 baseline
-  193/193 + R1 codebase facts + approval boundary + the `args[1:one]`
-  content-scope guard pin). Write scope: pairs on write/edit/block_transfer
-  path args (strict existence gate, mismatch FAILS CLOSED), fuzzy d<=1 on
-  write paths, git refs gated on rev-parse; read scope FROZEN (regression
-  gate); content args never mutated.
-- **R2 GREEN — VERIFIED** (35f8143; worker-14 compacted twice mid-task,
-  resumed via task_id both times, dumps archived — checkpoint protocol
-  worked): probe 206/206 (S20), smoke 35/35 (8f controlled write audit),
-  pytest 459, ruff clean; read scope frozen-green. Deviation ACCEPTED:
-  ref gate = `for-each-ref` membership (rev-parse vacuous for 40-hex —
-  worker-measured, decision-record §5 R2, supersedes §3.4). #68 CLOSED;
-  residual new-file near-miss hazard → #72 (his decision). His notes
-  this round: true ceiling ≈145K/103%; compact_memory `message` param is
-  NOT auto-delivered (manual copy into starting message) — #70 evidence;
-  his doubled-path init read (log 179-180) caught by out-of-sandbox.
-- **Next moves:** (1) his next restart → one-shot WRITE-scope acceptance
-  (sentinel: controlled scratchpad write, verify log says where it landed);
-  (2) his ruling on #72 (accept hazard vs intent-signal follow-on);
-  (3) confirm worker-8's feedback-file ask.
+
+## Direct session (2026-09-17, ses_f53a10d24ffesL2Oc8jPqY1bBc) — R2 live check, #72 ruling, dump-fail evidence, path-repair topic opened
+- **R2 write-scope live test: NO — host process is PRE-R2.** intercept.log is
+  continuous since 09-16 18-34 (no reload); R2 landed 09-17 09:28 (35f8143)
+  → the loaded plugin is the R1 build (observation + read-scope live, write
+  channels absent). Controlled test: mistyped `file-for.txt` write landed at
+  the literal path, zero write-scope log lines. On-disk code proven correct
+  (scratchpad repro `write_fuzzy_repro.mjs`: file-for→file-four d=1 gap=2
+  resolved; hazard file-5→file-4 d=1 gap=3 resolved). Sentinels intact
+  (file-4.txt TWIN / file-four.txt ORIGINAL); test artifacts removed.
+  **Acceptance remains pending his restart.**
+- **#72 RULING: M1 approved** (his 09-17 direct): implicit write-fuzzy
+  restricted to edit/block_transfer, removed from `write`; pair channel
+  unchanged (strict existence, fail-closed); all degraded outcomes = stray
+  file, no data loss. TODO #72 updated. Build unit queued (spec + S20 re-pin
+  + smoke 8f) — AFTER the restart one-shot, separate unit from the
+  path-repair topic.
+- **DUMP-FAIL evidence (his #1, 26-09-17_09-11 report):** manual dump of the
+  missing ses_f5467718… = 0.12s / 219KB → recovered as
+  `compaction_dumps/…_c0_manual.md` (corpus gap closed). The 2× ETIMEDOUT
+  lines are a HUNG CHILD INSIDE THE HOST (execFileSync timeout 60s,
+  stdio pipe, spawn `node` PATH fallback) — NOT script slowness. c1-missing
+  for f5409e7a5 confirmed (c0 ok 23:18, second compaction 23:59 failed).
+  Hook logs failures only (no DUMP-OK / duration) → add `DUMP-OK <sid> <ms>`
+  for self-diagnostics. Fold into the compact_memory unit (#70/#55).
+- **Path-repair topic OPENED (his idea, discussion — NOT approved/staged yet):**
+  his segment-permutation logic: a path is a sequence of folder units; the
+  doubled case is `1/2/2/3/4` vs `1/2/3/4` = segment-distance 1 (one extra
+  folder); one folder mismatch = 1; selection by closest match. My scope
+  check: (A) segment-level lev against the EXISTING corpus chassis
+  (buildCorpus + TTL + strict existence gate + fail-closed + probe pattern
+  — all bought by R1/R2) = small, focused unit; adjacency doubling (my R7
+  sketch) is its d=1-insertion special case → subsumed. (B) root
+  re-anchoring ("switch path start to an existing path" = exact tail match,
+  UNIQUE under a known-root allowlist {workspace, scratchpad}, existence
+  gate) = medium, the policy surface. (C) bash-command path repair = the
+  genuinely large/fuzzy piece (free-text parsing) — stage last or not at
+  all. KEY FACT: the execute.before arg mutation is exactly what prevents
+  the permission prompt from ever firing (the call arrives already
+  in-sandbox) → autorun unblocks for repairable cases; genuinely-external
+  calls still prompt (by design — the plugin cannot and must not blanket-
+  silence external access). Measured: doubled OpenCodeProjects = char-d 17,
+  users = 6 (both ≫ read d≤2 / write d≤1 → NOT caught today); doubled
+  WRITE silently plants a stray dir tree (write tool auto-creates parents —
+  live-measured, torn down). Awaiting his scope ruling → R7/R8 staging.
 
 ## Standing
 - Baselines (re-verified 2026-09-16, plan2, gates re-run by the planner
