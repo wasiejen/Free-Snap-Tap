@@ -116,6 +116,11 @@ export const CORPUS_TTL_MS = 60_000;
 export const CORPUS_MAX_ENTRIES = 20_000;
 export const FUZZY_MAX_D = 2;
 export const FUZZY_MIN_GAP = 2;
+// R2 (2026-09-16): the WRITE-scope fuzzy accept bar — d<=1 (tighter than
+// read's d<=2: the hazard class is different, research §2.3 — a wrong write
+// is not self-correcting). Same gap rule, same strict existence gate (the
+// corpus holds only REAL paths; the mistyped path is checked absent first).
+export const WRITE_FUZZY_MAX_D = 1;
 
 export const VERDICTS = Object.freeze([
   "observed-redundancy-ok",
