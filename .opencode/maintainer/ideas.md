@@ -1,30 +1,84 @@
---wip--defer
+--wip--defer: can be ignored if it prevents work on autorun: scanning ans proposals/research/feedbacl always allowed
+// --comment
+// e.g. proposals are always allowed to write, test implementations as scripts in tmp also
+// - in general all things you find that might lead to some general improvement or built up of actionable knowledge or helpful tools, etc can be done
+//   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
+// this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
-- message value from compact_memory do not arrive in the compacted sesssion. not as part of the summery or later
+  - !!! replace looprunner with a plugin that automatically resumes or restarts the planner agent
+    - thus i could have infinite direct session and a directer access to the planner. direct questions possible. way more effective and less butterfly effects of unintented or badly worked instructions or instruction relay
+      - research agent run with proposal? i think i must give a bit more details
 
-- removal of loop warning of compaction, or reducing its scope DONE
-- perception of models is correct in bitdrift, but they can not generate the value. so not a kv cache (memory) but a generation (weight) problem?
+  - compact keepMessenges setting must be codified (readme_loop most likely)
+    - settings to adjust what to keep in memory to be decided before compaction
+    - best time to compact is before big writing and editing work and after the implementation is clear.
+      - comprehensive handover and then compact with choosing carefully to retain the reasoning and implementation drafts
+      - write yourself a message to get easier started (currently not working but in priority.md # 1 compact_memory additions/fix messages)
+
+  - file size restriction? to seperate long files for coding (testing, gate, smoke) into smaller units that are more focused on each plugin? 
+    - i observed one really big file with over 3000 lines but i can not find it anymore. maybe in temp?
+      - probes\handover_probe.mjs 
+        - correction! now over 4000 lines :-D
+          - as long as it is maintainable and clear what sections reference each plugin, so that read can effectively bounded is it not a problem.
+  
+  - cleanup of agent_feedback
+    - get actionable items -> proposal bundle and extract knowledge if present
+
+  - raised internal limit of model 140K to 145K, gauge still based on 140k - buffer as intended did not work before opencode stopped agent at 140k of 145k
+    - so limit is a hard bound (what would happen if limit is set higher? rolling context window? need to research myself a bit)
+
+  musings on naming convention
+  - 2026_0-9_1-6__1-5_5-0 opencode restarted - (testing some date formats)
+    - changed name of the autorun folder. commented it in loop.log
+    - 2026 stayed since it seemed not not make problems yet 
+      - in doubt drop we could drop the 2026
+      - or shorten it to 0-9_1-6 and add the session_id of the looprunner ... but the session_is is AGAIN a dense string ...
+      - 0-9_1-6_loop-1 and if started more than one then 0-9_1-6_loop-<number>
+    - 2-0-2-6_0-9_1-6__1-5_5-0 is not easily readable for me
+      - 2-6_0-9_1-6__1-5_5-0 .. this could work. what do you say?
+        - and when appending to a name? autorun_2-6_0-9_1-6__1-5_5-0 underscore to diffeniate is more visually
+    - might not be needed anymore with fuzzy numword? redundant information should be in speaking names? 
+      - on write the question is more interesting - should we autocorrect references to filenames?
+
+ i could now with reduces kv-cache upgrade model iq3kt to 262k contextsize .. and make 2 slots so they can run parallel :-) mhhhh a workers with each 131k contextwindow
+            - question is how fast these are in reality compared to one worker
+            
+- my quess to path doubling is the double folder Free-Snap-Tap then might induce doubling in the path because of its double existence.
+
+-  perception of models is correct in bitdrift, but they can not generate the value. so not a kv cache (memory) but a generation (weight) problem?
   - "The two strings differ in a way I cannot see (Pattern 5)" see might mean generate? or perceive - but they know the number but can not write it - so generate, in adder construction they can reliably reproduce the number or in numwords. so they know the number -> model weight-problem
+  - 
 - increase default keepMessages to 20 with increaed window size
+  - better teach agents to set the value themselfes
+    - keepTokens is then need to set lower to allow the keepMessages to stick and not be overwritten by 30000 keepTokens
+    
 - ctx needs a session_id and role to better attribute which measurement it is
   - good place to track worker sessions and get session_id if needed
   - only place to check after error of a sub-agent how full his context was
-  - add tools.execute.before in watchdog to just trigger ctx.gauge - not change in message to keep it more up to date
+  - add tools.execute.before in watchdog to just trigger ctx.gauge update in the log - not change in message to keep it more up to date
+    - is there a trigger for every message? just to trigger the ctx.gauge update in the log
+      - normally the provider sends with EVERY return message the ctx info
 
-would be much more helpful with session_id and role (modelid can drop - is implied with role)
-2026-09-16_17-43 Qwen3.8-27B-IQ4KT-140K edit (97% used, 3K left)
-2026-09-16_17-46 Qwen3.8-27B-IQ4KT-140K bash (99% used, 1K left)
-2026-09-16_17-49 Qwen3.8-27B-IQ4KT-140K ctx_gauge (74% used, 36K left)
-2026-09-16_17-50 Qwen3.8-27B-IQ4KT-140K compact_memory (74% used, 35K left)
-2026-09-16_17-51 Qwen3.8-27B-IQ4KT-140K bash (75% used, 34K left)
-2026-09-16_17-51 Qwen3.8-27B-IQ4KT-140K COMPACT ses_f55463549ffelXphfcDlDGMhPJ tokens=30000 messages=12
+  - would be much more helpful with session_id and role (modelid can drop - is implied with role)
+    2026-09-16_17-43 Qwen3.8-27B-IQ4KT-140K edit (97% used, 3K left)
+    2026-09-16_17-46 Qwen3.8-27B-IQ4KT-140K bash (99% used, 1K left)
+    2026-09-16_17-49 Qwen3.8-27B-IQ4KT-140K ctx_gauge (74% used, 36K left)
+    2026-09-16_17-50 Qwen3.8-27B-IQ4KT-140K compact_memory (74% used, 35K left)
+    2026-09-16_17-51 Qwen3.8-27B-IQ4KT-140K bash (75% used, 34K left)
+    2026-09-16_17-51 Qwen3.8-27B-IQ4KT-140K COMPACT ses_f55463549ffelXphfcDlDGMhPJ tokens=30000 messages=12
 
+  - Line 4881: 2026-09-16_23-59 DUMP-FAIL ses_f5409e7a5ffeHFuZxFFuWovscO spawnSync node ETIMEDOUT
 
 # 8 write to buffer option?
 - so no direct writes can fail
 - if intercepts can not resolve a filepath it is buffered instead - but how to retrieve? special marker in write command? or just dump it into a file and inform agent?
+Refer to R6 in fuzzy_numword as sketch for a cheap dump file for every edit and write tool call, 
+- to prevent rewrite cost (rewrites take time and stay in context - copy with block_tansfer from the editlog or writelog is way cheaper and faster)
+  - .opencode/temp/journal_write.log
+  - .opencode/temp/journal_edit.log
+- but also to use anchor points to scan for low density parts of oldstring in the destination file to identify candidates and then fuzzy check these only and if one match is found replace oldstring with it to have no failed edit action
+  - path correction for edit should be in R1 already
 
-- my quess to path doubling is the double folder Free-Snap-Tap then might induce doubling in the path because of its double existence.
 
 # 1 tool description list/prompt that explains the available costum tools to each agent
 - session_info

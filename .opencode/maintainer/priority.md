@@ -27,8 +27,6 @@
 
 
 --info: 
-  - raised internal limit of model 140K to 145K, gauge still based on 140k - buffer as intended did not work before opencode stopped agent at 140k of 145k
-    - so limit is a hard bound (what would happen if limit is set higher? rolling context window? need to research myself a bit)
   - check # 9 general compaction recommendation/guideline if we should test out mit session compaction. reasoning laid out in the referenced section
     - you can test this out on yourself or on workers :-D
     - generally the planner could use compact on his session more often? suggestion :-)
@@ -38,24 +36,21 @@
     - e.g. research
       - you can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 
-  - 2026_0-9_1-6__1-5_5-0 opencode restarted - (testing some date formats)
-    - changed name of the autorun folder. commented it in loop.log
-    - 2026 stayed since it seemed not not make problems yet 
-      - in doubt drop we could drop the 2026
-      - or shorten it to 0-9_1-6 and add the session_id of the looprunner ... but the session_is is AGAIN a dense string ...
-      - 0-9_1-6_loop-1 and if started more than one then 0-9_1-6_loop-<number>
-    - 2-0-2-6_0-9_1-6__1-5_5-0 is not easily readable for me
-      - 2-6_0-9_1-6__1-5_5-0 .. this could work. what do you say?
-        - and when appending to a name? autorun_2-6_0-9_1-6__1-5_5-0 underscore to diffeniate is more visually
+# 0 fuzzy research scripts + plugin
+see .opencode\agent\research\fuzzy-numword
+
+--comments for discussion
+  - to enable using numword in output we might define excape notation, that excape from the rule of not appliing to the convention of not changing output
+    - if writing e.g. a todo ## <number> observed that some agents had problems because they could not write the number
+      - an excape notation would make this possible
+        - `## [56:five-six:ESC]` just an example that could be recognised and then the 2 leftmost applied according to convention
+          - does not have to be complicated, but just a means to force a very small scoped overwrite over just one instance
+            - or easier `[56:five-six:]` trailing marker ":", `[:56:five-six]` leading marker
+  - of really useful for dates
+    - could even create something like `[date:]` `[date-time:]` - so no look up and always according to a centralised convention for dates
 
 
-
-
-# fuzzy research scripts + plugin
--- see comments in research for direction/approval state
-- testing of log function.
-
-# compact_memory tool dump function ## 55 approved
+# 1 compact_memory additions/fix messages (your todo ##70 likely needs an update)
 - autocompact on context limit option, toggable via parameter in the budget file
 - (1)add a fallback to fetch the providerID and modelID as fallback for cross-session compaction (so only session_id needs to be set) 
   - source is in line 119 of opencode.json defines as agent compaction. (a planner used the wrong modelID for self-compaction)
@@ -63,12 +58,26 @@
     - cross-compaction -> only needs session id of to be compacted session
     - self-compaction -> needs not parameters at all (parameter desciptions in compact_memory are likely descriped badly by me -> needs to reword this so it is clearer)
     - 
-# addition to system prompt of planner, 
-- context_limit error -> compaction of worker, use Gemma model for this. You do not have to wait, sleep or wait only waste time, this is serial working flow - only one can be active at each time (compaction active = planner inactiv). you are not active while it compacts. your session is inactive and you can only continue after the compact is through
-- cross-compact only needs session_id (after compact tool rework above) - repeated calling with own id
-  - rework of compact_memory parameter count of remove providerID and modelID from parameter list avaialble -> get them from opencode.json - see # # compact_memory tool dump function
-  - 
-# repo split research/proposal
+26-09-16_21-02: 
+- message value from compact_memory do not arrive in the compacted sesssion. not as part of the summery or later
+  - change to direct prompt messges for message content. async should not hurt - no await (i guess?) - message should be queued and when resumed delivered
+    - we have done something similar in the past with out nudges and the message arrived. but interferred with execution. but on compaction not execution thus no risk of interception.
+    - keepMessage is extremely useful for customizing compaction
+      - testing a bit more
+  - idea: use of a collect function in buffer (proposed in .opencode\maintainer\feedback\FB_2026-09-16_block_transfer_status.md) to collect different parts of files and put them into a buffer to send with the message for the next compacted agent. he gets an instand dump of all relevant sections and does not need to reread everything.
+    - further costumization of compact to get the new one faster and targeted up and running
+    - feedback for that pleasy and for buffer_transfer - up and downs - what is problematic and why, what would be alternatives. so a small research on each.
+      - we need a research spec ...
+        - too many ideas .. idle hands and so ...
+
+26-09-17_00-11:
+  - observed multiple failed dump messages in ctx.log
+  - Line 4741: 2026-09-16_21-48 DUMP-FAIL ses_f54677188ffeVjBr0O8pXp5cXT spawnSync node ETIMEDOUT
+    - not present in compaction_dumps folder
+  - Line 4881: 2026-09-16_23-59 DUMP-FAIL ses_f5409e7a5ffeHFuZxFFuWovscO spawnSync node ETIMEDOUT
+    - this was the second compaction, but there was no ses..._c1.md created in compaction_dumps only ..._c0.md exists
+
+# 2 repo split research/proposal
 - how best to seperate fst and the opencode_test branch into 2 independently trackable git repos
   - goal is to seperate repo files from opencode and agent files
     - in the repo lives only the files that concern the repo - nothing of agents or opencode  (clean for)
@@ -78,6 +87,12 @@
     - and giving explicit diretory to C:\Users\Wasiejen\Projects\Repos\ or based on what repos to work on
       - path variable would be an option to make this in general more independent?
     - I would create a copy of the FST repo in github and clone it into this new folder and move the old FST into C:\Users\Wasiejen\Projects\Repos\Free-Snap-Tap (might defer move to not to have to update all the references at once?)
+        
+# addition to system prompt of planner, 
+- context_limit error -> compaction of worker, use Gemma model for this. You do not have to wait, sleep or wait only waste time, this is serial working flow - only one can be active at each time (compaction active = planner inactiv). you are not active while it compacts. your session is inactive and you can only continue after the compact is through
+- cross-compact only needs session_id (after compact tool rework above) - repeated calling with own id
+  - rework of compact_memory parameter count of remove providerID and modelID from parameter list avaialble -> get them from opencode.json - see # # compact_memory tool dump function
+  - 
 
 --defer # 3 3 destillation worker runs for now - to much work right now. 
 # 3 3
@@ -98,16 +113,13 @@ prompt additions/edits/rewrites:
 - addition in the agents.md, that general knowledge - actionable items,code,facts that helped to solve a problem should be sorted into the agent/knowledge section - file may be created to fit the general topic
   - when looking for solutions one of the first things should be to grep the knowledge folder for relevant hits (remember to limit outputted lines for first grep call or similar)
     - maybe just an knowledge inbox.md to append to to not reduce cognitive load in analysing where it should go.
+  - a small tool might be good. could be done in a plugin that offers multiple convenience tools
+    - feedback add tool
+    - knowledge add tool (general inbox and for a curator to sort in)
+      - (included description on usage in description of parameter might be enough)
+    - append todo_inbox aka todo_inbox add? :-)
 
 # 7 small knowledge / use addition - or more likely do-not addition? 
 - do we need explicit coding guidelines?
 - The edit tool chokes on non-ASCII chars in oldString (planner working on code failed multiple times to use the code due to this an neede to write a script to replace a textstring - tool block_transfer would be a solution for this case)
   - so do not use non-ASCII chars if possible
-
-# 8 test the block_transfer tool:
-- does it acutally do what is intended?
-- how to improve it to use it effectively?
-  - you can freely adapt it to the need
-- can it go in live usage?
-- writing a usage guide and include it with usage guides to the other tools - i think best place in repo_custom_tools and instrution as other parts to read as needed?
-- do what you can without approvel and for the rest make a proposal

@@ -3,6 +3,10 @@
 --wip
 
 
+- increase real context to 150k? possible but with a bit slower prefill think 1300 drop to 1200t/s?
+  - this is the maximum with this model
+    - 5000 buffer in gauge seemed to work fine to motivate handover
+    - caching on planner worker switch fails repeatedly - or semi repeatedly
 
 - need to move or rename the agent folder in .opencode
   - it is picked up as a general agents folder and every md file in it is added as a system prompt for aseperate agent to start
