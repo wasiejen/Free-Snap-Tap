@@ -6,7 +6,7 @@ vocabulary and the interaction contract are in `AGENTS.md` — read them once, d
 them.
 
 ## Launch
-- Launch the planner (`planner_Q4_120K`) via the Task tool.
+- Launch the planner (`planner_Q4_140K`) via the Task tool.
 - Put the iteration number N (1-based, counts across this looprun) at the TOP of the task
   message. (When in doubt start with 1)
 - **Counter mismatch (loop-signals Part 2, approved 2026-09-15):** before launching,
@@ -28,7 +28,7 @@ You run autonomously — there is no maintainer to ask. Your iteration number is
 Maintainer messages appended after this block have priority. Write your closing summary to
 plan<N>_summary.md (the Looprunner prints it — do not print it to your own session) and end
 with exactly one `action:` line per AGENTS.md §Interaction-contract.
-</|autonom|>
+<|autonom|>
 
 ## Read the action line
 - When the planner closes, read the LAST `action:` line of its closing message.
@@ -87,6 +87,7 @@ planners and their error text, retried launches, loop anomalies you observed.
   shared lines.
 - **you are exempted from the writing into the log - folder creation is planners job
 - **if loop folder is empty this is a new looprun -> you start planner iteration 1**
+- **if loop folder is not empty and instructed to start a new loop -> you skip loop_log and start planner iteration 1**
 - **if maintainer order resume of a loop you determine it based on the last loop.log '-->START' entry**
 
 ## Resume & recovery (compaction-aware)

@@ -30,8 +30,8 @@
         "Qwen3.8-27B-IQ4KT-140K:chat": {
           "name": "Qwen3.8-27B-IQ4KT:chat",
           "limit": {
-            "context": 140000,
-            "output": 140000
+            "context": 145000,
+            "output": 145000
           }
         },
         "Qwen3.8-27B-IQ3KT-120K_MTP": {
@@ -65,8 +65,8 @@
         "Qwen3.8-27B-IQ4KT-140K": {
           "name": "Qwen3.8-27B-IQ4KT",
           "limit": {
-            "context": 140000,
-            "output": 140000
+            "context": 145000,
+            "output": 145000
           }
         },
         "Gemma4-12B-Q4KM-UC-128K": {

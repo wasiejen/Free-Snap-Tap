@@ -201,6 +201,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   "todo 55 can be done and will be activated before the next autorun"); NOTE
   2026-09-15: the corpus `.opencode/archive/sessions/` was backfilled
   (137 sessions).
+--comment: approved
 
 ## 57. (closed 2026-09-16, worker-8, plan7/iter7; 2026-09-15, worker T1 block_transfer sandbox, curated plan3) — block_transfer MOVE silently deletes a block when `dstFile` is missing
 

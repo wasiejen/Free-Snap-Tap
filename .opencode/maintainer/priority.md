@@ -26,16 +26,37 @@
    whenever he wants — it is his log.
 
 
-stop/compaction protokol for now 95% - this means explicityl around 90% gauge with lagging value
-- compact workers as needed but try to dump there session if possible before
-  - might need to order workers to just stop before running into context limit
-    - and then to compact the as crosscompaction before dumping their session
-    - compaction seems to work quite good so far
+--info: 
+  - raised internal limit of model 140K to 145K, gauge still based on 140k - buffer as intended did not work before opencode stopped agent at 140k of 145k
+    - so limit is a hard bound (what would happen if limit is set higher? rolling context window? need to research myself a bit)
+  - check # 9 general compaction recommendation/guideline if we should test out mit session compaction. reasoning laid out in the referenced section
+    - you can test this out on yourself or on workers :-D
+    - generally the planner could use compact on his session more often? suggestion :-)
+  - --wip/--deferred if it prevents work can also be ignored when on autorun 
+    - e.g. proposals are always allowed to write, test implementations as scripts in tmp also
+  - in general all things you find that might lead to some general improvement or built up of actionable knowledge can be done
+    - e.g. research
+      - you can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 
---comment: when the session dumping addition is done to the compact_memory tool, how is the dumping of the same session_id before and after compaction handled? will the tool automaically create a seperate folder for the dump after compaction based on the tracked compaction budget? if this is handled without overwriting and thus loosing session info then good - if not include such a function please. thanks :-)
+  - 26-09-16_11-50 opencode restarted - changed plugin should now be active
 
-# 0 focus on proposals and open inbox items for now. lets reduce the open backlog
- - combine adjacent items when possible
+# compact_memory tool dump function ## 55 approved
+- compact count aware dump
+- autocompact on context limit option, toggable via parameter in the budget file
+
+# fuzzy research scripts + plugin
+-- see comments in research for direction/approval state
+
+# repo split research/proposal
+- how best to seperate fst and the opencode_test branch into 2 independently trackable git repos
+  - goal is to seperate repo files from opencode and agent files
+    - in the repo lives only the files that concern the repo - nothing of agents or opencode  (clean for)
+- i could imagen to move the opencode part in a parallel folder to FST
+  - C:\Users\Wasiejen\Projects\Repos\Opencode|Free-Snap-Tap
+    - Opencode would as start just copy the structure we already have without the FST files
+    - and giving explicit diretory to C:\Users\Wasiejen\Projects\Repos\ or based on what repos to work on
+      - path variable would be an option to make this in general more independent?
+    - I would create a copy of the FST repo in github and clone it into this new folder and move the old FST into C:\Users\Wasiejen\Projects\Repos\Free-Snap-Tap (might defer move to not to have to update all the references at once?)
 
 --defer # 3 3 destillation worker runs for now - to much work right now. 
 # 3 3
@@ -49,7 +70,7 @@ stop/compaction protokol for now 95% - this means explicityl around 90% gauge wi
 
 - so approved as long as you do not destroy my repo or pc :-)
 - ps --comment can be removed if acted on or you have aknowledged it - these are more as explanations to you then for me to keep.
-- --wip if it prevents work can also be ignored because i am afk/autorun mode :-)
+- 
 
 prompt additions/edits/rewrites:
 # 5
@@ -69,5 +90,3 @@ prompt additions/edits/rewrites:
 - can it go in live usage?
 - writing a usage guide and include it with usage guides to the other tools - i think best place in repo_custom_tools and instrution as other parts to read as needed?
 - do what you can without approvel and for the rest make a proposal
-
-
