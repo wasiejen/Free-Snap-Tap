@@ -42,3 +42,13 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   and the max label (107) can never be equal unless the gap is filled or the table
   labels are counted. #60's new labels continue from the real max label: 108..123
   (consecutive, machine-verified). Next free label = 124.
+
+## 2026-09-16 — worker-13 (plan9/iter9, research lane)
+- Stale doc baseline in `.opencode/plugin/README.md` line 9: it says
+  "probes/ — the test gates (handover_probe.mjs, 84/84 under NODE)", but the
+  current probe total is 120+2 (machine-verified plan9: `PROBE handover:
+  120+2/120+2 PASS`; the header annotation "one hundred twenty-two" in
+  repo_commands.md is the source). Fix = one-line baseline update in the
+  plugin README — out of scope for the research lane (`.opencode/plugin/**`
+  is DO-NOT-TOUCH there); delegate as a one-liner with any build that
+  touches the plugin folder.

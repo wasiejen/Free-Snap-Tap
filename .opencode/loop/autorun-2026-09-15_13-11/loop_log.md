@@ -47,3 +47,5 @@
 2026-09-16_05-15 DONE<--- planner-8 ses_f57dc514dffeO3jFufy9dxV6Lw Qwen3.8-27B-IQ4KT-140K gauge CTX=87227 (62%) REM=52773; batch #54+#51+#58 closed (384080f+f113002), gates green (probe 120+2 machine-verified / pytest 459+1w / ruff F=0 / 7 smokes), plan9 spec = approved research lane (agent/research/)
 2026-09-16_05-16 -RETURN- looprunner ses_f5b507a66ffegia0ZZifYeRD2l Qwen3.8-27B-IQ4KT-120K planner-8 ses_f57dc514dffeO3jFufy9dxV6Lw planner_Q4_140K
 2026-09-16_05-23 -->START planner-9 unknown Qwen3.8-27B-IQ4KT-140K plan9 (iter 9): approved research lane — fuzzy name resolution + numword tool-call hardening (RESEARCH ONLY, agent/research/ folder, worker delegation)
+2026-09-16_05-25 --INFO-- planner-9 ses_f57c84fbbffeaLDqNyuJzEw85G Qwen3.8-27B-IQ4KT-140K dense-digit trap live in planner-9: machine-computed 10+1 read as a shifted digit across 3 tool outputs (full enumeration 9..16 + charcodes [49,51] settled it: worker-13) — the exact failure mode the plan9 research lane investigates
+2026-09-16_05-26 -->START worker-13 ses_f57bfbc8effeXSe8mY7wuP0Xy7 Qwen3.8-27B-IQ4KT-140K plan9 research lane: fuzzy name resolution + numword tool-call hardening (research doc only)
