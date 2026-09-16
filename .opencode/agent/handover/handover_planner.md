@@ -66,20 +66,35 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   TODO #53, already self-contained + still DEFERRED — nothing to do now).
   `dense_numbers.md` (--wip, "idea collection — for discussion in direct
   session") LEFT UNTOUCHED (his live idea file).
-- #63 SPEC WRITTEN + committed (spec at handover_task.md). Root cause
-  MEASURED at spec time (not assumed): the dump hook (4512fe6) appends a
-  `WARNING: pre-compaction dump failed ...` line to the response in the smoke
-  sandbox (no `dump_session.cjs` there → MODULE_NOT_FOUND), breaking 4
-  byte-exact response checks; the probe already solves it via a stub script
-  (handover_probe.mjs 1983-2015) — the smoke mirrors that approach + gets ONE
-  new chk (dump file exists after a tool-path dispatch). Plugin behavior
-  untouched. worker-7 launched against the spec.
-- NEXT: verify worker-7 → then #60 block_transfer+loop_log probe pins
-  (delegate, medium; spec written AFTER #63 lands, against the fresh state).
+- #63 DONE + VERIFIED (worker-7, `6a9877f`): smoke sandbox carries a
+  byte-identical stub `dump_session.cjs` (probe S13 mirror) + 1 new chk
+  (hook fires on the tool path); smokes 43/43; gates re-run green by the
+  planner (probe 106/106, pytest 459+1w, ruff F=0, ALL 7 smokes green).
+- RETRIAGE (his commit 0e7bd8b "commented TODO" landed after plan6 — the
+  plan6-era sweep had `head`-truncated the match list and missed TODO.md):
+  NEW `--comment` rulings on TODO.md:
+  - **#57 APPROVED** (fix the MOVE dstFile guard — data loss prevention; his
+    feedback questions answered in plan7_summary.md: CLEAR mode already
+    empties buffers; the feedback-folder is gone → answers ride NAP/summary;
+    his "shared scriptlet sandbox" idle-thought = future research, not built)
+  - **#54 APPROVED** (no-circumvent rule into the role prompts — prompt-text
+    work, planner side)
+  - **#51 ruling** (`type: module` in .opencode/package.json is stale —
+    "you can remove it", restart will show)
+  - **#58** (gate definition: "you work with the commands. add to them as
+    need be" — NOTE: his marker has a TYPO `--commment`, so it evades the
+    ready-made sweep; the TODO.md sweep must include a typo variant)
+  - #56 --comment: stays last ("when nothing other is actionable")
+- REORDER (planner call): #57 BEFORE #60 — the #60 probe pins must pin the
+  POST-FIX block_transfer contract (a pin written against the buggy behavior
+  would need rework). Order: #57 (worker-8) → #60 (worker-9) → plan8:
+  #54 + #51 + #58 (planner-direct batch).
+- #57 SPEC WRITTEN (guard hoist, byte-identical error string, 1 new smoke
+  assertion). worker-8 launched.
 - OPEN (his direct session, non-blocking): #63's optional decision — should
-  the plugin smokes join the standard gate in repo_commands.md (relates #58,
-  both maintainer-owned)? #51's `type: module` ruling (--comment: likely
-  removable). fst-rebind-repeat still PARKED for his direct session.
+  the plugin smokes join the standard gate in repo_commands.md (folds into
+  #58, which he has now approved for the agent)? fst-rebind-repeat still
+  PARKED for his direct session. #56 stays last per his --comment.
 - MAINTAINER-OVERRIDE NOTE (carried from plan6): ask_maintainer does NOT
   pause the loop — open questions are recorded here, never issued as ask
   actions.
