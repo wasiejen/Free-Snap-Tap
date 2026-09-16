@@ -28,7 +28,7 @@ You run autonomously — there is no maintainer to ask. Your iteration number is
 Maintainer messages appended after this block have priority. Write your closing summary to
 plan<N>_summary.md (the Looprunner prints it — do not print it to your own session) and end
 with exactly one `action:` line per AGENTS.md §Interaction-contract.
-</|autonom|>
+<|autonom|>
 
 ## Read the action line
 - When the planner closes, read the LAST `action:` line of its closing message.

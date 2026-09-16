@@ -1,3 +1,11 @@
+--comment in future include session_id and agent
+- to resume the session if possible or 
+- to find the knowledge in the session archive 
+  - might then use it to read it in into an same agent to discuss it further
+
+Session_ID: ses_f57c84fbbffeaLDqNyuJzEw85G
+Agent: Planner_Q4_140K
+
 # 2026-09-16 — fuzzy name resolution + numword tool-call hardening (RESEARCH)
 
 Research doc for the plan9 approved research lane (maintainer ideas #5/#6/#7,
@@ -197,6 +205,8 @@ repair with two failed regex passes.
 - "b<six>c<eigth><six><one>d → b6c861d" (dense_numbers.md 81) — "eigth" is
   a misspelling of "eight" in the maintainer's own example.
 
+--comment: these both are my OWN examples given to clarify what i mean, NOT observed. The misspellings are entirely my own and i meant eight and fortyfour. (english is not my native language ;-P)
+
 So numberwords are not drift-FREE; they drift differently (letter
 substitution / missing letter instead of digit substitution, e.g. `eigth`,
 `fourty`). **Conclusion: the value of numword is CROSS-CHECKING, not
@@ -207,6 +217,29 @@ least clear that there is one" (his caveat stands: word-priority "is just a
 guess — needs to be observed"). A system that silently replaces one form with
 the other hides the mismatch; a system that checks both and logs a
 disagreement catches the drift.
+
+---
+
+--comment: so yes the conclusion is right but based on false examples that i created as demonstration and did not observe
+- the value is redundancy of information see #9 ideas.md
+
+# 9 general recommendation/consensus for file_naming and fuzzy matching is to not use files only seperated by numbers, but by words
+- e.g. plan<number>>_ho_task.md is only seperated by one digit and a bitdrift results in a succesful read if file is already there
+  - plan_9_nine_ho_task might be better - double informtion redundancy (minimal extra effort and high value)
+  - plan_9_ho_task_research_fuzzy - readable and very hard to mismatch, but single digit write fail will lead to a mis reference to another planner
+  - plan_9_nine_ho_task_research_fuzzy - safe for fuzzy read path match and write path match (if existing)
+  - autoreplce numword->num on writeout  
+    - plan_<nine>_nine_ho_task_research_fuzzy -> if bitdrift in words are less this makes this safer
+    - plan_<9|nine>_nine_ho_task_research_fuzzy 
+      - -> added intended number might further stabilise the use for writing
+        - take the first option if both match, else word_to_num the second option
+          - or plan_<9|nine>_ho_task_research_fuzzy could be resolved to plan_9_nine_ho_task_research_fuzzy automatically IF both match
+            - same information density as plan_<9|nine>_nine_ho_task_research_fuzzy?
+- my old naming for inbox items with pure date is such a bad example.
+  - date + topic on the other hand is safe for read matching g - topic delivers information to seperate from other file names
+    - and also generally safe for write matching when no closer neightbors exist
+
+---
 
 ### 3.2 The general function idea (dense_numbers.md 14–17)
 
@@ -224,6 +257,8 @@ and the entries only format it):
 - **bash:** a `w2n()` shell function delegating to the node one-liner
   (Git-Bash on this host; do not maintain a third copy of the map in awk).
 
+--comment: what is awk?
+
 Map coverage (required before it is a rule):
 - units `zero..nine`; tens `ten..ninety` **including the `fourty` alias**
   (both spellings map to 40 — the observed drift must be a legal input, not
@@ -235,6 +270,13 @@ Map coverage (required before it is a rule):
   version passed 8/9 and failed exactly on the units+unit pattern
   (`twozero`) — an untested grammar is an untested rule.
 
+--- 
+
+--comment: (`twozero`) -> (`two-zero`) or (`two+zero`): general recommendation is seperation of units of dense information, so a seperator should always be there
+- but "+" could be interpreted as a deconstruction. i have not observed a case where the the deconstructed number into multiple adder. 50+5 = 54 (normally the sum is the wrong part), the models are aware of what number they mean, but can not write it (just an observation)
+  - but to be safe only allow number words, no additions or subtractions
+
+---
 `<five>` markers: the delimiting convention (dense_numbers.md 73/81) makes
 the replace target unambiguous — a bare word `four` inside prose ("for"
 adjacency is harmless, but `ten` inside "bitten"/"often" is not) cannot be
@@ -270,6 +312,51 @@ This existence-gate is the safety core: the replace is only ever
 Fail-closed everywhere the gate is inconclusive. Best-effort: the hook never
 throws into the delegation (established pattern, ctx_watchdog.ts 13–14).
 
+---
+
+--commit: so only when there is not other neighbor with the same variation depth (no idea if this is the right term for this - definitely not i quess)
+- does is also handle `file-5.txt` → `file-4.txt`, if there is no other file with the structure → `file-<number>.txt` in the path? 
+  - perturbations would be d=1 if i remember the upper part correctly. but if there is a file e.g. `file-6.txt` (with same bitdrift distance and same pertubation count)
+    - so 2 neighbors with the same number of pertubations and same bitshift distance
+      - (i normally only see bitshift by one - my example in the file dense_numbers.md 89+1 = 94 was grapped from though of many attemps to resolve the this by trying a lot of different deconstructions into adders - drift is normally one and this example could be an attempt to lose the sticking 94)
+      - (might be worth a scan of the session for attempts of <num>+<num>=<num> via grep or similar tools to see if their are more examples of this)
+        - and normally in the same areas the attemps in different ways to resolve it. e.g. using words and we could scan how this fares but grepping the windows into files. let the gemma4 model then run over it (it has higher kv quant resolution and should not be as effected by this or at least if, then on other numbers :-) )
+        - then we have a base if a bitdrift of 1 is the representive for it
+        - so a file neighbor file with name `file-7.txt` could be excluded because the bitdrift it to high, maybe to be safe difference needs to be >2 or >3 to remove potential neightbors
+        - (but might make this too compliated right now)
+        
+- writing option <4|four> or simply 4|four might be worth it to get redundancy and more information about the intended file
+  - so `file-4|four.txt` → `file-4.txt`
+- how to handle multi digits?
+  - `file-fourfour.txt` misses the seperation and it is unclear if `file-4four.txt` `file-44.txt` or `file-four4.txt` is meant.
+  - using "|" as reduancy marker might make this easier
+    - `file-44|four-four.txt` or `file-44<>four-four.txt` or other variant (whichever is better for automatic replacement in repo over every file later)
+      - the reduncy marker makes it clear that their is a replacement to be done and it let us use seperated numwords on the right and gives us extra information even if the four-four is also drifting
+    - **ADDED BENEFIT: we could log discrepencies of left and right side and thus track potential mismatches!!!!**
+      - we could check/control these files later
+      - we could rename them to reduce confusion for later agents
+      - we could tune the matching mappings of words to numbers, because we get live mismatch data without needing to search for them in sessions
+      - we could observe how often this happens and thus i have some measurements when i try to influence this via agent settings, model settings or system prompt instruction
+    - maybe here additions would be able to provide more redundancy
+      - e.g.`file-39+5|four-four.txt` if 44 can not be thought or written about
+        - discrepency is as clear as before, but now we have real redundency and can be quite sure what was meant, because to have the same bitdrift in adder notation AND numword is very very unlikely (when adder notation used both must be the same?). your take on it? 
+        - the agents try it anyway and to codify adder deconstruction might be a natural way out -> clear action without being technically incorrect and thus do not need to stress about it
+  - idea needs to be refined i guess
+    - outer signaling `b<six>c<eigth><six><one>d -> b6c861d` would be better in such cases?
+      - `b6c861d|b-six-c-eigth-six-one-d -> b6c861d`
+        - might still work - maybe with outr brackets for a cleaning delimination to other text parts?
+          - `<b6c861d|b-six-c-eigth-six-one-d> -> b6c861d` 
+            - yeah i like this idea. your take on it?
+            - but this prohibits adder construction as fallback?
+              - maybe we need the rule to not include non num chars?
+                - `b<6|six>c<861|eight-six-one>d -> b6c861d` 
+                - `b<4+2|six>c<800+50+11|eight-six-one>d -> b6c861d` 
+                  - this could work
+                  - my intuition would be to restrict numword to single digit nums (zero to nine) but might not be optimal for token usage? 
+                  - 
+
+---
+
 ### 3.5 Interaction with Part A
 
 In the same hook, per argument: (1) numword word→digit (existence-gated),
@@ -303,6 +390,22 @@ it won't per §2.3).
 - **Anything whose replacement form ALREADY EXISTS as a distinct real name**
   (both forms present → the word form is intentional).
 
+---
+
+--comment: see above comment about redundency markers and delimination to other string content - might solve this and expand its scope on write, but general yes - be conservative if unsure
+- my earlier comment aim to add redundency and this fuzzy match might not be as needed or at least not as often
+  - yes this needs also to be logged when a closest neightbor was selected or when the tool call failed to resolve to a neightbor
+
+
+simple path checks could also be done to catch common error i observed like wrong base path 
+- e.g. c:\users\users\wasiejen with a doubled users part
+- sandboxing can be done here also, to prevent access outside of sandbox and thus prevent loop stopping access request in opencode
+  - should only have sandboxing in one place i think to now doublecheck and have a stale check prevent read and write :-)
+
+
+---
+
+
 ### 4.2 Where the correction log lives
 
 - Append-only, machine-written, agent-readable: a line per correction in
@@ -317,6 +420,14 @@ it won't per §2.3).
 - The FAIL-CLOSED candidates from Part A log to the same channel (one
   channel for all matcher activity — see, audit, trust-or-reject in one
   place).
+
+---
+
+--comment this would not prove that the correction where necessary, thus only an incident indicator and not an indicator for a realy problem (agent could be over cautious to prevent rejection of tool calls if they might type something wrong)
+- definitely another log file and not plugin.log
+  - for me add session_id, model_id and maybe close snippet of string with the pre replacement to have some context where it happened. e.g. in session_id, in git commit id, in dateformat
+
+---
 
 ### 4.3 Other risks
 
@@ -424,3 +535,15 @@ reach tool execution?):
 - Scratchpad experiment `fuzzy_numword_exp2.cjs` + the 9-case word_to_num
   check (8/9; failure = `twozero` units+unit pattern) — scratchpad only,
   not committed.
+
+
+--comment really nice work!
+- check my comments and check if these would improve the design and if what consequences this would have for the scope
+  - create a addendum to the research of what you find (seperate file also in research)
+
+approval:
+- generally everything you can do via scripts that improve this are approved to test (write only in temp) and if tested also to use as first test in live work on read actions
+  - so 5.1, 5.2 approved, 5.3 as general intercept plugin without correction is also approved as functional test to work for all relevant tools (or all if possible). + logging mechanism
+    - functional prototyp for the intercept
+    - seperate from watchdog (functional seperation)
+    - seperate log file (functional seperation also as reason )
