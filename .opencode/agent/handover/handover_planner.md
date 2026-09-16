@@ -131,6 +131,13 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   His FB files relocated by him to `research/` (`FB_` prefix) — his
   reorg, left untracked.
 - TODO #65-69 amended (67→R3, 68→R2 gates, 69 form superseded + ruled).
+- **R6 added (late, his proposal):** edit-scope hint channel + payload
+  journal (every write/edit dumped per-tool to temp; anchor-first content
+  locator; hints for not-found/multiple-matches; NEVER mutates content,
+  NEVER auto-retries — recovery = agent fires cp/block_transfer from the
+  journal). Observation-only → gates on R1, not R2. Design + reasoning:
+  decision-record §8, spec staged `spec_R6_edit_hint_journal.md`. After-hook
+  result-enrichment still UNVERIFIED (log-only fallback).
 
 ## Standing
 - Baselines (re-verified 2026-09-16, plan2, gates re-run by the planner

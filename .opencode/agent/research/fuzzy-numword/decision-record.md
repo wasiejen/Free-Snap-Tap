@@ -239,6 +239,12 @@ paste, like the stop-line change):
 - **R5 — letter-fuzzy / aliases** (no spec — deliberately): only if R4 shows
   word-mismatch lines. Design in reserve: Levenshtein over the map words
   (same mechanism as path fuzzy), aliases added per observed case.
+- **R6 — edit-scope hint channel + payload journal** (`spec_R6_*.md`, staged
+  — added 2026-09-16 late, see §8): observation-only throughout (journal on
+  every write/edit/block_transfer, anchor-first content locator, edit hints
+  for not-found + multiple-matches, no mutation, no auto-retry). GATE: R1
+  green (does NOT need the R2 write-scope approval). Direct answer to Loop
+  Pattern 3 (the failed-edit retry loop), like §4 answers Pattern 5.
 
 ## 6. Blind spots closed this session (and their standing status)
 1. Scope boundary args-vs-content — closed (§2.6); rides the AGENTS.md paste.
@@ -258,3 +264,41 @@ paste, like the stop-line change):
 ## 7. Open questions
 None blocking. Next maintainer decision: the R2 approval (write-scope spec
 is staged). R3/R4 gates are data-driven.
+
+## 8. R6 — edit-scope hint channel + payload journal (discussed 2026-09-16
+late, direct session; spec staged as `spec_R6_*.md`)
+His proposal: intercept `oldString` (and the write payload) — on mismatch,
+resolve first, else buffer/dump the payload with a reference for the agent.
+Decisions + reasoning from the exchange:
+- **Compute is NOT the constraint** (his ruling): tool-call rounds (~2s)
+  + context burn are the expensive resources; CPU idles. Consequence: NO
+  dense-trigger restriction — the hint channel runs on ALL edit failures.
+- **Anchor-first content locator** (his anchor insight, the unifying
+  primitive): split the query into dense (numerals/dates/ids) vs non-dense
+  (words) segments; anchor = longest non-dense run; find candidate lines by
+  anchor; exact-then-fuzzy (d/gap rule) ONLY within candidates; all-dense
+  query → bounded whole-file fuzzy → fail-closed. Same principle as
+  full-path matching. One primitive, three consumers: (a) R6 edit hints,
+  (b) R3 section-anchor resolver, (c) block_transfer section recovery.
+- **Payload journal on EVERY write/edit** (his ruling: "one file per tool
+  and we have a fallback"): `.opencode/temp/journal_write.log` /
+  `journal_edit.log` (date-stamped names = natural cap; git-ignored), one
+  line per call: write = full content, edit = filePath+old+new,
+  block_transfer = src/dst+anchors. Value: a write is a big GENERATION —
+  a failed call or a dead session must not force a full regeneration
+  ("rewriting doubles this; dump and copy is cheap").
+- **Recovery semantics (pinned): the hook NEVER auto-retries.** The journal
+  line + hint line give the agent / rescue session the one-command fallback
+  (`cp` payload in place, or block_transfer-PASTE the section by anchor);
+  the agent fires it. Fail-closed discipline applied to recovery.
+- **Content is never mutated** — hint, never fix (a wrong replacement in
+  the right file with plausible surroundings is the hardest corruption to
+  notice; the agent's one-call retry with the hint keeps the machine-check
+  culture). "Multiple matches" gets the same hint (candidate line numbers —
+  kills the "provide more context" loop).
+- **Placement correction (mine, superseding the §5 first pass):** R6 is
+  observation-only throughout (journal + hints, no mutation, no auto-retry)
+  → **gates on R1 green, NOT R2**. R2 (write-scope mutation) unchanged.
+  After-hook result-enrichment (hint inside the error text) = spec-time
+  type check against the installed host bundle; log-only is the fallback
+  (the after-hook result surface is UNVERIFIED as of this writing).
