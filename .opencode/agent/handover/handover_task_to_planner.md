@@ -1,106 +1,113 @@
-# Worker summary — 5.3 intercept observer plugin (worker-2, ses_f55bd6887ffeeIRO1FXrplLr78)
+# Worker summary — 5.4 intercept observer: export fix (core split) + read-scope
+# fuzzy read (worker-13, ses_f55463549ffelXphfcDlDGMhPJ)
 
-Looprun `autorun-2026-09-16_13-33`, iteration 1, branch `opencode_test`.
+Looprun `autorun-2026-09-16_17-20`, iteration 2 (plan2), branch `opencode_test`.
 TASK COMPLETE — all DoD items met (measured verification below).
 
-## What changed (3 commits)
+## What changed (one commit, base `e953a1f` — the commit carrying this file)
 
-1. `7d485b0` — **NEW `.opencode/plugin/intercept_observer.ts`** (518 lines)
-   + **NEW `.opencode/plugin/tests/intercept_observer.smoke.mjs`** (24 checks).
-   - `tool.execute.before` hook, ALL tools, log-only: NEVER mutates
-     `output.args`, NEVER blocks. Separate from the watchdog (own file, own
-     registration; `opencode.jsonc` untouched).
-   - Observations (each class = one bundled line; cap 3 lines/call, priority
-     order: mismatch → path-anomaly → out-of-sandbox → pair-ok → ambiguous →
-     no-candidate): (a) dense-digit (≥6-digit runs, `ses_` shape, date
-     shapes), (b) numword token hits via the shared map, (c) `<digit>|<word>`
-     tight pairs (left/right check: agree/mismatch/ambiguous/unknown-word; a
-     shell pipe with spaces is NOT a pair), (d) doubled path segments,
-     (e) out-of-sandbox path NOTE (note-only, no enforcement).
-   - Line shape C7 byte-exact: 8 `" | "`-separated fields
-     `stamp | session | model | tool | original-arg | evidence | context |
-     verdict`; field contents flattened (no `" | "` inside, cap 160 chars);
-     internal errors → at most one `intercept-error` line (8-field shape,
-     field 5 marker), the hook never throws.
-   - **Single numword map home (C3):** loads
-     `.opencode/agent/scripts/numword/numwords.json` at plugin start (path
-     resolved next to the plugin file); read failure → numword checks (b)/(c)
-     silently off, other checks run. NO embedded second copy.
-   - Model id: same source as the watchdog — `readGauge(undefined,
-     sessionID)` from `./scripts/gauge.mjs` (bounded backend chain;
-     per-session 60 s cache; no cross-session fallback) → `unknown` when
-     unavailable.
-   - Log: `.opencode/temp/intercept.log` under the PluginInput project dir
-     (git-ignored, verified by probe check 170).
-   - Detection core is NAMED exports (pure functions over arg strings + the
-     map): `observeArg`, `observePairs`, `observeDense`, `observeNumword`,
-     `observePathAnomaly`, `observeSandbox`, `resolveNumword`,
-     `classifyContext`, `loadNumwordMap`, `underRoot`, `flattenField`,
-     `VERDICTS` + constants — the probe/smoke pin fixtures WITHOUT a full
-     PluginInput harness (only the hook-level checks use the real factory,
-     against a sandbox project dir).
-   - Usage note (restart-gated activation; log location; verdict
-     vocabulary) in the plugin file header (the spec's either/or — NOT in
-     repo_custom_tools.md).
-2. `51529ac` — **probe S18 section (21 checks, 150–170)** in
-   `.opencode/plugin/probes/handover_probe.mjs`, inserted before the S5
-   hygiene section (existing sections untouched); header intro + section
-   summary + the machine-checked annotation updated (digit form):
-   `… S17=26 S18=21 hygiene=6 → "PROBE handover: 169/169 PASS"`. Pins:
-   shared map home (real file loads / missing → null), C4 grammar parity
-   (all 5.2 pass + reject fixtures), ambiguous split via a synthetic map,
-   every observation class with pass + negative fixtures, byte-exact
-   evidence strings, the 3-line cap + priority, clean arg → no line, hook
-   byte-identical args, garbage input → never throws, the 8-field line
-   shape + verdict vocabulary, live log untouched, git-ignored log path.
-   Same commit: removed a dead "next char is a letter" guard from
-   `pairMatches` (the `i`-flagged word class already consumes the maximal
-   token — the guard could never fire; the probe's first run pinned the
-   real behavior: `4|fourex` IS a pair → unknown-word gate line).
-3. Docs (with this handover): `.opencode/plugin/README.md` gains the
-   intercept_observer line (purpose + log location + pointer to the header
-   usage note).
+**Unit 1 — export fix (core split):**
+- NEW `.opencode/plugin/intercept_observer_core.ts` — ALL named exports moved
+  here (types, constants, regexes, the six observation functions,
+  `resolveNumword`, `classifyContext`, `flattenField`, `underRoot`,
+  `loadNumwordMap`, `VERDICTS`/`VERDICT_RANK`, `observeArg`). Pure module, no
+  default export, never loaded by the host loader directly. The ported
+  sections are byte-identical to the original (diff-verified against git HEAD;
+  one transcription slip in `DATE_RUN_RE` — `[12]\d` vs `[2]\d` — was caught
+  by that diff and fixed before commit).
+- REWRITTEN `.opencode/plugin/intercept_observer.ts` — hook plumbing only
+  (dir/map/model-cache state, `getModel`, log appenders, `onToolBefore`) +
+  `export default (async (input) => {...}) satisfies Plugin;`. Verified
+  `grep -c "^export"` = 1; every `Object.values` entry is a function (the host
+  loader contract — the "Plugin export is not a function" root cause, pinned
+  by probe check 171).
+- The shared numword map home (C3) stays in the PLUGIN file (`MAP_PATH`
+  resolved next to it — needed only at plugin start); the core stays path-free.
 
-## Measured verification (all after the final commit's code state)
+**Unit 2 — read-scope fuzzy resolution (the "read functionality"):**
+- In the CORE (pure, pinned): `buildCorpus(root)` (relative paths, dirs +
+  files, `.git`/`node_modules` skipped, cap `CORPUS_MAX_ENTRIES` = 20 000,
+  missing root → `[]`), `levenshtein`, `normPathForm`, `relForm`,
+  `nearestExistingDir`, and `resolveReadPath(argRel, corpus)` →
+  `{kind:"exact"}` (byte- or normalized-equal — untouched, no line) /
+  `{kind:"resolved", path, d, gap}` iff d<=2 AND gap>=2 / `{kind:"rejected",
+  cands: top-3 [rel,d], reason}` (d-too-high / gap-too-small / empty-corpus).
+- In the PLUGIN (wiring): scope `input.tool === "read"` with a STRING
+  `output.args.filePath` ONLY; exact/normalized-existing → fast-path (no
+  fuzzy); `resolved` → MUTATES `output.args.filePath` to the resolved
+  absolute path; BOTH outcomes logged (addendum C6) as the two new verdict
+  tokens `fuzzy-resolved` / `fuzzy-rejected` (evidence byte-shapes:
+  `fuzzy orig=<arg> -> <rel> d=<n> gap=<g|inf>` /
+  `fuzzy orig=<arg> cands=<p1 d1,…> reason=<r>`), same C7 8-field line shape.
+  Corpus cached per normalized root with `CORPUS_TTL_MS` = 60 s. The
+  observation channel (field 5) is captured BEFORE the mutation — it always
+  logs the original arg. Write/edit/delete args are NEVER touched.
+- `VERDICTS`/`VERDICT_RANK` extended with the two tokens (the existing six
+  stay byte-identical; fuzzy ranks 6/7 are documentary — fuzzy lines log
+  separately, never capped into the observation lines).
 
-- `node .opencode/plugin/probes/handover_probe.mjs` → **PROBE handover:
-  169/169 PASS**, agreeing with the header annotation (148 + 21).
-- All 8 smokes green (7 existing + new):
-  `INTERCEPT_OBSERVER_SMOKE: ALL PASS (24/24)`, plus BT-SANDBOX 52/52,
-  BLOCK_TRANSFER 22/22, COMPACT_MEMORY 46/46, CONTEXT_RECOVERY PASS,
-  CTX_GAUGE 3/3, GAUGE_CORE PASS, LOOP_LOG 24/24.
-- `./.venv/Scripts/python.exe -m pytest -q` → **459 passed, 1 warning**
-  (unchanged — no FST product code touched).
-- `./.venv/Scripts/ruff.exe check --select F .` → **All checks passed!**
-- `git status` at the end: my files all committed; remaining unstaged
-  entries are the maintainer's own live edits (`.opencode/maintainer/**`,
-  `opencode.jsonc`) — left uncommitted per the spec.
-- Smoke sandbox discipline verified by the smoke itself: the intercept.log
-  lands under the scratchpad sandbox project; the live
-  `.opencode/temp/intercept.log` state is byte-identical before/after
-  (did not exist at run time — still did not).
+**Test gates extended:**
+- `.opencode/plugin/probes/handover_probe.mjs` — S18 grows 21 → 32 (checks
+  171–181): export-fix loader contract; `resolveReadPath` exact / normalize /
+  d=1 / d=2 (transposition) / gap<2 / d>2 (top-3 cands) / empty-corpus
+  fail-safe; `buildCorpus` shape+cap+skip pins; hook-level mutation
+  (fuzzy-resolved, byte-exact evidence), fail-closed no-mutation
+  (fuzzy-rejected, cands+reason), exact-existing no-line. All pin values were
+  machine-measured before being written into the probe (no hand-computed
+  distances). Section annotations + EXPECTED OUTPUT updated and machine-checked
+  (annotation sum 180 = the `180/180 PASS` line).
+- `.opencode/plugin/tests/intercept_observer.smoke.mjs` — 24 → 29 checks:
+  loader-contract shape (default ONLY) + core-surface check; `VERDICTS` now
+  the eight; the "clean arg" fixture became an EXISTING file (a nonexistent
+  read now gets a fuzzy-rejected line by design); the three new read-scope
+  flows (mutation / fail-closed / exact) with byte-exact evidence; the
+  live-log-unchanged guard stays the final check.
+- `.opencode/plugin/README.md` — the intercept_observer line updated (split +
+  read-scope mutation contract).
 
-## Deviations (none material)
+**Live-acceptance fixtures (5.4 one-shot, created and KEPT):**
+`C:/Users/Wasiejen/AppData/Local/Temp/opencode/fuzzy_accept/` —
+`file-four.txt` (sentinel, content `ORIGINAL`) + `file-4.txt` (twin, content
+`TWIN`). The next-restart acceptance reads the sentinel with a d<=2 mistyped
+path and checks returned content + the `fuzzy-resolved` log line (mutation
+channel LIVE or NOT). Do not delete until that verdict lands.
 
-- Smoke = 24 checks (the spec's "established pattern", no count pinned);
-  probe S18 = 21 checks (within the spec's ~15–25).
-- The smoke/pin fixtures for `|`-pair ambiguity use a SYNTHETIC map passed
-  to the pure `resolveNumword` (the real shared map has no ambiguous split —
-  the C4 grammar makes splits unique; the ambiguous code path is still
-  pinned, per the spec's "ambiguous" verdict requirement).
-- Verdict assignment for the log-only gate evidence is documented in the
-  plugin header (standalone dense/numword findings → `no-candidate`;
-  unknown-word pair → `no-candidate`; multi-split → `ambiguous`) — the C7
-  vocabulary has no dedicated "observed-only" verdict.
+## Measured verification (standard gate, all green)
+- `grep -c "^export" .opencode/plugin/intercept_observer.ts` = 1; every
+  `Object.values` entry a function (node import check + probe check 171).
+- Probe: `PROBE handover: 180/180 PASS` (self-annotation machine-checked:
+  section sum 180; S18=32).
+- Smoke: `INTERCEPT_OBSERVER_SMOKE: ALL PASS (29/29)`.
+- pytest: `459 passed, 1 warning` (baseline held). ruff: `All checks passed!`
+  (F=0). The 7 other smokes: all OK.
+
+## Queue items (for the planner)
+- **Fuzzy scope extension (next candidate unit):** glob / grep /
+  section-anchors are NOT in this unit (spec: queue them) — only `read` is
+  wired; the core matcher is corpus-root-agnostic and ready for them.
+- **Maintainer `--wip` file observed:**
+  `.opencode/maintainer/feedback/2026-09-16_number-w2n-convention.md` has
+  live `--wip` additions (single-digit stability, digit-separator /
+  redundancy ideas). Left untouched (DO-NOT-touch + wip guard); if any of it
+  becomes a ruling it belongs in a numword-lane task, not 5.4.
+- **Loop-folder housekeeping (observation, planner territory):**
+  `.opencode/loop/` holds the current `autorun-2026-09-16_17-20` plus an
+  un-archived, name-mangled prior folder
+  `autorun_2-6_0-9_1-6__1-3_3-3/` (carries plan1/plan2 spec+summary copies).
+  Rollover moves the old folder into `.opencode/archive/loop/` — I did not
+  touch loop folders.
+- **Stale doc numbers (maintainer file, flagged only):**
+  `repo_commands.md` §Run/test still quotes probe totals "~376" /
+  "one hundred twenty-two (plan7…)" — both from the prior looprun; the current
+  self-annotation (the declared source) is 180/180.
 
 ## Deliberately NOT done
-
-- No `opencode.jsonc` / watchdog / compact_memory / FST product changes
-  (DO-NOT-touch list honored).
-- No mutation channel, no auto-resolution/renaming of `|` pairs, no
-  enforcement of the sandbox note (all §5.4 / open-question 2 scope).
-- Live activation is RESTART-GATED (plugins auto-load at host restart) —
-  the build is committed + smoke/pinned; one restart is the acceptance
-  (the #51/#55 pattern), then the first `intercept.log` lines are the live
-  evidence.
-- No `TODO.md` / `todo_inbox.md` entries — no real blockers hit.
+- No liveness proof (RESTART-GATED by the spec — pin + gate green is the DoD;
+  the live `.opencode/temp/intercept.log` was never touched, smoke/probe
+  verified it byte-unchanged).
+- `TODO.md` untouched (no curation from a worker role); findings went to
+  `todo_inbox.md` (stale `repo_commands.md` totals + the loop-folder
+  observation).
+- The untracked session compaction dump
+  (`.opencode/archive/sessions/compaction_dumps/ses_f5…_c0.md`) and the loop
+  folders were left for the planner's bookkeeping commit.

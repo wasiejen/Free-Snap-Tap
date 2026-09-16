@@ -25,10 +25,15 @@
 // 124-149; the shared numwords.json map + the node CLI spawned via
 // execFileSync + the python twin via the repo venv + the module required
 // DIRECT via createRequire) + EXTENDED 2026-09-16 (lane 5.3: the log-only
-// intercept observer — the new S18 section, checks 150-170; the plugin file
-// is imported DIRECT, type-stripped, the NAMED-export core pinned WITHOUT a
-// full PluginInput harness, the numword map is the REAL shared file, the
-// hook writes to a sandbox project dir): the pre-rebuild
+// intercept observer — the S18 section, checks 150-181; the plugin file is
+// imported DIRECT, type-stripped, the NAMED core is pinned from the SPLIT
+// core file (intercept_observer_core.ts — the 2026-09-16 export fix: the
+// host loader requires EVERY Object.values(module) entry to be a function,
+// so the plugin file exports the default factory ONLY), the read-scope
+// fuzzy resolution (lane 5.4) is pinned (matcher exact/normalize/d1/d2/
+// gap<2/d>2/cand-shape + the hook mutation / fail-closed / exact flows),
+// the numword map is the REAL shared file, the hook writes to a sandbox
+// project dir): the pre-rebuild
 // probe
 // (v2.2.1 era) targeted the DELETED handover.ts, the retired
 // experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
@@ -387,10 +392,12 @@
 //      (148) the module: every reject fixture throws (loud);
 //      (149) numword_check: AGREE 20 (code 0) / DISAGREE 9 (code 1) /
 //          UNKNOWN eleventy (code 2) — machine-readable shell contract
-//   S18 intercept observer (21) — the lane-5.3 log-only pin (approved
-//      2026-09-16): the NAMED-export core (pure functions over arg strings +
-//      the ONE shared numword map — addendum C3) + the C7 8-field line
-//      shape + the never-mutates / never-throws hook discipline:
+//   S18 intercept observer (32) — the lane-5.3 log-only pin + the lane-5.4
+//      read-scope fuzzy resolution (approved 2026-09-16): the NAMED core
+//      (pure functions over arg strings + the ONE shared numword map —
+//      addendum C3) from intercept_observer_core.ts + the C7 8-field line
+//      shape + the never-mutates (observation channel) / never-throws hook
+//      discipline + the read-scope mutation contract:
 //      (150-151) the ONE shared map home: the REAL numwords.json loads; a
 //          missing path → null (numword checks silently off);
 //      (152-154) resolveNumword: every 5.2 pass fixture → value; every 5.2
@@ -408,10 +415,28 @@
 //      (165-166) observeArg: 5 firing classes → capped at 3 lines in
 //          priority order; clean/empty arg → no line;
 //      (167-169) the HOOK (real factory, sandbox project dir): output.args
-//          byte-identical (never mutated); garbage input → never throws;
-//          the log line is EXACTLY 8 " | " fields (stamp/sid/model-unknown/
-//          tool/verdict vocabulary) + the LIVE log untouched;
-//      (170) the intercept log path is git-ignored
+//          byte-identical (observation channel never mutated); garbage input
+//          → never throws; the log line is EXACTLY 8 " | " fields
+//          (stamp/sid/model-unknown/tool/verdict vocabulary) + the LIVE log
+//          untouched;
+//      (170) the intercept log path is git-ignored;
+//      (171) the EXPORT FIX: the plugin module exports the default factory
+//          ONLY (every Object.values entry is a function — the host loader
+//          contract; the ~16 named exports moved to the core file);
+//      (172-178) the read-scope FUZZY MATCHER (core.resolveReadPath, pure
+//          over a relative-path corpus — research §2.2/§2.5): exact (byte-
+//          equal rel) → {exact}; normalize (case/backslash/trim) → {exact};
+//          d=1 → {resolved,d:1,gap>=2}; d=2 (transposition) → {resolved,
+//          d:2,gap>=2}; gap<2 (two close siblings) → {rejected,
+//          reason:gap-too-small, top-3 cands [rel,d]}; d>2 → {rejected,
+//          reason:d-too-high, top-3 cands}; empty corpus → {rejected,
+//          reason:empty-corpus} (fail-safe: never resolves);
+//      (179-181) the HOOK read-scope (real factory, sandbox project dir,
+//          real corpus under a sub-root): a d<=2 mistyped read filePath is
+//          MUTATED to the resolved absolute path + a fuzzy-resolved 8-field
+//          line; a d>2 read is FAIL-CLOSED (args byte-identical) + a
+//          fuzzy-rejected line (top-3 cands + reason); an exact existing
+//          path → untouched + no fuzzy line + the LIVE log still untouched.
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -424,7 +449,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=21 hygiene=6  →  "PROBE handover: 169/169 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 hygiene=6  →  "PROBE handover: 180/180 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -3083,21 +3108,27 @@ for (const w of NW_REJECT) {
   n17++;
 }
 
-// ------------------------------------------------------------------ S18 intercept observer (21)
+// ------------------------------------------------------------------ S18 intercept observer (32)
 //
-// The lane-5.3 log-only intercept observer (.opencode/plugin/
-// intercept_observer.ts, approved 2026-09-16): the C7 8-field line-shape pin
-// + the NAMED-export core (pure functions over arg strings + the shared
-// numword map — pinned WITHOUT a full PluginInput harness; the hook-level
-// checks use the real factory against a SANDBOX project dir). The plugin
-// file is imported DIRECT, type-stripped (the S12/S13 load pattern); the
+// The lane-5.3 log-only intercept observer + lane-5.4 read-scope fuzzy
+// resolution (.opencode/plugin/intercept_observer.ts + _core.ts, approved
+// 2026-09-16): the C7 8-field line-shape pin + the NAMED core (pure
+// functions over arg strings + the shared numword map + the read-scope
+// matcher — pinned WITHOUT a full PluginInput harness; the hook-level checks
+// use the real factory against a SANDBOX project dir). The plugin file is
+// imported DIRECT, type-stripped (the S12/S13 load pattern); the named core
+// is imported from the SPLIT core file (the 2026-09-16 export fix — the
+// plugin file exports the default factory ONLY, so every ioCore.* named
+// reference below reads from the core module, ioCore.* from the plugin). The
 // numword map is the REAL shared file (read-only — ONE map home, addendum
 // C3); the hook's intercept.log lands in the sandbox, never the live
 // .opencode/temp/.
 
 const OBS_TS = path.join(REPO_ROOT, ".opencode", "plugin", "intercept_observer.ts");
-const ioMod = await import(pathToFileURL(OBS_TS).href);
-const ioMap = ioMod.loadNumwordMap(NUMWORDS_JSON);
+const OBS_CORE_TS = path.join(REPO_ROOT, ".opencode", "plugin", "intercept_observer_core.ts");
+const ioMod = await import(pathToFileURL(OBS_TS).href); // default factory ONLY
+const ioCore = await import(pathToFileURL(OBS_CORE_TS).href); // the named core
+const ioMap = ioCore.loadNumwordMap(NUMWORDS_JSON);
 const ioSandboxProj = path.join(SANDBOX, "obsproj");
 mkdirSync(ioSandboxProj, { recursive: true });
 const ioLogPath = path.join(ioSandboxProj, ".opencode", "temp", "intercept.log");
@@ -3126,7 +3157,7 @@ check(
   String(n18),
   "S18",
   "loadNumwordMap(missing path) → null (numword checks silently off)",
-  ioMod.loadNumwordMap(path.join(SANDBOX, "no_such_numwords.json")) === null,
+  ioCore.loadNumwordMap(path.join(SANDBOX, "no_such_numwords.json")) === null,
 );
 n18++;
 
@@ -3136,10 +3167,10 @@ check(
   "S18",
   "resolveNumword: every 5.2 pass fixture → value (nine→9 … eleven→11)",
   NW_PASS.every(([w, d]) => {
-    const r = ioMod.resolveNumword(w, ioMap);
+    const r = ioCore.resolveNumword(w, ioMap);
     return r.kind === "value" && r.value === d;
   }),
-  JSON.stringify(NW_PASS.map(([w]) => ioMod.resolveNumword(w, ioMap))),
+  JSON.stringify(NW_PASS.map(([w]) => ioCore.resolveNumword(w, ioMap))),
 );
 n18++;
 
@@ -3148,8 +3179,8 @@ check(
   String(n18),
   "S18",
   "resolveNumword: every 5.2 reject fixture (twozero/two+zero/foour/eleventy) → unknown",
-  NW_REJECT.every((w) => ioMod.resolveNumword(w, ioMap).kind === "unknown"),
-  JSON.stringify(NW_REJECT.map((w) => ioMod.resolveNumword(w, ioMap))),
+  NW_REJECT.every((w) => ioCore.resolveNumword(w, ioMap).kind === "unknown"),
+  JSON.stringify(NW_REJECT.map((w) => ioCore.resolveNumword(w, ioMap))),
 );
 n18++;
 
@@ -3157,7 +3188,7 @@ n18++;
 //      (synthetic map — the real map has no ambiguous split)
 {
   const ambMap = { units: { a: 1, aa: 5 }, tens: { a: 10, aa: 20 }, teens: {} };
-  const amb = ioMod.resolveNumword("aaa", ambMap);
+  const amb = ioCore.resolveNumword("aaa", ambMap);
   check(
     String(n18),
     "S18",
@@ -3170,8 +3201,8 @@ n18++;
 
 // 155 — observeDense: a >=6-digit run fires the gate line; 5 digits do not
 {
-  const d1 = ioMod.observeDense("20260916");
-  const d2 = ioMod.observeDense("12345");
+  const d1 = ioCore.observeDense("20260916");
+  const d2 = ioCore.observeDense("12345");
   check(
     String(n18),
     "S18",
@@ -3184,9 +3215,9 @@ n18++;
 
 // 156 — observeNumword: map hit → value; twozero (unknown) → none; map null → none
 {
-  const n1 = ioMod.observeNumword("use four for plan", ioMap);
-  const n2 = ioMod.observeNumword("twozero plan", ioMap);
-  const n3 = ioMod.observeNumword("use four", null);
+  const n1 = ioCore.observeNumword("use four for plan", ioMap);
+  const n2 = ioCore.observeNumword("twozero plan", ioMap);
+  const n3 = ioCore.observeNumword("use four", null);
   check(
     String(n18),
     "S18",
@@ -3199,7 +3230,7 @@ n18++;
 
 // 157 — observePairs agree: 4|four → observed-redundancy-ok (byte-exact evidence)
 {
-  const p1 = ioMod.observePairs("4|four", ioMap);
+  const p1 = ioCore.observePairs("4|four", ioMap);
   check(
     String(n18),
     "S18",
@@ -3212,7 +3243,7 @@ n18++;
 
 // 158 — observePairs mismatch: 5|four → redundancy-mismatch (dist=1)
 {
-  const p2 = ioMod.observePairs("5|four", ioMap);
+  const p2 = ioCore.observePairs("5|four", ioMap);
   check(
     String(n18),
     "S18",
@@ -3225,7 +3256,7 @@ n18++;
 
 // 159 — observePairs unknown word: 4|foour → no-candidate gate=word-unknown
 {
-  const p3 = ioMod.observePairs("4|foour", ioMap);
+  const p3 = ioCore.observePairs("4|foour", ioMap);
   check(
     String(n18),
     "S18",
@@ -3239,8 +3270,8 @@ n18++;
 // 160 — observePairs negatives: a shell pipe (spaces around |) and a
 //      word-first order (four|4) are NOT redundancy pairs
 {
-  const p4 = ioMod.observePairs("head -30 | grep x", ioMap);
-  const p5 = ioMod.observePairs("four|4", ioMap);
+  const p4 = ioCore.observePairs("head -30 | grep x", ioMap);
+  const p5 = ioCore.observePairs("four|4", ioMap);
   check(
     String(n18),
     "S18",
@@ -3253,8 +3284,8 @@ n18++;
 
 // 161 — observePathAnomaly: doubled segment → path-anomaly; clean path → none
 {
-  const a1 = ioMod.observePathAnomaly("c:\\users\\users\\x");
-  const a2 = ioMod.observePathAnomaly("c:\\users\\x");
+  const a1 = ioCore.observePathAnomaly("c:\\users\\users\\x");
+  const a2 = ioCore.observePathAnomaly("c:\\users\\x");
   check(
     String(n18),
     "S18",
@@ -3268,9 +3299,9 @@ n18++;
 // 162 — observeSandbox: outside the root → out-of-sandbox; under → none;
 //      root null → none (note-only, no enforcement — addendum C6)
 {
-  const s1 = ioMod.observeSandbox("C:\\Windows\\System32\\cmd.exe", "C:\\repo");
-  const s2 = ioMod.observeSandbox("C:\\repo\\sub\\file.txt", "C:\\repo");
-  const s3 = ioMod.observeSandbox("C:\\Windows\\x", null);
+  const s1 = ioCore.observeSandbox("C:\\Windows\\System32\\cmd.exe", "C:\\repo");
+  const s2 = ioCore.observeSandbox("C:\\repo\\sub\\file.txt", "C:\\repo");
+  const s3 = ioCore.observeSandbox("C:\\Windows\\x", null);
   check(
     String(n18),
     "S18",
@@ -3284,8 +3315,8 @@ n18++;
 // 163 — underRoot: a JSON-escaped `\\` span collapses to single separators
 //      (case-insensitive; a JSON-stringified arg must not false the root)
 {
-  const u1 = ioMod.underRoot("C:\\\\Users\\\\Wasiejen\\\\proj\\\\x.txt", "C:/Users/Wasiejen/proj");
-  const u2 = ioMod.underRoot("C:\\\\Users\\\\other\\\\x.txt", "C:/Users/Wasiejen/proj");
+  const u1 = ioCore.underRoot("C:\\\\Users\\\\Wasiejen\\\\proj\\\\x.txt", "C:/Users/Wasiejen/proj");
+  const u2 = ioCore.underRoot("C:\\\\Users\\\\other\\\\x.txt", "C:/Users/Wasiejen/proj");
   check(
     String(n18),
     "S18",
@@ -3298,11 +3329,11 @@ n18++;
 
 // 164 — classifyContext: date / session-id / commit-ref / path / arg
 {
-  const c1 = ioMod.classifyContext("2026-09-16");
-  const c2 = ioMod.classifyContext("ses_f5605f805ffeElHB9mgtksjye1");
-  const c3 = ioMod.classifyContext("a".repeat(40));
-  const c4 = ioMod.classifyContext("C:\\Users\\x\\y");
-  const c5 = ioMod.classifyContext("hello world");
+  const c1 = ioCore.classifyContext("2026-09-16");
+  const c2 = ioCore.classifyContext("ses_f5605f805ffeElHB9mgtksjye1");
+  const c3 = ioCore.classifyContext("a".repeat(40));
+  const c4 = ioCore.classifyContext("C:\\Users\\x\\y");
+  const c5 = ioCore.classifyContext("hello world");
   check(
     String(n18),
     "S18",
@@ -3315,7 +3346,7 @@ n18++;
 
 // 165 — observeArg: FIVE firing classes → capped at 3, priority order
 {
-  const cap = ioMod.observeArg("c:\\users\\users\\5|four.txt 20260916 four", ioMap, "C:\\repo");
+  const cap = ioCore.observeArg("c:\\users\\users\\5|four.txt 20260916 four", ioMap, "C:\\repo");
   check(
     String(n18),
     "S18",
@@ -3331,7 +3362,7 @@ check(
   String(n18),
   "S18",
   "observeArg: clean arg → no lines; empty arg → no lines",
-  ioMod.observeArg("hello world", ioMap, "C:\\repo").length === 0 && ioMod.observeArg("", ioMap, "C:\\repo").length === 0,
+  ioCore.observeArg("hello world", ioMap, "C:\\repo").length === 0 && ioCore.observeArg("", ioMap, "C:\\repo").length === 0,
 );
 n18++;
 
@@ -3382,7 +3413,7 @@ n18++;
     "S18",
     "log line: exactly 8 ' | ' fields, stamp/sid/model-unknown/tool/verdict-vocab; 2 lines for the fixture; live log untouched",
     ioLines.length === 2 && ioF.length === 8 && ioStampRe.test(ioF[0]) && ioF[1] === "ses_fx_io1" && ioF[2] === "unknown" &&
-      ioF[3] === "bash" && ioMod.VERDICTS.includes(ioF[7]) && liveIoBefore === liveIoAfter,
+      ioF[3] === "bash" && ioCore.VERDICTS.includes(ioF[7]) && liveIoBefore === liveIoAfter,
     JSON.stringify({ lines: ioLines.length, fields: ioF.length, live: [liveIoBefore, liveIoAfter].map((x) => (x === null ? null : x.length)) }),
   );
   n18++;
@@ -3398,6 +3429,186 @@ n18++;
     ioIgnored = false;
   }
   check(String(n18), "S18", "the intercept log path is git-ignored (git check-ignore -q .opencode/temp/intercept.log)", ioIgnored);
+  n18++;
+}
+
+// 171 — the EXPORT FIX (2026-09-16): the plugin module exports the default
+//      factory ONLY — every Object.values entry is a function (the host
+//      loader contract; the "Plugin export is not a function" regression
+//      pin) and the named core surface lives in the SPLIT core module
+{
+  const ioVals = Object.values(ioMod);
+  check(
+    String(n18),
+    "S18",
+    "export fix: plugin module = default factory ONLY (every Object.values entry a function); named core in the core module (VERDICTS = 6 + 2 fuzzy)",
+    ioVals.length === 1 && ioVals.every((v) => typeof v === "function") &&
+      typeof ioMod.default === "function" &&
+      typeof ioCore.resolveReadPath === "function" && typeof ioCore.buildCorpus === "function" &&
+      typeof ioCore.observeArg === "function" && Array.isArray(ioCore.VERDICTS) && ioCore.VERDICTS.length === 8,
+    JSON.stringify({ pluginKeys: Object.keys(ioMod), verdicts: ioCore.VERDICTS.length }),
+  );
+  n18++;
+}
+
+// 172 — resolveReadPath: byte-equal relative path → {kind:"exact"} (untouched, no line)
+check(
+  String(n18),
+  "S18",
+  "resolveReadPath: byte-equal rel path → exact",
+  JSON.stringify(ioCore.resolveReadPath("sub/file.txt", ["sub/file.txt", "other/thing.txt"])) === '{"kind":"exact"}',
+);
+n18++;
+
+// 173 — resolveReadPath: case / backslash / trim noise → normalized-equal →
+//      exact (a case-only miss is not a typo, research §2.2)
+check(
+  String(n18),
+  "S18",
+  "resolveReadPath: case/backslash/trim noise → normalized-exact",
+  JSON.stringify(ioCore.resolveReadPath("SUB\\File.TXT ", ["sub/file.txt", "other/thing.txt"])) === '{"kind":"exact"}',
+);
+n18++;
+
+// 174 — resolveReadPath: d=1 (deletion) → resolved {path, d:1, gap:8}
+check(
+  String(n18),
+  "S18",
+  "resolveReadPath: d=1 → resolved d=1 gap=8 (the full rel path discriminates)",
+  JSON.stringify(ioCore.resolveReadPath("sub/fil.txt", ["sub/file.txt", "other/thing.txt"])) ===
+    JSON.stringify({ kind: "resolved", path: "sub/file.txt", d: 1, gap: 8 }),
+);
+n18++;
+
+// 175 — resolveReadPath: d=2 (transposition) → resolved {path, d:2, gap:7}
+check(
+  String(n18),
+  "S18",
+  "resolveReadPath: d=2 (transposition fiel) → resolved d=2 gap=7",
+  JSON.stringify(ioCore.resolveReadPath("sub/fiel.txt", ["sub/file.txt", "other/thing.txt"])) ===
+    JSON.stringify({ kind: "resolved", path: "sub/file.txt", d: 2, gap: 7 }),
+);
+n18++;
+
+// 176 — resolveReadPath: two close siblings (gap<2) → FAIL-CLOSED rejected
+//      reason=gap-too-small + the top-3 cands [rel,d] shape (never picks)
+check(
+  String(n18),
+  "S18",
+  "resolveReadPath: gap<2 → rejected gap-too-small, cands [[a/f.txt,1],[a/g.txt,2]]",
+  JSON.stringify(ioCore.resolveReadPath("a/fi.txt", ["a/f.txt", "a/g.txt"])) ===
+    JSON.stringify({ kind: "rejected", cands: [["a/f.txt", 1], ["a/g.txt", 2]], reason: "gap-too-small" }),
+);
+n18++;
+
+// 177 — resolveReadPath: d>2 → FAIL-CLOSED rejected reason=d-too-high, the
+//      top-3 cands [rel,d] sorted by d (all three of the 3-entry corpus)
+check(
+  String(n18),
+  "S18",
+  "resolveReadPath: d>2 → rejected d-too-high, cands top-3 [[x/y.txt,6],[sub/file.txt,7],[other/thing.txt,10]]",
+  JSON.stringify(ioCore.resolveReadPath("zzz/qqq.txt", ["sub/file.txt", "other/thing.txt", "x/y.txt"])) ===
+    JSON.stringify({ kind: "rejected", cands: [["x/y.txt", 6], ["sub/file.txt", 7], ["other/thing.txt", 10]], reason: "d-too-high" }),
+);
+n18++;
+
+// 178 — buildCorpus: relative paths (dirs + files), .git/node_modules
+//      skipped, the cap arg enforced, missing root → [] (empty corpus →
+//      resolveReadPath NEVER resolves — the fail-safe); CORPUS_MAX_ENTRIES = 20k
+{
+  const fzCorpus = path.join(ioSandboxProj, "corpus");
+  mkdirSync(path.join(fzCorpus, ".git"), { recursive: true });
+  mkdirSync(path.join(fzCorpus, "node_modules"), { recursive: true });
+  mkdirSync(path.join(fzCorpus, "a"), { recursive: true });
+  writeFileSync(path.join(fzCorpus, ".git", "head"), "x", "utf8");
+  writeFileSync(path.join(fzCorpus, "node_modules", "pkg.js"), "x", "utf8");
+  writeFileSync(path.join(fzCorpus, "a", "b.txt"), "x", "utf8");
+  writeFileSync(path.join(fzCorpus, "top.txt"), "x", "utf8");
+  const c1 = ioCore.buildCorpus(fzCorpus);
+  const c2 = ioCore.buildCorpus(fzCorpus, 2);
+  const c3 = ioCore.buildCorpus(path.join(ioSandboxProj, "no_such_root"));
+  const e1 = ioCore.resolveReadPath("a/b.txt", c3);
+  check(
+    String(n18),
+    "S18",
+    "buildCorpus: rel paths [a, a/b.txt, top.txt], .git/node_modules skipped, cap 2 → 2 entries, missing root → [] (empty corpus → never resolves)",
+    JSON.stringify(c1) === JSON.stringify(["a", "a/b.txt", "top.txt"]) && c2.length === 2 && c3.length === 0 &&
+      ioCore.CORPUS_MAX_ENTRIES === 20_000 && e1.kind === "rejected" && e1.reason === "empty-corpus",
+    JSON.stringify({ c1, c2: c2.length, c3, cap: ioCore.CORPUS_MAX_ENTRIES }),
+  );
+  n18++;
+}
+
+// fixture for the read-scope hook checks: a real file under the sandbox
+// project — the corpus root is its directory, so the mistyped sibling
+// queries match against the SAME dir (the §2.2 sibling-discrimination shape)
+const ioFzDir = path.join(ioSandboxProj, "fz");
+mkdirSync(ioFzDir, { recursive: true });
+writeFileSync(path.join(ioFzDir, "file.txt"), "x", "utf8");
+
+// 179 — the HOOK read-scope: a d<=2 mistyped read filePath is MUTATED to the
+//      resolved absolute path + a fuzzy-resolved 8-field line (byte-exact
+//      evidence: `fuzzy orig=<arg> -> file.txt d=1 gap=inf` — single-entry
+//      corpus, so the gap is infinite)
+{
+  const r1 = { filePath: ioFzDir + "\\fil.txt" };
+  const nLines1 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io1", callID: "c179" }, { args: r1 });
+  const r1Lines = ioReadLines();
+  const r1f = r1Lines[r1Lines.length - 1].split(" | ");
+  check(
+    String(n18),
+    "S18",
+    "hook read-scope: mistyped read filePath MUTATED to the resolved path + fuzzy-resolved line (8 fields, byte-exact evidence)",
+    r1.filePath === ioFzDir + "\\file.txt" && r1Lines.length === nLines1 + 1 && r1f.length === 8 &&
+      ioStampRe.test(r1f[0]) && r1f[1] === "ses_fx_io1" && r1f[3] === "read" &&
+      r1f[4] === JSON.stringify({ filePath: ioFzDir + "\\fil.txt" }) &&
+      r1f[5] === `fuzzy orig=${ioFzDir}\\fil.txt -> file.txt d=1 gap=inf` &&
+      r1f[6] === "path" && r1f[7] === "fuzzy-resolved",
+    JSON.stringify({ after: r1.filePath, n: r1Lines.length - nLines1, f: r1f }),
+  );
+  n18++;
+}
+
+// 180 — the HOOK read-scope fail-closed: a d>2 read filePath is NOT mutated
+//      (byte-identical) + a fuzzy-rejected 8-field line (top-3 cands +
+//      reason=d-too-high — the conservative channel, both logged)
+{
+  const r2 = { filePath: ioFzDir + "\\zzz-completely-different-abcdef.txt" };
+  const r2Before = JSON.stringify(r2);
+  const nLines2 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io1", callID: "c180" }, { args: r2 });
+  const r2Lines = ioReadLines();
+  const r2f = r2Lines[r2Lines.length - 1].split(" | ");
+  check(
+    String(n18),
+    "S18",
+    "hook read-scope fail-closed: d>2 read NOT mutated (byte-identical) + fuzzy-rejected line (cands + reason)",
+    JSON.stringify(r2) === r2Before && r2Lines.length === nLines2 + 1 && r2f.length === 8 &&
+      r2f[3] === "read" && r2f[7] === "fuzzy-rejected" &&
+      r2f[5] === `fuzzy orig=${ioFzDir}\\zzz-completely-different-abcdef.txt cands=file.txt 29 reason=d-too-high` &&
+      r2f[6] === "path",
+    JSON.stringify({ argsAfter: JSON.stringify(r2), f: r2f }),
+  );
+  n18++;
+}
+
+// 181 — the HOOK read-scope exact: an EXISTING filePath → untouched (no
+//      mutation, no fuzzy line) and the LIVE intercept.log is still
+//      byte-identical after all the new hook checks
+{
+  const r3 = { filePath: ioFzDir + "\\file.txt" };
+  const r3Before = JSON.stringify(r3);
+  const nLines3 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io1", callID: "c181" }, { args: r3 });
+  const liveIoAfter2 = existsSync(LIVE_IO_LOG) ? readFileSync(LIVE_IO_LOG, "utf8") : null;
+  check(
+    String(n18),
+    "S18",
+    "hook read-scope exact: existing path untouched + no fuzzy line; LIVE log still byte-identical",
+    JSON.stringify(r3) === r3Before && ioReadLines().length === nLines3 && liveIoBefore === liveIoAfter2,
+    JSON.stringify({ n: ioReadLines().length - nLines3, liveSame: liveIoBefore === liveIoAfter2 }),
+  );
   n18++;
 }
 

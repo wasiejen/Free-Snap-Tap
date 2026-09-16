@@ -47,3 +47,16 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
 - worker-13 block (stale "84/84" plugin-README baseline) → `TODO.md` #64,
   handled planner-direct (README line now points to the probe's self-annotated
   header total — the #58 curate-don't-duplicate convention).
+
+## 2026-09-16 — worker-13 (looprun autorun-2026-09-16_17-20, plan2/iter2, 5.4 intercept observer)
+- Doc discrepancy (maintainer file, flagged only, NOT edited):
+  `repo_commands.md` §Run/test quotes probe totals "~376" and "one hundred
+  twenty-two (plan7, S1–S16 + hygiene)" — both from the prior looprun and
+  mutually inconsistent; the current self-annotation (the declared source) is
+  **180/180** (plan2: S18=32, hygiene=6). Refresh the numbers when curation
+  runs.
+- Observation (loop-folder housekeeping, planner territory): `.opencode/loop/`
+  holds the current `autorun-2026-09-16_17-20` plus an un-archived,
+  name-mangled prior folder `autorun_2-6_0-9_1-6__1-3_3-3/` (carries
+  plan1/plan2 spec+summary copies). Rollover should move it into
+  `.opencode/archive/loop/`; the mangled name suggests a failed machine-rename.
