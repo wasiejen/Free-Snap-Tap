@@ -81,5 +81,7 @@
   maintainer inbox, `opencode.jsonc`, `AGENTS.md` (read-only references
   only; `dense_numbers.md` read, never edited).
 
-Commit: (hash appended by the planner at bookkeeping, or see `git log` —
-subject "plan9 research lane: fuzzy + numword tool-reliability doc").
+Commit: `37b000d` "plan9 research lane: fuzzy + numword
+tool-reliability doc" (6 files: research/ 2 + handover summary +
+todo_inbox + plan9_ho_task.md + loop_log.md; this hash line rides a
+2nd bookkeeping commit).
