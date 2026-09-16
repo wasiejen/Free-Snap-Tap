@@ -49,3 +49,4 @@
 2026-09-16_05-23 -->START planner-9 unknown Qwen3.8-27B-IQ4KT-140K plan9 (iter 9): approved research lane — fuzzy name resolution + numword tool-call hardening (RESEARCH ONLY, agent/research/ folder, worker delegation)
 2026-09-16_05-25 --INFO-- planner-9 ses_f57c84fbbffeaLDqNyuJzEw85G Qwen3.8-27B-IQ4KT-140K dense-digit trap live in planner-9: machine-computed 10+1 read as a shifted digit across 3 tool outputs (full enumeration 9..16 + charcodes [49,51] settled it: worker-13) — the exact failure mode the plan9 research lane investigates
 2026-09-16_05-26 -->START worker-13 ses_f57bfbc8effeXSe8mY7wuP0Xy7 Qwen3.8-27B-IQ4KT-140K plan9 research lane: fuzzy name resolution + numword tool-call hardening (research doc only)
+2026-09-16_05-44 DONE<--- worker-13 ses_f57bfbc8effeXSe8mY7wuP0Xy7 Qwen3.8-27B-IQ4KT-140K SESSION=ses_f57bfbc8effeXSe8mY7wuP0Xy7 CTX=76153 (54%) REM=63847
