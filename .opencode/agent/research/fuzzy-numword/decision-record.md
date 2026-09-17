@@ -308,10 +308,12 @@ paste, like the stop-line change):
    2 stays rejected). Pipeline per path field: pair → segment →
    char-fuzzy (char keeps its d≤2 read-scope fallback + the edit-scope
    bar); verdicts reuse `fuzzy-resolved/-rejected` with a `kind=seg`
-   evidence flag (nine-verdict vocabulary stays byte-stable). GATE: R2
+   evidence flag (nine-verdict vocabulary stays byte-stable).   GATE: R2
    live-accepted (done) + M1 unit landed (done, 9ec4c0b) + host restart
    (loads M1 for all agents — the build's own workers run through the
-   loaded interceptor).
+   loaded interceptor) — **ALL SATISFIED 09-17**: restart done, M1 live-
+   accepted (one-shot: d=1 new-file write landed LITERAL with zero fuzzy
+   lines — hazard dead; `edit` d=1 still corrected, `d=1 gap=inf`).
  - **R8 — root re-anchoring / tail match** (staged 2026-09-17): "switch path
    start to an existing path" — exact tail match, UNIQUE under a known-root
    allowlist, target must exist, fail-closed otherwise. Allowlist DERIVED

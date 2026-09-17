@@ -288,10 +288,14 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   worker):** dispatch guard in intercept_observer.ts (write excluded from the
   fuzzy channel); S20 re-pinned (196/198 no fuzzy line, 200/201 NOT mutated +
   zero lines) + new edit counter-pins 208/209; probe 208/208, smoke 36/36,
-  pytest 459+1w, ruff F=0. Live acceptance: rides the next host restart
-  (planner one-shot). Follow-on DISCUSSION (not yet approved, see NAP
-  2026-09-17 direct session): general path repair — segment-level resolver +
-  root re-anchoring.
+   pytest 459+1w, ruff F=0. **LIVE ACCEPTED 2026-09-17 (post-restart one-
+   shot, scratchpad fixture, torn down):** the d=1 new-file write landed
+   LITERAL (zero fuzzy lines — the guard live; the d=1 sibling untouched —
+   the hazard is dead) AND the `edit` d=1 typo was still corrected
+   (`fuzzy scope=write … d=1 gap=inf`, no stray file). Follow-on: R7
+   (segment resolver) + R8 (root re-anchoring) STAGED + design agreed
+   (substitution bar approved 09-17, decision-record §5); R9 documented-
+   optional. See NAP 2026-09-17 direct session.
 
 ## Closed entries
 

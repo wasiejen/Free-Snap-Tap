@@ -126,13 +126,12 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   counts as seg-d=1 only with intra-segment char-lev ≤1 (char-far fails
   closed — keeps the M1 hazard bar, `file-56`/`file-4` stays rejected);
   pipeline pair → segment → char-fuzzy; `kind=seg` evidence flag on the
-  existing fuzzy verdicts (vocabulary byte-stable). **NEXT MOVES (his
-  call to execute):** (1) his RESTART — loads M1 for all agents (the
-  current process still runs the pre-M1 build — #72 hazard still live
-  for `write` until then); (2) then M1 one-shot acceptance (d=1 mistyped
-  scratchpad write must land LITERAL — stray file, no hijack; `edit`
-  d=1 must still be corrected); (3) then R7 spec + S21 probe section +
-  launch.
+  existing fuzzy verdicts (vocabulary byte-stable). **NEXT MOVES:**
+  (1) his RESTART — **DONE 09-17**; (2) M1 one-shot acceptance —
+  **ACCEPTED** (d=1 new-file write landed LITERAL, zero fuzzy lines,
+  sibling untouched; `edit` d=1 still corrected `d=1 gap=inf`; fixture
+  torn down; TODO #72 + decision-record §5 updated); (3) R7 spec + S21
+  probe section + launch — **NEXT UNIT**.
 
 ## Standing
 - Baselines (re-verified 2026-09-17 by the planner post-M1): probe
