@@ -2,6 +2,42 @@
 
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
+## Current session — looprun autorun-2026-09-17_23-58, iteration 1 (ses_f4e9ea998ffeQ3Pa0atv10oysQ, planner-1, Qwen3.8-27B-IQ4KT-140K)
+- **State at self-compact checkpoint (2026-09-18 ~01-05):** #53 unit in
+  flight. Part A LANDED + committed (`5e29cb0`): mandatory friction
+  close-down step in all 4 role prompts (planner new §Friction check;
+  worker §Checkpoint & handoff incl. Lessons line + hand-append fallback;
+  explorer §Handoff + §Safety allow-list gain; looprunner §Loop log
+  analogue — loop log is its friction channel, file writes denied).
+  Part B spec COMMITTED (`.opencode/agent/handover/handover_task.md`,
+  copy in loop folder `plan1_ho_task.md`) — the `submit` tool build
+  (feedback/knowledge/todo append tool, hardcoded targets, never-read,
+  probe section + smoke).
+- **NEXT (on resume):** launch `worker_Q4_120K` on the committed spec
+  (launch message: spec path + baselines below + "stay on current
+  checkout"). On return: VERIFY (git log + full gate: probe + all smokes
+  + pytest + ruff), copy worker summary into the loop folder as
+  `plan1_ho_task_to_planner.md`, write loop_log `-RETURN-` line, update
+  TODO #53 (Part B LANDED status), move the proposal to
+  `proposals/implemented/` with a verdict note (his `--comment` ruling
+  stays in-file untouched), update this section, commit. Closing:
+  `plan1_summary.md` + loop_log DONE line + exactly ONE `action: restart`
+  line. NOTE: compress the 2026-09-17 direct-session section into the
+  Compressed archive at the real close (its detail is preserved in
+  TODO #53/#65/#71/#73 + knowledge_plugins.md + decision-record §5 +
+  git 0105b9f/dfda0dd).
+- **Queue after #53 (his priority.md order):** #0 numword-escape build
+  (approved `proposals/approved/2026-09-17_numword-escape-output.md` —
+  his `--comment` ruling: sentinel `esc`, catch case variants, must not
+  break the path channel) — TOP item; then #1 (compact_memory rework /
+  TODO #70), #2 (repo-split research). #56 distillation still DEFERRED.
+- **Pending paste (his action):** AGENTS.md §agent_feedback one-line
+  pointer for the #53 friction step (draft in `plan1_summary.md`).
+- Baselines at spec time (machine-verified 2026-09-18): probe
+  two-two-zero (2-2-0) / two-two-zero (annotation agrees with section
+  sum; last section S21) · smoke three-seven (3-7) across 7 smokes ·
+  pytest 459 passed + 1 warning · ruff F=0.
+
 ## Compressed archive (one line each — details in git log + TODO/records)
 - 2026-09-17 direct (ses_f510a05ceffeE6SnMBlvti40DE) — #73 dedup-collapse build + planner-verified (spec d627403, code dce82ad, bookkeeping 9c701ed; gate 216/37/459+1w/F=0; M1 write guard untouched; flattenField pin lesson; the abs-path-not-rel design catch) + numword-escape proposal filed (da3ca41) — details: nap_direct.md + git dce82ad/9c701ed/da3ca41
 - 2026-09-17 direct (ses_f53a10d24ffesL2Oc8jPqY1bBc) — R2 write-scope LIVE accepted post-restart (benign corrected + #72 hazard live-measured + display finding: post-mutation path shown, log field 5 = authority); #72 M1 ruling recorded + LANDED (9ec4c0b) + live-accepted; dump-fail evidence (hung child in host, not script slowness; DUMP-OK suggestion); path-repair topic opened + R7/R8 STAGED (his ruling; allowlist config-derived; R9 parked); R7 design (substitution bar approved) + FOUNDING (ee19a84; 1-seg bypass amendment 134b107); realistic nested doubling REJECTED → #73 filed — details: nap_direct.md + git 35f8143/9ec4c0b/ee19a84/24daf1e
