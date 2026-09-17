@@ -65,15 +65,19 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Direct session (2026-09-17, ses_f53a10d24ffesL2Oc8jPqY1bBc) — R2 live check, #72 ruling, dump-fail evidence, path-repair topic opened
-- **R2 write-scope live test: NO — host process is PRE-R2.** intercept.log is
-  continuous since 09-16 18-34 (no reload); R2 landed 09-17 09:28 (35f8143)
-  → the loaded plugin is the R1 build (observation + read-scope live, write
-  channels absent). Controlled test: mistyped `file-for.txt` write landed at
-  the literal path, zero write-scope log lines. On-disk code proven correct
-  (scratchpad repro `write_fuzzy_repro.mjs`: file-for→file-four d=1 gap=2
-  resolved; hazard file-5→file-4 d=1 gap=3 resolved). Sentinels intact
-  (file-4.txt TWIN / file-four.txt ORIGINAL); test artifacts removed.
-  **Acceptance remains pending his restart.**
+- **R2 write-scope acceptance: first check NO (host process was PRE-R2 —
+  log continuous since 09-16 18-34, R2 landed 09-17 09:28 → R1 build
+  loaded; mistyped write landed literal, zero write-channel lines; on-disk
+  code proven correct via scratchpad repro), then his RESTART → ACCEPTED
+  post-restart:** write-scope LIVE — benign mistype corrected live
+  (`orig=file-for.txt -> file-four.txt d=1 gap=2 fuzzy-resolved scope=write`)
+  AND the #72 hazard LIVE-MEASURED (`orig=file-5.txt -> file-4.txt d=1 gap=3`
+  hijack — I genuinely intended the new file; the channel took it).
+  **Display finding:** tool results/transcript show the POST-MUTATION path
+  only → inside a session a live mutation is indistinguishable from producer
+  drift; my own "3x drift" narrative was such a misread (log field 5 =
+  authority, again). Sentinels torn down; decision-record §5 R2 + TODO #68
+  updated. Repro script kept: scratchpad `write_fuzzy_repro.mjs`.
 - **#72 RULING: M1 approved** (his 09-17 direct): implicit write-fuzzy
   restricted to edit/block_transfer, removed from `write`; pair channel
   unchanged (strict existence, fail-closed); all degraded outcomes = stray
@@ -107,7 +111,12 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   silence external access). Measured: doubled OpenCodeProjects = char-d 17,
   users = 6 (both ≫ read d≤2 / write d≤1 → NOT caught today); doubled
   WRITE silently plants a stray dir tree (write tool auto-creates parents —
-  live-measured, torn down). Awaiting his scope ruling → R7/R8 staging.
+  live-measured, torn down). **RULING (his, 09-17): R7 + R8 APPROVED as
+  stages** (seg-d≤1 both scopes; allowlist DERIVED from `opencode.jsonc`
+  `permissions.external_directory` — config-driven, migration-stable) **;
+  R9 (bash) = documented-optional, parked pending R4 log data.** Stages
+  recorded in decision-record §5. Build order: M1 unit first, then R7,
+  then R8.
 
 ## Standing
 - Baselines (re-verified 2026-09-16, plan2, gates re-run by the planner

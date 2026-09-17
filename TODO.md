@@ -192,11 +192,15 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Scope:** research doc §2.3/§3.4/§4.2 as the design source; staged spec
   `research/fuzzy-numword/spec_R2_write_scope.md`.
 - **Status:** CLOSED 2026-09-16 — approved ("R2 approved") + build landed
-  GREEN (35f8143: probe 206/206 S20, smoke 35/35 8f, pytest 459, ruff
+ GREEN (35f8143: probe 206/206 S20, smoke 35/35 8f, pytest 459, ruff
   clean); acceptance met per spec. Deviation accepted: ref gate =
-  `for-each-ref` membership (rev-parse --verify vacuous for 40-hex —
-  measured, decision-record §5). One-shot write-scope acceptance pending
-  his next host restart. Residual new-file near-miss hazard → #72.
+  `for-each-ref` membership (rev-parse 40-hex ambiguity measured,
+  decision-record §5). **ONE-SHOT ACCEPTANCE MET 2026-09-17** (direct
+  session, post-restart): write-scope LIVE — benign mistype corrected
+  (`file-for→file-four d=1 gap=2`) AND the #72 hazard live-measured
+  (`file-5→file-4 d=1 gap=3` hijack); display finding: tool results show
+  the POST-MUTATION path (log field 5 = sole authority — decision-record
+  §5 R2). Residual hazard → #72 (M1 ruling recorded).
 
 ## 69. Redundancy form codification: `[left:right]` (SUPERSEDES the `<4|four>` Q2 form; 2026-09-16 direct session)
 - **Problem / evidence:** the addendum Q2 form `<4|four>` (angle brackets +

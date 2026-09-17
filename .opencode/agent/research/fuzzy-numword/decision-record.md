@@ -259,8 +259,19 @@ paste, like the stop-line change):
   name, so `rev-parse --verify <40hex>` exits 0 for ANY 40-hex string
   (incl. non-existent) and never consults a 40-hex-named ref; the
   spec's gate was vacuous for exactly the drift case (supersedes §3.4's
-  rev-parse formulation). LIVENESS: restart-gated (next host restart →
-  one-shot write-scope acceptance).
+  rev-parse formulation). **LIVENESS ACCEPTED 2026-09-17 (direct session,
+   post-restart one-shot, scratchpad sentinels):** write-scope LIVE — benign
+   mistype correction live (`orig=…file-for.txt -> file-four.txt d=1 gap=2`
+   `fuzzy-resolved scope=write`) AND the #72 hazard LIVE-MEASURED: a
+   genuine new-file write `orig=…file-5.txt` was hijacked onto `file-4.txt`
+   (`d=1 gap=3`, TWIN sentinel overwritten, no file-5.txt created) — the
+   pinned S20 behavior, experienced firsthand (motivation for the M1
+   ruling, #72). Sentinels torn down. **Display finding (attribution-rule
+   reinforcement):** the tool result / transcript shows the POST-MUTATION
+   path only — inside the session a live mutation is indistinguishable from
+   producer drift; log field 5 (orig) is the sole authority (this session's
+   own "3x drift" narrative was such a misread — I had generated
+   `file-for.txt` correctly; the channel had corrected it).
 - **R3 — arg-scope extension** (`spec_R3_*.md`, staged): glob/grep
   path+pattern args, section-anchor resolver (research §2.6), bash command
   args via `command.execute.before` (quoted forms), block_transfer anchors.
@@ -279,7 +290,28 @@ paste, like the stop-line change):
   every write/edit/block_transfer, anchor-first content locator, edit hints
   for not-found + multiple-matches, no mutation, no auto-retry). GATE: R1
   green (does NOT need the R2 write-scope approval). Direct answer to Loop
-  Pattern 3 (the failed-edit retry loop), like §4 answers Pattern 5.
+   Pattern 3 (the failed-edit retry loop), like §4 answers Pattern 5.
+ - **R7 — segment-level path resolver** (staged 2026-09-17, maintainer
+   approved as stage; his permutation logic): a path is a SEQUENCE OF
+   FOLDER UNITS; distance counted per segment (one extra folder / one
+   mismatched folder = 1). Doubled folders (`OpenCodeProjects/OpenCode…`) =
+   d=1 insertion; measured live: char-lev sees these as d=17 / d=6 (≫ every
+   bar — NOT caught by R1/R2). Corpus-chassis drop-in (buildCorpus + TTL +
+   strict existence gate + fail-closed + log/probe pattern); BOTH scopes;
+   START BAR seg-d≤1 both scopes (his ruling). Subsumes the adjacency-
+   collapse sketch. GATE: R2 live-accepted (done) + M1 unit landed (clean
+   bisection on the shared hook wiring).
+ - **R8 — root re-anchoring / tail match** (staged 2026-09-17): "switch path
+   start to an existing path" — exact tail match, UNIQUE under a known-root
+   allowlist, target must exist, fail-closed otherwise. Allowlist DERIVED
+   FROM CONFIG (his ruling): `opencode.jsonc` `permissions.external_directory`
+   (+ workspace + scratchpad) — migration-stable by construction, no
+   hardcoded roots. GATE: R7 green.
+ - **R9 — bash-command path repair** (documented-optional, his ruling):
+   paths embedded in free-text bash commands — the large/fuzzy piece
+   (string parsing, false friends). Parked pending R4 log data showing
+   frequency; spec only if the data justifies it.
+
 
 ## 6. Blind spots closed this session (and their standing status)
 1. Scope boundary args-vs-content — closed (§2.6); rides the AGENTS.md paste.
