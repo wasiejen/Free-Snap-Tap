@@ -475,28 +475,32 @@
 //      (193) SCRATCHPAD_ROOT: constant pin + slash/backslash-case/deep
 //          scratchpad paths → no out-of-sandbox; C:\Windows control fires;
 //      (194) HOOK scratchpad: bash arg under the scratchpad → zero lines.
-//   S20 write-scope pair/fuzzy (13) — the R2 pin (approved 2026-09-16;
-//      design source: research/fuzzy-numword/decision-record.md §2 +
-//      research doc §2.3/§3.4): the strict existence gate at the MUTATING
-//      surface + the mismatch fail-closed asymmetry + the d<=1 write-fuzzy
-//      bar (scope=write flag — the nine verdicts stay byte-identical) + the
-//      content-scope guard + the bash git-ref gate (git for-each-ref existence):
+//   S20 write-scope pair/fuzzy (15) — the R2 pin (approved 2026-09-16) +
+//      the M1 write-fuzzy exclusion (approved 2026-09-17, #72); design
+//      source: research/fuzzy-numword/decision-record.md §2 + research doc
+//      §2.3/§3.4): the strict existence gate at the MUTATING surface + the
+//      mismatch fail-closed asymmetry + the d<=1 write-fuzzy bar on
+//      edit/block_transfer ONLY (`write` excluded — "new file" is a legal
+//      intent, the d=1 near-miss must not hijack; scope=write flag — the
+//      nine verdicts stay byte-identical) + the content-scope guard + the
+//      bash git-ref gate (git for-each-ref existence):
 //      (195) HOOK write pair gate: canonical exists + pair-form absent →
 //          filePath MUTATED + pair-resolved gate=mutated (byte-exact);
 //      (196) HOOK write pair gate fail-closed: canonical absent → NOT
-//          mutated + gate=none-exist + fuzzy-rejected scope=write on the
-//          result (the fixed pipeline order);
+//          mutated + gate=none-exist + NO fuzzy line (M1: the write fuzzy
+//          channel is gone — zero new lines beyond the pair line);
 //      (197) HOOK write pair gate both-exist → NOT mutated + gate=both-exist
 //          (one line, the fuzzy fast-paths the existing original);
 //      (198) HOOK write MISMATCH ASYMMETRY: [7:eight] + file-8.txt exists →
 //          NOT mutated + redundancy-mismatch gate=fail-closed (contrast the
-//          read scope, S19 pin 191) + fuzzy-rejected scope=write;
+//          read scope, S19 pin 191) + NO fuzzy line (M1);
 //      (199) HOOK block_transfer: srcFile pair MUTATED + dstFile
 //          byte-identical;
-//      (200) HOOK write fuzzy d=1 (single-sibling dir, gap=inf) → MUTATED +
-//          fuzzy-resolved scope=write d=1 gap=inf;
-//      (201) HOOK write fuzzy d=2 → NOT mutated + fuzzy-rejected scope=write
-//          reason=d-too-high (the d<=1 write bar — read accepts d=2);
+//      (200) HOOK write fuzzy d=1 (file-9.txt, single-sibling dir) → NOT
+//          mutated + ZERO new log lines (M1, 2026-09-17, #72: no fuzzy
+//          channel for write — the d=1 near-miss must not hijack);
+//      (201) HOOK write fuzzy d=2 (file-56.txt) → NOT mutated + ZERO new
+//          log lines (M1 — nothing is logged for a bare write miss);
 //      (202) content-scope guard (write): pair in content → log line ONLY,
 //          args byte-identical (the `args[1:one]` python-slice collision);
 //      (203) content-scope guard (edit): pair in oldString → log line ONLY,
@@ -508,7 +512,13 @@
 //      (206) HOOK bash git-ref mismatch → NOT mutated + bare mismatch line
 //          (no gate attempt);
 //      (207) HOOK bash git-ref no-candidate ([4:foour]) → gate=right-unknown,
-//          NOT mutated (gate not attempted).
+//          NOT mutated (gate not attempted);
+//      (208) HOOK edit fuzzy d=1 (file-9.txt, the wf fixture) → MUTATED to
+//          file-4.txt + fuzzy-resolved scope=write d=1 gap=inf (edit KEEPS
+//          the fuzzy channel — M1);
+//      (209) HOOK edit fuzzy d=2 (file-56.txt) → NOT mutated +
+//          fuzzy-rejected scope=write reason=d-too-high (edit keeps the
+//          d<=1 bar — M1).
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -521,7 +531,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=13 hygiene=6  →  "PROBE handover: 206/206 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 hygiene=6  →  "PROBE handover: 208/208 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -3938,7 +3948,7 @@ let n19 = 182;
   n19++;
 }
 
-// ------------------------------------------------------------------ S20 write-scope pair/fuzzy (13)
+// ------------------------------------------------------------------ S20 write-scope pair/fuzzy (15)
 //
 // The R2 (2026-09-16) write-scope pair/fuzzy resolution + the bash git-ref
 // channel (spec: the R2 task; design source: research/fuzzy-numword/
@@ -3949,7 +3959,11 @@ let n19 = 182;
 // evidence flag — the nine VERDICTS stay byte-identical), the content-scope
 // guard (pairs in content args → log line ONLY, never mutated), and the
 // git-ref gate (git for-each-ref — MANDATORY; a ref run < 4 hex chars
-// → the bare log-only form, the gate is not even attempted).
+// → the bare log-only form, the gate is not even attempted). M1 (2026-09-17,
+// #72, maintainer ruling): the fuzzy channel is EXCLUDED for `write` —
+// "new file" is a legal write intent, so a d=1 near-miss must never hijack
+// an existing sibling; edit/block_transfer keep the channel (pins 208/209),
+// the pair channel is unchanged for all three tools.
 
 // git repo at the SANDBOX root: one seed commit + a 40-hex TAG — the
 // ref-gate pins resolve via the tag name (deterministic: a 40-char hex
@@ -3994,24 +4008,23 @@ let n20 = 195;
 }
 
 // 196 — the HOOK write-scope pair gate FAIL-CLOSED: canonical ABSENT → NOT
-//      mutated (byte-identical) + the pair line gate=none-exist + the fuzzy
-//      channel still runs on the result (d>1 → fuzzy-rejected, scope=write)
+//      mutated (byte-identical) + the pair line gate=none-exist + NO fuzzy
+//      line (M1, 2026-09-17, #72: the write fuzzy channel is excluded —
+//      exactly ONE line for the call)
 {
   const w2 = { filePath: ioPfDir + "\\file-[7:seven].txt" };
   const w2Before = JSON.stringify(w2);
   const nL2 = ioReadLines().length;
   await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c196" }, { args: w2 });
   const w2Lines = ioReadLines();
-  const w2p = w2Lines[w2Lines.length - 2].split(" | ");
-  const w2f = w2Lines[w2Lines.length - 1].split(" | ");
+  const w2p = w2Lines[w2Lines.length - 1].split(" | ");
   check(
     String(n20),
     "S20",
-    "hook write pair gate fail-closed: canonical absent → NOT mutated + 'gate=none-exist' + fuzzy-rejected scope=write on the result",
-    JSON.stringify(w2) === w2Before && w2Lines.length === nL2 + 2 &&
-      w2p[7] === "observed-redundancy-ok" && w2p[5] === "pair=[7:seven] canon=7 dist=0 gate=none-exist" &&
-      w2f[7] === "fuzzy-rejected" && w2f[5].includes("scope=write"),
-    JSON.stringify({ argsAfter: JSON.stringify(w2), n: w2Lines.length - nL2, f: [w2p[5], w2f[5], w2f[7]] }),
+    "hook write pair gate fail-closed: canonical absent → NOT mutated + 'gate=none-exist' + NO fuzzy line (M1: zero lines beyond the pair line)",
+    JSON.stringify(w2) === w2Before && w2Lines.length === nL2 + 1 &&
+      w2p[7] === "observed-redundancy-ok" && w2p[5] === "pair=[7:seven] canon=7 dist=0 gate=none-exist",
+    JSON.stringify({ argsAfter: JSON.stringify(w2), n: w2Lines.length - nL2, f: w2p }),
   );
   n20++;
 }
@@ -4041,24 +4054,21 @@ let n20 = 195;
 // 198 — the HOOK write-scope MISMATCH ASYMMETRY (§2.3): [7:eight] mismatches
 //      and the canonical file-8.txt EXISTS — the write scope FAILS CLOSED
 //      (NOT mutated, gate=fail-closed; contrast the read scope which
-//      resolves on mismatch — the S19 pin 191) + the fuzzy channel still
-//      runs on the untouched result (fuzzy-rejected scope=write)
+//      resolves on mismatch — the S19 pin 191) + NO fuzzy line (M1)
 {
   const w4 = { filePath: ioPfDir + "\\file-[7:eight].txt" };
   const w4Before = JSON.stringify(w4);
   const nL4 = ioReadLines().length;
   await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c198" }, { args: w4 });
   const w4Lines = ioReadLines();
-  const w4m = w4Lines[w4Lines.length - 2].split(" | ");
-  const w4f = w4Lines[w4Lines.length - 1].split(" | ");
+  const w4m = w4Lines[w4Lines.length - 1].split(" | ");
   check(
     String(n20),
     "S20",
-    "hook write mismatch FAIL-CLOSED: [7:eight] + file-8.txt exists → NOT mutated + redundancy-mismatch 'gate=fail-closed' + fuzzy-rejected scope=write",
-    JSON.stringify(w4) === w4Before && w4Lines.length === nL4 + 2 &&
-      w4m[7] === "redundancy-mismatch" && w4m[5] === "pair=[7:eight] canon=8 dist=1 gate=fail-closed" &&
-      w4f[7] === "fuzzy-rejected" && w4f[5].includes("scope=write"),
-    JSON.stringify({ argsAfter: JSON.stringify(w4), n: w4Lines.length - nL4, f: [w4m[5], w4f[7]] }),
+    "hook write mismatch FAIL-CLOSED: [7:eight] + file-8.txt exists → NOT mutated + redundancy-mismatch 'gate=fail-closed' + NO fuzzy line (M1)",
+    JSON.stringify(w4) === w4Before && w4Lines.length === nL4 + 1 &&
+      w4m[7] === "redundancy-mismatch" && w4m[5] === "pair=[7:eight] canon=8 dist=1 gate=fail-closed",
+    JSON.stringify({ argsAfter: JSON.stringify(w4), n: w4Lines.length - nL4, f: w4m }),
   );
   n20++;
 }
@@ -4084,46 +4094,42 @@ let n20 = 195;
   n20++;
 }
 
-// 200 — the HOOK write-scope FUZZY d<=1: a mistyped write path with a d=1
-//      existing sibling (single-sibling dir — gap=inf) → MUTATED to the real
-//      path + fuzzy-resolved with the `scope=write` flag (d=1 is the
-//      write-scope bar — read would accept d<=2)
+// 200 — the HOOK write-scope FUZZY exclusion (M1, 2026-09-17, #72): a
+//      mistyped write path with a d=1 existing sibling (single-sibling dir —
+//      gap=inf) → NOT mutated + ZERO new log lines (the d=1 near-miss must
+//      not hijack — "new file" is a legal write intent)
 {
   const f1 = { filePath: ioWfDir + "\\file-9.txt" };
+  const f1Before = JSON.stringify(f1);
   const nL6 = ioReadLines().length;
   await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c200" }, { args: f1 });
   const f1Lines = ioReadLines();
-  const f1f = f1Lines[f1Lines.length - 1].split(" | ");
   check(
     String(n20),
     "S20",
-    "hook write fuzzy d=1: file-9.txt → MUTATED to file-4.txt + fuzzy-resolved 'scope=write … d=1 gap=inf'",
-    f1.filePath === ioWfDir + "\\file-4.txt" && f1Lines.length === nL6 + 1 &&
-      f1f[7] === "fuzzy-resolved" && f1f[5].includes("fuzzy scope=write orig=") &&
-      f1f[5].includes("-> file-4.txt d=1 gap=inf"),
-    JSON.stringify({ after: f1.filePath, n: f1Lines.length - nL6, f: f1f }),
+    "hook write fuzzy d=1: file-9.txt → NOT mutated + ZERO new log lines (M1: no fuzzy channel for write)",
+    JSON.stringify(f1) === f1Before && f1Lines.length === nL6,
+    JSON.stringify({ argsAfter: JSON.stringify(f1), n: f1Lines.length - nL6 }),
   );
   n20++;
 }
 
-// 201 — the HOOK write-scope FUZZY bar: d=2 is REJECTED in the write scope
-//      (the read scope accepts it — the d<=1 bar, the §2.3 hazard class) →
-//      NOT mutated + fuzzy-rejected scope=write reason=d-too-high
+// 201 — the HOOK write-scope FUZZY exclusion (M1): a d=2 write path → NOT
+//      mutated + ZERO new log lines (same exclusion as 200 — nothing is
+//      logged for a bare write miss; the d<=1 bar question is moot for
+//      write until the channel exists again)
 {
   const f2 = { filePath: ioWfDir + "\\file-56.txt" };
   const f2Before = JSON.stringify(f2);
   const nL7 = ioReadLines().length;
   await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c201" }, { args: f2 });
   const f2Lines = ioReadLines();
-  const f2f = f2Lines[f2Lines.length - 1].split(" | ");
   check(
     String(n20),
     "S20",
-    "hook write fuzzy d=2: file-56.txt vs file-4.txt → NOT mutated + fuzzy-rejected scope=write reason=d-too-high",
-    JSON.stringify(f2) === f2Before && f2Lines.length === nL7 + 1 &&
-      f2f[7] === "fuzzy-rejected" && f2f[5].includes("scope=write") &&
-      f2f[5].includes("cands=file-4.txt 2") && f2f[5].includes("reason=d-too-high"),
-    JSON.stringify({ argsAfter: JSON.stringify(f2), n: f2Lines.length - nL7, f: f2f }),
+    "hook write fuzzy d=2: file-56.txt → NOT mutated + ZERO new log lines (M1: no fuzzy channel for write)",
+    JSON.stringify(f2) === f2Before && f2Lines.length === nL7,
+    JSON.stringify({ argsAfter: JSON.stringify(f2), n: f2Lines.length - nL7 }),
   );
   n20++;
 }
@@ -4251,6 +4257,48 @@ let n20 = 195;
     JSON.stringify(g4) === g4Before && g4Lines.length === nL13 + 1 &&
       g4f[5] === "pair=[4:foour] gate=right-unknown" && g4f[7] === "no-candidate",
     JSON.stringify({ argsAfter: JSON.stringify(g4), n: g4Lines.length - nL13, f: g4f }),
+  );
+  n20++;
+}
+
+// 208 — the HOOK EDIT-scope FUZZY (M1: edit KEEPS the channel): the wf
+//      fixture's d=1 sibling (file-9.txt vs file-4.txt, single-sibling dir —
+//      gap=inf) → MUTATED to the real path + fuzzy-resolved scope=write
+{
+  const e1 = { filePath: ioWfDir + "\\file-9.txt" };
+  const nL14 = ioReadLines().length;
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io2", callID: "c208" }, { args: e1 });
+  const e1Lines = ioReadLines();
+  const e1f = e1Lines[e1Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "hook edit fuzzy d=1: file-9.txt → MUTATED to file-4.txt + fuzzy-resolved 'scope=write … d=1 gap=inf' (edit keeps the channel — M1)",
+    e1.filePath === ioWfDir + "\\file-4.txt" && e1Lines.length === nL14 + 1 &&
+      e1f[3] === "edit" && e1f[7] === "fuzzy-resolved" &&
+      e1f[5].includes("fuzzy scope=write orig=") && e1f[5].includes("-> file-4.txt d=1 gap=inf"),
+    JSON.stringify({ after: e1.filePath, n: e1Lines.length - nL14, f: e1f }),
+  );
+  n20++;
+}
+
+// 209 — the HOOK EDIT-scope FUZZY bar (M1: edit keeps the d<=1 bar): d=2 →
+//      NOT mutated + fuzzy-rejected scope=write reason=d-too-high
+{
+  const e2 = { filePath: ioWfDir + "\\file-56.txt" };
+  const e2Before = JSON.stringify(e2);
+  const nL15 = ioReadLines().length;
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io2", callID: "c209" }, { args: e2 });
+  const e2Lines = ioReadLines();
+  const e2f = e2Lines[e2Lines.length - 1].split(" | ");
+  check(
+    String(n20),
+    "S20",
+    "hook edit fuzzy d=2: file-56.txt vs file-4.txt → NOT mutated + fuzzy-rejected scope=write reason=d-too-high (edit keeps the bar — M1)",
+    JSON.stringify(e2) === e2Before && e2Lines.length === nL15 + 1 &&
+      e2f[3] === "edit" && e2f[7] === "fuzzy-rejected" && e2f[5].includes("scope=write") &&
+      e2f[5].includes("cands=file-4.txt 2") && e2f[5].includes("reason=d-too-high"),
+    JSON.stringify({ argsAfter: JSON.stringify(e2), n: e2Lines.length - nL15, f: e2f }),
   );
   n20++;
 }

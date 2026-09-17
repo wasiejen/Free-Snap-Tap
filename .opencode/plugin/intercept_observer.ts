@@ -52,7 +52,11 @@
 //   (3b) FUZZY on the same path fields: the read-scope matcher at the
 //       TIGHTER bar d<=1 (`resolveWritePath`) under the same strict gate —
 //       `fuzzy-resolved`/`fuzzy-rejected` with the `scope=write` flag in
-//       the evidence (the nine verdicts stay byte-identical).
+//       the evidence (the nine verdicts stay byte-identical). M1 (2026-09-17,
+//       #72): the `write` tool is EXCLUDED from this channel — "new file"
+//       is a legal write intent, so a d=1 near-miss must never hijack an
+//       existing sibling (edit/block_transfer keep the channel; the (3a)
+//       pair channel is unaffected for all three tools).
 //   (3c) GIT REFS in the bash `command` string: pair → digit (right-wins),
 //       gated on ref EXISTENCE (research §3.4 — the gate is MANDATORY):
 //       the maximal hex run spanning the pair's canonical digits is the
@@ -605,7 +609,11 @@ async function onToolBefore(
     if (pairOwned) {
       const f = runFuzzyRead(output); // read-scope ONLY
       if (f !== null) fuzzy = [f];
-    } else if (writeOwned) {
+    } else if (writeOwned && tool !== "write") {
+      // M1, 2026-09-17, #72: `write` excluded from the fuzzy channel —
+      // "new file" is a legal intent for write, so a d=1 near-miss must
+      // never hijack the target (edit/block_transfer keep the channel;
+      // the pair channel above is unaffected for all three tools)
       fuzzy = runFuzzyWrite(output, tool); // write-scope ONLY
     }
     if (obs.length === 0 && channel.length === 0 && fuzzy.length === 0) return; // nothing to log

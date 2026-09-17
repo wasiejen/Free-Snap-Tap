@@ -1,7 +1,9 @@
 // intercept_observer.smoke.mjs — the 5.3 log-only intercept observer + the
 // 5.4 read-scope fuzzy resolution + the R2 write-scope pair/fuzzy resolution
 // (2026-09-16: the controlled scratchpad write audit, the content-scope
-// guard, the d<=1 write-fuzzy bar) (.opencode/plugin/intercept_observer.ts
+// guard, the d<=1 write-fuzzy bar; M1 2026-09-17 #72: the write fuzzy
+// channel EXCLUDED — "new file" is a legal write intent, the d=1 near-miss
+// must not hijack; edit keeps the channel) (.opencode/plugin/intercept_observer.ts
 // + _core.ts). The plugin factory is called with a SCRATCHPAD sandbox
 // `directory` — the intercept.log lands in the sandbox
 // (.opencode/temp/intercept.log under the sandbox project), NEVER the live
@@ -213,12 +215,14 @@ try {
       fQpair.length === 8 && fQpair[7] === "observed-redundancy-ok" && fQpair[5] === `pair=[3:three] canon=3 dist=0 gate=none-exist` &&
       fQ.length === 8 && fQ[7] === "fuzzy-rejected", JSON.stringify([fQpair, fQ]));
 
-  // ---- (8f) the WRITE-SCOPE resolution (R2, 2026-09-16): the DoD
+  // ---- (8f) the WRITE-SCOPE resolution (R2, 2026-09-16; M1, 2026-09-17,
+  //      #72 — the write fuzzy channel excluded, edit keeps it): the DoD
   //      controlled scratchpad write — the resolved write lands where the
   //      log says (end-to-end audit: field 5 = the ORIGINAL pair-form arg,
   //      field 6 = the gate evidence) + the content-scope guard (the
-  //      `args[1:one]` python-slice collision → log line ONLY) + the d<=1
-  //      write-fuzzy bar (scope=write evidence flag)
+  //      `args[1:one]` python-slice collision → log line ONLY) + the M1
+  //      write exclusion (d=1 near-miss: NOT mutated, zero lines) + the
+  //      edit counter-pin (d<=1 bar, scope=write evidence flag)
   fs.mkdirSync(path.join(proj, "wfx"), { recursive: true });
   fs.writeFileSync(path.join(proj, "wfx", "file-4.txt"), "TWIN", "utf-8");
   const argsW = { filePath: proj + "\\wfx\\file-[4:four].txt", content: "R2-WRITE" };
@@ -247,15 +251,26 @@ try {
     JSON.stringify(argsC) === argsCBefore && lC.length === countC + 1 && fC[7] === "observed-redundancy-ok" &&
       fC[5] === "pair=[1:one] canon=1 dist=0", JSON.stringify(fC));
 
+  // M1 (2026-09-17, #72): the write fuzzy channel is EXCLUDED — the d=1
+  // near-miss must not hijack the target ("new file" is a legal write
+  // intent): args byte-identical + ZERO new log lines
   const argsF = { filePath: proj + "\\wfx\\file-9.txt" };
   const argsFBefore = JSON.stringify(argsF);
   const countF = readLines().length;
   await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c10e" }, { args: argsF });
-  const lF = readLines();
-  const fF = split8(lF[lF.length - 1]);
-  chk("write fuzzy d=1 → MUTATED to the existing sibling + fuzzy-resolved scope=write (d=1 gap=inf)",
-    argsF.filePath === proj + "\\wfx\\file-4.txt" && lF.length === countF + 1 && fF[7] === "fuzzy-resolved" &&
-      fF[5].includes("fuzzy scope=write orig=") && fF[5].includes("-> file-4.txt d=1 gap=inf"), JSON.stringify(fF));
+  chk("write fuzzy d=1 → NOT mutated + ZERO new log lines (M1, #72: no fuzzy channel for write)",
+    JSON.stringify(argsF) === argsFBefore && readLines().length === countF);
+
+  // M1 counter-pin: edit KEEPS the fuzzy channel (same wfx fixture) — d=1 →
+  // MUTATED + fuzzy-resolved scope=write
+  const argsG = { filePath: proj + "\\wfx\\file-9.txt" };
+  const countG = readLines().length;
+  await before({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c10f" }, { args: argsG });
+  const lG = readLines();
+  const fG = split8(lG[lG.length - 1]);
+  chk("edit fuzzy d=1 → MUTATED to the existing sibling + fuzzy-resolved scope=write (d=1 gap=inf) (edit keeps the channel — M1)",
+    argsG.filePath === proj + "\\wfx\\file-4.txt" && lG.length === countG + 1 && fG[3] === "edit" && fG[7] === "fuzzy-resolved" &&
+      fG[5].includes("fuzzy scope=write orig=") && fG[5].includes("-> file-4.txt d=1 gap=inf"), JSON.stringify(fG));
 
   // ---- (9) the LIVE log is untouched by this smoke
   const liveAfter = fs.existsSync(LIVE_LOG) ? fs.statSync(LIVE_LOG).size : null;
