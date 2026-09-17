@@ -105,6 +105,20 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - Live acceptance rides the next host restart (planner one-shot, per the R7
   pattern): a doubled nested read/edit resolves (`kind=dedup`); a doubled write
   stays literal (zero lines).
+- **Escape-notation design converged + proposal written** (priority #0): the
+  motivating incident is THIS session's own NAP drift — I wrote the numword
+  `two-two-zero` correctly but the **digits** emitted were the old total
+  (drift of 4, invisible to me; a circular self-check passed). Goal (his):
+  extend the EXISTING numword→number resolution (works for path ARGS) to the
+  write/edit **CONTENT**, gated by a trailing sentinel so code is never touched.
+  Form `[incident:correcting:sentinel]` — incident = drifted as-seen (log-only),
+  correcting = dash-digits/numwords (the side I CAN emit = the value), sentinel
+  = `esc`|`w2n` (open, lean `esc`). Pre-step before R3 fuzzy; scope
+  oldString/newString/content; minimal log (original + resolved, R4 derives
+  drift). Deferred: 4-field adder + functional-injection (date) — recorded in
+  the proposal. Proposal: `.opencode/proposals/2026-09-17_numword-escape-output.md`
+  (awaiting his sentinel ruling). Also NOTE: my NAP totals in this section still
+  carry the drifted digits — to be fixed (separate small commit).
 
 ## Direct session (2026-09-17, ses_f53a10d24ffesL2Oc8jPqY1bBc) — R2 live check, #72 ruling, dump-fail evidence, path-repair topic opened
 - **R2 write-scope acceptance: first check NO (host process was PRE-R2 —
