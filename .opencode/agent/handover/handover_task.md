@@ -1,84 +1,103 @@
-# M1 spec — write-fuzzy scope restriction (the #72 ruling)
+# R7 spec — segment-level path resolver (the doubling/segment channel)
 
 STATUS: READY TO LAUNCH 2026-09-17, direct session
-ses_f53a10d24ffesL2Oc8jPqY1bBc. GATE: maintainer ruling "M1 approved"
-(2026-09-17, recorded in TODO #72 + NAP). Stay on the current checkout
-(opencode_test). This is an OBSERVABLE behavior change — pre-approved by
-that ruling; no further approval needed inside this scope.
+ses_f53a10d24ffesL2Oc8jPqY1bBc. GATE SATISFIED (verified 09-17): R2
+live-accepted + M1 landed (9ec4c0b) + host restart (M1 live-accepted).
+Maintainer rulings on file: staging (decision-record §5, R7 block),
+**seg-d≤1 both scopes**, and the **substitution bar** (approved 09-17): a
+pure segment INSERTION (the doubled folder) resolves free under the
+existence+uniqueness gate; a segment SUBSTITUTION counts as seg-d=1 ONLY
+when the two segment names are char-close (intra-segment Levenshtein ≤1) —
+a char-far substitution fails closed. Stay on the current checkout
+(opencode_test). Design source: decision-record §5 R7 (grep the heading —
+the record is large).
 
 ## Goal
-Remove the IMPLICIT fuzzy channel from the `write` tool only. `edit` and
-`block_transfer` keep it. Rationale (ruling): "new file" is a legal intent
-for `write`, so a d=1 near-miss hijack silently overwrites an existing
-sibling (live-measured 2026-09-17: `file-5.txt → file-4.txt`, the #72
-hazard); for `edit` no new-file intent exists, so redirect is unambiguous.
-The PAIR channel (strict existence gate, fail-closed) stays UNCHANGED for
-all three tools — it is the explicit, numeral-anchored correction path.
+Add a SEGMENT-LEVEL resolver between the pair channel and the char-fuzzy
+channel. A path is a sequence of folder units; distance counts per
+segment (one extra / one mismatched folder = 1). This catches the doubled
+folder (`OpenCodeProjects/OpenCodeProjects/…` — char-distance 17, invisible
+to the char channel) and one-folder-mismatch typos, under the same strict
+gate discipline. The `write` tool stays fully excluded from the implicit
+channels (M1 — the segment channel inherits the exclusion).
 
-## Verified facts (measured at spec time 2026-09-17 — build on these, do not re-derive)
-- Baseline: probe self-annotation **206/206** (S1–S20), smoke **35/35**,
-  pytest **459 passed + 1 warning** (the known #10), ruff **F=0**.
-  Re-verify by RUNNING before any edit (machine-read the self-annotation;
-  mismatch → STOP + report).
-- The write-scope fuzzy lives in ONE dispatch point:
-  `.opencode/plugin/intercept_observer.ts` lines 608-609 —
-  `else if (writeOwned) { fuzzy = runFuzzyWrite(output, tool); }`, where
-  `writeOwned` = the tool is in `WRITE_PATH_FIELDS` (write/edit/
-  block_transfer, lines 332-336). `runFuzzyWrite` (lines 439-470) itself is
-  tool-agnostic (iterates `writePathFields(tool)`).
-- The PAIR channel for the same tools is `runPairWrite` (lines 363+),
-  dispatched at line 602 — it must keep running for `write` too.
-- The matcher core (`resolveWritePath`, `WRITE_FUZZY_MAX_D = 1` in
-  `intercept_observer_core.ts` lines 134-140) stays — `edit`/
-  `block_transfer` still use it.
-- S20 probe section (`.opencode/plugin/probes/handover_probe.mjs`, header
-  comment lines 478-498, checks from line 3941): 13 checks. The write-
-  fuzzy expectations to RE-PIN: check ~4010 ("write pair gate fail-closed
-  … + fuzzy-rejected scope=write on the result"), ~4057 ("write mismatch
-  FAIL-CLOSED … + fuzzy-rejected scope=write"), ~4100 ("(200) hook write
-  fuzzy d=1: file-9.txt → MUTATED to file-4.txt + fuzzy-resolved
-  scope=write"), ~4122 ("(201) hook write fuzzy d=2 → NOT mutated +
-  fuzzy-rejected scope=write reason=d-too-high"). Check ~4033 (pair both-
-  exist, "no fuzzy line") already expects no fuzzy line → unchanged.
-- Smoke 8f (`.opencode/plugin/tests/intercept_observer.smoke.mjs` lines
-  216-258): the pin at 256 ("write fuzzy d=1 → MUTATED to the existing
-  sibling + fuzzy-resolved scope=write (d=1 gap=inf)") must be re-pinned;
-  the pair pins (232-238) and the content-scope guard pin (246) stay.
+## Verified facts (measured at spec time 09-17 — build on these)
+- Baseline: probe **208/208**, smoke **36/36**, pytest **459+1w**, ruff
+  **F=0**. Re-verify by RUNNING before any edit (mismatch → STOP + report).
+- Core (`.opencode/plugin/intercept_observer_core.ts`, 689 lines):
+  `levenshtein(a,b)` exported at 615 (reuse it for intra-segment distance);
+  corpus = sorted array of `/`-joined relative paths from the nearest
+  existing ancestor (built 590-612); `normPathForm` normalizes for
+  comparison; `matchNearPath(argRel, corpus, maxD)` (645) is the pure
+  matcher shape: exact → resolved iff d≤maxD AND gap≥`FUZZY_MIN_GAP`
+  (= 2, line 135) → rejected with top-3 `[relPath, d]` + reason
+  (`d-too-high`/`gap-too-small`/`empty-corpus`/`empty-arg`); returns
+  `ReadResolution` (`{kind:"exact"|"resolved"|"rejected", path?, d?, gap?,
+  cands?, reason?}`). Scope bars: `FUZZY_MAX_D=2` (read),
+  `WRITE_FUZZY_MAX_D=1` (write) at 134-140.
+- Hook (`.opencode/plugin/intercept_observer.ts`): dispatch at 605-617 —
+  `pairOwned → runFuzzyRead` (read scope) / `writeOwned && tool !==
+  "write" → runFuzzyWrite` (the M1 guard; `edit`/`block_transfer` only);
+  `runFuzzyRead`/`runFuzzyWrite` each: existsSync fast-path →
+  `nearestExistingDir` → `getCorpus(root)` → matcher → mutate + log on
+  resolved (evidence `fuzzy scope=… orig=… -> … d=… gap=…`).
+- Probe (`.opencode/plugin/probes/handover_probe.mjs`): S20 header at
+  line 3951 `// ---- S20 write-scope pair/fuzzy (15)`; the header
+  annotation total (208) is the source of truth — update it when S21
+  grows the probe. S21 goes AFTER the S20 section.
+- Smoke (`.opencode/plugin/tests/intercept_observer.smoke.mjs`, 268
+  lines): the 8f write-scope block ends at line 258; add the new pin
+  before the `(9) live log untouched` block.
 
 ## Definition of done (measurable)
-1. CODE: `write` produces NO fuzzy lines anymore (dispatch guard or early
-   return in `runFuzzyWrite` — your call, one-line change + a comment
-   citing "M1, 2026-09-17, #72"); `edit`/`block_transfer` fuzzy untouched;
-   `runPairWrite` behavior byte-identical for all three tools.
-2. PROBE S20: the 4 write-fuzzy expectations above re-pinned to the new
-   behavior — NOT mutated + NO fuzzy line (the hook logs nothing for a
-   bare `write` miss: zero new lines, not a "rejected" line); the S20
-   header comment (200/201 descriptions) updated accordingly. ADD 2 NEW
-   pins on the `edit` tool reusing the wfx fixture: edit d=1 (file-9.txt)
-   → MUTATED to file-4.txt + fuzzy-resolved scope=write d=1 gap=inf; edit
-   d=2 (file-56.txt) → NOT mutated + fuzzy-rejected scope=write
-   reason=d-too-high. S20 count (13) → (15); the probe header annotation
-   total updated (it is the source of truth); probe **208/208 PASS**.
-3. SMOKE: 8f pin 256 re-pinned (write d=1 → args byte-identical + ZERO new
-   log lines) + 1 NEW pin: edit d=1 → MUTATED + fuzzy-resolved scope=write
-   (same fixture). Smoke **36/36**.
-4. GATE: probe 208/208 + smoke 36/36 + pytest 459+1w + ruff F=0 (standard
-   gate, all from repo root; the probe's MODULE_TYPELESS warning is
-   expected).
-5. BOOKKEEPING: TODO #72 status → "M1 landed (<commit>)";
+1. CODE (core): new `SEG_MAX_D = 1` constant + a pure
+   `matchNearPathSegments(argRel, corpus)` following the
+   `matchNearPath` shape: exact short-circuit, then per-candidate
+   segment distance via DP over segment arrays where substitution cost is
+   1 iff `levenshtein(segA, segB) <= 1`, else non-substitutable
+   (insert/delete cost 1); accept iff seg-d ≤ SEG_MAX_D AND gap ≥
+   FUZZY_MIN_GAP; deterministic tie-break (seg-d, then intra-segment
+   char-sum, then lexical); same `ReadResolution` shape with d = segment
+   distance. Export it (the probe imports the core exports).
+2. CODE (hook): in `runFuzzyRead` and `runFuzzyWrite`, run
+   `matchNearPathSegments` BEFORE the char matcher on the same arg+corpus;
+   segment-resolved → mutate + one line, verdict `fuzzy-resolved`,
+   evidence `fuzzy kind=seg scope=<read|write> orig=… -> … d=<segd>
+   gap=…`; segment-rejected → fall through to the existing char matcher
+   (unchanged). The M1 guard stays EXACTLY where it is — `write` produces
+   no lines from either matcher.
+3. PROBE S21 (new section, 8 checks): (1) read doubled-segment (one
+   insertion, e.g. `a/a/b/c.txt` vs corpus `a/b/c.txt`) → MUTATED +
+   `kind=seg … d=1`; (2) `edit` doubled-segment → MUTATED + `kind=seg
+   d=1` (write scope keeps the channel); (3) `write` doubled-segment →
+   NOT mutated + ZERO lines (M1 exclusion extends to the segment
+   channel); (4) read one mismatched folder, intra-seg lev 1 (e.g.
+   `OpenCodeProject` vs `OpenCodeProjects`) → MUTATED + `kind=seg d=1`;
+   (5) read one mismatched folder, char-far (e.g. `zzz`) → NOT mutated +
+   NO `fuzzy-resolved` line (the char fallback also rejects); (6) read
+   seg-d=2 (two insertions) → NOT mutated + rejected; (7) two candidates
+   tied at seg-d=1 → NOT mutated + `gap-too-small`; (8) filename typo
+   `file-x.txt` vs corpus `file-4.txt` → MUTATED with `kind=seg` in the
+   evidence (subsumed by the segment channel, not the char fallback).
+   Probe total 208 → **216**, annotation updated.
+4. SMOKE: 1 new pin — `edit` doubled-segment end-to-end (the edit lands
+   where the log says; line carries `kind=seg`). Smoke 36 → **37/37**.
+5. GATE: probe 216/216 + smoke 37/37 + pytest 459+1w + ruff F=0.
+6. BOOKKEEPING: no TODO change needed (no open entry covers R7 build
+   state — record the landing in the worker summary only);
    handover_task_to_planner.md per the worker protocol.
 
 ## DO-NOT-TOUCH
-- The PAIR channel logic (runPairWrite / runPairRead), the read-scope
-  channels (runFuzzyRead / runPairRead), the git-ref channel
-  (runGitRefBash), `matchNearPath`/`resolveWritePath`/`WRITE_FUZZY_MAX_D`
-  in the core, the content-args guard, the log format (9-field).
+- The pair channels (runPairRead/runPairWrite), the git-ref channel,
+  `matchNearPath`/`resolveReadPath`/`resolveWritePath`/`FUZZY_MAX_D`/
+  `WRITE_FUZZY_MAX_D`, the M1 dispatch guard (line 612), the 9-verdict
+  vocabulary (kind=seg is an evidence flag ONLY), the log field layout
+  (8 fields), the corpus builder, the content-args guard.
 - Anything under `.opencode/maintainer/`, `opencode.jsonc`, the FST
-  Python package, pytest suite (it does not cover the plugin — gate runs
-  it unchanged).
-- No new files beyond the spec/handover/TODO bookkeeping; no live
-  acceptance run (probe+smoke are the gate; the live check rides the next
-  host restart and is the planner's one-shot, not the worker's).
+  Python package, the pytest suite (gate runs it unchanged), existing
+  S1–S20 pins.
+- No live acceptance run (probe + smoke are the gate; the live check
+  rides the next restart and is the planner's one-shot).
 
 ## Worker
 `worker_Q4_140K` (default; the 140K-era roster).
