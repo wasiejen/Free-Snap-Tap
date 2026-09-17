@@ -61,11 +61,17 @@ over per the stop line.
   fallback.
 
 ## Safety
-- Read-mostly. Your edit allow-list is `TODO.md`, the handoff summary, and the scratchpad —
-  nothing else. Do not run live/destructive probes (see `repo_testgate.md` safety limits,
-  `.opencode/agent/prompts/repo/`).
+- Read-mostly. Your edit allow-list is `TODO.md`, the handoff summary,
+  `.opencode/agent/agent_feedback.md` (friction entries, append-only — the #53 protocol),
+  and the scratchpad — nothing else. Do not run live/destructive probes (see
+  `repo_testgate.md` safety limits, `.opencode/agent/prompts/repo/`).
 
 ## Handoff
 - Write the executive summary to `handover_task_to_planner.md` per AGENTS.md §Handover-files
   — findings + severity, files touched = `TODO.md` only, gauge line verbatim.
+- **Friction check (close-down, mandatory — #53 protocol):** directly BEFORE the
+  handoff — did real friction occur (audit slow-down, confusion, unclear structure,
+  missing context)? If yes → fire `submit(feedback=...)` with ONE actionable line per
+  point (auto-stamped; absence = no entry); if `submit` is not in your toolset, append by
+  hand to `.opencode/agent/agent_feedback.md` (append-only, format in its header).
 - Your final message is a SHORT pointer to that file. Never touch the NAP. Then stop.

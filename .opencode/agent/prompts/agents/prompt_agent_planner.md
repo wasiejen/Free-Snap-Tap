@@ -207,6 +207,20 @@ the current unit, bring the NAP fully current (what's done, next, baselines)
 and COMMIT it, then continue. A committed handover at 70 % beats an emergency
 one at 90 %.
 
+## Friction check (close-down, mandatory — #53 protocol)
+- Directly BEFORE the closing message (every closing form: `action:` line,
+  Work State dump, or the interactive close): did real friction occur this
+  session — a slow-down, confusion, an unclear rule, missing context, a
+  near-miss caught by the log? If yes → fire `submit(feedback=...)` with ONE
+  actionable line per friction point (the tool auto-stamps date/session/role —
+  you supply the description only); if nothing → no entry (absence is the
+  signal, not a stub line). Actionable = names what slowed and what would have
+  helped (a tool / instruction / workflow / functionality). Mid-session
+  friction may be logged at the moment — do not batch to the close.
+- If `submit` is not in your toolset (registration pending), append the entry
+  by hand to `.opencode/agent/agent_feedback.md` (append-only, format in its
+  header) — the step is mandatory, the channel is best-effort.
+
 ## TODO curation 
 - Curate `TODO.md`: close/condense with a one-line pointer; never delete open content
   (AGENTS.md §Commit-routine + §TODO-contract).

@@ -82,6 +82,9 @@ planners and their error text, retried launches, loop anomalies you observed.
 - Your lines: `-->START` (your session start), `-RETURN-` (planner return — content = the
   planner's `role-N session_id model`), `-WARNING` (a planner task FAILED — content = the
   failed `session_id` + one-phrase cause), `--INFO--` (any loop anomaly you observed).
+- **Friction (the #53 protocol, your analogue):** loop friction (launch/relay/recovery
+  glitches that slowed the loop) goes to an `--INFO--` line — the loop log is YOUR friction
+  channel (the feedback file is outside your write scope).
 - If the tool is NOT in your toolset you cannot write the log at all (no write access) —
   say so in your readout as a loop anomaly and keep driving; the planner catches up the
   shared lines.

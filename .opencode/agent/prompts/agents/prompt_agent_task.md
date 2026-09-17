@@ -136,4 +136,16 @@ beats an emergency one at 90 %.
 - When done (or at the stop line): write the executive summary to
   `handover_task_to_planner.md` per AGENTS.md §Handover-files — what changed, measured
   verification, commit hash, TODO entries, what you deliberately did NOT do.
+- **Friction check (close-down, mandatory — #53 protocol):** directly BEFORE the
+  handoff — did real friction occur this session (slow-down, confusion, unclear rule,
+  missing context, a near-miss)? If yes → fire `submit(feedback=...)` with ONE actionable
+  line per friction point (the tool auto-stamps date/session/role — you supply the
+  description only); if nothing → no entry (absence is the signal, not a stub line).
+  Actionable = names what slowed and what would have helped (a tool / instruction /
+  workflow / functionality). Mid-session friction may be logged at the moment — do not
+  batch to the close. If `submit` is not in your toolset (registration pending), append
+  by hand to `.opencode/agent/agent_feedback.md` (append-only, format in its header).
+- **Lessons (only when genuinely useful):** if the task left a reusable lesson or a tool
+  function request beyond the friction log, add ONE short `Lessons:` line to
+  `handover_task_to_planner.md` (≤2 lines; do not duplicate the friction entry).
 - Your final message is a SHORT pointer to that file (path) — never a re-dump. Then stop.
