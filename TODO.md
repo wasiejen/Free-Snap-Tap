@@ -284,10 +284,14 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   legal there → redirect is unambiguous); `write` loses the implicit channel
   (new-file IS a legal intent → every degraded outcome becomes a visible
   stray file, never a silent overwrite); the pair channel stays unchanged
-  (strict existence, fail-closed). Build unit queued: spec + S20 re-pin
-  (check 200 → not-mutated for `write`) + smoke 8f update. Follow-on
-  DISCUSSION (not yet approved, see NAP 2026-09-17 direct session): general
-  path repair — segment-level resolver + root re-anchoring.
+  (strict existence, fail-closed). **M1 LANDED (commit 9ec4c0b, 2026-09-17,
+  worker):** dispatch guard in intercept_observer.ts (write excluded from the
+  fuzzy channel); S20 re-pinned (196/198 no fuzzy line, 200/201 NOT mutated +
+  zero lines) + new edit counter-pins 208/209; probe 208/208, smoke 36/36,
+  pytest 459+1w, ruff F=0. Live acceptance: rides the next host restart
+  (planner one-shot). Follow-on DISCUSSION (not yet approved, see NAP
+  2026-09-17 direct session): general path repair — segment-level resolver +
+  root re-anchoring.
 
 ## Closed entries
 
