@@ -92,7 +92,7 @@ The delegate targets live in `opencode.jsonc` (mode `all`) — the maintainer ed
 that file live, so **verify the roster there, never trust this section or
 memory**. Model notes for choosing (Q4 = 4bit, higher precision; Q3 = 3bit,
 faster/weaker):
-- **Default** `worker_Q4_120K` — same model as `planner_Q4_120K`, no reload cost,
+- **Default** `worker_Q4_140K` — same model as `planner_Q4_140K`, no reload cost,
   high precision: use for normal edits / builds / tests.
 - `worker_Q3_*` — faster, medium precision (3bit): use when throughput beats
   precision. The large-context `…210K` variant is for very long / deeply complex
