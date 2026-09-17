@@ -80,9 +80,14 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - **#72 RULING: M1 approved** (his 09-17 direct): implicit write-fuzzy
   restricted to edit/block_transfer, removed from `write`; pair channel
   unchanged (strict existence, fail-closed); all degraded outcomes = stray
-  file, no data loss. TODO #72 updated. Build unit queued (spec + S20 re-pin
-  + smoke 8f) — AFTER the restart one-shot, separate unit from the
-  path-repair topic.
+  file, no data loss. **M1 LANDED + planner-verified 09-17:** spec
+  `17bd3fd` → worker-`9ec4c0b` (one-line dispatch guard
+  `writeOwned && tool !== "write"` + S20 re-pins 196/198/200/201 + edit
+  counter-pins 208/209 + smoke 8f re-pin + edit pin) → `dfdc494` (TODO #72
+  → LANDED + summary). Planner re-ran the FULL gate: probe 208/208, smoke
+  36/36, pytest 459+1w, F=0 — all green. Live effect rides the NEXT host
+  restart (one-shot then: a d=1 mistyped write must land LITERAL — stray
+  file, no hijack; edit stays corrected).
 - **DUMP-FAIL evidence (his #1, 26-09-17_09-11 report):** manual dump of the
   missing ses_f5467718… = 0.12s / 219KB → recovered as
   `compaction_dumps/…_c0_manual.md` (corpus gap closed). The 2× ETIMEDOUT
@@ -118,12 +123,12 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   then R8.
 
 ## Standing
-- Baselines (re-verified 2026-09-16, plan2, gates re-run by the planner
-  after worker-13): probe **180/180** (S17=26 numword pins, S18=32
-  intercept-observer + read-scope-fuzzy pins incl. the loader-contract
-  check; the header annotation total is DIGIT-form and is the source);
-  pytest **459 passed + 1 warning (the known #10 coroutine warning)**;
-  ruff **F=0**. All 8 smokes green (7 + intercept_observer 29/29).
+- Baselines (re-verified 2026-09-17 by the planner post-M1): probe
+  **208/208** (S1–S20 incl. the M1 write-fuzzy re-pins + edit counter-
+  pins 208/209; the header annotation total is DIGIT-form and is the
+  source); pytest **459 passed + 1 warning (the known #10 coroutine
+  warning)**; ruff **F=0**. All 8 smokes green (7 + intercept_observer
+  **36/36**).
 - Corpus refresh cadence (planner call, plan6 — TODO #59 CLOSED): refresh
   BEFORE the #56 distillation runs + after heavy loopruns —
   `node .opencode/agent/scripts/db/dump_session.cjs --all --slim`.
