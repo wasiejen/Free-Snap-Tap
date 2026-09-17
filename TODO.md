@@ -58,11 +58,15 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 
 ## 53. Agent-feedback protocol: mandatory close-down step + small write-tool (DEFERRED 2026-09-12, **DEFERRAL LIFTED 2026-09-17** — direct session; maintainer: "it did not even know anymore that i deferred it") — the optional `agent_feedback.md` entries get discarded by the early-close-at-stop-line discipline; make it a NON-optional part of the close-down phase (directly before the closing message), full date_time on each entry, and a small tool that writes the entry (no file fiddling / accidental reads). **Proposal FILED 2026-09-17** (`proposals/2026-09-17_agent-feedback-closedown.md` —
 Part A: mandatory close-down prompt step, full date_time auto-stamped; Part B:
-unified `submit` tool per his #5 sketch; recommendation: both as one unit).
-Awaiting his ruling.
-**Status 2026-09-18:** Part A LANDED (5e29cb0, plan1); Part B (submit tool)
-LANDED b83b34f — probe + smoke green; registration + per-agent tool grant =
-maintainer restart; live acceptance pending.
+unified `submit` tool per his #5 sketch; recommendation: both as one unit)
+— **ruled 2026-09-17: approved both parts in one unit**.
+**Status 2026-09-18 (plan1, looprun 2026-09-17_23-58):** Part A LANDED
+(5e29cb0 — friction close-down step in all 4 role prompts) + Part B LANDED
+(b83b34f — `submit` tool + 20/20 smoke + probe S23 pin; gate re-verified
+green by planner: probe annotation-agree, all 9 smokes, pytest 459+1w,
+ruff F=0). REMAINING (maintainer domain): registration in live
+`opencode.jsonc` + per-agent tool grant at restart; live acceptance after
+restart.
 
 ## 56. (DEFERRED 2026-09-15, maintainer `--defer` in priority.md) — Distillation worker runs over the session dumps (his # 3 3 mandate)
 
