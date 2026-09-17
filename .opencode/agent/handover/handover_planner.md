@@ -131,7 +131,16 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   **ACCEPTED** (d=1 new-file write landed LITERAL, zero fuzzy lines,
   sibling untouched; `edit` d=1 still corrected `d=1 gap=inf`; fixture
   torn down; TODO #72 + decision-record §5 updated); (3) R7 spec + S21
-  probe section + launch — **NEXT UNIT**.
+  probe section + launch — **DONE + FOUNDING**: spec 20e7d64 (amendment
+  134b107: 1-segment bypass approved) → worker ee19a84 (mid-task
+  self-compaction RESUMEd via task_id — worked) → gates planner-verified
+  (216/216 + 37/37 + 459+1w + F=0). **FINDING (measured, scratchpad
+  repro `r7_realistic_repro.mjs`): the realistic nested doubling is
+  REJECTED** (parent-dir corpus entry kills the gap rule; S21 fixtures
+  were flat — pin-design gap) → **TODO #73 filed** with the fix design
+  (structural adjacency-collapse pre-check, existence-gated,
+  `kind=dedup` flag + realistic fixture pins). **NEXT UNIT: TODO #73**
+  (R7 correction), then R8.
 
 ## Standing
 - Baselines (re-verified 2026-09-17 by the planner post-M1): probe

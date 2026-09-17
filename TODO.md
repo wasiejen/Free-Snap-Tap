@@ -297,6 +297,40 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
    (substitution bar approved 09-17, decision-record §5); R9 documented-
    optional. See NAP 2026-09-17 direct session.
 
+## #73 — R7 realistic doubled case: the segment channel's gap rule fails
+## when the target's parent DIR is a corpus entry (measured 09-17)
+- **Problem + evidence:** the shipped R7 (ee19a84; gates 216/216 + 37/37
+  green) does NOT resolve the realistic nested doubling. Repro
+  (scratchpad `r7_realistic_repro.mjs`, still there): repo
+  `Projects/OpenCodeProjects/{Free-Snap-Tap/TODO.md, SiblingProj/…}` +
+  doubled arg `…/OpenCodeProjects/OpenCodeProjects/Free-Snap-Tap/TODO.md`
+  → `fuzzy-rejected` for read AND edit. Root cause: the corpus (built
+  from the nearest existing ancestor) contains the target's parent DIR
+  entry at seg-d=2; the target sits at seg-d=1 → gap 1 <
+  FUZZY_MIN_GAP=2 → `gap-too-small`. S21 pins 210/211 pass only because
+  their fixture corpus is FLAT files (second-best at seg-d=3) — the
+  pin-fixture design gap is the planner's (spec'd the shapes, not the
+  corpus realism).
+- **Desired outcome:** the doubled-folder case (the maintainer's most
+  observed error) resolves at hook level in a real nested repo.
+- **Design (planner 09-17):** a STRUCTURAL pre-check before corpus
+  matching in `runFuzzyRead`/`runFuzzyWrite`: if the arg's segments
+  contain an adjacent identical pair (case-insensitive), collapse one
+  copy; the collapsed path must EXIST (strict gate, no corpus, no gap
+  rule) → resolve; else fail-closed and fall through to the existing
+  matchers. Verdict reuses `fuzzy-resolved` with a `kind=dedup` evidence
+  flag (9-verdict vocabulary untouched; `write` stays M1-excluded).
+  S21 gains the REALISTIC nested fixture pin (parent-dir corpus entry +
+  sibling project) for read + edit + write-zero-lines.
+- **Acceptance:** the 3 repro cases behave per the design (read/edit
+  resolved, write zero lines); new S21 realistic pin green; full gate
+  green; repro torn down.
+- **Suggested scope:** `intercept_observer_core.ts` (the collapse
+  helper), `intercept_observer.ts` (pre-check in both fuzzy runners),
+  the S21 section.
+- **Status:** OPEN (planner design; next build unit after this session;
+  the R7 staging approval covers it as an R7 correction).
+
 ## Closed entries
 
 Moved to `todo_records.md` on 2026-09-10 — one-line records, IDs 2, 5, 10, 12, 13, 14, 15,
