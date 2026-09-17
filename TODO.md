@@ -60,6 +60,9 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 Part A: mandatory close-down prompt step, full date_time auto-stamped; Part B:
 unified `submit` tool per his #5 sketch; recommendation: both as one unit).
 Awaiting his ruling.
+**Status 2026-09-18:** Part A LANDED (5e29cb0, plan1); Part B (submit tool)
+LANDED b83b34f — probe + smoke green; registration + per-agent tool grant =
+maintainer restart; live acceptance pending.
 
 ## 56. (DEFERRED 2026-09-15, maintainer `--defer` in priority.md) — Distillation worker runs over the session dumps (his # 3 3 mandate)
 
