@@ -276,10 +276,12 @@ try {
     argsG.filePath === proj + "\\wfx\\file-4.txt" && lG.length === countG + 1 && fG[3] === "edit" && fG[7] === "fuzzy-resolved" &&
       fG[5].includes("fuzzy scope=write orig=") && fG[5].includes("-> file-4.txt d=1 gap=inf"), JSON.stringify(fG));
 
-  // ---- (8g) the R7 SEGMENT-level channel (2026-09-17): the doubled folder
-  //      (one extra folder unit = seg-d 1 — char-lev 3, the char channel is
-  //      blind) end-to-end: the edit lands where the log says, the line
-  //      carries kind=seg scope=write
+  // ---- (8g) the #73 STRUCTURAL dedup-collapse pre-check (2026-09-17,
+  //      the R7 re-pin): the doubled folder (the rel form has no pair —
+  //      nearestExistingDir absorbs one) end-to-end: the edit lands where
+  //      the log says, the line carries kind=dedup scope=write d=0 (the
+  //      collapse fires BEFORE the segment channel — the collapse target
+  //      EXISTS)
   fs.mkdirSync(path.join(proj, "sx"), { recursive: true });
   fs.writeFileSync(path.join(proj, "sx", "real-a.txt"), "x", "utf-8");
   fs.writeFileSync(path.join(proj, "sx", "sib-zzz.txt"), "x", "utf-8");
@@ -290,11 +292,14 @@ try {
   fs.writeFileSync(argsS.filePath, argsS.newString, "utf-8");
   const lS = readLines();
   const fS = split8(lS[lS.length - 1]);
-  chk("edit doubled-segment → MUTATED + the edit lands where the log says + fuzzy-resolved kind=seg scope=write d=1 gap=2 (R7)",
+  chk("edit doubled-segment → MUTATED + the edit lands where the log says + fuzzy-resolved kind=dedup scope=write d=0 (#73, the collapse pre-check before the R7 segment channel)",
     argsS.filePath === proj + "\\sx\\real-a.txt" &&
       fs.readFileSync(path.join(proj, "sx", "real-a.txt"), "utf-8") === "R7" &&
       lS.length === countS + 1 && fS.length === 8 && fS[3] === "edit" && fS[7] === "fuzzy-resolved" &&
-      fS[5] === `fuzzy kind=seg scope=write orig=${proj}\\sx\\sx\\real-a.txt -> real-a.txt d=1 gap=2`, JSON.stringify(fS));
+      // the evidence format is byte-exact; the log FIELD is cap-truncated
+      // (MAX_FIELD_CHARS, the `...` marker) — expected via the SAME
+      // flattenField the hook's log path uses
+      fS[5] === core.flattenField(`fuzzy kind=dedup scope=write orig=${proj}\\sx\\sx\\real-a.txt -> ${proj}\\sx\\real-a.txt d=0`), JSON.stringify(fS));
 
   // ---- (9) the LIVE log is untouched by this smoke
   const liveAfter = fs.existsSync(LIVE_LOG) ? fs.statSync(LIVE_LOG).size : null;

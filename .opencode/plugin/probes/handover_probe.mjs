@@ -519,18 +519,24 @@
 //      (209) HOOK edit fuzzy d=2 (file-56.txt) → NOT mutated +
 //          fuzzy-rejected scope=write reason=d-too-high (edit keeps the
 //          d<=1 bar — M1).
-//   S21 R7 segment-level channel (8) — the R7 pin (2026-09-17; design
-//      source: research/fuzzy-numword/decision-record.md §5 R7): a path
-//      is a sequence of FOLDER UNITS (distance per segment; the doubled
-//      folder = one INSERTION); the substitution bar (a segment
-//      substitution counts as seg-d 1 ONLY when intra-segment lev <= 1 —
-//      a char-far sub is non-substitutable); the >=2-segment hook gate
-//      (1-segment args BYPASS the segment matcher — the char channel
-//      owns them, the S18/S20 pins); the kind=seg evidence flag (the
+//   S21 R7 segment-level channel (12) — the R7 pin (2026-09-17; design
+//      source: research/fuzzy-numword/decision-record.md §5 R7) + the #73
+//      STRUCTURAL dedup-collapse pre-check (2026-09-17): a path is a
+//      sequence of FOLDER UNITS (distance per segment; the doubled folder
+//      = one INSERTION); the substitution bar (a segment substitution
+//      counts as seg-d 1 ONLY when intra-segment lev <= 1 — a char-far
+//      sub is non-substitutable); the >=2-segment hook gate (1-segment
+//      args BYPASS the segment matcher — the char channel owns them, the
+//      S18/S20 pins); the kind=seg / kind=dedup evidence flags (the
 //      9-verdict vocabulary is untouched) + the M1 exclusion extends to
-//      the segment channel:
-//      (210) HOOK read doubled-seg → MUTATED + kind=seg scope=read d=1;
-//      (211) HOOK edit doubled-seg → MUTATED + kind=seg scope=write d=1;
+//      the segment + dedup channels. The dedup pre-check (before the
+//      corpus matchers): an adjacent identical FOLDER pair in the
+//      ABSOLUTE path → collapse one copy; the collapsed path EXISTS →
+//      kind=dedup d=0 (NO gap field); absent → fail-closed fall-through:
+//      (210) HOOK read doubled-seg → MUTATED + kind=dedup scope=read d=0
+//          (the #73 collapse fires first — the collapse target EXISTS);
+//      (211) HOOK edit doubled-seg → MUTATED + kind=dedup
+//          scope=write d=0;
 //      (212) HOOK write doubled-seg → NOT mutated + ZERO lines (M1);
 //      (213) PURE lev-1 folder mismatch → resolved d=1 (the substitution
 //          bar);
@@ -539,7 +545,16 @@
 //      (215) PURE seg-d=2 (two insertions) → rejected d-too-high;
 //      (216) PURE tie at seg-d=1 → rejected gap-too-small;
 //      (217) PURE 2-seg filename typo → resolved d=1 (the segment
-//          channel subsumes the char-close name typo).
+//          channel subsumes the char-close name typo);
+//      (218) HOOK read doubled-NESTED (the realistic shape, the collapse
+//          target EXISTS) → MUTATED + kind=dedup scope=read d=0;
+//      (219) HOOK edit doubled-nested → MUTATED + kind=dedup
+//          scope=write d=0;
+//      (220) HOOK read doubled-nested, collapse target ABSENT → NOT
+//          mutated + fuzzy-rejected (NO kind=dedup — the fail-closed
+//          fall-through);
+//      (221) HOOK write doubled-nested → NOT mutated + ZERO lines (M1
+//          extends to the dedup pre-check).
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -552,7 +567,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=8 hygiene=6  →  "PROBE handover: 216/216 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 hygiene=6  →  "PROBE handover: 220/220 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -4324,7 +4339,7 @@ let n20 = 195;
   n20++;
 }
 
-// ------------------------------------------------------------------ S21 R7 segment-level channel (8)
+// ------------------------------------------------------------------ S21 R7 segment-level channel (12)
 //
 // The R7 (2026-09-17) segment-level matcher: a path is a sequence of
 // FOLDER UNITS; distance counts per segment (one extra / one mismatched
@@ -4334,9 +4349,15 @@ let n20 = 195;
 // the segment matcher — the char channel owns bare filenames, the S18/S20
 // evidence pins; the doubling case is structurally >=2); the kind=seg
 // evidence flag (the 9-verdict vocabulary is untouched); the M1 exclusion
-// extends to the segment channel:
-// (210) HOOK read doubled-seg → MUTATED + kind=seg scope=read d=1;
-// (211) HOOK edit doubled-seg → MUTATED + kind=seg scope=write d=1;
+// extends to the segment channel. The #73 (2026-09-17) STRUCTURAL
+// dedup-collapse pre-check (before the corpus matchers): an adjacent
+// identical FOLDER pair in the ABSOLUTE path (the rel form has no pair —
+// nearestExistingDir absorbs one) → collapse one copy; the collapsed path
+// EXISTS → kind=dedup d=0 (NO gap field — structural, not a distance
+// match); absent → fail-closed fall-through:
+// (210) HOOK read doubled-seg → MUTATED + kind=dedup scope=read d=0 (the
+//       #73 collapse fires first — the collapse target EXISTS);
+// (211) HOOK edit doubled-seg → MUTATED + kind=dedup scope=write d=0;
 // (212) HOOK write doubled-seg → NOT mutated + ZERO lines (M1);
 // (213) PURE lev-1 folder mismatch → resolved d=1 (the substitution bar);
 // (214) HOOK char-far folder mismatch → NOT mutated + fuzzy-rejected
@@ -4344,8 +4365,18 @@ let n20 = 195;
 // (215) PURE seg-d=2 (two insertions) → rejected d-too-high;
 // (216) PURE two candidates tied at seg-d=1 → rejected gap-too-small;
 // (217) PURE 2-segment filename typo → resolved d=1 (the segment channel
-//       subsumes a char-close name typo inside a folder).
+//       subsumes a char-close name typo inside a folder);
+// (218) HOOK read doubled-NESTED (the realistic shape, the collapse
+//       target EXISTS) → MUTATED + kind=dedup scope=read d=0;
+// (219) HOOK edit doubled-nested → MUTATED + kind=dedup scope=write d=0;
+// (220) HOOK read doubled-nested, collapse target ABSENT → NOT mutated +
+//       fuzzy-rejected (NO kind=dedup — the fail-closed fall-through);
+// (221) HOOK write doubled-nested → NOT mutated + ZERO lines (M1 extends
+//       to the dedup pre-check).
 // fixture: doubled-folder + mismatched-folder shapes under the sandbox
+// + the realistic nested-doubling shape (the seg channel REJECTS it —
+// the target's parent DIR is a corpus entry, keeping the best at
+// seg-d 2 → the target at seg-d 1 → gap 1 < FUZZY_MIN_GAP)
 const ioSegDir = path.join(ioSandboxProj, "seg");
 mkdirSync(path.join(ioSegDir, "dd"), { recursive: true });
 mkdirSync(path.join(ioSegDir, "mm", "sub"), { recursive: true });
@@ -4355,9 +4386,10 @@ writeFileSync(path.join(ioSegDir, "mm", "sub", "x.txt"), "x", "utf8");
 writeFileSync(path.join(ioSegDir, "mm", "other-zz.txt"), "x", "utf8");
 let n21 = 210;
 
-// 210 — R7 pin 1: HOOK READ doubled segment (one folder-unit INSERTION —
-//      the doubled folder; char-lev 3, above the read bar d<=2, so the
-//      char channel is blind) → MUTATED + kind=seg scope=read d=1
+// 210 — #73 pin (R7 re-pin): HOOK READ doubled segment — the STRUCTURAL
+//      dedup-collapse pre-check fires FIRST (the collapse target EXISTS —
+//      the doubled folder; the rel form has no pair): MUTATED + kind=dedup
+//      scope=read d=0 (the segment channel is never reached)
 {
   const s1 = { filePath: ioSegDir + "\\dd\\dd\\real-a.txt" };
   const nL1 = ioReadLines().length;
@@ -4367,17 +4399,20 @@ let n21 = 210;
   check(
     String(n21),
     "S21",
-    "hook read doubled-seg: dd\\dd\\real-a.txt → MUTATED to dd\\real-a.txt + fuzzy-resolved kind=seg scope=read d=1 gap=2 (char-lev 3 — the char channel is blind)",
+    "hook read doubled-seg: dd\\dd\\real-a.txt → MUTATED to dd\\real-a.txt + fuzzy-resolved kind=dedup scope=read d=0 (the #73 collapse pre-check fires before the segment channel)",
     s1.filePath === ioSegDir + "\\dd\\real-a.txt" && s1Lines.length === nL1 + 1 &&
       s1f[3] === "read" && s1f[7] === "fuzzy-resolved" &&
-      s1f[5] === `fuzzy kind=seg scope=read orig=${ioSegDir}\\dd\\dd\\real-a.txt -> real-a.txt d=1 gap=2`,
+      // the evidence format is byte-exact; the log FIELD is cap-truncated
+      // (MAX_FIELD_CHARS, the `...` marker) — expected via the SAME
+      // flattenField the hook's log path uses
+      s1f[5] === ioCore.flattenField(`fuzzy kind=dedup scope=read orig=${ioSegDir}\\dd\\dd\\real-a.txt -> ${ioSegDir}\\dd\\real-a.txt d=0`),
     JSON.stringify({ after: s1.filePath, n: s1Lines.length - nL1, f: s1f }),
   );
   n21++;
 }
 
-// 211 — R7 pin 2: HOOK EDIT doubled segment (write scope KEEPS the channel)
-//      → MUTATED + kind=seg scope=write d=1
+// 211 — #73 pin (R7 re-pin): HOOK EDIT doubled segment (write scope KEEPS
+//      the channel) → MUTATED + kind=dedup scope=write d=0
 {
   const s2 = { filePath: ioSegDir + "\\dd\\dd\\real-a.txt" };
   const nL2 = ioReadLines().length;
@@ -4387,10 +4422,10 @@ let n21 = 210;
   check(
     String(n21),
     "S21",
-    "hook edit doubled-seg: MUTATED to dd\\real-a.txt + fuzzy-resolved kind=seg scope=write d=1 gap=2 (write scope keeps the channel)",
+    "hook edit doubled-seg: MUTATED to dd\\real-a.txt + fuzzy-resolved kind=dedup scope=write d=0 (the #73 collapse pre-check fires before the segment channel)",
     s2.filePath === ioSegDir + "\\dd\\real-a.txt" && s2Lines.length === nL2 + 1 &&
       s2f[3] === "edit" && s2f[7] === "fuzzy-resolved" &&
-      s2f[5] === `fuzzy kind=seg scope=write orig=${ioSegDir}\\dd\\dd\\real-a.txt -> real-a.txt d=1 gap=2`,
+      s2f[5] === ioCore.flattenField(`fuzzy kind=dedup scope=write orig=${ioSegDir}\\dd\\dd\\real-a.txt -> ${ioSegDir}\\dd\\real-a.txt d=0`),
     JSON.stringify({ after: s2.filePath, n: s2Lines.length - nL2, f: s2f }),
   );
   n21++;
@@ -4495,6 +4530,100 @@ let n21 = 210;
     "pure 2-seg filename typo: sub/file-x.txt → resolved d=1 gap=inf (the segment channel subsumes the char-close name typo)",
     s8.kind === "resolved" && s8.path === "sub/file-4.txt" && s8.d === 1 && s8.gap === Infinity,
     JSON.stringify(s8),
+  );
+  n21++;
+}
+
+// #73 (2026-09-17): the REALISTIC nested-doubling fixture — a target whose
+// PARENT DIR is a corpus entry + a sibling project (replicating the
+// scratchpad repro: OpenCodeProjects/Free-Snap-Tap/TODO.md +
+// OpenCodeProjects/SiblingProj/whatever.md). The seg channel REJECTS this
+// shape (the parent-dir corpus entry keeps the best at seg-d 2 → the
+// target at seg-d 1 → gap 1 < FUZZY_MIN_GAP) — only the structural
+// collapse resolves it
+const ioRnDir = path.join(ioSegDir, "rn");
+mkdirSync(path.join(ioRnDir, "OpenCodeProjects", "Free-Snap-Tap"), { recursive: true });
+mkdirSync(path.join(ioRnDir, "OpenCodeProjects", "SiblingProj"), { recursive: true });
+writeFileSync(path.join(ioRnDir, "OpenCodeProjects", "Free-Snap-Tap", "TODO.md"), "x", "utf8");
+writeFileSync(path.join(ioRnDir, "OpenCodeProjects", "SiblingProj", "whatever.md"), "x", "utf8");
+
+// 218 — #73 pin 1: HOOK READ doubled NESTED (the realistic shape — the
+//      collapse target EXISTS) → MUTATED + kind=dedup scope=read d=0
+{
+  const r1 = { filePath: ioRnDir + "\\OpenCodeProjects\\OpenCodeProjects\\Free-Snap-Tap\\TODO.md" };
+  const nR1 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io2", callID: "c218" }, { args: r1 });
+  const r1Lines = ioReadLines();
+  const r1f = r1Lines[r1Lines.length - 1].split(" | ");
+  check(
+    String(n21),
+    "S21",
+    "hook read doubled-nested (the realistic shape): MUTATED to the collapsed path + fuzzy-resolved kind=dedup scope=read d=0 (the seg channel REJECTS this shape — the parent-dir corpus entry kills the gap)",
+    r1.filePath === ioRnDir + "\\OpenCodeProjects\\Free-Snap-Tap\\TODO.md" && r1Lines.length === nR1 + 1 &&
+      r1f[3] === "read" && r1f[7] === "fuzzy-resolved" &&
+      r1f[5] === ioCore.flattenField(`fuzzy kind=dedup scope=read orig=${ioRnDir}\\OpenCodeProjects\\OpenCodeProjects\\Free-Snap-Tap\\TODO.md -> ${ioRnDir}\\OpenCodeProjects\\Free-Snap-Tap\\TODO.md d=0`),
+    JSON.stringify({ after: r1.filePath, n: r1Lines.length - nR1, f: r1f }),
+  );
+  n21++;
+}
+
+// 219 — #73 pin 2: HOOK EDIT doubled NESTED → MUTATED + kind=dedup
+//      scope=write d=0 (the write scope keeps the channel — M1)
+{
+  const r2 = { filePath: ioRnDir + "\\OpenCodeProjects\\OpenCodeProjects\\Free-Snap-Tap\\TODO.md" };
+  const nR2 = ioReadLines().length;
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io2", callID: "c219" }, { args: r2 });
+  const r2Lines = ioReadLines();
+  const r2f = r2Lines[r2Lines.length - 1].split(" | ");
+  check(
+    String(n21),
+    "S21",
+    "hook edit doubled-nested: MUTATED to the collapsed path + fuzzy-resolved kind=dedup scope=write d=0",
+    r2.filePath === ioRnDir + "\\OpenCodeProjects\\Free-Snap-Tap\\TODO.md" && r2Lines.length === nR2 + 1 &&
+      r2f[3] === "edit" && r2f[7] === "fuzzy-resolved" &&
+      r2f[5] === ioCore.flattenField(`fuzzy kind=dedup scope=write orig=${ioRnDir}\\OpenCodeProjects\\OpenCodeProjects\\Free-Snap-Tap\\TODO.md -> ${ioRnDir}\\OpenCodeProjects\\Free-Snap-Tap\\TODO.md d=0`),
+    JSON.stringify({ after: r2.filePath, n: r2Lines.length - nR2, f: r2f }),
+  );
+  n21++;
+}
+
+// 220 — #73 pin 3: HOOK READ doubled NESTED where the collapse target is
+//      ABSENT (OpenCodeProjects/TODO.md does not exist) → NOT mutated +
+//      fuzzy-rejected, NO kind=dedup line (the fail-closed fall-through;
+//      the seg AND char channels both reject → the char-form line)
+{
+  const r3 = { filePath: ioRnDir + "\\OpenCodeProjects\\OpenCodeProjects\\TODO.md" };
+  const r3Before = JSON.stringify(r3);
+  const nR3 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io2", callID: "c220" }, { args: r3 });
+  const r3Lines = ioReadLines();
+  const r3f = r3Lines[r3Lines.length - 1].split(" | ");
+  check(
+    String(n21),
+    "S21",
+    "hook read doubled-nested, collapse target ABSENT: NOT mutated + fuzzy-rejected (NO kind=dedup — the fail-closed fall-through; NO kind=seg either)",
+    JSON.stringify(r3) === r3Before && r3Lines.length === nR3 + 1 &&
+      r3f[3] === "read" && r3f[7] === "fuzzy-rejected" &&
+      !r3f[5].includes("kind=dedup") && !r3f[5].includes("kind=seg"),
+    JSON.stringify({ argsAfter: JSON.stringify(r3), n: r3Lines.length - nR3, f: r3f }),
+  );
+  n21++;
+}
+
+// 221 — #73 pin 4: HOOK WRITE doubled NESTED → NOT mutated + ZERO new log
+//      lines (M1 — the exclusion extends to the dedup pre-check:
+//      runFuzzyWrite is never called for `write`)
+{
+  const r4 = { filePath: ioRnDir + "\\OpenCodeProjects\\OpenCodeProjects\\Free-Snap-Tap\\TODO.md", content: "x" };
+  const r4Before = JSON.stringify(r4);
+  const nR4 = ioReadLines().length;
+  await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c221" }, { args: r4 });
+  check(
+    String(n21),
+    "S21",
+    "hook write doubled-nested: NOT mutated + ZERO new log lines (M1 — the exclusion extends to the dedup pre-check)",
+    JSON.stringify(r4) === r4Before && ioReadLines().length === nR4,
+    JSON.stringify({ argsAfter: JSON.stringify(r4), n: ioReadLines().length - nR4 }),
   );
   n21++;
 }

@@ -782,3 +782,31 @@ export function matchNearPathSegments(argRel: string, corpus: string[]): ReadRes
     reason: b.d > SEG_MAX_D ? "d-too-high" : "gap-too-small",
   };
 }
+
+// ------------------------------------------------------------------ R7.1 dedup-collapse (2026-09-17, #73)
+//
+// The STRUCTURAL doubling pre-check (the realistic nested doubling —
+// OpenCodeProjects/OpenCodeProjects/…): detect it on the ABSOLUTE path
+// form, NOT the rel path (nearestExistingDir absorbs one doubled folder
+// into the root, so the rel form has no adjacent pair). Find the FIRST
+// adjacent identical FOLDER pair (case-insensitive — normPathForm per
+// segment), remove ONE copy → the collapsed absolute path (the input's
+// separator form is preserved; empty segments from separator runs never
+// qualify — a double slash is not a doubled folder); null when no such
+// pair. The caller EXISTS-gates the result (fail-closed fall-through
+// when absent); there is deliberately NO file-vs-dir gate (the corpus
+// matchers return both, the gate discipline stays one check).
+
+export function collapseAdjacentDup(absPath: string): string | null {
+  const p = String(absPath ?? "").trim();
+  if (p === "") return null;
+  const segs = p.split(/[\\/]/);
+  for (let i = 0; i + 1 < segs.length; i++) {
+    if (segs[i] === "" || segs[i + 1] === "") continue;
+    if (normPathForm(segs[i]) === normPathForm(segs[i + 1])) {
+      const sep = p.includes("\\") ? "\\" : "/";
+      return segs.slice(0, i + 1).concat(segs.slice(i + 2)).join(sep);
+    }
+  }
+  return null;
+}

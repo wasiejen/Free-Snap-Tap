@@ -147,6 +147,7 @@ import {
   buildCorpus,
   checkPairs,
   classifyContext,
+  collapseAdjacentDup,
   flattenField,
   loadNumwordMap,
   matchNearPathSegments,
@@ -302,6 +303,22 @@ function runFuzzyRead(output: { args?: unknown }): Observation | null {
   // absolute form against the workspace root (cwd-independent)
   const abs = isAbsolute(filePath) ? filePath : join(dir || ".", filePath);
   if (existsSync(abs)) return null; // exact — the tool will find it; never fuzzy
+  // #73 (2026-09-17): the STRUCTURAL dedup-collapse pre-check — an adjacent
+  // identical FOLDER pair in the ABSOLUTE path (the realistic nested
+  // doubling; the rel form has no pair — nearestExistingDir absorbs one)
+  // → collapse one copy; the collapsed path EXISTS → resolve to it BEFORE
+  // the corpus matchers (kind=dedup evidence, d=0 structural, NO gap field
+  // — it is not a distance match); absent → fail-closed fall-through
+  // (the matchers below, unchanged).
+  const collapsed = collapseAdjacentDup(abs);
+  if (collapsed !== null && existsSync(collapsed)) {
+    (args as { filePath: string }).filePath = collapsed;
+    return {
+      verdict: "fuzzy-resolved",
+      evidence: `fuzzy kind=dedup scope=read orig=${filePath} -> ${collapsed} d=0`,
+      context: classifyContext(filePath),
+    };
+  }
   const root = nearestExistingDir(abs);
   if (root === "") return null; // nowhere to match against — fail silent
   const rel = relForm(abs, root);
@@ -472,6 +489,22 @@ function runFuzzyWrite(output: { args?: unknown }, tool: string): Observation[] 
     if (typeof filePath !== "string" || filePath.trim() === "") continue;
     const abs = isAbsolute(filePath) ? filePath : join(dir || ".", filePath);
     if (existsSync(abs)) continue; // exact-existing target — never fuzzy
+    // #73 (2026-09-17): the STRUCTURAL dedup-collapse pre-check (the M1
+    // dispatch guard keeps `write` OUT of this channel — edit/
+    // block_transfer only; a doubled `write` stays ZERO lines): collapse
+    // one copy of an adjacent identical FOLDER pair in the ABSOLUTE path;
+    // the collapsed path EXISTS → mutate + kind=dedup scope=write line;
+    // absent → fail-closed fall-through (the matchers below, unchanged).
+    const collapsed = collapseAdjacentDup(abs);
+    if (collapsed !== null && existsSync(collapsed)) {
+      (args as Record<string, string>)[field] = collapsed;
+      lines.push({
+        verdict: "fuzzy-resolved",
+        evidence: `fuzzy kind=dedup scope=write orig=${filePath} -> ${collapsed} d=0`,
+        context: classifyContext(filePath),
+      });
+      continue;
+    }
     const root = nearestExistingDir(abs);
     if (root === "") continue; // nowhere to match against — fail silent
     const rel = relForm(abs, root);
