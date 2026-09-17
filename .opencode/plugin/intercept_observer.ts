@@ -149,6 +149,7 @@ import {
   classifyContext,
   flattenField,
   loadNumwordMap,
+  matchNearPathSegments,
   nearestExistingDir,
   normPathForm,
   observeArg,
@@ -303,7 +304,27 @@ function runFuzzyRead(output: { args?: unknown }): Observation | null {
   if (existsSync(abs)) return null; // exact — the tool will find it; never fuzzy
   const root = nearestExistingDir(abs);
   if (root === "") return null; // nowhere to match against — fail silent
-  const res = resolveReadPath(relForm(abs, root), getCorpus(root));
+  const rel = relForm(abs, root);
+  const corpus = getCorpus(root);
+  // R7 (2026-09-17): the SEGMENT-level matcher FIRST — >=2-segment rel args
+  // only (a single segment is a bare filename — BYPASS: the char channel
+  // owns it exactly as pinned in S18/S20; the doubling case is
+  // structurally >=2 segments). Segment-resolved → the kind=seg evidence
+  // line; segment-rejected → fall through to the char matcher below
+  // (unchanged).
+  if (normPathForm(rel).split("/").filter((s) => s !== "").length >= 2) {
+    const seg = matchNearPathSegments(rel, corpus);
+    if (seg.kind === "exact") return null;
+    if (seg.kind === "resolved") {
+      (args as { filePath: string }).filePath = join(root, seg.path);
+      return {
+        verdict: "fuzzy-resolved",
+        evidence: `fuzzy kind=seg scope=read orig=${filePath} -> ${seg.path} d=${seg.d} gap=${seg.gap === Infinity ? "inf" : seg.gap}`,
+        context: classifyContext(filePath),
+      };
+    }
+  }
+  const res = resolveReadPath(rel, corpus);
   if (res.kind === "exact") return null; // normalized-equal — untouched
   if (res.kind === "resolved") {
     (args as { filePath: string }).filePath = join(root, res.path);
@@ -453,7 +474,27 @@ function runFuzzyWrite(output: { args?: unknown }, tool: string): Observation[] 
     if (existsSync(abs)) continue; // exact-existing target — never fuzzy
     const root = nearestExistingDir(abs);
     if (root === "") continue; // nowhere to match against — fail silent
-    const res = resolveWritePath(relForm(abs, root), getCorpus(root));
+    const rel = relForm(abs, root);
+    const corpus = getCorpus(root);
+    // R7 (2026-09-17): the SEGMENT-level matcher FIRST — >=2-segment rel
+    // args only (a single segment is a bare filename — BYPASS: the char
+    // channel owns it, the S18/S20 pins); segment-resolved → the kind=seg
+    // scope=write line; segment-rejected → fall through to the char
+    // matcher below (unchanged).
+    if (normPathForm(rel).split("/").filter((s) => s !== "").length >= 2) {
+      const seg = matchNearPathSegments(rel, corpus);
+      if (seg.kind === "exact") continue;
+      if (seg.kind === "resolved") {
+        (args as Record<string, string>)[field] = join(root, seg.path);
+        lines.push({
+          verdict: "fuzzy-resolved",
+          evidence: `fuzzy kind=seg scope=write orig=${filePath} -> ${seg.path} d=${seg.d} gap=${seg.gap === Infinity ? "inf" : seg.gap}`,
+          context: classifyContext(filePath),
+        });
+        continue;
+      }
+    }
+    const res = resolveWritePath(rel, corpus);
     if (res.kind === "exact") continue; // normalized-equal — untouched
     if (res.kind === "resolved") {
       (args as Record<string, string>)[field] = join(root, res.path);

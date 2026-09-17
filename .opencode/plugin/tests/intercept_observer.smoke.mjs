@@ -3,7 +3,10 @@
 // (2026-09-16: the controlled scratchpad write audit, the content-scope
 // guard, the d<=1 write-fuzzy bar; M1 2026-09-17 #72: the write fuzzy
 // channel EXCLUDED — "new file" is a legal write intent, the d=1 near-miss
-// must not hijack; edit keeps the channel) (.opencode/plugin/intercept_observer.ts
+// must not hijack; edit keeps the channel; R7 2026-09-17: the SEGMENT-level
+// channel — a path is a sequence of folder units, the doubled folder is one
+// insertion (seg-d 1), the kind=seg evidence flag)
+// (.opencode/plugin/intercept_observer.ts
 // + _core.ts). The plugin factory is called with a SCRATCHPAD sandbox
 // `directory` — the intercept.log lands in the sandbox
 // (.opencode/temp/intercept.log under the sandbox project), NEVER the live
@@ -50,7 +53,8 @@ try {
     typeof core.observeArg === "function" && typeof core.resolveNumword === "function" &&
       typeof core.classifyContext === "function" && typeof core.loadNumwordMap === "function" &&
       typeof core.flattenField === "function" && typeof core.resolveReadPath === "function" &&
-      typeof core.buildCorpus === "function" && Array.isArray(core.VERDICTS));
+      typeof core.matchNearPathSegments === "function" && typeof core.buildCorpus === "function" &&
+      Array.isArray(core.VERDICTS));
   chk("VERDICTS vocabulary (exactly the nine: the six observation + the two fuzzy + pair-resolved)",
     JSON.stringify([...core.VERDICTS]) === JSON.stringify([
       "observed-redundancy-ok", "redundancy-mismatch", "no-candidate",
@@ -271,6 +275,26 @@ try {
   chk("edit fuzzy d=1 → MUTATED to the existing sibling + fuzzy-resolved scope=write (d=1 gap=inf) (edit keeps the channel — M1)",
     argsG.filePath === proj + "\\wfx\\file-4.txt" && lG.length === countG + 1 && fG[3] === "edit" && fG[7] === "fuzzy-resolved" &&
       fG[5].includes("fuzzy scope=write orig=") && fG[5].includes("-> file-4.txt d=1 gap=inf"), JSON.stringify(fG));
+
+  // ---- (8g) the R7 SEGMENT-level channel (2026-09-17): the doubled folder
+  //      (one extra folder unit = seg-d 1 — char-lev 3, the char channel is
+  //      blind) end-to-end: the edit lands where the log says, the line
+  //      carries kind=seg scope=write
+  fs.mkdirSync(path.join(proj, "sx"), { recursive: true });
+  fs.writeFileSync(path.join(proj, "sx", "real-a.txt"), "x", "utf-8");
+  fs.writeFileSync(path.join(proj, "sx", "sib-zzz.txt"), "x", "utf-8");
+  const argsS = { filePath: proj + "\\sx\\sx\\real-a.txt", oldString: "x", newString: "R7" };
+  const countS = readLines().length;
+  await before({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c10g" }, { args: argsS });
+  // the tool lands the edit at the (mutated) path — simulating the host
+  fs.writeFileSync(argsS.filePath, argsS.newString, "utf-8");
+  const lS = readLines();
+  const fS = split8(lS[lS.length - 1]);
+  chk("edit doubled-segment → MUTATED + the edit lands where the log says + fuzzy-resolved kind=seg scope=write d=1 gap=2 (R7)",
+    argsS.filePath === proj + "\\sx\\real-a.txt" &&
+      fs.readFileSync(path.join(proj, "sx", "real-a.txt"), "utf-8") === "R7" &&
+      lS.length === countS + 1 && fS.length === 8 && fS[3] === "edit" && fS[7] === "fuzzy-resolved" &&
+      fS[5] === `fuzzy kind=seg scope=write orig=${proj}\\sx\\sx\\real-a.txt -> real-a.txt d=1 gap=2`, JSON.stringify(fS));
 
   // ---- (9) the LIVE log is untouched by this smoke
   const liveAfter = fs.existsSync(LIVE_LOG) ? fs.statSync(LIVE_LOG).size : null;

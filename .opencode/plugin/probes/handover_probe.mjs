@@ -519,6 +519,27 @@
 //      (209) HOOK edit fuzzy d=2 (file-56.txt) → NOT mutated +
 //          fuzzy-rejected scope=write reason=d-too-high (edit keeps the
 //          d<=1 bar — M1).
+//   S21 R7 segment-level channel (8) — the R7 pin (2026-09-17; design
+//      source: research/fuzzy-numword/decision-record.md §5 R7): a path
+//      is a sequence of FOLDER UNITS (distance per segment; the doubled
+//      folder = one INSERTION); the substitution bar (a segment
+//      substitution counts as seg-d 1 ONLY when intra-segment lev <= 1 —
+//      a char-far sub is non-substitutable); the >=2-segment hook gate
+//      (1-segment args BYPASS the segment matcher — the char channel
+//      owns them, the S18/S20 pins); the kind=seg evidence flag (the
+//      9-verdict vocabulary is untouched) + the M1 exclusion extends to
+//      the segment channel:
+//      (210) HOOK read doubled-seg → MUTATED + kind=seg scope=read d=1;
+//      (211) HOOK edit doubled-seg → MUTATED + kind=seg scope=write d=1;
+//      (212) HOOK write doubled-seg → NOT mutated + ZERO lines (M1);
+//      (213) PURE lev-1 folder mismatch → resolved d=1 (the substitution
+//          bar);
+//      (214) HOOK char-far folder mismatch → NOT mutated + fuzzy-rejected
+//          (seg-rejected → the char fallback also rejects — NO kind=seg);
+//      (215) PURE seg-d=2 (two insertions) → rejected d-too-high;
+//      (216) PURE tie at seg-d=1 → rejected gap-too-small;
+//      (217) PURE 2-seg filename typo → resolved d=1 (the segment
+//          channel subsumes the char-close name typo).
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -531,7 +552,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 hygiene=6  →  "PROBE handover: 208/208 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=8 hygiene=6  →  "PROBE handover: 216/216 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -4301,6 +4322,181 @@ let n20 = 195;
     JSON.stringify({ argsAfter: JSON.stringify(e2), n: e2Lines.length - nL15, f: e2f }),
   );
   n20++;
+}
+
+// ------------------------------------------------------------------ S21 R7 segment-level channel (8)
+//
+// The R7 (2026-09-17) segment-level matcher: a path is a sequence of
+// FOLDER UNITS; distance counts per segment (one extra / one mismatched
+// folder = 1); the substitution bar (a segment substitution counts as
+// seg-d 1 ONLY when the two names are char-close — intra-segment
+// levenshtein <= 1); the >=2-segment hook gate (a 1-segment arg BYPASSes
+// the segment matcher — the char channel owns bare filenames, the S18/S20
+// evidence pins; the doubling case is structurally >=2); the kind=seg
+// evidence flag (the 9-verdict vocabulary is untouched); the M1 exclusion
+// extends to the segment channel:
+// (210) HOOK read doubled-seg → MUTATED + kind=seg scope=read d=1;
+// (211) HOOK edit doubled-seg → MUTATED + kind=seg scope=write d=1;
+// (212) HOOK write doubled-seg → NOT mutated + ZERO lines (M1);
+// (213) PURE lev-1 folder mismatch → resolved d=1 (the substitution bar);
+// (214) HOOK char-far folder mismatch → NOT mutated + fuzzy-rejected
+//       (seg-rejected → the char fallback also rejects, NO kind=seg);
+// (215) PURE seg-d=2 (two insertions) → rejected d-too-high;
+// (216) PURE two candidates tied at seg-d=1 → rejected gap-too-small;
+// (217) PURE 2-segment filename typo → resolved d=1 (the segment channel
+//       subsumes a char-close name typo inside a folder).
+// fixture: doubled-folder + mismatched-folder shapes under the sandbox
+const ioSegDir = path.join(ioSandboxProj, "seg");
+mkdirSync(path.join(ioSegDir, "dd"), { recursive: true });
+mkdirSync(path.join(ioSegDir, "mm", "sub"), { recursive: true });
+writeFileSync(path.join(ioSegDir, "dd", "real-a.txt"), "x", "utf8");
+writeFileSync(path.join(ioSegDir, "dd", "sib-zzz.txt"), "x", "utf8");
+writeFileSync(path.join(ioSegDir, "mm", "sub", "x.txt"), "x", "utf8");
+writeFileSync(path.join(ioSegDir, "mm", "other-zz.txt"), "x", "utf8");
+let n21 = 210;
+
+// 210 — R7 pin 1: HOOK READ doubled segment (one folder-unit INSERTION —
+//      the doubled folder; char-lev 3, above the read bar d<=2, so the
+//      char channel is blind) → MUTATED + kind=seg scope=read d=1
+{
+  const s1 = { filePath: ioSegDir + "\\dd\\dd\\real-a.txt" };
+  const nL1 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io2", callID: "c210" }, { args: s1 });
+  const s1Lines = ioReadLines();
+  const s1f = s1Lines[s1Lines.length - 1].split(" | ");
+  check(
+    String(n21),
+    "S21",
+    "hook read doubled-seg: dd\\dd\\real-a.txt → MUTATED to dd\\real-a.txt + fuzzy-resolved kind=seg scope=read d=1 gap=2 (char-lev 3 — the char channel is blind)",
+    s1.filePath === ioSegDir + "\\dd\\real-a.txt" && s1Lines.length === nL1 + 1 &&
+      s1f[3] === "read" && s1f[7] === "fuzzy-resolved" &&
+      s1f[5] === `fuzzy kind=seg scope=read orig=${ioSegDir}\\dd\\dd\\real-a.txt -> real-a.txt d=1 gap=2`,
+    JSON.stringify({ after: s1.filePath, n: s1Lines.length - nL1, f: s1f }),
+  );
+  n21++;
+}
+
+// 211 — R7 pin 2: HOOK EDIT doubled segment (write scope KEEPS the channel)
+//      → MUTATED + kind=seg scope=write d=1
+{
+  const s2 = { filePath: ioSegDir + "\\dd\\dd\\real-a.txt" };
+  const nL2 = ioReadLines().length;
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io2", callID: "c211" }, { args: s2 });
+  const s2Lines = ioReadLines();
+  const s2f = s2Lines[s2Lines.length - 1].split(" | ");
+  check(
+    String(n21),
+    "S21",
+    "hook edit doubled-seg: MUTATED to dd\\real-a.txt + fuzzy-resolved kind=seg scope=write d=1 gap=2 (write scope keeps the channel)",
+    s2.filePath === ioSegDir + "\\dd\\real-a.txt" && s2Lines.length === nL2 + 1 &&
+      s2f[3] === "edit" && s2f[7] === "fuzzy-resolved" &&
+      s2f[5] === `fuzzy kind=seg scope=write orig=${ioSegDir}\\dd\\dd\\real-a.txt -> real-a.txt d=1 gap=2`,
+    JSON.stringify({ after: s2.filePath, n: s2Lines.length - nL2, f: s2f }),
+  );
+  n21++;
+}
+
+// 212 — R7 pin 3: HOOK WRITE doubled segment → the M1 exclusion extends to
+//      the segment channel: NOT mutated + ZERO new log lines
+{
+  const s3 = { filePath: ioSegDir + "\\dd\\dd\\real-a.txt", content: "x" };
+  const s3Before = JSON.stringify(s3);
+  const nL3 = ioReadLines().length;
+  await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c212" }, { args: s3 });
+  check(
+    String(n21),
+    "S21",
+    "hook write doubled-seg: NOT mutated + ZERO new log lines (M1 — the exclusion extends to the segment channel)",
+    JSON.stringify(s3) === s3Before && ioReadLines().length === nL3,
+    JSON.stringify({ argsAfter: JSON.stringify(s3), n: ioReadLines().length - nL3 }),
+  );
+  n21++;
+}
+
+// 213 — R7 pin 4: PURE lev-1 folder mismatch — a segment SUBSTITUTION at
+//      the intra-seg char bar (OpenCodeProject vs OpenCodeProjects, lev 1)
+//      → resolved seg-d 1 (the substitution bar)
+{
+  const s4 = ioCore.matchNearPathSegments(
+    "OpenCodeProject/Free-Snap-Tap/x.txt",
+    ["OpenCodeProjects/Free-Snap-Tap/x.txt", "zzz/qqq/w.txt"],
+  );
+  check(
+    String(n21),
+    "S21",
+    "pure lev-1 folder mismatch: OpenCodeProject/… → resolved d=1 (the substitution bar: intra-seg lev <= 1 counts as seg-d 1)",
+    JSON.stringify(s4) === '{"kind":"resolved","path":"OpenCodeProjects/Free-Snap-Tap/x.txt","d":1,"gap":4}',
+    JSON.stringify(s4),
+  );
+  n21++;
+}
+
+// 214 — R7 pin 5: HOOK char-far folder mismatch (zzz vs sub — the
+//      substitution is NON-substitutable) → NOT mutated + fuzzy-rejected
+//      (the seg channel rejects at seg-d 2; the char fallback ALSO rejects
+//      at d=3 — the line is the char-form rejection, NO kind=seg)
+{
+  const s5 = { filePath: ioSegDir + "\\mm\\zzz\\x.txt" };
+  const s5Before = JSON.stringify(s5);
+  const nL4 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io2", callID: "c214" }, { args: s5 });
+  const s5Lines = ioReadLines();
+  const s5f = s5Lines[s5Lines.length - 1].split(" | ");
+  check(
+    String(n21),
+    "S21",
+    "hook char-far folder mismatch: mm\\zzz\\x.txt → NOT mutated + fuzzy-rejected (seg-rejected → the char fallback also rejects; NO kind=seg)",
+    JSON.stringify(s5) === s5Before && s5Lines.length === nL4 + 1 &&
+      s5f[3] === "read" && s5f[7] === "fuzzy-rejected" &&
+      !s5f[5].includes("kind=seg") && s5f[5].includes("reason=d-too-high"),
+    JSON.stringify({ argsAfter: JSON.stringify(s5), n: s5Lines.length - nL4, f: s5f }),
+  );
+  n21++;
+}
+
+// 215 — R7 pin 6: PURE seg-d=2 (two INSERTIONS: px/qa before a/b.txt) →
+//      rejected d-too-high (the seg-d<=1 bar)
+{
+  const s6 = ioCore.matchNearPathSegments("px/qa/a/b.txt", ["a/b.txt", "zz/w.txt"]);
+  check(
+    String(n21),
+    "S21",
+    "pure seg-d=2 (two insertions): px/qa/a/b.txt → rejected d-too-high (the seg-d<=1 bar)",
+    JSON.stringify(s6) === '{"kind":"rejected","cands":[["a/b.txt",2],["zz/w.txt",5]],"reason":"d-too-high"}',
+    JSON.stringify(s6),
+  );
+  n21++;
+}
+
+// 216 — R7 pin 7: PURE two candidates TIED at seg-d=1 (a/b.txt vs
+//      b/b.txt and c/b.txt) → rejected gap-too-small (the gap rule)
+{
+  const s7 = ioCore.matchNearPathSegments("a/b.txt", ["b/b.txt", "c/b.txt"]);
+  check(
+    String(n21),
+    "S21",
+    "pure tie at seg-d=1: a/b.txt vs [b/b.txt, c/b.txt] → rejected gap-too-small (the gap rule)",
+    JSON.stringify(s7) === '{"kind":"rejected","cands":[["b/b.txt",1],["c/b.txt",1]],"reason":"gap-too-small"}',
+    JSON.stringify(s7),
+  );
+  n21++;
+}
+
+// 217 — R7 pin 8: PURE 2-segment filename typo (sub/file-x.txt vs
+//      sub/file-4.txt — the folder matches, the name is a char-close
+//      substitution) → resolved seg-d 1: the segment channel SUBSUMES a
+//      char-close name typo inside a folder (the 1-segment form is the
+//      char channel's — the bypass rule, the S18/S20 pins)
+{
+  const s8 = ioCore.matchNearPathSegments("sub/file-x.txt", ["sub/file-4.txt"]);
+  check(
+    String(n21),
+    "S21",
+    "pure 2-seg filename typo: sub/file-x.txt → resolved d=1 gap=inf (the segment channel subsumes the char-close name typo)",
+    s8.kind === "resolved" && s8.path === "sub/file-4.txt" && s8.d === 1 && s8.gap === Infinity,
+    JSON.stringify(s8),
+  );
+  n21++;
 }
 
 // ------------------------------------------------------------------ S5 hygiene (6)

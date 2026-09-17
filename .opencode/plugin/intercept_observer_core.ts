@@ -138,6 +138,13 @@ export const FUZZY_MIN_GAP = 2;
 // is not self-correcting). Same gap rule, same strict existence gate (the
 // corpus holds only REAL paths; the mistyped path is checked absent first).
 export const WRITE_FUZZY_MAX_D = 1;
+// R7 (2026-09-17): the SEGMENT-level accept bar — seg-d<=1, the same bar in
+// both scopes (maintainer ruling 09-17). A path is a sequence of folder
+// units: one extra / one mismatched folder = 1. A segment SUBSTITUTION
+// counts as seg-d 1 ONLY when the two names are char-close (intra-segment
+// levenshtein <= 1); a char-far substitution is non-substitutable (the DP
+// routes around it at insert+delete cost 2 — fails closed).
+export const SEG_MAX_D = 1;
 
 export const VERDICTS = Object.freeze([
   "observed-redundancy-ok",
@@ -686,4 +693,92 @@ export function resolveReadPath(argRel: string, corpus: string[]): ReadResolutio
 // the mistyped path absent first and the corpus holds only REAL paths).
 export function resolveWritePath(argRel: string, corpus: string[]): ReadResolution {
   return matchNearPath(argRel, corpus, WRITE_FUZZY_MAX_D);
+}
+
+// ------------------------------------------------------------------ R7 segment-level matcher (2026-09-17)
+//
+// A path is a SEQUENCE OF FOLDER UNITS: distance is counted per segment
+// (one extra / one mismatched folder = 1). The doubled folder
+// (OpenCodeProjects/OpenCodeProjects/… — char-lev 17, invisible to the
+// char channel) is a single INSERTION (seg-d 1). Same gate discipline as
+// matchNearPath: the corpus holds only REAL paths (the caller checks the
+// mistyped path absent first), accept iff seg-d <= SEG_MAX_D AND gap to the
+// second-best >= FUZZY_MIN_GAP, deterministic tie-break (seg-d, then
+// intra-segment char-sum, then lexical), fail-closed rejected with top-3
+// [relPath, seg-d] + reason. The hook applies it to >=2-segment relative
+// args BEFORE the char matcher; 1-segment args BYPASS it (the char channel
+// owns bare filenames — the S18/S20 evidence pins).
+
+// The per-candidate segment DP: [seg-d, charSum] under the lex order —
+// delete/insert cost 1 (charSum unchanged); substitution is allowed ONLY at
+// the intra-segment char bar (cost = lev, charSum += lev); a char-far pair
+// is non-substitutable. charSum is the intra-segment char total of the
+// chosen alignment (the tie-break second key).
+function segmentDistance(a: string[], b: string[]): [number, number] {
+  const m = a.length;
+  const n = b.length;
+  const dp: Array<Array<[number, number]>> = [];
+  for (let i = 0; i <= m; i++) {
+    dp.push([]);
+    for (let j = 0; j <= n; j++) {
+      let v: [number, number];
+      if (i === 0 && j === 0) v = [0, 0];
+      else if (i === 0) v = [j, 0];
+      else if (j === 0) v = [i, 0];
+      else {
+        const lev = levenshtein(a[i - 1], b[j - 1]);
+        const opts: Array<[number, number]> = [
+          [dp[i - 1][j][0] + 1, dp[i - 1][j][1]],
+          [dp[i][j - 1][0] + 1, dp[i][j - 1][1]],
+        ];
+        if (lev <= 1) opts.push([dp[i - 1][j - 1][0] + lev, dp[i - 1][j - 1][1] + lev]);
+        opts.sort((x, y) => x[0] - y[0] || x[1] - y[1]);
+        v = opts[0];
+      }
+      dp[i].push(v);
+    }
+  }
+  return dp[m][n];
+}
+
+// Split a normalized rel path into folder units (normPathForm can keep a
+// leading slash — drop empties so "///a/b" still splits to [a, b]).
+function splitSegments(rel: string): string[] {
+  return rel.split("/").filter((s) => s !== "");
+}
+
+// The R7 PURE segment matcher (DoD 1): same ReadResolution shape as
+// matchNearPath with d = segment distance, cands = [relPath, seg-d].
+export function matchNearPathSegments(argRel: string, corpus: string[]): ReadResolution {
+  const q = normPathForm(argRel);
+  if (q === "" || corpus.length === 0) {
+    return { kind: "rejected", cands: [], reason: corpus.length === 0 ? "empty-corpus" : "empty-arg" };
+  }
+  for (const c of corpus) {
+    if (normPathForm(c) === q) return { kind: "exact" };
+  }
+  const qSegs = splitSegments(q);
+  const scored: Array<{ c: string; d: number; cs: number }> = [];
+  let best: { c: string; d: number; cs: number } | null = null;
+  let second = Infinity;
+  for (const c of corpus) {
+    const [d, cs] = segmentDistance(qSegs, splitSegments(normPathForm(c)));
+    scored.push({ c, d, cs });
+    if (best === null || d < best.d || (d === best.d && (cs < best.cs || (cs === best.cs && c < best.c)))) {
+      second = best === null ? Infinity : best.d;
+      best = { c, d, cs };
+    } else if (d < second) {
+      second = d;
+    }
+  }
+  scored.sort((x, y) => x.d - y.d || x.cs - y.cs || (x.c < y.c ? -1 : x.c > y.c ? 1 : 0));
+  const b = best as { c: string; d: number; cs: number };
+  if (b.d <= SEG_MAX_D && second - b.d >= FUZZY_MIN_GAP) {
+    return { kind: "resolved", path: b.c, d: b.d, gap: second === Infinity ? Infinity : second - b.d };
+  }
+  return {
+    kind: "rejected",
+    cands: scored.slice(0, 3).map((e) => [e.c, e.d] as [string, number]),
+    reason: b.d > SEG_MAX_D ? "d-too-high" : "gap-too-small",
+  };
 }
