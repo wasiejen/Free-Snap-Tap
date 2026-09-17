@@ -50,3 +50,5 @@ awaiting approval (observable behavior change = maintainer-gated; approval bound
 a : b
 -b|(p("shift")) :: c
 then holding a should result in repeated b, but as soon as e.g. shift is hold it would fires the macro and then it should no longer be repeating. 1 action results in one macro/toggle triggering.
+
+--deferred until repo split into pure FST and opencode agentic part

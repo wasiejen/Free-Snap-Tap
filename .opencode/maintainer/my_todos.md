@@ -7,13 +7,16 @@
   - this is the maximum with this model
     - 5000 buffer in gauge seemed to work fine to motivate handover
     - caching on planner worker switch fails repeatedly - or semi repeatedly
+      - check number of contextpoint for the new context size
+        - RAM seem ok so far - ok ram overflow or ram freeing action triggers missing cache
+  - increaset o 150k not possible - not enough vram. ubatch already at minimum
+    
+
 
 - need to move or rename the agent folder in .opencode
   - it is picked up as a general agents folder and every md file in it is added as a system prompt for aseperate agent to start
   - maybe enough to rename it _agent?
     - might be prodent to name all new folders with prefix _ to prevent clashes with opencode
-
-260914-1422 (need to update my fst macro for date) it is still outputting the old format
 
 260915-0325: look for models that might better suited for compaction.
 - gemma4-12b is a bit dated but still very solid and fast

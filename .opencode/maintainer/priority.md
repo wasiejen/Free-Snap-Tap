@@ -27,7 +27,7 @@
 
 
 --info: 
-  - check # 9 general compaction recommendation/guideline if we should test out mit session compaction. reasoning laid out in the referenced section
+  - check # 9 general compaction recommendation/guideline in ideas.md if we should test out mit session compaction. reasoning laid out in the referenced section
     - you can test this out on yourself or on workers :-D
     - generally the planner could use compact on his session more often? suggestion :-)
   - --wip/--deferred if it prevents work can also be ignored when on autorun 
@@ -36,19 +36,9 @@
     - e.g. research
       - you can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 
-# 0 fuzzy research scripts + plugin
-see .opencode\agent\research\fuzzy-numword
-
---comments for discussion
-  - to enable using numword in output we might define excape notation, that excape from the rule of not appliing to the convention of not changing output
-    - if writing e.g. a todo ## <number> observed that some agents had problems because they could not write the number
-      - an excape notation would make this possible
-        - `## [56:five-six:ESC]` just an example that could be recognised and then the 2 leftmost applied according to convention
-          - does not have to be complicated, but just a means to force a very small scoped overwrite over just one instance
-            - or easier `[56:five-six:]` trailing marker ":", `[:56:five-six]` leading marker
-  - of really useful for dates
-    - could even create something like `[date:]` `[date-time:]` - so no look up and always according to a centralised convention for dates
-
+# 0 fuzzy_numword escape output option
+  numword escape implementation .opencode\proposals\approved\2026-09-17_numword-escape-output.md
+  Infos on bitdrift .opencode\maintainer\draft\26-09-17_20-05_bitdrift_observations.md
 
 # 1 compact_memory additions/fix messages (your todo ##70 likely needs an update)
 - autocompact on context limit option, toggable via parameter in the budget file
@@ -87,10 +77,12 @@ see .opencode\agent\research\fuzzy-numword
     - and giving explicit diretory to C:\Users\Wasiejen\Projects\Repos\ or based on what repos to work on
       - path variable would be an option to make this in general more independent?
     - I would create a copy of the FST repo in github and clone it into this new folder and move the old FST into C:\Users\Wasiejen\Projects\Repos\Free-Snap-Tap (might defer move to not to have to update all the references at once?)
-        
+
+# research on event hook messages.updated
+
 # addition to system prompt of planner, 
 - context_limit error -> compaction of worker, use Gemma model for this. You do not have to wait, sleep or wait only waste time, this is serial working flow - only one can be active at each time (compaction active = planner inactiv). you are not active while it compacts. your session is inactive and you can only continue after the compact is through
-- cross-compact only needs session_id (after compact tool rework above) - repeated calling with own id
+- cross-compact only needs session_id (after compact tool rework above) - repeated calling with own id observed
   - rework of compact_memory parameter count of remove providerID and modelID from parameter list avaialble -> get them from opencode.json - see # # compact_memory tool dump function
   - 
 
@@ -118,6 +110,7 @@ prompt additions/edits/rewrites:
     - knowledge add tool (general inbox and for a curator to sort in)
       - (included description on usage in description of parameter might be enough)
     - append todo_inbox aka todo_inbox add? :-)
+  - unified "Submit" tool may be good that offers parameters and pipes the input into the correct files via append. e.g. submit(inbox="...",feedback="...",knowledge="...") all optional. time and session_id then recorded with it
 
 # 7 small knowledge / use addition - or more likely do-not addition? 
 - do we need explicit coding guidelines?

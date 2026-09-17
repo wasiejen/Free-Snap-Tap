@@ -126,3 +126,9 @@ current date, `datetime` = inject the current date-time, etc.
 Awaiting maintainer decision.
 - **Open:** sentinel = `esc` vs `w2n` (maintainer to rule; lean `esc`).
 - Deferred items A + B are recorded, not approved.
+
+--comment: lets use "esc" 
+  - i like the nmenonic of having an escape for the inability to emit/produce a number :-)
+  - and catch their variants like "escape", "ESC", "ESCAPE", "Escape" and treat them as same
+
+- should also resolve without a problem in all places that these numwords can be used already. so e.g. in path parameter if an agent uses it their - it should not fail because of the presense of the sentinel
