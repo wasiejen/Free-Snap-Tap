@@ -63,6 +63,49 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 
+## Direct session (2026-09-17, ses_f510a05ceffeE6SnMBlvti40DE) — continued R7 → #73 dedup-collapse build + verified
+- Maintainer said "continue" (direct session, no `<|autonom|>`). Rebuilt from
+  committed state: R7 shipped green (two-one-six/216 + two-three-seven/37) but
+  the realistic nested doubling REJECTED; TODO #73 = the R7 correction (inside
+  the R7 staging approval — no new ruling needed).
+- **Built #73 (delegated `worker_Q4_140K`; spec d627403, code dce82ad,
+  bookkeeping 9c701ed): the STRUCTURAL dedup-collapse pre-check** — a new PURE
+  `collapseAdjacentDup(absPath)` core helper (split the abs path on `/` or `\`,
+  find the FIRST adjacent identical folder pair case-insensitive, remove ONE
+  copy, null on no-pair) + an existence-gated pre-check in
+  `runFuzzyRead`/`runFuzzyWrite` BEFORE the corpus matchers: collapsed path
+  EXISTS → resolve + `fuzzy-resolved kind=dedup scope=<read|write> … d=0`
+  (NO gap — structural, not a distance match); else fail-closed fall-through
+  (the seg/char matchers, unchanged). The M1 write guard untouched (a doubled
+  `write` stays ZERO lines).
+- **Key design catch (verified pre-spec, measured repro):** the doubling must
+  be detected on the ABSOLUTE path, NOT the rel path — `nearestExistingDir`
+  absorbs one doubled folder into the root, so the rel form has no adjacent
+  pair.
+- **Consequence (a design outcome, NOT a regression):** the dedup fires FIRST,
+  so the existing doubled-segment pins re-pin to kind=dedup (their collapse
+  target EXISTS in the fixture): probe S21 210/211 + smoke 8g (mutation targets
+  UNCHANGED; `kind=seg … d=1 gap=2` → `kind=dedup … d=0`). All other S21 pins
+  unchanged (212 write=zero; 213/215/216/217 pure core; 214 no pair).
+- **GATE planner-verified (re-ran all four myself, not assumed):** probe
+  two-one-six (216) → **two-two-zero (216)** [annotation == machine count];
+  smoke two-three-seven (37/37); pytest 459+1w; ruff F=0. 4 new S21 pins
+  (218 read resolved / 219 edit resolved / 220 collapse-target-absent stays
+  rejected / 21 write zero-lines) + the realistic-nested fixture (parent dir in
+  the corpus + sibling project — the shape the seg channel rejects). Repro torn
+  down.
+- **Worker deviation (accepted — spec-wording, not a bug):** the re-pin strings
+  can't be literal byte-equality — every log field is cap-truncated at
+  `MAX_FIELD_CHARS=160` (`flattenField`) and the dedup evidence carries two abs
+  paths (~219-281 chars) → always truncated. Pins build the expected field via
+  the same `flattenField` the hook applies (still verifying the byte-exact
+  format string). KNOWLEDGE NOTE for future specs: when a new evidence field can
+  exceed the field cap, the probe pin must build the expected via `flattenField`,
+  not literal equality.
+- Live acceptance rides the next host restart (planner one-shot, per the R7
+  pattern): a doubled nested read/edit resolves (`kind=dedup`); a doubled write
+  stays literal (zero lines).
+
 ## Direct session (2026-09-17, ses_f53a10d24ffesL2Oc8jPqY1bBc) — R2 live check, #72 ruling, dump-fail evidence, path-repair topic opened
 - **R2 write-scope acceptance: first check NO (host process was PRE-R2 —
   log continuous since 09-16 18-34, R2 landed 09-17 09:28 → R1 build
@@ -143,12 +186,11 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   (R7 correction), then R8.
 
 ## Standing
-- Baselines (re-verified 2026-09-17 by the planner post-M1): probe
-  **208/208** (S1–S20 incl. the M1 write-fuzzy re-pins + edit counter-
-  pins 208/209; the header annotation total is DIGIT-form and is the
-  source); pytest **459 passed + 1 warning (the known #10 coroutine
-  warning)**; ruff **F=0**. All 8 smokes green (7 + intercept_observer
-  **36/36**).
+- Baselines (re-verified 2026-09-17 by the planner post-#73, ses_f510a…): probe
+  **216→216** [two-one-six → two-two-zero; S1–S21 incl. the #73 dedup pins +
+  re-pins 210/211; the header annotation total is the source]; smoke
+  **37/37**; pytest **459 passed + 1 warning (the known #10 coroutine
+  warning)**; ruff **F=0**.
 - Corpus refresh cadence (planner call, plan6 — TODO #59 CLOSED): refresh
   BEFORE the #56 distillation runs + after heavy loopruns —
   `node .opencode/agent/scripts/db/dump_session.cjs --all --slim`.

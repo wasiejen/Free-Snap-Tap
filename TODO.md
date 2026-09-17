@@ -328,8 +328,16 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Suggested scope:** `intercept_observer_core.ts` (the collapse
   helper), `intercept_observer.ts` (pre-check in both fuzzy runners),
   the S21 section.
-- **Status:** OPEN (planner design; next build unit after this session;
-  the R7 staging approval covers it as an R7 correction).
+- **Status:** LANDED + planner-verified (2026-09-17, ses_f510a…, code
+  dce82ad, bookkeeping 9c701ed): the `collapseAdjacentDup` existence-gated
+  pre-check in `runFuzzyRead`/`runFuzzyWrite` (BEFORE the seg/char matchers)
+  resolves the realistic nested doubling with a `kind=dedup` evidence line
+  (d=0, no gap); a doubled `write` stays ZERO lines (M1 extends to the dedup).
+  Gate: probe two-one-six → two-two-zero (216), smoke 37/37, pytest 459+1w,
+  ruff F=0; S21 8 → 12 (re-pins 210/211 + smoke 8g to kind=dedup, 4 new pins
+  218 read / 219 edit / 220 collapse-target-absent stays rejected / 21 write
+  zero-lines + realistic-nested fixture). Repro torn down. Live acceptance
+  rides the next host restart (planner one-shot).
 
 ## Closed entries
 
