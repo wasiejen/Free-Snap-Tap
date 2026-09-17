@@ -121,6 +121,18 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   R9 (bash) = documented-optional, parked pending R4 log data.** Stages
   recorded in decision-record §5. Build order: M1 unit first, then R7,
   then R8.
+- **R7 design agreed (09-17):** substitution bar APPROVED (his): pure
+  segment INSERTION resolves free (existence+uniqueness); SUBSTITUTION
+  counts as seg-d=1 only with intra-segment char-lev ≤1 (char-far fails
+  closed — keeps the M1 hazard bar, `file-56`/`file-4` stays rejected);
+  pipeline pair → segment → char-fuzzy; `kind=seg` evidence flag on the
+  existing fuzzy verdicts (vocabulary byte-stable). **NEXT MOVES (his
+  call to execute):** (1) his RESTART — loads M1 for all agents (the
+  current process still runs the pre-M1 build — #72 hazard still live
+  for `write` until then); (2) then M1 one-shot acceptance (d=1 mistyped
+  scratchpad write must land LITERAL — stray file, no hijack; `edit`
+  d=1 must still be corrected); (3) then R7 spec + S21 probe section +
+  launch.
 
 ## Standing
 - Baselines (re-verified 2026-09-17 by the planner post-M1): probe

@@ -299,8 +299,19 @@ paste, like the stop-line change):
    bar — NOT caught by R1/R2). Corpus-chassis drop-in (buildCorpus + TTL +
    strict existence gate + fail-closed + log/probe pattern); BOTH scopes;
    START BAR seg-d≤1 both scopes (his ruling). Subsumes the adjacency-
-   collapse sketch. GATE: R2 live-accepted (done) + M1 unit landed (clean
-   bisection on the shared hook wiring).
+   collapse sketch. **Substitution bar (his approval 09-17):** a pure
+   segment INSERTION (the doubling) resolves free (existence + uniqueness
+   gate); a segment SUBSTITUTION counts as seg-d=1 only when the two
+   segment names are char-close (intra-segment Levenshtein ≤1, e.g.
+   `OpenCodeProject` vs `OpenCodeProjects`) — a char-far substitution
+   fails closed (keeps the M1 hazard bar: `file-56` vs `file-4` = char-lev
+   2 stays rejected). Pipeline per path field: pair → segment →
+   char-fuzzy (char keeps its d≤2 read-scope fallback + the edit-scope
+   bar); verdicts reuse `fuzzy-resolved/-rejected` with a `kind=seg`
+   evidence flag (nine-verdict vocabulary stays byte-stable). GATE: R2
+   live-accepted (done) + M1 unit landed (done, 9ec4c0b) + host restart
+   (loads M1 for all agents — the build's own workers run through the
+   loaded interceptor).
  - **R8 — root re-anchoring / tail match** (staged 2026-09-17): "switch path
    start to an existing path" — exact tail match, UNIQUE under a known-root
    allowlist, target must exist, fail-closed otherwise. Allowlist DERIVED
