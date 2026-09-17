@@ -111,18 +111,36 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   #63/start #64 — actually up to #73; now corrected, new entries start #74).
   A phantom "duplicate #53 heading" was my read drift on a dense numeral —
   grep verified the file has exactly one #53 and one #55.
-- Baselines unchanged: probe two-two-zero/216, smoke 37/37, pytest 459+1w,
-  ruff F=0.
-- **NEXT UNIT: #55 dump-function live acceptance** (the deferral-lifted #53 is
-  proposal-stage, awaiting his ruling): call `compact_memory` on THIS session
-  → verify `.opencode/archive/sessions/compaction_dumps/ses_f4f539d7cffeVeRhsFQRdoSRUC_c0.md`
-  exists and carries the pre-compaction content (summarizer = Gemma per
-  `opencode.jsonc` `agent.compaction`; the tool is fire-and-forget — the
-  COMPACT line lands in `.opencode/temp/ctx.log` on verified success; a
-  DUMP-FAIL ETIMEDOUT here would be data point 3 for the hung-child issue,
-  his priority #1 evidence). After that: his priority #1 (compact_memory
-  additions — TODO #70 needs the update he asked for) and #0 (numword escape
-  build — approved proposal).
+- Baselines: probe 216/216 (re-verified by running the probe post-compaction
+   2026-09-17 — the earlier bare "/216" in this line was a transcription
+   drift; the numword two-two-zero = 216 was right), smoke 37/37, pytest
+   459+1w, ruff F=0.
+ - **#53 (dump function) LIVE ACCEPTED** (this session's own self-compact call
+   at 21:32, the acceptance it was): `compaction_dumps/ses_f4f539d7cffeVeRhsFQRdoSRUC_c0.md`
+   carries the FULL pre-compaction content (75 messages / 360 parts, mode=full,
+   dumped 19:32:58 — before the summarize landed); compaction ran clean
+   (COMPACT line in `.opencode/temp/ctx.log` 21-33, gauge 84% → 27%). All
+   acceptance criteria met (dump exists, pre-compaction messages intact,
+   no-overwrite `_c0` naming, compaction not blocked). TODO #53 → CLOSED.
+   The 4 compaction dumps (incl. 3 from 09-16/17 sessions) committed as
+   corpus artifacts. Today's clean dump is the first live acceptance AFTER
+   the node-resolution fix (9fd7557); the earlier DUMP-FAIL "hung child"
+   observation (session ses_f53a10d24…, 09-17) PRE-DATES that fix — whether
+   it shared the root cause is an open question for the next failure (if
+   any): CLI help text in the log = wrong spawn, silence = real hang.
+ - **Session was compacted once** (the #53 live-acceptance self-compact);
+   post-compaction continuation: re-verified state from git log + this file
+   (commit 0105b9f = the pre-compaction bookkeeping; its commit message is
+   the session work summary).
+ - **OPEN after this session (his priority order):** #53 (agent-feedback
+   protocol — proposal `2026-09-17_agent-feedback-closedown.md` filed, awaiting
+   his ruling); #1 (compact_memory additions — TODO #70 update he asked for:
+   the cross-compact-by-session_id + Gemma worker compaction + no-wait flow);
+   #0 (numword-escape build — his approved proposal
+   `proposals/approved/2026-09-17_numword-escape-output.md`, the escape
+   notation: resolve a number in write/edit content); #2 (repo-split
+   research); #5 (knowledge/submit tools — partly served by the #53
+   proposal's Part B); #7 (non-ASCII edit notes).
 
 ## Standing
 - Baselines (re-verified 2026-09-17 by the planner post-#73, ses_f510a…): probe

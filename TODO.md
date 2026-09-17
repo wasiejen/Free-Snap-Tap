@@ -56,7 +56,10 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 
 ## Loop & coordination (open)
 
-## 53. Agent-feedback protocol: mandatory close-down step + small write-tool (DEFERRED 2026-09-12, **DEFERRAL LIFTED 2026-09-17** — direct session; maintainer: "it did not even know anymore that i deferred it") — the optional `agent_feedback.md` entries get discarded by the early-close-at-stop-line discipline; make it a NON-optional part of the close-down phase (directly before the closing message), full date_time on each entry, and a small tool that writes the entry (no file fiddling / accidental reads). **Proposal OWED (deferral lifted 2026-09-17; planner drafting — lands in `proposals/` this session).**
+## 53. Agent-feedback protocol: mandatory close-down step + small write-tool (DEFERRED 2026-09-12, **DEFERRAL LIFTED 2026-09-17** — direct session; maintainer: "it did not even know anymore that i deferred it") — the optional `agent_feedback.md` entries get discarded by the early-close-at-stop-line discipline; make it a NON-optional part of the close-down phase (directly before the closing message), full date_time on each entry, and a small tool that writes the entry (no file fiddling / accidental reads). **Proposal FILED 2026-09-17** (`proposals/2026-09-17_agent-feedback-closedown.md` —
+Part A: mandatory close-down prompt step, full date_time auto-stamped; Part B:
+unified `submit` tool per his #5 sketch; recommendation: both as one unit).
+Awaiting his ruling.
 
 ## 56. (DEFERRED 2026-09-15, maintainer `--defer` in priority.md) — Distillation worker runs over the session dumps (his # 3 3 mandate)
 
@@ -393,7 +396,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   `prompt_agent_planner.md` (§Delegate vs. do) — grep-verifiable
   (`rg -n circumvent .opencode/agent/prompts/agents/` → 5 hits).
 
-## 55. (open, maintainer call 2026-09-15) — `compact_memory` needs a dump function of the current session
+## 55. (closed 2026-09-17, live-accepted in direct session ses_f4f539d7c…; maintainer call 2026-09-15) — `compact_memory` needs a dump function of the current session
 
 - **Problem / evidence:** compaction (host default AND `compact_memory`) irreversibly
   destroys the fine-grained session context — the pre-compaction messages are gone once
@@ -416,12 +419,18 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Suggested scope:** `.opencode/plugin/compact_memory.ts` (dump hook before
   summarize); the session-dump script shared with the backfill idea (read-only DB →
   markdown, tool outputs condensed); `.opencode/archive/sessions/`.
-- **Status:** BUILD LANDED (plan4, 2026-09-15): the hook is in
+- **Status:** **LIVE ACCEPTED 2026-09-17** (direct session
+  `ses_f4f539d7cffeVeRhsFQRdoSRUC`, post-restart — the acceptance was the
+  session's own self-compact call): `compaction_dumps/ses_f4f539d7cffeVeRhsFQRdoSRUC_c0.md`
+  produced with the FULL pre-compaction content (75 messages / 360 parts,
+  mode=full, dumped 19:33:00 — BEFORE the summarize landed; the post-dump
+  compaction ran clean, COMPACT line in `.opencode/temp/ctx.log` at 21-33,
+  gauge back from 84% to 27%). All acceptance criteria met: dump exists,
+  pre-compaction messages intact, no-overwrite `_c0` naming, compaction not
+  blocked. BUILD LANDED (plan4, 2026-09-15): the hook is in
   `compact_memory.ts` (`preCompactionDump`, fires before ANY dispatch,
   no-overwrite `compaction_dumps/<sid>_c<count>.md` naming), `dump_session.cjs`
-  gained `--out`, probe S14 (101-107) green. Live acceptance PENDING the
-  maintainer's host restart — a single compact_memory call must then produce
-  `.opencode/archive/sessions/compaction_dumps/<sid>_c0.md`. Still OPEN.
+  gained `--out`, probe S14 (101-107) green.
    NOTE 2026-09-16 (worker-10, plan7/iter7): node-resolution fix landed (commit
    9fd7557) — the dump hook spawns via `resolveNodeExe()` (the live host's
    execPath is the CLI binary — the wrong spawn failed every dump with a
