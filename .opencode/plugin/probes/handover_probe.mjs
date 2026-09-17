@@ -555,6 +555,46 @@
 //          fall-through);
 //      (221) HOOK write doubled-nested → NOT mutated + ZERO lines (M1
 //          extends to the dedup pre-check).
+//   S22 submit tool (9) — the #53 Part B pin (2026-09-18; approved
+//      2026-09-17_agent-feedback-closedown.md part 2): ONE unified append
+//      tool for the three agent-inbox channels — the registration shape
+//      (3 shape checks: the tool() default export (description + the 5
+//      args IN ORDER) / NO stale name+parameters keys (the host names
+//      the tool by FILENAME) / execute an AsyncFunction), the arg schema
+//      (the 5 args feedback/knowledge/todo/role/session ALL optional-
+//      accept: undefined AND a string — the at-least-one-required rule
+//      is a RUNTIME rule, not a schema one), the no-params error ({} AND
+//      all-empty-string args → the exact error string + NO target
+//      created — nothing written), one append behavior per param (the
+//      entry = <header> <stamp> <role> <session> + the raw text + one
+//      trailing blank line, appended to the HARDCODED target; the stamp
+//      is minute-resolution, pinned by FORMAT + the before/after trick;
+//      the return per param = <param> + target: <rel> + entry: <exact
+//      text>; feedback → .opencode/agent/agent_feedback.md ### /
+//      knowledge → .opencode/agent/knowledge/knowledge_inbox.md ## /
+//      todo → the PROJECT-ROOT todo_inbox.md ## — the no-path-parameter
+//      IS the sandbox: the deliberate deviation from the proposal
+//      (the proposal's quoted ".opencode/ subtree" wording — the quote
+//      marks are literal file content), ratified by the spec), and the
+//      never-read preservation (all three targets pre-seeded with
+//      sentinels; ONE feedback append → the sentinel BYTE-EXACT before
+//      the appended entry; the unprovided targets byte-identical — the
+//      tool appends, it NEVER reads or rewrites):
+//      (230) registration shape (1 of 3): the tool() default export
+//           (description + the 5 args in order + an execute function);
+//      (231) registration shape (2 of 3): NO stale name/parameters keys;
+//      (232) registration shape (3 of 3): execute is an AsyncFunction;
+//      (233) arg schema: all 5 args optional-accept (undefined AND a string);
+//      (234) no-params error: {} and all-empty-string → the exact error string +
+//           NO target created (nothing written);
+//      (235) feedback append: target created carrying ONLY the entry (### stamp),
+//           return byte-exact, the other two targets absent;
+//      (236) knowledge append: target created carrying ONLY the entry (## stamp),
+//           return byte-exact, the other two targets absent;
+//      (237) todo append: project-root target created carrying ONLY the entry
+//           (## stamp), return byte-exact, the other two targets absent;
+//      (238) never-read preservation: pre-seeded sentinel byte-exact before the
+//           appended entry + the unprovided targets byte-identical.
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -567,7 +607,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 hygiene=6  →  "PROBE handover: 220/220 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 hygiene=6  →  "PROBE handover: 229/229 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -4626,6 +4666,231 @@ writeFileSync(path.join(ioRnDir, "OpenCodeProjects", "SiblingProj", "whatever.md
     JSON.stringify({ argsAfter: JSON.stringify(r4), n: ioReadLines().length - nR4 }),
   );
   n21++;
+}
+
+// ------------------------------------------------------------------ S22 submit tool (9) — the #53 Part B pin (2026-09-18): the unified append tool for the three agent-inbox channels
+//
+// The custom tool at .opencode/tools/submit.ts (approved
+// 2026-09-17_agent-feedback-closedown.md, Part B): ONE unified append tool
+// for the three agent-inbox channels — feedback (the #53 friction log),
+// knowledge (the knowledge inbox), todo (the loose-findings inbox). The
+// tool machine-stamps each entry (<header> <YYYY-MM-DD_HH-MM> <role>
+// <session> + the raw text + one trailing blank line) and APPENDS it to
+// its HARDCODED target — the NO-path-parameter IS the sandbox (note the
+// deliberate deviation from the proposal's ".opencode/ subtree" wording:
+// todo_inbox.md sits at the project root — the spec ratifies the three
+// exact paths). Imported DIRECT (type-stripped, the S12/S13/S16 load
+// pattern). Driven with context.directory = sandbox roots — the targets
+// land in the sandbox, the real .opencode/agent/agent_feedback.md /
+// knowledge_inbox.md / todo_inbox.md are NEVER touched (S5 hygiene
+// verifies zero writes outside the sandbox). The stamp is local-clock,
+// minute resolution — pinned by FORMAT (regex) + the minute-boundary
+// before/after trick, never the exact value. Plain tool() object: no
+// plugin hooks — the S5 tallies are unaffected.
+const SUB_TOOL_TS = path.join(REPO_ROOT, ".opencode", "tools", "submit.ts");
+const SUB_FB = path.join(SANDBOX, "submit-fb"); // no-params error + the feedback append (checks 230/231)
+const SUB_KN = path.join(SANDBOX, "submit-kn"); // the knowledge append (check 234)
+const SUB_TODO = path.join(SANDBOX, "submit-todo"); // the todo append (check 235)
+const SUB_KEEP = path.join(SANDBOX, "submit-keep"); // the never-read preservation (check 238)
+const SUB_NO_PARAMS_ERR = "error: none of feedback/knowledge/todo provided — nothing written";
+const SUB_REL = {
+  feedback: ".opencode/agent/agent_feedback.md",
+  knowledge: ".opencode/agent/knowledge/knowledge_inbox.md",
+  todo: "todo_inbox.md",
+};
+const SUB_HDR = { feedback: "###", knowledge: "##", todo: "##" };
+const subEntry = (k, s, role, ses, text) => `${SUB_HDR[k]} ${s} ${role} ${ses}\n${text}\n\n`;
+const subBlock = (k, entry) => `${k}\ntarget: ${SUB_REL[k]}\nentry: ${entry}`;
+const subStampNow = () => {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`;
+};
+let n22 = 230;
+let subTool;
+
+// 230 — registration shape (1 of 3): the tool file imports (type-stripped,
+//      direct) and exposes the tool() default export: description
+//      (non-empty string) + the 5 args IN ORDER
+//      (feedback/knowledge/todo/role/session) + an execute function
+{
+  const toolMod = await import(pathToFileURL(SUB_TOOL_TS).href);
+  subTool = toolMod.default;
+  const argKeys = Object.keys(subTool?.args ?? {});
+  check(
+    String(++n22),
+    "S22",
+    "submit tool file imports (type-stripped, direct) and exposes the tool() default export (description + args [feedback, knowledge, todo, role, session] + execute)",
+    subTool != null && typeof subTool.description === "string" && subTool.description.length > 0 &&
+      JSON.stringify(argKeys) === JSON.stringify(["feedback", "knowledge", "todo", "role", "session"]) &&
+      typeof subTool.execute === "function",
+    JSON.stringify({ keys: argKeys, descType: typeof subTool?.description }),
+  );
+}
+
+// 231 — registration shape (2 of 3): NO stale `name`/`parameters` keys —
+//      the host names the tool by FILENAME (the committed tool() form)
+{
+  check(
+    String(++n22),
+    "S22",
+    "NO stale `name`/`parameters` keys (the host names the tool by FILENAME)",
+    subTool != null && !("name" in subTool) && !("parameters" in subTool),
+    JSON.stringify({ nameIn: "name" in (subTool ?? {}), parametersIn: "parameters" in (subTool ?? {}) }),
+  );
+}
+
+// 232 — registration shape (3 of 3): execute is an ASYNC function
+{
+  check(
+    String(++n22),
+    "S22",
+    "execute is an AsyncFunction",
+    subTool != null && typeof subTool.execute === "function" && subTool.execute.constructor.name === "AsyncFunction",
+    subTool?.execute?.constructor?.name,
+  );
+}
+
+// 233 — the arg schema: ALL 5 args are OPTIONAL (each accepts undefined
+//      AND a string — the at-least-one-required rule is a RUNTIME rule,
+//      not a schema constraint)
+{
+  const optAccept = (k) => {
+    const s = subTool?.args?.[k];
+    return s != null && typeof s.safeParse === "function" && s.safeParse(undefined).success === true && s.safeParse("x").success === true;
+  };
+  check(
+    String(++n22),
+    "S22",
+    "arg schema: all 5 args (feedback/knowledge/todo/role/session) optional-accept (undefined AND a string)",
+    ["feedback", "knowledge", "todo", "role", "session"].every(optAccept),
+    JSON.stringify(["feedback", "knowledge", "todo", "role", "session"].map((k) => ({ k, ok: optAccept(k) }))),
+  );
+}
+
+// 234 — the no-params error: execute({}) AND all-empty-string args return
+//      the EXACT error string and create NO target (the fresh sandbox
+//      project dir stays empty — nothing written)
+{
+  const noArgsRet = await subTool.execute({}, { directory: SUB_FB });
+  const emptyRet = await subTool.execute({ feedback: "", knowledge: "  ", todo: "" }, { directory: SUB_FB });
+  check(
+    String(++n22),
+    "S22",
+    "no-params ({} and all-empty-string) → the EXACT error string + NO target created (nothing written)",
+    noArgsRet === SUB_NO_PARAMS_ERR && emptyRet === SUB_NO_PARAMS_ERR &&
+      !existsSync(path.join(SUB_FB, ".opencode")) && !existsSync(path.join(SUB_FB, "todo_inbox.md")),
+    JSON.stringify({ noArgsRet, emptyRet }),
+  );
+}
+
+// 235 — the feedback append (1 of 3): a fresh sandbox project dir — the
+//      tool CREATES .opencode/agent/agent_feedback.md (parent dirs
+//      auto-created) carrying ONLY the entry: `### <stamp> probe-s21
+//      ses_fx_sub` + the raw text + one trailing blank line (the stamp
+//      minute-resolution, pinned by the before/after trick); the return is
+//      `feedback` + `target: <rel>` + `entry: <exact text>` byte-exact;
+//      the other two targets are ABSENT
+{
+  const t1 = subStampNow();
+  const ret = await subTool.execute(
+    { feedback: "probe feedback line", role: "probe-s21", session: "ses_fx_sub" },
+    { directory: SUB_FB },
+  );
+  const t2 = subStampNow();
+  const f = path.join(SUB_FB, SUB_REL.feedback);
+  const body = existsSync(f) ? readFileSync(f, "utf8") : null;
+  const okEntry = (s) => body === subEntry("feedback", s, "probe-s21", "ses_fx_sub", "probe feedback line");
+  const okRet = (s) => ret === subBlock("feedback", subEntry("feedback", s, "probe-s21", "ses_fx_sub", "probe feedback line"));
+  check(
+    String(++n22),
+    "S22",
+    "feedback append: target created carrying ONLY the entry (### stamp, format pinned) + return byte-exact (`feedback` + `target:` + `entry:`) + the other two targets absent",
+    (okEntry(t1) || okEntry(t2)) && (okRet(t1) || okRet(t2)) &&
+      !existsSync(path.join(SUB_FB, SUB_REL.knowledge)) && !existsSync(path.join(SUB_FB, SUB_REL.todo)),
+    JSON.stringify({ ret, body }),
+  );
+}
+
+// 236 — the knowledge append (2 of 3): the same contract for
+//      .opencode/agent/knowledge/knowledge_inbox.md with the `## ` header
+//      (the established form of the inbox channel)
+{
+  const t1 = subStampNow();
+  const ret = await subTool.execute(
+    { knowledge: "probe knowledge line", role: "probe-s21", session: "ses_fx_sub" },
+    { directory: SUB_KN },
+  );
+  const t2 = subStampNow();
+  const f = path.join(SUB_KN, SUB_REL.knowledge);
+  const body = existsSync(f) ? readFileSync(f, "utf8") : null;
+  const okEntry = (s) => body === subEntry("knowledge", s, "probe-s21", "ses_fx_sub", "probe knowledge line");
+  const okRet = (s) => ret === subBlock("knowledge", subEntry("knowledge", s, "probe-s21", "ses_fx_sub", "probe knowledge line"));
+  check(
+    String(++n22),
+    "S22",
+    "knowledge append: target created carrying ONLY the entry (## stamp) + return byte-exact + the other two targets absent",
+    (okEntry(t1) || okEntry(t2)) && (okRet(t1) || okRet(t2)) &&
+      !existsSync(path.join(SUB_KN, SUB_REL.feedback)) && !existsSync(path.join(SUB_KN, SUB_REL.todo)),
+    JSON.stringify({ ret, body }),
+  );
+}
+
+// 237 — the todo append (3 of 3): the same contract for the PROJECT-ROOT
+//      todo_inbox.md with the `## ` header (the repo-root location is the
+//      ratified deviation from the proposal's ".opencode/ subtree" wording)
+{
+  const t1 = subStampNow();
+  const ret = await subTool.execute(
+    { todo: "probe todo line", role: "probe-s21", session: "ses_fx_sub" },
+    { directory: SUB_TODO },
+  );
+  const t2 = subStampNow();
+  const f = path.join(SUB_TODO, SUB_REL.todo);
+  const body = existsSync(f) ? readFileSync(f, "utf8") : null;
+  const okEntry = (s) => body === subEntry("todo", s, "probe-s21", "ses_fx_sub", "probe todo line");
+  const okRet = (s) => ret === subBlock("todo", subEntry("todo", s, "probe-s21", "ses_fx_sub", "probe todo line"));
+  check(
+    String(++n22),
+    "S22",
+    "todo append: project-root target created carrying ONLY the entry (## stamp) + return byte-exact + the other two targets absent",
+    (okEntry(t1) || okEntry(t2)) && (okRet(t1) || okRet(t2)) &&
+      !existsSync(path.join(SUB_TODO, SUB_REL.feedback)) && !existsSync(path.join(SUB_TODO, SUB_REL.knowledge)),
+    JSON.stringify({ ret, body }),
+  );
+}
+
+// 238 — the never-read preservation: ALL THREE targets pre-seeded with
+//      sentinel lines; ONE feedback append → the feedback file = the
+//      sentinel bytes + the entry (the sentinel BYTE-EXACT before the
+//      appended entry) and the knowledge/todo files byte-identical to the
+//      pre-seed (untouched) — the tool appends, never reads/rewrites
+{
+  const seed = (dir, k, line) => {
+    const f = path.join(dir, SUB_REL[k]);
+    mkdirSync(path.dirname(f), { recursive: true });
+    writeFileSync(f, line + "\n", "utf8");
+  };
+  seed(SUB_KEEP, "feedback", "SENTINEL fb — the pre-seeded line must survive byte-exact.");
+  seed(SUB_KEEP, "knowledge", "SENTINEL kn — must stay byte-identical.");
+  seed(SUB_KEEP, "todo", "SENTINEL todo — must stay byte-identical.");
+  const t1 = subStampNow();
+  await subTool.execute(
+    { feedback: "probe keep line", role: "probe-s21", session: "ses_fx_sub" },
+    { directory: SUB_KEEP },
+  );
+  const t2 = subStampNow();
+  const fb = readFileSync(path.join(SUB_KEEP, SUB_REL.feedback), "utf8");
+  const okFb = (s) => fb === "SENTINEL fb — the pre-seeded line must survive byte-exact.\n" + subEntry("feedback", s, "probe-s21", "ses_fx_sub", "probe keep line");
+  check(
+    String(++n22),
+    "S22",
+    "never-read preservation: pre-seeded sentinel BYTE-EXACT before the appended entry (append-only) + the unprovided targets byte-identical (untouched)",
+    (okFb(t1) || okFb(t2)) &&
+      readFileSync(path.join(SUB_KEEP, SUB_REL.knowledge), "utf8") === "SENTINEL kn — must stay byte-identical.\n" &&
+      readFileSync(path.join(SUB_KEEP, SUB_REL.todo), "utf8") === "SENTINEL todo — must stay byte-identical.\n",
+    JSON.stringify({ fb }),
+  );
 }
 
 // ------------------------------------------------------------------ S5 hygiene (6)
