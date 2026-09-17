@@ -312,9 +312,30 @@ paste, like the stop-line change):
    live-accepted (done) + M1 unit landed (done, 9ec4c0b) + host restart
    (loads M1 for all agents — the build's own workers run through the
    loaded interceptor) — **ALL SATISFIED 09-17**: restart done, M1 live-
-   accepted (one-shot: d=1 new-file write landed LITERAL with zero fuzzy
+  accepted (one-shot: d=1 new-file write landed LITERAL with zero fuzzy
    lines — hazard dead; `edit` d=1 still corrected, `d=1 gap=inf`).
- - **R8 — root re-anchoring / tail match** (staged 2026-09-17): "switch path
+    **#73 correction LANDED + LIVE-ACCEPTED (09-17, dce82ad):** the realistic
+    nested doubling was REJECTED by the seg channel (parent-dir corpus entry
+    kills the gap rule — the S21 pin fixtures were flat, a pin-design gap);
+    fix = a STRUCTURAL pre-check `collapseAdjacentDup` (split abs path, first
+    adjacent identical folder pair case-insensitive, remove one copy,
+    existence-gated, `kind=dedup d=0` NO gap, fail-closed fall-through)
+    BEFORE the seg/char matchers in both runners. LIVE (post-restart one-shot,
+    scratchpad fixture): doubled `read` resolved `kind=dedup scope=read`,
+    doubled `edit` resolved `kind=dedup scope=write` (applied to the real
+    file); doubled `write` not live-proven via planner emission (5/5 collapsed
+    at emission — log-verified; single writes literal + zero lines, M1 held;
+    hook coverage = pins 21/218–220). **DISPLAY-LAYER FINDING (extends the R2
+    display finding to the CALL side):** the stored tool-call `state.input`
+    is POST-mutation (DB query: the read's stored args show the corrected
+    single path while the log `orig=` shows it arrived doubled) — an agent
+    can NEVER self-verify its own raw emission from within the session;
+    `.opencode/temp/intercept.log` (field 5 `orig=` + `doubled=` anomaly line)
+    is the sole pre-mutation authority. The same session measured BOTH
+    directions: the read arrived doubled (stored single — display artifact)
+    and 5 write calls genuinely arrived single (real emission collapse, the
+    bias STRONGEST on write args).
+  - **R8 — root re-anchoring / tail match** (staged 2026-09-17): "switch path
    start to an existing path" — exact tail match, UNIQUE under a known-root
    allowlist, target must exist, fail-closed otherwise. Allowlist DERIVED
    FROM CONFIG (his ruling): `opencode.jsonc` `permissions.external_directory`

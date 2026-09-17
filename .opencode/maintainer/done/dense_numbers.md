@@ -1,5 +1,3 @@
---wip
-
 idea collection - for discussion in direct session
 
 fuzzy search for reading files per name?

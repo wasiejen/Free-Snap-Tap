@@ -154,3 +154,29 @@ Gained, verified knowledge for opencode plugins. Format per the README:
   `#57-live`.
 - **Keys:** execPath, resolveNodeExe, execFileSync, opencode.exe, dump hook,
   spawn, PATH, PATHEXT.
+
+## Stored tool-call args are POST-mutation — you only see the corrected path
+- **Do:** NEVER trust the tool-call args you see in your own context / the
+  session dump to diagnose a bitdrift or fuzzy-resolve — the DB stores the
+  POST-mutation `state.input` (the corrected path), not what you EMITTED. To
+  know what you actually emitted, read `.opencode/temp/intercept.log` (the
+  `orig=` field of the `fuzzy-resolved` line + the `path-anomaly`
+  `doubled=...` line) — that is the ONLY pre-mutation record. A live mutation
+  is indistinguishable from producer drift inside your own session.
+- **Why (evidence):** 2026-09-17 (planner ses_f4f539d7c, #73 live acceptance):
+  the EMITTED doubled path `.../OpenCodeProjects/OpenCodeProjects/...` was
+  fuzzy-resolved (intercept.log `orig=` doubled → corrected, `kind=dedup`),
+  but the stored part `state.input` for that SAME read shows the SINGLE
+  (corrected) path — queried directly from `opencode.db`. The planner, reading
+  back its own "sent" args from context, concluded it had dropped the doubling
+  (perceived drift); the log proved the read had arrived correctly doubled —
+  while 5 write calls in the same session genuinely arrived single (the log
+  shows `orig=` single, no anomaly line) — a REAL emission collapse. Both
+  diagnoses were possible ONLY via the log; the stored args could not
+  distinguish the two cases. Same class as the R2 display finding (post-
+  mutation result shown) — extended to the CALL side.
+- **Ref:** `opencode.db` `part.state.input` for the #73 read;
+  `.opencode/temp/intercept.log` 2026-09-17_21-03 lines; planner verification
+  (2026-09-17 direct, ses_f4f539d7c).
+- **Keys:** post-mutation, state.input, intercept.log, orig, display,
+  self-diagnosis, bitdrift, producer-drift, indistinguishable.

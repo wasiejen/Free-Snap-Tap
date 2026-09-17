@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #63, new
-entries start at #64 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #73, new
+entries start at #74 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -56,7 +56,7 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 
 ## Loop & coordination (open)
 
-## 53. Agent-feedback protocol: mandatory close-down step + small write-tool (DEFERRED 2026-09-12, maintainer `deferred:do_later` in `inbox_planner/feedback_protol_tool.md`) — the optional `agent_feedback.md` entries get discarded by the early-close-at-stop-line discipline; make it a NON-optional part of the close-down phase (directly before the closing message), full date_time on each entry, and a small tool that writes the entry (no file fiddling / accidental reads). Proposal owed when the deferral lifts.
+## 53. Agent-feedback protocol: mandatory close-down step + small write-tool (DEFERRED 2026-09-12, **DEFERRAL LIFTED 2026-09-17** — direct session; maintainer: "it did not even know anymore that i deferred it") — the optional `agent_feedback.md` entries get discarded by the early-close-at-stop-line discipline; make it a NON-optional part of the close-down phase (directly before the closing message), full date_time on each entry, and a small tool that writes the entry (no file fiddling / accidental reads). **Proposal OWED (deferral lifted 2026-09-17; planner drafting — lands in `proposals/` this session).**
 
 ## 56. (DEFERRED 2026-09-15, maintainer `--defer` in priority.md) — Distillation worker runs over the session dumps (his # 3 3 mandate)
 
@@ -123,7 +123,7 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 
 ## 52. (closed 2026-09-13, see todo_records.md) — `compact_memory` fails in the current host build — connection error on both paths (2026-09-12) — LANDED (2026-09-12, worker-2, per the approved v2 proposal) + live acceptance DONE (2026-09-13, iteration 1: compaction part + directive + budget 1/3 + COMPACT line verified in the DB); the resume-overflow finding → `proposals/2026-09-13_compact_memory-findings.md` (Item 1 superseded by the 2026-09-15 protocol; Item 2 ruling bundled in 2026-09-15_backlog-decisions.md, Decision 3).
 
-## 65. loop_log tool folder-detection bug: spurious folders on the maintainer-renamed loop folder (2026-09-16, plan2)
+## 65. (closed 2026-09-17, maintainer-ruled — NOT a tool bug, see todo_records.md for the full entry if needed) — loop_log tool folder-detection bug: spurious folders on the maintainer-renamed loop folder (2026-09-16, plan2)
 - **Problem / evidence:** the `loop_log` tool did not recognize the
   maintainer-renamed folder `autorun_2-6_0-9_1-6__1-3_3-3` and created TWO
   spurious date-stamped folders in one iteration (autorun-2026-09-16_16-15
@@ -138,10 +138,13 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   folder's loop_log.md; no spurious folder on the next looprun; probe/smoke
   green.
 - **Scope:** `.opencode/tools/loop_log.ts` (+ its smoke if any). Restart-gated.
-- **Status:** OPEN (planned). 3rd occurrence 2026-09-16 18-27
-  (`autorun-2026-09-16_13-33`, lines already consolidated in the real log;
-  planner removed the folder) — the looprunner's INFO line in the real
-  loop_log.md confirms the tool still mis-detects the renamed folder.
+- **Status:** CLOSED 2026-09-17 (maintainer-ruled, direct session): the cause
+  was the maintainer HIMSELF — he had been testing another date format on the
+  autorun folder to reduce bitdrift, which the tool's date-pattern detection
+  did not recognize. He re-unified both folders into the old date style and
+  changed the minute value to remove the previously observed 3→5 bitdrift. No
+  tool change needed; the "spurious folder" events were expected behavior on
+  a non-matching folder name.
 
 ## 66. 5.3+5.4 restart acceptance (CLOSED 2026-09-16 direct session; verdict LIVE)
 - **Problem / evidence:** the observer plugin failed to LOAD on the first
@@ -261,8 +264,10 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 - **Acceptance:** section reads the pointer; no duplicated total.
 - **Scope:** `repo_commands.md` §Run/test (maintainer or an explicitly
   tasked agent).
-- **Status:** OPEN (maintainer-file flag; refreshed at R1 — the stale prose
-  now reads 193/193 off; worker-13 R1 inbox entry folded in, 2026-09-16).
+- **Status:** CLOSED (2026-09-17, planner-direct — maintainer ruled the
+  planner is allowed to update this file): §Run/test now carries the
+  curate-don't-duplicate pointer (no duplicated moving number at all — the
+  probe's self-annotation is the sole source), per the #58/#64 convention.
 
 ## 72. Write-scope residual hazard: new-file near-miss (maintainer decision; 2026-09-17)
 - **Problem / evidence:** the write-fuzzy channel (and the pair gate) cannot
@@ -336,8 +341,18 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   Gate: probe two-one-six → two-two-zero (216), smoke 37/37, pytest 459+1w,
   ruff F=0; S21 8 → 12 (re-pins 210/211 + smoke 8g to kind=dedup, 4 new pins
   218 read / 219 edit / 220 collapse-target-absent stays rejected / 21 write
-  zero-lines + realistic-nested fixture). Repro torn down. Live acceptance
-  rides the next host restart (planner one-shot).
+  zero-lines + realistic-nested fixture). Repro torn down. **LIVE ACCEPTED
+  (2026-09-17, ses_f4f539d7c… post-restart one-shot, scratchpad fixture, torn
+  down):** doubled nested `read` resolved `kind=dedup scope=read d=0` (log
+  `orig=` doubled → corrected, file content returned); doubled `edit` resolved
+  `kind=dedup scope=write d=0` (applied to the real file). Doubled `write`
+  NOT live-proven via the planner's own emission — 5/5 attempts collapsed the
+  doubled segment at emission (log-verified `orig=` single each time; the
+  single writes landed literal + zero lines, M1 guard held). Hook-level
+  doubled-write coverage stands on pins 21/218–220 (same runner as the
+  live-proven edit path — the guard is the shared dispatch condition).
+  Emission data point: the collapse bias is STRONGEST on write calls
+  (read doubled 1st try, edit 3rd, write 5/5 collapsed).
 
 ## Closed entries
 
@@ -467,7 +482,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   join the standard gate?) was NOT decided unilaterally — it stays open for
   his direct session.
 
-## 59. (open, 2026-09-15, script-collection worker, curated plan3) — session-corpus refresh cadence
+## 59. (closed 2026-09-16, plan6; 2026-09-15, script-collection worker, curated plan3) — session-corpus refresh cadence
 
 - **Problem / evidence:** the corpus `.opencode/archive/sessions/` goes stale
   between backfills (e.g. `ses_f5d03802...` was dumped mid-session: 59 msgs

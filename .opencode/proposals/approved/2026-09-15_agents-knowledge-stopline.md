@@ -12,10 +12,12 @@ now 95% — this means explicitly around 90% gauge with lagging value". The
 current §Context budget says "Stop line: stop starting new work when
 `REM ≤ 15k` or usage ≥ 85%". Suggested replacement of that line (rest stays):
 
-- **Stop line:** stop starting new work when the gauge readout reaches
-  ≈90 % (≈95 % of the real wall, which sits below the limit — the gauge
-  lags ~2 tool calls, so the readout is a lower bound). `REM ≤ 15k` stays
-  as the hard tail (the handover still needs ~10–15k to write).
+- **Stop line (unified 2026-09-17 ruling, two stages):** stop starting new
+  work when the gauge readout reaches ≈90 % — this sits ≈14 k tokens + 5 k
+  tokens (gauge lag) BEFORE the real ceiling of the context window. At ≈95 %:
+  EMERGENCY handover — stop new work, bring the handover/NAP current, commit,
+  then compact (self- or cross-). `REM ≤ 15k` stays as the hard tail (the
+  handover still needs ~10–15k to write).
 
 And the new worker protocol (suggested addition after the stop line):
 

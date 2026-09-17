@@ -3,6 +3,8 @@
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 ## Compressed archive (one line each — details in git log + TODO/records)
+- 2026-09-17 direct (ses_f510a05ceffeE6SnMBlvti40DE) — #73 dedup-collapse build + planner-verified (spec d627403, code dce82ad, bookkeeping 9c701ed; gate 216/37/459+1w/F=0; M1 write guard untouched; flattenField pin lesson; the abs-path-not-rel design catch) + numword-escape proposal filed (da3ca41) — details: nap_direct.md + git dce82ad/9c701ed/da3ca41
+- 2026-09-17 direct (ses_f53a10d24ffesL2Oc8jPqY1bBc) — R2 write-scope LIVE accepted post-restart (benign corrected + #72 hazard live-measured + display finding: post-mutation path shown, log field 5 = authority); #72 M1 ruling recorded + LANDED (9ec4c0b) + live-accepted; dump-fail evidence (hung child in host, not script slowness; DUMP-OK suggestion); path-repair topic opened + R7/R8 STAGED (his ruling; allowlist config-derived; R9 parked); R7 design (substitution bar approved) + FOUNDING (ee19a84; 1-seg bypass amendment 134b107); realistic nested doubling REJECTED → #73 filed — details: nap_direct.md + git 35f8143/9ec4c0b/ee19a84/24daf1e
 - 2026-09-16/17 looprun 2, iteration 2 (ses_f556cadecffeH5P5uZNS33i20R, planner Qwen3.8-27B-IQ4KT-140K) — plan2: read-scope fuzzy + pair convention `[left:right]` ruled (supersedes pipe form); R1 (96bb173) + R2 (35f8143) landed + verified, gates 206/206 + 35/35 + 459+1w + F=0; TODO #65-72; details: loop folder plan2_nap.md + git 4030e01
 - 2026-09-16 direct (ses_f54ee6ba8ffeeoFUc1zptUtsb5) — fuzzy/numword topic: #66 LIVE verdict, pair convention + scratchpad-sandbox ruled (decision record), R1/R2 live acceptance, incidents (worker inbox trim, producer-drift 3/3, line-153 correction), R6 staged; details: nap_direct.md + research/fuzzy-numword/ + git d1c148b..4030e01
 - 2026-09-16 looprun 2, iteration 1 (ses_f5605f805ffeElHB9mgtksjye1, planner-1) — plan1: research addendum C1-C7 + 5.2 numword scriptlet (worker-1) + 5.3 log-only intercept observer (worker-2) landed+verified (baseline 169/169) + self-compact test PASSED — details: loop folder plan1_summary.md + git aa4132d
@@ -63,141 +65,64 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 
-## Direct session (2026-09-17, ses_f510a05ceffeE6SnMBlvti40DE) — continued R7 → #73 dedup-collapse build + verified
-- Maintainer said "continue" (direct session, no `<|autonom|>`). Rebuilt from
-  committed state: R7 shipped green (two-one-six/216 + two-three-seven/37) but
-  the realistic nested doubling REJECTED; TODO #73 = the R7 correction (inside
-  the R7 staging approval — no new ruling needed).
-- **Built #73 (delegated `worker_Q4_140K`; spec d627403, code dce82ad,
-  bookkeeping 9c701ed): the STRUCTURAL dedup-collapse pre-check** — a new PURE
-  `collapseAdjacentDup(absPath)` core helper (split the abs path on `/` or `\`,
-  find the FIRST adjacent identical folder pair case-insensitive, remove ONE
-  copy, null on no-pair) + an existence-gated pre-check in
-  `runFuzzyRead`/`runFuzzyWrite` BEFORE the corpus matchers: collapsed path
-  EXISTS → resolve + `fuzzy-resolved kind=dedup scope=<read|write> … d=0`
-  (NO gap — structural, not a distance match); else fail-closed fall-through
-  (the seg/char matchers, unchanged). The M1 write guard untouched (a doubled
-  `write` stays ZERO lines).
-- **Key design catch (verified pre-spec, measured repro):** the doubling must
-  be detected on the ABSOLUTE path, NOT the rel path — `nearestExistingDir`
-  absorbs one doubled folder into the root, so the rel form has no adjacent
-  pair.
-- **Consequence (a design outcome, NOT a regression):** the dedup fires FIRST,
-  so the existing doubled-segment pins re-pin to kind=dedup (their collapse
-  target EXISTS in the fixture): probe S21 210/211 + smoke 8g (mutation targets
-  UNCHANGED; `kind=seg … d=1 gap=2` → `kind=dedup … d=0`). All other S21 pins
-  unchanged (212 write=zero; 213/215/216/217 pure core; 214 no pair).
-- **GATE planner-verified (re-ran all four myself, not assumed):** probe
-  two-one-six (216) → **two-two-zero (216)** [annotation == machine count];
-  smoke two-three-seven (37/37); pytest 459+1w; ruff F=0. 4 new S21 pins
-  (218 read resolved / 219 edit resolved / 220 collapse-target-absent stays
-  rejected / 21 write zero-lines) + the realistic-nested fixture (parent dir in
-  the corpus + sibling project — the shape the seg channel rejects). Repro torn
-  down.
-- **Worker deviation (accepted — spec-wording, not a bug):** the re-pin strings
-  can't be literal byte-equality — every log field is cap-truncated at
-  `MAX_FIELD_CHARS=160` (`flattenField`) and the dedup evidence carries two abs
-  paths (~219-281 chars) → always truncated. Pins build the expected field via
-  the same `flattenField` the hook applies (still verifying the byte-exact
-  format string). KNOWLEDGE NOTE for future specs: when a new evidence field can
-  exceed the field cap, the probe pin must build the expected via `flattenField`,
-  not literal equality.
-- Live acceptance rides the next host restart (planner one-shot, per the R7
-  pattern): a doubled nested read/edit resolves (`kind=dedup`); a doubled write
-  stays literal (zero lines).
-- **Escape-notation design converged + proposal written** (priority #0): the
-  motivating incident is THIS session's own NAP drift — I wrote the numword
-  `two-two-zero` correctly but the **digits** emitted were the old total
-  (drift of 4, invisible to me; a circular self-check passed). Goal (his):
-  extend the EXISTING numword→number resolution (works for path ARGS) to the
-  write/edit **CONTENT**, gated by a trailing sentinel so code is never touched.
-  Form `[incident:correcting:sentinel]` — incident = drifted as-seen (log-only),
-  correcting = dash-digits/numwords (the side I CAN emit = the value), sentinel
-  = `esc`|`w2n` (open, lean `esc`). Pre-step before R3 fuzzy; scope
-  oldString/newString/content; minimal log (original + resolved, R4 derives
-  drift). Deferred: 4-field adder + functional-injection (date) — recorded in
-  the proposal. Proposal: `.opencode/proposals/2026-09-17_numword-escape-output.md`
-  (awaiting his sentinel ruling). Also NOTE: my NAP totals in this section still
-  carry the drifted digits — to be fixed (separate small commit).
 
-## Direct session (2026-09-17, ses_f53a10d24ffesL2Oc8jPqY1bBc) — R2 live check, #72 ruling, dump-fail evidence, path-repair topic opened
-- **R2 write-scope acceptance: first check NO (host process was PRE-R2 —
-  log continuous since 09-16 18-34, R2 landed 09-17 09:28 → R1 build
-  loaded; mistyped write landed literal, zero write-channel lines; on-disk
-  code proven correct via scratchpad repro), then his RESTART → ACCEPTED
-  post-restart:** write-scope LIVE — benign mistype corrected live
-  (`orig=file-for.txt -> file-four.txt d=1 gap=2 fuzzy-resolved scope=write`)
-  AND the #72 hazard LIVE-MEASURED (`orig=file-5.txt -> file-4.txt d=1 gap=3`
-  hijack — I genuinely intended the new file; the channel took it).
-  **Display finding:** tool results/transcript show the POST-MUTATION path
-  only → inside a session a live mutation is indistinguishable from producer
-  drift; my own "3x drift" narrative was such a misread (log field 5 =
-  authority, again). Sentinels torn down; decision-record §5 R2 + TODO #68
-  updated. Repro script kept: scratchpad `write_fuzzy_repro.mjs`.
-- **#72 RULING: M1 approved** (his 09-17 direct): implicit write-fuzzy
-  restricted to edit/block_transfer, removed from `write`; pair channel
-  unchanged (strict existence, fail-closed); all degraded outcomes = stray
-  file, no data loss. **M1 LANDED + planner-verified 09-17:** spec
-  `17bd3fd` → worker-`9ec4c0b` (one-line dispatch guard
-  `writeOwned && tool !== "write"` + S20 re-pins 196/198/200/201 + edit
-  counter-pins 208/209 + smoke 8f re-pin + edit pin) → `dfdc494` (TODO #72
-  → LANDED + summary). Planner re-ran the FULL gate: probe 208/208, smoke
-  36/36, pytest 459+1w, F=0 — all green. Live effect rides the NEXT host
-  restart (one-shot then: a d=1 mistyped write must land LITERAL — stray
-  file, no hijack; edit stays corrected).
-- **DUMP-FAIL evidence (his #1, 26-09-17_09-11 report):** manual dump of the
-  missing ses_f5467718… = 0.12s / 219KB → recovered as
-  `compaction_dumps/…_c0_manual.md` (corpus gap closed). The 2× ETIMEDOUT
-  lines are a HUNG CHILD INSIDE THE HOST (execFileSync timeout 60s,
-  stdio pipe, spawn `node` PATH fallback) — NOT script slowness. c1-missing
-  for f5409e7a5 confirmed (c0 ok 23:18, second compaction 23:59 failed).
-  Hook logs failures only (no DUMP-OK / duration) → add `DUMP-OK <sid> <ms>`
-  for self-diagnostics. Fold into the compact_memory unit (#70/#55).
-- **Path-repair topic OPENED (his idea, discussion — NOT approved/staged yet):**
-  his segment-permutation logic: a path is a sequence of folder units; the
-  doubled case is `1/2/2/3/4` vs `1/2/3/4` = segment-distance 1 (one extra
-  folder); one folder mismatch = 1; selection by closest match. My scope
-  check: (A) segment-level lev against the EXISTING corpus chassis
-  (buildCorpus + TTL + strict existence gate + fail-closed + probe pattern
-  — all bought by R1/R2) = small, focused unit; adjacency doubling (my R7
-  sketch) is its d=1-insertion special case → subsumed. (B) root
-  re-anchoring ("switch path start to an existing path" = exact tail match,
-  UNIQUE under a known-root allowlist {workspace, scratchpad}, existence
-  gate) = medium, the policy surface. (C) bash-command path repair = the
-  genuinely large/fuzzy piece (free-text parsing) — stage last or not at
-  all. KEY FACT: the execute.before arg mutation is exactly what prevents
-  the permission prompt from ever firing (the call arrives already
-  in-sandbox) → autorun unblocks for repairable cases; genuinely-external
-  calls still prompt (by design — the plugin cannot and must not blanket-
-  silence external access). Measured: doubled OpenCodeProjects = char-d 17,
-  users = 6 (both ≫ read d≤2 / write d≤1 → NOT caught today); doubled
-  WRITE silently plants a stray dir tree (write tool auto-creates parents —
-  live-measured, torn down). **RULING (his, 09-17): R7 + R8 APPROVED as
-  stages** (seg-d≤1 both scopes; allowlist DERIVED from `opencode.jsonc`
-  `permissions.external_directory` — config-driven, migration-stable) **;
-  R9 (bash) = documented-optional, parked pending R4 log data.** Stages
-  recorded in decision-record §5. Build order: M1 unit first, then R7,
-  then R8.
-- **R7 design agreed (09-17):** substitution bar APPROVED (his): pure
-  segment INSERTION resolves free (existence+uniqueness); SUBSTITUTION
-  counts as seg-d=1 only with intra-segment char-lev ≤1 (char-far fails
-  closed — keeps the M1 hazard bar, `file-56`/`file-4` stays rejected);
-  pipeline pair → segment → char-fuzzy; `kind=seg` evidence flag on the
-  existing fuzzy verdicts (vocabulary byte-stable). **NEXT MOVES:**
-  (1) his RESTART — **DONE 09-17**; (2) M1 one-shot acceptance —
-  **ACCEPTED** (d=1 new-file write landed LITERAL, zero fuzzy lines,
-  sibling untouched; `edit` d=1 still corrected `d=1 gap=inf`; fixture
-  torn down; TODO #72 + decision-record §5 updated); (3) R7 spec + S21
-  probe section + launch — **DONE + FOUNDING**: spec 20e7d64 (amendment
-  134b107: 1-segment bypass approved) → worker ee19a84 (mid-task
-  self-compaction RESUMEd via task_id — worked) → gates planner-verified
-  (216/216 + 37/37 + 459+1w + F=0). **FINDING (measured, scratchpad
-  repro `r7_realistic_repro.mjs`): the realistic nested doubling is
-  REJECTED** (parent-dir corpus entry kills the gap rule; S21 fixtures
-  were flat — pin-design gap) → **TODO #73 filed** with the fix design
-  (structural adjacency-collapse pre-check, existence-gated,
-  `kind=dedup` flag + realistic fixture pins). **NEXT UNIT: TODO #73**
-  (R7 correction), then R8.
+## Direct session (2026-09-17, ses_f4f539d7cffeVeRhsFQRdoSRUC) — #73 live acceptance + display-layer finding + rulings batch
+- **#73 LIVE ACCEPTED** (post-restart one-shot, scratchpad `fst_accept`
+  fixture, torn down): doubled nested `read` resolved `kind=dedup scope=read
+  d=0` (log `orig=` doubled → corrected, content returned); doubled `edit`
+  resolved `kind=dedup scope=write d=0` (applied to the real file; the doubled
+  arg arrived on the 3rd attempt). Doubled `write` NOT live-proven via the
+  planner's own emission — 5/5 attempts collapsed the doubled segment at
+  emission (log-verified `orig=` single each time; the single writes landed
+  literal + zero lines — M1 guard held). Hook-level doubled-write coverage
+  stands on pins 21/218–220 (same runner as the live-proven edit path).
+  Emission data point: the collapse bias is STRONGEST on write args (read
+  doubled 1st try, edit 3rd, write 5/5 collapsed).
+- **DISPLAY-LAYER FINDING (his hypothesis, CONFIRMED):** the stored tool-call
+  `state.input` is POST-mutation — the DB part for the resolved read shows the
+  corrected single path while the log `orig=` proves it arrived doubled; the
+  session context only ever shows the corrected path → an agent CANNOT
+  self-verify its own raw emission from within the session; `intercept.log`
+  (field 5 `orig=` + the `doubled=` path-anomaly line) is the sole pre-
+  mutation authority. The same session measured BOTH directions: the read =
+  display artifact (emitted doubled, stored single — my "I dropped the
+  doubling" self-diagnosis was wrong for the read), the 5 write calls = REAL
+  emission collapse (arrived single at the hook). → `knowledge_plugins.md`
+  entry + decision-record §5 R7 note.
+- **Rulings batch handled (his 2026-09-17 direct):** #53 agent-feedback
+  DEFERRAL LIFTED (proposal `2026-09-17_agent-feedback-closedown.md` filed —
+  Part A mandatory close-down prompt step + Part B unified `submit` tool,
+  his #5 sketch; recommendation: both as one unit); #65 CLOSED (maintainer
+  cause — his own date-format test on the autorun folder; he re-unified both
+  folders into the old date style, minute changed to kill the 3→5 bitdrift —
+  NOT a tool bug); #71 CLOSED (repo_commands.md §Run/test → curate-don't-
+  duplicate pointer, planner explicitly allowed); stopline paste values
+  finalized (90 % = ≈14 k + 5 k before the real ceiling; 95 % = emergency
+  handover + compaction) — recorded in
+  `2026-09-15_agents-knowledge-stopline.md` (the PASTE stays his action);
+  `dense_numbers.md` → `done/` content-untouched (all ideas already covered:
+  fuzzy read-path = R1/R2 LIVE, in-file line match = R3 staged, numword→
+  number = R1, the num() shell scriptlet = 5.2 (plan1), count-in-words =
+  AGENTS.md protocol, the quoted interceptor draft = the built observer
+  plugin).
+- **NOTE:** the distillation TODO ID is #56 (his priority "# 3 3") — my
+  opening status report mislabeled it "#3" (confusing his priority number
+  with the TODO ID); the TODO.md header counter was stale (claimed up to
+  #63/start #64 — actually up to #73; now corrected, new entries start #74).
+  A phantom "duplicate #53 heading" was my read drift on a dense numeral —
+  grep verified the file has exactly one #53 and one #55.
+- Baselines unchanged: probe two-two-zero/216, smoke 37/37, pytest 459+1w,
+  ruff F=0.
+- **NEXT UNIT: #55 dump-function live acceptance** (the deferral-lifted #53 is
+  proposal-stage, awaiting his ruling): call `compact_memory` on THIS session
+  → verify `.opencode/archive/sessions/compaction_dumps/ses_f4f539d7cffeVeRhsFQRdoSRUC_c0.md`
+  exists and carries the pre-compaction content (summarizer = Gemma per
+  `opencode.jsonc` `agent.compaction`; the tool is fire-and-forget — the
+  COMPACT line lands in `.opencode/temp/ctx.log` on verified success; a
+  DUMP-FAIL ETIMEDOUT here would be data point 3 for the hung-child issue,
+  his priority #1 evidence). After that: his priority #1 (compact_memory
+  additions — TODO #70 needs the update he asked for) and #0 (numword escape
+  build — approved proposal).
 
 ## Standing
 - Baselines (re-verified 2026-09-17 by the planner post-#73, ses_f510a…): probe

@@ -45,9 +45,10 @@ verified live in a direct session). Unix idioms work natively: `ls -la`,
   expected and harmless — `.opencode/package.json` must NOT gain a "type" field,
   TODO #51). **The "standard gate" = pytest + ruff + this probe.** The probe
   self-annotates its total: the output line `PROBE handover: <t>/<t> PASS` must
-  agree with the header annotation (the section-sum line, currently ~376) — current
-  total one hundred twenty-two (plan7, S1–S16 + hygiene; the annotation is the
-  source, re-count it when the probe grows).
+  agree with the header annotation (the section-sum line) — the annotation is
+  the source; NO duplicated moving number lives here (curate-don't-duplicate,
+  per #58/#64; refreshed 2026-09-17, planner-allowed per maintainer ruling for
+  #71).
 
 ## Handover file paths
 Channel semantics (who writes/reads, canonicality) live in the `AGENTS.md`
