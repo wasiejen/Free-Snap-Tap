@@ -2,6 +2,8 @@
 
 STATUS: DONE — gate green, repro torn down. (Replaces the R7-verification
 summary; this is the #73 correction, inside the R7 staging approval.)
+Commit: dce82ad (the code + probe + smoke + this summary); the commit-hash
+note itself rides a one-line follow-up bookkeeping commit.
 
 ## What changed
 1. **Core** (`intercept_observer_core.ts`, after `matchNearPathSegments`,
