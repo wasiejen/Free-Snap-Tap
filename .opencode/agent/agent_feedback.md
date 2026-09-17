@@ -272,3 +272,15 @@ post-mutation canonical path in the tool output contaminates recall of what
 I passed). Lesson now in the primer ("Attribution rule"): log field 5 is the
 only authority for what an arg actually was. Suggestion: none for the tooling
 — this is a discipline rule, and it is now written down.
+
+### Task-tool launch against a stale roster name — planner-1 2026-09-18
+- **Friction:** first worker launch used `worker_Q4_120K` (the roster from
+  the prior looprun) and failed with "Unknown agent type" — the maintainer
+  had live-edited `opencode.jsonc` (roster now `worker_Q4_140K`); even
+  `repo_map.md` still carried the stale name (his mid-run one-liner
+  a021021). Cost: one failed launch + a re-verify round-trip.
+- **Suggested change:** (a) planner prompt: verify the roster in
+  `opencode.jsonc` (one grep) BEFORE the first launch of a session — the
+  repo_map section already says "verify, never trust memory", but the
+  launch path skipped it; (b) the Task tool's unknown-agent-type error
+  could list the currently valid types.
