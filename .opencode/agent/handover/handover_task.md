@@ -65,7 +65,13 @@ channels (M1 — the segment channel inherits the exclusion).
    evidence `fuzzy kind=seg scope=<read|write> orig=… -> … d=<segd>
    gap=…`; segment-rejected → fall through to the existing char matcher
    (unchanged). The M1 guard stays EXACTLY where it is — `write` produces
-   no lines from either matcher.
+   no lines from either matcher. **Single-segment args (no folder
+   component) BYPASS the segment matcher** (planner ruling at
+   worker-observation, 09-17 — the worker's analysis is approved): the
+   char channel owns 1-segment args exactly as pinned in S18/S20 (its
+   evidence carries no `kind=seg`); the segment channel handles args with
+   ≥2 segments only. (The doubling case is structurally ≥2 segments, so
+   nothing is lost.)
 3. PROBE S21 (new section, 8 checks): (1) read doubled-segment (one
    insertion, e.g. `a/a/b/c.txt` vs corpus `a/b/c.txt`) → MUTATED +
    `kind=seg … d=1`; (2) `edit` doubled-segment → MUTATED + `kind=seg
@@ -77,8 +83,11 @@ channels (M1 — the segment channel inherits the exclusion).
    NO `fuzzy-resolved` line (the char fallback also rejects); (6) read
    seg-d=2 (two insertions) → NOT mutated + rejected; (7) two candidates
    tied at seg-d=1 → NOT mutated + `gap-too-small`; (8) filename typo
-   `file-x.txt` vs corpus `file-4.txt` → MUTATED with `kind=seg` in the
-   evidence (subsumed by the segment channel, not the char fallback).
+   `sub/file-x.txt` vs corpus `sub/file-4.txt` (2-segment arg) → MUTATED
+   with `kind=seg` in the
+   evidence (the segment channel subsumes a char-close name typo inside a
+   folder). 1-segment filename typos stay the char channel's (the
+   bypass rule — S18/S20 pins prove it).
    Probe total 208 → **216**, annotation updated.
 4. SMOKE: 1 new pin — `edit` doubled-segment end-to-end (the edit lands
    where the log says; line carries `kind=seg`). Smoke 36 → **37/37**.
