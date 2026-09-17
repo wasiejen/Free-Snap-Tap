@@ -64,3 +64,11 @@ unified `submit` scope feels too big for one approval, Part A + a
 `feedback`-only tool is the fallback split — but the unified form is what
 his #5 sketch describes, and it retires three future one-param tools in one
 build.
+
+--comment: approved both parts in one unit
+optional addition to part A: instructions for the agent via submit tool (general idea sketch):
+- `log immediate friction`
+- `After each task, include a "Lessons Learned" and "Tool ROI"`
+- `summarizing which tool sequences were most efficient and which failed`
+- `what functionality would have been great to have e.g. in a tool, in instruction, in workflow`
+do not include verbatim, but if, then implement a best effort and efficient way for the agents to give feedback and that we get actionable feedback and e.g. tool function requests.
