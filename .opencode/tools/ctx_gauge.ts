@@ -19,7 +19,8 @@ import { readGauge, formatGauge } from "../plugin/scripts/gauge.mjs"
 
 export default tool({
   description: `Reads the context usage of the current (or a named) session, read-only.
-Returns the \`SESSION=… CTX=… (…%) REM=…\` readout (window unknown → no pct/REM; no total / unreadable db → CTX=notAvailable with the error appended). Fire this for context-budget decisions instead of the peek.mjs shell-out.`,
+Returns the \`SESSION=… CTX=… (…%) REM=…\` readout (window unknown → no pct/REM; no total / unreadable db → CTX=notAvailable with the error appended). Fire this for context-budget decisions instead of the peek.mjs shell-out.
+The readout LAGS true usage by ≈2 tool calls (~5k tokens) — treat it as a LOWER bound and plan with margin (the same lag applies to the injected ctx: nudge lines).`,
   args: {
     sessionID: tool.schema.string().optional().describe("Session id to read (the per-session read). Empty/omitted: the newest-updated session (the default peek read)."),
   },

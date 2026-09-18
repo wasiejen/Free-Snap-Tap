@@ -22,7 +22,7 @@ function sandboxCheck(cwd: string, givenPath: string): string | null {
 }
 
 export default tool({
-  description: `Move, copy, cut, paste, delete, or clear multi-line blocks in files using short unique line-prefix anchors and named clipboard buffers. Housekeeping rule: use this tool to move/copy/delete multi-line blocks (TODO sections, log sections, etc.) instead of write/edit.
+  description: `Move, copy, cut, paste, delete, or clear multi-line blocks in files using short unique line-prefix anchors and named clipboard buffers.
 
 MODES — MOVE: immediate cut-and-paste, extracts a block from srcFile and inserts it into dstFile in one call. COPY: extract a block from srcFile into a buffer, leaving the source untouched. CUT: extract into a buffer AND delete from the source. PASTE: write a buffer into dstFile. DELETE: extract a block and discard it (purge without outputting). CLEAR: empty a buffer. Use MOVE for a single direct transfer; use COPY/CUT + PASTE for multi-buffer work across files (one buffer can be pasted several times).
 
