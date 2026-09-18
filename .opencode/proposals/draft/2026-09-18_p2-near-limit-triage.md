@@ -1,4 +1,8 @@
 # DRAFT P2 (v2) — near-limit triage, replacing the effort-ceiling design
+STATUS 2026-09-18: IMPLEMENTED directly in the role prompts per maintainer direction
+(canonical text in `prompt_agent_planner.md` §Context-budget trigger, word-for-word;
+worker/explorer point at it). This draft is superseded — keep only as the rationale
+record.
 Supersedes the v1 draft (`maintainer/draft/prompt_engineer/_inbox/2026-09-18_p2_effort-
 scaling.md`, ceiling design) per maintainer feedback 2026-09-18: workers perform well;
 the ceiling would unduly constrain them. The observed failure is the inverse — the worker
