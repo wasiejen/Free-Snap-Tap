@@ -56,6 +56,13 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   it) — it is separate from #70 (the compact_memory tool itself); the
   draft is superseded-by-implementation and keeps as the rationale record.
   Loop is paused (11-47 INFO line; iteration 3 launch was noted).
+- **Memory pilot (his, 2026-09-18): planner namespace SEEDED** —
+  `agent/memory/planner/` (README filled: role scope / not-for list /
+  categories / retrieval keywords / write + review policy; memory.md:
+  two high-value seeds — MEM-0101 observer-side acceptance rule, MEM-0102
+  two-phase maintainer-domain close-out; template example superseded,
+  no restatement of prompt/knowledge/NAP content). Pilot verdict pending
+  his review.
 
 ## Closed session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
 - **plan2 closed (2026-09-18): BOTH units LANDED, gate re-verified by the
