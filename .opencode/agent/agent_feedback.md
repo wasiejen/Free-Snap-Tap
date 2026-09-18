@@ -287,3 +287,6 @@ only authority for what an arg actually was. Suggestion: none for the tooling
 ### 2026-09-18_12-19 planner_Q4_140K ses_f4c039ae2ffeRqvdPqGu8IdB37
 LIVE ACCEPTANCE PASSED (2026-09-18, direct ses_f4c039ae2ffeRqvdPqGu8IdB37): `submit` registered in live opencode.jsonc, fired from a live session, role+session autofilled from the tool context (no manual args) — closing the pending item from the plan1/plan2 bookkeeping.
 
+### 2026-09-18_18-41 prompt_builder_Q4_140K ses_f4ba3e2eaffeL562KXvPVmB81u
+Prompt-rework session: launch-time tool deny (.opencode/agent/prompts/**) was lifted by the maintainer only mid-session — a delegated prompt-engineer session should verify its write grants at session start against the live opencode.jsonc, not assume them from the role prompt.
+

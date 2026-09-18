@@ -146,3 +146,15 @@ Refer to R6 in fuzzy_numword as sketch for a cheap dump file for every edit and 
 
 ## prompt example of rmaintence --info instruction in priority 
 - but you may as well do some maintenance and curation on knowledge files. repo prompt files, nap, explore new script we could need, ... :-) if you are bored look in my ideas and make some proposels or research how to do this. fuzzy search on read or when searching in files. or num_to_word autoreplace as intercept plugin on hook.execute.before to combine both and make tools calls more reliable even with bitshifts in numbers. worthwhile thing to research. but dont save research in your nap. make e.g. a agent/research folder if you want.
+
+
+# prompt and tool description engineering (research) DONE
+  https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
+  https://www.anthropic.com/engineering/building-effective-agents
+  https://www.anthropic.com/engineering/multi-agent-research-system
+  https://www.anthropic.com/engineering/writing-tools-for-agents
+  - create a comprehensive guide on how to optimise system prompts for out agents, how to structure our added prompts via read and how to optimise tool descriptions for better usage
+  - this is the knowledge basis for a prompt engineer skillset
+    - hw should get all the knowledge to be able to optimize all the prompts, tool, plugin descriptions - essentially everything that
+  - e.g. from writign-tools-for-agents
+    - "When writing tool descriptions and specs, think of how you would describe your tool to a new hire on your team. Consider the context that you might implicitly bring—specialized query formats, definitions of niche terminology, relationships between underlying resources—and make it explicit. Avoid ambiguity by clearly describing (and enforcing with strict data models) expected inputs and outputs. In particular, input parameters should be unambiguously named: instead of a parameter named user, try a parameter named user_id"

@@ -28,18 +28,19 @@ export default tool({
   args: {},
   async execute(args: any, context: any) {
 
-    return JSON.stringify({
-      sessionID:  context.sessionID,
-      abort:  context.abort,
-      messageID:  context.messageID,
-      callID:  context.callID,
-      extra:  context.extra,
-      agent:  context.agent,
-      //messages:  context.messages, // to much info - one example at the end
-      metadata:  context.metadata,
-      ask:  context.ask,
-      directory:  context.directory,
-      worktree:  context.worktree,
-    }, null, 2)
+    return [JSON.stringify({
+      contextKeys: Object.keys(context ?? {}),
+      sessionID: context.sessionID,
+      abort: context.abort,
+      messageID: context.messageID,
+      callID: context.callID,
+      extra: context.extra,
+      agent: context.agent,
+      messages:  context.messages.slice(0,1), // to much info - one example only
+      metadata: context.metadata,
+      ask: context.ask,
+      directory: context.directory,
+      worktree: context.worktree,
+    }, null, 2)]
   }
 })

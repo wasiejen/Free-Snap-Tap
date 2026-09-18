@@ -21,3 +21,6 @@ close or when the placement becomes obvious. Format per the folder README
 ## 2026-09-18_14-29 agent_Q4_140K ses_f4ba3e2eaffeL562KXvPVmB81u
 Maintainer-verified (2026-09-18, prompt_engineer scan comments): (1) This host runs ONE llama-swap model slot — subagent execution is inherently SERIAL; parallel Task launches (guide S3-P8 style) are not usable here. The delegated slot workflow exists precisely to free window space per task. (2) "Half prefill" on the Q4 models is a CONTEXT-SIZE setting (enlarges the effective window), not a cost mitigation — its price is slower initiation. (3) The only cost metric on this setup is TIME (energy); no token/money cost. Optimization framing must be time-per-iteration, not token cost.
 
+## 2026-09-18_18-41 prompt_builder_Q4_140K ses_f4ba3e2eaffeL562KXvPVmB81u
+2026-09-18 verified (direct session, prompt-engineer rework): the tool DESCRIPTIONS injected at launch are the actual agent-facing surface — the maintainer confirms the compact_memory providerID/modelID params were an un-reworked placeholder since 2026-09-12 (now reworded to override semantics: pair sent verbatim vs auto-resolve, both-or-neither); block_transfer gained its first copy-pasteable example. All five custom-tool descriptions now pass the new-hire test; the residual gaps are in the PROMPTS (fixed same session), not the tool descriptions.
+

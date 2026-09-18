@@ -178,6 +178,7 @@
         },
         "bash": "allow",
         "webfetch": "allow"
+
       }
     },
     "planner_Q4_140K": {
@@ -199,7 +200,7 @@
       "color": "accent"
     },
     "worker_gemma_Q4_128K": {
-      "description": "intelligent, fast, 120k context, medium precision due to 3bit Quant",
+      "description": "moderately intelligent, very very fast, 128k context, should do no coding",
       "mode": "all",
       "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_explorer.md}",
@@ -305,7 +306,7 @@
       "color": "accent"
     },
     "agent_gemma_Q4_128K": {
-      "description": "intelligent, fast, 120k context, medium precision due to 3bit Quant",
+      "description": "moderately intelligent, very very fast, 128k context, should do no coding",
       "mode": "all",
       "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
       "prompt": "",
