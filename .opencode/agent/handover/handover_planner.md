@@ -43,7 +43,15 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   `.opencode/agent/knowledge/opencode-plugins/` (README + `auto-resume-map.md`
   with verification note). Model-sizing entry (gemma shallow/fast, step-level
   instructions; iq4kt deliberate) appended to `knowledge_tools.md`.
-- **Phase 2 (next, awaiting his green light):** three deep-dive specs scoped
+- **Memory-pilot status (his question, 2026-09-18 end):** grep-verified —
+  NO reference to `agent/memory/planner/` in my planner prompt or the repo
+  docs (only `prompt_engineer.md` carries a memory line). I knew the pilot
+  only via the previous session's NAP text (now compressed). Pilot is SEEDED
+  but NOT WIRED — a fresh session would not follow its read/write convention.
+  Adding the reference = his call (pilot verdict still pending his review).
+- **Continue ruling (his, 2026-09-18 end):** compact + continue accepted —
+  after self-compact, next unit = Phase 2 deep-dive A spec.
+- **Phase 2 (next):** three deep-dive specs scoped
   by the map's line ranges — A continuous auto-start (1834-2091 tick, 746-908
   send path, 2576-2585/2691-2708 ESC), B context-overflow + errors (2306-2345
   ctx-wrapup, 231-263/2588-2609/1983-2017 streaming-fail, 318-352/2257-2304
