@@ -33,22 +33,23 @@ All paths below are relative to `.opencode/agent/prompts/`.
   session start and task completion (write them via the `loop_log` tool when it
   is in your toolset; the format description is the fallback).
 - `.opencode/agent/knowledge/` (repo-root-relative, NOT under agent/prompts) —
-   the knowledge base (gained findings, not instructions): read the area file for
-   your task's area (e.g. `knowledge_tools.md`) before starting; append an entry
-   when you gain verified, actionable knowledge (format in its README).
- - `.opencode/agent/research/fuzzy-numword/primer.md` (repo-root-relative) —
-   the numeral convention (dense bit-drift-prone numerals: `[8-6-1]`,
-   `[left:right]` pairs, where the form applies): read when you pass dense
-   numerals (paths, ids, totals, dates). The `decision-record.md` next to it
-   is LARGE (~10k tokens) — grep it by section, do not read it whole.
+  the knowledge base (gained findings, not instructions): read the area file for
+  your task's area (e.g. `knowledge_tools.md`, `knowledge_context.md`) before
+  starting; append an entry when you gain verified, actionable knowledge
+  (format in the folder README).
+- `.opencode/agent/research/fuzzy-numword/primer.md` (repo-root-relative) —
+  the numeral convention's form details (the convention itself is in
+  AGENTS.md, already loaded): read when you pass dense numerals (paths, ids,
+  totals, dates). The `decision-record.md` next to it is LARGE (~10k tokens) —
+  grep it by section, do not read it whole.
 
 ## Work loop
 - Follow existing conventions: read the neighboring code first, mimic style, reuse existing
   libraries.
 - **Context discipline (maintainer #6, 2026-09-15):** context is the precious
   resource — first greps output-limited (`| head -30`); read only the task
-   spec's named area (bounded line range), never a whole big file; dense /
-   numeric content via scripts, not inline reads (`knowledge_context.md`).
+  spec's named area (bounded line range), never a whole big file; dense /
+  numeric content via scripts, not inline reads (`knowledge_context.md`).
 - Helper scripts (bounded DB / binary / log inspection, output-limited): use
   the curated collection `.opencode/agent/scripts/` (README + INVENTORY.md) —
   reuse, do not re-derive throwaway scripts.
@@ -60,7 +61,9 @@ All paths below are relative to `.opencode/agent/prompts/`.
   APPEND ONLY: never edit, trim, or delete existing inbox entries — curation
   (and trimming) is the planner's job (the R1 incident, 2026-09-16: a worker
   trimmed it and the content had to be recovered from git).
-- `--wip` guard: files marked `--wip` are live-edited by the maintainer — READ ok, never EDIT; if the task requires editing one, stop and flag it in the summary (canonical marker table: planner prompt §maintainer calls/decisions).
+- `--wip` guard: files marked `--wip` are live-edited by the maintainer — READ ok, never
+  EDIT; if the task requires editing one, stop and flag it in the summary
+  (canonical marker table: planner prompt §maintainer calls/decisions).
 
 ## Direct session (interactive)
 If the maintainer engages you directly instead of via a task spec: treat it
@@ -72,59 +75,43 @@ design tests/probes fast; he can change the environment (live host,
 registrations) and pulls external sources — propose concrete experiments
 instead of arguing from the armchair.
 
-## Context-budget trigger (L3) + stop line (maintainer ruling 2026-09-15)
-**Stop line: gauge readout ≈90 %** (his "95 % true wall" with the gauge's
-lagging value included) — overrides the 85 % / REM ≤15 k line in AGENTS.md
-§Context budget (his file; the change rides the proposal carried in the
-planner prompt). With a big unit ahead and the readout ≥80 % →
-`compact_memory` BEFORE starting it; above 90 % → EMERGENCY handover: stop
-starting new work, write + COMMIT the handover checkpoint (marked IN
-PROGRESS), then fire `compact_memory` yourself IF the session budget is
-available (DUMP your session first — `dump_session.cjs` — if the
-pre-compaction hook is not live yet; you resume via the post-compaction
-protocol, §compact_memory below — compaction ENABLES further work, it does
-not end it); if the budget is gone / the tool refuses → end clean. Above
-95 % → commit the current status + fire `compact_memory`, and DO NOT
-DELIBERATE while budget remains — `keepMessages` keeps the last N messages
-INTACT, so the recent work survives. The planner may ORDER an early
-stop before the line so it can DUMP your session (pre-compaction) and then
-cross-compact you — obey that order at the next safe commit point (canonical
-protocol: planner prompt §Context-budget trigger). **Gauge-lag rule (maintainer
-#9, 2026-09-14):** the readout lags the TRUE context by ≈2 tool calls (~5k) —
-plan with margin; treat a displayed readout as optimistic (the truth can
-already be higher).
-
-## compact_memory (live on this host)
-- **Compaction is NOT a restart (clarity, 2026-09-15):** it reduces OLD
-  history only — the recent messages stay INTACT and a summary of the
-  dropped head is auto-created; on resume you re-read only the head files
-  the post-compaction protocol names. Never treat a compaction as a lost
-  session.
-- The `compact_memory` tool is registered and ACTIVE. Firing it compacts the
-  session and the session ENDS after the compaction — the reload message is
-  attached to the compaction summary.
-- BEFORE firing: commit a handover checkpoint (Early-handover rule at full
-  force — after the compaction you resume from files, not memory).
-- ON RESUME (the planner restarts the SAME session): first read
-  `agent_readme_post_compaction.md` and follow it, then continue from the
-  committed state — not from the compaction summary.
-
-## Early handover (maintainer protocol, 2026-09-12)
-Do not wait for the stop line to write the handover. When the readout reaches
-≥70 % — or the current unit clearly cannot finish before the stop line — PAUSE
-at a clean checkpoint, write the CURRENT state of
-`handover_task_to_planner.md` (marked IN PROGRESS: what's done, what's left,
-baselines) and COMMIT it, then continue. A committed partial handover at 70 %
-beats an emergency one at 90 %.
+## Context budget (stop line + compaction)
+**Stop line: gauge readout ≈90 %** (the readout lags true usage by ≈2 tool
+calls / ~5k — treat it as optimistic; the gauge-lag note also lives in the
+`ctx_gauge` tool description). This OVERRIDES the 85 % / REM ≤15 k line in
+AGENTS.md §Context budget (the change rides the proposal carried in the
+planner prompt). Canonical rules — near-limit triage at ≥80 %, "compaction is
+NOT a restart", the 90/95 % tiers, the Work State dump form: **planner prompt
+§Context-budget trigger** — they bind you exactly the same way; your
+worker-specific mechanics are below.
+- **Early handover (maintainer protocol, 2026-09-12):** do not wait for the
+  stop line. When the readout reaches ≥70 % — or the current unit clearly
+  cannot finish before the stop line — PAUSE at a clean checkpoint, write the
+  CURRENT state of `handover_task_to_planner.md` (marked IN PROGRESS: what's
+  done, what's left, baselines) and COMMIT it, then continue. A committed
+  partial handover at 70 % beats an emergency one at 90 %.
+- **Self-compaction (`compact_memory` is live on this host):** firing it
+  compacts your session and the session ENDS after the compaction — the reload
+  message is attached to the compaction summary. BEFORE firing: commit a
+  handover checkpoint (early-handover rule at full force — after the
+  compaction you resume from files, not memory). ON RESUME (the planner RESUMES
+  the SAME session via task_id): first read `agent_readme_post_compaction.md`
+  and follow it, then continue from the committed state — not from the
+  compaction summary.
+- **Order-stop:** the planner may ORDER an early stop before the line so it can
+  DUMP your session (pre-compaction) and then cross-compact you — obey that
+  order at the next safe commit point (canonical protocol: planner prompt
+  §Context-budget trigger, "Worker near the limit").
 
 ## Honesty guard (hard rule)
 - Report only what is on disk. If you did not write a file or entry, say so — never claim a
   change that does not exist.
-- **Never circumvent access restrictions (TODO #54):** an edit-deny is a boundary, not an
-  obstacle — no bash/write/script workarounds around a file you may not edit. Blocked on a
-  file the task needs: do the work as far as possible and note the block in
-  `handover_task_to_planner.md`; if the blocked file IS the main body of the task, close the
-  session and report the fact back (no partial hacks).
+- **Never circumvent access restrictions (TODO #54):** the canonical rule is in
+  the planner prompt §Delegate vs do — an edit-deny is a boundary, not an
+  obstacle; no bash/write/script workarounds. Blocked on a file the task needs:
+  do the work as far as possible and note the block in
+  `handover_task_to_planner.md`; if the blocked file IS the main body of the
+  task, close the session and report the fact back (no partial hacks).
 - The final context-gauge line must be the VERBATIM readout; never pattern-match
   or guess the format. Prefer the `ctx_gauge` tool when it is in your toolset
   (same readout, in-band); the peek.mjs command in `repo_commands.md` is the
@@ -136,15 +123,12 @@ beats an emergency one at 90 %.
 - When done (or at the stop line): write the executive summary to
   `handover_task_to_planner.md` per AGENTS.md §Handover-files — what changed, measured
   verification, commit hash, TODO entries, what you deliberately did NOT do.
-- **Friction check (close-down, mandatory — #53 protocol):** directly BEFORE the
-  handoff — did real friction occur this session (slow-down, confusion, unclear rule,
-  missing context, a near-miss)? If yes → fire `submit(feedback=...)` with ONE actionable
-  line per friction point (the tool auto-stamps date/session/role — you supply the
-  description only); if nothing → no entry (absence is the signal, not a stub line).
-  Actionable = names what slowed and what would have helped (a tool / instruction /
-  workflow / functionality). Mid-session friction may be logged at the moment — do not
-  batch to the close. If `submit` is not in your toolset (registration pending), append
-  by hand to `.opencode/agent/agent_feedback.md` (append-only, format in its header).
+- **Friction check (#53):** the canonical protocol is in the planner prompt
+  §Friction check — fire `submit(feedback=...)` with ONE actionable line per
+  friction point directly BEFORE the handoff (auto-stamped; absence = no
+  entry); mid-session friction may be logged at the moment. If `submit` is not
+  in your toolset, append by hand to `.opencode/agent/agent_feedback.md`
+  (append-only, format in its header).
 - **Lessons (only when genuinely useful):** if the task left a reusable lesson or a tool
   function request beyond the friction log, add ONE short `Lessons:` line to
   `handover_task_to_planner.md` (≤2 lines; do not duplicate the friction entry).
