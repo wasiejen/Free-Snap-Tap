@@ -24,10 +24,20 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   `knowledge/knowledge_tools.md` (planning rule: no task-scale work on that
   model). Comparison degrades to a single gemma run — if its map is weak,
   fallback = raw `agent_Q4_140K` on the same prompt-agnostic spec.
-- NEXT: verify Run B (`worker_gemma_Q4_128K`, output
-  `auto-resume-map-runB.md`) → consolidate the map into
-  `.opencode/agent/knowledge/opencode-plugins/` (+ folder README, same
-  commit) → then Phase 2 deep-dive specs scoped by the map's line ranges.
+- **Run B (gemma) verdict — his "bad joke" + my spot-check:** handover
+  self-contradictory ("Measured: 0" vs every entry `confidence: measured`);
+  ALL 21 entries `test: none` — zero test-file mapping despite 28
+  feature-named test files; the "Context saturation" feature is MISSING
+  (his topic B!); the "Recovery model"/"Architecture" entries point at
+  README lines (269-294 / 295-328), not `index.ts` lines. SALVAGEABLE: the
+  structural skeleton (symbol+line seed list). Artifacts kept as comparison
+  data (scratchpad runB map + commit 2b020fd).
+- **Ruling (his): back to IQ4KT** — Run C launched on `worker_Q4_140K`
+  (same spec, prompt-agnostic; spec header updated + runB-do-not-read line
+  added). After Run C: cross-check against the gemma skeleton, consolidate
+  the verified map into `.opencode/agent/knowledge/opencode-plugins/`
+  (+ folder README, same commit) → then Phase 2 deep-dive specs scoped by
+  the map's line ranges.
 
 ## Closed session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
 - **plan2 closed (2026-09-18): BOTH units LANDED, gate re-verified by the

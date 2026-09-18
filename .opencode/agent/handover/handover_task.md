@@ -1,8 +1,11 @@
 # Task spec — opencode-auto-resume Phase 1: feature-index map (A/B comparison run)
 
-Workers: Run A = `worker_explorer_Q3_120K_mtp` · Run B (separate later launch, SAME spec)
-= `worker_gemma_Q4_128K`. Your run's output filename is given in the launch
-message — write the map to EXACTLY that path.
+Workers: Run A = `worker_explorer_Q3_120K_mtp` (died: model corruption, no
+output) · Run B = `worker_gemma_Q4_128K` (completed; planner verdict:
+skeleton usable, test-mapping missing — see the NAP) · Run C (CURRENT) =
+`worker_Q4_140K`. Your run's output filename is given in the launch message —
+write the map to EXACTLY that path. Do NOT read the prior runB map — work
+independently from the spec (planner cross-checks runs after the fact).
 
 ## Context (one line)
 The maintainer copied an open-source opencode plugin (auto-resume of stalled
