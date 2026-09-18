@@ -290,3 +290,6 @@ LIVE ACCEPTANCE PASSED (2026-09-18, direct ses_f4c039ae2ffeRqvdPqGu8IdB37): `sub
 ### 2026-09-18_18-41 prompt_builder_Q4_140K ses_f4ba3e2eaffeL562KXvPVmB81u
 Prompt-rework session: launch-time tool deny (.opencode/agent/prompts/**) was lifted by the maintainer only mid-session — a delegated prompt-engineer session should verify its write grants at session start against the live opencode.jsonc, not assume them from the role prompt.
 
+### 2026-09-18_20-15 planner_Q4_140K ses_f4c039ae2ffeRqvdPqGu8IdB37
+IQ3KT-MTP variant output corruption in a live planner session (2026-09-18): the corrupted turn burned ~10K context before the model swap; recovery via git-status + NAP worked, zero file impact. Worth weighing when choosing models for long sessions.
+

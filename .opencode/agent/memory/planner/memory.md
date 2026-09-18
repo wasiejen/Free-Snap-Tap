@@ -88,3 +88,46 @@ knowledge / NAP) is re-stated.
 - Related: MEM-0101
 - Review when: the maintainer automates registration (no per-tool phase),
   or the pending-list format changes in the planner prompt.
+
+### MEM-0103: Maintainer files live in the tree and grow as thoughts mature — single-tree status quo (ruling 2026-09-18)
+
+- Type: `decided`
+- Status: `active`
+- Confidence: `high`
+- Scope: how the planner treats the maintainer's live files (live config,
+  AGENTS.md, prompts, drafts, priority) and when file content counts as a
+  work item
+- Keywords: live-file, wip, handoff, commit-point, status-quo,
+  file-lifecycle, priority-move
+- Memory: the maintainer live-edits his files across days as thoughts
+  mature — mostly growth, never "done", they stay open on his screen
+  uncommitted ("all my files are --wip and will never be complete").
+  STATUS QUO (his ruling 2026-09-18: "i am fine as it is") — the 2-repo /
+  draft-separation variants were considered and rejected; his stated
+  reasons: sync friction, and live markers / inbox / draft channels only
+  work in a SHARED tree (he sees my uncommitted progress live too).
+  Channel semantics: marker / inbox / handoff content WORKS uncommitted
+  (that is how markers reach me); he commits his live files before bigger
+  tests or when he wants the option for me to move handled priority items
+  (the move = commit-point action). He does NOT use `--wip` broadly (his
+  files are all perpetually mid-state); if he places it, strictest
+  handling applies: no edit, no stage, and NO READ until cleared — the
+  "not-listed-as-unread in a close" variant means exactly that: a
+  mid-state file's content is mid-thought, reading copies an already-stale
+  version into my context, and the close message lists which wip files
+  stayed unread. My side: named-path commits only, never `git add -A`
+  (one incident: dc3f137 disclosure, NAP Standing).
+- Why it matters: prevents re-litigating the 2-repo variant in a future
+  session and makes handling of his files unambiguous: read freely unless
+  `--wip`, never stage, uncommitted content is not a task unless a
+  marker / inbox / handoff designates it.
+- Evidence: maintainer message, direct session
+  ses_f4c039ae2ffeRqvdPqGu8IdB37 (2026-09-18: "i am fine as it is" + the
+  lifecycle explanation incl. the ideas-file habit); dc3f137 disclosure;
+  this session's flag-only handling of his uncommitted p2 STATUS line and
+  memory files (f3da151 handed over by him, 1740bb3 his live edits).
+- Verified: 2026-09-18
+- Related: MEM-0102 (phase-2 verification shares the file-verification
+  discipline)
+- Review when: the maintainer starts using `--wip` routinely, or a
+  separate-draft-repo variant actually lands.

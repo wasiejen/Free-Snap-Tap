@@ -43,13 +43,10 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   example, `13b0583`); maintainer main-files update (`784346a`);
   prompt_engineer memory namespace seeded + pointer (`68aa290`,
   `c20b8cf`, `e00d52b`). NO live maintainer markers found on the sweep.
-- **Left UNCOMMITTED (his/that agent's — NOT staged, flagged only):**
-  `?? agent/memory/planner/` (planner-memory namespace seed — still a
-  TEMPLATE EXAMPLE entry MEM-0001, not planner-specific content) and the
-  `+STATUS` line in `proposals/draft/2026-09-18_p2-near-limit-triage.md`
-  (marks the draft IMPLEMENTED in the role prompts per maintainer
-  direction; it rides a `maintainer:` ruling + now matches the prompt I
-  boot with).
+- **Earlier flagged-UNCOMMITTED items — RESOLVED:** the memory/planner
+  seed + the p2 draft `+STATUS` line were handed over by the maintainer
+  and committed by him (`f3da151`); flag-only handling per the
+  maintainer-live-file discipline held.
 - **Queue (his priority.md order):** #70 compact_memory rework →
   repo-split research → #56 distillation (DEFERRED). Note: the near-limit
   triage (P2) is now LIVE in the role prompts (this session boots with
@@ -60,9 +57,25 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   `agent/memory/planner/` (README filled: role scope / not-for list /
   categories / retrieval keywords / write + review policy; memory.md:
   two high-value seeds — MEM-0101 observer-side acceptance rule, MEM-0102
-  two-phase maintainer-domain close-out; template example superseded,
-  no restatement of prompt/knowledge/NAP content). Pilot verdict pending
-  his review.
+  two-phase maintainer-domain close-out; template-example references
+   removed per his live edit — examples are scaffolding, not entries,
+   `1740bb3`). Pilot verdict pending his review.
+- **Maintainer-file discipline (his, 2026-09-18):** he does NOT use
+  `--wip` broadly — all his files are perpetually mid-state (thoughts
+  mature in the file over days; ideas-file habit); commits happen before
+  bigger tests or when he wants the option to move handled priority
+  items to `_past_priorities`. Markers/inbox content WORKS uncommitted
+  (that is the shared-tree liveness both sides rely on). He is fine as
+  is — the 2-repo / draft-separation variant was considered and REJECTED
+  (his reasons: sync friction + live channels only work in a shared tree).
+  My side: named-path commits only, never `git add -A`. → seeded as
+  `agent/memory/planner` MEM-0103.
+- **Model swap (his, 2026-09-18):** the IQ3KT-MTP variant
+  crashed/corrupted mid-session (output-channel corruption only —
+  measured: zero filesystem impact, `git status` clean at the
+  pre-corruption HEAD); the session was restarted on
+  Qwen3.8-27B-IQ4KT-140K and reoriented from committed state. → noted in
+  `knowledge/knowledge_tools.md` (corruption/recovery entry).
 
 ## Closed session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
 - **plan2 closed (2026-09-18): BOTH units LANDED, gate re-verified by the

@@ -210,3 +210,24 @@ instructions/protocol — facts that save lookups. Format per the README:
   `preCompactionDump`); `handover_probe.mjs` S14; `dump_session.cjs` `--out`.
 - **Keys:** compact_memory, pre-compaction dump, compaction_dumps, no
   overwrite, --out, DUMP-FAIL, S14, naming.
+
+## The IQ3KT-MTP model variant crashed/corrupted — recovery from committed state
+- **Do:** when a session (or a worker launched on the 3bit-MTP variant)
+  shows output corruption (garbled streams, false-repeats, broken prose),
+  FIRST verify the filesystem (`git status` + `git log`) before assuming
+  file impact — the measured 2026-09-18 incident was confined to the
+  OUTPUT channel: zero partial writes, zero repo content damage. Then
+  rebuild reality from committed state (git log + NAP + TODO) — the
+  mid-turn work was lost only from the session context, never from the
+  tree. Model switching between variants is the maintainer's operation
+  (live opencode.jsonc); do not try to "fix" it from a session.
+- **Why (evidence):** 2026-09-18, direct session
+  ses_f4c039ae2ffeRqvdPqGu8IdB37 — the IQ3KT-MTP variant crashed/corrupted
+  (maintainer report + the corrupted turn visible in-session); the
+  maintainer restarted the session on a different model; the recovery
+  check found `git status` clean at the pre-corruption HEAD — no files
+  were touched by the corrupted turn.
+- **Ref:** direct session ses_f4c039ae2ffeRqvdPqGu8IdB37; maintainer
+  report; recovery git check 2026-09-18.
+- **Keys:** mtp, iq3kt, corruption, crash, model-swap, recovery,
+  git-status, output-channel, worker-verification.
