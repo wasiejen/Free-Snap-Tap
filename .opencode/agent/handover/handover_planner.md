@@ -25,16 +25,37 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - Bookkeeping: leftovers commit `8855be6` (loop_log INFO lines, approved/
   escape-proposal deletion, agent-feedback-closedown verdict section,
   worker-2 compaction dump).
-- **AGENTS.md paste (his, still pending — the ONLY remaining maintainer
-  domain item from plan1/plan2):** (a) the submit one-liner for
+- **AGENTS.md paste (his):** (a) the submit one-liner for
   §agent_feedback (draft in loop folder plan1_summary.md §Pending.3);
   (b) the content-escape (sentinel-gated) sentence of the
   decision-record §4 paste-draft — the Redundancy-form block itself IS
-  already live in AGENTS.md, but WITHOUT that escape tail sentence.
-- **Queue (his priority.md order, unchanged):** #70 compact_memory rework
-  → repo-split research → #56 distillation (DEFERRED). Loop is paused
-  (11-47 INFO line; the looprunner notes iteration 3 launch after this
-  acceptance).
+  already live in AGENTS.md, but WITHOUT that escape tail sentence. →
+  **BOTH LANDED the same day (verified on disk, see below).**
+- **AGENTS.md paste LANDED (his, 2026-09-18):** both pieces verified on
+  disk — submit one-liner (line 208, §agent_feedback) + the
+  sentinel-gated content-escape block (Pattern 5 area). The last
+  maintainer-domain item from plan1/plan2 is CLOSED — zero items of the
+  old pending set remain.
+- **Prompt rework check (another agent, 2026-09-18):** 8 commits
+  `671a582..e00d52b` — loop readme 8-char tokens; memory-files template
+  (`4a1192a`); stale 85 % override notes removed from role prompts
+  (`79beebd`); tool descriptions reworked (compact_memory + block_transfer
+  example, `13b0583`); maintainer main-files update (`784346a`);
+  prompt_engineer memory namespace seeded + pointer (`68aa290`,
+  `c20b8cf`, `e00d52b`). NO live maintainer markers found on the sweep.
+- **Left UNCOMMITTED (his/that agent's — NOT staged, flagged only):**
+  `?? agent/memory/planner/` (planner-memory namespace seed — still a
+  TEMPLATE EXAMPLE entry MEM-0001, not planner-specific content) and the
+  `+STATUS` line in `proposals/draft/2026-09-18_p2-near-limit-triage.md`
+  (marks the draft IMPLEMENTED in the role prompts per maintainer
+  direction; it rides a `maintainer:` ruling + now matches the prompt I
+  boot with).
+- **Queue (his priority.md order):** #70 compact_memory rework →
+  repo-split research → #56 distillation (DEFERRED). Note: the near-limit
+  triage (P2) is now LIVE in the role prompts (this session boots with
+  it) — it is separate from #70 (the compact_memory tool itself); the
+  draft is superseded-by-implementation and keeps as the rationale record.
+  Loop is paused (11-47 INFO line; iteration 3 launch was noted).
 
 ## Closed session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
 - **plan2 closed (2026-09-18): BOTH units LANDED, gate re-verified by the
