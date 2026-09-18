@@ -66,7 +66,12 @@ unified `submit` tool per his #5 sketch; recommendation: both as one unit)
 green by planner: probe annotation-agree, all 9 smokes, pytest 459+1w,
 ruff F=0). REMAINING (maintainer domain): registration in live
 `opencode.jsonc` + per-agent tool grant at restart; live acceptance after
-restart.
+restart. **Status 2026-09-18 (plan2/iter2):** maintainer inbox instruction
+(session/role autofill) LANDED (86a977f — `submit` derives role from
+context.agent / session from context.sessionID; role+session REMOVED from the
+args schema; smoke 20/20 + probe S23 re-pinned to 3 args + context stamps;
+gate green: probe 239/239 annotation-agree, all 9 smokes, pytest 459+1w,
+ruff F=0).
 
 ## 56. (DEFERRED 2026-09-15, maintainer `--defer` in priority.md) — Distillation worker runs over the session dumps (his # 3 3 mandate)
 
