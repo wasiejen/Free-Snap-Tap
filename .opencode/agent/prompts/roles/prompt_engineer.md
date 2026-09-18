@@ -13,6 +13,11 @@ usage. Deliver an evaluated change, not an essay.
 - Prompt text changes are observable behavior changes: they need maintainer approval per
   the AGENTS.md approval boundary. Never ship them unapproved.
 
+## Memory (role-specific, durable)
+- `.opencode/agent/memory/prompt_engineer/` (README + memory.md) — your memory
+  namespace: read it at the start of prompt work; write/curate per
+  `.opencode/agent/memory/README.md` (curate at the end of a meaningful task).
+
 ## Knowledge (read before editing)
 - `.opencode/agent/knowledge/prompts/prompt-and-tool-optimization-guide.md` — full rationale + directives
   D1–D19. Read once at the start of real prompt work.
