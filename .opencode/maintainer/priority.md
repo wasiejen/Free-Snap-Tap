@@ -77,8 +77,14 @@
     - this was the second compaction, but there was no ses..._c1.md created in compaction_dumps only ..._c0.md exists
 
   - rework of compact_memory parameter count of remove providerID and modelID from parameter list avaialble -> get them from opencode.json - see # # compact_memory tool dump function
-    
-# 2 repo split research/proposal
+
+# fuzzy_numword  
+- R8 (to minimze loop disruptions)
+  - e.g. redirect calls like "C:\Users\Asiejen\AppData\Local\Temp\opencode\brtest.mjs" into the sandbox
+    - data for allowed paths is in opencode.json permission.external_directory
+- R3 if not already implemented?
+
+# repo split research/proposal (each research should be at least a single run)
 - how best to seperate fst and the opencode_test branch into 2 independently trackable git repos
   - goal is to seperate repo files from opencode and agent files
     - in the repo lives only the files that concern the repo - nothing of agents or opencode  (clean for)
@@ -89,11 +95,21 @@
       - path variable would be an option to make this in general more independent?
     - I would create a copy of the FST repo in github and clone it into this new folder and move the old FST into C:\Users\Wasiejen\Projects\Repos\Free-Snap-Tap (might defer move to not to have to update all the references at once?)
 
-# research on event hook messages.updated
+# research on event hook messages.updated (each research should be at least a single run)
 
-# addition to system prompt of planner, 
+# research, analyse the copied repo (a lot of files, so do not try to run it in one session)
+- "C:\Users\Wasiejen\AppData\Local\Temp\opencode\opencode-auto-resume-master"
+- goal: general map the usage and map out what problems and how this plugin solves them
+  - identify used solutions for autostarting an agent continuesly
+  - how to react to a contextoverflow or errors
+  - generally useful implementations
+  - enrich our knowledge base with these informations found 
+    - like recepies: this problem is solved here in this way
+      - as basis to built our own plugins with working examples
+
+<!--# addition to system prompt of planner, 
 - You do not have to wait on a worker (e.g. use the sleep or wait tool/function). sleep or wait only waste time, this is serial working flow - only one can be active at each time (compaction active = planner inactiv). you are not active while it compacts. your session is inactive and you can only continue after the compact is through
-- cross-compact only needs session_id (after compact tool rework above) - repeated calling with own id observed
+- cross-compact only needs session_id (after compact tool rework above) - repeated calling with own id observed-->
 
 
 --defer # 3 3 destillation worker runs for now - to much work right now. 

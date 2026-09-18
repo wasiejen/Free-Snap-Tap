@@ -5,6 +5,12 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
+
+
+26-09-18_11-14:
+  - cross compaction seems to invalidate the cache of the session which fires the compaction. why?
+
+  
   - !!! replace looprunner with a plugin that automatically resumes or restarts the planner agent
     - thus i could have infinite direct session and a directer access to the planner. direct questions possible. way more effective and less butterfly effects of unintented or badly worked instructions or instruction relay
       - research agent run with proposal? i think i must give a bit more details
@@ -110,13 +116,13 @@ Refer to R6 in fuzzy_numword as sketch for a cheap dump file for every edit and 
     - markers not only for line but for specific text (best combined with a line reference for closet search) + fuzzy matching in this area
     - applied from highest line number to lowest to not shift lines
 
-# 1 tool description list/prompt that explains the available costum tools to each agent
+## tool description list/prompt that explains the available costum tools to each agent
 - session_info
 - ctx_gauge
 - block_tranfer //when working
 - compact_memory
 
-# 2 tool erase message from seesion
+## tool erase message from seesion
 - a tool to make it possible to remove the tail to a specific message and replace it by e.g. a summary
   - or directly remove a message or a list of messages identified by heir messageID from the session
   - usage: on ingesion of large files -e.g webfetch or log/dump reads summarise the useful parts and then remove it from context
@@ -125,7 +131,7 @@ Refer to R6 in fuzzy_numword as sketch for a cheap dump file for every edit and 
   - ARE these actually the context???
   - and when removed the context is recompiled???
 
-# 3 codify knowledge gain and how to save it
+## codify knowledge gain and how to save it
   e.g. keywords to be easily searchable because the knowledge files could get very big
     specific instruction for retrieval
     - storage would be done in a knowledge inbox with recommendation for keywords
@@ -134,7 +140,7 @@ Refer to R6 in fuzzy_numword as sketch for a cheap dump file for every edit and 
       - feedback_tool that just appends to the inbox???
 
 
-# 6 lets remove the verbatim output printout of looprunner. formatting is butchered by the transfer and the token are filling up
+## lets remove the verbatim output printout of looprunner. formatting is butchered by the transfer and the token are filling up
 
-# 7 
+## prompt example of rmaintence --info instruction in priority 
 - but you may as well do some maintenance and curation on knowledge files. repo prompt files, nap, explore new script we could need, ... :-) if you are bored look in my ideas and make some proposels or research how to do this. fuzzy search on read or when searching in files. or num_to_word autoreplace as intercept plugin on hook.execute.before to combine both and make tools calls more reliable even with bitshifts in numbers. worthwhile thing to research. but dont save research in your nap. make e.g. a agent/research folder if you want.
