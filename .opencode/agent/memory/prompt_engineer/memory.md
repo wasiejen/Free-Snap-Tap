@@ -1,9 +1,7 @@
 # Prompt_Engineer memory
 
 Seeded 2026-09-18 from the first rework session (direct session with the
-maintainer: serial-workflow scan + prompt-surface rework). The researcher
-example entry that shipped in the template is superseded by this seed (it was
-scaffolding for another role's namespace).
+maintainer: serial-workflow scan + prompt-surface rework). 
 
 ### MEM-0101: Subagent launches are serial — one llama-swap model slot
 

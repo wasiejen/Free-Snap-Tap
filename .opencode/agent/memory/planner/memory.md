@@ -1,9 +1,7 @@
 # Planner memory
 
 Seeded 2026-09-18 from the memory-pilot seed instruction (direct session
-ses_f4c039ae2ffeRqvdPqGu8IdB37) — the template example entry that shipped in
-this file (researcher MEM-0101) is superseded (scaffolding for another
-role's namespace). Seeds only: high-value lessons already VERIFIED from
+ses_f4c039ae2ffeRqvdPqGu8IdB37). Seeds only: high-value lessons already VERIFIED from
 actual planner work; nothing that is authoritative elsewhere (prompt /
 knowledge / NAP) is re-stated.
 
