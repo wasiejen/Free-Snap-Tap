@@ -17,8 +17,12 @@ not here.
   carried verbatim, no interpretation.
 
 ## Action line
-- The vocabulary (`restart` / `resume` / `ask_maintainer` / `stop`) lives in
-  AGENTS.md §Interaction-contract — reference it, don't restate it.
+- The states (INLINED here — the looprunner does NOT load AGENTS.md; the
+  planner references AGENTS.md §Interaction-contract, same vocabulary):
+  - `restart` — fresh planner launch (the default; missing/unclear → restart)
+  - `resume` — resume the same sub-agent session via `task_id`
+  - `ask_maintainer: <q>` — pause the loop until the maintainer answers
+  - `stop` — goal reached / unrecoverable
 - The planner ends each autonomous session with a closing summary
   (`plan<N>_summary.md`) and exactly one `action:` line; the looprunner reads
   the LAST one.
