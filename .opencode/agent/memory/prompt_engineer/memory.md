@@ -15,7 +15,9 @@ scaffolding for another role's namespace).
 - Memory: This host runs ONE llama-swap model slot — subagent Task launches run
   one at a time; the built-in Task description's "launch multiple agents
   concurrently" guidance does NOT apply here. The delegated-slot workflow exists
-  precisely to free window space per task.
+  precisely to free window space per task. The built-in Task description is NOT
+  editable (maintainer 2026-09-18: "i can do nothing about it") — the mitigation
+  is the serial-slot line in the planner prompt, not a description patch.
 - Why it matters: kills a class of otherwise-attractive proposals (parallel
   delegation rules) at the idea stage; effort framing must be wall-clock.
 - Evidence: maintainer comment 1, direct session 2026-09-18 (serial-workflow
@@ -133,3 +135,80 @@ scaffolding for another role's namespace).
 - Related: MEM-0102
 - Review when: the 10/6 starting values are calibrated from a measured looprun
   (P6 loop_stats)
+
+### MEM-0107: Canonical-home map — where each shared protocol fact lives (post-rework)
+
+- Type: `derived`
+- Status: `active`
+- Confidence: `high`
+- Scope: deciding where a new shared rule goes, or fixing a drift/restatement finding
+- Keywords: canonical-home, dedup, single-source, triage, friction, no-circumvent, marker-table, action-states, gauge-lag
+- Memory: the 2026-09-18 rework fixed the single-source layout: near-limit triage +
+  compaction tiers + Work State dump → planner prompt §Context-budget trigger;
+  friction #53 → planner prompt §Friction check; no-circumvent #54 → planner prompt
+  §Delegate vs do; marker table + priority ladder → planner prompt §maintainer
+  calls/decisions; action-line states → agent_readme_loop.md §Action line (inlined
+  there because the looprunner loads no AGENTS.md); gauge-lag note → the ctx_gauge
+  tool description. The worker/explorer/looprunner prompts carry POINTERS, not
+  restatements. A new shared rule goes into ONE of these homes; the roles get a
+  pointer line.
+- Why it matters: the restatement/drift vector is the main token cost of this prompt
+  set; the map prevents a future session from putting a new shared rule in a role
+  prompt (where it gets copied again).
+- Evidence: rework commits of 2026-09-18 (git log; the D2 check "grep the concept:
+  one definition, N references" passes on the named sections)
+- Verified: 2026-09-18
+- Related: MEM-0103, MEM-0104, MEM-0106
+- Review when: a canonical home moves (rename/merge of a section) or a new shared
+  rule has no home
+
+### MEM-0108: Description layering + opencode.jsonc working agreement
+
+- Type: `decided`
+- Status: `active`
+- Confidence: `high`
+- Scope: editing tool/plugin descriptions or subagent registrations
+- Keywords: description, layering, opencode.jsonc, housekeeping-rule, trigger, live-file, flag-dont-edit
+- Memory: a tool/plugin description is CONTRACT text — what/how/params/returns/edge
+  cases only. Workflow-preference or trigger sentences ("use X instead of Y for …")
+  do NOT belong there; they live in repo_custom_tools.md (deferred) or the role
+  prompt (precedent: the block_transfer housekeeping directive was removed from the
+  description, 2026-09-18). opencode.jsonc is the maintainer's LIVE file: flag stale
+  subagent descriptions/model facts, do not edit them (he fixes them himself — e.g.
+  the worker_gemma_Q4_128K description); verify the roster there at launch, never
+  trust memory.
+- Why it matters: description reworks keep being tempted to re-add directives, and
+  editing his live config is the one surface where my change would collide with his.
+- Evidence: direct session 2026-09-18 (maintainer: rework descriptions OK;
+  "the stale discription I have fixed in the opencode.json")
+- Verified: 2026-09-18
+- Related: MEM-0101
+- Review when: the maintainer changes description policy or takes over reworks
+
+### MEM-0109: Verification state for prompt changes (no harness yet)
+
+- Type: `learned`
+- Status: `active`
+- Confidence: `high`
+- Scope: closing out any prompt/description change with a verification claim
+- Keywords: verification, wc, d2-grep, probe, gate, harness, restart, unresloved, p3, p6
+- Memory: as of 2026-09-18 there is NO eval harness for prompt changes — the
+  verification ladder is: (1) static: wc -w before/after per surface + the D2 grep
+  check (one definition, N references); (2) structural: every pointer resolvable by
+  the ROLE that reads it (check the role's loading/grants in opencode.jsonc first —
+  the looprunner lesson, MEM-0103); (3) gate: `node .opencode/plugin/probes/
+  handover_probe.mjs` must stay green (235/235 PASS measured after the 2026-09-18
+  rework). Runtime before/after deltas are UNRESOLVED until the P6 loop_stats draft
+  lands (`.opencode/proposals/draft/2026-09-18_p6-looprun-measurement.md`; the P3
+  snapshot-tool draft sits beside it, P2 superseded-by-implementation). Prompt/config
+  changes activate only at the maintainer's NEXT HOST RESTART — say so on every
+  landing.
+- Why it matters: without this, every prompt change ships an unverified "should be
+  better" claim, and the next session re-derives the same ladder or forgets the
+  restart.
+- Evidence: rework session 2026-09-18 (gate run after commit 79beebd; the three
+  drafts in .opencode/proposals/draft/)
+- Verified: 2026-09-18
+- Related: MEM-0102
+- Review when: the P6 harness lands, or the probe total changes (update the 235
+  figure from the probe's own output — never from memory)
