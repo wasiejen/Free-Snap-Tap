@@ -2,34 +2,56 @@
 
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
-## Current session — looprun autorun-2026-09-17_23-58, iteration 1 (ses_f4e9ea998ffeQ3Pa0atv10oysQ, planner-1, Qwen3.8-27B-IQ4KT-140K)
-- **plan1 CLOSED (2026-09-18): #53 unit LANDED in full.** Part A (5e29cb0,
-  planner-direct): mandatory friction close-down step in all 4 role prompts
-  (planner new §Friction check; worker §Checkpoint & handoff incl. Lessons
-  line + hand-append fallback; explorer §Handoff + §Safety allow-list gain;
-  looprunner §Loop log analogue). Part B (worker-14 ses_f4e83d605ffeOKFdW4VvtvafcR,
-  worker_Q4_140K): `submit` tool (b83b34f — `.opencode/tools/submit.ts` +
-  submit.smoke.mjs 20/20 + probe S23 pin) + bookkeeping (a8636ef). Gate
-  RE-VERIFIED GREEN BY PLANNER (probe annotation-agree, all 9 smokes,
-  pytest 459+1w, ruff F=0). Proposal moved to
-  `proposals/implemented/` with verdict note. TODO #53 curated (ruling +
-  LANDED status). Self-compact once this session (c0 dump committed? no —
-  dump file untracked, rides this close commit).
-- **Pending (maintainer domain, after restart):** `submit` registration in
-  live `opencode.jsonc` + per-agent tool grant; LIVE ACCEPTANCE of the
-  tool; AGENTS.md §agent_feedback one-line paste (draft in the loop folder
-  `plan1_summary.md`). Note: worker roster changed live during the run
-  (worker_Q4_120K → worker_Q4_140K; repo_map one-liner a021021,
-  maintainer's own commit).
-- **Queue next (his priority.md order):** #0 numword-escape build
-  (approved `proposals/approved/2026-09-17_numword-escape-output.md` —
-  his ruling: sentinel `esc`, catch case variants, must not break the
-  path channel) — TOP item; then #1 (compact_memory rework / TODO #70),
-  #2 (repo-split research). #56 distillation still DEFERRED.
-- **Next planner session note:** compress the 2026-09-17 direct-session
-  section into the Compressed archive at the close of the NEXT session
-  (its detail is preserved in TODO #53/#65/#71/#73 + knowledge_plugins.md
-  + decision-record §5 + git 0105b9f/dfda0dd).
+## Current session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K)
+- **plan2 EMERGENCY CHECKPOINT (2026-09-18, stop line, self-compact dispatched):**
+- Unit 1 LANDED + planner-verified: submit session/role autofill (maintainer
+  inbox instruction `submit_tool.md` → done/; the `submit` tool derives
+  role + session from the tool context `context.agent`/`context.sessionID`,
+  args removed from the schema). Code 86a977f + bookkeeping ac8f1c8. Gate
+  RE-RUN BY PLANNER green (probe two-two-nine annotation-agree, all 9
+  smokes incl. submit 20/20, pytest 459+1w, ruff F=0). NOTE: the worker's
+  report said "probe two-three-nine" = dense-numeral drift; the machine's
+  two-two-nine is correct (annotation line 611 agrees with the run).
+- Unit 2 (#0 numword escape, spec 9924e71) IN FLIGHT: worker-2
+  ses_f4e084942ffeSedvBfOKl2ehQY STOPPED by the host at a sandbox violation
+  (accessed `C:\Users\Asiejen\AppData\Local\Temp\opencode\brtest.mjs` —
+  username bit-shift W→A; correct scratchpad has the W). Committed
+  checkpoint 4e2fd0c: core `resolveEscapes`/`resolveEscapeSafe` + observer
+  `runEscapeContent` pre-step (write/edit/block_transfer content fields,
+  `pair-resolved kind=escape scope=content`, nine verdicts unchanged) +
+  smoke 39/39 + probe regression two-two-nine.
+- Resume cycle IN FLIGHT: the resume attempt hit context_length_exceeded
+  (the worker session is FULL — 63 msgs/302 parts). Full dump SECURED
+  (`.opencode/archive/sessions/ses_f4e084942ffeSedvBfOKl2ehQY.md`);
+  cross-compaction DISPATCHED (Gemma4-12B-Q4KXL-MTP-128K per
+  opencode.jsonc agent.compaction; explicit providerID/modelID required —
+  the #70 session-id-only rework is NOT live yet).
+- **ON RETURN (resumed session):** (1) verify the worker's COMPACT line in
+  `.opencode/temp/ctx.log`; (2) resume worker-2 via task_id with the spec
+  + state: S24 probe section is ~176 lines UNCOMMITTED in the working tree
+  of handover_probe.mjs (verify/complete the six pins; annotation total
+  machine-verified), primer "Where it applies" block, decision-record §4
+  paste-draft line, finish the handover (IN PROGRESS), commit ONLY task
+  files BY NAME (the working tree also carries the maintainer's live
+  changes — never stage those); (3) verify the gate; (4) close: proposal
+  `2026-09-17_numword-escape-output.md` → implemented/ (verdict note),
+  TODO #53 status note stays, plan2_summary.md, action line. FALLBACK if
+  the worker resume fails again: a FRESH worker (new session) continues
+  from 4e2fd0c + the working tree + the spec (the checkpoint is complete
+  enough — no session state needed).
+- **Queue behind #0 (his priority.md order):** #1 (compact_memory rework /
+  TODO #70 — incl. the measured gap: cross-compact still requires explicit
+  providerID/modelID; the param rework + session-id-only path), #2
+  (repo-split research). #56 distillation DEFERRED. PENDING (maintainer
+  domain): `submit` registration in the live opencode.jsonc + live
+  acceptance + the AGENTS.md paste.
+- **NAP debt (do at the FINAL close of this session, post-compaction):**
+  compress the 2026-09-17 direct-session section (ses_f4f539d7c…) into the
+  Compressed archive (detail preserved in TODO #53/#65/#71/#73 +
+  knowledge_plugins.md + decision-record §5 + git 0105b9f/dfda0dd).
+
+## Compressed archive (one line each — details in git log + TODO/records)
+- 2026-09-18 looprun 2026-09-17_23-58, iteration 1 (ses_f4e9ea998ffeQ3Pa0atv10oysQ, planner-1) — plan1: #53 unit LANDED in full (Part A 5e29cb0 friction-check close-down in all 4 role prompts, planner-direct + Part B worker-14 `submit` tool b83b34f + bookkeeping a8636ef; gate re-verified by planner: probe two-two-nine, 9 smokes, pytest 459+1w, ruff F=0; proposal → implemented/); pending maintainer-domain: submit registration + live acceptance + AGENTS.md paste — details: loop folder plan1_summary.md + git 4fd2065/f13886d
 
 ## Compressed archive (one line each — details in git log + TODO/records)
 - 2026-09-17 direct (ses_f510a05ceffeE6SnMBlvti40DE) — #73 dedup-collapse build + planner-verified (spec d627403, code dce82ad, bookkeeping 9c701ed; gate 216/37/459+1w/F=0; M1 write guard untouched; flattenField pin lesson; the abs-path-not-rel design catch) + numword-escape proposal filed (da3ca41) — details: nap_direct.md + git dce82ad/9c701ed/da3ca41
