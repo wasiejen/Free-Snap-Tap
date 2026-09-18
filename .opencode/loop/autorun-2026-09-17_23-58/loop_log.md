@@ -17,3 +17,5 @@
 2026-09-18_11-34 DONE<--- worker-2 ses_f4e084942ffeSedvBfOKl2ehQY Qwen3.8-27B-IQ4KT-140K 53%/65K
 2026-09-18_11-45 -RETURN- planner-2 ses_f4e47085affelnyR0nKkHeF54M Qwen3.8-27B-IQ4KT-140K worker-2 ses_f4e084942ffeSedvBfOKl2ehQY worker_Q4_140K (#0 escape: 4e2fd0c + 67ccd73 S24 + 281b6d9 docs/handover; gate re-verified green by planner: probe 235/235, 9/9 smokes, pytest 459+1w, ruff F=0)
 2026-09-18_11-46 DONE<--- planner-2 ses_f4e47085affelnyR0nKkHeF54M Qwen3.8-27B-IQ4KT-140K plan2 closed: unit1 submit autofill (86a977f/ac8f1c8) + unit2 #0 numword-escape (4e2fd0c+67ccd73+281b6d9) LANDED; gate green (probe two-three-five, 9/9 smokes, 459+1w, F=0); proposal -> implemented/ w/ verdict; queue next: #1 TODO #70 compact_memory rework
+2026-09-18_11-47 --INFO-- looprunner ses_f4e9f8fefffeBLlsElx7iCSm3t Qwen3.8-27B-IQ4KT-140K maintainer: temporary stop to enable plugin; loop paused after iteration 2 (action was restart)
+2026-09-18_11-56 --INFO-- looprunner ses_f4e9f8fefffeBLlsElx7iCSm3t Qwen3.8-27B-IQ4KT-140K maintainer resume after plugin enable + live acceptance of submit tool & numword escape; iteration 3 launch

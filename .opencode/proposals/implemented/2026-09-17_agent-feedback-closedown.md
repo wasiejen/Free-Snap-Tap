@@ -72,3 +72,32 @@ optional addition to part A: instructions for the agent via submit tool (general
 - `summarizing which tool sequences were most efficient and which failed`
 - `what functionality would have been great to have e.g. in a tool, in instruction, in workflow`
 do not include verbatim, but if, then implement a best effort and efficient way for the agents to give feedback and that we get actionable feedback and e.g. tool function requests.
+
+## Planner verdict (2026-09-18, looprun autorun-2026-09-17_23-58, plan1)
+- **Shipped (his ruling: approved both parts in one unit):**
+  - Part A — the mandatory friction close-down step is in all 4 role prompts
+    (commit `5e29cb0`): planner new §Friction check; worker §Checkpoint &
+    handoff (friction check + `Lessons:` line + hand-append fallback);
+    explorer §Handoff (+ §Safety allow-list gain for the feedback file);
+    looprunner §Loop log (analogue: the loop log is its friction channel —
+    file writes are edit-denied for the looprunner).
+  - Part B — the `submit` tool (commit `b83b34f`):
+    `.opencode/tools/submit.ts` + `submit.smoke.mjs` (20/20) + probe section
+    S23 pin (header annotation updated, machine-verified agreement). Gate
+    re-verified green by the planner (all 9 smokes, pytest 459+1w, ruff F=0).
+- **Deviations (worker design choices, within the DoD):** return includes a
+  param-name label line per entry (superset of the spec's two fields); ONE
+  stamp per call is shared by all entries of that call; empty/blank strings
+  count as not-provided. Sandbox note: targets are HARDCODED (no path
+  parameter) — `todo_inbox.md` sits at the repo root (the proposal's
+  ".opencode/ subtree" wording does not cover it).
+- **His optional Part A addition (best-effort implementation):** the
+  `Lessons:` line in the worker close-down covers "Lessons Learned / tool
+  function requests" compactly; "log immediate friction" = the mid-session
+  logging allowance in all four prompts; the tool-ROI/sequence-efficiency
+  summarizing is NOT implemented (kept out of scope for the unit — a
+  follow-up if the maintainer wants it).
+- **Pending (maintainer domain):** registration in the live `opencode.jsonc`
+  + per-agent tool grant at restart; LIVE ACCEPTANCE after restart;
+  AGENTS.md §agent_feedback one-line paste pointer (draft in
+  `plan1_summary.md` of the loop folder).
