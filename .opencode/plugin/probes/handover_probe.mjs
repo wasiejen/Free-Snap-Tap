@@ -558,10 +558,10 @@
 //   S22 submit tool (9) — the #53 Part B pin (2026-09-18; approved
 //      2026-09-17_agent-feedback-closedown.md part 2): ONE unified append
 //      tool for the three agent-inbox channels — the registration shape
-//      (3 shape checks: the tool() default export (description + the 5
-//      args IN ORDER) / NO stale name+parameters keys (the host names
+//      (3 shape checks: the tool() default export (description + the 3
+//      channel args IN ORDER) / NO stale name+parameters keys (the host names
 //      the tool by FILENAME) / execute an AsyncFunction), the arg schema
-//      (the 5 args feedback/knowledge/todo/role/session ALL optional-
+//      (the 3 channel args feedback/knowledge/todo ALL optional-
 //      accept: undefined AND a string — the at-least-one-required rule
 //      is a RUNTIME rule, not a schema one), the no-params error ({} AND
 //      all-empty-string args → the exact error string + NO target
@@ -581,10 +581,11 @@
 //      the appended entry; the unprovided targets byte-identical — the
 //      tool appends, it NEVER reads or rewrites):
 //      (230) registration shape (1 of 3): the tool() default export
-//           (description + the 5 args in order + an execute function);
+//           (description + the 3 channel args in order + an execute function);
 //      (231) registration shape (2 of 3): NO stale name/parameters keys;
 //      (232) registration shape (3 of 3): execute is an AsyncFunction;
-//      (233) arg schema: all 5 args optional-accept (undefined AND a string);
+//      (233) arg schema: all 3 channel args optional-accept (undefined AND a string);
+//      role/session absent from the schema (auto-filled from the tool context);
 //      (234) no-params error: {} and all-empty-string → the exact error string +
 //           NO target created (nothing written);
 //      (235) feedback append: target created carrying ONLY the entry (### stamp),
@@ -4685,7 +4686,7 @@ writeFileSync(path.join(ioRnDir, "OpenCodeProjects", "SiblingProj", "whatever.md
 // knowledge_inbox.md / todo_inbox.md are NEVER touched (S5 hygiene
 // verifies zero writes outside the sandbox). The stamp is local-clock,
 // minute resolution — pinned by FORMAT (regex) + the minute-boundary
-// before/after trick, never the exact value. Plain tool() object: no
+// before/after trick, never the exact value. role + session are AUTO-FILLED from the tool context (context.agent / context.sessionID, falling back to `agent`/`unknown`) — the agent supplies the three channel texts only; there is NO role/session parameter. Plain tool() object: no
 // plugin hooks — the S5 tallies are unaffected.
 const SUB_TOOL_TS = path.join(REPO_ROOT, ".opencode", "tools", "submit.ts");
 const SUB_FB = path.join(SANDBOX, "submit-fb"); // no-params error + the feedback append (checks 230/231)
@@ -4711,18 +4712,19 @@ let subTool;
 
 // 230 — registration shape (1 of 3): the tool file imports (type-stripped,
 //      direct) and exposes the tool() default export: description
-//      (non-empty string) + the 5 args IN ORDER
-//      (feedback/knowledge/todo/role/session) + an execute function
+//      (non-empty string) + the 3 channel args IN ORDER
+//      (feedback/knowledge/todo — role/session are GONE, auto-filled from
+//      the tool context) + an execute function
 {
   const toolMod = await import(pathToFileURL(SUB_TOOL_TS).href);
   subTool = toolMod.default;
   const argKeys = Object.keys(subTool?.args ?? {});
   check(
     String(++n22),
-    "S22",
-    "submit tool file imports (type-stripped, direct) and exposes the tool() default export (description + args [feedback, knowledge, todo, role, session] + execute)",
+    "S23",
+    "submit tool file imports (type-stripped, direct) and exposes the tool() default export (description + args [feedback, knowledge, todo] + execute; role/session GONE from the schema)",
     subTool != null && typeof subTool.description === "string" && subTool.description.length > 0 &&
-      JSON.stringify(argKeys) === JSON.stringify(["feedback", "knowledge", "todo", "role", "session"]) &&
+      JSON.stringify(argKeys) === JSON.stringify(["feedback", "knowledge", "todo"]) &&
       typeof subTool.execute === "function",
     JSON.stringify({ keys: argKeys, descType: typeof subTool?.description }),
   );
@@ -4751,7 +4753,7 @@ let subTool;
   );
 }
 
-// 233 — the arg schema: ALL 5 args are OPTIONAL (each accepts undefined
+// 233 — the arg schema: ALL 3 channel args are OPTIONAL (each accepts undefined
 //      AND a string — the at-least-one-required rule is a RUNTIME rule,
 //      not a schema constraint)
 {
@@ -4762,9 +4764,9 @@ let subTool;
   check(
     String(++n22),
     "S22",
-    "arg schema: all 5 args (feedback/knowledge/todo/role/session) optional-accept (undefined AND a string)",
-    ["feedback", "knowledge", "todo", "role", "session"].every(optAccept),
-    JSON.stringify(["feedback", "knowledge", "todo", "role", "session"].map((k) => ({ k, ok: optAccept(k) }))),
+    "arg schema: all 3 channel args (feedback/knowledge/todo) optional-accept (undefined AND a string); role/session absent from the schema",
+    ["feedback", "knowledge", "todo"].every(optAccept) && !("role" in (subTool?.args ?? {})) && !("session" in (subTool?.args ?? {})),
+    JSON.stringify({ args: ["feedback", "knowledge", "todo"].map((k) => ({ k, ok: optAccept(k) })), roleIn: "role" in (subTool?.args ?? {}), sessionIn: "session" in (subTool?.args ?? {}) }),
   );
 }
 
@@ -4794,8 +4796,8 @@ let subTool;
 {
   const t1 = subStampNow();
   const ret = await subTool.execute(
-    { feedback: "probe feedback line", role: "probe-s21", session: "ses_fx_sub" },
-    { directory: SUB_FB },
+    { feedback: "probe feedback line" },
+    { directory: SUB_FB, agent: "probe-s21", sessionID: "ses_fx_sub" },
   );
   const t2 = subStampNow();
   const f = path.join(SUB_FB, SUB_REL.feedback);
@@ -4818,8 +4820,8 @@ let subTool;
 {
   const t1 = subStampNow();
   const ret = await subTool.execute(
-    { knowledge: "probe knowledge line", role: "probe-s21", session: "ses_fx_sub" },
-    { directory: SUB_KN },
+    { knowledge: "probe knowledge line" },
+    { directory: SUB_KN, agent: "probe-s21", sessionID: "ses_fx_sub" },
   );
   const t2 = subStampNow();
   const f = path.join(SUB_KN, SUB_REL.knowledge);
@@ -4842,8 +4844,8 @@ let subTool;
 {
   const t1 = subStampNow();
   const ret = await subTool.execute(
-    { todo: "probe todo line", role: "probe-s21", session: "ses_fx_sub" },
-    { directory: SUB_TODO },
+    { todo: "probe todo line" },
+    { directory: SUB_TODO, agent: "probe-s21", sessionID: "ses_fx_sub" },
   );
   const t2 = subStampNow();
   const f = path.join(SUB_TODO, SUB_REL.todo);
@@ -4876,8 +4878,8 @@ let subTool;
   seed(SUB_KEEP, "todo", "SENTINEL todo — must stay byte-identical.");
   const t1 = subStampNow();
   await subTool.execute(
-    { feedback: "probe keep line", role: "probe-s21", session: "ses_fx_sub" },
-    { directory: SUB_KEEP },
+    { feedback: "probe keep line" },
+    { directory: SUB_KEEP, agent: "probe-s21", sessionID: "ses_fx_sub" },
   );
   const t2 = subStampNow();
   const fb = readFileSync(path.join(SUB_KEEP, SUB_REL.feedback), "utf8");

@@ -52,13 +52,14 @@ try {
   chk("no stale 'name'/'parameters' keys", t != null && !("name" in t) && !("parameters" in t));
   chk("execute is async fn", t != null && typeof t.execute === "function" && t.execute.constructor.name === "AsyncFunction");
   chk(
-    "all 5 args optional at parse (feedback/knowledge/todo/role/session accept undefined)",
-    t != null && ["feedback", "knowledge", "todo", "role", "session"].every((k) => t.args[k] != null && t.args[k].safeParse(undefined).success === true),
+    "all 3 channel args optional at parse (feedback/knowledge/todo accept undefined) AND role/session are GONE from the schema (auto-filled from the context)",
+    t != null && ["feedback", "knowledge", "todo"].every((k) => t.args[k] != null && t.args[k].safeParse(undefined).success === true) && !("role" in t.args) && !("session" in t.args),
   );
 
-  // ---- (A) feedback single-param, DEFAULT role/session: creates the file
-  //      carrying only the entry (no header invention), `### ` stamp with
-  //      the literal `agent` / `unknown` fields
+  // ---- (A) feedback single-param, FALLBACK role/session: the context carries
+  //      NO agent/sessionID, so the stamp falls back to the literal `agent`
+  //      / `unknown` fields — the proof that role/session are auto-filled from
+  //      the context (this is the fallback assertion the spec asks for)
   const projA = mkproj("A");
   const argsA = { feedback: "friction: the gauge command took a while to discover" };
   const tA1 = localStamp();
@@ -67,19 +68,20 @@ try {
   const fA = fpath(projA, "feedback");
   const bodyA = fs.existsSync(fA) ? fs.readFileSync(fA, "utf-8") : null;
   const okEntryA = (s) => bodyA === mkEntry("feedback", s, "agent", "unknown", argsA.feedback);
-  chk("(A) feedback append: file created with EXACTLY the entry (### stamp, default `agent`/`unknown`), minute-boundary-safe", okEntryA(tA1) || okEntryA(tA2), `got=${JSON.stringify(bodyA)}`);
+  chk("(A) feedback append + FALLBACK: context WITHOUT agent/sessionID stamps `agent`/`unknown`; file created with EXACTLY the entry (### stamp), minute-boundary-safe", okEntryA(tA1) || okEntryA(tA2), `got=${JSON.stringify(bodyA)}`);
   chk("(A) no other target created", !fs.existsSync(fpath(projA, "knowledge")) && !fs.existsSync(fpath(projA, "todo")));
   const okRetA = (s) => retA === mkBlock("feedback", mkEntry("feedback", s, "agent", "unknown", argsA.feedback));
   chk("(A) return = `feedback` + `target:` + `entry:` with entry byte-exact == file content", okRetA(tA1) || okRetA(tA2), `got=${JSON.stringify(retA)}`);
 
-  // ---- (B) knowledge single-param, EXPLICIT role/session: `## ` stamp into
-  //      the knowledge inbox (parent dir auto-created)
+  // ---- (B) knowledge single-param, role/session via the CONTEXT: `## ` stamp
+  //      into the knowledge inbox (parent dir auto-created); the stamp is
+  //      pinned from the context values (agent/sessionID)
   const projB = mkproj("B");
   const argsB = { knowledge: "probe S16 shows loop_log stamps are minute-resolution" };
   const roleB = "worker-13";
   const sesB = "ses_TEST_71";
   const tB1 = localStamp();
-  const retB = await t.execute({ ...argsB, role: roleB, session: sesB }, { directory: projB });
+  const retB = await t.execute({ ...argsB }, { directory: projB, agent: roleB, sessionID: sesB });
   const tB2 = localStamp();
   const fB = fpath(projB, "knowledge");
   const bodyB = fs.existsSync(fB) ? fs.readFileSync(fB, "utf-8") : null;
@@ -114,19 +116,19 @@ try {
   //      three files, the return = the three blocks in feedback/knowledge/
   //      todo order
   const projE = mkproj("E");
+  const roleE = "probe-smoke";
+  const sesE = "ses_TEST_72";
   const argsE = {
     feedback: "multi: friction line",
     knowledge: "multi: knowledge line",
     todo: "multi: finding line",
-    role: "probe-smoke",
-    session: "ses_TEST_72",
   };
   const tE1 = localStamp();
-  const retE = await t.execute(argsE, { directory: projE });
+  const retE = await t.execute(argsE, { directory: projE, agent: roleE, sessionID: sesE });
   const tE2 = localStamp();
   const bodyE = (k) => { const f = fpath(projE, k); return fs.existsSync(f) ? fs.readFileSync(f, "utf-8") : null; };
-  const mkRetE = (s) => ["feedback", "knowledge", "todo"].map((k) => mkBlock(k, mkEntry(k, s, argsE.role, argsE.session, argsE[k]))).join("\n");
-  const okFilesE = (s) => ["feedback", "knowledge", "todo"].every((k) => bodyE(k) === mkEntry(k, s, argsE.role, argsE.session, argsE[k]));
+  const mkRetE = (s) => ["feedback", "knowledge", "todo"].map((k) => mkBlock(k, mkEntry(k, s, roleE, sesE, argsE[k]))).join("\n");
+  const okFilesE = (s) => ["feedback", "knowledge", "todo"].every((k) => bodyE(k) === mkEntry(k, s, roleE, sesE, argsE[k]));
   chk("(E) multi-param: all three files created with byte-exact entries (minute-boundary-safe)", okFilesE(tE1) || okFilesE(tE2), JSON.stringify(["feedback", "knowledge", "todo"].map((k) => bodyE(k))));
   const okRetE = (s) => retE === mkRetE(s);
   chk("(E) return = the three blocks in feedback/knowledge/todo order (byte-exact)", okRetE(tE1) || okRetE(tE2), `got=${JSON.stringify(retE)}`);
@@ -143,15 +145,17 @@ try {
   seedF("feedback", "SENTINEL fb — pre-existing content must survive byte-exact.");
   seedF("knowledge", "SENTINEL kn — must stay byte-identical.");
   seedF("todo", "SENTINEL todo — must stay byte-identical.");
-  const argsF = { feedback: "friction after pre-seed", role: "worker-14", session: "ses_TEST_73" };
+  const roleF = "worker-14";
+  const sesF = "ses_TEST_73";
+  const argsF = { feedback: "friction after pre-seed" };
   const tF1 = localStamp();
-  const retF = await t.execute(argsF, { directory: projF });
+  const retF = await t.execute(argsF, { directory: projF, agent: roleF, sessionID: sesF });
   const tF2 = localStamp();
   const fbBody = fs.readFileSync(fpath(projF, "feedback"), "utf-8");
-  const okFb = (s) => fbBody === "SENTINEL fb — pre-existing content must survive byte-exact.\n" + mkEntry("feedback", s, argsF.role, argsF.session, argsF.feedback);
+  const okFb = (s) => fbBody === "SENTINEL fb — pre-existing content must survive byte-exact.\n" + mkEntry("feedback", s, roleF, sesF, argsF.feedback);
   chk("(F) pre-seeded sentinel stays byte-exact BEFORE the appended entry (append-only)", okFb(tF1) || okFb(tF2), `got=${JSON.stringify(fbBody)}`);
   chk("(F) the other two targets are byte-identical (untouched)", fs.readFileSync(fpath(projF, "knowledge"), "utf-8") === "SENTINEL kn — must stay byte-identical.\n" && fs.readFileSync(fpath(projF, "todo"), "utf-8") === "SENTINEL todo — must stay byte-identical.\n");
-  const okRetF = (s) => retF === mkBlock("feedback", mkEntry("feedback", s, argsF.role, argsF.session, argsF.feedback));
+  const okRetF = (s) => retF === mkBlock("feedback", mkEntry("feedback", s, roleF, sesF, argsF.feedback));
   chk("(F) return reflects only the provided param (feedback block only, byte-exact, minute-boundary-safe)", okRetF(tF1) || okRetF(tF2), `got=${JSON.stringify(retF)}`);
 } finally {
   fs.rmSync(base, { recursive: true, force: true });

@@ -13,9 +13,10 @@
 //
 // Behavior (append-only — the tool NEVER reads or rewrites a target):
 //   1. args: `feedback?` / `knowledge?` / `todo?` (all optional strings,
-//      at least one required — an EMPTY string counts as NOT provided) +
-//      `role?` (default `agent`) + `session?` (default `unknown`) for the
-//      stamp;
+//      at least one required — an EMPTY string counts as NOT provided).
+//      role + session for the stamp are AUTO-FILLED from the tool context
+//      (role = context.agent else `agent`; session = context.sessionID
+//      else `unknown`) — there is NO role/session parameter;
 //   2. NONE provided -> return an error string, no file touched;
 //   3. for each PROVIDED param, append ONE entry to its HARDCODED target
 //      (relative to `context.directory ?? process.cwd()`): entry =
@@ -68,7 +69,7 @@ const CHANNELS = {
 type ChannelKey = keyof typeof CHANNELS;
 
 export default tool({
-  description: `Appends ONE machine-stamped entry (<header> <YYYY-MM-DD_HH-MM> <role> <session> + your raw text) to each of the provided inbox channels — feedback (friction points: what slowed/confused this session, one line preferred) -> .opencode/agent/agent_feedback.md; knowledge (verified, actionable knowledge in inbox format) -> .opencode/agent/knowledge/knowledge_inbox.md; todo (a loose finding, unnumbered — the planner assigns IDs at curation) -> todo_inbox.md. Fire it with at least one of feedback/knowledge/todo (several at once allowed; pass an empty string for the ones you skip). The date + role + session are stamped automatically (role defaults to 'agent', session to 'unknown'); the targets are hardcoded and NEVER read — you supply the text only, no file fiddling.`,
+  description: `Appends ONE machine-stamped entry (<header> <YYYY-MM-DD_HH-MM> <role> <session> + your raw text) to each of the provided inbox channels — feedback (friction points: what slowed/confused this session, one line preferred) -> .opencode/agent/agent_feedback.md; knowledge (verified, actionable knowledge in inbox format) -> .opencode/agent/knowledge/knowledge_inbox.md; todo (a loose finding, unnumbered — the planner assigns IDs at curation) -> todo_inbox.md. Fire it with at least one of feedback/knowledge/todo (several at once allowed; pass an empty string for the ones you skip). The date is stamped automatically and role + session are auto-filled from the tool context (role = context.agent, session = context.sessionID — falling back to 'agent'/'unknown'); the targets are hardcoded and NEVER read — you supply the three channel texts only, no file fiddling.`,
   args: {
     feedback: tool.schema
       .string()
@@ -82,14 +83,6 @@ export default tool({
       .string()
       .optional()
       .describe("A loose finding (unnumbered) for the planner's TODO curation: problem + evidence, desired outcome, acceptance criteria."),
-    role: tool.schema
-      .string()
-      .optional()
-      .describe("Role token for the stamp (default 'agent'), e.g. 'planner-10', 'worker-13', 'looprunner'."),
-    session: tool.schema
-      .string()
-      .optional()
-      .describe("Session id for the stamp (default 'unknown'), from the SESSION= field of your injected ctx: line."),
   },
 
   execute: async (args: any, context: any) => {
@@ -105,10 +98,13 @@ export default tool({
     }
 
     const stamp = localStamp();
+    // role + session are AUTO-FILLED from the tool context — the agent never
+    // supplies them (the empty/blank string counts as NOT provided, the same
+    // convention as loop_log's session handling).
     const role =
-      args.role != null && String(args.role).trim() !== "" ? String(args.role) : "agent";
+      context?.agent != null && String(context.agent).trim() !== "" ? String(context.agent) : "agent";
     const session =
-      args.session != null && String(args.session).trim() !== "" ? String(args.session) : "unknown";
+      context?.sessionID != null && String(context.sessionID).trim() !== "" ? String(context.sessionID) : "unknown";
 
     const blocks: string[] = [];
     for (const key of provided) {
