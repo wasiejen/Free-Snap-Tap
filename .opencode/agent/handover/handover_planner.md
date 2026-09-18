@@ -14,15 +14,18 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - **Phase 1 = A/B comparison test (his proposal):** symmetric spec
   WRITTEN + COMMITTED (`handover_task.md` — feature-map task; constraint
   equality: handover summary + scratchpad map only, no TODO entries).
-  Run A launched on `worker_explorer_Q3_120K_mtp` (the CORRUPTED IQ3KT-MTP
-  model — doubles as the corruption probe); Run B queued on
-  `worker_gemma_Q4_128K` (same explorer prompt, 12B Gemma — the prompt he
-  flagged as a misconfig) after Run A verify. Roster verified live in
-  opencode.jsonc: both explorer-prompt agents confirmed; a built-in
-  `explorer` agent type also exists in the Task-tool list (model not in our
-  config — not used here).
-- NEXT: verify Run A → launch Run B → compare (map quality, method, context
-  behavior, corruption evidence) → consolidate the better map into
+  Roster verified live in opencode.jsonc: both explorer-prompt agents
+  confirmed; a built-in `explorer` agent type also exists in the Task-tool
+  list (model not in our config — not used here).
+- **Run A DIED (corruption, 2nd incident):** launch on
+  `worker_explorer_Q3_120K_mtp` returned `Task cancelled`; maintainer: the
+  IQ3KT-MTP model corrupted again at ≈88k context fill. Zero partial
+  artifacts (scratchpad + tree verified clean). Data point recorded in
+  `knowledge/knowledge_tools.md` (planning rule: no task-scale work on that
+  model). Comparison degrades to a single gemma run — if its map is weak,
+  fallback = raw `agent_Q4_140K` on the same prompt-agnostic spec.
+- NEXT: verify Run B (`worker_gemma_Q4_128K`, output
+  `auto-resume-map-runB.md`) → consolidate the map into
   `.opencode/agent/knowledge/opencode-plugins/` (+ folder README, same
   commit) → then Phase 2 deep-dive specs scoped by the map's line ranges.
 

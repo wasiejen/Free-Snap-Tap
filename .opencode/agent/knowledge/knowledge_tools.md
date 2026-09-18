@@ -215,19 +215,30 @@ instructions/protocol — facts that save lookups. Format per the README:
 - **Do:** when a session (or a worker launched on the 3bit-MTP variant)
   shows output corruption (garbled streams, false-repeats, broken prose),
   FIRST verify the filesystem (`git status` + `git log`) before assuming
-  file impact — the measured 2026-09-18 incident was confined to the
+  file impact — both measured 2026-09-18 incidents were confined to the
   OUTPUT channel: zero partial writes, zero repo content damage. Then
   rebuild reality from committed state (git log + NAP + TODO) — the
   mid-turn work was lost only from the session context, never from the
   tree. Model switching between variants is the maintainer's operation
   (live opencode.jsonc); do not try to "fix" it from a session.
+  **Planning rule (2nd incident):** do NOT delegate task-scale work to the
+  IQ3KT-MTP variant (`worker_explorer_Q3_120K_mtp`) — it corrupts at ≈88k
+  context FILL (maintainer-measured; the 140k window is not usable); if it
+  must be probed at all, keep the task's tool-call budget far below the
+  fill point.
 - **Why (evidence):** 2026-09-18, direct session
   ses_f4c039ae2ffeRqvdPqGu8IdB37 — the IQ3KT-MTP variant crashed/corrupted
   (maintainer report + the corrupted turn visible in-session); the
   maintainer restarted the session on a different model; the recovery
   check found `git status` clean at the pre-corruption HEAD — no files
-  were touched by the corrupted turn.
-- **Ref:** direct session ses_f4c039ae2ffeRqvdPqGu8IdB37; maintainer
-  report; recovery git check 2026-09-18.
+  were touched by the corrupted turn. 2nd incident same day, direct
+  session ses_f4a3f85e1ffeO9206c9ENvkK0f — a subagent launch on the
+  variant (`worker_explorer_Q3_120K_mtp`, feature-map task, spec
+  adc3500) returned `Task cancelled`; maintainer: corrupted again at
+  ≈88k context fill; zero partial artifacts (scratchpad + tree checked
+  clean).
+- **Ref:** direct session ses_f4c039ae2ffeRqvdPqGu8IdB37 (incident 1);
+  direct session ses_f4a3f85e1ffeO9206c9ENvkK0f (incident 2, subagent
+  launch); maintainer reports; recovery git checks 2026-09-18.
 - **Keys:** mtp, iq3kt, corruption, crash, model-swap, recovery,
   git-status, output-channel, worker-verification.
