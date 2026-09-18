@@ -43,15 +43,15 @@
         "Qwen3.8-27B-IQ3KT-120K_MTP": {
           "name": "Qwen3.8-27B-IQ3KT-MTP",
           "limit": {
-            "context": 120000,
-            "output": 120000
+            "context": 140000,
+            "output": 140000
           }
         },
         "Qwen3.8-27B-IQ3KT-210K": {
           "name": "Qwen3.8-27B-IQ3KT",
           "limit": {
-            "context": 210000,
-            "output": 131072
+            "context": 262144,
+            "output": 262144
           }
         },
         "Qwen3.8-27B-IQ3KP-UC-100K": {
@@ -389,6 +389,24 @@
         },
         "bash": "allow",
         "webfetch": "allow"
+      },
+      "color": "#ff6b6b"
+    },
+    "prompt_builder_Q4_140K": {
+      "description": "half prefill, very intelligent, moderately fast, 140k context, no worker prompt, higher precision and higher stability due to 4bit Quant",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-IQ4KT-140K",
+      "prompt": "{file:./.opencode/agent/prompts/roles/prompt_engineer.md}",
+      "temperature": 1.0,
+      "permission": {
+        "task": "allow",
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          ".opencode/agent/handover/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
       },
       "color": "#ff6b6b"
     },
