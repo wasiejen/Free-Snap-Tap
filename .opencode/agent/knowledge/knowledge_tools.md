@@ -261,3 +261,20 @@ instructions/protocol — facts that save lookups. Format per the README:
   as `knowledge/opencode-plugins/auto-resume-map.md`).
 - **Keys:** gemma, iq4kt, model-sizing, delegation, step-level-instructions,
   contract-spec, explorer, feature-map.
+
+## Escape sentinel in edit content + heredoc limits (2026-09-18, Deep-Dive A run)
+- **Do:** the content-escape sentinel (`[<form>:esc]` in edit/write
+  oldString/newString) RESOLVES — verified in `.opencode/temp/intercept.log`
+  (kind=escape, scope=content, verdict pair-resolved; 5 attempts). When a
+  worker reports "the sentinel was a no-op", check the intercept log FIRST
+  (grep `kind=escape`) — the log is the ground truth; the observed real
+  failure mode was the worker typing the SAME digits on both sides (identical
+  after resolution → edit error unrelated to the escape). Corollary for
+  planner/worker: to MATCH a literal escape form that sits IN the file, anchor
+  the edit elsewhere (you cannot type the bracket form into oldString — it
+  resolves before matching).
+- **Do:** multi-section file authoring (>~90 lines) via the write/edit tools,
+  NOT bash heredocs — heredocs that long silently truncate mid-content with
+  no error (worker-reported, Deep-Dive A: lost a whole section).
+- **Keys:** escape, sentinel, intercept-log, edit, oldString, heredoc,
+  truncation, dense-numeral, verification.

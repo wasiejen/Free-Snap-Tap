@@ -51,14 +51,24 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   Adding the reference = his call (pilot verdict still pending his review).
 - **Continue ruling (his, 2026-09-18 end):** compact + continue accepted —
   after self-compact, next unit = Phase 2 deep-dive A spec.
-- **Phase 2 (next):** three deep-dive specs scoped
-  by the map's line ranges — A continuous auto-start (1834-2091 tick, 746-908
-  send path, 2576-2585/2691-2708 ESC), B context-overflow + errors (2306-2345
+- **Deep-Dive A VERIFIED + CONSOLIDATED (2026-09-18):** spec d96b89d; run
+  ses_f49eda7a1ffezGm7zQi15jhpBs (worker_Q4_140K), recipe 8 sections in order,
+  scope 1-8 all done; spot-checks passed (watchdog-guard sites 747/754/759/
+  864/879, latch block 747-753, pluginAbortInFlight 1709/2578 verbatim; §7
+  registration list matches our live ctx_watchdog.ts 726-731); one worker
+  line-ref error fixed in consolidation (§8 "190-190" → "190-190",
+  map-verified range); consolidated to
+  `knowledge/opencode-plugins/auto-resume-deepdive-A.md`. Worker friction
+  handled: heredoc-truncation finding → knowledge_tools.md; escape-sentinel
+  "no-op" claim VERIFIED FALSE via intercept.log 1083-1087 (5 attempts
+  pair-resolved) — his --comment acknowledged + removed, knowledge recorded.
+- **Phase 2 REMAINING:** B context-overflow + errors (2306-2345
   ctx-wrapup, 231-263/2588-2609/1983-2017 streaming-fail, 318-352/2257-2304
   silent dead-stream, 853-908 watchdog), C generally-useful (1372-1692
   idle-scan mega-function by sub-candidate, 2642-2665 task_complete, 969-990
   celebration, 183-230 done-claim). Worker: `worker_Q4_140K` (IQ4KT, per the
-  sizing entry).
+  sizing entry). Then Phase 3: consolidation + TODO seed "build our own
+  plugin" (his priority.md item).
 
 ## Closed session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
 - **plan2 closed (2026-09-18): BOTH units LANDED, gate re-verified by the

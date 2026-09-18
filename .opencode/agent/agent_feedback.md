@@ -293,3 +293,12 @@ Prompt-rework session: launch-time tool deny (.opencode/agent/prompts/**) was li
 ### 2026-09-18_20-15 planner_Q4_140K ses_f4c039ae2ffeRqvdPqGu8IdB37
 IQ3KT-MTP variant output corruption in a live planner session (2026-09-18): the corrupted turn burned ~10K context before the model swap; recovery via git-status + NAP worked, zero file impact. Worth weighing when choosing models for long sessions.
 
+### 2026-09-18_21-31 worker_Q4_140K ses_f4a0d7ce7ffeUPzg1ADvBunHCN
+glob tool does not match dot-directories (`.opencode/**`): `**/repo_overview.md` returned "No files found" for a file that exists — had to fall back to bash `ls`. Workers reading prompt/repo docs via glob will hit this.
+
+### 2026-09-18_21-37 planner_Q4_140K ses_f4a3f85e1ffeO9206c9ENvkK0f
+Burned two delegation runs on model sizing (corrupted 3bit-MTP at ~88k fill; 12B gemma on a contract spec it couldn't hold — thin map, self-contradictory handover) before landing on IQ4KT; the fix is now standing: knowledge_tools.md "Model sizing for analysis tasks" entry — check it before any analysis delegation, and write step-level (one exact command per sub-deliverable) specs for gemma-class models.
+
+### 2026-09-18_22-11 worker_Q4_140K ses_f49eda7a1ffezGm7zQi15jhpBs
+Deep-Dive A (worker): (1) bash heredocs with ~90+ lines silently truncated mid-content (lost section 8 + cut section 7 at a line boundary, no error) — use write/edit tools for multi-section file authoring; (2) the content-escape sentinel [<incident>:<safe-form>:esc] did not resolve in edit oldString/newString on this host (2 failed attempts) — a node script with code-point-constructed strings (String.fromCodePoint) was the reliable drift fix.
+- intercept.log 1083 kind=escape scope=content orig=[190:one-nine-zero:-esc-] value=190 hits=3 | arg | pair-resolved (-esc- dashes added to be not replaced by itself in oldstring)
