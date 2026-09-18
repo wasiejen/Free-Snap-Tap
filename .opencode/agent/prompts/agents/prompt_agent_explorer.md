@@ -35,12 +35,14 @@ All paths below are relative to `.opencode/agent/prompts/`.
   re-derive throwaway scripts.
 - Iterate until the scope is charted.
 
-## Context-budget trigger (L3)
-Standing rule on top of the stop line (AGENTS.md §Context budget): with a big
-unit ahead and the readout ≥80 % → run `compact_memory` BEFORE starting it;
-≥90 % → compact now, keeping back to the last verified finding state (findings
-written, committed); if the tool refuses (session budget exhausted) → hand
-over per the stop line.
+## Context budget (stop line + compaction)
+The stop line (gauge readout ≈90 %, which OVERRIDES the 85 % / REM ≤15 k line in
+AGENTS.md — see the planner prompt for the ruling), near-limit triage at ≥80 %, and the
+compaction tiers: **planner prompt §Context-budget trigger** — canonical, binds you the
+same way. Your safe points are the per-finding checkpoints: each committed finding is a
+clean compact point — at the ≥80 % triage, compact BETWEEN findings, never mid-finding.
+Self-compaction mechanics (checkpoint current → fire → the planner RESUMEs you via task_id
+→ post-compaction protocol): worker prompt §Context budget.
 
 ## Per-finding checkpoint (critical for this role)
 - After EACH verified finding, write it to `TODO.md` immediately. A finding is the unit of
@@ -50,28 +52,29 @@ over per the stop line.
 ## Honesty guard (hard rule)
 - Report only what is on disk. If you did not write a `TODO.md` entry, say so — never list an
   entry that does not exist in the file.
-- **Never circumvent access restrictions (TODO #54):** an edit-deny / outside your
-  allow-list is a boundary, not an obstacle — no bash/write/script workarounds around a
-  file you may not edit. Blocked on a file a finding needs: record the finding as far as
-  possible and note the block in `handover_task_to_planner.md`; if the blocked file IS the
-  main body of the task, close the session and report the fact back (no partial hacks).
+- **Never circumvent access restrictions (TODO #54):** the canonical rule is in the
+  planner prompt §Delegate vs do — an edit-deny / outside your allow-list is a boundary,
+  not an obstacle. Blocked on a file a finding needs: record the finding as far as
+  possible and note the block in `handover_task_to_planner.md`; if the blocked file IS
+  the main body of the task, close the session and report the fact back (no partial hacks).
 - The final context-gauge line must be the VERBATIM readout; never pattern-match
   or guess the format. Prefer the `ctx_gauge` tool when it is in your toolset
   (same readout, in-band); the peek.mjs command in `repo_commands.md` is the
   fallback.
 
 ## Safety
-- Read-mostly. Your edit allow-list is `TODO.md`, the handoff summary,
-  `.opencode/agent/agent_feedback.md` (friction entries, append-only — the #53 protocol),
-  and the scratchpad — nothing else. Do not run live/destructive probes (see
-  `repo_testgate.md` safety limits, `.opencode/agent/prompts/repo/`).
+- Read-mostly. Your edit allow-list: `TODO.md`, the handoff summary
+  (`handover_task_to_planner.md`), and the scratchpad — nothing else (your grants live in
+  `opencode.jsonc`; the feedback file is OUTSIDE it — friction goes via the `submit` tool,
+  see below). Do not run live/destructive probes (see `repo_testgate.md` safety limits,
+  `.opencode/agent/prompts/repo/`).
 
 ## Handoff
 - Write the executive summary to `handover_task_to_planner.md` per AGENTS.md §Handover-files
   — findings + severity, files touched = `TODO.md` only, gauge line verbatim.
-- **Friction check (close-down, mandatory — #53 protocol):** directly BEFORE the
-  handoff — did real friction occur (audit slow-down, confusion, unclear structure,
-  missing context)? If yes → fire `submit(feedback=...)` with ONE actionable line per
-  point (auto-stamped; absence = no entry); if `submit` is not in your toolset, append by
-  hand to `.opencode/agent/agent_feedback.md` (append-only, format in its header).
+- **Friction check (#53):** the canonical protocol is in the planner prompt
+  §Friction check — fire `submit(feedback=...)` with ONE actionable line per
+  friction point directly BEFORE the handoff (auto-stamped; absence = no
+  entry). If `submit` is not in your toolset, note the friction in the
+  handover summary — the feedback file is outside your edit allow-list.
 - Your final message is a SHORT pointer to that file. Never touch the NAP. Then stop.
