@@ -209,7 +209,12 @@ paste, like the stop-line change):
   dense form without a pair: `[8-6-1]`. The form is legal in tool args /
   commit text / prose — NEVER inside code content, NEVER bare in prose, and
   quote it when it passes through a bash command (`< >` and `|` are bash
-  metacharacters — measured). Full grammar + pipeline + verdict log:
+  metacharacters — measured). Content escape (sentinel-gated): in the
+  `content`/`oldString`/`newString` of `write`/`edit`,
+  `[<incident>:<safe-form>:esc]` resolves to the digits derived from field 2
+  (dash digits or numwords); the sentinel (`esc`/`escape`, case-insensitive)
+  is the gate — unmarked / invalid forms are never touched, and a sentinel
+  form in a PATH is just text. Full grammar + pipeline + verdict log:
   `.opencode/agent/research/fuzzy-numword/decision-record.md`.
 ```
 

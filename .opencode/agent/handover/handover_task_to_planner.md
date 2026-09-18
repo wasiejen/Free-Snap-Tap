@@ -1,69 +1,107 @@
-# Worker summary — #0 numword escape output (worker-2, ses_f4e084942ffeSedvBfOKl2ehQY, plan2/iter2) — IN PROGRESS (checkpoint)
+# Worker summary — #0 numword escape output (worker-2, plan2/iter2) — COMPLETE
 
-State at this checkpoint (context-budget early handover, 73% used). If this
-session dies, a fresh worker resumes from here.
+Session: ses_f4e084942ffeSedvBfOKl2ehQY (post cross-compaction resume; the
+pre-compaction stop was an out-of-sandbox path — username bit-shift W→A —
+and then context_length_exceeded at 101%; resumed from committed state, all
+gates re-verified on the current tree in the final session, not trusted).
 
-## Done (verified)
-- `intercept_observer_core.ts` — `resolveEscapes(text, map)` + `resolveEscapeSafe`
-  (pure, exported): form `[<digits>:<safe-form>:esc|escape>]` (one regex, `i`
-  flag — case variants); field 2 = dash-separated single digits OR numwords
-  (reuses the existing `resolveNumword` grammar — no second table); invalid
-  field 2 → form left byte-identical; returns transformed text + hit list
-  (raw + value per hit).
-- `intercept_observer.ts` — `runEscapeContent(output, tool)` wired for
+## What changed (all committed except this bookkeeping commit)
+- `intercept_observer_core.ts` — `resolveEscapes(text, map)` +
+  `resolveEscapeSafe` (pure, exported): form
+  `[<digits>:<safe-form>:esc|escape>]` (ONE regex, `i` flag — case
+  variants); field 2 = dash-separated single digits OR numwords (reuses the
+  existing `resolveNumword` grammar — no second table, DoD grep-verified:
+  line 442 `ESCAPE_RE`, 456-462 grammar-driven); invalid field 2 → form
+  left byte-identical; returns transformed text + hit list (raw + value per
+  hit). — commit 4e2fd0c
+- `intercept_observer.ts` — `runEscapeContent(output, tool)` for
   write/edit/block_transfer on the string args `content`/`oldString`/
   `newString` (block_transfer carries none → natural no-op); runs FIRST
   (before the pair observation — Part 3 order); a hit mutates the arg +
   logs ONE 8-field line per hit, verdict `pair-resolved`, evidence
-  `kind=escape scope=content orig=<form> value=<digits> hits=<n>` (n = hits
-  in that field); nine-verdict vocabulary unchanged (#73 kind=dedup
-  precedent). Path fields untouched. Header comments updated (the
-  (3a) content-scope guard gains the escape exception; the verdict-vocabulary
-  block notes kind=escape).
+  `kind=escape scope=content orig=<form> value=<digits> hits=<n>`; nine-
+  verdict vocabulary unchanged (#73 kind=dedup precedent). Path fields
+  untouched. Header comments updated ((3a) content-scope guard gains the
+  escape exception; verdict block notes kind=escape). — commit 4e2fd0c
 - `intercept_observer.smoke.mjs` — +2 checks (8h): escape positive (edit
   oldString+newString, numword + dash-digit forms; 3 lines = 2 escape + the
-  numword observation on the original arg — observeArg always sees the
-  pre-mutation argStr, field 5 stays the original arg via flattenField) +
+  numword observation on the ORIGINAL argStr — observeArg always sees the
+  pre-mutation argStr; field 5 stays the original arg via flattenField) +
   escape negative (unmarked `[1:one]` pair-logged only, invalid
-  `[316:foo-bar:esc]` untouched). **39/39 GREEN.**
-- Probe regression check (no S24 yet): `PROBE handover: 229/229 PASS` —
-  agrees with the header annotation (line 611, `S21=12 S22=9 hygiene=6 →
-  "PROBE handover: 229/229 PASS"`; note: the S23 submit section is annotated
-  as `S22=9` — the pre-existing inline label off-by-one the spec names; do
-  not "fix" it).
+  `[316:foo-bar:esc]` untouched). 39/39. — commit 4e2fd0c
+- `handover_probe.mjs` — new S24 section (append-only, run IDs 240-245,
+  inline labels = run IDs, the S23 inline-label quirk left untouched) + the
+  header annotation block + the section-sum total (machine-verified
+  sum = 235). Checks: (240) write content dash-form → resolved + kind=
+  escape line (byte-exact); (241) edit oldString+newString numword-form →
+  both resolved + numword observation on the original arg; (242) unmarked
+  pair-form content → NOT resolved (args byte-identical, pair line only);
+  (243) invalid safe form → untouched (zero lines); (245→labeled 245)
+  sentinel form in a read/write PATH → path channels treat it as plain text
+  (read: ONE fuzzy-rejected line — the channel ran normally; write: zero
+  lines — M1; zero kind=escape); (245 case) case variants ESC/Escape/
+  escape → all resolved (3 kind=escape lines, hits=3). — committed at
+  planner emergency checkpoint 67ccd73 (the section was in the working
+  tree at the stop line; the planner carried it)
+- `primer.md` "Where it applies" — the escape block (form, example
+  `[316:3-2-0:esc]` → `320`, content scope, case variants) + the NO-bullet
+  gains the "except the escape, below" pointer so the section stays
+  accurate. — THIS commit
+- `decision-record.md` §4 — ONE line appended to the AGENTS.md paste-draft
+  fenced block naming the content escape (the maintainer's paste stays his).
+  — THIS commit
 
-## Remaining
-1. `handover_probe.mjs` — new S24 section (append-only, after the S23
-   section, before S5 hygiene; run IDs 240-245, inline labels = run IDs
-   (correct, per the spec's quirk note)); 6 checks: (a) write content
-   dash-form → resolved + kind=escape line; (b) edit oldString+newString
-   numword-form → both resolved (expect the numword observation line on the
-   original argStr too — see smoke 8h); (c) unmarked → zero escape lines;
-   (d) invalid safe-form → untouched; (e) sentinel form in a read/write
-   PATH → path channel outcomes unchanged (byte-identical, no escape line —
-   create a real bracketed file `file-[4:four:esc].txt` in ioPfDir so read
-   fast-paths); (f) case variants ESC/Escape → resolved. Header: S24
-   annotation block after the S23 block (~line 598) + the section-sum line
-   611 gains `S24=6` and the total (229+6=235 — machine-verify, never
-   retype).
-2. `primer.md` "Where it applies" — the escape form block (form,
-   `[316:3-2-0:esc]` → `320`, content scope, case variants).
-3. `decision-record.md` §4 paste-draft block (the fenced block at ~line
-   204-214) — APPEND one line naming the escape form (his paste stays his).
-4. Full gate: probe (235/235 + annotation agree) + all 9 smokes (intercept
-   39/39) + `pytest -q` (459+1w) + `ruff check --select F .` (0) — commands
-   per repo_commands.md. DoD grep: `grep -n "esc" intercept_observer_core.ts`
-   map/grammar-driven.
-5. Final handover (this file) + code commit + bookkeeping (the #53 Part B
-   precedent: one code commit + bookkeeping if it carries its own hash).
+## Measured verification (verbatim, final session, current tree)
+- `PROBE handover: 235/235 PASS` — agrees with the header annotation
+  (`... S21=12 S22=9 S24=6 hygiene=6 → "PROBE handover: 235/235 PASS"`;
+  the section-sum total was machine-computed, never retyped).
+- All 9 smokes green: `BT-SANDBOX-SMOKE: ALL PASS (52/52)`; `BLOCK_TRANSFER_
+  SMOKE: ALL PASS (22/22)`; `COMPACT_MEMORY_SMOKE: ALL PASS (46/46)`;
+  `CONTEXT_RECOVERY_SMOKE: ALL PASS`; `CTX_GAUGE_SMOKE: ALL PASS (3/3)`;
+  `GAUGE_CORE_SMOKE: ALL PASS`; `INTERCEPT_OBSERVER_SMOKE: ALL PASS (39/39)`;
+  `LOOP_LOG_SMOKE: ALL PASS (24/24)`; `SUBMIT_SMOKE: ALL PASS (20/20)`.
+- `459 passed, 1 warning in 2.01s` (pytest -q, venv).
+- `All checks passed!` (ruff check --select F ., exit 0).
+- DoD grep: `grep -n "esc" intercept_observer_core.ts` → ESCAPE_RE +
+  resolveEscapeSafe over the shared map (no hardcoded numeral tables).
 
-## Deviations / notes so far
-- Smoke positive check pins 3 lines (2 escape + 1 numword observation) —
-  observeNumword sees the `four-two-five` token inside the oldString escape
-  form on the ORIGINAL argStr (escape forms are not pair spans). Consistent
-  with "field 5 = original arg" + the observation channel logging incident
-  data; the pair observation on the field (runPairWrite) sees the RESOLVED
-  text (no pair there after resolution).
-- worker-1's handover claims a 239/239 probe total; the committed annotation
-  + spec baseline + a fresh run all say 229 (239 is the last S23 RUN ID,
-  the inline-label quirk). The spec baseline (229) is the authority.
+## Commits
+- 4e2fd0c — core + observer + smoke + handover(IN PROGRESS checkpoint)
+- 67ccd73 — S24 probe section (planner emergency checkpoint) + session dump
+  + NAP/loop state
+- this bookkeeping commit — primer + decision-record + this file (its hash:
+  the commit whose tree carries this file, subject "handover: #0 numword
+  escape complete — docs + final summary").
+
+## TODO entries
+- None new (spec: #0 is not a TODO ID). No todo_inbox additions — nothing
+  out-of-scope found beyond what was already recorded (the S23 inline-label
+  quirk is spec-named and left untouched by design).
+
+## Deviations
+- Check 245 redesign (the notable one): the spec's suggested fixture
+  (a real on-disk `file-[4:four:esc].txt`) is INFEASIBLE on NTFS — after
+  the first colon the rest of the name parses as an alternate-data-stream
+  name, which may not carry a SECOND colon → `ENOENT` on create (measured).
+  Reworked: the sentinel form rides a NON-EXISTENT path arg (dash-digit safe
+  form `4-4`, keeping the numword observation quiet); the pin proves the
+  same ruling — path channels treat the form as plain text (read: exactly
+  one fuzzy-rejected line, the channel ran normally; write: zero lines per
+  M1; args byte-identical; zero kind=escape lines).
+- Session incidents: the sandbox-path stop (W→A bit-shift) and the
+  context_length_exceeded cross-compaction — both resumed from committed
+  state; nothing was lost (the S24 section rode the planner's checkpoint).
+- Carried from the IN-PROGRESS checkpoint: worker-1's claimed 239/239 probe
+  total vs the committed annotation's 229 — the spec baseline (229) was the
+  authority; 239 is the last S23 RUN ID (the inline-label quirk).
+- Smoke positive check pins 3 lines (2 escape + 1 numword observation on
+  the ORIGINAL argStr) — consistent with "field 5 = original arg" + the
+  observation channel logging incident data.
+
+## Deliberately NOT done
+- Deferred A/B proposal items (not in v1). No live-listener / real-input
+  verification (repo safety limit). No AGENTS.md edit (the paste draft in
+  decision-record §4 only — his paste). No FST product (Python) changes.
+- The loop folder's `loop_log.md` DONE line for this task was appended
+  (append-only) but NOT staged — the loop file is the planner/looprunner's
+  committed channel; carry it with your bookkeeping.
