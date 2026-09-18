@@ -462,14 +462,14 @@ export default async function CompactMemoryPlugin(ctx: any) {
   return {
     tool: {
       compact_memory: tool({
-        description: "Triggers session compaction to free context space. The compaction runs as a BACKGROUND fire-and-forget dispatch (it never blocks the session — an await here would deadlock on the single llama-swap model slot); success is verified asynchronously: the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success. Budget is per-session and per-model quant-class (CPU models are excluded — see the classifier in this plugin).",
+        description: "Compacts a session to free context space. Two paths: SELF (sessionID omitted) — your own session ENDS after the compaction; you resume from committed files via the post-compaction protocol. CROSS (explicit sessionID) — a fire-and-forget dispatch: it returns immediately and never blocks (an await would deadlock on the single llama-swap model slot); success is verified ASYNCHRONOUSLY — the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success, and a failed dispatch burns NO budget. The budget is per TARGET session, per model quant-class (CPU models denied — cap 0). Use it at the stop line / near-limit triage (self) or before a task_id resume of a session that died at its limit (cross); do NOT use it as a restart substitute — the recent head stays INTACT and a summary of the dropped tail is auto-created.",
         args: {
-          sessionID: tool.schema.string().optional().describe("Session ID to compact (defaults to the calling session; an explicit id compacts ANOTHER session)"),
-          providerID: tool.schema.string().optional().describe("ProviderID to be submitted when using a sessionID - has to be the ID corresponding to the SessionID - in doubt 'llama-swap'"),
-          modelID: tool.schema.string().optional().describe("modelID to be submitted when using a sessionID - has to be the ID corresponding to the SessionID - in doubt 'llama-swap'"),
-          keepTokens: tool.schema.number().optional().describe("Number of recent tokens to retain (e.g. 10000 or 30000)"),
-          keepMessages: tool.schema.number().optional().describe("Number of recent messages to retain (e.g. 6 or 12)"),
-          message: tool.schema.string().optional().describe("Post-compaction continuation message for the target session. Usage: 1-3 lines: what to resume + which files to re-read. ABSENT → the default reload directive is returned."),
+          sessionID: tool.schema.string().optional().describe("Session to compact. Omit = your own session (the SELF path). An explicit id = ANOTHER session (the CROSS fire-and-forget path)."),
+          providerID: tool.schema.string().optional().describe("Model-pair OVERRIDE, paired with modelID — the provider id submitted VERBATIM in the summarize body instead of the auto-resolved pair. Leave BOTH unset for the normal case (auto-resolved; the host's compaction-model default applies). Set the pair only to force a specific compaction model (e.g. a small fast model for a cross compaction)."),
+          modelID: tool.schema.string().optional().describe("Model id — set TOGETHER with providerID (sent verbatim in the summarize body)."),
+          keepTokens: tool.schema.number().optional().describe("Recent tokens to retain (e.g. 30000). Note: this build's server ignores the keep fields (the compaction floor is server-side) — they are sent, dropped on rejection, and never block the call."),
+          keepMessages: tool.schema.number().optional().describe("Recent messages to retain (e.g. 12) — same note as keepTokens."),
+          message: tool.schema.string().optional().describe("Post-compaction continuation message (1-3 lines: what to resume + which files to re-read), attached to the compaction summary. ABSENT → the default reload directive is returned."),
 
         },
         async execute(args: any, c: any) {

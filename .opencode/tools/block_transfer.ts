@@ -30,7 +30,12 @@ ANCHORS — startMarker and endMarker are short UNIQUE line prefixes; the block 
 
 BUFFERS — bufferName selects a named clipboard buffer (default 'default'); multiple buffers can coexist in one session; CLEAR empties one.
 
-SANDBOX — all file access (reads AND writes) is confined to the working directory and the Windows temp directory; any path outside is rejected with an error.`,
+SANDBOX — all file access (reads AND writes) is confined to the working directory and the Windows temp directory; any path outside is rejected with an error.
+
+EDGE — a non-unique anchor, a missing required path, an empty PASTE buffer, or an out-of-sandbox path each return an error naming the cause — read the error, fix the input, re-issue (a non-unique anchor: widen the prefix, do not guess).
+
+EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TODO.md into BACKLOG.md, right after its "# Backlog" header line:
+  { "mode": "MOVE", "srcFile": "TODO.md", "dstFile": "BACKLOG.md", "startMarker": "## TODO", "endMarker": "## Notes", "targetMarker": "# Backlog" }`,
   args: {
     mode: tool.schema.enum(["MOVE", "COPY", "CUT", "PASTE", "DELETE", "CLEAR"]).describe("Operation mode: MOVE (immediate cut-and-paste), COPY (yank to buffer), CUT (yank to buffer and delete from source), PASTE (write buffer to target), DELETE (cut to null), CLEAR (empty buffer)."),
     srcFile: tool.schema.string().optional().describe("Source file path. Required for MOVE, COPY, CUT, and DELETE."),
