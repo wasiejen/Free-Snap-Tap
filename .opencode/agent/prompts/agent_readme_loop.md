@@ -64,9 +64,9 @@ not here.
     `explorer-N`; the iteration number when known (it is in the launch
     message / task spec), role only for direct runs.
   - `<content>` per status:
-    - `START-->` — looprunner, planner, and worker each write one at their own
+    - `-->START` — looprunner, planner, and worker each write one at their own
       session/task start; content = the task oneliner.
-    - `<---DONE` — every agent WITH loop-folder write access (planner, worker)
+    - `DONE<---` — every agent WITH loop-folder write access (planner, worker)
       writes one on task completion; content = the final gauge readout
       `<CTX>%/<REM>K` — verbatim from the gauge command, never guessed.
       (The explorer has no loop-folder write access — its completion rides the
