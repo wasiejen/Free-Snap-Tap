@@ -301,6 +301,44 @@ try {
       // flattenField the hook's log path uses
       fS[5] === core.flattenField(`fuzzy kind=dedup scope=write orig=${proj}\\sx\\sx\\real-a.txt -> ${proj}\\sx\\real-a.txt d=0`), JSON.stringify(fS));
 
+  // ---- (8h) the #0 numword escape (2026-09-18; approved
+  //      2026-09-17_numword-escape-output.md): the sentinel-gated CONTENT
+  //      resolution — the ONE legal content mutation:
+  //      `[<incident>:<safe-form>:esc]` → the field-2-derived digits (the
+  //      safe form: dash digits or numwords); the sentinel never reaches
+  //      the content; unmarked / invalid forms are NEVER touched
+  const argsE1 = { filePath: proj + "\\wfx\\file-4.txt", oldString: "n [405:four-two-five:esc]", newString: "m [405:4-2-5:esc]" };
+  const argsE1Before = JSON.stringify(argsE1);
+  const countE1 = readLines().length;
+  await before({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c10h" }, { args: argsE1 });
+  const lE1 = readLines();
+  // line order: escape(oldString) + escape(newString) — the channel lines —
+  // then the observation line on the ORIGINAL argStr (observeNumword sees the
+  // `four-two-five` token inside the oldString form — it is not a pair span;
+  // the observation channel always sees the pre-mutation arg)
+  const fE1a = split8(lE1[countE1]);
+  const fE1b = split8(lE1[countE1 + 1]);
+  const fE1c = split8(lE1[countE1 + 2]);
+  chk("escape positive (edit oldString+newString) → both resolved (numword + dash-digit forms) + 2 pair-resolved kind=escape lines + the numword observation on the original arg",
+    argsE1.oldString === "n 425" && argsE1.newString === "m 425" && lE1.length === countE1 + 3 &&
+      fE1a[7] === "pair-resolved" && fE1a[5] === "kind=escape scope=content orig=[405:four-two-five:esc] value=425 hits=1" &&
+      fE1b[7] === "pair-resolved" && fE1b[5] === "kind=escape scope=content orig=[405:4-2-5:esc] value=425 hits=1" &&
+      // the log FIELD is cap-truncated (MAX_FIELD_CHARS) — expected via the
+      // SAME flattenField the hook's log path uses
+      fE1a[4] === core.flattenField(argsE1Before) && fE1c[7] === "no-candidate" && fE1c[5] === "numword four-two-five→425",
+    JSON.stringify([fE1a, fE1b, fE1c]));
+
+  const argsE2 = { filePath: proj + "\\wfx\\file-4.txt", content: "x = args[1:one] + y; [316:foo-bar:esc]" };
+  const argsE2Before = JSON.stringify(argsE2);
+  const countE2 = readLines().length;
+  await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c10i" }, { args: argsE2 });
+  const lE2 = readLines();
+  const fE2 = split8(lE2[lE2.length - 1]);
+  chk("escape negative: unmarked [1:one] pair-logged only (args byte-identical) + INVALID safe form [316:foo-bar:esc] untouched (zero kind=escape lines)",
+    JSON.stringify(argsE2) === argsE2Before && lE2.length === countE2 + 1 && fE2[7] === "observed-redundancy-ok" &&
+      fE2[5] === "pair=[1:one] canon=1 dist=0" &&
+      !lE2.slice(countE2).some((l) => l.includes("kind=escape")), JSON.stringify([argsE2, lE2.slice(countE2)]));
+
   // ---- (9) the LIVE log is untouched by this smoke
   const liveAfter = fs.existsSync(LIVE_LOG) ? fs.statSync(LIVE_LOG).size : null;
   chk("live .opencode/temp/intercept.log untouched (sandbox-only writes)",

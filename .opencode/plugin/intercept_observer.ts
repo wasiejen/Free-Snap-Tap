@@ -48,7 +48,14 @@
 //       oldString / newString / bufferName / …) carry the observation-form
 //       pair line ONLY — never mutated (the content-scope guard: mutation
 //       is scope, not grammar — `args[1:one]` collides with the python
-//       slice form in the string space).
+//       slice form in the string space). ONE exception (the #0 numword
+//       escape, 2026-09-18): a SENTINEL-carrying form
+//       `[<digits>:<safe-form>:esc]` in `content` / `oldString` /
+//       `newString` IS resolved (the form → the field-2-derived digits;
+//       the sentinel never reaches the file) — the gate is the sentinel,
+//       so unmarked / invalid forms stay byte-identical. Path fields are
+//       untouched by the escape (a sentinel form in a path must not
+//       change the R1/R2 path-channel outcomes — maintainer ruling).
 //   (3b) FUZZY on the same path fields: the read-scope matcher at the
 //       TIGHTER bar d<=1 (`resolveWritePath`) under the same strict gate —
 //       `fuzzy-resolved`/`fuzzy-rejected` with the `scope=write` flag in
@@ -108,7 +115,10 @@
 // not attempted).
 // Verdict vocabulary: the six observation verdicts (core header) +
 // `fuzzy-resolved` / `fuzzy-rejected` + `pair-resolved` + `error` (the
-// intercept-error line).
+// intercept-error line). The #0 escape line (2026-09-18) REUSES the
+// `pair-resolved` verdict — evidence `kind=escape scope=content
+// orig=<form> value=<digits> hits=<n>` (the nine verdicts stay
+// byte-identical — the #73 `kind=dedup` precedent).
 //
 // MODEL ID: obtained the same way the watchdog fills its ctx-log model field
 // — readGauge(undefined, sessionID) from ./scripts/gauge.mjs (the shared
@@ -155,6 +165,7 @@ import {
   normPathForm,
   observeArg,
   relForm,
+  resolveEscapes,
   resolveReadPath,
   resolveWritePath,
 } from "./intercept_observer_core.ts";
@@ -471,6 +482,44 @@ function runPairWrite(output: { args?: unknown }, tool: string): Observation[] {
   return lines.slice(0, MAX_LINES_PER_CALL);
 }
 
+// CONTENT-SCOPED ESCAPE resolution (#0, 2026-09-18; approved
+// 2026-09-17_numword-escape-output.md): the ONE legal content mutation —
+// sentinel-gated, so unmarked / invalid forms are never touched (the
+// content-scope guard's exception, the match gate is the sentinel).
+// Runs FIRST for write/edit/block_transfer — before the pair observation
+// on the same fields (Part 3 pipeline order: the pair channel then sees
+// the resolved text) and before the observation channel. The string args
+// named `content` / `oldString` / `newString` only — block_transfer
+// carries none of these names (natural no-op); the PATH fields are
+// untouched (R1/R2 semantics unchanged — a sentinel-carrying form in a
+// path is not an escape and must not change the path-channel outcomes).
+// A hit MUTATES the arg (form → field-2-derived digits) and logs ONE
+// 8-field line per hit reusing the `pair-resolved` verdict — evidence
+// `kind=escape scope=content orig=<form> value=<digits> hits=<n>` (n =
+// the hits in that field; the nine-verdict vocabulary is unchanged, the
+// #73 `kind=dedup` precedent). Never throws.
+function runEscapeContent(output: { args?: unknown }, tool: string): Observation[] {
+  const args = output?.args;
+  if (args == null || typeof args !== "object" || map === null) return [];
+  if (!writePathFields(tool).length) return [];
+  const lines: Observation[] = [];
+  for (const field of ["content", "oldString", "newString"]) {
+    const raw = (args as Record<string, unknown>)[field];
+    if (typeof raw !== "string" || raw === "") continue;
+    const res = resolveEscapes(raw, map);
+    if (res.hits.length === 0) continue;
+    (args as Record<string, string>)[field] = res.text;
+    for (const h of res.hits) {
+      lines.push({
+        verdict: "pair-resolved",
+        evidence: `kind=escape scope=content orig=${h.raw} value=${h.value} hits=${res.hits.length}`,
+        context: classifyContext(raw),
+      });
+    }
+  }
+  return lines;
+}
+
 // WRITE-scope FUZZY: the read-scope matcher at the tighter bar (d<=1,
 // resolveWritePath) under the SAME strict existence gate — runs on the
 // (possibly pair-mutated) RESULT, per path field. Existing target → fast
@@ -670,10 +719,14 @@ async function onToolBefore(
     const writeOwned = isObj && writePathFields(tool).length > 0;
     const bashOwned = isObj && tool === "bash" && typeof (output.args as { command?: unknown }).command === "string";
     const skipPairs = pairOwned || writeOwned || bashOwned;
-    // Pipeline order: pair FIRST (may mutate), then the fuzzy matcher on the
+    // Pipeline order: ESCAPE FIRST (sentinel-gated content mutation — Part
+    // 3 pre-step: the pair observation then sees the resolved text), then
+    // the pair channel (may mutate), then the fuzzy matcher on the
     // (possibly pair-mutated) result (decision-record §2.6). Channel lines
     // log BEFORE the observation lines (the pair-before-dense order the
     // smoke/probe pins).
+    let escape: Observation[] = [];
+    if (writeOwned) escape = runEscapeContent(output, tool);
     let channel: Observation[] = [];
     let fuzzy: Observation[] = [];
     if (pairOwned) channel = runPairRead(output);
@@ -690,8 +743,9 @@ async function onToolBefore(
       // the pair channel above is unaffected for all three tools)
       fuzzy = runFuzzyWrite(output, tool); // write-scope ONLY
     }
-    if (obs.length === 0 && channel.length === 0 && fuzzy.length === 0) return; // nothing to log
+    if (escape.length === 0 && obs.length === 0 && channel.length === 0 && fuzzy.length === 0) return; // nothing to log
     model = await getModel(sid);
+    for (const o of escape) appendObservation(sid, model, tool, argStr, o);
     for (const o of channel) appendObservation(sid, model, tool, argStr, o);
     for (const o of obs) appendObservation(sid, model, tool, argStr, o);
     for (const o of fuzzy) appendObservation(sid, model, tool, argStr, o);

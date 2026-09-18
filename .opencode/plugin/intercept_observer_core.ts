@@ -422,6 +422,69 @@ export function observePairs(arg: string, map: NumwordMap | null): Observation[]
   return obs;
 }
 
+// ------------------------------------------------------------------ escape resolution (#0, 2026-09-18)
+//
+// The numword escape form (approved 2026-09-17_numword-escape-output.md):
+// `[<incident>:<safe-form>:<sentinel>]` in write/edit CONTENT — a dense
+// number the agent cannot reliably emit is WRITTEN into the file via the
+// safe form it CAN. Field 1 (the incident, digits as-seen — the drifted
+// state) is log-only, never authoritative. Field 2 (the correcting side)
+// is the VALUE: dash-separated single digits (`3-2-0`) or numwords
+// (`three-two-zero`) — the existing safe forms. Field 3 (the sentinel,
+// `esc` / `escape` — the case variants are the same: one regex, the `i`
+// flag) is the MATCH GATE: only sentinel-carrying forms are resolved, an
+// unmarked `[a:b]` or an invalid field 2 stays byte-identical (Part 4 —
+// no risk of unknowingly rewriting code; the clash surface is the exact
+// `<digits>:<safe-form>:<sentinel>` structure). The whole form is
+// replaced by the field-2-derived digits — the sentinel never reaches the
+// file.
+
+const ESCAPE_RE = /\[([0-9]+):([^:\]]+):esc(?:ape)?\]/gi;
+
+export interface EscapeHit {
+  raw: string; // the matched form as-seen (the log evidence)
+  value: string; // the digits derived from field 2 (the written value)
+  start: number;
+  end: number;
+}
+
+// The safe form of field 2 (map/grammar-driven — no second numeral table):
+// dash-separated single digits, or a numword form resolvable by the
+// EXISTING `resolveNumword` grammar (single map word / dash-separated
+// single units / tens / teens). Invalid → null (not a match — the loud
+// unknown discipline, never a guess).
+export function resolveEscapeSafe(raw: string, map: NumwordMap): string | null {
+  const s = String(raw).trim().toLowerCase();
+  if (s === "") return null;
+  if (/^[0-9](?:-[0-9])*$/.test(s)) return s.replace(/-/g, ""); // 3-2-0 → 320
+  const r = resolveNumword(s, map);
+  return r.kind === "value" ? r.value : null;
+}
+
+// Resolve EVERY sentinel-carrying escape form in `text`: returns the
+// transformed text (each matched form → its field-2-derived digits; the
+// sentinel is stripped) + the hit list (original form + resolved digits
+// per hit) for the log line. A form whose field 2 is not a valid safe
+// form is left byte-identical (NOT a match). Pure function over arg
+// strings + the shared map.
+export function resolveEscapes(text: string, map: NumwordMap): { text: string; hits: EscapeHit[] } {
+  const s = String(text ?? "");
+  const hits: EscapeHit[] = [];
+  for (const m of s.matchAll(ESCAPE_RE)) {
+    const value = resolveEscapeSafe(m[2], map);
+    if (value === null) continue;
+    hits.push({ raw: m[0], value, start: m.index!, end: m.index! + m[0].length });
+  }
+  if (hits.length === 0) return { text: s, hits };
+  let out = "";
+  let last = 0;
+  for (const h of hits) {
+    out += s.slice(last, h.start) + h.value;
+    last = h.end;
+  }
+  return { text: out + s.slice(last), hits };
+}
+
 // ------------------------------------------------------------------ numword tokens (observation b)
 
 export function observeNumword(arg: string, map: NumwordMap | null): Observation[] {

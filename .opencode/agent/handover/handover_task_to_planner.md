@@ -1,27 +1,69 @@
-# Worker summary — submit tool session/role autofill (worker-1, ses_f4e3d64e9ffeO1uIkfX5WzDaNx, plan2/iter2)
+# Worker summary — #0 numword escape output (worker-2, ses_f4e084942ffeSedvBfOKl2ehQY, plan2/iter2) — IN PROGRESS (checkpoint)
 
-## What changed (code commit 86a977f on `opencode_test`)
-- `.opencode/tools/submit.ts` — `role`/`session` REMOVED from the args schema (only `feedback`/`knowledge`/`todo` remain). `execute` now auto-fills the stamp: `role` = non-empty `context.agent` else `agent`; `session` = non-empty `context.sessionID` else `unknown` (same fallback semantics as the old defaults). Description updated to say role+session are auto-filled from the tool context (no parameter); the "from the SESSION= field of your injected ctx: line" instruction is gone (it lived in the removed `session` schema entry). Header comment updated.
-- `.opencode/plugin/tests/submit.smoke.mjs` (20/20) — args-optional check now covers the 3 channel args AND asserts `role`/`session` are GONE from the schema; every test that passed explicit role/session now passes them via the context (`{ directory, agent, sessionID }`) and expects the stamped entry from the context values; (A) is the fallback assertion (context WITHOUT agent/sessionID → `agent`/`unknown`). Check count unchanged (20).
-- `.opencode/plugin/probes/handover_probe.mjs` — S23 section ONLY: args-shape re-pinned to `[feedback, knowledge, todo]` (+ role/session absent pin); the append checks pass a context carrying `agent`/`sessionID` and pin the stamp from it; section check COUNT (9) and header count (9) unchanged → section-sum annotation total (239) agrees, machine-verified, number NOT retyped. Also refreshed the S23 "WHAT IT RUNS" description lines in the header block (comment-only) so they no longer say "5 args" — see Deviations.
+State at this checkpoint (context-budget early handover, 73% used). If this
+session dies, a fresh worker resumes from here.
 
-## Measured verification (all post-commit, verbatim gate readouts)
-- `node .opencode/plugin/probes/handover_probe.mjs` → `PROBE handover: 239/239 PASS` (header annotation line 611 reads `S1=3 … S23=9 hygiene=6 → "PROBE handover: 239/239 PASS"` — agrees)
-- `submit.smoke.mjs` → `SUBMIT_SMOKE: ALL PASS (20/20)`
-- all 9 smokes green: block_transfer.sandbox 52/52, block_transfer 22/22, compact_memory 46/46, context_recovery ALL PASS, ctx_gauge 3/3, gauge_core ALL PASS, intercept_observer 37/37, loop_log 24/24, submit 20/20
-- `./.venv/Scripts/python.exe -m pytest -q` → `459 passed, 1 warning` (baseline match)
-- `./.venv/Scripts/ruff.exe check --select F .` → `All checks passed!` (F=0, baseline match)
-- DO-NOT-touch grep check on submit.ts: zero `role:`/`session:` schema entries (verified with `grep -nE "^\s*(role|session)\s*:"` → NONE); remaining "session"/"role" hits are comments/description (explaining the auto-fill) + the context-derivation lines + the stamp code.
+## Done (verified)
+- `intercept_observer_core.ts` — `resolveEscapes(text, map)` + `resolveEscapeSafe`
+  (pure, exported): form `[<digits>:<safe-form>:esc|escape>]` (one regex, `i`
+  flag — case variants); field 2 = dash-separated single digits OR numwords
+  (reuses the existing `resolveNumword` grammar — no second table); invalid
+  field 2 → form left byte-identical; returns transformed text + hit list
+  (raw + value per hit).
+- `intercept_observer.ts` — `runEscapeContent(output, tool)` wired for
+  write/edit/block_transfer on the string args `content`/`oldString`/
+  `newString` (block_transfer carries none → natural no-op); runs FIRST
+  (before the pair observation — Part 3 order); a hit mutates the arg +
+  logs ONE 8-field line per hit, verdict `pair-resolved`, evidence
+  `kind=escape scope=content orig=<form> value=<digits> hits=<n>` (n = hits
+  in that field); nine-verdict vocabulary unchanged (#73 kind=dedup
+  precedent). Path fields untouched. Header comments updated (the
+  (3a) content-scope guard gains the escape exception; the verdict-vocabulary
+  block notes kind=escape).
+- `intercept_observer.smoke.mjs` — +2 checks (8h): escape positive (edit
+  oldString+newString, numword + dash-digit forms; 3 lines = 2 escape + the
+  numword observation on the original arg — observeArg always sees the
+  pre-mutation argStr, field 5 stays the original arg via flattenField) +
+  escape negative (unmarked `[1:one]` pair-logged only, invalid
+  `[316:foo-bar:esc]` untouched). **39/39 GREEN.**
+- Probe regression check (no S24 yet): `PROBE handover: 229/229 PASS` —
+  agrees with the header annotation (line 611, `S21=12 S22=9 hygiene=6 →
+  "PROBE handover: 229/229 PASS"`; note: the S23 submit section is annotated
+  as `S22=9` — the pre-existing inline label off-by-one the spec names; do
+  not "fix" it).
 
-## TODO
-- #53 status line appended under the existing entry (LANDED 86a977f, plan2/iter2). No new todo_inbox entries — nothing out of scope found.
+## Remaining
+1. `handover_probe.mjs` — new S24 section (append-only, after the S23
+   section, before S5 hygiene; run IDs 240-245, inline labels = run IDs
+   (correct, per the spec's quirk note)); 6 checks: (a) write content
+   dash-form → resolved + kind=escape line; (b) edit oldString+newString
+   numword-form → both resolved (expect the numword observation line on the
+   original argStr too — see smoke 8h); (c) unmarked → zero escape lines;
+   (d) invalid safe-form → untouched; (e) sentinel form in a read/write
+   PATH → path channel outcomes unchanged (byte-identical, no escape line —
+   create a real bracketed file `file-[4:four:esc].txt` in ioPfDir so read
+   fast-paths); (f) case variants ESC/Escape → resolved. Header: S24
+   annotation block after the S23 block (~line 598) + the section-sum line
+   611 gains `S24=6` and the total (229+6=235 — machine-verify, never
+   retype).
+2. `primer.md` "Where it applies" — the escape form block (form,
+   `[316:3-2-0:esc]` → `320`, content scope, case variants).
+3. `decision-record.md` §4 paste-draft block (the fenced block at ~line
+   204-214) — APPEND one line naming the escape form (his paste stays his).
+4. Full gate: probe (235/235 + annotation agree) + all 9 smokes (intercept
+   39/39) + `pytest -q` (459+1w) + `ruff check --select F .` (0) — commands
+   per repo_commands.md. DoD grep: `grep -n "esc" intercept_observer_core.ts`
+   map/grammar-driven.
+5. Final handover (this file) + code commit + bookkeeping (the #53 Part B
+   precedent: one code commit + bookkeeping if it carries its own hash).
 
-## Deliberately NOT done
-- Registration of `submit` in the live `opencode.jsonc` + per-agent tool grant (maintainer domain, already REMAINING under #53 from plan1).
-- Did NOT touch the probe's section-sum annotation NUMBER (kept 239 — check count unchanged) and did NOT touch any other probe section, the section-sum line's total, or any file on the DO-NOT-touch list.
-
-## Deviations / notes for the planner
-- **Commit structure (2 commits, not 1):** the spec asked for "ONE commit (code + TODO.md + handover)" AND a status line carrying the commit `<hash>`. A single commit cannot contain its own hash, so I followed the repo's own #53 Part B precedent (b83b34f code + a8636ef bookkeeping): commit `86a977f` = code (3 files); this bookkeeping commit = TODO.md #53 status line (referencing 86a977f) + this handover. If strict single-commit is required, the two can be squashed — the record stays traceable either way.
-- **Pre-existing inline-numbering quirk (NOT fixed, out of scope):** in `handover_probe.mjs` the S23 section's inline comment labels read 230–238 while the actual run check IDs are 231–239 (the counter `let n23 = 230` is pre-incremented). Pre-existing; cosmetic only; left as-is to stay in scope.
-- **Counter-var near-miss (caught, fixed):** my first probe edit accidentally mistyped ONE digit in the S23 counter variable name — a look-alike that renders identically in the editor (the correct name and my mistake differ in a single digit; per char-codes the correct one, copied from an untouched check, ends in the digit `2` while my mistake ended in `3`). The probe threw `ReferenceError: <var> is not defined`. Fixed by splicing the correct token from an untouched S23 check; probe is 239/239 green. Flagging per the honesty guard.
-- Branch confirmed `opencode_test` via `git branch -v` before committing; pre-existing unstaged working-tree changes (deletions/modifications/new files under .opencode/) were NOT staged — only my 3 code files + TODO.md + this handover.
+## Deviations / notes so far
+- Smoke positive check pins 3 lines (2 escape + 1 numword observation) —
+  observeNumword sees the `four-two-five` token inside the oldString escape
+  form on the ORIGINAL argStr (escape forms are not pair spans). Consistent
+  with "field 5 = original arg" + the observation channel logging incident
+  data; the pair observation on the field (runPairWrite) sees the RESOLVED
+  text (no pair there after resolution).
+- worker-1's handover claims a 239/239 probe total; the committed annotation
+  + spec baseline + a fresh run all say 229 (239 is the last S23 RUN ID,
+  the inline-label quirk). The spec baseline (229) is the authority.
