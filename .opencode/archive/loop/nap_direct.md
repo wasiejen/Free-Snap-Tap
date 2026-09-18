@@ -727,3 +727,78 @@
   (structural adjacency-collapse pre-check, existence-gated,
   `kind=dedup` flag + realistic fixture pins). **NEXT UNIT: TODO #73**
   (R7 correction), then R8.
+
+## Current session — direct (ses_f4c039ae2ffeRqvdPqGu8IdB37, planner, Qwen3.8-27B-IQ4KT-140K, post-opencode-restart)
+- **LIVE ACCEPTANCE PASSED for BOTH pending items** (the plan2 PENDING line
+  is closed):
+  - `submit` — registered in the live opencode.jsonc (the 11-47 loop pause
+    enabled the plugin); fired from this live session with NO manual args;
+    the entry stamped `planner_Q4_140K ses_f4c039ae2ffeRqvdPqGu8IdB37` in
+    agent_feedback.md (autofill from the tool context verified).
+  - `#0 numword escape` — live writes with sentinel forms (`esc` + `escape`
+    variants) resolved to field-2 digits; unmarked control form survived
+    byte-identical; VERIFIED VIA intercept.log 2026-09-18_12-19 lines
+    (4 `kind=escape scope=content` verdicts, `pair-resolved`, `hits=2`) —
+    not via my own args (see the finding below).
+- **Maintainer ruling + noted for future planners:** an agent CANNOT
+  perceive the pre-correction parts of its own tool calls — the DB stores
+  the POST-mutation args and only the corrected form re-enters the context
+  (my 3 "repeated" writes were actually sentinel-carrying; I perceived the
+  corrected digits = a false repetition loop). Extended the existing
+  "Stored tool-call args are POST-mutation" entry in
+  `knowledge/knowledge_plugins.md` (this is the SECOND instance, escape
+  channel). Verify escape/fuzzy behavior against intercept.log FIRST.
+- Bookkeeping: leftovers commit `8855be6` (loop_log INFO lines, approved/
+  escape-proposal deletion, agent-feedback-closedown verdict section,
+  worker-2 compaction dump).
+- **AGENTS.md paste (his):** (a) the submit one-liner for
+  §agent_feedback (draft in loop folder plan1_summary.md §Pending.3);
+  (b) the content-escape (sentinel-gated) sentence of the
+  decision-record §4 paste-draft — the Redundancy-form block itself IS
+  already live in AGENTS.md, but WITHOUT that escape tail sentence. →
+  **BOTH LANDED the same day (verified on disk, see below).**
+- **AGENTS.md paste LANDED (his, 2026-09-18):** both pieces verified on
+  disk — submit one-liner (line 208, §agent_feedback) + the
+  sentinel-gated content-escape block (Pattern 5 area). The last
+  maintainer-domain item from plan1/plan2 is CLOSED — zero items of the
+  old pending set remain.
+- **Prompt rework check (another agent, 2026-09-18):** 8 commits
+  `671a582..e00d52b` — loop readme 8-char tokens; memory-files template
+  (`4a1192a`); stale 85 % override notes removed from role prompts
+  (`79beebd`); tool descriptions reworked (compact_memory + block_transfer
+  example, `13b0583`); maintainer main-files update (`784346a`);
+  prompt_engineer memory namespace seeded + pointer (`68aa290`,
+  `c20b8cf`, `e00d52b`). NO live maintainer markers found on the sweep.
+- **Earlier flagged-UNCOMMITTED items — RESOLVED:** the memory/planner
+  seed + the p2 draft `+STATUS` line were handed over by the maintainer
+  and committed by him (`f3da151`); flag-only handling per the
+  maintainer-live-file discipline held.
+- **Queue (his priority.md order):** #70 compact_memory rework →
+  repo-split research → #56 distillation (DEFERRED). Note: the near-limit
+  triage (P2) is now LIVE in the role prompts (this session boots with
+  it) — it is separate from #70 (the compact_memory tool itself); the
+  draft is superseded-by-implementation and keeps as the rationale record.
+  Loop is paused (11-47 INFO line; iteration 3 launch was noted).
+- **Memory pilot (his, 2026-09-18): planner namespace SEEDED** —
+  `agent/memory/planner/` (README filled: role scope / not-for list /
+  categories / retrieval keywords / write + review policy; memory.md:
+  two high-value seeds — MEM-0101 observer-side acceptance rule, MEM-0102
+  two-phase maintainer-domain close-out; template-example references
+   removed per his live edit — examples are scaffolding, not entries,
+   `1740bb3`). Pilot verdict pending his review.
+- **Maintainer-file discipline (his, 2026-09-18):** he does NOT use
+  `--wip` broadly — all his files are perpetually mid-state (thoughts
+  mature in the file over days; ideas-file habit); commits happen before
+  bigger tests or when he wants the option to move handled priority
+  items to `_past_priorities`. Markers/inbox content WORKS uncommitted
+  (that is the shared-tree liveness both sides rely on). He is fine as
+  is — the 2-repo / draft-separation variant was considered and REJECTED
+  (his reasons: sync friction + live channels only work in a shared tree).
+  My side: named-path commits only, never `git add -A`. → seeded as
+  `agent/memory/planner` MEM-0103.
+- **Model swap (his, 2026-09-18):** the IQ3KT-MTP variant
+  crashed/corrupted mid-session (output-channel corruption only —
+  measured: zero filesystem impact, `git status` clean at the
+  pre-corruption HEAD); the session was restarted on
+  Qwen3.8-27B-IQ4KT-140K and reoriented from committed state. → noted in
+  `knowledge/knowledge_tools.md` (corruption/recovery entry).

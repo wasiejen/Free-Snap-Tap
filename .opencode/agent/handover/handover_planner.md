@@ -2,80 +2,29 @@
 
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
-## Current session — direct (ses_f4c039ae2ffeRqvdPqGu8IdB37, planner, Qwen3.8-27B-IQ4KT-140K, post-opencode-restart)
-- **LIVE ACCEPTANCE PASSED for BOTH pending items** (the plan2 PENDING line
-  is closed):
-  - `submit` — registered in the live opencode.jsonc (the 11-47 loop pause
-    enabled the plugin); fired from this live session with NO manual args;
-    the entry stamped `planner_Q4_140K ses_f4c039ae2ffeRqvdPqGu8IdB37` in
-    agent_feedback.md (autofill from the tool context verified).
-  - `#0 numword escape` — live writes with sentinel forms (`esc` + `escape`
-    variants) resolved to field-2 digits; unmarked control form survived
-    byte-identical; VERIFIED VIA intercept.log 2026-09-18_12-19 lines
-    (4 `kind=escape scope=content` verdicts, `pair-resolved`, `hits=2`) —
-    not via my own args (see the finding below).
-- **Maintainer ruling + noted for future planners:** an agent CANNOT
-  perceive the pre-correction parts of its own tool calls — the DB stores
-  the POST-mutation args and only the corrected form re-enters the context
-  (my 3 "repeated" writes were actually sentinel-carrying; I perceived the
-  corrected digits = a false repetition loop). Extended the existing
-  "Stored tool-call args are POST-mutation" entry in
-  `knowledge/knowledge_plugins.md` (this is the SECOND instance, escape
-  channel). Verify escape/fuzzy behavior against intercept.log FIRST.
-- Bookkeeping: leftovers commit `8855be6` (loop_log INFO lines, approved/
-  escape-proposal deletion, agent-feedback-closedown verdict section,
-  worker-2 compaction dump).
-- **AGENTS.md paste (his):** (a) the submit one-liner for
-  §agent_feedback (draft in loop folder plan1_summary.md §Pending.3);
-  (b) the content-escape (sentinel-gated) sentence of the
-  decision-record §4 paste-draft — the Redundancy-form block itself IS
-  already live in AGENTS.md, but WITHOUT that escape tail sentence. →
-  **BOTH LANDED the same day (verified on disk, see below).**
-- **AGENTS.md paste LANDED (his, 2026-09-18):** both pieces verified on
-  disk — submit one-liner (line 208, §agent_feedback) + the
-  sentinel-gated content-escape block (Pattern 5 area). The last
-  maintainer-domain item from plan1/plan2 is CLOSED — zero items of the
-  old pending set remain.
-- **Prompt rework check (another agent, 2026-09-18):** 8 commits
-  `671a582..e00d52b` — loop readme 8-char tokens; memory-files template
-  (`4a1192a`); stale 85 % override notes removed from role prompts
-  (`79beebd`); tool descriptions reworked (compact_memory + block_transfer
-  example, `13b0583`); maintainer main-files update (`784346a`);
-  prompt_engineer memory namespace seeded + pointer (`68aa290`,
-  `c20b8cf`, `e00d52b`). NO live maintainer markers found on the sweep.
-- **Earlier flagged-UNCOMMITTED items — RESOLVED:** the memory/planner
-  seed + the p2 draft `+STATUS` line were handed over by the maintainer
-  and committed by him (`f3da151`); flag-only handling per the
-  maintainer-live-file discipline held.
-- **Queue (his priority.md order):** #70 compact_memory rework →
-  repo-split research → #56 distillation (DEFERRED). Note: the near-limit
-  triage (P2) is now LIVE in the role prompts (this session boots with
-  it) — it is separate from #70 (the compact_memory tool itself); the
-  draft is superseded-by-implementation and keeps as the rationale record.
-  Loop is paused (11-47 INFO line; iteration 3 launch was noted).
-- **Memory pilot (his, 2026-09-18): planner namespace SEEDED** —
-  `agent/memory/planner/` (README filled: role scope / not-for list /
-  categories / retrieval keywords / write + review policy; memory.md:
-  two high-value seeds — MEM-0101 observer-side acceptance rule, MEM-0102
-  two-phase maintainer-domain close-out; template-example references
-   removed per his live edit — examples are scaffolding, not entries,
-   `1740bb3`). Pilot verdict pending his review.
-- **Maintainer-file discipline (his, 2026-09-18):** he does NOT use
-  `--wip` broadly — all his files are perpetually mid-state (thoughts
-  mature in the file over days; ideas-file habit); commits happen before
-  bigger tests or when he wants the option to move handled priority
-  items to `_past_priorities`. Markers/inbox content WORKS uncommitted
-  (that is the shared-tree liveness both sides rely on). He is fine as
-  is — the 2-repo / draft-separation variant was considered and REJECTED
-  (his reasons: sync friction + live channels only work in a shared tree).
-  My side: named-path commits only, never `git add -A`. → seeded as
-  `agent/memory/planner` MEM-0103.
-- **Model swap (his, 2026-09-18):** the IQ3KT-MTP variant
-  crashed/corrupted mid-session (output-channel corruption only —
-  measured: zero filesystem impact, `git status` clean at the
-  pre-corruption HEAD); the session was restarted on
-  Qwen3.8-27B-IQ4KT-140K and reoriented from committed state. → noted in
-  `knowledge/knowledge_tools.md` (corruption/recovery entry).
+
+## Current session — direct (ses_f4a3f85e1ffeO9206c9ENvkK0f, planner, Qwen3.8-27B-IQ4KT-140K)
+- **opencode-auto-resume research (his priority.md item):** surface gauge
+  (scratchpad copy: ONE monolith `src/index.ts` 2767 lines + 28 feature-named
+  test files + 30KB README ≈30 features — small repo, dense monolith).
+  Agreed approach: Phase 1 feature-index MAP → Phase 2 three thematic
+  deep-dives (A continuous auto-start / B context-overflow + error handling /
+  C generally-useful) as recipe entries → Phase 3 consolidation + TODO seed
+  "build our own plugin".
+- **Phase 1 = A/B comparison test (his proposal):** symmetric spec
+  WRITTEN + COMMITTED (`handover_task.md` — feature-map task; constraint
+  equality: handover summary + scratchpad map only, no TODO entries).
+  Run A launched on `worker_explorer_Q3_120K_mtp` (the CORRUPTED IQ3KT-MTP
+  model — doubles as the corruption probe); Run B queued on
+  `worker_gemma_Q4_128K` (same explorer prompt, 12B Gemma — the prompt he
+  flagged as a misconfig) after Run A verify. Roster verified live in
+  opencode.jsonc: both explorer-prompt agents confirmed; a built-in
+  `explorer` agent type also exists in the Task-tool list (model not in our
+  config — not used here).
+- NEXT: verify Run A → launch Run B → compare (map quality, method, context
+  behavior, corruption evidence) → consolidate the better map into
+  `.opencode/agent/knowledge/opencode-plugins/` (+ folder README, same
+  commit) → then Phase 2 deep-dive specs scoped by the map's line ranges.
 
 ## Closed session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
 - **plan2 closed (2026-09-18): BOTH units LANDED, gate re-verified by the
@@ -111,6 +60,7 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   distillation — DEFERRED.
 
 ## Compressed archive (one line each — details in git log + TODO/records)
+- 2026-09-18 direct (ses_f4c039ae2ffeRqvdPqGu8IdB37, planner Qwen3.8-27B-IQ4KT-140K, post-opencode-restart) — live acceptance PASSED for both pending items (submit registration, #0 escape via intercept.log); his AGENTS.md paste LANDED (submit one-liner + sentinel-gated escape block); prompt-rework 8 commits `671a582..e00d52b` mapped; memory pilot planner namespace seeded (MEM-0101/0102); maintainer-file discipline (MEM-0103) + IQ3KT-MTP corruption/recovery entry recorded; full section text appended to nap_direct.md — details: git cc8e8cb
 - 2026-09-18 looprun 2026-09-17_23-58, iteration 1 (ses_f4e9ea998ffeQ3Pa0atv10oysQ, planner-1) — plan1: #53 unit LANDED in full (Part A 5e29cb0 friction-check close-down in all 4 role prompts, planner-direct + Part B worker-14 `submit` tool b83b34f + bookkeeping a8636ef; gate re-verified by planner: probe two-two-nine, 9 smokes, pytest 459+1w, ruff F=0; proposal → implemented/); pending maintainer-domain: submit registration + live acceptance + AGENTS.md paste — details: loop folder plan1_summary.md + git 4fd2065/f13886d
 - 2026-09-17 direct (ses_f4f539d7cffeVeRhsFQRdoSRUC, Qwen3.8-27B-IQ4KT-120K) — the FST live-listener session: live capture (FST 0.1.2.4) + fuzzy/numword observer R0–R7 + R7.5 LANDED & live-accepted (baseline two-two-nine) + #56 distillation DEFERRED (his 2-2-0 ruling); TODO #65/#71/#73 + #70/#53 filed; maintainer domain left: live-listener restarts, AGENTS.md paste, FST live testing, #56 distillation — details: TODO + knowledge_plugins.md + decision-record §5 + git 0105b9f/dfda0dd
 - 2026-09-17 direct (ses_f510a05ceffeE6SnMBlvti40DE) — #73 dedup-collapse build + planner-verified (spec d627403, code dce82ad, bookkeeping 9c701ed; gate 216/37/459+1w/F=0; M1 write guard untouched; flattenField pin lesson; the abs-path-not-rel design catch) + numword-escape proposal filed (da3ca41) — details: nap_direct.md + git dce82ad/9c701ed/da3ca41
