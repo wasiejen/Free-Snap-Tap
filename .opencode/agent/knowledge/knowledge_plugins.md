@@ -155,14 +155,20 @@ Gained, verified knowledge for opencode plugins. Format per the README:
 - **Keys:** execPath, resolveNodeExe, execFileSync, opencode.exe, dump hook,
   spawn, PATH, PATHEXT.
 
-## Stored tool-call args are POST-mutation — you only see the corrected path
+## Stored tool-call args are POST-mutation — you only see the corrected args
 - **Do:** NEVER trust the tool-call args you see in your own context / the
   session dump to diagnose a bitdrift or fuzzy-resolve — the DB stores the
   POST-mutation `state.input` (the corrected path), not what you EMITTED. To
   know what you actually emitted, read `.opencode/temp/intercept.log` (the
   `orig=` field of the `fuzzy-resolved` line + the `path-anomaly`
   `doubled=...` line) — that is the ONLY pre-mutation record. A live mutation
-  is indistinguishable from producer drift inside your own session.
+  is indistinguishable from producer drift inside your own session. EXTENDED
+  to the escape/numword content channel: the SAME applies to
+  `kind=escape scope=content` lines (`orig=[...] value=...`) — and the
+  corrected form re-ENTERS your own context on the next pass, so a mutation
+  looks like "I typed the corrected value again" (a false repetition loop).
+  For any acceptance/diagnosis of escape or fuzzy behavior, check
+  intercept.log FIRST; your own perception of your args is not evidence.
 - **Why (evidence):** 2026-09-17 (planner ses_f4f539d7c, #73 live acceptance):
   the EMITTED doubled path `.../OpenCodeProjects/OpenCodeProjects/...` was
   fuzzy-resolved (intercept.log `orig=` doubled → corrected, `kind=dedup`),
@@ -174,9 +180,22 @@ Gained, verified knowledge for opencode plugins. Format per the README:
   shows `orig=` single, no anomaly line) — a REAL emission collapse. Both
   diagnoses were possible ONLY via the log; the stored args could not
   distinguish the two cases. Same class as the R2 display finding (post-
-  mutation result shown) — extended to the CALL side.
+  mutation result shown) — extended to the CALL side. SECOND INSTANCE (the
+  escape channel): 2026-09-18 (direct, ses_f4c039ae2ffeRqvdPqGu8IdB37) — the
+  planner's live-acceptance writes EMITTED sentinel forms (one short `esc`,
+  one `escape` numword form); the file on disk shows the corrected digits,
+  and the planner PERCEIVED its own 3 "repeated" writes as literal digit
+  strings (a false repetition loop); intercept.log 2026-09-18_12-19 lines
+  (4 `kind=escape` verdicts, `hits=2`) prove every write carried the
+  sentinels and each was `pair-resolved` (`orig=` = the sentinel form,
+  `value=` = the field-2 digits).
+  Ruled by the maintainer the same session: the agent CANNOT perceive the
+  pre-corrected parts of a tool call — only the corrected form enters the
+  context.
 - **Ref:** `opencode.db` `part.state.input` for the #73 read;
   `.opencode/temp/intercept.log` 2026-09-17_21-03 lines; planner verification
-  (2026-09-17 direct, ses_f4f539d7c).
+  (2026-09-17 direct, ses_f4f539d7c); intercept.log 2026-09-18_12-19 lines
+  (escape acceptance, ses_f4c039ae2ffeRqvdPqGu8IdB37).
 - **Keys:** post-mutation, state.input, intercept.log, orig, display,
-  self-diagnosis, bitdrift, producer-drift, indistinguishable.
+  self-diagnosis, bitdrift, producer-drift, indistinguishable, escape,
+  numword, sentinel, false-repetition, pre-correction-perception.

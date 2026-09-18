@@ -2,7 +2,41 @@
 
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
-## Current session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
+## Current session — direct (ses_f4c039ae2ffeRqvdPqGu8IdB37, planner, Qwen3.8-27B-IQ4KT-140K, post-opencode-restart)
+- **LIVE ACCEPTANCE PASSED for BOTH pending items** (the plan2 PENDING line
+  is closed):
+  - `submit` — registered in the live opencode.jsonc (the 11-47 loop pause
+    enabled the plugin); fired from this live session with NO manual args;
+    the entry stamped `planner_Q4_140K ses_f4c039ae2ffeRqvdPqGu8IdB37` in
+    agent_feedback.md (autofill from the tool context verified).
+  - `#0 numword escape` — live writes with sentinel forms (`esc` + `escape`
+    variants) resolved to field-2 digits; unmarked control form survived
+    byte-identical; VERIFIED VIA intercept.log 2026-09-18_12-19 lines
+    (4 `kind=escape scope=content` verdicts, `pair-resolved`, `hits=2`) —
+    not via my own args (see the finding below).
+- **Maintainer ruling + noted for future planners:** an agent CANNOT
+  perceive the pre-correction parts of its own tool calls — the DB stores
+  the POST-mutation args and only the corrected form re-enters the context
+  (my 3 "repeated" writes were actually sentinel-carrying; I perceived the
+  corrected digits = a false repetition loop). Extended the existing
+  "Stored tool-call args are POST-mutation" entry in
+  `knowledge/knowledge_plugins.md` (this is the SECOND instance, escape
+  channel). Verify escape/fuzzy behavior against intercept.log FIRST.
+- Bookkeeping: leftovers commit `8855be6` (loop_log INFO lines, approved/
+  escape-proposal deletion, agent-feedback-closedown verdict section,
+  worker-2 compaction dump).
+- **AGENTS.md paste (his, still pending — the ONLY remaining maintainer
+  domain item from plan1/plan2):** (a) the submit one-liner for
+  §agent_feedback (draft in loop folder plan1_summary.md §Pending.3);
+  (b) the content-escape (sentinel-gated) sentence of the
+  decision-record §4 paste-draft — the Redundancy-form block itself IS
+  already live in AGENTS.md, but WITHOUT that escape tail sentence.
+- **Queue (his priority.md order, unchanged):** #70 compact_memory rework
+  → repo-split research → #56 distillation (DEFERRED). Loop is paused
+  (11-47 INFO line; the looprunner notes iteration 3 launch after this
+  acceptance).
+
+## Closed session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
 - **plan2 closed (2026-09-18): BOTH units LANDED, gate re-verified by the
   planner (probe two-three-five 235/235 annotation-agree, 9/9 smokes,
   pytest 459+1w, ruff F=0).**
@@ -26,9 +60,11 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   ETIMEDOUT — the committed checkpoint 67ccd73 is the durable state).
   Measured for TODO #70: cross-compact still REQUIRES explicit
   providerID/modelID.
-- PENDING (maintainer domain): `submit` registration in live opencode.jsonc
-  + live acceptance; AGENTS.md paste (submit one-liner + escape
-  paste-draft line).
+- PENDING (maintainer domain) — **CLOSED 2026-09-18** (direct
+  ses_f4c039ae2ffeRqvdPqGu8IdB37): submit registered + live-accepted;
+  escape live-accepted via intercept.log; AGENTS.md paste STILL pending
+  (submit one-liner + the escape sentinel-gated tail sentence — see the
+  current-session section).
 - **Queue (his priority.md order):** 1. TODO #70 compact_memory rework
   (incl. the measured cross-compact gap). 2. Repo-split research. 3. #56
   distillation — DEFERRED.
