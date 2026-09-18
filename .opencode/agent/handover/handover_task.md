@@ -1,82 +1,87 @@
-# Task spec — opencode-auto-resume Phase 1: feature-index map (A/B comparison run)
+# Task spec — opencode-auto-resume Phase 2, Deep-Dive A: continuous auto-start
 
-Workers: Run A = `worker_explorer_Q3_120K_mtp` (died: model corruption, no
-output) · Run B = `worker_gemma_Q4_128K` (completed; planner verdict:
-skeleton usable, test-mapping missing — see the NAP) · Run C (CURRENT) =
-`worker_Q4_140K`. Your run's output filename is given in the launch message —
-write the map to EXACTLY that path. Do NOT read the prior runB map — work
-independently from the spec (planner cross-checks runs after the fact).
+Worker: `worker_Q4_140K` (single run; Phase 1 map already consolidated).
 
-## Context (one line)
+## Context (verified facts — do not re-derive)
 The maintainer copied an open-source opencode plugin (auto-resume of stalled
-LLM sessions) into the scratchpad as reference material for building our own
-plugins. This run builds a **feature-index map**: every README feature →
-where it lives in `src/index.ts` (line range) + which test file covers it —
-so later deep-dive sessions can be scoped by line range.
+LLM sessions) into the scratchpad as reference for building our own plugins.
+Phase 1 delivered a PLANNER-VERIFIED feature map:
+`.opencode/agent/knowledge/opencode-plugins/auto-resume-map.md` — **READ IT
+FIRST**; every line range in it is verified. This run extracts the recipe for
+the **continuous auto-start** topic: how the plugin keeps a stalled/dead
+session moving without user clicks — without ever fighting the user's ESC.
 
 ## Source — READ-ONLY, outside our repo (the "plugin repo")
 Root: `C:/Users/Wasiejen/AppData/Local/Temp/opencode/opencode-auto-resume-master`
-- `README.md` (30KB) — the feature docs; feature index #1.
-- `src/index.ts` — 2767 lines (planner-measured) — the ENTIRE plugin, one
-  monolith.
-- `src/*.test.ts` — 28 test files, one per feature area; `src/test-utils.ts`
-  shared helpers.
-- `package.json` — Bun, single dep `@opencode-ai/plugin` (settled — do not
-  re-verify).
+- `src/index.ts` — 2767 lines, one monolith (map verified).
+- `src/*.test.ts` — 28 test files.
 - **NEVER execute anything from the plugin repo** (no bun/npm/node, no
-  `bun test`, no build): it is a live-session-management plugin and has no
-  node_modules — static analysis only.
+  `bun test`): static analysis only.
 
-## Goal
-Map every README feature — all `###` sections under "What it does" (README
-line 5 to line 258), plus "Recovery model" (line 269) and "Architecture"
-(line 295) — to its implementation in `src/index.ts` + its test coverage.
-README sections from "Installation" onward are OUT of scope.
+## Scope — read ONLY these `src/index.ts` ranges (map = your index)
+1. State machine + options: 21-63 (`SessionWatch`), 421-481 (options, incl.
+   `busyStallStrategy` 470-473).
+2. Send path: 746-908 (`sendContinuePrompt`: agent/model extraction 761-803,
+   prompt 810, one retry 829, watchdog chain 853-904, abort+resume escalation
+   886-890).
+3. Resume/abort: 1698-1749 (`tryAbortAndResume`), 1751-1796 (`tryResume`).
+4. The 5s tick: 1834-2091 (`startTimer` — all sub-blocks; the map's skeleton
+   lists them with line refs).
+5. Event-side arming: 2123-2143 (status interrupted + orphan arm), 2506-2517
+   (`session.interrupted`), 2524-2532 (`message.updated` re-arm), 2576-2585
+   (`session.error` latch).
+6. Hook: 2691-2708 (`chat.message` re-arm).
+7. Loop detectors gating resumes: 489-504 (`recordContinue` /
+   `isHallucinationLoop`).
+8. Test files — case names ONLY (bounded loop, head -8 per file, Phase-1
+   method): `index.continue.test.ts`, `index.busy-stall-strategy.test.ts`,
+   `index.backoff.test.ts`, `index.watchdog.test.ts`,
+   `index.esc-stops-timers.test.ts`, `index.rearm.test.ts`,
+   `index.events.test.ts`, `index.session-watch.test.ts`,
+   `index.state-machine.test.ts`.
 
 ## Definition of done (measurable)
-1. **Map file** at the scratchpad path from the launch message, with:
-   - `## Method` — the exact grep/scan commands you used for structure
-     discovery (so the method is auditable and reproducible).
-   - `## Structural skeleton` — the top-level structure of `src/index.ts`
-     (section-banner comments, top-level const/class/function/export) with
-     line numbers.
-   - `## Feature index` — one entry per README feature:
-     `### <feature name>` / what it does (1-2 lines, your words) /
-     `where:` src/index.ts lines `<start>-<end>` / `test:` file name (or
-     `none`) / `confidence:` `measured` or `guessed`.
-   - Coverage: EVERY in-scope `###` feature section gets an entry (a
-     `UNKNOWN` entry counts — see rule 4). The `####` sub-sections under
-     "Streaming failure recovery" may fold into that one entry.
-2. **Line ranges are verified**: for each `measured` entry the start line
-   contains (or directly precedes) the named symbol/section — confirm with a
-   targeted read before writing the entry. Never invent a range: if a feature
-   is not found after a reasonable search, write `where: UNKNOWN` + the greps
-   you tried (one line).
-3. **Handover summary** in
-   `.opencode/agent/handover/handover_task_to_planner.md`: executive summary —
-   method, coverage count (mapped / measured / unknown), 3-5 notable
-   findings (one line each, e.g. the state-machine name, the central tick /
-   watch function), the scratchpad map path, the context-gauge line VERBATIM.
-   Do NOT paste the full map into the handover — it stays in the scratchpad
-   file.
-4. **Commit** per the commit routine: stage NAMED paths only (the handover
-   file — NEVER `git add -A`); subject names the run (e.g.
-   "auto-resume feature-map Run A (explorer-mtp)").
-   **NO TODO.md / todo_inbox.md entries in this task** — the map IS the
-   deliverable (this OVERRIDES your per-finding TODO checkpoint; instead
-   append map entries to the scratchpad file in batches as you go, so a dead
-   session loses at most a few entries).
-
-## Context discipline (binding)
-- Read `README.md` in full (it IS the index — that is the point).
-- NEVER read `src/index.ts` in full. Grep its structure first (record the
-  commands in `## Method`); then targeted reads only around candidate feature
-  locations (bounded ranges, e.g. 40-80 lines).
-- Test files: case names only — `grep -n "describe\|it(" <file> | head -40`
-  per file (or equivalent); never full test bodies.
+1. **Recipe file** at `C:/Users/Wasiejen/AppData/Local/Temp/opencode/auto-resume-deepdive-A.md`,
+   sections IN THIS ORDER:
+   1. **Problem map** — the failure modes this topic addresses (busy-silence
+      stall; stale-busy needing abort; orphaned parent with dead child;
+      user-cancel vs plugin-abort collision), each with trigger conditions +
+      line refs.
+   2. **State machine** — the `SessionWatch` fields relevant to auto-start +
+      the arm → trigger → send → retry → escalate → gaveUp chain with line
+      refs; one compact ASCII flow.
+   3. **Timer architecture** — what the 5s tick owns vs what event dispatch
+      owns, and the design lesson for plugin builders (why this split).
+   4. **Send path** — `sendContinuePrompt` pipeline step by step (extraction,
+      retry, watchdog re-arm, escalation).
+   5. **ESC boundary** — how user-cancel is distinguished from the plugin's
+      own aborts (`userCancelled`, `pluginAbortInFlight`, the `continuing`
+      latch + `chat.message` re-arm).
+   6. **Recipes** — one block per mechanism: what to reuse/adapt for our
+      stack (opencode plugin hooks + `ctx.client.session`), and what its tests
+      prove (test file + case-name pattern).
+   7. **Fit assessment** — against OUR plugin surface: enumerate what
+      `.opencode/plugin/` in our repo registers (read-only grep of our plugin
+      files for hook/tool registrations), state what maps and what is missing.
+   8. **Unverified / unclear** — explicit list of anything you could not
+      confirm (claims + the check you tried).
+   Every line ref must be `src/index.ts`-verified by you (read or
+   line-anchored grep). Quote at most 6 consecutive lines of code anywhere in
+   the file; reference the rest.
+2. **Handover summary** in
+   `.opencode/agent/handover/handover_task_to_planner.md`: method, coverage
+   (scope items 1-8: done/skipped per item), 3-5 notable findings (one line
+   each), the recipe file path, the context-gauge line VERBATIM. Do NOT paste
+   the recipe into the handover.
+3. **Commit** per the commit routine: stage NAMED paths only (the handover
+   file — NEVER `git add -A`); subject names the run. **NO TODO.md /
+   todo_inbox.md entries** (the recipe is the deliverable; Phase 3 curates
+   TODO seeds). Write the recipe file in batches as you go (a dead session
+   loses at most a section).
 
 ## DO-NOT-touch
 - The plugin repo (read-only — no writes/edits/execution of any kind).
 - Our repo except the handover summary file: `.opencode/maintainer/**`,
   `.opencode/agent/prompts/**`, `handover_planner.md`, `TODO.md` /
-  `todo_inbox.md` (none written by this task), `AGENTS.md`, `.git/**`.
+  `todo_inbox.md`, `AGENTS.md`, `.opencode/agent/knowledge/**` (the map is
+  read-only for you), `.git/**`.
