@@ -284,3 +284,6 @@ only authority for what an arg actually was. Suggestion: none for the tooling
   repo_map section already says "verify, never trust memory", but the
   launch path skipped it; (b) the Task tool's unknown-agent-type error
   could list the currently valid types.
+### 2026-09-18_12-19 planner_Q4_140K ses_f4c039ae2ffeRqvdPqGu8IdB37
+LIVE ACCEPTANCE PASSED (2026-09-18, direct ses_f4c039ae2ffeRqvdPqGu8IdB37): `submit` registered in live opencode.jsonc, fired from a live session, role+session autofilled from the tool context (no manual args) — closing the pending item from the plan1/plan2 bookkeeping.
+
