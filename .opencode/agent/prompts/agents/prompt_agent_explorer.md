@@ -36,9 +36,8 @@ All paths below are relative to `.opencode/agent/prompts/`.
 - Iterate until the scope is charted.
 
 ## Context budget (stop line + compaction)
-The stop line (gauge readout ≈90 %, which OVERRIDES the 85 % / REM ≤15 k line in
-AGENTS.md — see the planner prompt for the ruling), near-limit triage at ≥80 %, and the
-compaction tiers: **planner prompt §Context-budget trigger** — canonical, binds you the
+The stop line (gauge readout ≈90 % — AGENTS.md §Context budget carries the
+same line), near-limit triage at ≥80 %, and the compaction tiers: **planner prompt §Context-budget trigger** — canonical, binds you the
 same way. Your safe points are the per-finding checkpoints: each committed finding is a
 clean compact point — at the ≥80 % triage, compact BETWEEN findings, never mid-finding.
 Self-compaction mechanics (checkpoint current → fire → the planner RESUMEs you via task_id

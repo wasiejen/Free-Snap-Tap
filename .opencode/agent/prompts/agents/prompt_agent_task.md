@@ -78,9 +78,8 @@ instead of arguing from the armchair.
 ## Context budget (stop line + compaction)
 **Stop line: gauge readout ≈90 %** (the readout lags true usage by ≈2 tool
 calls / ~5k — treat it as optimistic; the gauge-lag note also lives in the
-`ctx_gauge` tool description). This OVERRIDES the 85 % / REM ≤15 k line in
-AGENTS.md §Context budget (the change rides the proposal carried in the
-planner prompt). Canonical rules — near-limit triage at ≥80 %, "compaction is
+`ctx_gauge` tool description). AGENTS.md §Context budget carries the same
+line. Canonical rules — near-limit triage at ≥80 %, "compaction is
 NOT a restart", the 90/95 % tiers, the Work State dump form: **planner prompt
 §Context-budget trigger** — they bind you exactly the same way; your
 worker-specific mechanics are below.

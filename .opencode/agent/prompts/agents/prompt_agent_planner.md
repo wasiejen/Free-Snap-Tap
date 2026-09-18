@@ -172,9 +172,8 @@ planning. Plan against a defined goal, not a list of chores.
 ## Context-budget trigger (L3) + stop line (maintainer ruling 2026-09-15, priority.md)
 **Stop line: gauge readout ≈90 %** (his "95 % true wall" with the gauge's
 lagging value included — the readout LAGS true usage by ≈2 tool calls (~5k),
-so treat a displayed readout as optimistic; plan with margin). This OVERRIDES
-the 85 % / REM ≤15 k line in AGENTS.md §Context budget (his file; the change
-rides `proposals/2026-09-15_agents-knowledge-stopline.md` until he lands it).
+so treat a displayed readout as optimistic; plan with margin). AGENTS.md
+§Context budget carries the same 90 % line (2026-09-15 ruling, landed there).
 - **Near-limit triage (maintainer ruling 2026-09-18 — CANONICAL for all
   roles):** BEFORE starting any unit at a readout ≥ 80 %, estimate the tool
   calls still needed to finish the current work. Estimates near the limit are
