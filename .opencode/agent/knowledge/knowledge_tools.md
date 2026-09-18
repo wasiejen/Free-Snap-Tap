@@ -276,5 +276,10 @@ instructions/protocol — facts that save lookups. Format per the README:
 - **Do:** multi-section file authoring (>~90 lines) via the write/edit tools,
   NOT bash heredocs — heredocs that long silently truncate mid-content with
   no error (worker-reported, Deep-Dive A: lost a whole section).
+- **Do (maintainer move, observed 2026-09-18):** a LIVE escape form can only
+  reach a file via bash (unresolved) or the maintainer's own editor; the
+  maintainer may render a form INERT by breaking the sentinel (e.g. dashes
+  around it) — an inert form is then matchable/removable literally via
+  oldString. Recognize both forms in files; never try to "fix" an inert one.
 - **Keys:** escape, sentinel, intercept-log, edit, oldString, heredoc,
   truncation, dense-numeral, verification.
