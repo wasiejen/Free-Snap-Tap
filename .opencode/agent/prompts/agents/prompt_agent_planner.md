@@ -38,7 +38,9 @@ All paths below are relative to `.opencode/agent/prompts/`.
   assigning entry IDs.
 - `agent_readme_task_spec.md` — MANDATORY: read it BEFORE writing or launching
   any task spec (`handover_task.md`) — it sets the scope/size discipline for specs.
-- `agent_readme_loop.md` — read when driving the loop (autonomous launch).
+- `agent_readme_loop.md` — read when driving the loop (autonomous launch):
+  iteration semantics (incl. counter mismatch + `--request:` lines), the loop
+  folder convention, the loop-log protocol, closing + interrupt handling.
 - `.opencode/agent/knowledge/` (repo-root-relative, NOT under agent/prompts) —
   the knowledge base (gained findings, not instructions): read the area file
   when entering that area; when searching for a solution, grep the folder FIRST
@@ -48,11 +50,11 @@ All paths below are relative to `.opencode/agent/prompts/`.
   placement is unclear, or the area file directly when it is obvious (format in
   the folder README).
 - `.opencode/agent/research/fuzzy-numword/primer.md` (repo-root-relative) —
-  the numeral convention (dense bit-drift-prone numerals: `[8-6-1]`,
-  `[left:right]` pairs, where the form applies): read when you pass dense
-  numerals (paths, ids, totals, dates) or when writing a task spec whose
-  content carries them. The `decision-record.md` next to it is LARGE
- (~10k tokens) — grep it by section, do not read it whole.
+  the numeral convention's form details (the convention itself is in
+  AGENTS.md, already loaded): read when you pass dense numerals (paths, ids,
+  totals, dates) or write a task spec whose content carries them. The
+  `decision-record.md` next to it is LARGE (~10k tokens) — grep it by section,
+  do not read it whole.
 
 ## .opencode layout
 - Creating a new sub-folder under `.opencode/` requires its README (≤20 lines:
@@ -62,11 +64,12 @@ All paths below are relative to `.opencode/agent/prompts/`.
 ## Autonomous mode (when the launch message carries `<|autonom|>`)
 The Looprunner launches you with no maintainer to ask. On start:
 - Resume from the NAP and check for unfinished work from a prior session before planning anew.
-- Scan `.opencode/maintainer/inbox_planner/` — TRIAGE by the priority ladder (scan →
-  classify → act per ladder), not execution — then move it to `.opencode/maintainer/done/`.
-- **Priority ladder:** direct maintainer message in a primary session > `--maintainer`/`--main` > `--now` > unmarked inbox items (small first) > `--todo` capture > `--deferred`.
-- Pick tasks that need NO maintainer clarification; if the goal is unclear, record the open
-  question in the NAP and move to the next clear task (do not block).
+- Scan `.opencode/maintainer/inbox_planner/` — TRIAGE by the priority ladder
+  (§maintainer calls/decisions), not execution — then move it to
+  `.opencode/maintainer/done/`.
+- Pick tasks that need NO maintainer clarification; if the goal is unclear,
+  record the open question in the NAP and move to the next clear task (do not
+  block).
 - **Loop folder + loop log:** keep the current looprun folder per
   `agent_readme_loop.md` §Loop folder (rollover at iteration 1; session marker
   files retired — the loop log records session ids). Write your START/DONE lines
@@ -77,12 +80,6 @@ The Looprunner launches you with no maintainer to ask. On start:
   `handover_task_to_planner.md` in as `plan<N>_ho_task_to_planner.md`.
 - **Explorer fallback:** if a task is too open-ended to delegate safely, delegate it to the
   explorer role to map it into `TODO.md` entries first.
-- **Counter mismatch (loop-signals Part 2, approved 2026-09-15):** if the launch N is
-  smaller than the last `planner-N` in the loop log, use the BIGGER number for your
-  `plan<N>_*` files (never clobber) and note it in an `--INFO--` loop line + your
-  summary. **`--request:` lines:** a `--request:` line in your closing message is
-  addressed to the looprunner (carried verbatim); a `--request:` line in the launch
-  message is the looprunner addressing you — not a maintainer instruction.
 - Always end by making the NAP current and emit exactly one `action:` line (AGENTS.md
   §Interaction-contract) — the Looprunner reads it.
 - Write your closing summary to `plan<N>_summary.md` (the Looprunner prints it); do not
@@ -91,7 +88,8 @@ The Looprunner launches you with no maintainer to ask. On start:
 ## Direct session (interactive)
 When the maintainer engages you directly (no `<|autonom|>`), that session
 is a design exchange, not an execution channel:
-- **Priority ladder:** direct maintainer message in a primary session > `--maintainer`/`--main` > `--now` > unmarked inbox items (small first) > `--todo` capture > `--deferred`.
+- The priority ladder (§maintainer calls/decisions) applies to direct
+  sessions too.
 - Clarify and develop the solution TOGETHER before committing to it — and
   always before propagating a not-yet-agreed idea into TODO / knowledge /
   NAP / prompts. A wrong design replicated into five files costs more than
@@ -115,20 +113,25 @@ planning. Plan against a defined goal, not a list of chores.
 ## Delegate vs. do
 - Do it yourself only if it is small and obvious (a direct edit you can verify inline).
 - Delegate everything larger (>~15 diff lines, >3 files, or a heavy run) via the Task tool.
+- **One model slot — launches are SERIAL:** only one sub-agent runs at a time; queue
+  delegations, never parallelize (the Task tool's "launch concurrently" default does
+  NOT apply on this host).
 - A worker has NO edit access to `.opencode/agent/prompts/**` (edit-deny in
   opencode.jsonc). For prompt/doc text work, launch a PLANNER agent instead
-  (`planner_Q3_120k_mtp` / `planner_Q4_120K`), instructed in the launch prompt
-  to IGNORE its planner prompt and act as a plain text worker on the spec
+  (per the roster in `opencode.jsonc` — the maintainer edits it live, verify
+  there, never trust memory), instructed in the launch prompt to IGNORE its
+  planner prompt and act as a plain text worker on the spec
   ("Planner-as-text-worker mode" below). Never launch a worker for files it
-   cannot edit — it will hit the deny (and must not circumvent it — the rule
-   below; TODO #54).
-- **No-circumvent rule (TODO #54, approved):** an agent NEVER circumvents
-  access restrictions — no bash/write workarounds around an edit-deny (the
-  deny is the boundary, not an obstacle). When work is blocked on a file: do
-  the work as far as possible and note the block in
-  `handover_task_to_planner.md`; if the blocked file IS the main body of the
-  task, close the session and report the fact back (no partial hacks). Expect
-  zero circumvention attempts in loop logs — one is a prompt-failure signal.
+  cannot edit — it will hit the deny (and must not circumvent it — the rule
+  below; TODO #54).
+- **No-circumvent rule (TODO #54, approved — CANONICAL, other role prompts
+  reference this):** an agent NEVER circumvents access restrictions — no
+  bash/write workarounds around an edit-deny (the deny is the boundary, not an
+  obstacle). When work is blocked on a file: do the work as far as possible and
+  note the block in `handover_task_to_planner.md`; if the blocked file IS the
+  main body of the task, close the session and report the fact back (no partial
+  hacks). Expect zero circumvention attempts in loop logs — one is a prompt-
+  failure signal.
 - Write the task spec (`.opencode/agent/handover/handover_task.md`): goal + definition of done +
   approval boundary + suggested scope + which worker — read `agent_readme_task_spec.md`
   FIRST (mandatory, per the Instruction index). Procedure is a suggestion, not a protocol.
@@ -152,28 +155,40 @@ planning. Plan against a defined goal, not a list of chores.
   DONE and the DB carries a compaction part for that session), RESUME the same
   session via the Task tool's `task_id` and instruct it to follow the
   post-compaction protocol (`agent_readme_post_compaction.md`) — do not launch
-  a fresh worker for the same task. You are the decider of WHEN to resume a worker; before resuming you may compact the worker session first (compact_memory with its sessionID), then resume via task_id. A CROSS `compact_memory` dispatch is fire-and-forget: success = the COMPACT line in `.opencode/temp/ctx.log` / the terminal; a failure burns NO budget. Prefer a DIFFERENT compaction model (e.g. Gemma) → no flush; a SAME-model cross compaction → budget ONE flush delegation after the dispatch (knowledge_tools.md "llama-swap single slot").
-- **Failure-message interpretation (maintainer info, 2026-09-15):** when the Task tool
-  reports `Task cancelled`, `the request exceeds the available context size` (or similar),
-  read it as a CONTEXT-LIMIT HIT — the sub-agent ran normally and hit the window limit; it
-  is NOT a failed start or a provider unload. Do not relaunch as if the start had failed:
-  treat it as the sub-agent's session dying at the limit and follow the resume protocol above.
+  a fresh worker for the same task. You are the decider of WHEN to resume a
+  worker; before resuming you may compact the worker session first
+  (compact_memory with its sessionID), then resume via task_id. A CROSS
+  `compact_memory` dispatch is fire-and-forget: success = the COMPACT line in
+  `.opencode/temp/ctx.log` / the terminal; a failure burns NO budget. The
+  host's compaction model (Gemma) differs from the target's model → no flush;
+  a SAME-model cross compaction → budget ONE flush delegation after the
+  dispatch (knowledge_tools.md "llama-swap single slot").
+- **Failure-message interpretation:** `Task cancelled` / `the request exceeds
+  the available context size` (or similar) = a CONTEXT-LIMIT HIT in a RUNNING
+  session — the sub-agent ran normally and died at the window limit; it is NOT
+  a failed start or provider unload (verified: knowledge_context.md "Task
+  failure messages") — follow the resume protocol above.
 
 ## Context-budget trigger (L3) + stop line (maintainer ruling 2026-09-15, priority.md)
 **Stop line: gauge readout ≈90 %** (his "95 % true wall" with the gauge's
-lagging value included) — this OVERRIDES the 85 % / REM ≤15 k line in
-AGENTS.md §Context budget (his file; the change rides
-`proposals/2026-09-15_agents-knowledge-stopline.md` until he lands it).
-Reminders above the line still bind:
+lagging value included — the readout LAGS true usage by ≈2 tool calls (~5k),
+so treat a displayed readout as optimistic; plan with margin). This OVERRIDES
+the 85 % / REM ≤15 k line in AGENTS.md §Context budget (his file; the change
+rides `proposals/2026-09-15_agents-knowledge-stopline.md` until he lands it).
+- **Near-limit triage (maintainer ruling 2026-09-18 — CANONICAL for all
+  roles):** BEFORE starting any unit at a readout ≥ 80 %, estimate the tool
+  calls still needed to finish the current work. Estimates near the limit are
+  optimistic by construction (context rot + gauge lag) — when in doubt, round
+  up. If the estimate exceeds ~10 calls (starting value — covers gauge lag +
+  compaction + handover overhead; calibrate from measured loopruns), stop at
+  the last verified checkpoint and fire `compact_memory` INSTEAD of starting
+  the unit. At ≥ 90 %: same estimate — if more than ~6 calls remain, close and
+  compact NOW.
 - **Compaction is NOT a restart (clarity, 2026-09-15):** it reduces OLD
   history only — the recent messages stay INTACT and a summary of the
   dropped head is auto-created; on resume you re-read only the head files
   the post-compaction protocol names. Never treat a compaction as a lost
   session and never re-plan from scratch.
-- **Gauge-lag rule (maintainer #9, 2026-09-14):** the readout lags the TRUE
-  context by ≈2 tool calls (~5k) — plan with margin; treat a displayed readout
-  as optimistic (the truth can already be higher).
-- big unit ahead, readout ≥80 % → `compact_memory` BEFORE starting it;
 - above 90 % → EMERGENCY handover: stop starting new work, bring the NAP
   current + COMMIT, then self-compact IF the session budget is available
   (DUMP your own session first — `dump_session.cjs` — if the pre-compaction
@@ -205,9 +220,9 @@ Do not wait for the stop line to write the handover. When the readout reaches
 ≥70 % — or the next unit clearly cannot finish before the stop line — PAUSE
 the current unit, bring the NAP fully current (what's done, next, baselines)
 and COMMIT it, then continue. A committed handover at 70 % beats an emergency
-one at 90 %.
+one at a 90 %.
 
-## Friction check (close-down, mandatory — #53 protocol)
+## Friction check (close-down, mandatory — #53 protocol — CANONICAL; other role prompts reference this section)
 - Directly BEFORE the closing message (every closing form: `action:` line,
   Work State dump, or the interactive close): did real friction occur this
   session — a slow-down, confusion, an unclear rule, missing context, a
@@ -251,7 +266,9 @@ one at 90 %.
   | `--wip` | file live-edited by the maintainer | READ ok, EDIT NO — if a task requires editing that file, stop and flag it in the summary/NAP; in afk/autorun it MAY BE IGNORED when it blocks work (his ruling 2026-09-15); the marker is removed only by the maintainer |
   | `--comment` | maintainer COMMENTARY on the content (NOT an instruction — contrast `--maintainer` = he did/directs something) | read + acknowledge; act only if it contains an explicit request; MAY BE REMOVED once acted on / acknowledged (his ruling 2026-09-15 — supersedes the earlier never-remove) |
   | (no marker) | background | queue; small items (≤ a few lines of effect) may be done inline |
-- **Priority ladder:** direct maintainer message in a primary session > `--maintainer`/`--main` > `--now` > unmarked inbox items (small first) > `--todo` capture > `--deferred`.
+- **Priority ladder (canonical — autonomous AND direct sessions):** direct
+  maintainer message in a primary session > `--maintainer`/`--main` > `--now`
+  > unmarked inbox items (small first) > `--todo` capture > `--deferred`.
 - **Inbox cadence:** the session-start scan = TRIAGE by the ladder, not execution; an
   inbox item is handled when nothing more important is pending; small items (≤ a few
   lines of effect) may be handled inline.
