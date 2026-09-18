@@ -165,8 +165,9 @@ planners and their error text, retried launches, loop anomalies you observed.
   (you are the loop's only driver and cannot restart yourself — you must last as long
   as possible). Above the line: stop starting new work and close the loop.
 - **End of loop (autorun_summary skill):** on `stop` (goal reached / unrecoverable /
-  maintainer-gated) OR at your stop line — before closing, launch a Q4-model agent
-  (e.g. `agent_Q4_120K` — do NOT switch the backend model) via the Task tool with
+  maintainer-gated) OR at your stop line — before closing, launch a Q4-model raw
+  agent (e.g. `agent_Q4_140K` — per the roster in opencode.jsonc; do NOT switch the
+  backend model) via the Task tool with
   exactly this instruction: "Read `.opencode/agent/prompts/skill/skill_autorun_summary.md`
   and follow it for the loop folder `.opencode/loop/<current autorun folder>`." It
   writes `_overall_summary.md` into the loop run folder and reports the path. If the
