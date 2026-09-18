@@ -78,10 +78,26 @@
 
   - rework of compact_memory parameter count of remove providerID and modelID from parameter list avaialble -> get them from opencode.json - see # # compact_memory tool dump function
 
+# prompt and tool description engineering (research)
+  https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents
+  https://www.anthropic.com/engineering/building-effective-agents
+  https://www.anthropic.com/engineering/multi-agent-research-system
+  https://www.anthropic.com/engineering/writing-tools-for-agents
+  - create a comprehensive guide on how to optimise system prompts for out agents, how to structure our added prompts via read and how to optimise tool descriptions for better usage
+  - this is the knowledge basis for a prompt engineer skillset
+    - hw should get all the knowledge to be able to optimize all the prompts, tool, plugin descriptions - essentially everything that
+  - e.g. from writign-tools-for-agents
+    - "When writing tool descriptions and specs, think of how you would describe your tool to a new hire on your team. Consider the context that you might implicitly bring—specialized query formats, definitions of niche terminology, relationships between underlying resources—and make it explicit. Avoid ambiguity by clearly describing (and enforcing with strict data models) expected inputs and outputs. In particular, input parameters should be unambiguously named: instead of a parameter named user, try a parameter named user_id"
+
+
 # fuzzy_numword  
 - R8 (to minimze loop disruptions)
   - e.g. redirect calls like "C:\Users\Asiejen\AppData\Local\Temp\opencode\brtest.mjs" into the sandbox
     - data for allowed paths is in opencode.json permission.external_directory
+- we might need a return information in tool call that something was replaced
+  - like we add the message content in the compact_memory .. add the information what was replaced as feedback because the agent using the escape cannnot perceive their escape form past tool call anymore - they only see the correction. always check against the intercept.log when in doubt
+    - mandatory information for all that are working on this plugin
+  - or else the agents will get confused
 - R3 if not already implemented?
 
 # repo split research/proposal (each research should be at least a single run)

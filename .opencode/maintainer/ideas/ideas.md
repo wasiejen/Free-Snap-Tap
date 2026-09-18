@@ -6,6 +6,8 @@
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
 
+- we might need an information in tool call that something was replaced
+  - or else the agents will get confused
 
 26-09-18_11-14:
   - cross compaction seems to invalidate the cache of the session which fires the compaction. why?

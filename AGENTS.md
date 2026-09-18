@@ -56,7 +56,8 @@ conflicts with the code or `repo_overview.md`, the code wins — but flag the di
 * *Concrete Example:* renaming dated files: derive new names in a script and
   verify via `git status` — never retype a date into a command.
 
-**Redundancy form (bit-drift-safe numerals):** when a dense numeral is at
+**Redundancy form (bit-drift-safe numerals):** 
+- when a dense numeral is at
   risk, write the pair `[left:right]` — left = digits as seen OR an adder
   construction (`[800+50+11]`), right = dash-separated single-digit numwords
   (`[eight-six-one]`); the resolver takes the RIGHT side on mismatch. Short
@@ -69,6 +70,9 @@ conflicts with the code or `repo_overview.md`, the code wins — but flag the di
   e.g. `b[six]c[eight-six-one]d -> b6c861d` 
   e.g. `b[6]c[8-6-1]d -> b6c861d` 
   e.g. `b[six]c[800+55+6]d -> b6c861d` 
+
+**Content escape (sentinel-gated) to output drifted dense numbers directly:**
+- in the content/oldString/newString of write/edit, [<incident>:<safe-form>:esc] resolves to the digits derived from field 2 (dash digits or numwords); the sentinel (esc/escape, case-insensitive) is the gate — unmarked / invalid forms are never touched, and a sentinel form in a PATH is just text.
 
 ## Role & interaction model
 
@@ -139,12 +143,15 @@ agent can resume from a committed state without re-exploring. Two-party split:
   (command + path in `repo_overview.md`, read-only) → `CTX=n (p%) REM=m`. The injected `ctx:`
   nudge from the gauge plugin is the same number from your last finished message — treat it
   as a reminder; the self-gauge is source of truth.
-- **Stop line:** stop starting new work when `REM ≤ 15k` or usage `≥ 85%`, whichever comes
+- **Stop line:** stop starting new work when `REM ≤ 15k` or usage `≥ 90%`, whichever comes
   first. Writing the handover/summary needs ~10–15k more.
 - At the line (or when the next task won't fit): make the handover current, finish the commit
-  routine, stop at a clean point, **inform the user**. Never start new work past the line.
-- Give a rough estimate of tokens still needed vs. remaining window so the user can decide to
-  switch to a larger-context variant if available.
+  routine, stop at a clean point and **inform the user** or self-compact to continue work. Never continue work past the line.
+
+## Compaction Guideline
+  - Customize your self-compaction via keepMessages=<X> (this will allow you to keep your last #<X> Messages - keep all recent drafts and most of your planning)
+  - self-compaction does not need a session_id on compact_memory tool call (only for cross session compaction)
+  - (message is currently not working - if in loop write your message into your stop message to be relayed to your resume)
 
 ## TODO.md entry contract
 A `TODO.md` entry must be self-contained enough to be delegated **by unique ID** (a handoff
@@ -198,10 +205,7 @@ delegating. Closed entries live in `todo_records.md`.
 - Concrete paths: see the interaction-contract table above and `repo_overview.md`.
 
 ## agent_feedback (maintainer-only friction log)
-- `.opencode/agent/agent_feedback.md` is a **maintainer-only** log of what slowed or confused you
-  (friction points, unclear rules, missing context). Append a dated, role-tagged line when you
-  hit real friction — do not edit prior entries. It is the maintainer's inbox for improving
-  these prompts; it is *not* a TODO and does not block work.
+- The mandatory close-down friction check (#53) is codified in each role prompt; entries go to this file via the submit tool (append-only, auto-stamped)
 
 ## Safety limits
 - Repo-specific safety limits (never run live/destructive/manual probes unless permitted)
