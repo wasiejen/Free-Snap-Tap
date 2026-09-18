@@ -242,3 +242,22 @@ instructions/protocol — facts that save lookups. Format per the README:
   launch); maintainer reports; recovery git checks 2026-09-18.
 - **Keys:** mtp, iq3kt, corruption, crash, model-swap, recovery,
   git-status, output-channel, worker-verification.
+
+## Model sizing for analysis tasks (feature-map runs A/B/C, 2026-09-18)
+- **Do:** match the model to the analysis scale. Dense-monomith
+  mapping/verification (2767-line single file + 28 test files) → IQ4KT-class
+  (27B) with a contract spec: Run C delivered 22/22 verified entries incl.
+  full test mapping, planner spot-check passed. Gemma-12B
+  (`worker_gemma_Q4_128K`) is FAST (<1 min) but SHALLOW: it reads the whole
+  README in one go, runs ~3 broad greps, drops DoD sub-items (every entry
+  `test: none`, one key feature missing), and its handover bookkeeping was
+  self-contradictory — use it only with STEP-LEVEL instructions (one exact
+  command per sub-deliverable, explicit "do not stop before X"), not contract
+  specs. Maintainer's characterization: gemma = "distracted squirrel", needs
+  strong directional guidelines; IQ4KT is deliberate (partly the worker
+  prompt).
+- **Why (evidence):** runs A (mtp — corrupted ≈88k fill, zero output), B
+  (gemma — thin map, see NAP runB verdict), C (iq4kt — verified, committed
+  as `knowledge/opencode-plugins/auto-resume-map.md`).
+- **Keys:** gemma, iq4kt, model-sizing, delegation, step-level-instructions,
+  contract-spec, explorer, feature-map.

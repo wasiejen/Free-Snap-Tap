@@ -34,10 +34,23 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   data (scratchpad runB map + commit 2b020fd).
 - **Ruling (his): back to IQ4KT** — Run C launched on `worker_Q4_140K`
   (same spec, prompt-agnostic; spec header updated + runB-do-not-read line
-  added). After Run C: cross-check against the gemma skeleton, consolidate
-  the verified map into `.opencode/agent/knowledge/opencode-plugins/`
-  (+ folder README, same commit) → then Phase 2 deep-dive specs scoped by
-  the map's line ranges.
+  added).
+- **Run C VERIFIED + CONSOLIDATED (Phase 1 closed):** handover sharp; six
+  anchor lines (21/421/746/1372/1834/2099) spot-checked verbatim against
+  `src/index.ts` + the ctx-wrapup block 2306-2345 confirmed; 22/22 entries
+  mapped+measured incl. full test mapping and the context-saturation feature
+  (gemma's gap). Consolidated into
+  `.opencode/agent/knowledge/opencode-plugins/` (README + `auto-resume-map.md`
+  with verification note). Model-sizing entry (gemma shallow/fast, step-level
+  instructions; iq4kt deliberate) appended to `knowledge_tools.md`.
+- **Phase 2 (next, awaiting his green light):** three deep-dive specs scoped
+  by the map's line ranges — A continuous auto-start (1834-2091 tick, 746-908
+  send path, 2576-2585/2691-2708 ESC), B context-overflow + errors (2306-2345
+  ctx-wrapup, 231-263/2588-2609/1983-2017 streaming-fail, 318-352/2257-2304
+  silent dead-stream, 853-908 watchdog), C generally-useful (1372-1692
+  idle-scan mega-function by sub-candidate, 2642-2665 task_complete, 969-990
+  celebration, 183-230 done-claim). Worker: `worker_Q4_140K` (IQ4KT, per the
+  sizing entry).
 
 ## Closed session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
 - **plan2 closed (2026-09-18): BOTH units LANDED, gate re-verified by the
