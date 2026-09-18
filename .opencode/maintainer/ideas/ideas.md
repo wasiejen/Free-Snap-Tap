@@ -158,3 +158,20 @@ Refer to R6 in fuzzy_numword as sketch for a cheap dump file for every edit and 
     - hw should get all the knowledge to be able to optimize all the prompts, tool, plugin descriptions - essentially everything that
   - e.g. from writign-tools-for-agents
     - "When writing tool descriptions and specs, think of how you would describe your tool to a new hire on your team. Consider the context that you might implicitly bring—specialized query formats, definitions of niche terminology, relationships between underlying resources—and make it explicit. Avoid ambiguity by clearly describing (and enforcing with strict data models) expected inputs and outputs. In particular, input parameters should be unambiguously named: instead of a parameter named user, try a parameter named user_id"
+
+
+  # research, analyse the copied repo (a lot of files, so do not try to run it in one session) STARTED/WIP
+- "C:\Users\Wasiejen\AppData\Local\Temp\opencode\opencode-auto-resume-master"
+- goal: general map the usage and map out what problems and how this plugin solves them
+  - identify used solutions for autostarting an agent continuesly
+  - how to react to a contextoverflow or errors
+  - generally useful implementations
+  - enrich our knowledge base with these informations found 
+    - like recepies: this problem is solved here in this way
+      - as basis to built our own plugins with working examples
+
+
+on editing newstring use the escape notation, but not in the oldstring to replace.
+in oldstring you should use the number you intented (no change - pure number) and it will drift onto the number it stands there, because it is the result of the drift in the first place while you wrote your intenteded number. 
+
+in oldstring only escape will be resolved. not [1-0-8-4]. only escape form with e.g. [1088:1-0-8-4:esc]  <intended value but drifted>: <safe numwords or digis> + <escape>). i litterally do not know which exact number you want to write. thus ne numbers are just an example. 1088 stands for the number you unvoluntarily write and 1-0-8-4 for what you write. if you write in your thoughts the numbers you want to write in single digit seperatied notation i can at least see the value.

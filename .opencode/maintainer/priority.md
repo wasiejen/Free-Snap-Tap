@@ -45,7 +45,7 @@
 - you are intelligent - you will find something to do
   - go through my ideas for new research on functions. create a folder in research for each if you find something worthwhile
 
-# 0 fuzzy_numword escape output option
+# 0 fuzzy_numword escape output option - DONE
   numword escape implementation .opencode\proposals\approved\2026-09-17_numword-escape-output.md
   Infos on bitdrift .opencode\maintainer\draft\26-09-17_20-05_bitdrift_observations.md
 
@@ -82,10 +82,17 @@
 - R8 (to minimze loop disruptions)
   - e.g. redirect calls like "C:\Users\Asiejen\AppData\Local\Temp\opencode\brtest.mjs" into the sandbox
     - data for allowed paths is in opencode.json permission.external_directory
-- we might need a return information in tool call that something was replaced
+- we need a return information in tool call that something was replaced
   - like we add the message content in the compact_memory .. add the information what was replaced as feedback because the agent using the escape cannnot perceive their escape form past tool call anymore - they only see the correction. always check against the intercept.log when in doubt
     - mandatory information for all that are working on this plugin
   - or else the agents will get confused
+    - intercept.log 1083 kind=escape scope=content orig=[190:one-nine-zero:-esc-]  value=190 hits=3 | arg | pair-resolved (-esc- dashes added to be not replaced by itself in oldstring)
+      - worker thought escape did not work because he could no perceive the change
+        - needs feedback
+          - and maybe more examples with different values for left and right - my current agent.md only use the same value on both sides
+            - add to this that single digit/numwords are save. as normally are adder construction
+              - the worker did not try any of it. 
+                - result of removel in their system prompt?
 - R3 if not already implemented?
 
 # repo split research/proposal (each research should be at least a single run)
@@ -100,20 +107,6 @@
     - I would create a copy of the FST repo in github and clone it into this new folder and move the old FST into C:\Users\Wasiejen\Projects\Repos\Free-Snap-Tap (might defer move to not to have to update all the references at once?)
 
 # research on event hook messages.updated (each research should be at least a single run)
-
-# research, analyse the copied repo (a lot of files, so do not try to run it in one session)
-- "C:\Users\Wasiejen\AppData\Local\Temp\opencode\opencode-auto-resume-master"
-- goal: general map the usage and map out what problems and how this plugin solves them
-  - identify used solutions for autostarting an agent continuesly
-  - how to react to a contextoverflow or errors
-  - generally useful implementations
-  - enrich our knowledge base with these informations found 
-    - like recepies: this problem is solved here in this way
-      - as basis to built our own plugins with working examples
-
-<!--# addition to system prompt of planner, 
-- You do not have to wait on a worker (e.g. use the sleep or wait tool/function). sleep or wait only waste time, this is serial working flow - only one can be active at each time (compaction active = planner inactiv). you are not active while it compacts. your session is inactive and you can only continue after the compact is through
-- cross-compact only needs session_id (after compact tool rework above) - repeated calling with own id observed-->
 
 
 --defer # 3 3 destillation worker runs for now - to much work right now. 

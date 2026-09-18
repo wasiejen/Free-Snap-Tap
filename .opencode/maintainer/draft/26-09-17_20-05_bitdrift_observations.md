@@ -204,3 +204,8 @@ fresh worker ses_f4e3d64e9ffeO1uIkfX5WzDaNx could emit S22
 
 worker on numword sentinel ses_f4e084942ffeSedvBfOKl2ehQY tried to write to the wrong file outside sandbox test
   ←Write C:\Users\Asiejen\AppData\Local\Temp\opencode\brtest.mjs
+
+
+planner and worker had the same bitdrift
+written by the planner: [1093:1-1-0-3] got replaced with [1093:1-0-9-3], while rewriting the line [1103:1-1-0-3] is replaced by [1093:1-0-9-3]
+- 1103 -> 1093 drift (but he can write 1093 directly)

@@ -203,7 +203,7 @@
       "description": "moderately intelligent, very very fast, 128k context, should do no coding",
       "mode": "all",
       "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
-      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_explorer.md}",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
       "temperature": 0.6,
       "permission": {
         //"task": "allow",
