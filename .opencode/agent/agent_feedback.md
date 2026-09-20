@@ -305,3 +305,6 @@ Deep-Dive A (worker): (1) bash heredocs with ~90+ lines silently truncated mid-c
 ### 2026-09-19_18-28 worker_Q4_140K ses_f45a1df5affevJKITicbgS0fle
 Long multi-paragraph tool args (Write content ~3-4k chars, loop_log content string) repeatedly failed with 'JSON parsing failed: Text: {.' on this host; shorter payloads or edit-append/bash printf worked — if other runs hit it, split big writes into marker-appended edits.
 
+### 2026-09-20_23-45 worker_Q4_170K ses_f3f6c39a4ffe34mNRWa65h9zdL
+Deep-Dive B run #4: two frictions — (1) spec-vs-direct-instruction output paths diverged (unsuffixed in DoD vs _4-suffixed in launch); worker had to guess which binds — put canonical paths in ONE place. (2) write-tool long-content failures force the printf-create + read + edit-marker-append dance even for scratchpad recipes — chunked append guidance was only given mid-run.
+

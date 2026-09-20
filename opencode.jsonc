@@ -218,7 +218,7 @@
     "worker_Q4_135K_mtp": {
       "description": "half prefill, very intelligent, moderately fast, 140k context, higher precision and higher stability due to 4bit Quant",
       "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q4-135K",
+      "model": "llama-swap/Qwen3.8-27B-Q4-135K-MTP",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
       "temperature": 1.0,
       "permission": {
