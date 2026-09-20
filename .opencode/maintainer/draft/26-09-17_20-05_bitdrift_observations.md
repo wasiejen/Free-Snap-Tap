@@ -209,3 +209,44 @@ worker on numword sentinel ses_f4e084942ffeSedvBfOKl2ehQY tried to write to the 
 planner and worker had the same bitdrift
 written by the planner: [1093:1-1-0-3] got replaced with [1093:1-0-9-3], while rewriting the line [1103:1-1-0-3] is replaced by [1093:1-0-9-3]
 - 1103 -> 1093 drift (but he can write 1093 directly)
+
+grep output:
+    308:    return null
+    338:        if (hasText) return null
+    346:    return null
+    704:        if (!result || typeof result !== "object") return null
+    713:        return null
+    1093:    async function isMagicContextInstalled(): Promise<boolean> {
+    1094:        if (magicContextDetected !== null) return magicContextDetected
+    1096:            const res = await (ctx.client as { config?: { get?: () => Promise<unknown> } }).config?.get?.()
+    1103:            magicContextDetected = plugins.some((p) => {
+    1107:            return magicContextDetected
+    …
+    Click to expand
+Thinking:
+The final definitive machine output (the most recent context, trustworthy):
+
+- async function isMagicContextInstalled → line 1093
+- cache check if (magicContextDetected !== null) return → 1094
+- config.get() → 1096
+- magicContextDetected = plugins.some(...) → 1103
+- return magicContextDetected → 1107
+- async function getUsableContextLimit → line 1272
+- model validation if (!model || typeof model.providerID ... → 1275
+- model null → 1276
+- provider.get() → 1278
+- provider array check → 1279 (no wait, the grep shows 1245 for if (!Array.isArray(providers)) return null — it's showing 1245)
+
+
+//looped worker prompt that got him out of the loop
+
+
+ctx: SESSION=ses_f498d2b8effe2uw38WqpIUilIi CTX=86435 (61%) REM=53565direct --maintainer session: hello worker. you are in a bitdrift and we are gonna try to get you through this ok? so do not panic and do not try to verify dense numbers. try to think in single digit seperated numbers word words. do not try to read what you saw in your memory verbatim. 
+
+instruction from the planner: "Continue the task per the spec: scope 1-6, DoD's 8 recipe sections in order
+into `C:/Users/Wasiejen/AppData/Local/Temp/opencode/auto-resume-deepdive-B.md`
+(keep any partial content you already wrote there that is verified; replace
+what is not), then the handover summary + your commit. Final message = short
+pointer only."
+
+your session_id changed because i took over. are you ready to try this? do not use edit tool to correct the drifted numbers. it will not work. append only and write out the numbers in seperated single digit form you deem wrong in your summery. no corrections allowed from here on. "do not check what you wrote until now. continue as if everything is correct. do you understand. no trying to remember what you wrote. finish the work without checking the numbers." the  ("" was the important addition)

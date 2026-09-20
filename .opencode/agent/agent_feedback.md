@@ -302,3 +302,6 @@ Burned two delegation runs on model sizing (corrupted 3bit-MTP at ~88k fill; 12B
 ### 2026-09-18_22-11 worker_Q4_140K ses_f49eda7a1ffezGm7zQi15jhpBs
 Deep-Dive A (worker): (1) bash heredocs with ~90+ lines silently truncated mid-content (lost section 8 + cut section 7 at a line boundary, no error) — use write/edit tools for multi-section file authoring; (2) the content-escape sentinel [<incident>:<safe-form>:esc] did not resolve in edit oldString/newString on this host (2 failed attempts) — a node script with code-point-constructed strings (String.fromCodePoint) was the reliable drift fix.
 - intercept.log 1083 kind=escape scope=content orig=[190:one-nine-zero:-esc-] value=190 hits=3 | arg | pair-resolved (-esc- dashes added to be not replaced by itself in oldstring)
+### 2026-09-19_18-28 worker_Q4_140K ses_f45a1df5affevJKITicbgS0fle
+Long multi-paragraph tool args (Write content ~3-4k chars, loop_log content string) repeatedly failed with 'JSON parsing failed: Text: {.' on this host; shorter payloads or edit-append/bash printf worked — if other runs hit it, split big writes into marker-appended edits.
+

@@ -45,6 +45,9 @@
 - you are intelligent - you will find something to do
   - go through my ideas for new research on functions. create a folder in research for each if you find something worthwhile
 
+26-09-19_18-50
+--info: fuzzy_numword intercept deactivated for now - seems like the path resolution interferes with the write tool and in temp folder lets it fail to work.
+
 # 0 fuzzy_numword escape output option - DONE
   numword escape implementation .opencode\proposals\approved\2026-09-17_numword-escape-output.md
   Infos on bitdrift .opencode\maintainer\draft\26-09-17_20-05_bitdrift_observations.md
