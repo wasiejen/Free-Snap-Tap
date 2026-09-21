@@ -9,15 +9,15 @@
 //     on microtasks well before that).
 //   - the retry-keep note + the background failure go to console.log /
 //     console.error — captured, not returned.
-//   - the arg shape is SIX keys (providerID/modelID added for the maintainer's
-//     round-2 explicit-pair override — that case replaces cm_v2's retired
-//     context.api / context.session.id source checks).
+//   - the arg shape is FOUR keys (unit A, 2026-09-21: providerID/modelID
+//     REMOVED — the summarizer resolves from the root config's
+//     agent.compaction.model, falling back to the session model).
 //   - the sandbox carries a stub dump_session.cjs so the pre-compaction dump hook (4512fe6) succeeds silently (a dump failure would append a WARNING line and break the byte-exact checks) — mirrors the probe S13 preamble.
 // Idempotent re-runs: the sandbox is a FRESH scratchpad subdir each run.
 // Run: node .opencode/plugin/tests/compact_memory.smoke.mjs (plain node, exit 0 iff green).
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
-import { freshSandbox, loadRepo, makeChecker } from "./_smoke_base.mjs";
+import { REPO_ROOT, freshSandbox, loadRepo, makeChecker } from "./_smoke_base.mjs";
 
 const SANDBOX = freshSandbox("compact_memory");
 mkdirSync(path.join(SANDBOX, ".opencode", "temp"), { recursive: true });
@@ -110,7 +110,7 @@ chk("named export classifyQuantClass is a function", typeof mod.classifyQuantCla
 
 // ---- client stubs (recording; error specs per call count)
 const makeClient = (spec = {}) => {
-  const rec = { summarize: [], compact: [], messages: [] };
+  const rec = { summarize: [], compact: [], messages: [], prompt: [] };
   const client = { session: {} };
   if (spec.summarize) client.session.summarize = (o) => {
     rec.summarize.push(o);
@@ -126,6 +126,7 @@ const makeClient = (spec = {}) => {
     if (spec.messagesError) return Promise.reject(spec.messagesError);
     return Promise.resolve(spec.messages);
   };
+  if (spec.promptAsync) client.session.promptAsync = (o) => { rec.prompt.push(o); return Promise.resolve(true); };
   return { client, rec };
 };
 const toolCtx = (over = {}) => ({ sessionID: "ses_sm_self", directory: SANDBOX, extra: { model: { id: "Qwen3.8-27B-IQ4KT-120K", providerID: "llama-swap" } }, ...over });
@@ -136,13 +137,13 @@ const withClient = async (spec = {}) => {
   return { rec, t, exec: (args, extra) => t.execute(args, toolCtx(extra)) };
 };
 
-// ---- registration shape (FIRE-AND-FORGET build: SIX args)
+// ---- registration shape (unit A: FOUR args — the override pair is GONE)
 {
   const { t } = await withClient({ summarize: true });
   chk("factory returns { tool: { compact_memory } }", t != null);
   chk("reg shape: description string + async execute", typeof t.description === "string" && typeof t.execute === "function" && t.execute.constructor.name === "AsyncFunction");
-  chk("reg args: SIX keys (sessionID, providerID, modelID, keepTokens, keepMessages, message)",
-    JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "providerID", "modelID", "keepTokens", "keepMessages", "message"]),
+  chk("reg args: FOUR keys (sessionID, keepTokens, keepMessages, message)",
+    JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "keepTokens", "keepMessages", "message"]),
     JSON.stringify(Object.keys(t.args)));
   chk("reg args: every value is a zod schema (safeParse)", Object.values(t.args).every((s) => typeof s.safeParse === "function"));
 }
@@ -164,6 +165,11 @@ const withClient = async (spec = {}) => {
   chk("COMPACT line written with model field + keep args", line != null && / COMPACT ses_sm_self tokens=42000 messages=7$/.test(line) && line.includes("Qwen3.8-27B-IQ4KT-120K"), JSON.stringify(line));
   const dumpFile = path.join(SANDBOX, ".opencode", "archive", "sessions", "compaction_dumps", "ses_sm_self_c0.md");
   chk("dump hook fired on the tool path: compaction_dumps/ses_sm_self_c0.md exists (the stub dump, no WARNING appended)", existsSync(dumpFile), dumpFile);
+  const DT = "\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}";
+  const dumpOk = readLog().trim().split("\n").find((l) => l.includes("DUMP-OK ses_sm_self"));
+  chk("DUMP-OK line on success: `<stamp> DUMP-OK ses_sm_self compaction_dumps/ses_sm_self_c0.md <ms>`",
+    dumpOk != null && new RegExp(`^${DT} DUMP-OK ses_sm_self compaction_dumps/ses_sm_self_c0\\.md \\d+$`).test(dumpOk),
+    JSON.stringify(dumpOk));
 }
 
 // ---- keep rejected once -> retried without keep (the note is console.log'd)
@@ -200,19 +206,45 @@ const withClient = async (spec = {}) => {
   chk("v2 success consumed the budget (model recorded)", readStore().sessions.ses_sm_v2?.count === 1 && readStore().sessions.ses_sm_v2?.model === "Qwen3.8-27B-IQ4KT-120K");
 }
 
-// ---- the explicit providerID+modelID override (round-2 path — replaces
-// cm_v2's retired context.api / context.session.id source checks)
+// ---- the config-resolved summarizer (unit A: agent.compaction.model — the
+// root config is read PER CALL from the sandbox root: opencode.jsonc first,
+// opencode.json second, "" when neither; the file is removed after each case
+// so the other cases see the fallback path)
+const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
 {
-  const { rec, exec } = await withClient({ summarize: true });
-  const res = await exec({ sessionID: "ses_sm_explicit", providerID: "llama-swap", modelID: "Qwen3.8-27B-IQ4KT-120K", keepTokens: 7, keepMessages: 3 });
+  const { rec, exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "Session-Model-120K", providerID: "llama-swap" } }] });
+  writeFileSync(CFG_PATH, `{\n  // root config (JSONC)\n  "agent": { "compaction": { "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K" } }\n}`, "utf8");
+  const res = await exec({ sessionID: "ses_sm_cfg", keepTokens: 7, keepMessages: 3 });
   await drain();
-  chk("explicit pair: body carries the override verbatim (no model read performed)",
-    rec.summarize.length === 1 && rec.summarize[0].path.id === "ses_sm_explicit" &&
-    rec.summarize[0].body.providerID === "llama-swap" && rec.summarize[0].body.modelID === "Qwen3.8-27B-IQ4KT-120K" &&
+  rmSync(CFG_PATH, { force: true });
+  chk("config set: summarize body carries the CONFIG pair (not the session model)",
+    rec.summarize.length === 1 && rec.summarize[0].path.id === "ses_sm_cfg" &&
+    rec.summarize[0].body.providerID === "llama-swap" && rec.summarize[0].body.modelID === "Gemma4-12B-Q4KXL-MTP-128K" &&
     rec.summarize[0].body.keep.tokens === 7 && rec.summarize[0].body.keep.messages === 3,
     JSON.stringify(rec.summarize[0]));
-  chk("explicit pair: dispatch line names the override model", res === dispatchLine("ses_sm_explicit", "summarize", "Qwen3.8-27B-IQ4KT-120K"), JSON.stringify(res.slice(0, 160)));
-  chk("explicit pair: budget incremented under the target id", readStore().sessions.ses_sm_explicit?.count === 1);
+  chk("config set: dispatch line names the config model + budget under the target id",
+    res === dispatchLine("ses_sm_cfg", "summarize", "Gemma4-12B-Q4KXL-MTP-128K") && readStore().sessions.ses_sm_cfg?.count === 1,
+    JSON.stringify(res.slice(0, 160)));
+}
+{
+  const { rec, exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "IQ4-fb", providerID: "llama-swap" } }] });
+  writeFileSync(CFG_PATH, `{\n  // "agent": {\n  //   "compaction": { "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K" }\n  // },\n  "models": {}\n}`, "utf8");
+  await exec({ sessionID: "ses_sm_cfgco", keepTokens: 1, keepMessages: 1 });
+  await drain();
+  rmSync(CFG_PATH, { force: true });
+  chk("config commented-out: the FALLBACK session-model pair is used (comment-aware JSONC parse)",
+    rec.summarize.length === 1 && rec.summarize[0].body.providerID === "llama-swap" && rec.summarize[0].body.modelID === "IQ4-fb",
+    JSON.stringify(rec.summarize[0]));
+}
+{
+  const { rec, exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "IQ4-fb", providerID: "llama-swap" } }] });
+  writeFileSync(CFG_PATH, "{ oops — not json", "utf8");
+  await exec({ sessionID: "ses_sm_cfgbad", keepTokens: 1, keepMessages: 1 });
+  await drain();
+  rmSync(CFG_PATH, { force: true });
+  chk("config malformed (unparseable): the FALLBACK session-model pair is used (never throws)",
+    rec.summarize.length === 1 && rec.summarize[0].body.providerID === "llama-swap" && rec.summarize[0].body.modelID === "IQ4-fb",
+    JSON.stringify(rec.summarize[0]));
 }
 
 // ---- no-client core (cm_v2 folded): never throws, names the probes, ZERO
@@ -264,13 +296,31 @@ const withClient = async (spec = {}) => {
     String(res).slice(0, 160));
 }
 
-// ---- the `message` arg shape (continuation message + dispatch line)
+// ---- the `message` arg (unit A: queued as a direct promptAsync — never
+// awaited, delivered on the compacted session's resume)
 {
-  const { exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "IQ4-x", providerID: "llama-swap" } }] });
+  const { rec, exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "IQ4-x", providerID: "llama-swap" } }], promptAsync: true });
   const res = await exec({ message: "resume unit-3", sessionID: "ses_sm_msg" });
   await drain();
-  chk("message arg: 'resume unit-3\\n' + the exact dispatch line", res === `resume unit-3\n${dispatchLine("ses_sm_msg", "summarize", "IQ4-x")}`, JSON.stringify(res));
+  chk("message arg: EXACTLY one queued promptAsync with the byte-exact text part",
+    rec.prompt.length === 1 && rec.prompt[0].path.id === "ses_sm_msg" &&
+    rec.prompt[0].body.parts.length === 1 && rec.prompt[0].body.parts[0].type === "text" &&
+    rec.prompt[0].body.parts[0].text === "resume unit-3",
+    JSON.stringify(rec.prompt));
+  chk("message arg: response = the dispatch line + the queued note (the message itself NOT in the response)",
+    res === `${dispatchLine("ses_sm_msg", "summarize", "IQ4-x")}\nThe message was queued for ses_sm_msg (delivered on its resume).` && !res.startsWith("resume unit-3"),
+    JSON.stringify(res));
   chk("message arg: budget incremented under the target id", readStore().sessions.ses_sm_msg?.count === 1);
+}
+// ---- message WITHOUT promptAsync on the client: NO prompt sent, the
+// dispatch response carries the WARNING
+{
+  const { rec, exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "IQ4-y", providerID: "llama-swap" } }] });
+  const res = await exec({ message: "resume unit-4", sessionID: "ses_sm_nomsg" });
+  await drain();
+  chk("no promptAsync: NO prompt sent, the response carries the NOT-queued WARNING",
+    rec.prompt.length === 0 && res.includes("WARNING: the message was NOT queued for ses_sm_nomsg (client.session.promptAsync unavailable)."),
+    JSON.stringify(res));
 }
 
 // ---- gate: allow-allow-allow then deny (IQ4 cap 3), increment-on-verified-success
@@ -323,6 +373,18 @@ const withClient = async (spec = {}) => {
   chk("lenient v1 read + bump on write (count 1 -> 2, model from the messages read)",
     /dispatched/i.test(res) && st2.version === 2 && st2.sessions.ses_sm_v1.count === 2 && st2.sessions.ses_sm_v1.model === "Qwen-IQ4-X",
     JSON.stringify(st2));
+}
+
+// ---- the dump spawn's defensive stdio (unit A: "pipe" → "ignore" — the
+// pipe-buffer deadlock failure mode; pinned on the source — the live spawn
+// is exercised by the DUMP-OK case above)
+{
+  const src = readFileSync(path.join(REPO_ROOT, ".opencode", "plugin", "compact_memory.ts"), "utf8");
+  const spawnIdx = src.indexOf("execFileSync(resolveNodeExe()");
+  const spawn = src.slice(spawnIdx, spawnIdx + 260);
+  chk("dump spawn: stdio 'ignore' (no stdio 'pipe' anywhere in the source)",
+    spawnIdx >= 0 && /stdio:\s*"ignore"/.test(spawn) && !src.includes('stdio: "pipe"'),
+    spawn);
 }
 
 finish();

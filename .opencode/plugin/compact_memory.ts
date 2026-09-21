@@ -252,6 +252,21 @@ export function preCompactionDumpName(sessionID: string, count: number, stamp: s
   return stamp != null ? `${core}_${stamp}.md` : `${core}.md`;
 }
 
+// Best-effort append of a DUMP-OK line to the ctx log (unit A, 2026-09-21):
+// same local-stamp prefix style as the DUMP-FAIL line —
+// `<stamp> DUMP-OK <sid> <relfile> <ms>` (relfile = the corpus-relative dump
+// path, ms = elapsed milliseconds). Never throws.
+function appendDumpOkLine(root: string, sessionID: string, relFile: string, ms: number): void {
+  try {
+    const dir = tempDir(root);
+    mkdirSync(dir, { recursive: true });
+    const p = path.join(dir, "ctx.log");
+    appendFileSync(p, `${localStamp()} DUMP-OK ${sessionID} ${relFile} ${ms}\n`, "utf8");
+  } catch {
+    // best effort — never break the tool over a write failure
+  }
+}
+
 // Best-effort append of a DUMP-FAIL line to the ctx log (same append style as
 // appendCompactLine — never throws).
 function appendDumpFailLine(root: string, sessionID: string, error: string): void {
@@ -290,7 +305,13 @@ export function preCompactionDump(root: string, sessionID: string, count: number
   const name = preCompactionDumpName(sessionID, count, stamp);
   const target = path.join(archiveDir, name);
   try {
-    execFileSync(resolveNodeExe(), [scriptPath, sessionID, "--out", name], { timeout: 60_000, stdio: "pipe" });
+    // stdio "ignore" (unit A, 2026-09-21): the "pipe" setting buffered the
+    // child's output into a dead pipe inside the host — a pipe-buffer
+    // deadlock failure mode (the ETIMEDOUT evidence: the hung child in
+    // host; the script runs 0.12 s standalone).
+    const t0 = Date.now();
+    execFileSync(resolveNodeExe(), [scriptPath, sessionID, "--out", name], { timeout: 60_000, stdio: "ignore" });
+    appendDumpOkLine(root, sessionID, name, Date.now() - t0);
     return { ok: true, file: target };
   } catch (err: any) {
     const error =
@@ -460,19 +481,132 @@ async function resolveModel(
   }
 }
 
+// ------------------------------------------------------------------ the config summarizer (unit A, 2026-09-21,
+// priority.md #1)
+//
+// The providerID / modelID ARGS are REMOVED: the summarizer pair resolves
+// from the root config's agent.compaction.model ("provider/model"), falling
+// back to the compacting session's own model (the resolveModel result). The
+// parser is JSONC-safe — // line + /* */ block comments are stripped with a
+// string-state-aware scan (a // inside a string literal — e.g. a URL — must
+// NOT start a comment; a quote inside a comment must not open a string).
+// Absent file / unparseable / key missing / malformed → the fallback pair
+// UNCHANGED (source "fallback").
+
+// Strips // line + /* */ block comments from JSONC content, string-state
+// aware (quoted regions survive byte-exact; backslash escapes handled).
+// Exported for the probe (the comment + URL-safe parse pin).
+export function stripJsoncComments(content: string): string {
+  if (typeof content !== "string") return "";
+  let out = "";
+  let i = 0;
+  const n = content.length;
+  let str: string | null = null; // the open quote char, or null
+  while (i < n) {
+    const ch = content[i];
+    if (str !== null) {
+      out += ch;
+      if (ch === "\\" && i + 1 < n) { out += content[i + 1]; i += 2; continue; }
+      if (ch === str) str = null;
+      i += 1;
+      continue;
+    }
+    if (ch === '"' || ch === "'") { str = ch; out += ch; i += 1; continue; }
+    if (ch === "/" && i + 1 < n && content[i + 1] === "/") {
+      while (i < n && content[i] !== "\n") i += 1; // drop to the newline (kept next pass)
+      continue;
+    }
+    if (ch === "/" && i + 1 < n && content[i + 1] === "*") {
+      i += 2;
+      while (i < n && !(content[i] === "*" && i + 1 < n && content[i + 1] === "/")) i += 1;
+      i += 2; // drop the closing */
+      continue;
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
+}
+
+// Resolves the summarizer model pair from root-config content — PURE (no fs,
+// no clock, probe-pinnable): agent.compaction.model = "provider/model" → the
+// config pair split at the FIRST "/" (both halves non-empty — a missing "/"
+// or an empty half is malformed → the fallback). Any other shape (absent
+// content, unparseable JSONC, key missing, non-string, malformed) → the
+// fallback pair UNCHANGED, source "fallback".
+export function resolveCompactionModel(
+  configContent: string,
+  fallback: { providerID: string; modelID: string },
+): { providerID: string; modelID: string; source: "config" | "fallback" } {
+  const fb = {
+    providerID: typeof fallback?.providerID === "string" ? fallback.providerID : "",
+    modelID: typeof fallback?.modelID === "string" ? fallback.modelID : "",
+  };
+  let cfg: any = null;
+  try {
+    cfg = JSON.parse(stripJsoncComments(configContent));
+  } catch {
+    cfg = null; // unparseable → fallback (never throws)
+  }
+  const model = cfg != null && typeof cfg === "object" ? cfg?.agent?.compaction?.model : null;
+  if (typeof model !== "string" || model === "") return { ...fb, source: "fallback" };
+  const slash = model.indexOf("/");
+  if (slash <= 0 || slash >= model.length - 1) return { ...fb, source: "fallback" };
+  return { providerID: model.slice(0, slash), modelID: model.slice(slash + 1), source: "config" };
+}
+
+// The queued continuation message (unit A, 2026-09-21): when `message` is
+// non-empty, AFTER the compaction dispatch (the void path — no await
+// anywhere) fire EXACTLY ONE queued promptAsync to the compacted session
+// (the auto_resume.ts queued-prompt pattern — delivered on its resume).
+// typeof promptAsync !== "function" → NO prompt sent: the dispatch response
+// gains a WARNING line saying the message was not queued.
+function queueMessage(client: any, sessionID: string, message: unknown, dispatch: string, modelNote: string): string {
+  let body = dispatch;
+  if (typeof message === "string" && message !== "") {
+    if (typeof client?.session?.promptAsync === "function") {
+      void Promise.resolve(
+        client.session.promptAsync({ path: { id: sessionID }, body: { parts: [{ type: "text", text: message }] } }),
+      ).catch((err: unknown) =>
+        console.error(
+          `compact_memory: message queue FAILED for ${sessionID}:`,
+          err instanceof Error ? err.message : String(err),
+        ),
+      );
+      body += `\nThe message was queued for ${sessionID} (delivered on its resume).`;
+    } else {
+      body += `\nWARNING: the message was NOT queued for ${sessionID} (client.session.promptAsync unavailable).`;
+    }
+  }
+  return modelNote !== "" ? `${body}\n${modelNote}` : body;
+}
+
+// The root config content for the summarizer resolution: opencode.jsonc
+// (JSONC), falling back to opencode.json when absent ("" when neither — the
+// resolver then takes the fallback path). Never throws.
+function readRootConfigContent(root: string): string {
+  for (const name of ["opencode.jsonc", "opencode.json"]) {
+    const p = path.join(root, name);
+    try {
+      if (existsSync(p)) return readFileSync(p, "utf8");
+    } catch {
+      return ""; // unreadable → fallback
+    }
+  }
+  return "";
+}
+
 // ------------------------------------------------------------------ the plugin
 export default async function CompactMemoryPlugin(ctx: any) {
   return {
     tool: {
       compact_memory: tool({
-        description: "Compacts a session to free context space. Two paths: SELF (sessionID omitted) — your own session ENDS after the compaction; you resume from committed files via the post-compaction protocol. CROSS (explicit sessionID) — a fire-and-forget dispatch: it returns immediately and never blocks (an await would deadlock on the single llama-swap model slot); success is verified ASYNCHRONOUSLY — the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success, and a failed dispatch burns NO budget. The budget is per TARGET session, per model quant-class (CPU models denied — cap 0). Use it at the stop line / near-limit triage (self) or before a task_id resume of a session that died at its limit (cross); do NOT use it as a restart substitute — the recent head stays INTACT and a summary of the dropped tail is auto-created.",
+        description: "Compacts a session to free context space. Two paths: SELF (sessionID omitted) — your own session ENDS after the compaction; you resume from committed files via the post-compaction protocol. CROSS (explicit sessionID) — a fire-and-forget dispatch: it returns immediately and never blocks (an await would deadlock on the single llama-swap model slot); success is verified ASYNCHRONOUSLY — the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success, and a failed dispatch burns NO budget. The budget is per TARGET session, per model quant-class (CPU models denied — cap 0). Use it at the stop line / near-limit triage (self) or before a task_id resume of a session that died at its limit (cross); do NOT use it as a restart substitute — the recent head stays INTACT and a summary of the dropped tail is auto-created. The summarizer model pair is NOT an argument: it resolves from the root opencode.jsonc agent.compaction.model when set, else from the compacting session's own model.",
         args: {
           sessionID: tool.schema.string().optional().describe("Session to compact. Omit = your own session (the SELF path). An explicit id = ANOTHER session (the CROSS fire-and-forget path)."),
-          providerID: tool.schema.string().optional().describe("Model-pair OVERRIDE, paired with modelID — the provider id submitted VERBATIM in the summarize body instead of the auto-resolved pair. Leave BOTH unset for the normal case (auto-resolved; the host's compaction-model default applies). Set the pair only to force a specific compaction model (e.g. a small fast model for a cross compaction)."),
-          modelID: tool.schema.string().optional().describe("Model id — set TOGETHER with providerID (sent verbatim in the summarize body)."),
           keepTokens: tool.schema.number().optional().describe("Recent tokens to retain (e.g. 30000). Note: this build's server ignores the keep fields (the compaction floor is server-side) — they are sent, dropped on rejection, and never block the call."),
           keepMessages: tool.schema.number().optional().describe("Recent messages to retain (e.g. 12) — same note as keepTokens."),
-          message: tool.schema.string().optional().describe("Post-compaction continuation message (1-3 lines: what to resume + which files to re-read), attached to the compaction summary. ABSENT → the default reload directive is returned."),
+          message: tool.schema.string().optional().describe("Post-compaction continuation message (1-3 lines: what to resume + which files to re-read) — queued as a direct prompt to the compacted session (delivered on its resume; never awaited). ABSENT → nothing is queued."),
 
         },
         async execute(args: any, c: any) {
@@ -513,27 +647,22 @@ export default async function CompactMemoryPlugin(ctx: any) {
             }
             const isSelf = sessionID === c?.sessionID;
 
-            // 2. resolve the model pair — an EXPLICIT providerID+modelID pair
-            //    (BOTH given, non-empty) is an OVERRIDE (the maintainer's
-            //    round-2 tested cross path); otherwise resolveModel (self:
+            // 2. resolve the model pair — resolveModel is the FALLBACK (self:
             //    extra.model; cross: the messages-RPC read of the LAST entry —
-            //    never a throw, a NOTE on degradation)
-            const explicitProvider = typeof args?.providerID === "string" ? args.providerID.trim() : "";
-            const explicitModel = typeof args?.modelID === "string" ? args.modelID.trim() : "";
-            let model = "";
-            let providerID = "";
-            let modelNote = "";
-            if (explicitProvider !== "" && explicitModel !== "") {
-              providerID = explicitProvider;
-              model = explicitModel;
-            } else {
-              const resolved = await resolveModel(ctx?.client, c, sessionID, isSelf);
-              model = resolved.model;
-              providerID = resolved.providerID;
-              modelNote = resolved.note;
-            }
-
+            //    never a throw, a NOTE on degradation); the summarizer pair
+            //    then resolves from the root config's agent.compaction.model
+            //    when set (unit A, 2026-09-21: providerID/modelID are NOT
+            //    arguments — the config is the only override)
             const root = resolveRoot(c);
+            const resolved = await resolveModel(ctx?.client, c, sessionID, isSelf);
+            let model = resolved.model;
+            let providerID = resolved.providerID;
+            const modelNote = resolved.note;
+            const cfgPair = resolveCompactionModel(readRootConfigContent(root), { providerID, modelID: model });
+            if (cfgPair.source === "config") {
+              providerID = cfgPair.providerID;
+              model = cfgPair.modelID;
+            }
 
             // 3. the quant-class cap + the budget gate — BEFORE any compact
             //    call: denial has ZERO side effects (no increment, no compact
@@ -604,9 +733,7 @@ export default async function CompactMemoryPlugin(ctx: any) {
                 `Compaction dispatched for ${sessionID} (background, fire-and-forget) — the compact call was sent ` +
                 `(model: ${model}); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.` +
                 dumpWarning;
-              const body =
-                typeof args?.message === "string" && args.message !== "" ? `${args.message}\n${dispatch}` : dispatch;
-              return modelNote !== "" ? `${body}\n${modelNote}` : body;
+              return queueMessage(client, sessionID, args?.message, dispatch, modelNote);
             } else if (typeof client?.session?.summarize === "function") {
               // v1 — THE ACTIVE PATH ON THIS BUILD: the body MUST carry
               // providerID + modelID (REQUIRED by the server payload schema)
@@ -636,9 +763,7 @@ export default async function CompactMemoryPlugin(ctx: any) {
                 `Compaction dispatched for ${sessionID} (background, fire-and-forget) — the summarize call was sent ` +
                 `(model: ${model}); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.` +
                 dumpWarning;
-              const body =
-                typeof args?.message === "string" && args.message !== "" ? `${args.message}\n${dispatch}` : dispatch;
-              return modelNote !== "" ? `${body}\n${modelNote}` : body;
+              return queueMessage(client, sessionID, args?.message, dispatch, modelNote);
             } else {
               const compactType = typeof client?.session?.compact;
               const summarizeType = typeof client?.session?.summarize;

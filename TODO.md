@@ -293,7 +293,7 @@ smokes, pytest 459+1w, ruff F=0).
   `.opencode/plugin/tests/compact_memory.smoke.mjs`,
   `.opencode/plugin/probes/handover_probe.mjs`, (follow-on:
   `.opencode/plugin/auto_resume.ts` + the budget store).
-- **Status:** OPEN (approved — priority.md #1, top of his active list).
+- **Status:** OPEN (approved — priority.md #1, top of his active list). unit A landed, commit <hash>.
   **Unit A build in flight (plan5, 2026-09-21, looprun 2026-09-21_15-33):**
   the param rework + config resolution + queued message + DUMP-OK
   diagnostics — spec committed this iteration; follow-on: the auto-compact

@@ -1,120 +1,85 @@
-# Worker summary — auto-resume UNIT 4: planner liveness watchdog
+# Worker summary — compact_memory unit A (priority.md #1, TODO #70)
 
-Worker: `worker-5` (`worker_Q3S_160K`), session `ses_f3af705fdffeRiYr9H7FflN0o7`,
-2026-09-21, plan4 (iteration 5, looprun autorun-2026-09-21_15-33, AFK).
-Task spec: `.opencode/agent/handover/handover_task.md` (committed at b1ae759).
+Worker: `worker-6` (`worker_Q3S_160K`), session `ses_f3ab3c67dffeujQ8L1ucfWu8k8`,
+2026-09-21, plan5 (looprun autorun-2026-09-21_15-33). Task spec:
+`.opencode/agent/handover/handover_task.md` (committed at 7e790d4).
 
 ## What changed
 
-One commit on `opencode_test` (parent `b1ae759` — this summary file rides
-in that same commit; subject: "Auto-resume UNIT 4: planner liveness
-watchdog (scope + action: routing + restart branch)"):
+ONE commit on `opencode_test` (parent `7e790d4` — this summary rides in that
+same commit; subject "Compact_memory unit A landed: 4-key args +
+config-resolved summarizer + queued message + DUMP-OK"). Files:
 
-- `.opencode/plugin/auto_resume.ts` — UNIT 4 per the locked design:
-  - **Surface:** `messages` added to `SESSION_CANDIDATES` (the plural
-    list endpoint — distinct from the singular `message` single-fetch;
-    the live typeof verdict lands in the surface-report supplement).
-  - **Scope:** a sid is planner-scoped iff it is in the Unit 3 `spawned`
-    map (no fetch) OR any of its user messages carries the literal
-    `<|autonom|>` (fetched via `client.session.messages({path:{id}})` —
-    ONE round trip serves both the scope marker scan and the routing
-    scan). Cached per watch: `scope: "planner" | "none" | "unknown"`
-    (fetch pending/failed → unknown, re-checked next idle; fail-safe =
-    no action). Non-scoped sessions are never acted on.
-  - **Trigger:** scoped session `session.status` idle OR
-    `session.error` → `idlePending` latch (ONE decision per idle cycle;
-    a fresh busy resets `recoveryCount` and clears the latch).
-    `session.created` events tracked (sid → epoch, `props.time.created`
-    when a number else observe-time) for the successor check.
-  - **Routing** (next tick; the 5s funnel stays the only decision+send
-    funnel) on the LAST assistant message's text parts, regex
-    `action:\s*(restart|resume|stop|ask_maintainer)` (last match wins):
-    - `stop` / `ask_maintainer` → no send, `route= stop|ask sid=…`.
-    - `resume` or no line → queued CONTINUE prompt (locked text naming
-      `agent_readme_post_compaction.md`), `recoveryCount++` (cap 2 per
-      idle cycle; reset on fresh busy), `recovery= sid=… attempt=N`.
-    - `restart`, or cap exhausted with still no line → SUCCESSOR CHECK
-      (different sid tracked in `session.created` since the closing
-      session's `lastActivityAt` → `skip= successor sid=…`; lastActivityAt
-      null → fail-safe spawn) else `spawnPlanner` (RESTART prompt:
-      `<|autonom|>` + iteration-counter rule + rebuild-from-committed-
-      state block) + `route= restart spawn sid=…`.
-  - **Fail-safe:** every section try/catch; the tick never rejects; one
-    `err= sid=… <msg>` line per failed cycle per sid (no log spam).
-  - Header comment: new UNIT 4 block + the overlap-era caveat
-    (documented, not solved); the DELIBERATELY-ABSENT list updated.
-  - Units 1-3 behavior unchanged except the `SESSION_CANDIDATES`
-    addition; tick funnel structure, `spawnPlanner` body, Unit 2
-    constants untouched.
-- `.opencode/plugin/tests/auto_resume.smoke.mjs` — new UNIT 4 section
-  (13 checks; `client.session.messages` scripted per sid; batch A fires
-  all scenarios before one tick pass): stop/ask → zero sends + route
-  lines; restart w/o successor → spawn (ONE create, agent start prompt
-  carrying `<|autonom|>` + `loop_log.md` rule); restart w/ successor
-  (`session.created` first) → skip, no second spawn; no-line → continue
-  attempt 1 (locked text pinned); second idle → attempt 2; third idle
-  cap-exhausted → restart spawn; non-scoped (no marker, not spawned) →
-  zero sends, no route/recovery line, exactly one fetch; spawned-map
-  scope (the UNIT 3 self-marked `ses_u3_new`, user msg carries NO
-  marker) → routes as planner, attempt 1; `messages()` throwing →
-  `err=` line, no action, no throw; send totals pinned (3 CONTINUE +
-  2 RESTART spawns, nothing else touched). Surface pin updated (12
-  candidates incl. `messages`; v1 mock carries it). `smokeSids` array
-  extended for the live-log invariance check.
-- `.opencode/agent/knowledge/opencode-plugins/auto-resume-unit1-surface-
-  report.md` — appended `## UNIT 4 supplement`: the `messages` endpoint
-  facts (sdk/types line refs, plural-vs-singular distinction, live
-  typeof verdict pending), the implemented scope rule, the overlap-era
-  caveat, the routing summary.
-- `TODO.md` #75 — status line: Unit 4 LANDED + smoke-verified; LIVE
-  ACCEPTANCE PENDING the next host restart (the four acceptance cases,
-  proposal lines 138-142).
+- `.opencode/plugin/compact_memory.ts`:
+  - **A — params + resolution:** args schema is now EXACTLY 4 keys
+    (sessionID, keepTokens, keepMessages, message) — providerID/modelID
+    removed (schema + read sites). New exported PURE
+    `resolveCompactionModel(configContent, fallback) -> { providerID, modelID,
+    source: "config" | "fallback" }` (+ exported `stripJsoncComments`, a
+    string-state-aware // and /* */ comment stripper). Tool: reads
+    `opencode.jsonc` from the root (falls back to `opencode.json`; "" when
+    neither) PER CALL, resolves with the existing `resolveModel` result as
+    fallback; empty pair → refused exactly as before (no request sent, no
+    budget burned). Description + message-arg strings updated.
+  - **B — queued message:** when `message` is non-empty, AFTER the dispatch
+    (the void path — no await anywhere) exactly ONE queued
+    `promptAsync({ path: { id }, body: { parts: [{ type: "text", text }] } })`
+    fires to the compacted session (both v2 and v1 branches); the response
+    states the message was queued (delivered on its resume) and the message
+    is NO LONGER embedded in the response. `typeof promptAsync !==
+    "function"` → no prompt sent + a WARNING line in the dispatch response.
+  - **C — dump diagnostics:** successful dump appends a
+    `DUMP-OK <sid> <relfile> <ms>` line to `.opencode/temp/ctx.log` (same
+    local-stamp prefix style as DUMP-FAIL; relfile corpus-relative; ms
+    elapsed); spawn `stdio: "pipe"` → `"ignore"` (pipe-buffer deadlock
+    failure mode). DUMP-FAIL format + 60 s timeout UNCHANGED.
+  - The maintainer's `--comment` block is untouched; `callSummarize`,
+    keep-rejected retry, increment-on-success, budget gate, `resolveModel`
+    fallback all unchanged.
+- `.opencode/plugin/tests/compact_memory.smoke.mjs` — re-pinned (4-key args;
+  config set → config pair in body / commented-out → fallback / malformed →
+  fallback; old override case removed; message → promptAsync pins incl. the
+  no-promptAsync WARNING; DUMP-OK line pin; stdio-ignore pin).
+- `.opencode/plugin/probes/handover_probe.mjs` — S13 check 86 updated to the
+  4-key args; check 100 (explicit-pair override) REMOVED with a note; check
+  97 re-pinned to the new queued-message shape; NEW S25 section (7 checks:
+  the new exports, config present, comment+URL-safe parse, fallback battery,
+  block comments + first-slash split, DUMP-OK format, tool integration);
+  header annotation + EXPECTED OUTPUT + FINGERPRINT updated (241/241).
+- `TODO.md` — #70 status line: appended "unit A landed, commit <hash>"
+  (literal `<hash>` placeholder per the spec's quoted text — fill in from
+  this commit at curation; the commit = the single one on `opencode_test`
+  with parent `7e790d4`).
 
-## Measured verification (verbatim)
+## Measured verification (full standard gate, this commit's state)
 
-- `node .opencode/plugin/tests/auto_resume.smoke.mjs` →
-  `AUTO_RESUME_SMOKE: ALL PASS (53/53)` (40 existing + 13 new).
-- FULL smoke suite (every `*.smoke.mjs` in `.opencode/plugin/tests/`):
-  all 10 GREEN — auto_resume 53/53, block_transfer.sandbox 52/52,
-  block_transfer 22/22, compact_memory 47/47, context_recovery ALL
-  PASS, ctx_gauge 3/3, gauge_core ALL PASS, intercept_observer 39/39,
-  loop_log 24/24, submit 20/20.
-- `node .opencode/plugin/probes/handover_probe.mjs` →
-  `PROBE handover: 235/235 PASS`.
-- `./.venv/Scripts/python.exe -m pytest -q` → `459 passed, 1 warning in 2.10s`.
-- `./.venv/Scripts/ruff.exe check --select F .` → `All checks passed!`
+- `compact_memory.smoke.mjs`: **52/52 ALL PASS**
+- `handover_probe.mjs`: **241/241 PASS** (agrees with the header annotation
+  `S13=14 … S25=7 hygiene=6 → 241/241`)
+- pytest: **459 passed, 1 warning** (baseline match)
+- ruff `--select F`: **0 findings**
+- ALL 10 smokes green: auto_resume 53/53 (untouched), block_transfer
+  22/22 + sandbox 52/52, compact_memory 52/52, context_recovery ALL PASS,
+  ctx_gauge 3/3, gauge_core ALL PASS, intercept_observer 39/39, loop_log
+  24/24, submit 20/20.
 
-## Discrepancy found (planner curation)
+## What was deliberately NOT done
 
-- The Unit 3 status line in TODO #75 still records "one pre-existing red
-  smoke OUT OF SCOPE: block_transfer.sandbox stale description pin" —
-  this run measured `BT-SANDBOX-SMOKE: ALL PASS (52/52)`. That pin must
-  have been fixed since (not by this task; nothing in this commit
-  touches it). The todo_inbox entry (2026-09-21) can likely be closed —
-  flagged here, not edited (curator territory).
+- No live config change (the live `opencode.jsonc` is READ-ONLY — the config
+  is only ever read; the live `agent.compaction` block is still commented
+  out, so the fallback path remains the active one).
+- Follow-on parts of #70 not in this unit: the budget-file auto-compact
+  toggle (auto_resume.ts) and the research spec — per the spec, out of
+  scope.
+- No branch switch (stayed on `opencode_test`); the 3 pre-existing
+  uncommitted maintainer/planner file modifications (repo_map.md,
+  maintainer/ideas.md, maintainer/priority.md) were left untouched.
+- No `--wip`/access-restriction issues hit.
 
-## Deliberately NOT done
+## Note (spec interpretation)
 
-- Live acceptance (the four cases, proposal lines 138-142) — PENDING
-  the next host restart; that is the planner's job.
-- The overlap-era double-spawn race — documented in the header comment +
-  surface report per spec item 6; NOT solved (maintainer's call re:
-  retiring the looprunner).
-- No probe pin for the auto_resume shape (spec DO-NOT-touch: the probe
-  pins no auto_resume shape; I do not believe one is needed — no
-  todo_inbox entry filed, no pin built).
-- `session.error` trigger is IMPLEMENTED (sets the same idlePending
-  latch) but not smoke-pinned — it is not in the spec's smoke case
-  list; the latch it sets is pinned via the idle events.
-- The live `messages=function` typeof verdict — pending the next host
-  restart (noted in the surface-report supplement).
-- No changes to `.opencode/maintainer/**` or the live `opencode.jsonc`
-  (DO-NOT-touch); no edits to any other in-flight file (git status
-  showed maintainer/planner files modified by other sessions — left
-  untouched and uncommitted).
-
-## Lessons
-
-- The `glob` tool returned no matches for `.opencode/**` patterns
-  (hidden-dir exclusion?) — `ls` via bash worked; logged to
-  agent_feedback.
+The DoD's "ONE commit … 'unit A landed, commit <hash>'" is self-referential
+(a commit cannot carry its own hash; a 7-hex fixed-point is infeasible) —
+resolved by keeping the spec's quoted text verbatim with the literal
+`<hash>` placeholder in the status line, the actual commit identifiable via
+`git log` (parent `7e790d4`), and this summary in the same commit.

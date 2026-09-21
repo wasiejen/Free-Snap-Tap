@@ -293,7 +293,7 @@
 //      — no hook fires (S5 tallies unaffected); ALL fs writes steered into
 //      the sandbox via directory=SANDBOX; fake client records
 //      summarize/compact/messages; fresh ses_qc_* ids (in the FINGERPRINT):
-//      (86) registration shape (6 args incl. the explicit pair); (87)
+//      (86) registration shape (4 args — the override pair is GONE, unit A); (87)
 //      classifier fixtures incl. the trap; (88) summarize path (SELF sync) +
 //          default response BYTE-EXACT; (89) keep retry-once (cross dispatch,
 //          async-verified); (90) compact flat; (91) no-client error naming
@@ -302,8 +302,9 @@
 //          success only (cross dispatch); (95) v2 store schema on disk (model
 //          populated); (96) COMPACT line WITH model; (97) message + dispatch
 //          line (cross, NO trailer); (98) cross-session model read (the LAST
-//          entry, pair-less); (100) explicit pair override (verbatim body,
-//          NO messages RPC); (99) failing RPC (default cap + note, no throw)
+//          entry, pair-less); (100 REMOVED 2026-09-21 unit A — the explicit
+//          pair override is GONE, the S25 section pins the config resolver);
+//          (99) failing RPC (default cap + note, no throw)
 //   S14 compact_memory pre-compaction dump hook (7) — TODO #152 (approved
 //      2026-09-15): BEFORE ANY dispatch the hook dumps the target session's
 //      full pre-compaction content into the corpus via the dump script
@@ -624,6 +625,21 @@
 //            fast-paths the existing bracketed file);
 //      (245) case variants ESC/Escape/escape → all resolved (one check,
 //            3 kind=escape lines, hits=3 per field).
+//   S25 compact_memory unit A (7) — 2026-09-21 (priority.md #1): the 4-key
+//      args + the config-resolved summarizer + the DUMP-OK line (the
+//      S13 check 100 explicit-pair override pin is REMOVED):
+//      (250) the new exports: resolveCompactionModel + stripJsoncComments;
+//      (251) config present: agent.compaction.model → the config pair,
+//          source 'config';
+//      (252) comment + URL-safe parse: a // inside a string literal does
+//          NOT start a comment (JSONC string-state-aware strip);
+//      (253) the fallback battery (absent / no-key / non-string / no-'/' /
+//          empty halves / unparseable → the fallback pair UNCHANGED);
+//      (254) block comments + the FIRST-slash split ('prov/one/two');
+//      (255) the DUMP-OK line on a successful dump (the DUMP-FAIL prefix
+//          style, the numeric ms field);
+//      (256) tool integration: the sandbox opencode.jsonc config model →
+//          the summarize body carries the config pair (4-key args).
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -636,7 +652,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=15 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 hygiene=6  →  "PROBE handover: 235/235 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=14 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 hygiene=6  →  "PROBE handover: 241/241 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -2278,7 +2294,7 @@ const qcClassify = qcMod.classifyQuantClass;
 const QC_DIRECTIVE =
   "[SYSTEM CONTEXT DIRECTIVE]\nContext was compacted. Read .opencode\\agent\\prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.";
 const qcMakeClient = (spec = {}) => {
-  const rec = { summarize: [], compact: [], messages: [] };
+  const rec = { summarize: [], compact: [], messages: [], prompt: [] };
   const client = { session: {} };
   // The success value is the handler's real return: boolean `true` (the
   // server handler ends with `return true` — the 2026-09-12 bugfix verifies
@@ -2297,6 +2313,7 @@ const qcMakeClient = (spec = {}) => {
     if (spec.messagesError) return Promise.reject(spec.messagesError);
     return Promise.resolve(spec.messages);
   };
+  if (spec.promptAsync) client.session.promptAsync = (o) => { rec.prompt.push(o); return Promise.resolve(true); };
   return { client, rec };
 };
 const qcCtx = (over = {}) => ({ sessionID: "ses_qc_self", directory: SANDBOX, extra: { model: { id: "Qwen3.8-27B-IQ4KT-120K", providerID: "llama-swap" } }, ...over });
@@ -2350,9 +2367,9 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   check(
     "86",
     "S13",
-    "registration shape: default factory → tool.compact_memory (description + args [sessionID, providerID, modelID, keepTokens, keepMessages, message] as zod schemas + execute)",
+    "registration shape: default factory → tool.compact_memory (description + args [sessionID, keepTokens, keepMessages, message] as zod schemas + execute)",
     t != null && typeof t.description === "string" && typeof t.execute === "function" &&
-      JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "providerID", "modelID", "keepTokens", "keepMessages", "message"]) &&
+      JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "keepTokens", "keepMessages", "message"]) &&
       Object.values(t.args).every((s) => s != null && typeof s.safeParse === "function"),
     JSON.stringify({ tools: Object.keys(reg?.tool ?? {}), args: Object.keys(t?.args ?? {}) }),
   );
@@ -2540,18 +2557,21 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   );
 }
 
-// 97 — the message response shape (cross dispatch, the message arg GIVEN):
-//      the message + the dispatch line (NO reload trailer — the CALLER's
-//      context is untouched; the trailer belongs to the SELF path, where the
-//      caller's own context is the compacted one)
+// 97 — the message response shape (cross dispatch, the message arg GIVEN,
+//      unit A): the response is the dispatch line + the queued note (the
+//      message itself is NOT in the response) and EXACTLY ONE queued
+//      promptAsync carries the text part (delivered on the session's resume)
 {
-  const { res } = await qcExec({ summarize: true, messages: [{ info: { modelID: "IQ4-x", providerID: "llama-swap" } }] }, { message: "resume unit-3", sessionID: "ses_qc_msg" });
+  const { rec, res } = await qcExec({ summarize: true, messages: [{ info: { modelID: "IQ4-x", providerID: "llama-swap" } }], promptAsync: true }, { message: "resume unit-3", sessionID: "ses_qc_msg" });
+  await qcTick();
   check(
     "97",
     "S13",
-    "message response (cross dispatch): the message + the dispatch line, NO trailer (byte-exact)",
-    res === `resume unit-3\nCompaction dispatched for ses_qc_msg (background, fire-and-forget) — the summarize call was sent (model: IQ4-x); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.`,
-    JSON.stringify(res),
+    "message (unit A): response = dispatch line + the queued note (byte-exact) + exactly ONE queued promptAsync carrying the text part",
+    res === `Compaction dispatched for ses_qc_msg (background, fire-and-forget) — the summarize call was sent (model: IQ4-x); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.\nThe message was queued for ses_qc_msg (delivered on its resume).` &&
+      rec.prompt.length === 1 && rec.prompt[0]?.path?.id === "ses_qc_msg" &&
+      rec.prompt[0]?.body?.parts?.[0]?.type === "text" && rec.prompt[0]?.body?.parts?.[0]?.text === "resume unit-3",
+    JSON.stringify({ res: String(res).slice(0, 160), prompt: rec.prompt }),
   );
 }
 
@@ -2572,28 +2592,9 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   );
 }
 
-// 100 — the explicit pair OVERRIDE (the maintainer's round-2 path): BOTH
-//      providerID+modelID given → used VERBATIM in the summarize body, the
-//      messages RPC is NOT called (the pair IS the answer — no model read),
-//      the cap classifies the EXPLICIT model, the budget tracks the TARGET
-//      session (the stored model = the explicit summarizer model)
-{
-  const { rec, res } = await qcExec(
-    { summarize: true, messages: [] },
-    { sessionID: "ses_qc_pair", providerID: "llama-swap", modelID: "Gemma4-12B-Q4KXL-MTP-128K", keepTokens: 1, keepMessages: 1 },
-  );
-  await qcTick();
-  const st = qcStore();
-  check(
-    "100",
-    "S13",
-    "explicit pair override: BOTH given → verbatim in the body, the messages RPC NOT called, the budget tracks the TARGET session (count 1, the explicit model stored)",
-    rec.messages.length === 0 && rec.summarize.length === 1 &&
-      rec.summarize[0]?.body?.providerID === "llama-swap" && rec.summarize[0]?.body?.modelID === "Gemma4-12B-Q4KXL-MTP-128K" &&
-      /dispatched/i.test(res) && st.sessions.ses_qc_pair?.count === 1 && st.sessions.ses_qc_pair?.model === "Gemma4-12B-Q4KXL-MTP-128K",
-    JSON.stringify({ messages: rec.messages.length, res: String(res).slice(0, 120), st: st.sessions.ses_qc_pair }),
-  );
-}
+// 100 — REMOVED 2026-09-21 (unit A, priority.md #1): the explicit
+//      providerID+modelID override is GONE from the args — the summarizer
+//      resolves from the root config's agent.compaction.model (pinned in S25).
 
 // 99 — the failing RPC: session.messages THROWS → NO throw, the request is NOT sent (no resolvable model pair — the server
 //      requires both; a send would be a guaranteed schema rejection, the
@@ -5084,6 +5085,106 @@ let n24 = 239;
   );
 }
 
+// ------------------------------------------------------------------ S25 compact_memory unit A (7) — 2026-09-21 (priority.md #1): the 4-key args + the config-resolved summarizer (the exported pure resolver, JSONC-safe) + the DUMP-OK line
+//
+// Reuses S13's type-stripped plugin import (qcMod) and the sandbox: the
+// resolver is PURE (driven directly over string fixtures); the DUMP-OK pin
+// drives the exported preCompactionDump with the S14 stub dump script (still
+// in place from check 105); the tool-integration pin writes a SANDBOX
+// opencode.jsonc (removed afterwards) and drives the tool path with the
+// 4-key args.
+{
+  check(
+    "250",
+    "S25",
+    "exports: resolveCompactionModel + stripJsoncComments are functions (the new unit A surface)",
+    typeof qcMod.resolveCompactionModel === "function" && typeof qcMod.stripJsoncComments === "function",
+    JSON.stringify({ r: typeof qcMod.resolveCompactionModel, s: typeof qcMod.stripJsoncComments }),
+  );
+}
+{
+  const fb = { providerID: "llama-swap", modelID: "Session-Model-120K" };
+  const cfg = qcMod.resolveCompactionModel(
+    `{\n  // root config (JSONC)\n  "agent": { "compaction": { "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K" } }\n}`,
+    fb);
+  check(
+    "251",
+    "S25",
+    "config present: agent.compaction.model 'provider/model' → the config pair, source 'config'",
+    cfg.source === "config" && cfg.providerID === "llama-swap" && cfg.modelID === "Gemma4-12B-Q4KXL-MTP-128K",
+    JSON.stringify(cfg),
+  );
+}
+{
+  const fb = { providerID: "llama-swap", modelID: "Session-Model-120K" };
+  const urlCfg = qcMod.resolveCompactionModel(
+    `{\n  /* block comment */\n  "website": "https://example.com/docs//compaction?x=1", // line comment\n  "agent": { "compaction": { "model": "prov-x/model-y" } }\n}`,
+    fb);
+  check(
+    "252",
+    "S25",
+    "comment + URL-safe parse: a // inside a string literal does NOT start a comment (the config pair still resolves)",
+    urlCfg.source === "config" && urlCfg.providerID === "prov-x" && urlCfg.modelID === "model-y",
+    JSON.stringify(urlCfg),
+  );
+}
+{
+  const fb = { providerID: "llama-swap", modelID: "Session-Model-120K" };
+  const cases = {
+    absent: qcMod.resolveCompactionModel("", fb),
+    noKey: qcMod.resolveCompactionModel(`{ "agent": { "other": 1 } }`, fb),
+    notString: qcMod.resolveCompactionModel(`{ "agent": { "compaction": { "model": 42 } } }`, fb),
+    noSlash: qcMod.resolveCompactionModel(`{ "agent": { "compaction": { "model": "Gemma4-12B" } } }`, fb),
+    emptyLeft: qcMod.resolveCompactionModel(`{ "agent": { "compaction": { "model": "/model-y" } } }`, fb),
+    emptyRight: qcMod.resolveCompactionModel(`{ "agent": { "compaction": { "model": "prov-x/" } } }`, fb),
+    badJson: qcMod.resolveCompactionModel("{ oops", fb),
+  };
+  check(
+    "253",
+    "S25",
+    "fallback battery: absent / no-key / non-string / no-'/' / empty halves / unparseable → the fallback pair UNCHANGED, source 'fallback'",
+    Object.values(cases).every((r) => r.source === "fallback" && r.providerID === "llama-swap" && r.modelID === "Session-Model-120K"),
+    JSON.stringify(cases),
+  );
+}
+{
+  const fb = { providerID: "llama-swap", modelID: "Session-Model-120K" };
+  const multi = qcMod.resolveCompactionModel(`{\n/* c1 */ "agent": { "compaction": { "model": "prov/one/two" } } /* c2 */\n}`, fb);
+  check(
+    "254",
+    "S25",
+    "block comments + the FIRST-slash split: 'prov/one/two' → providerID 'prov', modelID 'one/two'",
+    multi.source === "config" && multi.providerID === "prov" && multi.modelID === "one/two",
+    JSON.stringify(multi),
+  );
+}
+{
+  const r = qcMod.preCompactionDump(SANDBOX, "ses_qc_dumpok", 0);
+  const line = ctxLogLines().find((l) => l.includes("DUMP-OK ses_qc_dumpok"));
+  check(
+    "255",
+    "S25",
+    "DUMP-OK line on success: `<dt> DUMP-OK ses_qc_dumpok compaction_dumps/ses_qc_dumpok_c0.md <ms>` (ms numeric, the DUMP-FAIL prefix style)",
+    r.ok === true && line != null && new RegExp(`^${DT} DUMP-OK ses_qc_dumpok compaction_dumps/ses_qc_dumpok_c0\\.md \\d+$`).test(line),
+    JSON.stringify(line),
+  );
+}
+{
+  const CFGP = path.join(SANDBOX, "opencode.jsonc");
+  writeFileSync(CFGP, `{\n  "agent": { "compaction": { "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K" } }\n}`, "utf8");
+  const { rec, res } = await qcExec({ summarize: true, messages: [] }, { sessionID: "ses_qc_cfgbody" });
+  await qcTick();
+  rmSync(CFGP, { force: true });
+  check(
+    "256",
+    "S25",
+    "tool integration: the sandbox opencode.jsonc agent.compaction.model → the summarize body carries the config pair (the 4-key args — no providerID/modelID keys)",
+    rec.summarize.length === 1 && rec.summarize[0]?.body?.providerID === "llama-swap" &&
+      rec.summarize[0]?.body?.modelID === "Gemma4-12B-Q4KXL-MTP-128K" && /dispatched/i.test(res),
+    JSON.stringify({ body: rec.summarize[0]?.body, res: String(res).slice(0, 120) }),
+  );
+}
+
 // ------------------------------------------------------------------ S5 hygiene (6)
 
 // 40 — every sandbox plugin.log line parses as JSON (no stray/blank/garbled lines)
@@ -5142,7 +5243,7 @@ let n24 = 239;
   const postLog = POST["plugin.log"] ?? "";
   const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
   const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
-  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non", "ses_qc_self", "ses_qc_retry", "ses_qc_flat", "ses_qc_nocli", "ses_qc_gate", "ses_qc_cpu", "ses_qc_fail", "ses_qc_msg", "ses_qc_cross", "ses_qc_rpc", "ses_qc_pair", "ses_pc_noscript", "ses_pc_ok"];
+  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non", "ses_qc_self", "ses_qc_retry", "ses_qc_flat", "ses_qc_nocli", "ses_qc_gate", "ses_qc_cpu", "ses_qc_fail", "ses_qc_msg", "ses_qc_cross", "ses_qc_rpc", "ses_qc_pair", "ses_pc_noscript", "ses_pc_ok", "ses_qc_dumpok", "ses_qc_cfgbody"];
   const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`) || l.includes(`"sess":"${fid}"`)));
   check(
     "43",
