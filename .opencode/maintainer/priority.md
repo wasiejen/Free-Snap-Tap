@@ -46,7 +46,11 @@
   - go through my ideas for new research on functions. create a folder in research for each if you find something worthwhile
 
 26-09-19_18-50
---info: fuzzy_numword intercept deactivated for now - seems like the path resolution interferes with the write tool and in temp folder lets it fail to work.
+--info: fuzzy_numword intercept deactivated for now 
+  - seems like the path resolution interferes with the write tool and in temp folder lets it fail to work.
+  - write tool still fails to work for multiline write operations:
+  - "invalid [tool=write, error=Invalid input for tool write: JSON parsing failed: Text: {.
+  Error message: JSON Parse error: Expected '}']"
 
 # 0 fuzzy_numword escape output option - DONE
   numword escape implementation .opencode\proposals\approved\2026-09-17_numword-escape-output.md
@@ -59,6 +63,10 @@
   - on self-compaction the model should also be resolved from the opencode.json if in doubt. only explicit overwrite of the model will change the compaction model.
     - cross-compaction -> only needs session id of to be compacted session
     - self-compaction -> needs not parameters at all (parameter desciptions in compact_memory are likely descriped badly by me -> needs to reword this so it is clearer)
+  - 26-09-21_03-17: both providerID and modelID should just be removed from the parameter list exposed to the agents
+    - looks up settings in opencode.json for the compaction agent
+    - if not compaction agent it used the default providerID and modelID of the session that does the compaction. (normally a worker, planner have the same anyway)
+      - the same model of the session to compact the session should result in better results even - even if it takes a whole lot longer than gemma.
     - 
 26-09-16_21-02: 
 - message value from compact_memory do not arrive in the compacted sesssion. not as part of the summery or later

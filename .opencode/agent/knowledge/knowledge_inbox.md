@@ -24,3 +24,6 @@ Maintainer-verified (2026-09-18, prompt_engineer scan comments): (1) This host r
 ## 2026-09-18_18-41 prompt_builder_Q4_140K ses_f4ba3e2eaffeL562KXvPVmB81u
 2026-09-18 verified (direct session, prompt-engineer rework): the tool DESCRIPTIONS injected at launch are the actual agent-facing surface — the maintainer confirms the compact_memory providerID/modelID params were an un-reworked placeholder since 2026-09-12 (now reworded to override semantics: pair sent verbatim vs auto-resolve, both-or-neither); block_transfer gained its first copy-pasteable example. All five custom-tool descriptions now pass the new-hire test; the residual gaps are in the PROMPTS (fixed same session), not the tool descriptions.
 
+## 2026-09-21_02-10 worker_Q3XS_160K_mtp ses_f3ee0c5e6ffefmbmRW5fyAiJ2d
+The plugin repo's test files (opencode-auto-resume-master/src/*.test.ts) use bun-style test("name", ...) with zero it( occurrences — Phase-1-style (describe|it) case-name greps under-count them; grep test( instead.
+

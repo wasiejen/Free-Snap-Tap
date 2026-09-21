@@ -25,68 +25,52 @@
         "baseURL": "http://192.168.178.20:8033/v1"
       },
       "models": {
-        "Qwen3.8-27B-Q3-150K-MTP:looprunner": {
-          "name": "Qwen3.8-27B-Q3-MTP:looprunner",
+        "Qwen3.8-27B-Q2S-210K-MTP": {
+          "name": "Qwen3.8-27B-Q2S-MTP",
           "limit": {
-            "context": 150000,
-            "output": 150000
+            "context": 210000,
+            "output": 210000
           }
         },
-        "Qwen3.8-27B-Q4-135K-MTP:looprunner": {
-          "name": "Qwen3.8-27B-Q4-MTP:looprunner",
+        "Qwen3.8-27B-Q2S-128K-x2": {
+          "name": "Qwen3.8-27B-Q2S-2Slots",
           "limit": {
-            "context": 145000,
-            "output": 145000
-          }
-        },
-
-
-        // "Qwen3.8-27B-IQ4KT-120K": {
-        //   "name": "Qwen3.8-27B-IQ4KT",
-        //   "limit": {
-        //     "context": 120000,
-        //     "output": 120000
-        //   }
-        // },
-
-        "Qwen3.8-27B-Q4-135K-MTP": {
-          "name": "Qwen3.8-27B-Q4-MTP",
-          "limit": {
-            "context": 135000,
-            "output": 135000
-          }
-        },
-        "Qwen3.8-27B-Q4-170K": {
-          "name": "Qwen3.8-27B-Q4",
-          "limit": {
-            "context": 170000,
-            "output": 170000
-          }
-        },
-        "Qwen3.8-27B-Q3-150K-MTP": {
-          "name": "Qwen3.8-27B-Q3-MTP",
-          "limit": {
-            "context": 150000,
-            "output": 150000
-          }
-        },
-        "Qwen3.8-27B-Q3-220K": {
-          "name": "Qwen3.8-27B-Q3",
-          "limit": {
-            "context": 220000,
-            "output": 220000
-          }
-        },
-        "Qwen3.8-27B-Q3-140K-MTP": {
-          "name": "compaction_qwen",
-          "limit": {
-            "context": 140000,
-            "output": 140000
+            "context": 128000,
+            "output": 128000
           }
         },
 
 
+        "Qwen3.8-27B-Q3XS-160K-MTP": {
+          "name": "Qwen3.8-27B-Q3XS-MTP",
+          "limit": {
+            "context": 160000,
+            "output": 160000
+          }
+        },
+        "Qwen3.8-27B-Q3XS-160K-MTP:looprunner": {
+          "name": "Qwen3.8-27B-Q3XS-MTP:looprunner",
+          "limit": {
+            "context": 160000,
+            "output": 160000
+          }
+        },
 
+
+        "Qwen3.8-27B-Q3S-110K-MTP": {
+          "name": "Qwen3.8-27B-Q3S-MTP",
+          "limit": {
+            "context": 110000,
+            "output": 110000
+          }
+        },
+        "Qwen3.8-27B-Q3S-160K": {
+          "name": "Qwen3.8-27B-Q3S",
+          "limit": {
+            "context": 160000,
+            "output": 160000
+          }
+        },
 
 
         "Gemma4-12B-Q4KM-UC-128K": {
@@ -135,15 +119,15 @@
   },
   "subagent_depth": 2,
   "agent": {
-    "compaction": {
-      "model": "llama-swap/compaction_qwen",
-      // "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
-      "temperature": 0.1
-    },
-    "looprunner_Q4_135K_mtp": {
+    // when no compaction model is set, then the session own model will be used for compaction
+    // "compaction": {
+    //   "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
+    //   "temperature": 0.1
+    // },
+    "looprunner_Q3S_160K": {
       "description": "Just restarts the Planner in autonomous mode",
       "mode": "primary",
-      "model": "llama-swap/Qwen3.8-27B-Q4-135K-MTP:looprunner",
+      "model": "llama-swap/Qwen3.8-27B-Q3S-160K:looprunner",
       "temperature": 0.1, // set a bit higher - was really a bit easy to confuse with low temp
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_looprunner.md}",
       "tools": {
@@ -179,10 +163,72 @@
         "load_workspace_tree": false
       }
     },
-    "prompt_builder_Q4_135K_mtp": {
+    "planner_Q3S_160K": {
+      "description": "very high intelligence, moderately fast, 160k context, very high precision, plans tasks and delegates to sub-agents",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-Q3S-160K",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_planner.md}",
+      "temperature": 1.0,
+      "permission": {
+        "task": "allow",
+        "edit": {
+          "*": "allow",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
+    },
+    "worker_Q3S_160K": {
+      "description": "very high intelligence, moderately fast, 160k context, very high precision",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-Q3S-160K",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
+      "temperature": 1.0,
+      "permission": {
+        "task": "allow",
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          "AGENTS.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
+    },
+    "agent_Q3S_160K": {
+      "description": "very high intelligence, moderately fast, 160k context, very high precision",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-Q3S-160K",
+      "prompt": "",
+      "temperature": 1.0,
+      "permission": {
+        "task": "allow",
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          "AGENTS.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "#ff6b6b"
+    },
+    "prompt_builder_Q3S_160K": {
       "description": "half prefill, very intelligent, moderately fast, 140k context, no worker prompt, higher precision and higher stability due to 4bit Quant",
       "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q4-135K-MTP",
+      "model": "llama-swap/Qwen3.8-27B-Q3S-160K",
       "prompt": "{file:./.opencode/agent/prompts/roles/prompt_engineer.md}",
       "temperature": 1.0,
       "permission": {
@@ -197,157 +243,73 @@
       },
       "color": "#ff6b6b"
     },
-    "planner_Q4_135K_mtp": {
-      "description": "half prefill, very intelligent, moderately fast, 140k context, plans tasks and delegates to sub-agents, higher precision and higher stability due to 4bit Quant",
-      "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q4-135K-MTP",
-      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_planner.md}",
-      "temperature": 1.0,
-      "permission": {
-        "task": "allow",
-        "edit": {
-          "*": "allow",
-          ".git/**": "deny",
-          ".github/**": "deny"
-        },
-        "bash": "allow",
-        "webfetch": "allow"
-      },
-      "color": "accent"
-    },
-    "worker_Q4_135K_mtp": {
-      "description": "half prefill, very intelligent, moderately fast, 140k context, higher precision and higher stability due to 4bit Quant",
-      "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q4-135K-MTP",
-      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
-      "temperature": 1.0,
-      "permission": {
-        "task": "allow",
-        "edit": {
-          "*": "allow",
-          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
-          "AGENTS.md": "deny",
-          ".opencode/agent/prompts/**": "deny",
-          ".opencode/agent/handover/handover_planner.md": "deny",
-          ".git/**": "deny",
-          ".github/**": "deny"
-        },
-        "bash": "allow",
-        "webfetch": "allow"
-      },
-      "color": "accent"
-    },
-    "agent_Q4_135K_mtp": {
-      "description": "half prefill, very intelligent, moderately fast, 120k context, no worker prompt, higher precision and higher stability due to 4bit Quant",
-      "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q4-135K-MTP",
-      "prompt": "",
-      "temperature": 1.0,
-      "permission": {
-        "task": "allow",
-        "edit": {
-          "*": "allow",
-          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
-          "AGENTS.md": "deny",
-          ".opencode/agent/prompts/**": "deny",
-          ".opencode/agent/handover/handover_planner.md": "deny",
-          ".git/**": "deny",
-          ".github/**": "deny"
-        },
-        "bash": "allow",
-        "webfetch": "allow"
-      },
-      "color": "#ff6b6b"
-    },
-    "agent_TempOnly_Q4_135K_mtp": {
-      "description": "Agent for testing, only has edit access to the TMP folder (C:/Users/Wasiejen/AppData/Local/Temp/opencode)",
-      "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q4-135K-MTP",
-      "prompt": "You only have acces to C:/Users/Wasiejen/AppData/Local/Temp/opencode (env variable TMP or TEMP)",
-      "temperature": 1.0,
-      "tools" : {
-        "read_file" : true,
-        "write_file": true,
-        "list_dir": true,
-        "glob": true
-      },
-      "permission": {
-        "edit": {
-          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
-        }
-      },
-      "options": {
-        "load_project_docs": false,
-        "load_agents_md": false
-      },
-      "color": "#222222"
-    },
-    "planner_Q4_170K": {
-      "description": "very intelligent, moderately fast, 140k context, plans tasks and delegates to sub-agents, higher precision and higher stability due to 4bit Quant",
-      "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q4-170K",
-      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_planner.md}",
-      "temperature": 1.0,
-      "permission": {
-        "task": "allow",
-        "edit": {
-          "*": "allow",
-          ".git/**": "deny",
-          ".github/**": "deny"
-        },
-        "bash": "allow",
-        "webfetch": "allow"
-      },
-      "color": "accent"
-    },
-    "worker_Q4_170K": {
-      "description": "very intelligent, moderately fast, 140k context, higher precision and higher stability due to 4bit Quant",
-      "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q4-170K",
-      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
-      "temperature": 1.0,
-      "permission": {
-        "task": "allow",
-        "edit": {
-          "*": "allow",
-          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
-          "AGENTS.md": "deny",
-          ".opencode/agent/prompts/**": "deny",
-          ".opencode/agent/handover/handover_planner.md": "deny",
-          ".git/**": "deny",
-          ".github/**": "deny"
-        },
-        "bash": "allow",
-        "webfetch": "allow"
-      },
-      "color": "accent"
-    },
-    "agent_Q4_170K": {
-      "description": "very intelligent, fast, small 50k context, no worker prompt, higher precision and higher stability due to 4bit Quant",
-      "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q4-170K",
-      "prompt": "",
-      "temperature": 1.0,
-      "permission": {
-        "task": "allow",
-        "edit": {
-          "*": "allow",
-          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
-          "AGENTS.md": "deny",
-          ".opencode/agent/prompts/**": "deny",
-          ".opencode/agent/handover/handover_planner.md": "deny",
-          ".git/**": "deny",
-          ".github/**": "deny"
-        },
-        "bash": "allow",
-        "webfetch": "allow"
-      },
-      "color": "#ff6b6b"
-    },
-    "looprunner_Q3_150K_mtp": {
+    // "planner_Q4_135K_mtp": {
+    //   "description": "half prefill, very intelligent, moderately fast, 140k context, plans tasks and delegates to sub-agents, higher precision and higher stability due to 4bit Quant",
+    //   "mode": "all",
+    //   "model": "llama-swap/Qwen3.8-27B-Q4-135K-MTP",
+    //   "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_planner.md}",
+    //   "temperature": 1.0,
+    //   "permission": {
+    //     "task": "allow",
+    //     "edit": {
+    //       "*": "allow",
+    //       ".git/**": "deny",
+    //       ".github/**": "deny"
+    //     },
+    //     "bash": "allow",
+    //     "webfetch": "allow"
+    //   },
+    //   "color": "accent"
+    // },
+    // "agent_Q4_135K_mtp": {
+    //   "description": "half prefill, very intelligent, moderately fast, 120k context, no worker prompt, higher precision and higher stability due to 4bit Quant",
+    //   "mode": "all",
+    //   "model": "llama-swap/Qwen3.8-27B-Q4-135K-MTP",
+    //   "prompt": "",
+    //   "temperature": 1.0,
+    //   "permission": {
+    //     "task": "allow",
+    //     "edit": {
+    //       "*": "allow",
+    //       "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+    //       "AGENTS.md": "deny",
+    //       ".opencode/agent/prompts/**": "deny",
+    //       ".opencode/agent/handover/handover_planner.md": "deny",
+    //       ".git/**": "deny",
+    //       ".github/**": "deny"
+    //     },
+    //     "bash": "allow",
+    //     "webfetch": "allow"
+    //   },
+    //   "color": "#ff6b6b"
+    // },
+    // "agent_TempOnly_Q4_135K_mtp": {
+    //   "description": "Agent for testing, only has edit access to the TMP folder (C:/Users/Wasiejen/AppData/Local/Temp/opencode)",
+    //   "mode": "all",
+    //   "model": "llama-swap/Qwen3.8-27B-Q4-135K-MTP",
+    //   "prompt": "You only have acces to C:/Users/Wasiejen/AppData/Local/Temp/opencode (env variable TMP or TEMP)",
+    //   "temperature": 1.0,
+    //   "tools" : {
+    //     "read_file" : true,
+    //     "write_file": true,
+    //     "list_dir": true,
+    //     "glob": true
+    //   },
+    //   "permission": {
+    //     "edit": {
+    //       "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+    //     }
+    //   },
+    //   "options": {
+    //     "load_project_docs": false,
+    //     "load_agents_md": false
+    //   },
+    //   "color": "#222222"
+    // },
+    "looprunner_Q3XS_160K_mtp": {
       "description": "Just restarts the Planner in autonomous mode",
       "mode": "primary",
-      "model": "llama-swap/Qwen3.8-27B-Q3-150K-MTP:looprunner",
+      "model": "llama-swap/Qwen3.8-27B-Q3XS-160K-MTP:looprunner",
       "temperature": 0.1, // set a bit higher - was really a bit easy to confuse with low temp
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_looprunner.md}",
       "tools": {
@@ -383,10 +345,10 @@
         "load_workspace_tree": false
       }
     },
-    "planner_Q3_150k_mtp": {
-      "description": "intelligent, fast, 120k context, plans tasks and delegates to sub-agents, medium precision due to 3bit Quant",
+    "planner_Q3XS_160k_mtp": {
+      "description": "high intelligence, fast, 160k context, high precision, plans tasks and delegates to sub-agents",
       "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q3-150K-MTP",
+      "model": "llama-swap/Qwen3.8-27B-Q3XS-160K-MTP",
       "temperature": 1.0,
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_planner.md}",
       "permission": {
@@ -400,10 +362,10 @@
 
       }
     },
-    "worker_Q3_150K_mtp": {
-      "description": "intelligent, fast, 120k context, medium precision due to 3bit Quant",
+    "worker_Q3XS_160K_mtp": {
+      "description": "high intelligence, fast, 160k context, high precision",
       "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q3-150K-MTP",
+      "model": "llama-swap/Qwen3.8-27B-Q3XS-160K-MTP",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
       "temperature": 0.3,
       "permission": {
@@ -422,10 +384,10 @@
       },
       "color": "accent"
     },
-    "agent_Q3_150K_mtp": {
-      "description": "intelligent, fast, 120k context, no worker prompt, medium precision due to 3bit Quant",
+    "agent_Q3XS_160K_mtp": {
+      "description": "high intelligence, fast, 160k context, high precision",
       "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q3-150K-MTP",
+      "model": "llama-swap/Qwen3.8-27B-Q3XS-160K-MTP",
       "prompt": "",
       "temperature": 1.0,
       "permission": {
@@ -444,10 +406,10 @@
       },
       "color": "#ff6b6b"
     },
-    "worker_explorer_Q3_150K_mtp": {
-      "description": "intelligent, fast generation, 120K context window, to be used to explore code base - to be checked",
+    "worker_explorer_Q3XS_160K_mtp": {
+      "description": "high intelligence, fast, 160k context, high precision, to be used to explore code base",
       "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q3-150K-MTP",
+      "model": "llama-swap/Qwen3.8-27B-Q3XS-160K-MTP",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_explorer.md}",
       "temperature": 1.0,
       "permission": {
@@ -462,12 +424,13 @@
       },
       "color": "accent"
     },
-    "worker_Q3_220K": {
-      "description": "intelligent, slow, big 210k context - for very long and complex tasks, medium precision due to 3bit Quant",
+
+    "worker_Q2XS_210K_mtp": {
+      "description": "intelligent, fast, 210k context, medium precision but still quite ok (not tested on code yet)",
       "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q3-220K",
+      "model": "llama-swap/Qwen3.8-27B-Q2S-210K-MTP",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
-      "temperature": 0.3,
+      "temperature": 1.0,
       "permission": {
         "task": "allow",
         "edit": {
@@ -484,30 +447,9 @@
       },
       "color": "accent"
     },
-    "agent_Q3_220K": {
-      "description": "intelligent, slow, big 210k context - for very long and complex tasks, no worker prompt, medium precision due to 3bit Quant",
-      "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q3-220K",
-      "prompt": "",
-      "temperature": 1.0,
-      "permission": {
-        "task": "allow",
-        "edit": {
-          "*": "allow",
-          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
-          "AGENTS.md": "deny",
-          ".opencode/agent/prompts/**": "deny",
-          ".opencode/agent/handover/handover_planner.md": "deny",
-          ".git/**": "deny",
-          ".github/**": "deny"
-        },
-        "bash": "allow",
-        "webfetch": "allow"
-      },
-      "color": "#ff6b6b"
-    },
+
     "worker_gemma_Q4_128K": {
-      "description": "moderately intelligent, very very fast, 128k context, should do no coding",
+      "description": "moderately intelligent, very very fast, 128k context, lower pecision, needs explicit step by step guidance, should do no coding",
       "mode": "all",
       "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
@@ -529,7 +471,7 @@
       "color": "accent"
     },
     "agent_gemma_Q4_128K": {
-      "description": "moderately intelligent, very very fast, 128k context, should do no coding",
+      "description": "moderately intelligent, very very fast, 128k context, lower pecision, needs explicit step by step guidance, should do no coding",
       "mode": "all",
       "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
       "prompt": "",
