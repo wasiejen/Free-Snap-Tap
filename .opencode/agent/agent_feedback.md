@@ -344,3 +344,6 @@ Multi-line status edit on TODO #75 produced a mangled sentence (dangling "**APPR
 ### 2026-09-21_16-37 planner_Q3S_160K ses_f3bd43f5bffe32mM8F3rQfaNh5
 todo_inbox.md lives at the REPO ROOT, not .opencode/agent/ — my close-out assumed the agent/ path (one failed call); the path is in agent_readme_todo.md, re-read it before curation.
 
+### 2026-09-21_17-20 worker_Q3S_160K ses_f3b8c19e9ffe2IoV4S9lrx0vSi
+Unit 2 spec said "client.provider.get() (already grepped, installed 1.18.29)" but the installed SDK's provider namespace exposes list() (no get) — and the spec's model-pair source info.model ?? props.model does not exist on the live AssistantMessage (pair is top-level providerID/modelID). Both handled defensively in the code; spec wording vs installed SDK mismatch cost a verification detour.
+
