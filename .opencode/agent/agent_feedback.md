@@ -347,3 +347,6 @@ todo_inbox.md lives at the REPO ROOT, not .opencode/agent/ — my close-out assu
 ### 2026-09-21_17-20 worker_Q3S_160K ses_f3b8c19e9ffe2IoV4S9lrx0vSi
 Unit 2 spec said "client.provider.get() (already grepped, installed 1.18.29)" but the installed SDK's provider namespace exposes list() (no get) — and the spec's model-pair source info.model ?? props.model does not exist on the live AssistantMessage (pair is top-level providerID/modelID). Both handled defensively in the code; spec wording vs installed SDK mismatch cost a verification detour.
 
+### 2026-09-21_17-32 planner_Q3S_160K ses_f3b948fcdffeiw3Lx7PsOzvP7I
+Task-spec SDK facts: a partial .d.ts grep claimed `client.provider.get()`, but the installed SDK exposes `provider.list()`; the live model pair is top-level `providerID`/`modelID`, not `info.model` — the worker had to resolve both gaps via live/static verification. Rule: "already-grepped" spec claims must name the exact method/field (or be explicitly marked unverified) — the live surface is the authority over the static .d.ts.
+
