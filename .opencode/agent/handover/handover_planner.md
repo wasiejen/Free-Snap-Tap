@@ -111,10 +111,23 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   predating the new models); knowledge_tools.md model-sizing entry
   extended (stable-set characterizations + MTP speed note + bit-drift
   verdict + the budget ruling).
-- **NEXT:** verify the running Deep-Dive C worker (worker_Q3S_160K,
-  launched right after this commit) against git log + its recipe
-  anchors on return; then Phase 3 consolidation + TODO seed "build our
-  own plugin" (his priority.md item).
+- **Deep-Dive C VERIFIED + VENDORED (this close-down):** worker
+  ses_f3e0a156bffeQYDNsR9B4AfIbb delivered per handover: all six scope
+  items done, full mega-function read, off-by-one map corrections
+  recorded, one dead-branch finding (tick celebration latch), NO-AWAIT
+  constraint restated as binding. Planner verification passed by
+  machine-grepped bare numbers: function-symbol grep landed the exact
+  megafn start, DONE_CLAIM_PATTERNS region confirmed in spec's resolved
+  range, banner comment block verbatim at its claimed lines; 8-section
+  header structure clean in both copies. Recipe vendored byte-identical
+  (minus its own duplicate title line) into
+  `knowledge/opencode-plugins/auto-resume-deepdive-C.md` (+ provenance
+  note + README line) in the same commit as the feedback channel
+  append. All three deep dives now live in-repo (A/B/C).
+- **NEXT (pending his call):** Phase 3 consolidation + TODO seed
+  "build our own plugin" (his priority.md item). Scratchpad run
+  artifacts (_run maps, B_5/6/7_1 recipes, auto-resume repos) are still
+  untracked temp files — cleanup is optional and his call.
 
 ## Closed session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
 - **plan2 closed (2026-09-18): BOTH units LANDED, gate re-verified by the

@@ -317,3 +317,12 @@ write tool failed for every payload this session (JSON parse "Expected '}'", eve
 ### 2026-09-21_02-54 worker_Q3XS_160K_mtp ses_f3ea32083ffefmGD9PrdzCnTYr
 Deep-Dive B run #7_1: write tool failed 3x on long content (JSON parse error "Text: {." — looks like argument truncation mid-string); small write + edit-append batches worked as workaround; also spec-vs-launch path mismatch (auto-resume-deepdive-B.md vs _7_1.md) needed resolving — launch's "EXACTLY" won.
 
+### 2026-09-21_04-24 planner_Q3XS_160k_mtp ses_f4a3f85e1ffeO9206c9ENvkK0f
+Self-compaction budget (cap 1 per model quant-class) ran silently: I planned compaction mid-session but the budget was already spent, so the refusal only surfaced at 97 % and forced a maintainer manual compaction — a visible budget state in the gauge readout / ctx line (remaining compactions for this session) would have made the cliff predictable.
+
+### 2026-09-21_05-42 worker_Q3S_160K ses_f3e0a156bffeQYDNsR9B4AfIbb
+write/edit tool JSON-arg serialization failed twice on long content in Deep-Dive C session (TODO #74 recurrence: parse error 'Expected }'); bash heredoc chunked appends into the scratchpad were the reliable path instead.
+
+### 2026-09-21_05-56 planner_Q3XS_160k_mtp ses_f4a3f85e1ffeO9206c9ENvkK0f
+Write-tool JSON flakiness hit this PLANNER session too (spec draft write refused with the logged "Text: {." signature); chunked bash heredoc fallback worked both times. Guidance currently lives only in worker-facing DoDs + agent_feedback.md — a one-liner in repo_commands.md (host tooling caveats: long write payloads unreliable; default to printf/heredoc-create + small edit-append batches) would cover ALL roles including planner spec authoring without re-discovery each session.
+
