@@ -327,9 +327,20 @@ smokes, pytest 459+1w, ruff F=0).
   resolveModel + smoke wrapper case (smoke 53/53, probe 241/241, pytest
   459+1w, ruff F=0).** LIVE RE-ACCEPTANCE (cross model resolution + queued
   message + COMPACT line) PENDING the NEXT host restart (the fix is not
-  live yet). Unit B: spec committed (1c599a6); worker-8 DIED mid-run
-  (host stream-cut mid tool-call emission — the #74 family; no file
-  changes, nothing lost) → UNIT B LAUNCH-READY for the next iteration.
+   live yet). Unit B: spec committed (1c599a6); worker-8 DIED mid-run
+   (host stream-cut mid tool-call emission — the #74 family; no file
+   changes, nothing lost) → UNIT B LAUNCH-READY for the next iteration.
+   **Unit B LANDED (2026-09-22, plan7, worker-10 `worker_Q3S_160K`
+   ses_f3a03af20ffe1bRa56xVl143VG, code `d4ef76e` — planner re-verified:
+   smoke 62/62, probe 241/241, pytest 459+1w, ruff F=0):**
+   `autoCompactEnabled()` per-tick reader (fail-open: missing/unreadable/
+   malformed file or absent key → ON; key present → Boolean) + the tick
+   gate (`skip= autoCompact-off` line, no send, the once-per-busy-cycle
+   attempts budget NOT consumed when OFF); live `compact_budget.json`
+   untouched. Worker-9's cancelled partial (header comment + constant —
+   maintainer interrupt, the #79 ping-pong incident) was carried by
+   worker-10. Live acceptance pending the next host restart. Follow-on:
+   the requested research spec (compact_memory + block_transfer up/downs).
 
 ## 71. Stale probe totals in repo_commands.md (maintainer file — needs his tasking; 2026-09-16)
 - **Problem / evidence:** `repo_commands.md` §Run/test still quotes "~376"

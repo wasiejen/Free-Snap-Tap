@@ -2,7 +2,35 @@
 
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
-## Current session — looprun autorun-2026-09-21_15-33, iteration 6 (ses_f3a51aedcffeSa0cwt8PmwlXAr, planner-6, Qwen3.8-27B-Q3S-160K)
+## Current session — looprun autorun-2026-09-21_15-33, iteration 7 (ses_f3a24dc3bffe59B5xpa0Ho3XZd, planner-7, Qwen3.8-27B-Q3S-160K)
+- UNIT B LANDED + planner re-verified (d4ef76e, worker-10 `worker_Q3S_160K`
+  ses_f3a03af20ffe1bRa56xVl143VG): the autoCompact toggle (per-tick reader
+  `autoCompactEnabled()`, fail-open; OFF → `skip= autoCompact-off` line, no
+  send, the once-per-busy-cycle attempts budget retained; 4 new smoke
+  cases → 62/62; probe 241/241, pytest 459+1w, ruff F=0). Worker-9 was
+  CANCELLED mid-run by the maintainer interrupt (the #79 ping-pong
+  incident) with a partial diff (header comment + constant) — worker-10
+  carried it from the working tree.
+- Maintainer interrupt incident: the auto-resume plugin repeatedly
+  re-resumed planner-6 after its valid `action: restart` (ping-pong risk
+  on the single serial slot). Planner-6 filed TODO #79 (HIGH) — the real
+  cause: `msgPairs` never unwraps the SDK `{ data }` wrapper (the earlier
+  "read-race" INFO line was WRONG, corrected in the loop log).
+- The #79 fix spec committed (handover_task.md; loop copy
+  plan7_ho_task_79.md) + worker-11 launched.
+- NEXT (in order): (1) #79 fix verification + bookkeeping; (2) live
+  acceptance of Unit A cross re-acceptance / Unit 2 saturation+trigger /
+  Unit 4 route lines — ALL pending the next host restart (the fixes are
+  in code; the running host is pre-restart); (3) the requested research
+  spec (compact_memory + block_transfer up/downs — priority.md #1) still
+  unwritten; (4) TODO #78 scoping (dump completeness).
+- NOTE for my close: the still-live buggy plugin (pre-restart host) may
+  fire 1-2 spurious recovery prompts at THIS finished session (cap 2 per
+  idle cycle, recoveryCount resets on every busy) — do not treat a
+  revival of this session as a real resume; the looprunner's action-line
+  handling is authoritative.
+
+## Prior session — looprun autorun-2026-09-21_15-33, iteration 6 (ses_f3a51aedcffeSa0cwt8PmwlXAr, planner-6, Qwen3.8-27B-Q3S-160K)
 - **Post-restart live acceptance (Unit A) + live bug found+fixed:** (a) DUMP-OK LIVE PASS (ctx.log `DUMP-OK ses_f3b16aa46… 76` + `compaction_dumps/ses_f3b16aa46…_c0.md`); (b) live `agent.compaction` confirmed COMMENTED OUT (opencode.jsonc ~130) → same-model fallback is the active path; (c) CROSS MODEL-READ LIVE BUG: the in-process client resolves SDK calls to a RequestResult wrapper `{ data: [...] }` (never a bare array — measured precedent auto_resume.ts:383-386 `res.data.id ?? res.id`) → `resolveModel`'s `Array.isArray` always failed → `no resolvable model` (2 live dispatches; smoke fakes returned bare arrays so the gate stayed green) → **FIXED + planner-verified (280b8d0, worker-7): dual-shape unwrap + smoke wrapper case (smoke 53/53, probe 241/241, pytest 459+1w, ruff F=0)**; live re-acceptance (cross resolution + queued message + COMPACT line) PENDING the NEXT host restart (fix not live yet).
 - **Unit 2 partial live:** `arm=` lines ARE live post-restart (6 for the planner session — the statusOf shape fix works); `saturation=`/`trigger=` pending a natural 85 % crossing (none this looprun).
 - **Unit 4:** route lines pending — they fire on MY idle at this session's close; the NEXT planner verifies from `.opencode/temp/auto_resume.log` (proposal lines 138-142 acceptance cases).

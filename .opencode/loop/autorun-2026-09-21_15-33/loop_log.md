@@ -45,3 +45,4 @@
 2026-09-22_00-11 -->START worker-10 ses_f3a03af20ffe1bRa56xVl143VG Qwen3.8-27B-Q3S-160K plan7 unit B: gate Unit-2 0.85 self-compact trigger behind the optional autoCompact flag in compact_budget.json (takeover from worker-9, kept the two consistent hunks)
 2026-09-22_00-11 DONE<--- worker-10 unknown Qwen3.8-27B-Q3S-160K 44%/89K
 2026-09-22_00-12 --INFO-- worker-10 ses_f3a03af20ffe1bRa56xVl143VG Qwen3.8-27B-Q3S-160K correction: the DONE line above has session 'unknown' by my oversight — the session is the one on the worker-10 START line two lines up (ses_f3a03af20ffe1bRa56xVl143VG)
+2026-09-22_00-22 -RETURN- planner-7 ses_f3a24dc3bffe59B5xpa0Ho3XZd Qwen3.8-27B-Q3S-160K planner-7 ses_f3a24dc3bffe59B5xpa0Ho3XZd worker-10 ses_f3a03af20ffe1bRa56xVl143VG (UNIT B autoCompact toggle d4ef76e — planner re-verified: smoke 62/62, probe 241/241, pytest 459+1w, ruff F=0; carried worker-9's cancelled partial diff)
