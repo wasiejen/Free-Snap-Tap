@@ -172,7 +172,10 @@ try {
       },
     },
   });
-  const statusEv = (sid, status) => ({ event: { type: "session.status", properties: { sessionID: sid, status } } });
+  // session.status in the LIVE shape (measured 2026-09-21): `status` is
+  // an OBJECT `{ type: <s> }`, not a bare string. The STRING-shape
+  // acceptance is pinned separately below (dual-shape check).
+  const statusEv = (sid, status) => ({ event: { type: "session.status", properties: { sessionID: sid, status: { type: status } } } });
   const fire = async (h, sid, evs) => { for (const e of evs) await h.event(e); };
 
   // Arm every scenario session: busy → assistant token update(s) → idle
@@ -224,8 +227,22 @@ try {
   chk("UNIT 2: second send is the same session with the same ratio text",
     calls[1]?.path?.id === "ses_u2_sat" && ((calls[1]?.body?.parts?.[0]?.text ?? "")).includes(RATIO_HI), "");
 
+  // ---- dual-shape acceptance: a STRING-shape "busy" event (older host
+  // shape / mocks) still arms + fires a trigger= line for a >= 0.85
+  // session (the LIVE object shape is what statusEv pins above; the
+  // idle leg here is sent in the live shape).
+  await fire(hooksU2, "ses_u2_str", [
+    { event: { type: "session.status", properties: { sessionID: "ses_u2_str", status: "busy" } } },
+    msgUpdated("ses_u2_str", "assistant", { total: 80000 }, MODEL),
+    statusEv("ses_u2_str", "idle"),
+  ]);
+  const ok5 = await waitUntil(() => calls.length >= 3 && readLines().some((l) => l.includes("trigger= sid=ses_u2_str")));
+  chk("UNIT 2: STRING-shape busy event still arms + fires trigger= for a >= 0.85 session (dual-shape acceptance)",
+    ok5 && calls.length === 3 && readLines().some((l) => l.includes("arm= sid=ses_u2_str")), `n=${calls.length}`);
+
   // ---- fail-safety: a throwing send + a missing provider → no throw,
   // no silent success; send-fail logged (the tick survives)
+  const cBeforeFail = calls.length; // baseline before the fail-safe scenarios
   const v3Session = {
     prompt: function () {},
     promptAsync: async () => { throw new Error("queued send exploded"); },
@@ -245,7 +262,7 @@ try {
   chk("UNIT 2: promptAsync throw → send-fail logged, tick/handler survive", threw3 === false && ok4, ok4 ? "" : "no send-fail line");
   chk("UNIT 2: send-fail line carries the error message", readLines().some((l) => l.includes("send-fail= sid=ses_u2_sendfail") && l.includes("queued send exploded")), "");
   chk("UNIT 2: missing provider data → usable null → no send, no trigger line, count unchanged",
-    calls.length === 2 && !readLines().some((l) => l.includes("trigger= sid=ses_u2_noprov2")), `n=${calls.length}`);
+    calls.length === cBeforeFail && !readLines().some((l) => l.includes("trigger= sid=ses_u2_noprov2")), `n=${calls.length}`);
 
   // ============================================================
   // UNIT 3 — new-planner spawn helper
@@ -374,7 +391,7 @@ try {
   } else if (liveBefore === null && liveSizeNow > 0) {
     appended = fs.readFileSync(LIVE_LOG, "utf-8"); // did not exist before — all new
   }
-  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov", "ses_u2_sendfail", "ses_u2_noprov2", "ses_u3_new", "ses_u3_chk2"];
+  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov", "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u3_new", "ses_u3_chk2"];
   chk("LIVE .opencode/temp/auto_resume.log received no smoke line (sandbox got every smoke line)",
     liveBefore === liveSizeNow || !smokeSids.some((s) => appended.includes(s)), `before=${liveBefore} after=${liveSizeNow}`);
   chk("sandbox log path is under the sandbox", sandboxLog.startsWith(base), sandboxLog);

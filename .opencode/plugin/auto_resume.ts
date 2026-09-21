@@ -148,12 +148,28 @@ function log(line: string) {
   }
 }
 
+// Unit 2: normalize the session.status payload to its status string.
+// The LIVE shape (measured 2026-09-21) carries `status` as an OBJECT
+// `{ type: "busy"|"idle"|"retry"|"interrupted" }`; a bare string is
+// accepted defensively (older host shapes / mocks). Anything else →
+// null (unknown vocabulary — no state change, no arm/log line; the
+// event line falls back to the raw `String()`).
+function statusOf(status: unknown): string | null {
+  if (typeof status === "string") return status;
+  const obj = status as { type?: unknown } | null;
+  if (obj && typeof obj === "object" && typeof obj.type === "string") return obj.type;
+  return null;
+}
+
 // The short `<key fields>` tail of an event line: the event's properties
 // bits that exist, kept short (status for session.status; tokens for
 // message.updated). Defensive — unknown shapes yield no extra bits.
 function keyFields(props: Record<string, unknown>): string {
   const bits: string[] = [];
-  if (props.status != null) bits.push(`status=${String(props.status)}`);
+  if (props.status != null) {
+    const s = statusOf(props.status);
+    bits.push(`status=${s ?? String(props.status)}`); // normalized value; raw fallback only when normalization yields null
+  }
   const m = (props.message ?? props.info) as Record<string, unknown> | undefined;
   if (m && typeof m === "object" && m.tokens != null) {
     bits.push(`tokens=${JSON.stringify(m.tokens)}`);
@@ -422,16 +438,19 @@ async function tick() {
 // the tick is the only decision+send funnel).
 function armEvent(type: string, sid: string, props: Record<string, unknown>) {
   if (type === "session.status") {
-    if (props.status === "busy") {
+    const status = statusOf(props.status); // live object shape {type} normalized to its string
+    if (status === "busy") {
       const w = getWatch(sid);
       w.armed = true;
       w.attempts = 0; // a fresh busy cycle resets the once-per-cycle budget
       w.status = "busy";
       log(`arm= sid=${sid}`);
-    } else if (props.status === "idle") {
+    } else if (status === "idle") {
       const w = watches.get(sid);
       if (w) w.status = "idle"; // the tick decides
     }
+    // any other vocabulary (retry/interrupted/unknown/null): no state
+    // change, no log line — the tick stays the only decision+send funnel
     return;
   }
   if (type !== "message.updated") return;

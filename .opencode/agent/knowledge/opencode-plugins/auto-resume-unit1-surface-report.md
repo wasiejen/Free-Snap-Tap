@@ -101,3 +101,37 @@ auto-discovered and loaded (first log line `2026-09-21T14:25:48.595Z` UTC).
    every event) — a smoke asserting "live log size unchanged" FAILS on any
    multi-second smoke; the correct invariant is "no smoke-session line in
    the newly appended bytes" (measured: +696 B over a ~30s smoke).
+
+## LIVE ACCEPTANCE supplement — plan4 (2026-09-21; planner-measured, worker-4 fix)
+
+1. **LIVE `session.status` shape (the Unit 2 string bug — found in live
+   acceptance, fixed 2026-09-21):** EVERY live `session.status` line in
+   `.opencode/temp/auto_resume.log` ends in `status=[object Object]` (e.g.
+   16:51:43.577Z) — the host carries `status` as an OBJECT
+   `{ type: "busy"|"idle"|"retry"|"interrupted" }` (the field is `type`;
+   vocabulary per the SDK `SessionStatus` map in `ctx_watchdog.ts` ~line
+   175). The old `armEvent` compared `props.status === "busy"` / `===
+   "idle"` (strings) → ZERO `arm=`/`saturation=`/`trigger=` lines in the
+   whole log: the idle transition never registered, the tick never
+   evaluated, the Unit 2 trigger never fired live. The smoke was green
+   because its `statusEv` helper mocked the STRING shape. Fix (this
+   commit): a module-internal `statusOf()` — string → as-is, object with
+   a string `type` → that `type`, else null; `armEvent` uses it (busy
+   arms, idle sets idle, any other vocabulary → no state change, no log
+   line); the event line prints the normalized value (`status=busy`),
+   falling back to the raw `String()` only when normalization yields
+   null. The smoke `statusEv` now emits the LIVE object shape; a
+   STRING-shape `"busy"` event is pinned separately (dual-shape
+   acceptance check, new sid `ses_u2_str`). Live re-acceptance PENDING
+   the next host restart (expect `arm=`/`saturation=`/`trigger=` lines).
+2. **`create=function` live verdict (Unit 3 pending surface fact,
+   settled):** the post-restart surface line
+   `2026-09-21T16:42:39.969Z` (log line 148832) carries
+   `create=function`.
+3. **UNIT 3 LIVE ACCEPTANCE PASSED (planner-run 2026-09-21 17:00Z):**
+   trigger file → `spawn= sid=ses_f3b16aa46ffe07iI4CSrScxeWK
+   agent=planner_Q3S_160K` (log line 163103) + the `.consumed` rename +
+   the spawned session WROTE the marker
+   `.opencode/temp/auto_resume_unit3_live_acceptance.txt`
+   (`unit3-live-acceptance ses_f3b16aa46ffe07iI4CSrScxeWK 2026-09-21
+   17:00:55 UTC`).

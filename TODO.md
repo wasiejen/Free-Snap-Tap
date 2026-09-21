@@ -612,10 +612,16 @@ probe 235/235, pytest 459+1w, ruff F=0). Three spec-vs-reality
 discrepancies resolved defensively (SDK `provider.list()` not `get()`;
 model pair top-level on the message, not `info.model`; smoke live-log
 invariant) — facts cured into the unit-1 surface report §UNIT 2 supplement.
-LIVE ACCEPTANCE for Unit 2 PENDING (a live session crossing 85 % must
-self-compact once per busy cycle, no re-prefill stall — verified from
-`arm=`/`saturation=`/`trigger=` log lines; runs after the host picks up
-the build). Unit 3 LANDED + smoke-verified (2026-09-21, plan3, worker
+LIVE ACCEPTANCE for Unit 2: the shape bug was FOUND in live acceptance
+(the live `session.status` carries `status` as OBJECT `{type}` while
+`armEvent` compared strings → zero `arm=`/`saturation=`/`trigger=` lines
+in the whole log) and FIXED this commit (`statusOf()` normalization +
+dual-shape smoke pin; verdict in the unit-1 surface report
+§LIVE ACCEPTANCE supplement). Live re-acceptance PENDING the next host
+restart (a live session crossing 85 % must self-compact once per busy
+cycle, no re-prefill stall — verified from
+`arm=`/`saturation=`/`trigger=` log lines). Unit 3 LANDED + smoke-verified
+(2026-09-21, plan3, worker
 `worker_Q3S_160K` ses_f3b555033ffem2gI9qBct1JZwG, the single UNIT 3 commit
 on `opencode_test` — see the committed handover summary): the new-planner
 spawn helper — the 5s tick (the only decision+send funnel; events stay
@@ -634,10 +640,13 @@ verdict is pending for the surface-report supplement). Smoke 39/39 (32
 existing + 7 new UNIT 3 checks; surface pin updated to carry create);
 gate: probe 235/235 UNCHANGED, pytest 459+1w, ruff F=0 (one pre-existing
 red smoke OUT OF SCOPE: block_transfer.sandbox stale description pin —
-todo_inbox entry 2026-09-21). LIVE ACCEPTANCE for Unit 3 PENDING (the
-one-shot trigger file must produce a running fresh planner session,
-verified from the `spawn=` log line; runs after the host picks up the
-build). next: Unit 4 spec (planner liveness watchdog — its restart
+todo_inbox entry 2026-09-21). LIVE ACCEPTANCE for Unit 3 PASSED (planner-run 2026-09-21 17:00Z: the
+one-shot trigger file → `spawn= sid=ses_f3b16aa46ffe07iI4CSrScxeWK
+agent=planner_Q3S_160K` (log line 163103) + `.consumed` rename + the
+spawned session wrote
+`.opencode/temp/auto_resume_unit3_live_acceptance.txt`; verdict in the
+unit-1 surface report §LIVE ACCEPTANCE supplement). next: Unit 4 spec
+(planner liveness watchdog — its restart
 branches consume this helper). NOTE: unit numbering
 per the revised proposal — Unit 3 = new-planner spawn helper (shared
 building block), Unit 4 = planner liveness watchdog (auto-resume after
