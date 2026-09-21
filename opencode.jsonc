@@ -57,6 +57,13 @@
         // },
 
 
+        "Qwen3.8-27B-Q3S-140K-MTP-Beellama": {
+          "name": "Qwen3.8-27B-Q3S-MTP-Bee",
+          "limit": {
+            "context": 140000,
+            "output": 140000
+          }
+        },
         "Qwen3.8-27B-Q3S-110K-MTP": {
           "name": "Qwen3.8-27B-Q3S-MTP",
           "limit": {
@@ -164,7 +171,7 @@
       }
     },
     "planner_Q3S_160K": {
-      "description": "very high intelligence, moderately fast, 160k context, very high precision, plans tasks and delegates to sub-agents",
+      "description": "plans tasks and delegates to sub-agents: very high intelligence, speedrating 48, 160k context, very high precision, highest general knowledge: best for very complex coding and code review work",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-Q3S-160K",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_planner.md}\n{file:.opencode/agent/memory/planner/destilled_mem.md}",
@@ -183,7 +190,7 @@
       "color": "accent"
     },
     "worker_Q3S_160K": {
-      "description": "very high intelligence, moderately fast, 160k context, very high precision",
+      "description": "very high intelligence, speedrating 48, 160k context, very high precision, highest general knowledge: best for very complex coding and code review work",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-Q3S-160K",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
@@ -205,7 +212,7 @@
       "color": "accent"
     },
     "agent_Q3S_160K": {
-      "description": "very high intelligence, moderately fast, 160k context, very high precision",
+      "description": "very high intelligence, speedrating 48, 160k context, very high precision, highest general knowledge: best for very complex coding and code review work",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-Q3S-160K",
       "prompt": "",
@@ -245,7 +252,7 @@
       "color": "#ff6b6b"
     },
     "planner_Q3S_110K_mtp": {
-      "description": "very high intelligence, fast, 110k context, very high precision, plans tasks and delegates to sub-agents",
+      "description": "plans tasks and delegates to sub-agents: very high intelligence, speedrating 66, 110k context, very high precision, highest general knowledge: best for complex coding and code review work that is workable with reduced context size",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-Q3S-110K-MTP",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_planner.md}\n{file:.opencode/agent/memory/planner/destilled_mem.md}",
@@ -263,7 +270,7 @@
       "color": "accent"
     },
     "worker_Q3S_110K_mtp": {
-      "description": "very high intelligence, fast, 110k context, very high precision",
+      "description": "very high intelligence, speedrating 66, 110k context, very high precision, highest general knowledge: best for complex coding and code review work that is workable with reduced context size",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-Q3S-110K-MTP",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
@@ -285,7 +292,7 @@
       "color": "accent"
     },
     "agent_Q3S_110K_mtp": {
-      "description": "very high intelligence, fast, 110k context, very high precision",
+      "description": "very high intelligence, speedrating 66, 110k context, very high precision, highest general knowledge: best for complex coding and code review work that is workable with reduced context size",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-Q3S-110K-MTP",
       "prompt": "",
@@ -489,7 +496,7 @@
     // },
 
     "worker_Q2XS_210K_mtp": {
-      "description": "intelligent, fast, 210k context, medium precision but still quite ok (not tested on code yet)",
+      "description": "intelligent, speedrating 68, 210k context, medium precision, medium general knowledge: (not tested on code yet), reliable so far",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-Q2S-210K-MTP",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
@@ -512,7 +519,7 @@
     },
 
     "worker_gemma_Q4_128K": {
-      "description": "moderately intelligent, very very fast, 128k context, lower pecision, needs explicit step by step guidance, should do no coding",
+      "description": "moderately intelligent, speedrating 160-200, 128k context, lower pecision, lower to medium general knowledge: needs explicit step by step guidance, should do no coding",
       "mode": "all",
       "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
@@ -534,7 +541,7 @@
       "color": "accent"
     },
     "agent_gemma_Q4_128K": {
-      "description": "moderately intelligent, very very fast, 128k context, lower pecision, needs explicit step by step guidance, should do no coding",
+      "description": "moderately intelligent, speedrating 160-200, 128k context, lower pecision, lower to medium general knowledge: needs explicit step by step guidance, should do no coding",
       "mode": "all",
       "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
       "prompt": "",

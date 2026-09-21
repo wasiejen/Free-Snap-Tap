@@ -5,8 +5,14 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
-- might be worth to think about a tool that codifies the first steps of creating realiaty from commit state via automated read and git diff etc, maintainer marker check and create a return that directly injects all these seperate tool call into the session?
+- on planner closeup with enough room to the stop line, maybe add feedback integration. look at the current accumulated agent_feedback and decide if and where it should be integrated.
 
+-pathfinder mentality as planner prompt part - when you are in an area (files/folders) and you see something is bad or not current or is easily fixed - leave it in a better state then before.
+- but might distract from task. small edits yes, bigger ones todo_inbox?
+
+- might be worth to think about a tool that codifies the first steps of creating reality from commit state via automated read and git diff etc, maintainer marker check and create a return that directly injects all these seperate tool call into the session?
+ - activated parallel tool call - so currently 3 tools can be called at the same time - and is already reducing init times and is more flexible.
+ 
 - we might need an information in tool call that something was replaced
   - or else the agents will get confused
 

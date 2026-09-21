@@ -123,15 +123,11 @@
 
 prompt additions/edits/rewrites:
 # 5
-- addition in the agents.md, that general knowledge - actionable items,code,facts that helped to solve a problem should be sorted into the agent/knowledge section - file may be created to fit the general topic
-  - when looking for solutions one of the first things should be to grep the knowledge folder for relevant hits (remember to limit outputted lines for first grep call or similar)
-    - maybe just an knowledge inbox.md to append to to not reduce cognitive load in analysing where it should go.
-  - a small tool might be good. could be done in a plugin that offers multiple convenience tools
-    - feedback add tool
-    - knowledge add tool (general inbox and for a curator to sort in)
-      - (included description on usage in description of parameter might be enough)
-    - append todo_inbox aka todo_inbox add? :-)
-  - unified "Submit" tool may be good that offers parameters and pipes the input into the correct files via append. e.g. submit(inbox="...",feedback="...",knowledge="...") all optional. time and session_id then recorded with it
+- addition in the agents.md, that general knowledge - actionable items,code,facts that helped to solve a problem should be send via submit directly
+  - when looking for solutions one of the first things should be to grep the knowledge in the folder for relevant hits (remember to limit outputted lines for first grep call or similar)
+    - knowledge folder may need to get keywords? or would a tool with e.g. increasing resolution and window of needle search be useful?
+    - maybe just an knowledge inbox.md to append to to not reduce cognitive load in analysing where it should go -> submit tool
+
 
 # 7 small knowledge / use addition - or more likely do-not addition? 
 - do we need explicit coding guidelines?
