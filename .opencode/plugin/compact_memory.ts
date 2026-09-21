@@ -48,9 +48,10 @@
 // Quant-class compaction budget (Part 2, priority.md #1): the cap is resolved
 // AT CALL TIME from the target session's model name — SELF:
 // c.extra?.model?.id; CROSS: the LAST entry of
-// ctx.client.session.messages({ path: { id } }) (info.modelID — assistant /
-// info.model — user); RPC failure / no messages → default cap 1 + a note in
-// the response (never a throw). The gate (count from the store vs the cap)
+// ctx.client.session.messages({ path: { id } }) (DUAL SHAPE: the bare array,
+// or the in-process client's RequestResult wrapper { data: [...] }) —
+// info.modelID — assistant / info.model — user; RPC failure / no messages →
+// default cap 1 + a note in the response (never a throw). The gate (count from the store vs the cap)
 // comes BEFORE any compact call: denial → clear message naming class + cap +
 // count, ZERO side effects (no increment, no compact call, no COMPACT line).
 //
@@ -429,9 +430,11 @@ async function callSummarize(
 // Resolves the target session's model PAIR (id + providerID — the server's
 // summarize payload REQUIRES both): SELF (no explicit id, or the explicit id
 // == the calling session) → c.extra?.model ({ id, providerID }); CROSS → the
-// LAST entry of session.messages({ path: { id } }) — info.modelID +
-// info.providerID (assistant) / the info.model object { id/modelID,
-// providerID } (user). RPC failure / no messages / no client → "" + a NOTE
+// LAST entry of session.messages({ path: { id } }) (DUAL SHAPE: bare array,
+// or the in-process client's RequestResult wrapper { data: [...] }) —
+// info.modelID + info.providerID (assistant) / the info.model object
+// { id/modelID, providerID } (user). RPC failure / no messages / no client →
+// "" + a NOTE
 // (the default cap 1 applies downstream — never a throw).
 async function resolveModel(
   client: any,
@@ -457,8 +460,12 @@ async function resolveModel(
       }
       return { model: "", providerID: "", note: "cross-session model read unavailable (no client.session.messages) — default compaction budget applied" };
     }
-    const msgs = await client.session.messages({ path: { id: sessionID } });
-    if (Array.isArray(msgs) && msgs.length > 0) {
+    const raw = await client.session.messages({ path: { id: sessionID } });
+    // DUAL RESPONSE SHAPE (2026-09-21): the in-process client resolves SDK
+    // calls to a RequestResult wrapper ({ data: [...] }); the bare array is
+    // the older / faked shape. Normalize to the bare array before the logic.
+    const msgs = Array.isArray(raw) ? raw : (raw != null && typeof raw === "object" && Array.isArray(raw.data) ? raw.data : null);
+    if (msgs != null && msgs.length > 0) {
       const info = msgs[msgs.length - 1]?.info ?? {};
       let id = "";
       let pid = "";

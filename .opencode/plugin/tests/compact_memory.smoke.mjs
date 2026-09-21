@@ -286,6 +286,21 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
     JSON.stringify(st.sessions.ses_sm_cross));
 }
 
+// ---- gate: cross-session model read — DUAL SHAPE: the in-process client's
+// RequestResult wrapper { data: [...] } resolves IDENTICALLY to the bare
+// array (the bare-array case above stays the regression pin)
+{
+  const { rec, exec } = await withClient({ summarize: true, messages: { data: [{ info: { modelID: "Qwen3.8-27B-IQ3KT-210K", providerID: "llama-swap" }, parts: [] }] } });
+  const res = await exec({ keepTokens: 1, keepMessages: 1, sessionID: "ses_sm_crosswrap" });
+  await drain();
+  const st = readStore();
+  chk("cross model read ({ data } wrapper): same resolution — model + providerID, empty note, IQ3 cap 1, one increment",
+    rec.messages.length === 1 && rec.messages[0].path.id === "ses_sm_crosswrap" &&
+    st.sessions.ses_sm_crosswrap?.model === "Qwen3.8-27B-IQ3KT-210K" && st.sessions.ses_sm_crosswrap?.count === 1 &&
+    /dispatched/i.test(res) && !/compacted/i.test(res) && !/model read/i.test(res),
+    JSON.stringify(st.sessions.ses_sm_crosswrap));
+}
+
 // ---- cross read FAILED (RPC error): the request is NOT sent, note in response
 {
   const { exec } = await withClient({ summarize: true, messagesError: new Error("boom-rpc") });
