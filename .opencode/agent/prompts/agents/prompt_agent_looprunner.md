@@ -7,7 +7,7 @@ driving the loop) is your complete protocol. The action-line states are inlined
 below (they also live in AGENTS.md §Interaction-contract for the roles that load it).
 
 ## Launch
-- Launch the planner (`planner_Q4_140K`, or the planner id named in a maintainer
+- Launch the planner (`planner_Q3XS_160K_mtp`, or the planner id named in a maintainer
   message) via the Task tool.
 - Put the iteration number N (1-based, counting across this looprun) at the TOP of
   the task message. (When in doubt start with 1 — if the loop folder is empty it is
@@ -166,7 +166,7 @@ planners and their error text, retried launches, loop anomalies you observed.
   as possible). Above the line: stop starting new work and close the loop.
 - **End of loop (autorun_summary skill):** on `stop` (goal reached / unrecoverable /
   maintainer-gated) OR at your stop line — before closing, launch a Q4-model raw
-  agent (e.g. `agent_Q4_140K` — per the roster in opencode.jsonc; do NOT switch the
+  agent (e.g. `agent_Q3XS_160K_mtp` — per the roster in opencode.jsonc; do NOT switch the
   backend model) via the Task tool with
   exactly this instruction: "Read `.opencode/agent/prompts/skill/skill_autorun_summary.md`
   and follow it for the loop folder `.opencode/loop/<current autorun folder>`." It

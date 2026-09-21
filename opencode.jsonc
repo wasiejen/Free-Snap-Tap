@@ -12,7 +12,7 @@
       "keep": {
         "system": true,
         "tokens": 30000,
-        "messages": 12
+        "messages": 18
     },
     "buffer": 2000
   },
