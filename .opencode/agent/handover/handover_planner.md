@@ -3,131 +3,13 @@
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
-## Current session — direct (ses_f4a3f85e1ffeO9206c9ENvkK0f, planner, Qwen3.8-27B-IQ4KT-140K)
-- **opencode-auto-resume research (his priority.md item):** surface gauge
-  (scratchpad copy: ONE monolith `src/index.ts` 2767 lines + 28 feature-named
-  test files + 30KB README ≈30 features — small repo, dense monolith).
-  Agreed approach: Phase 1 feature-index MAP → Phase 2 three thematic
-  deep-dives (A continuous auto-start / B context-overflow + error handling /
-  C generally-useful) as recipe entries → Phase 3 consolidation + TODO seed
-  "build our own plugin".
-- **Phase 1 = A/B comparison test (his proposal):** symmetric spec
-  WRITTEN + COMMITTED (`handover_task.md` — feature-map task; constraint
-  equality: handover summary + scratchpad map only, no TODO entries).
-  Roster verified live in opencode.jsonc: both explorer-prompt agents
-  confirmed; a built-in `explorer` agent type also exists in the Task-tool
-  list (model not in our config — not used here).
-- **Run A DIED (corruption, 2nd incident):** launch on
-  `worker_explorer_Q3_120K_mtp` returned `Task cancelled`; maintainer: the
-  IQ3KT-MTP model corrupted again at ≈88k context fill. Zero partial
-  artifacts (scratchpad + tree verified clean). Data point recorded in
-  `knowledge/knowledge_tools.md` (planning rule: no task-scale work on that
-  model). Comparison degrades to a single gemma run — if its map is weak,
-  fallback = raw `agent_Q4_140K` on the same prompt-agnostic spec.
-- **Run B (gemma) verdict — his "bad joke" + my spot-check:** handover
-  self-contradictory ("Measured: 0" vs every entry `confidence: measured`);
-  ALL 21 entries `test: none` — zero test-file mapping despite 28
-  feature-named test files; the "Context saturation" feature is MISSING
-  (his topic B!); the "Recovery model"/"Architecture" entries point at
-  README lines (269-294 / 295-328), not `index.ts` lines. SALVAGEABLE: the
-  structural skeleton (symbol+line seed list). Artifacts kept as comparison
-  data (scratchpad runB map + commit 2b020fd).
-- **Ruling (his): back to IQ4KT** — Run C launched on `worker_Q4_140K`
-  (same spec, prompt-agnostic; spec header updated + runB-do-not-read line
-  added).
-- **Run C VERIFIED + CONSOLIDATED (Phase 1 closed):** handover sharp; six
-  anchor lines (21/421/746/1372/1834/2099) spot-checked verbatim against
-  `src/index.ts` + the ctx-wrapup block 2306-2345 confirmed; 22/22 entries
-  mapped+measured incl. full test mapping and the context-saturation feature
-  (gemma's gap). Consolidated into
-  `.opencode/agent/knowledge/opencode-plugins/` (README + `auto-resume-map.md`
-  with verification note). Model-sizing entry (gemma shallow/fast, step-level
-  instructions; iq4kt deliberate) appended to `knowledge_tools.md`.
-- **Memory-pilot status (his question, 2026-09-18 end):** grep-verified —
-  NO reference to `agent/memory/planner/` in my planner prompt or the repo
-  docs (only `prompt_engineer.md` carries a memory line). I knew the pilot
-  only via the previous session's NAP text (now compressed). Pilot is SEEDED
-  but NOT WIRED — a fresh session would not follow its read/write convention.
-  Adding the reference = his call (pilot verdict still pending his review).
-- **Continue ruling (his, 2026-09-18 end):** compact + continue accepted —
-  after self-compact, next unit = Phase 2 deep-dive A spec.
-- **Deep-Dive A VERIFIED + CONSOLIDATED (2026-09-18, commit 818ef7f):**
-  recipe at `knowledge/opencode-plugins/auto-resume-deepdive-A.md` (planner
-  spot-checks passed; one worker line-ref fixed in consolidation).
-- **His roster rework (2026-09-21, a9146ff):** new bit-drift-free test agents
-  (handover_task_to_planner_5/6/7_1 in opencode.jsonc) tested on my committed
-  Deep-Dive B spec (2fce3df). FIVE B runs: #3 (173caf8 checkpoint,
-  6d37c0e complete), #4 (757eb94, handover cleaned by ad93d67), #5/#6/#7_1
-  COMPLETE — handovers `handover_task_to_planner_5/6/7_1.md` + scratchpad
-  recipes `auto-resume-deepdive-B_5/6/7_1.md`.
-- **B runs' shared findings (3/3 agree):** wrapup budget is once per BUSY
-  cycle (resetBusyFlags 1288), not per session; parent ctx-wrapup gated on
-  host-side magic-context plugin; subagent `session.summarize` opt-in (default
-  off); session.error self-suppresses when busyCount()==0; fit gap = our
-  compact_memory lacks saturation detection + AWAIT dispatch — B's chain is
-  the missing model-independent safety net.
-- **SPEC LINE-REF DRIFT (mine, all 3 complete runs caught it independently,
-  per their §8):** getUsableContextLimit actual 1122-1159 (source ground
-  truth 1122; line 1084 = hasBusySubagents close); my spec said "1084-1084".
-  The trust-the-symbol fallback in the spec worked as designed. **STILL TO
-  FIX:** spec line → 1122-1159 (one edit; a future re-run/diff needs the
-  accurate anchor). B-runs all finished full coverage — no re-run needed.
-- **Write-tool flakiness (needs TODO — his --info, priority.md
-  26-09-19_18-50 + feedback 2026-09-19..21):** write fails on long payloads
-  (arg truncation, JSON parse "Text: {." / "Expected '}'", even a 3-line
-  file once) across Q4_140K/Q4_170K/Q3XS_160K_mtp sessions; his note: the
-  (now-deactivated) fuzzy_numword intercept path-resolution "interferes with
-  the write tool... in temp folder". TODO entry = append next session
-  (self-contained: evidence above; outcome = host-side fix (maintainer) or
-  codified workaround — printf/bash create + chunked edit-append — into repo
-  docs). His --info items also logged: compaction timing = after planning +
-  drafting, keepMessages preserves drafting; auto session-dumps incomplete
-  (missing thinking/writing parts — e.g. archive/sessions/
-  ses_f5aefe9e1ffemgTiq9GELiqaGL.md).
-- **Deep-Dive B CONSOLIDATED (this session, post his manual compaction):**
-  all three complete runs cross-checked; winner base = RUN 6 text (richest:
-  10 recipes + full §8 cross-checks), complemented with RUN 5's
-  fit-assessment table (§7.1) + RUN 5's token double-add flag (§8.10);
-  RUN 7_1 (Q2S, parallel run — 7_2 interrupted to speed it up) confirmed
-  every RUN-6 anchor independently. Anchors spot-verified 2026-09-21
-  (1122/1288/2196/2284/2574, raw-grep machine-check incl. post-edit
-  re-check). -> `knowledge/opencode-plugins/auto-resume-deepdive-B.md`
-  (+ README provenance line). Same commit: spec line fix
-  1084→1122-1159 + TODO #74 (write-tool flakiness, his --info
-  26-09-19_18-50; host-side fix = maintainer call, workaround
-  codification pre-approved).
-- **His model map for the test runs (supersedes the workers' self-tagged
-  feedback lines — host mapping authoritative): #5=Q3XS, #6=Q3S,
-  #7_1=Q2S (parallel).**
-- **Deep-Dive C SPEC COMMITTED this turn (his ruling: use Q3S):**
-  `handover_task.md` rewritten whole via bash heredoc chunks AFTER a
-  mid-turn write-tool failure on its draft (~fourth occurrence incl. this
-  planner session — TODO #74 signature; workaround proven again). Same
-  commit unit: compaction budget per his new stable-roster ruling
-  (3-bit class cap raised to 3, like 4-bit; 2-bit row added at 1
-  "for now") in compact_memory.ts classifier + smoke pins — machine-run
-  GREEN (the compact smoke full suite); TODO #74 evidence corrected
-  (write fails even WITH the intercept deactivated → host-side issue
-  predating the new models); knowledge_tools.md model-sizing entry
-  extended (stable-set characterizations + MTP speed note + bit-drift
-  verdict + the budget ruling).
-- **Deep-Dive C VERIFIED + VENDORED (this close-down):** worker
-  ses_f3e0a156bffeQYDNsR9B4AfIbb delivered per handover: all six scope
-  items done, full mega-function read, off-by-one map corrections
-  recorded, one dead-branch finding (tick celebration latch), NO-AWAIT
-  constraint restated as binding. Planner verification passed by
-  machine-grepped bare numbers: function-symbol grep landed the exact
-  megafn start, DONE_CLAIM_PATTERNS region confirmed in spec's resolved
-  range, banner comment block verbatim at its claimed lines; 8-section
-  header structure clean in both copies. Recipe vendored byte-identical
-  (minus its own duplicate title line) into
-  `knowledge/opencode-plugins/auto-resume-deepdive-C.md` (+ provenance
-  note + README line) in the same commit as the feedback channel
-  append. All three deep dives now live in-repo (A/B/C).
-- **NEXT (pending his call):** Phase 3 consolidation + TODO seed
-  "build our own plugin" (his priority.md item). Scratchpad run
-  artifacts (_run maps, B_5/6/7_1 recipes, auto-resume repos) are still
-  untracked temp files — cleanup is optional and his call.
+## Current session — direct (planner, Qwen3.8-27B-Q3S-160K)
+- **NAP size:** the previous direct session's section (opencode-auto-resume Phases 1-2) moved in full to `.opencode/archive/loop/nap_direct.md`; its one-line record added to the Compressed archive (below).
+- **README gap fixed (this turn):** `knowledge/opencode-plugins/README.md` was missing the Deep-Dive C provenance line (the NAP had claimed it) — added.
+- **Birds-eye overview delivered (his question)** from the vendored A/B/C docs; his scoping rulings received: (1) A/B/C kept as-is as the agent reference corpus — Phase 3 = ONE slim build spec referencing them by path (no rewritten consolidation doc); (2) upstream v1.1.16 uses only v1-era surface (event cases session.status/created/updated/idle/interrupted, message.updated, todo.updated, session.error, command.executed; hooks chat.message, tool.execute.before/after, command.execute.before; client app.log/session.prompt/abort/list/summarize/command) → compatible with our v1 instance (opencode-ai@1.18.31); his slim-skeleton logging probe = first build unit (doubles as the event-firing testbed); (3) plugin home = `.opencode/plugin/` (auto-discovery only).
+- **Tool flakiness (TODO #74) — his ruling: this comes FIRST.** Evidence added this turn: (a) the same "JSON parsing failed: Text: {." signature hit a GREP tool call in THIS session (scope > write); (b) machine check: both error strings embedded in `opencode.exe` (v1.18.31) → the failing parse is server-side, upstream of every plugin hook (NOT intercept — it is log-only and sees already-parsed args); (c) `--log-level DEBUG --print-logs` flags verified (stderr capture path); (d) HIS HYPOTHESIS: the truncation began after his llama.cpp update — his bit-drift-countermeasure fork `ik_llama`; other people report the same issue → suspected fork-side (provider) bug. Next localization: direct-to-server long-JSON probe bypassing opencode (isolates the fork), raw SSE capture on one large-arg turn, fork issue search, server max-tokens/ctx config check.
+- **NEXT:** the flaky-tool localization unit (direct-to-server probe first) — then the Phase 3 slim build spec.
+
 
 ## Closed session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
 - **plan2 closed (2026-09-18): BOTH units LANDED, gate re-verified by the
@@ -163,6 +45,7 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   distillation — DEFERRED.
 
 ## Compressed archive (one line each — details in git log + TODO/records)
+- 2026-09-21 direct (ses_f4a3f85e1ffeO9206c9ENvkK0f, planner Qwen3.8-27B-IQ4KT-140K) — opencode-auto-resume research Phases 1-2 COMPLETE: map (Run C, verified) + deep-dives A/B/C all vendored into `knowledge/opencode-plugins/` (B consolidated from 3 runs + spec line fix 1084→1122-1159; C vendored byte-identical from Q3S worker ses_f3e0a156bffeQYDNsR9B4AfIbb); compaction budget ruling landed (3-bit cap→3, 2-bit row→1); TODO #74 filed (write-tool flakiness, host-side) — details: full section appended to .opencode/archive/loop/nap_direct.md (2026-09-21) + git 820a7bd
 - 2026-09-18 direct (ses_f4c039ae2ffeRqvdPqGu8IdB37, planner Qwen3.8-27B-IQ4KT-140K, post-opencode-restart) — live acceptance PASSED for both pending items (submit registration, #0 escape via intercept.log); his AGENTS.md paste LANDED (submit one-liner + sentinel-gated escape block); prompt-rework 8 commits `671a582..e00d52b` mapped; memory pilot planner namespace seeded (MEM-0101/0102); maintainer-file discipline (MEM-0103) + IQ3KT-MTP corruption/recovery entry recorded; full section text appended to nap_direct.md — details: git cc8e8cb
 - 2026-09-18 looprun 2026-09-17_23-58, iteration 1 (ses_f4e9ea998ffeQ3Pa0atv10oysQ, planner-1) — plan1: #53 unit LANDED in full (Part A 5e29cb0 friction-check close-down in all 4 role prompts, planner-direct + Part B worker-14 `submit` tool b83b34f + bookkeeping a8636ef; gate re-verified by planner: probe two-two-nine, 9 smokes, pytest 459+1w, ruff F=0; proposal → implemented/); pending maintainer-domain: submit registration + live acceptance + AGENTS.md paste — details: loop folder plan1_summary.md + git 4fd2065/f13886d
 - 2026-09-17 direct (ses_f4f539d7cffeVeRhsFQRdoSRUC, Qwen3.8-27B-IQ4KT-120K) — the FST live-listener session: live capture (FST 0.1.2.4) + fuzzy/numword observer R0–R7 + R7.5 LANDED & live-accepted (baseline two-two-nine) + #56 distillation DEFERRED (his 2-2-0 ruling); TODO #65/#71/#73 + #70/#53 filed; maintainer domain left: live-listener restarts, AGENTS.md paste, FST live testing, #56 distillation — details: TODO + knowledge_plugins.md + decision-record §5 + git 0105b9f/dfda0dd
