@@ -669,6 +669,15 @@ prose.
 - **Status:** OPEN — needs scoping (measure what dump_session.cjs currently
   drops + the spawn timeout behavior; his lean: dump raw as it is).
 
+## 79. (open, 2026-09-21, planner; HIGH — live, measured) — auto_resume Unit 4 `msgPairs` never unwraps the SDK `{ data }` wrapper → action lines are NEVER recognized (spurious recovery prompts / context drain)
+- **Problem / evidence (measured live, plan6, 2026-09-21):** after closing TWO consecutive turns each ending in a valid `action: restart`, `auto_resume.log` shows two `recovery= … attempt=1` lines (the counter RESET between them — `armEvent` busy resets `recoveryCount` at line 679 on every busy cycle) and `route=` count = **0** across the whole looprun — i.e. NO action line was ever recognized.
+- **Root cause:** `auto_resume.ts` line 492 `msgPairs(msgs) = Array.isArray(msgs) ? msgs : []`. But `sess.messages()` (line 567) returns the SDK `RequestResult` wrapper `{ data: [...] }`, never a bare array — so `msgPairs` always returns `[]` → `lastAssistantAction` (line 518) always returns null → `userHasMarker` (line 505) always returns false. **Same root cause as the `compact_memory` `resolveModel` bug fixed in 280b8d0 — NOT covered in auto_resume.**
+- **Consequence:** Unit 4 can never read restart/resume/stop/ask_maintainer → always the recovery branch; since `recoveryCount` resets on every busy cycle, the cap (2) is never reached → a FINISHED session gets re-woken with spurious recovery prompts (context drain). The loop itself still progresses via the **looprunner** (a separate mechanism with correct parsing) — the auto-resume plugin's own routing is broken.
+- **Desired outcome:** the messages-RPC result is unwrapped (bare array + `{ data }` wrapper) at the single `msgPairs` site, so Unit 4 routing reads action lines correctly: stop/ask → no send (`route= stop|ask`); resume/null → bounded recovery; restart → `route= restart spawn`.
+- **Acceptance:** a planner closing `action: restart` produces `route= restart spawn` (not a recovery prompt); `action: stop` → `route= stop`, no send; a smoke case pins the wrapper shape; standard gate green (smoke + probe + pytest + ruff).
+- **Suggested scope:** `.opencode/plugin/auto_resume.ts` (`msgPairs` line 492 — the single consumer fix; verify no other messages-RPC site), `.opencode/plugin/tests/auto_resume.smoke.mjs` (add a wrapper-shape case), probe pins.
+- **Status:** OPEN — needs a worker task (relates to #75). Priority: HIGH (spurious resumes + context drain). NOTE: an earlier plan6 INFO line attributed this to a "read-race" — that was WRONG; this shape bug is the real cause.
+
 ## 75. (open, 2026-09-21, planner) — **Build our own auto-resume plugin** (opencode-auto-resume research, Phase 3 seed):
 the looprunner is a mechanical relay; the maintainer wants infinite direct
 planner sessions (his ideas.md item 2026-09-18). Three measured gaps: no
