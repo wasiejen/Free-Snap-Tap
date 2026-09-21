@@ -170,6 +170,10 @@ instructions/protocol — facts that save lookups. Format per the README:
   unload + fresh reload moved it to the old ik_llama);
   server-side verification goes through the session's own tool calls or is
   done by the maintainer on his end.
+- **Update discipline (his, 2026-09-21):** never adopt a fresh ik_llama
+  build immediately — let it rest days so others surface the bugs first
+  (#2492/#2470: he hit the tool-call truncation ~48h before the issue was
+  filed; A/B in one session confirmed it — see TODO #74).
 - **Why (evidence):** the maintainer's round-2 experiment (2026-09-14, his
   report `maintainer/done/cross_session_compaction_summary.md`): round 2
   (queued, same model) — the first delegation was consumed by the compaction;
