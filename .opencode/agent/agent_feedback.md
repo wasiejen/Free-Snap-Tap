@@ -365,3 +365,12 @@ Gate re-run friction: the standard-gate commands (pytest/ruff) need the venv pat
 ### 2026-09-21_22-02 planner_Q3S_160K ses_f3acaf402ffexZ2GH0r5N0ZEWm
 Task-spec self-referential commit-hash instruction (plan5 spec 7e790d4: DoD said the worker's ONE commit must include "unit A landed, commit <hash>" — the worker's own hash) burned the worker 15k+ tokens of thinking and contributed to its context-limit death before the final commit. Spec pattern fix: the worker commits WITHOUT its own hash (handover carries parent + subject); the planner fills the hash into the TODO status line at the close commit.
 
+### 2026-09-21_22-57 worker_Q3S_160K ses_f3a4006ceffeLKWk1NqL9dMgX1
+Spec's "standard gate commands" listed bare `pytest -q` / `ruff check --select F .`, but bare pytest and ruff are NOT on PATH (repo_commands.md §Environment says use `./.venv/Scripts/python.exe -m pytest -q` and `./.venv/Scripts/ruff.exe`). A worker following the spec literally will hit `command not found` and waste a call. Recommend the task spec's gate lines cite the venv-invoked forms.
+
+### 2026-09-21_23-20 planner_Q3S_160K ses_f3a51aedcffeSa0cwt8PmwlXAr
+Pre-compaction dump hook times out on large sessions (DUMP-FAIL spawnSync node ETIMEDOUT on a ~90% planner session; a small session dumped fine in 76 ms) — the dump spawn's timeout does not scale with session size, so exactly the sessions most in need of a pre-compaction corpus backup are the ones that fail. Needs a scaled/removed timeout + retry in compact_memory's preCompactionDump.
+
+### 2026-09-21_23-20 planner_Q3S_160K ses_f3a51aedcffeSa0cwt8PmwlXAr
+A dead sub-agent with an EMPTY Task-tool result (worker-8: host stream-cut mid tool-call emission, zero work) left no diagnostic — I had to rebuild the cause from the DB part-table (final assistant part = a literal '</function>' fragment). The known failure signatures (context-limit, Task cancelled) are documented; the empty-result / stream-cut signature is not — add it to the failure-message interpretation guide (knowledge base or repo_gotchas) so the next dead-worker triage does not re-derive it.
+

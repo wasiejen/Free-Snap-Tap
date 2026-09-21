@@ -661,8 +661,13 @@ prose.
 - **Suggested scope:** `.opencode/agent/scripts/db/dump_session.cjs` (+ the
   `preCompactionDump` call site in compact_memory.ts),
   `.opencode/archive/sessions/` (read-only reference).
+- **Live evidence #2 (plan6, 2026-09-21):** the compact pre-dump hook
+  ALSO times out on large sessions — `DUMP-FAIL ses_f3a51aedcffeSa0cwt8PmwlXAr
+  spawnSync node ETIMEDOUT` (ctx.log) on a ~90 % session while a small
+  session dumped in 76 ms (`DUMP-OK`) — the dump's spawn timeout does not
+  scale with session size (same script family as the corpus dumps).
 - **Status:** OPEN — needs scoping (measure what dump_session.cjs currently
-  drops; his lean: dump raw as it is).
+  drops + the spawn timeout behavior; his lean: dump raw as it is).
 
 ## 75. (open, 2026-09-21, planner) — **Build our own auto-resume plugin** (opencode-auto-resume research, Phase 3 seed):
 the looprunner is a mechanical relay; the maintainer wants infinite direct
