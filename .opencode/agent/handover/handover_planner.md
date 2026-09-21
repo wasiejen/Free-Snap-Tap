@@ -51,23 +51,46 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   Adding the reference = his call (pilot verdict still pending his review).
 - **Continue ruling (his, 2026-09-18 end):** compact + continue accepted —
   after self-compact, next unit = Phase 2 deep-dive A spec.
-- **Deep-Dive A VERIFIED + CONSOLIDATED (2026-09-18):** spec d96b89d; run
-  ses_f49eda7a1ffezGm7zQi15jhpBs (worker_Q4_140K), recipe 8 sections in order,
-  scope 1-8 all done; spot-checks passed (watchdog-guard sites 747/754/759/
-  864/879, latch block 747-753, pluginAbortInFlight 1709/2578 verbatim; §7
-  registration list matches our live ctx_watchdog.ts 726-731); one worker
-  line-ref error fixed in consolidation (§8 "190-190" → "190-190",
-  map-verified range); consolidated to
-  `knowledge/opencode-plugins/auto-resume-deepdive-A.md`. Worker friction
-  handled: heredoc-truncation finding → knowledge_tools.md; escape-sentinel
-  "no-op" claim VERIFIED FALSE via intercept.log 1083-1087 (5 attempts
-  pair-resolved) — his --comment acknowledged + removed, knowledge recorded.
-- **Phase 2 REMAINING:** B context-overflow + errors (2306-2345
-  ctx-wrapup, 231-263/2588-2609/1983-2017 streaming-fail, 318-352/2257-2304
-  silent dead-stream, 853-908 watchdog), C generally-useful (1372-1692
-  idle-scan mega-function by sub-candidate, 2642-2665 task_complete, 969-990
-  celebration, 183-230 done-claim). Worker: `worker_Q4_140K` (IQ4KT, per the
-  sizing entry). Then Phase 3: consolidation + TODO seed "build our own
+- **Deep-Dive A VERIFIED + CONSOLIDATED (2026-09-18, commit 818ef7f):**
+  recipe at `knowledge/opencode-plugins/auto-resume-deepdive-A.md` (planner
+  spot-checks passed; one worker line-ref fixed in consolidation).
+- **His roster rework (2026-09-21, a9146ff):** new bit-drift-free test agents
+  (handover_task_to_planner_5/6/7_1 in opencode.jsonc) tested on my committed
+  Deep-Dive B spec (2fce3df). FIVE B runs: #3 (173caf8 checkpoint,
+  6d37c0e complete), #4 (757eb94, handover cleaned by ad93d67), #5/#6/#7_1
+  COMPLETE — handovers `handover_task_to_planner_5/6/7_1.md` + scratchpad
+  recipes `auto-resume-deepdive-B_5/6/7_1.md`.
+- **B runs' shared findings (3/3 agree):** wrapup budget is once per BUSY
+  cycle (resetBusyFlags 1288), not per session; parent ctx-wrapup gated on
+  host-side magic-context plugin; subagent `session.summarize` opt-in (default
+  off); session.error self-suppresses when busyCount()==0; fit gap = our
+  compact_memory lacks saturation detection + AWAIT dispatch — B's chain is
+  the missing model-independent safety net.
+- **SPEC LINE-REF DRIFT (mine, all 3 complete runs caught it independently,
+  per their §8):** getUsableContextLimit actual 1122-1159 (source ground
+  truth 1122; line 1084 = hasBusySubagents close); my spec said "1084-1084".
+  The trust-the-symbol fallback in the spec worked as designed. **STILL TO
+  FIX:** spec line → 1122-1159 (one edit; a future re-run/diff needs the
+  accurate anchor). B-runs all finished full coverage — no re-run needed.
+- **Write-tool flakiness (needs TODO — his --info, priority.md
+  26-09-19_18-50 + feedback 2026-09-19..21):** write fails on long payloads
+  (arg truncation, JSON parse "Text: {." / "Expected '}'", even a 3-line
+  file once) across Q4_140K/Q4_170K/Q3XS_160K_mtp sessions; his note: the
+  (now-deactivated) fuzzy_numword intercept path-resolution "interferes with
+  the write tool... in temp folder". TODO entry = append next session
+  (self-contained: evidence above; outcome = host-side fix (maintainer) or
+  codified workaround — printf/bash create + chunked edit-append — into repo
+  docs). His --info items also logged: compaction timing = after planning +
+  drafting, keepMessages preserves drafting; auto session-dumps incomplete
+  (missing thinking/writing parts — e.g. archive/sessions/
+  ses_f5aefe9e1ffemgTiq9GELiqaGL.md).
+- **NEXT (post-compaction):** (1) cross-check the 3 complete B recipes
+  (_5/_6/_7_1), pick winner, planner spot-verify a few anchors, consolidate
+  into `knowledge/opencode-plugins/auto-resume-deepdive-B.md` (+ fix spec
+  line + TODO entry, same commit); (2) Deep-Dive C spec (generally-useful:
+  1372-1692 idle-scan mega-function by sub-candidate, 2642-2665
+  task_complete, 969-990 celebration, 183-230 done-claim) on a new stable
+  roster agent; (3) Phase 3 consolidation + TODO seed "build our own
   plugin" (his priority.md item).
 
 ## Closed session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
