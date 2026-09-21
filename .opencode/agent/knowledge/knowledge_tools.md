@@ -16,11 +16,23 @@ instructions/protocol — facts that save lookups. Format per the README:
 
 ## The `description` is the agent-facing usage channel
 - **Do:** write `description` as usage documentation (modes, args, semantics,
-  boundaries) — it is the primary way an agent learns to use the tool.
+  boundaries) — it is the primary way an agent learns to use the tool. The
+  descriptions injected at launch ARE the actual agent-facing surface (a
+  parameter's runtime behavior is invisible to the agent — only its
+  description is).
+- **Do:** check a description with the "new-hire test": could an agent with no
+  prior context use the tool correctly from the description alone? (All five
+  custom-tool descriptions passed after the 2026-09-18 rework; residual gaps
+  live in the prompts, not the descriptions.)
 - **Why (evidence):** the description is what the agent sees; a one-liner
-  leaves usage opaque (maintainer inbox item on block_transfer).
-- **Ref:** block_transfer.ts description rewrite; loop_log.ts.
-- **Keys:** description, usage, help, agent-facing, schema.
+  leaves usage opaque (maintainer inbox item on block_transfer); 2026-09-18
+  prompt-rework verified the surface claim (the compact_memory
+  providerID/modelID params were an un-reworked placeholder since 2026-09-12,
+  invisible to the agent except via their description).
+- **Ref:** block_transfer.ts description rewrite; loop_log.ts; 2026-09-18
+  prompt-rework session (cured 2026-09-21 from knowledge_inbox).
+- **Keys:** description, usage, help, agent-facing, schema, new-hire test,
+  placeholder params.
 
 ## Context fields a custom tool receives
 - **Do:** read `context.sessionID` (CAPITAL `ID`), `context.messageID`,
@@ -313,3 +325,28 @@ instructions/protocol — facts that save lookups. Format per the README:
   oldString. Recognize both forms in files; never try to "fix" an inert one.
 - **Keys:** escape, sentinel, intercept-log, edit, oldString, heredoc,
   truncation, dense-numeral, verification.
+
+## The built-in `edit` tool chokes on non-ASCII chars in oldString (cured 2026-09-21 from knowledge_inbox)
+- **Do:** when the text to replace contains non-ASCII characters (em-dashes,
+  curly quotes, umlauts), do NOT fight the built-in `edit` — use
+  `block_transfer` (line-anchor based, ASCII-safe) or a small node script for
+  the replacement. Avoid non-ASCII in new text where possible (maintainer #7:
+  "do not use non-ASCII chars if possible").
+- **Why (evidence):** maintainer report 2026-09-15 (priority.md #7): the
+  planner working on code failed multiple times on non-ASCII `oldString`
+  matches and needed a script.
+- **Ref:** priority.md #7; `block_transfer` tool.
+- **Keys:** edit, oldString, non-ASCII, unicode, em-dash, block_transfer,
+  replacement, script fallback.
+
+## Model config facts: "half prefill" = context size; the cost metric is TIME (cured 2026-09-21 from knowledge_inbox)
+- **Do:** treat "half prefill" on the Q4 models as a CONTEXT-SIZE setting
+  (enlarges the effective window), not a cost mitigation — its price is slower
+  initiation. Frame every optimization as time-per-iteration: the only cost
+  metric on this setup is TIME (energy); there is no token/money cost.
+- **Why (evidence):** maintainer-verified 2026-09-18 (prompt-engineer scan
+  comments).
+- **Ref:** knowledge_inbox entry 2026-09-18_14-29 (agent_Q4_140K); the model
+  config in `opencode.jsonc`.
+- **Keys:** half-prefill, context size, cost, time, energy, optimization
+  framing.

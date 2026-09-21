@@ -18,6 +18,13 @@ verified live in a direct session). Unix idioms work natively: `ls -la`,
   where a table would add noise.
 - **Writes**: file tools only — no `>` / `cat >` except deliberate stdin
   piping.
+- **Host tooling caveat (TODO #74, 2026-09-21):** tool calls can fail with
+  server-side JSON parse errors (`JSON parsing failed: Text: {.` /
+  `Expected '}'`) — payload length is NOT a reliable predictor (short args
+  have failed too); it is host-side, not our intercept. On a hit: retry once;
+  if it persists, create the content via a bash heredoc (deliberate stdin
+  piping) + small edit-append batches (covers ALL roles, incl. planner spec
+  authoring).
 - **Timeout**: tool default 120s — pass `timeout` (ms) for heavy ops.
 - **Python**: bare `python` on PATH = 3.14, NO repo deps (fake-starts, then
   import-fails). Always `./.venv/Scripts/python.exe` (same for

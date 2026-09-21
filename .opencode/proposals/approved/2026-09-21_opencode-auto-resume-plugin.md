@@ -146,6 +146,7 @@ if stalls prove a real problem.
 
 ## Status
 
-Awaiting approval. Units are independently approvable and strictly ordered
-(each leaves the repo green); Unit 1 can launch as soon as this proposal is
-approved.
+APPROVED 2026-09-21 (maintainer moved this file to `approved/`). Units are
+independently approvable and strictly ordered (each leaves the repo green);
+Unit 1 is launched in looprun `autorun-2026-09-21_15-33` (plan1, task spec
+`plan1_ho_task.md` in the loop folder).

@@ -11,6 +11,27 @@ The planner's primary responsibilities here are:
 - closing units — including the maintainer-domain handoff pieces (registration,
   pastes, live acceptance) that the planner cannot perform itself.
 
+## The destill (`destilled_mem.md`)
+
+`destilled_mem.md` is a CONDENSED projection of `memory.md`, loaded into the
+planner's system prompt via `opencode.jsonc` (every planner launch / after
+compaction / restart). It must stay compact — it is paid for in every planner
+session.
+
+Format: a short header (what it is, where the full text lives) + ONE entry per
+memory: `- MEM-<id>: <the one-line essence>` (≤2 lines each). No protocol
+restatement, no unit-level state, no evidence blocks — those stay in
+`memory.md`.
+
+Maintenance (planner):
+- whenever you CREATE or UPDATE an entry in `memory.md`, update the matching
+  destill line in the SAME commit (a missing/stale line = a memory that never
+  gets recalled);
+- if `memory.md` grows, distill DOWN — the least-active entries get a shorter
+  one-liner before the file grows; keep the whole file well under ~40 lines;
+- never carry maintainer comments/ideas into the destill — open questions go to
+  the NAP, instructions are acted on and removed (marker rules).
+
 This memory is useful when the agent must:
 - plan or verify acceptance tests for observer-mediated mechanisms
   (mutation/escape features whose evidence lives in intercept.log);

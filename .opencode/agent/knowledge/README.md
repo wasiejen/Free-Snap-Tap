@@ -34,5 +34,10 @@ in the area, append an entry (date + role tag in the Ref). Keep it terse.
 One area = one file; create a new file for a new area.
 
 ## Files
-- `knowledge_tools.md` — opencode custom tools (`.opencode/tools/*.ts`).
+- `knowledge_tools.md` — opencode custom tools (`.opencode/tools/*.ts`) + host/model facts (single slot, gauge lag, model sizing).
 - `knowledge_plugins.md` — opencode plugins (`.opencode/plugin/`).
+- `knowledge_context.md` — context hygiene: dense numerals, pipeline rules for big sources, task-failure interpretation.
+- `knowledge_inbox.md` — append-only inbox for verified entries without an obvious area yet; the PLANNER cures them into the area files (same discipline as `TODO.md` curation).
+- `opencode-plugins/` — reference analyses of external opencode plugins (feature map + deep-dive recipes; own README).
+- `plugin_tools/` — dated notes from the tool/plugin design work (registration, tool context, design handout).
+- `prompts/` — prompt-and-tool optimization guide (prompt_engineer session output).

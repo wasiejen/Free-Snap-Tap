@@ -1,11 +1,10 @@
-// --comment to be filled with a very condensed version of the memory.md with direct references to MEM<Number> to be directly loaded as part of the system prompt via opencode.jsonc. must be compact be detailed enough. memory.md is the full memory - but most is not needed all the time and can be looked up on a need basis. thus the destilled/condensed version.
-// --comments this needs to be codified in the readme.md also i think
-// here should only remain the condensed/destilled memories with mention of the link the full memory.md
---maintainer: fill out this file at the first start you see this entry - remove alle comments - reverence your memory.md and readme.md as needed, update the readme.to to include instructions on how to create the destill. (you can also look into feedback, knowledge etc for usable knowledge that pertains your role as planner. currently the knowledge base is not well ingrated and curated)
---comment what about the idea to create a smaller nap that you can copy into the current state e.g. on compact and that is loaded the same way directly via agent prompt definition in opencode.jsonc - it survives compaction and restarts without need for reading.
---comment might be worth to think about a tool that codifies the first steps of creating realiaty from commit state via automated read and git diff etc, maintainer marker check and create a return that directly injects all these seperate tool call into the session?
+# Planner memory — destill
 
-// full memory in .opencode\agent\memory\planner\memory.md
+Condensed planner memory, one line per entry; each line points at the full
+entry (evidence + rationale + review conditions) in `memory.md` (same folder —
+read it only when you need the full text). Write/review policy: `README.md`
+(same folder). Never restate prompt/AGENTS.md protocol text here.
 
-e.g. 
-MEM999:the maintainer likes a joke now and again
+- MEM-0101: live acceptance of an observer-mediated mutation verifies BOTH sides — the mechanism side (intercept.log `orig=`/`value=` lines + on-disk artifact) and the perception side; you CANNOT see your own pre-mutation args, so a "repeat" in your own view is a false-repeat — cross-reference the log first, never self-perception.
+- MEM-0102: tool/plugin units close via the two-phase maintainer-domain handoff — your close-out NAMES every pending item verbatim (registration in the live opencode.jsonc, the AGENTS.md paste, live acceptance after restart); the REOPENING session verifies FROM FILES FIRST (grep the live config, read the pasted text, `git log`) and only then fires live acceptance — never mark a pending item done from a worker summary or memory.
+- MEM-0103: maintainer files live in the shared tree and grow as thoughts mature (single-tree status-quo ruling 2026-09-18) — uncommitted content is NOT a task unless a marker/inbox/handover designates it; read freely unless `--wip` is placed (strictest handling: no edit, no stage, no read until cleared); named-path commits only, never `git add -A`.

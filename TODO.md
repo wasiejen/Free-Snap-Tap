@@ -594,4 +594,10 @@ new planner; each unit leaves the repo green). — **Suggested scope:**
 `.opencode/plugin/auto_resume.ts` (new), `knowledge/opencode-plugins/`
 (surface report append), the proposal file itself. — **Status:** open —
 awaiting approval of the proposal; units are independently approvable, strict
-build order, unit 1 launchable on approval.
+build order, unit 1 launchable on approval. **Status 2026-09-21:** APPROVED
+(the maintainer moved the proposal to `approved/`); Unit 1 launched in looprun
+`autorun-2026-09-21_15-33` (plan1). NOTE: unit numbering per the revised
+proposal — Unit 3 = new-planner spawn helper (shared building block), Unit 4 =
+planner liveness watchdog (auto-resume after compaction is its first branch);
+the "unit 3 = auto-resume / unit 4 = restart detection" wording above is the
+pre-revision numbering.

@@ -343,3 +343,10 @@ confidence: measured
 - confidence measured: **22 / 22** (no guessed, no UNKNOWN — every range line-verified by targeted read or line-anchored declaration grep)
 - test: dedicated file named: 14 entries; shared/multi-file mapping: 8 entries; `none` (no dedicated file in case-name scan): 3 (Subagent stuck detection, Spurious error suppression — note: Session discovery & cleanup maps to integration/plugin tests as shared)
 - notable: `checkForToolCallAsText` (1372-1692, ~320 lines) is the single idle-scan mega-function covering tool-as-text + thinking-tool + ready-to-continue + done-claim + open-todos-reminder + celebration; `sendContinuePrompt` (746-908) is the central send path with the watchdog/escalation chain inside it; the state machine is `interface SessionWatch` (21-63).
+
+## Test layout note (cured 2026-09-21 from knowledge_inbox)
+
+The plugin repo's test files (`src/*.test.ts`) use bun-style
+`test("name", ...)` with ZERO `it(` occurrences — Method step 6's
+`(describe|it)` case-name grep under-counts them; grep `test(` instead for
+case-name audits (verified 2026-09-21, Deep-Dive B run, worker_Q3XS_160K).
