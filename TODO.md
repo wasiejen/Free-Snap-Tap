@@ -687,7 +687,16 @@ prose.
 - **Desired outcome:** the messages-RPC result is unwrapped (bare array + `{ data }` wrapper) at the single `msgPairs` site, so Unit 4 routing reads action lines correctly: stop/ask → no send (`route= stop|ask`); resume/null → bounded recovery; restart → `route= restart spawn`.
 - **Acceptance:** a planner closing `action: restart` produces `route= restart spawn` (not a recovery prompt); `action: stop` → `route= stop`, no send; a smoke case pins the wrapper shape; standard gate green (smoke + probe + pytest + ruff).
 - **Suggested scope:** `.opencode/plugin/auto_resume.ts` (`msgPairs` line 492 — the single consumer fix; verify no other messages-RPC site), `.opencode/plugin/tests/auto_resume.smoke.mjs` (add a wrapper-shape case), probe pins.
-- **Status:** OPEN — needs a worker task (relates to #75). Priority: HIGH (spurious resumes + context drain). NOTE: an earlier plan6 INFO line attributed this to a "read-race" — that was WRONG; this shape bug is the real cause.
+  - **Status:** LANDED + planner-verified (2026-09-22, plan7, worker-11
+    `worker_Q3S_110K_mtp` ses_f39eef70effefmk8Bt598jhqwK, code `eaef397`):
+    the dual-shape unwrap in `msgPairs` (bare array + `{ data }` wrapper —
+    the same normalization as 280b8d0) + the `ses_u4_wrap` wrapper-shape
+    smoke case (smoke 63/63, probe 241/241, pytest 459+1w, ruff F=0). LIVE
+    ACCEPTANCE pending the next host restart (the running host is pre-fix;
+    the post-restart planner verifies `route=`/`skip=` lines for the
+    planner-7 close from `auto_resume.log`). NOTE: an earlier plan6 INFO
+    line attributed this to a "read-race" — that was WRONG; this shape bug
+    is the real cause.
 
 ## 75. (open, 2026-09-21, planner) — **Build our own auto-resume plugin** (opencode-auto-resume research, Phase 3 seed):
 the looprunner is a mechanical relay; the maintainer wants infinite direct

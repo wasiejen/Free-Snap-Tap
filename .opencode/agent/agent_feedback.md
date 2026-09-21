@@ -377,3 +377,6 @@ A dead sub-agent with an EMPTY Task-tool result (worker-8: host stream-cut mid t
 ### 2026-09-22_00-11 worker_Q3S_160K ses_f3a03af20ffe1bRa56xVl143VG
 auto_resume.smoke.mjs: the module-level `client` is swapped by every re-factory, so a new section after the fail-safety block must re-factory with its own spy client (1 full smoke cycle lost to this on the first run — the spec's smoke section note didn't mention the client swap).
 
+### 2026-09-22_00-42 planner_Q3S_160K ses_f3a24dc3bffe59B5xpa0Ho3XZd
+The READY-MADE marker-sweep command in the planner prompt has a flag-order bug: `--include="*.md"` sits AFTER the `--`, which ends option parsing, so grep treats it as a path and scans the whole tree (100k+ lines incl. plugin.log) — I had to re-run with `--include` moved before the pattern. Fix the command in the prompt (measured 2026-09-22, plan7).
+
