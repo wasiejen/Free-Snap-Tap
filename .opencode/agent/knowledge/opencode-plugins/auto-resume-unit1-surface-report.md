@@ -61,17 +61,23 @@ Expected values (2026-09-12 probe + static .d.ts above):
 The log line lands in `.opencode/temp/auto_resume.log` (append; the temp
 dir is mkdir'd recursive by the plugin).
 
-## LIVE CONFIRMATION PENDING (maintainer restart)
+## LIVE CONFIRMATION — PASSED (2026-09-21, planner-1, ses_f3bd43f5bffe32mM8F3rQfaNh5)
 
-The probe only runs when the host loads the plugin (plugins auto-discover
-from `.opencode/plugin/`). After the maintainer's host restart, the planner
-verifies:
+Host restart (maintainer, inbox item 26-09-21_16-31) → the plugin
+auto-discovered and loaded (first log line `2026-09-21T14:25:48.595Z` UTC).
 
-1. `.opencode/temp/auto_resume.log` carries live event lines from a live
-   session (`event=<type> sid=<sessionID> <key fields>`);
-2. the init `surface=` line is present and matches the expected values above
-   (deviations — especially `app.log` and any surprise `compact` — are noted
-   here, then the marker below is replaced by the live verdict).
-
-Append the live confirmation HERE (provenance: verifying session + date),
-then mark this section confirmed.
+1. **`surface=` init probe line:** `prompt=function promptAsync=function
+   abort=function list=function get=function message=function
+   todo=function command=function summarize=function compact=undefined
+   app.log=function` — matches the expected v1-generation values.
+   ONE deviation from the STATIC table: `session.message` reads
+   `function` live but was absent from the bounded .d.ts grep
+   (head-40 truncation — the live `typeof` probe is the authority:
+   `session.message` IS callable from the plugin). `compact=undefined`
+   CONFIRMED (no host-side compaction trigger in the session namespace
+   — the Unit 2 trigger cannot rely on one). `app.log=function` — the
+   shared-rule logging path is available.
+2. **Live event lines:** 12,629 `event=` lines at verification, incl. the
+   verifying session itself (`ses_f3bd43f5bffe32mM8F3rQfaNh5`,
+   `message.part.updated` events) — the stream is DENSE (per-part
+   updates); Unit 2/3 consumers must FILTER events, not count raw lines.

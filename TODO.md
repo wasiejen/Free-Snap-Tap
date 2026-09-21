@@ -597,11 +597,11 @@ new planner; each unit leaves the repo green). — **Suggested scope:**
 (surface report append), the proposal file itself. — Units are independently
 approvable, strict build order, unit 1 launchable on approval. **Status 2026-09-21:** Unit 1
 LANDED + planner-verified (worker d322927, gate green: smoke 14/14, probe
-235/235, pytest 459+1w, ruff F=0); pending: LIVE ACCEPTANCE after the
-maintainer's host restart (live event lines in `.opencode/temp/auto_resume.log`
-+ the init `surface=` line → appended to the unit-1 surface report), then
-Unit 2 (context-limit compaction trigger); APPROVED by the maintainer (moved
-to `approved/`), Unit 1 launched in looprun
+235/235, pytest 459+1w, ruff F=0); LIVE ACCEPTANCE PASSED same day (post-restart:
+the init `surface=` line + 12,629 live event lines in
+`.opencode/temp/auto_resume.log`; verdict in the unit-1 surface report);
+next: Unit 2 (context-limit compaction trigger); APPROVED by the maintainer
+(moved to `approved/`), Unit 1 launched in looprun
 `autorun-2026-09-21_15-33` (plan1). NOTE: unit numbering per the revised
 proposal — Unit 3 = new-planner spawn helper (shared building block), Unit 4 =
 planner liveness watchdog (auto-resume after compaction is its first branch);

@@ -35,15 +35,16 @@ task_id — loop log -WARNING lines). No work lost: the worker's commit +
 the pre-compaction commits were durable; the close-out bookkeeping
 finished in the post-compaction pass.
 
-## PENDING (maintainer domain) — Unit 1 LIVE ACCEPTANCE, after his host
-restart (plugin auto-discovers; no registration):
-1. live event lines in `.opencode/temp/auto_resume.log`;
-2. the init `surface=` probe line;
-then append the live confirmation to the unit-1 surface report.
+## Unit 1 LIVE ACCEPTANCE — PASSED (same session, post-restart)
+His inbox item (26-09-21_16-31, moved to `maintainer/done/`): the host had
+been restarted, the plugin is live. Verified from files:
+- init `surface=` line: `prompt/promptAsync/abort/list/get/message/todo/
+  command/summarize=function`, `compact=undefined`, `app.log=function`
+  (one deviation from the static grep: `session.message=function` live —
+  the bounded .d.ts grep missed it);
+- 12,629 live event lines, incl. this session itself.
+Verdict appended to the unit-1 surface report; TODO #75 updated.
 
 ## Next (next planner iteration)
-1. Live-acceptance check above (only meaningful after a host restart —
-   if the log is absent/empty and the host hasn't restarted, note it in
-   the NAP and proceed to the next non-gated task).
-2. Unit 2 per the approved proposal: the context-limit compaction trigger
-   (gated send path in auto_resume.ts).
+Unit 2 per the approved proposal: the context-limit compaction trigger
+(the gated send path in `auto_resume.ts`) — spec + delegation + verify.
