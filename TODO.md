@@ -293,7 +293,17 @@ smokes, pytest 459+1w, ruff F=0).
   `.opencode/plugin/tests/compact_memory.smoke.mjs`,
   `.opencode/plugin/probes/handover_probe.mjs`, (follow-on:
   `.opencode/plugin/auto_resume.ts` + the budget store).
-- **Status:** OPEN (approved — priority.md #1, top of his active list). unit A landed, commit <hash>.
+- **Status:** OPEN (approved — priority.md #1, top of his active list).
+  **Unit A LANDED (2026-09-21, plan5, worker-6 `worker_Q3S_160K`
+  ses_f3ab3c67dffeujQ8L1ucfWu8k8, code `6864bc0` — the planner verified the
+  full gate and landed the commit after the worker's context-limit death):**
+  4-key args (providerID/modelID removed) + config-resolved summarizer
+  (opencode.jsonc `agent.compaction.model` → session-model fallback; the
+  live config is commented out → fallback active = same-model summarize) +
+  queued promptAsync message + DUMP-OK line + stdio ignore (probe 241/241,
+  all 10 smokes, pytest 459+1w, ruff F=0). FOLLOW-ONS: the auto-compact
+  budget-file toggle (unit B), the research spec (compact_memory +
+  block_transfer up/downs), live acceptance after the next host restart.
   **Unit A build in flight (plan5, 2026-09-21, looprun 2026-09-21_15-33):**
   the param rework + config resolution + queued message + DUMP-OK
   diagnostics — spec committed this iteration; follow-on: the auto-compact

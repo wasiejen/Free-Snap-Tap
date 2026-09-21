@@ -60,12 +60,25 @@ the date digits.
   sub-agent having RUN NORMALLY and hit the context window limit — not as a failed
   launch / provider unload. Diagnose from the loop log (START without DONE for that
   role-N) + the session before treating it as a start failure; recover with the
-  compact + `task_id`-resume protocol, never a fresh relaunch of the same task.
+  compact + `task_id`-resume protocol, never a fresh relaunch of the same task. A
+  limit death can arrive AFTER the work is complete (the session finished the task
+  and died just before its last steps, e.g. the final commit) — the work sits in
+  the UNCOMMITTED tree: rebuild from files (git status + working-tree handover +
+  run the gate) before a task_id resume, or land the last steps yourself.
 - **Why (evidence):** 2026-09-15 plan2 (ses_f5b1f19): two worker launches reporting
   `Task cancelled` and `the request exceeds the available context size` were misread
   as a provider unload / failed starts; the maintainer corrected (direct session +
   inbox_planner/context_limit.md) that both were normal context overflows in running
   sessions (worker2 had reached design + drafted pinning tests before the limit).
+  2026-09-21 plan5: a worker launch reported `context_length_exceeded` but the
+  session (ses_f3ab3c67dffeujQ8L1ucfWu8k8) had finished the ENTIRE build (all
+  green) — only the final commit + feedback submit remained; the planner
+  verified the gate and landed the commit (6864bc0); maintainer ruling: this
+  message ALWAYS means the sub-agent hit its limit, and a resume WITHOUT
+  compaction is the order when budget allows. Contrast: a DIFFERENT signature
+  ("Assistant response prefill is incompatible with enable_thinking") was a
+  genuine host-side launch failure the same task — distinguish by file state,
+  not by the message.
 - **Ref:** maintainer inbox `context_limit.md` (moved to `done/`, plan3 2026-09-15);
   plan2 NAP CORRECTION block; loop log autorun-2026-09-15_13-11.
 - **Keys:** Task cancelled, request exceeds the available context size, context

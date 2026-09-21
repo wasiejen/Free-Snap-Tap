@@ -131,3 +131,30 @@ knowledge / NAP) is re-stated.
   discipline)
 - Review when: the maintainer starts using `--wip` routinely, or a
   separate-draft-repo variant actually lands.
+
+## MEM-0104 — A context-limit failure message can arrive AFTER the work is complete; rebuild from files before resuming
+- What: a Task-tool failure of `context_length_exceeded: the request exceeds
+  the available context size` ALWAYS means the sub-agent RAN and hit its
+  context limit (maintainer ruling 2026-09-21) — including the case where the
+  session finished the ENTIRE task and died only before its last steps (the
+  final commit, the feedback submit). The work then sits UNCOMMITTED in the
+  working tree.
+- Do: on such a message — never assume lost work and never reflexively
+  relaunch: rebuild from files FIRST (git status → modified files; read the
+  working-tree handover file; run the gate yourself), then either land the
+  last steps yourself (planner completing the worker's commit + feedback) or
+  resume via task_id; a resume WITHOUT compaction is valid when budget allows
+  and the maintainer orders it (compaction is not the default recovery).
+- Why (evidence): plan5 (2026-09-21): worker-6's launch reported
+  context_length_exceeded, but the session ses_f3ab3c67dffeujQ8L1ucfWu8k8 had
+  completed the whole compact_memory unit A build (handover complete, all
+  green); the planner verified probe 241/241 + 10/10 smokes + pytest 459+1w +
+  ruff F=0 and landed the commit 6864bc0. Contrast: the FIRST launch of the
+  same task failed with a DIFFERENT signature ("Assistant response prefill is
+  incompatible with enable_thinking") and never ran — a genuine host-side
+  failure. File state, not the message, is the discriminator.
+- Verified: 2026-09-21 (planner-5, plan5, looprun 2026-09-21_15-33)
+- Related: MEM-0102 (verify-from-files-first discipline); knowledge_context.md
+  "Task failure messages: context-limit hits, not failed starts"
+- Review when: the failure-message vocabulary grows, or the resume protocol
+  changes.

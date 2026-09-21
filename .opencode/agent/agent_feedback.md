@@ -362,3 +362,6 @@ glob tool returns no matches for .opencode/** patterns (hidden dirs seem exclude
 ### 2026-09-21_20-21 planner_Q3S_160K ses_f3b1fb61effes4b4uZhoDYM3ix
 Gate re-run friction: the standard-gate commands (pytest/ruff) need the venv paths (./.venv/Scripts/python.exe, ./.venv/Scripts/ruff.exe) which live only in repo_commands.md — the NAP Standing baseline line carries only the COUNTS, so a fresh planner session burns a call rediscovering the commands (bare `python`/`ruff` fail silently/wrongly). Suggestion: one line in the Standing baseline naming the exact venv-prefixed commands (or an explicit pointer to repo_commands.md §Run/test).
 
+### 2026-09-21_22-02 planner_Q3S_160K ses_f3acaf402ffexZ2GH0r5N0ZEWm
+Task-spec self-referential commit-hash instruction (plan5 spec 7e790d4: DoD said the worker's ONE commit must include "unit A landed, commit <hash>" — the worker's own hash) burned the worker 15k+ tokens of thinking and contributed to its context-limit death before the final commit. Spec pattern fix: the worker commits WITHOUT its own hash (handover carries parent + subject); the planner fills the hash into the TODO status line at the close commit.
+
