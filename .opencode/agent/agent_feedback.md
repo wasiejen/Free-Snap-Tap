@@ -350,3 +350,6 @@ Unit 2 spec said "client.provider.get() (already grepped, installed 1.18.29)" bu
 ### 2026-09-21_17-32 planner_Q3S_160K ses_f3b948fcdffeiw3Lx7PsOzvP7I
 Task-spec SDK facts: a partial .d.ts grep claimed `client.provider.get()`, but the installed SDK exposes `provider.list()`; the live model pair is top-level `providerID`/`modelID`, not `info.model` — the worker had to resolve both gaps via live/static verification. Rule: "already-grepped" spec claims must name the exact method/field (or be explicitly marked unverified) — the live surface is the authority over the static .d.ts.
 
+### 2026-09-21_18-25 worker_Q3S_160K ses_f3b555033ffem2gI9qBct1JZwG
+File-tool results display absolute Windows paths with a leading `~` prefix (cosmetic, but it made me re-verify edit landing via relative grep — one wasted call; a one-line note in repo_custom_tools.md or the tool description would kill it).
+
