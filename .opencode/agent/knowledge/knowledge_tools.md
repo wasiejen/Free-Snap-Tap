@@ -259,6 +259,24 @@ instructions/protocol — facts that save lookups. Format per the README:
 - **Why (evidence):** runs A (mtp — corrupted ≈88k fill, zero output), B
   (gemma — thin map, see NAP runB verdict), C (iq4kt — verified, committed
   as `knowledge/opencode-plugins/auto-resume-map.md`).
+- **Update 2026-09-21 (maintainer roster rework, his direct session):** new
+  bit-drift-free stable set replaces the IQ3KT class for task-scale work —
+  Q3S (quant 3 small): best overall for deep/complex coding and code analysis
+  (proven by our Deep-Dive runs), slowest of the three, biggest general
+  knowledge base, AND best at recovering from write-tool failures;
+  Q3XS ("extra small" — little brother of Q3S): faster, a touch less general
+  knowledge, coding still fine; Q2S (little brother of Q3XS): least
+  impressed on quality but reliable and surprisingly stable, scalable to a
+  large context (~262k) — suited for large-file handling / webfetch
+  summarization with clear instructions; MTP builds run roughly 30–40 %
+  faster without quality loss but with a hit on context size; parallel
+  execution only works when the PLANNER runs the same model (no such
+  planner agent exists yet). BITDRIFT VERDICT: every old-generation model
+  mangled dense line-number citations; this quant-3 / quant-2 set showed
+  none so far across all test runs → pick from this set first. Compaction
+  budget ruling: quant-3 cap raised to quant-4's value (three);
+  quant-2 cap = one (for now) — classifier + smoke pins updated in this
+  commit.
 - **Keys:** gemma, iq4kt, model-sizing, delegation, step-level-instructions,
   contract-spec, explorer, feature-map.
 

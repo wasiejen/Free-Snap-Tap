@@ -99,11 +99,22 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - **His model map for the test runs (supersedes the workers' self-tagged
   feedback lines — host mapping authoritative): #5=Q3XS, #6=Q3S,
   #7_1=Q2S (parallel).**
-- **NEXT:** (1) Deep-Dive C spec (generally-useful: 1372-1692 idle-scan
-  mega-function by sub-candidate, 2642-2665 task_complete, 969-990
-  celebration, 183-230 done-claim) — launch agent pending his answer (his
-  new stable set: Q3XS/Q3S/Q2S); (2) Phase 3 consolidation + TODO seed
-  "build our own plugin" (his priority.md item).
+- **Deep-Dive C SPEC COMMITTED this turn (his ruling: use Q3S):**
+  `handover_task.md` rewritten whole via bash heredoc chunks AFTER a
+  mid-turn write-tool failure on its draft (~fourth occurrence incl. this
+  planner session — TODO #74 signature; workaround proven again). Same
+  commit unit: compaction budget per his new stable-roster ruling
+  (3-bit class cap raised to 3, like 4-bit; 2-bit row added at 1
+  "for now") in compact_memory.ts classifier + smoke pins — machine-run
+  GREEN (the compact smoke full suite); TODO #74 evidence corrected
+  (write fails even WITH the intercept deactivated → host-side issue
+  predating the new models); knowledge_tools.md model-sizing entry
+  extended (stable-set characterizations + MTP speed note + bit-drift
+  verdict + the budget ruling).
+- **NEXT:** verify the running Deep-Dive C worker (worker_Q3S_160K,
+  launched right after this commit) against git log + its recipe
+  anchors on return; then Phase 3 consolidation + TODO seed "build our
+  own plugin" (his priority.md item).
 
 ## Closed session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
 - **plan2 closed (2026-09-18): BOTH units LANDED, gate re-verified by the

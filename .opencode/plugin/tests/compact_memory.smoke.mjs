@@ -83,7 +83,8 @@ chk("named export classifyQuantClass is a function", typeof mod.classifyQuantCla
 {
   const c = mod.classifyQuantClass;
   chk("clf IQ4 -> 3", c("Qwen-IQ4-Test").cap === 3);
-  chk("clf IQ3 -> 1", c("Qwen-IQ3-Test").cap === 1);
+  chk("clf IQ3 -> 3 (ruling 2026-09-21)", c("Qwen-IQ3-Test").cap === 3);
+  chk("clf IQ2 -> 1", c("Qwen-IQ2-Test").cap === 1);
   chk("clf Q4KM -> 3", c("Gemma-Q4KM-12B").cap === 3);
   chk("clf CPU -> 0 (excluded)", c("CPU-Qwen3-0.6B").cap === 0);
   chk("clf unknown -> 1 (default)", c("Mystery-7B").cap === 1);

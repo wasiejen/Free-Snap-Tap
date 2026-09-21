@@ -73,11 +73,14 @@ import { tool } from "@opencode-ai/plugin";
 // must be tested FIRST, then 4-bit, then 3-bit, then the default — the probe
 // pins this with the "Qwen3.8-27B-IQ4KT-120K" trap (it must hit the 4-bit
 // row, not the 3-bit one).
+// Ruling 2026-09-21 (maintainer, direct session): 3-bit cap 1 -> 3 (same
+// budget as 4-bit); 2-bit row added with cap 1 ("for now").
 const QUANT_CLASS_RULES: Array<{ test: (name: string) => boolean; cap: number; label: string }> = [
   { test: (name) => /^cpu/i.test(name), cap: 0, label: "cpu (excluded)" },
   // case-insensitive: the LIVE model names are UPPERCASE ("Qwen3.8-27B-IQ4KT-120K")
   { test: (name) => /iq4|q4/i.test(name), cap: 3, label: "4-bit quant" },
-  { test: (name) => /iq3|q3/i.test(name), cap: 1, label: "3-bit quant" },
+  { test: (name) => /iq3|q3/i.test(name), cap: 3, label: "3-bit quant" },
+  { test: (name) => /iq2|q2/i.test(name), cap: 1, label: "2-bit quant" },
   { test: () => true, cap: 1, label: "default" },
 ];
 
