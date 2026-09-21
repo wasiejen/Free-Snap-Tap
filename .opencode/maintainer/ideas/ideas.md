@@ -5,87 +5,46 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
+26-09-22_00-46:
+- resume message of auto_resume invalidates the cache? but i observed the same after return from a sub-agent to the planner. might be just the size that is not supported right now - try some fixes in the backend.
+
+26-09-22_00-25:
+- loosen the less than 15 lines diff can do a planner a bit. maybe 50 diff lines? still a small change. and prevents delegating an extra worker with all the turn around
+
+- worker gets confused because he does not know how to include in git hash in his closing commit - this might be needed to declared more specifically - he burned 10k token and 6,5 minutes to decide to look up how other have done it in the existing handover_task_to_planner
+
 - on planner closeup with enough room to the stop line, maybe add feedback integration. look at the current accumulated agent_feedback and decide if and where it should be integrated.
 
 -pathfinder mentality as planner prompt part - when you are in an area (files/folders) and you see something is bad or not current or is easily fixed - leave it in a better state then before.
 - but might distract from task. small edits yes, bigger ones todo_inbox?
 
-- might be worth to think about a tool that codifies the first steps of creating reality from commit state via automated read and git diff etc, maintainer marker check and create a return that directly injects all these seperate tool call into the session?
- - activated parallel tool call - so currently 3 tools can be called at the same time - and is already reducing init times and is more flexible.
- 
 - we might need an information in tool call that something was replaced
   - or else the agents will get confused
 
-26-09-18_11-14:
-  - cross compaction seems to invalidate the cache of the session which fires the compaction. why?
+- need a dedicated research agent
+  - prompt and instruction set/skillset inclusive?
+    - analyse how the word with fuzzy_numword was done
+      - check the sessions and curate a research guideline. like the tasc_spec in function only describing how best to research a topic and write a comprehensive proposal
+      - good starting point the planner created in a dedicated research session was:
+        - .opencode\agent\research\fuzzy-numword\drafting\2026-09-16_fuzzy-and-numword-tool-reliability.md
+      - then discussion phases and addendum while preserving history
+      - and then creating a compresehensive summary with reasoning and draft of Phases
+        - Phases based on task_spec in size and strucute
+  - ideal working flow. i destribe an intented function, write some thoughts down and an agent checks viability, seaches in the internet (context might be too tight - might need to upgrade gemma to 256K (found a way to do so and gemma is fast)) and creating a comprehensive overview with potential problems, usages, benefits -> an analysis if this is workable, how much work it would need and what we could expect as return in worth (e.g. smoother interaction, less friction with tools,)
 
-  
-  - !!! replace looprunner with a plugin that automatically resumes or restarts the planner agent
-    - thus i could have infinite direct session and a directer access to the planner. direct questions possible. way more effective and less butterfly effects of unintented or badly worked instructions or instruction relay
-      - research agent run with proposal? i think i must give a bit more details
-    - auto-continue/opencode-auto-resume is an already existing plugin that solves this
-        - is also an already existing plugin, but extremely complex it seems
-          - overengineeded for this purpose but may be good to scan it for solutions to
-            - how to restart a compacted planner agent without a looprunner
-            - how to trigger a compaction on context_limit
-            - how to start a new planner when the old signals restart (like the looprunner)
-          - "C:\Users\Wasiejen\AppData\Local\Temp\opencode\opencode-auto-resume-master"
+- compact keepMessenges setting must be codified (readme_loop most likely)
+  - settings to adjust what to keep in memory to be decided before compaction
+  - best time to compact is before big writing and editing work and after the implementation is clear.
+    - comprehensive handover and then compact with choosing carefully to retain the reasoning and implementation drafts
+    - write yourself a message to get easier started (currently not working but in priority.md # 1 compact_memory additions/fix messages)
 
- 
-  - need a dedicated research agent
-    - prompt and instruction set/skillset inclusive?
-      - analyse how the word with fuzzy_numword was done
-        - check the sessions and curate a research guideline. like the tasc_spec in function only describing how best to research a topic and write a comprehensive proposal
-        - good starting point the planner created in a dedicated research session was:
-          - .opencode\agent\research\fuzzy-numword\drafting\2026-09-16_fuzzy-and-numword-tool-reliability.md
-        - then discussion phases and addendum while preserving history
-        - and then creating a compresehensive summary with reasoning and draft of Phases
-          - Phases based on task_spec in size and strucute
-    - ideal working flow. i destribe an intented function, write some thoughts down and an agent checks viability, seaches in the internet (context might be too tight - might need to upgrade gemma to 256K (found a way to do so and gemma is fast)) and creating a comprehensive overview with potential problems, usages, benefits -> an analysis if this is workable, how much work it would need and what we could expect as return in worth (e.g. smoother interaction, less friction with tools,)
-
-  - compact keepMessenges setting must be codified (readme_loop most likely)
-    - settings to adjust what to keep in memory to be decided before compaction
-    - best time to compact is before big writing and editing work and after the implementation is clear.
-      - comprehensive handover and then compact with choosing carefully to retain the reasoning and implementation drafts
-      - write yourself a message to get easier started (currently not working but in priority.md # 1 compact_memory additions/fix messages)
-
-  - file size restriction? to seperate long files for coding (testing, gate, smoke) into smaller units that are more focused on each plugin? 
-    - i observed one really big file with over 3000 lines but i can not find it anymore. maybe in temp?
-      - probes\handover_probe.mjs 
-        - correction! now over 4000 lines :-D
-          - as long as it is maintainable and clear what sections reference each plugin, so that read can effectively bounded is it not a problem.
   
   - cleanup of agent_feedback
     - get actionable items -> proposal bundle and extract knowledge if present
 
-  - raised internal limit of model 140K to 145K, gauge still based on 140k - buffer as intended did not work before opencode stopped agent at 140k of 145k
-    - so limit is a hard bound (what would happen if limit is set higher? rolling context window? need to research myself a bit)
-
-  musings on naming convention
-  - 2026_0-9_1-6__1-5_5-0 opencode restarted - (testing some date formats)
-    - changed name of the autorun folder. commented it in loop.log
-    - 2026 stayed since it seemed not not make problems yet 
-      - in doubt drop we could drop the 2026
-      - or shorten it to 0-9_1-6 and add the session_id of the looprunner ... but the session_is is AGAIN a dense string ...
-      - 0-9_1-6_loop-1 and if started more than one then 0-9_1-6_loop-<number>
-    - 2-0-2-6_0-9_1-6__1-5_5-0 is not easily readable for me
-      - 2-6_0-9_1-6__1-5_5-0 .. this could work. what do you say?
-        - and when appending to a name? autorun_2-6_0-9_1-6__1-5_5-0 underscore to diffeniate is more visually
-    - might not be needed anymore with fuzzy numword? redundant information should be in speaking names? 
-      - on write the question is more interesting - should we autocorrect references to filenames?
-
  i could now with reduces kv-cache upgrade model iq3kt to 262k contextsize .. and make 2 slots so they can run parallel :-) mhhhh a workers with each 131k contextwindow
             - question is how fast these are in reality compared to one worker
             
-- my quess to path doubling is the double folder Free-Snap-Tap then might induce doubling in the path because of its double existence.
-
--  perception of models is correct in bitdrift, but they can not generate the value. so not a kv cache (memory) but a generation (weight) problem?
-  - "The two strings differ in a way I cannot see (Pattern 5)" see might mean generate? or perceive - but they know the number but can not write it - so generate, in adder construction they can reliably reproduce the number or in numwords. so they know the number -> model weight-problem
-  - 
-- increase default keepMessages to 20 with increaed window size
-  - better teach agents to set the value themselfes
-    - keepTokens is then need to set lower to allow the keepMessages to stick and not be overwritten by 30000 keepTokens
-    
 - ctx needs a session_id and role to better attribute which measurement it is
   - good place to track worker sessions and get session_id if needed
   - only place to check after error of a sub-agent how full his context was
@@ -121,7 +80,7 @@ Refer to R6 in fuzzy_numword as sketch for a cheap dump file for every edit and 
 ## what would be needed to make block_transfer as versatile as edit but less prone to oldstring mismatch?
   - write option to write into the selected block?
   - multiple writes per tool call
-  - stability by providing markers 
+  - stability by providing markers/text anchors that can resolve in the line not only at the start? - might be too much work for small gain. but might be useful for long lines?
     - markers not only for line but for specific text (best combined with a line reference for closet search) + fuzzy matching in this area
     - applied from highest line number to lowest to not shift lines
 
@@ -176,9 +135,3 @@ Refer to R6 in fuzzy_numword as sketch for a cheap dump file for every edit and 
   - enrich our knowledge base with these informations found 
     - like recepies: this problem is solved here in this way
       - as basis to built our own plugins with working examples
-
-
-on editing newstring use the escape notation, but not in the oldstring to replace.
-in oldstring you should use the number you intented (no change - pure number) and it will drift onto the number it stands there, because it is the result of the drift in the first place while you wrote your intenteded number. 
-
-in oldstring only escape will be resolved. not [1-0-8-4]. only escape form with e.g. [1088:1-0-8-4:esc]  <intended value but drifted>: <safe numwords or digis> + <escape>). i litterally do not know which exact number you want to write. thus ne numbers are just an example. 1088 stands for the number you unvoluntarily write and 1-0-8-4 for what you write. if you write in your thoughts the numbers you want to write in single digit seperatied notation i can at least see the value.
