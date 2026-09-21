@@ -161,7 +161,15 @@ instructions/protocol — facts that save lookups. Format per the README:
   session gives the same result cheaper); (4) the keep args ARE sent in the
   body, but this host's server schema has no keep key → the retry-once
   drops them; the observed compaction floor is server-side behavior, not the
-  keep args.
+  keep args; (5) agents NEVER send direct requests (curl/test scripts) to
+  the inference server while a session is active — the single slot UNLOADS
+  the session's model to serve that request (maintainer note 2026-09-21:
+  the direct-probe idea was rejected for exactly this reason; a running
+  session keeps whatever model was loaded for it — it was still served by
+  the buggy build after his fork switch, until his explicit
+  unload + fresh reload moved it to the old ik_llama);
+  server-side verification goes through the session's own tool calls or is
+  done by the maintainer on his end.
 - **Why (evidence):** the maintainer's round-2 experiment (2026-09-14, his
   report `maintainer/done/cross_session_compaction_summary.md`): round 2
   (queued, same model) — the first delegation was consumed by the compaction;
