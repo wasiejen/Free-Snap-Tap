@@ -514,12 +514,20 @@ function restartText(): string {
 
 // Unit 4: the SDK list shape of a messages() result —
 // Array<{info: Message, parts: Array<Part>}> (SessionMessagesData,
-// 200 = the array of message+parts pairs). Defensive: a non-array
-// or malformed entry yields no role / no text.
+// 200 = the array of message+parts pairs). DUAL SHAPE (2026-09-21):
+// the in-process client resolves the list as a RequestResult wrapper
+// ({ data: [...] }) — normalize to the bare array before the logic
+// (the same fix as resolveModel, compact_memory.ts, 280b8d0).
+// Defensive: a non-array or malformed entry yields no role / no text.
 type MsgPair = { info?: Record<string, unknown>; parts?: Array<Record<string, unknown>> };
 
 function msgPairs(msgs: unknown): MsgPair[] {
-  return Array.isArray(msgs) ? (msgs as MsgPair[]) : [];
+  const arr = Array.isArray(msgs)
+    ? (msgs as MsgPair[])
+    : (msgs != null && typeof msgs === "object" && Array.isArray((msgs as { data?: unknown }).data)
+      ? (msgs as { data: MsgPair[] }).data
+      : null);
+  return arr ?? [];
 }
 
 function textParts(pair: MsgPair): string[] {

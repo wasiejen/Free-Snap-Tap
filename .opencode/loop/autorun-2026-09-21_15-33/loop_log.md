@@ -46,3 +46,5 @@
 2026-09-22_00-11 DONE<--- worker-10 unknown Qwen3.8-27B-Q3S-160K 44%/89K
 2026-09-22_00-12 --INFO-- worker-10 ses_f3a03af20ffe1bRa56xVl143VG Qwen3.8-27B-Q3S-160K correction: the DONE line above has session 'unknown' by my oversight — the session is the one on the worker-10 START line two lines up (ses_f3a03af20ffe1bRa56xVl143VG)
 2026-09-22_00-22 -RETURN- planner-7 ses_f3a24dc3bffe59B5xpa0Ho3XZd Qwen3.8-27B-Q3S-160K planner-7 ses_f3a24dc3bffe59B5xpa0Ho3XZd worker-10 ses_f3a03af20ffe1bRa56xVl143VG (UNIT B autoCompact toggle d4ef76e — planner re-verified: smoke 62/62, probe 241/241, pytest 459+1w, ruff F=0; carried worker-9's cancelled partial diff)
+2026-09-22_00-23 -->START worker-11 ses_f39eef70effefmk8Bt598jhqwK Qwen3.8-27B-Q3S-110K-MTP worker-11 [TODO #79]: msgPairs dual-shape unwrap in auto_resume.ts — Unit 4 action routing (in-process client returns RequestResult wrapper { data: [...] })
+2026-09-22_00-32 DONE<--- worker-11 ses_f39eef70effefmk8Bt598jhqwK Qwen3.8-27B-Q3S-110K-MTP worker-11 [TODO #79] done: smoke 63/63, pytest 459+1w, ruff F=0, probe 241/241 — SESSION=ses_f39eef70effefmk8Bt598jhqwK CTX=53335 (48%) REM=56665

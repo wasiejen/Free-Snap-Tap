@@ -487,6 +487,9 @@ try {
   msgScript.set("ses_u4_sux", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done. action: restart"]]));
   msgScript.set("ses_u4_noline", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Mid-unit, no closing line."]]));
   msgScript.set("ses_u4_plain", mkPairs([["user", "plain direct session, no marker"], ["assistant", "Done. action: stop"]]));
+  // wrapper shape (the in-process client's RequestResult { data: [...] }):
+  // the plugin must unwrap it — without the unwrap, scope=none, no route line
+  msgScript.set("ses_u4_wrap", { data: mkPairs([["user", MARK + " iteration 1"], ["assistant", "Unit closed. action: stop"]]) });
   msgScript.set("ses_u3_new", mkPairs([["user", "plain user message, no marker"], ["assistant", "Working, no closing line."]]));
   msgScript.set("ses_u4_throw", { throw: "messages exploded for ses_u4_throw" });
 
@@ -529,6 +532,7 @@ try {
   await hooksU4.event({ event: { type: "session.created", properties: { sessionID: "ses_u4_succ" } } });
   await fire(hooksU4, "ses_u4_noline", [statusEv("ses_u4_noline", "busy"), statusEv("ses_u4_noline", "idle")]);
   await fire(hooksU4, "ses_u4_plain", [statusEv("ses_u4_plain", "busy"), statusEv("ses_u4_plain", "idle")]);
+  await fire(hooksU4, "ses_u4_wrap", [statusEv("ses_u4_wrap", "busy"), statusEv("ses_u4_wrap", "idle")]);
   await fire(hooksU4, "ses_u4_throw", [statusEv("ses_u4_throw", "busy"), statusEv("ses_u4_throw", "idle")]);
   await fire(hooksU4, "ses_u3_new", [statusEv("ses_u3_new", "busy"), statusEv("ses_u3_new", "idle")]);
 
@@ -541,13 +545,16 @@ try {
       readLines().some((l) => l.includes("skip= successor sid=ses_u4_succ")) &&
       nolineCont(1) &&
       readLines().some((l) => l.includes("recovery= sid=ses_u3_new attempt=1")) &&
-      readLines().some((l) => l.includes("err= sid=ses_u4_throw")),
+      readLines().some((l) => l.includes("err= sid=ses_u4_throw")) &&
+      readLines().some((l) => l.includes("route= stop sid=ses_u4_wrap")),
     12000,
   );
   const contSends = () => u4Sends.filter((c) => !(c.body && c.body.agent)).map((c) => c.path?.id);
   const spawnSends = () => u4Sends.filter((c) => c.body?.agent === "planner_Q3S_160K");
   chk("UNIT 4: batch-A scenarios all routed (stop / ask / restart / skip / continue / spawned-scope / err lines present)", okA, okA ? "" : "missing line(s)");
   chk("UNIT 4: action: stop → NO send, route= stop logged", okA && !u4Sends.some((c) => c.path?.id === "ses_u4_stop"), "");
+  chk("UNIT 4: wrapper shape { data: [...] } (in-process RequestResult) → unwrapped, action: stop → route= stop, NO send",
+    okA && !u4Sends.some((c) => c.path?.id === "ses_u4_wrap"), "");
   chk("UNIT 4: action: ask_maintainer → NO send, route= ask logged", okA && !u4Sends.some((c) => c.path?.id === "ses_u4_ask"), "");
   chk("UNIT 4: action: restart without a successor → spawnPlanner (ONE create, agent start prompt, route= restart spawn logged)",
     okA && u4Creates.length === 1 && spawnSends().length === 1 &&
@@ -608,7 +615,7 @@ try {
   } else if (liveBefore === null && liveSizeNow > 0) {
     appended = fs.readFileSync(LIVE_LOG, "utf-8"); // did not exist before — all new
   }
-  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_throw", "ses_u4_spawn"];
+  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_wrap", "ses_u4_throw", "ses_u4_spawn"];
   chk("LIVE .opencode/temp/auto_resume.log received no smoke line (sandbox got every smoke line)",
     liveBefore === liveSizeNow || !smokeSids.some((s) => appended.includes(s)), `before=${liveBefore} after=${liveSizeNow}`);
   chk("sandbox log path is under the sandbox", sandboxLog.startsWith(base), sandboxLog);
