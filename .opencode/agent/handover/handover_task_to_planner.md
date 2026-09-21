@@ -1,91 +1,77 @@
-# Handover Summary — auto-resume Phase 2, Deep-Dive C: generally-useful mechanisms (worker_Q3S_160K)
+# Handover Summary — auto-resume UNIT 1: skeleton logging plugin (worker_Q3S_160K, ses_f3bbdd89affeigE26tm2lka7AT, 2026-09-21)
 
-## Method
-Static analysis only (plugin repo READ-ONLY, never executed). Verified phase-1 map +
-Deep-Dives A/B read first; shared machinery referenced by pointer, not re-derived.
-Every src/index.ts ref verified this session by bounded direct reads
-(1372–1692 FULL mega-function read; partials 180–232, 965–994, 1272–1318,
-2044–2075, 2348–2380, 2635–2699) or line-anchored symbol greps
-(doneClaimNoTodosAttempts / checkingToolText / todoCheckAttempts /
-taskCompleteOverrides / toolLoopAttempts — every consumer listed in §5/§2 of the
-recipe). Test files: case names only via ONE bounded loop over the seven
-C-relevant named files, regex `(describe|it|test)` per B-run lesson
-(`it` under-collection avoided); issue16 (18) and events (49) captures
-complete, others head-truncated and marked as such in recipe §8.
-Fit assessment: read-only grounding of OUR `.opencode/plugin/` this session
-(wc -l + header-block symbol spot checks), building on A §7 / B §7 pointers.
-Recipe written to its canonical scratchpad path via chunked appends
-(~14 small heredoc chunks; write-tool JSON flakiness recurred twice —
-TODO #74) then cleaned; final verify: 368 lines, exactly 8 section headers
-in spec order, zero stray markers.
+## What changed (one commit with this file)
+1. **`.opencode/plugin/auto_resume.ts`** (new) — default-exported Plugin
+   factory, same shape as the existing plugins. Hooks installed:
+   - `event: onEvent` — one log line per event to
+     `.opencode/temp/auto_resume.log` (append; temp dir mkdir'd recursive):
+     `<ISO time> event=<type> sid=<sessionID> <key fields>` (status for
+     session.status, tokens for message.updated — short, defensive).
+     Never throws (try/catch swallow, intercept_observer discipline).
+   - one-shot init `surface=` probe at load: `typeof
+     ctx.client.session.<m>` for prompt, promptAsync, abort, list, get,
+     message, todo, command, summarize, compact + `app.log=...`
+     (`typeof` only — Object.keys misses prototype methods).
+   - NO timers, NO sends, NO state machine (Unit 2 slots in at the marked
+     points; module-level state + pure-observer hooks).
+2. **`.opencode/plugin/tests/auto_resume.smoke.mjs`** (new) — smoke per the
+   existing pattern (scratchpad sandbox `directory`; live log untouched):
+   factory shape, `event` hook present, surface line first + all 11 verdicts,
+   v1 expectations (summarize=function, compact=undefined, app.log=function),
+   session.status + message.updated line shapes, degenerate inputs never
+   throw, throwing mock client survives, live-log-untouched + sandbox checks.
+3. **`.opencode/agent/knowledge/opencode-plugins/auto-resume-unit1-surface-report.md`**
+   (new) — static `session.*` surface from the installed .d.ts (bounded
+   grep), probe design + expected values, provenance, and the
+   "LIVE CONFIRMATION PENDING (maintainer restart)" marker.
+4. **`todo_inbox.md`** (append-only) — one finding: the pre-existing
+   handover-probe [87] stale-pin failure (see below).
 
-## Coverage (spec scope items 1-6)
-1. Idle-scan mega-function decomposition (checkForToolCallAsText 1372–1692)
-   — **done**, full read; sub-candidates 2.0–2.10 each with trigger/range/
-   state-fields/gates incl. the tool-loop and thinking-part traps, priority
-   classes, and the dispatch funnel (per-source budgets, minActivityGap,
-   hallucination abort-or-send branch).
-2. task_complete — **done**: definition 2642–2665 read verbatim, registration
-   inside returned hooks block confirmed at 2687–2689 (banner 2638–2640),
-   behavior contract step-by-step (parent-only open-todo rejection,
-   taskCompleteOverrides capped at maxRetries then accept-despite-open-todos,
-   double-latch + timer clear, unknown-session no-crash), test pins from
-   events/rearm files quoted verbatim.
-3. Celebration mechanics — **done**: detector def 969–990 verified plus all
-   THREE use sites read (inline variant 1601–1614, idle handler 2348–2373,
-   periodic tick 2044–2074); anti-race pinned by continue FIX #16 + issue16
-   FIX B4 pair, case names verbatim.
-4. Done-claim machinery — **done**: patterns 183–198 / prompts 200–211 /
-   detectors 213–229 read; every doneClaimNoTodosAttempts consumer grepped
-   (decl 52, default 575, gate 1568, increment 1643, reset 2530 only);
-   the deliberate PRESERVE in resetBusyFlags 1297–1299 (#26 unbounded-refire
-   guard) read in context of the whole function 1272–1302.
-5. Test-file case names — **done** as scoped (seven C-relevant named files,
-   bounded single loop, corrected regex); see coverage note above on which
-   captures are complete vs truncated.
-6. Fit assessment — **done**: §7 of recipe focuses compact_memory.ts
-   (measured 654 lines this session) + ctx_watchdog; NO-AWAIT fire-and-forget
-   dispatch constraint restated as binding for every ported send path.
+## Measured verification (DoD)
+- **Smoke: GREEN** — `node .opencode/plugin/tests/auto_resume.smoke.mjs` →
+  `AUTO_RESUME_SMOKE: ALL PASS (14/14)`.
+- **pytest: GREEN** — `./.venv/Scripts/python.exe -m pytest -q` →
+  `459 passed, 1 warning` (baseline 459+1w ✓).
+- **ruff: GREEN** — `./.venv/Scripts/ruff.exe check --select F .` →
+  `All checks passed!` (F=0 ✓).
+- **handover_probe: NOT GREEN — pre-existing, out of scope.**
+  `node .opencode/plugin/probes/handover_probe.mjs` → exactly ONE failure:
+  check [87] classifier fixtures — pin expects `iq3`→1, the current
+  `compact_memory.ts` classifier (line 82, per the 2026-09-21 ruling; the
+  smoke at line 86 already pins `clf IQ3 -> 3`) returns 3. Verified
+  pre-existing at HEAD: the probe references none of UNIT 1's files, and
+  `compact_memory.ts` is byte-unchanged (git status). The probe check TOTAL
+  is UNCHANGED by this unit (no new pins — DoD satisfied on that count);
+  the failure is a stale pin in the probe file, which is DO-NOT-TOUCH for
+  this unit. Finding appended to `todo_inbox.md` (unnumbered, for
+  curation).
+- The three files exist + committed with this summary (single commit,
+  subject `add auto-resume UNIT 1: skeleton logging plugin + surface probe + smoke + report`).
 
-## Notable findings
-1. The mega-function's celebration check is an INLINE REIMPLEMENTATION that
-   scans ALL accumulated recent assistant text, while the shared detector
-   checks only the newest assistant message — two truths can coexist per
-   idle boundary (recipe §8.4, unverified if any test distinguishes them).
-2. Dead branch observed: the periodic-tick clean-celebration latch
-   (2062–2065) is unreachable inside its own loop because line 2052 early-
-   continues when open.length === 0 (§8.3) — defensive duplication of
-   mega-fn behavior; no execution evidence either way.
-3. The three celebration use sites intentionally DIVERGE (send-nudge at idle
-   handler vs skip-cycle at tick vs fall-through inline) — a port must
-   pick one policy per call context rather than copy-paste (§4/§6.2).
-4. doneClaimNoTodosAttempts cap works via EXPLICIT non-reset
-   (documented comment, #26), not absence: only inbound user messages
-   re-arm it (2530); todoNudgeAttempts is the opposite discipline
-   (zeroed each busy cycle, 1296) — both patterns captured for reuse (§5/
-   §6.3).
-5. DONE_WITHOUT_DETAILS_PROMPT wording maps 1:1 onto our handover-summary
-   conventions — flagged as a lift-as-is text asset for future nudge
-   prompts (§6.3).
-6. Map off-by-one refs found and recorded (DONE_WITHOUT_DETAILS_PROMPT
-   ends 211 not 210; containsWorkDescription body ends 229, 230 blank);
-   spec item-4 range "~183–230" resolved to exactly 183–198 by symbol grep
-   (recipe §8.1–8.2).
+## Discrepancy flagged (in the report, not acted)
+- Installed `@opencode-ai/sdk` / `@opencode-ai/plugin` under
+  `.opencode/node_modules/` = **1.18.29**, while the design doc names the
+  host install as `opencode-ai@1.18.31`. Both v1-generation; the live
+  `surface=` probe confirms the runtime surface.
 
-## Recipe file
-`C:/Users/Wasiejen/AppData/Local/Temp/opencode/auto-resume-deepdive-C.md`
-(canonical scratchpad path, no suffixed variant. 368 lines, sections in
-spec order 1 problem map / 2 mega-fn decomposition / 3 task_complete /
-4 celebration / 5 done-claim / 6 recipes with test-case evidence /
-7 fit assessment / 8 unverified + discrepancies.)
+## Deliberately NOT done
+- No live acceptance (pending: maintainer host restart — the plugin must be
+  loaded by the host to log live events + fire the init probe). Planner
+  verifies (a) live event lines in `.opencode/temp/auto_resume.log`,
+  (b) the `surface=` line, then appends the live confirmation to the
+  surface report (its "LIVE CONFIRMATION PENDING" section).
+- No `opencode.jsonc` registration (plugins auto-discover from
+  `.opencode/plugin/`), no timers/send path/watch objects (Unit 2), no
+  edits to product code, probes, other plugins, maintainer files, or
+  `compact_memory.ts` (all DO-NOT-TOUCH).
 
-## Commits
-One commit, NAMED PATHS ONLY (no `git add -A`): this handover file staged
-by name; recipe lives in the scratchpad outside the repo. Per spec,
-NO TODO.md / todo_inbox.md entries (Phase 3 curates seeds). The pre-existing
-dirty `.opencode/agent/agent_feedback.md` working-tree change was NOT
-staged into my commit (friction entry auto-appended by the submit tool
-also lands there unstaged, consistent with house handling).
+## TODO entries
+- `todo_inbox.md` (append-only): the pre-existing probe [87] stale-pin
+  failure (`iq3` pin 1 vs classifier 3) — one block, unnumbered, dated
+  2026-09-21, worker_Q3S_160K.
 
-## Context gauge (verbatim, read at handover time)
-SESSION=ses_f3e0a156bffeQYDNsR9B4AfIbb CTX=84421 (52%) REM=75579
+## Lessons
+Gate baselines in task specs should be machine-verified at spec time: the
+spec's DoD assumed the handover probe was green, but it had a pre-existing
+stale pin — the worker can only verify and name, not fix, a DO-NOT-TOUCH
+failure.
