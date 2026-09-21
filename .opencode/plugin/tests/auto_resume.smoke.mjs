@@ -8,6 +8,14 @@
 // log dir, consumed (renamed .consumed) by the 5s tick after ONE spawn
 // attempt (create + queued promptAsync, agent=planner_Q3S_160K, NO model
 // field), even on failure.
+// UNIT 4: the planner liveness watchdog — a planner-scoped session
+// (spawned-map self-mark OR a `<|autonom|>` launch marker in one of its
+// user messages) going idle (or session.error) is routed on the next
+// tick by the LAST assistant message's action: line: stop / ask → no
+// send; resume / no-line → queued CONTINUE prompt (recovery cap 2,
+// reset on a fresh busy); restart or cap exhausted → successor check
+// (a session.created tracked since lastActivityAt) → skip or
+// spawnPlanner (the RESTART prompt).
 // The plugin factory is called with a SCRATCHPAD sandbox `directory` —
 // auto_resume.log lands in the sandbox (.opencode/temp/auto_resume.log
 // under the sandbox project), NEVER the live .opencode/temp/. Run:
@@ -36,7 +44,7 @@ const readLines = () =>
   fs.existsSync(sandboxLog) ? fs.readFileSync(sandboxLog, "utf-8").split(/\r?\n/).filter((l) => l.length > 0) : [];
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z /;
-const CANDIDATES = ["prompt", "promptAsync", "abort", "list", "get", "message", "todo", "command", "summarize", "compact", "create", "app.log"];
+const CANDIDATES = ["prompt", "promptAsync", "abort", "list", "get", "message", "messages", "todo", "command", "summarize", "compact", "create", "app.log"];
 
 // A minimal mock client; app.log present only when a fn is passed.
 const mkClient = (session, appLog) => ({
@@ -70,6 +78,7 @@ try {
     list: function () {},
     get: function () {},
     message: function () {},
+    messages: function () {},
     todo: function () {},
     command: function () {},
     summarize: function () {},
@@ -81,7 +90,7 @@ try {
   const l0 = readLines();
   const surf = l0.find((l) => l.includes("surface="));
   chk("init probe logged the surface= line FIRST (one-shot at load)", l0.length >= 1 && surf === l0[0], `n=${l0.length}`);
-  chk("surface line carries all eleven candidates incl. create + app.log", surf && CANDIDATES.every((m) => surf.includes(m + "=")), surf ?? "");
+  chk("surface line carries all twelve candidates incl. create + messages + app.log", surf && CANDIDATES.every((m) => surf.includes(m + "=")), surf ?? "");
   chk("probe verdicts by typeof (v1 client: summarize=function, compact=undefined, app.log=function)",
     surf && surf.includes("summarize=function") && surf.includes("compact=undefined") && surf.includes("app.log=function"), surf ?? "");
 
@@ -374,7 +383,138 @@ try {
   // mock carries it as a function — the live typeof verdict lands in
   // the surface report).
   chk("UNIT 3: surface pin updated — create= in the candidates (v1 mock: create=function)",
-    surf && surf.includes("create=") && surf.includes("create=function"), surf ?? "");
+    surf && surf.includes("create=function"), surf ?? "");
+
+  // ============================================================
+  // UNIT 4 — planner liveness watchdog
+  //
+  // The factory is re-invoked with a SPYING client: `messages` is
+  // scripted PER SID (the SDK list shape Array<{info, parts}>),
+  // `create` + `promptAsync` record every call. Scope: a sid is
+  // planner-scoped iff it is in the module-level `spawned` map (the
+  // UNIT 3 spawn `ses_u3_new` is still self-marked there) OR one of
+  // its user messages carries the `<|autonom|>` launch marker. The
+  // single 5s tick is the only decision+send funnel — the smoke waits
+  // on it (real time). Batch A fires every scenario before one tick
+  // pass, so one pass routes them all.
+  // ============================================================
+  const u4Sends = []; // every promptAsync on this client (CONTINUE + spawn)
+  const u4Creates = [];
+  const messagesCalls = [];
+  const MARK = "<|autonom|>";
+  const mkPairs = (entries) => entries.map(([role, text]) => ({ info: { role }, parts: [{ type: "text", text }] }));
+  const msgScript = new Map();
+  msgScript.set("ses_u4_stop", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Unit closed. action: stop"]]));
+  msgScript.set("ses_u4_ask", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Blocked. action: ask_maintainer: which branch?"]]));
+  msgScript.set("ses_u4_restart", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done. action: restart"]]));
+  msgScript.set("ses_u4_sux", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done. action: restart"]]));
+  msgScript.set("ses_u4_noline", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Mid-unit, no closing line."]]));
+  msgScript.set("ses_u4_plain", mkPairs([["user", "plain direct session, no marker"], ["assistant", "Done. action: stop"]]));
+  msgScript.set("ses_u3_new", mkPairs([["user", "plain user message, no marker"], ["assistant", "Working, no closing line."]]));
+  msgScript.set("ses_u4_throw", { throw: "messages exploded for ses_u4_throw" });
+
+  const u4Session = {
+    prompt: function () {},
+    promptAsync: async (args) => { u4Sends.push(args); return { data: { id: "queued" } }; },
+    abort: function () {},
+    list: function () {},
+    get: function () {},
+    message: function () {},
+    messages: async (args) => {
+      messagesCalls.push(args);
+      const scripted = msgScript.get(args?.path?.id);
+      if (scripted && typeof scripted === "object" && scripted.throw) throw new Error(scripted.throw);
+      return scripted ?? [];
+    },
+    todo: function () {},
+    command: function () {},
+    summarize: function () {},
+    create: async () => { u4Creates.push({}); return { data: { id: "ses_u4_spawn" } }; },
+  };
+  const hooksU4 = await factory({ directory: proj, client: { session: u4Session, provider: { list: providerList }, app: { log: () => "log" } } });
+  chk("UNIT 4: re-factory with the spying client returns the event hook", typeof hooksU4?.event === "function");
+
+  // ---- batch A: every scenario armed (busy → idle) before one tick
+  // pass. Order matters only for timestamps: ses_u4_sux's assistant
+  // token update stamps its lastActivityAt, and the successor's
+  // session.created event lands AFTER it (the successor window).
+  // ses_u4_restart / ses_u4_noline carry NO assistant token update →
+  // lastActivityAt null → the restart branch's fail-safe side (spawn,
+  // even though the successor is tracked in the map).
+  await fire(hooksU4, "ses_u4_stop", [statusEv("ses_u4_stop", "busy"), statusEv("ses_u4_stop", "idle")]);
+  await fire(hooksU4, "ses_u4_ask", [statusEv("ses_u4_ask", "busy"), statusEv("ses_u4_ask", "idle")]);
+  await fire(hooksU4, "ses_u4_restart", [statusEv("ses_u4_restart", "busy"), statusEv("ses_u4_restart", "idle")]);
+  await fire(hooksU4, "ses_u4_sux", [
+    statusEv("ses_u4_sux", "busy"),
+    msgUpdated("ses_u4_sux", "assistant", { total: 100 }),
+    statusEv("ses_u4_sux", "idle"),
+  ]);
+  await hooksU4.event({ event: { type: "session.created", properties: { sessionID: "ses_u4_succ" } } });
+  await fire(hooksU4, "ses_u4_noline", [statusEv("ses_u4_noline", "busy"), statusEv("ses_u4_noline", "idle")]);
+  await fire(hooksU4, "ses_u4_plain", [statusEv("ses_u4_plain", "busy"), statusEv("ses_u4_plain", "idle")]);
+  await fire(hooksU4, "ses_u4_throw", [statusEv("ses_u4_throw", "busy"), statusEv("ses_u4_throw", "idle")]);
+  await fire(hooksU4, "ses_u3_new", [statusEv("ses_u3_new", "busy"), statusEv("ses_u3_new", "idle")]);
+
+  const nolineCont = (n) => readLines().some((l) => l.includes(`recovery= sid=ses_u4_noline attempt=${n}`));
+  const okA = await waitUntil(
+    () =>
+      readLines().some((l) => l.includes("route= stop sid=ses_u4_stop")) &&
+      readLines().some((l) => l.includes("route= ask sid=ses_u4_ask")) &&
+      readLines().some((l) => l.includes("route= restart spawn sid=ses_u4_restart")) &&
+      readLines().some((l) => l.includes("skip= successor sid=ses_u4_succ")) &&
+      nolineCont(1) &&
+      readLines().some((l) => l.includes("recovery= sid=ses_u3_new attempt=1")) &&
+      readLines().some((l) => l.includes("err= sid=ses_u4_throw")),
+    12000,
+  );
+  const contSends = () => u4Sends.filter((c) => !(c.body && c.body.agent)).map((c) => c.path?.id);
+  const spawnSends = () => u4Sends.filter((c) => c.body?.agent === "planner_Q3S_160K");
+  chk("UNIT 4: batch-A scenarios all routed (stop / ask / restart / skip / continue / spawned-scope / err lines present)", okA, okA ? "" : "missing line(s)");
+  chk("UNIT 4: action: stop → NO send, route= stop logged", okA && !u4Sends.some((c) => c.path?.id === "ses_u4_stop"), "");
+  chk("UNIT 4: action: ask_maintainer → NO send, route= ask logged", okA && !u4Sends.some((c) => c.path?.id === "ses_u4_ask"), "");
+  chk("UNIT 4: action: restart without a successor → spawnPlanner (ONE create, agent start prompt, route= restart spawn logged)",
+    okA && u4Creates.length === 1 && spawnSends().length === 1 &&
+      spawnSends()[0]?.path?.id === "ses_u4_spawn" &&
+      (spawnSends()[0]?.body?.parts?.[0]?.text ?? "").startsWith(MARK) &&
+      (spawnSends()[0]?.body?.parts?.[0]?.text ?? "").includes("loop_log.md") &&
+      (spawnSends()[0]?.body?.parts?.[0]?.text ?? "").includes("auto-resume unit 4 restart branch"),
+    `create=${u4Creates.length} spawns=${spawnSends().length}`);
+  chk("UNIT 4: action: restart WITH a tracked successor (session.created since lastActivityAt) → skip, no second spawn",
+    okA && u4Creates.length === 1 && !u4Sends.some((c) => c.path?.id === "ses_u4_sux"), "");
+  chk("UNIT 4: no action: line → CONTINUE attempt 1 (queued, locked text names the post-compaction head)",
+    okA && contSends().includes("ses_u4_noline") &&
+      ((u4Sends.find((c) => c.path?.id === "ses_u4_noline")?.body?.parts?.[0]?.text) ?? "").includes("agent_readme_post_compaction.md"), "");
+  chk("UNIT 4: non-scoped (no marker, not spawned) → zero sends, no route/recovery line (scope=none after ONE fetch)",
+    okA && !u4Sends.some((c) => c.path?.id === "ses_u4_plain") &&
+      messagesCalls.filter((c) => c?.path?.id === "ses_u4_plain").length === 1 &&
+      !readLines().some((l) => l.includes("sid=ses_u4_plain") && (l.includes("route=") || l.includes("recovery="))), "");
+  chk("UNIT 4: spawned-map scope (UNIT 3 self-mark, user msg carries NO marker) → routes as planner, CONTINUE attempt 1",
+    okA && contSends().includes("ses_u3_new") && readLines().some((l) => l.includes("recovery= sid=ses_u3_new attempt=1")), "");
+  chk("UNIT 4: messages() throwing → err= line with the error, no action, no throw",
+    okA && !u4Sends.some((c) => c.path?.id === "ses_u4_throw") &&
+      readLines().some((l) => l.includes("err= sid=ses_u4_throw") && l.includes("messages exploded for ses_u4_throw")), "");
+
+  // ---- batch B: a SECOND idle (no fresh busy) → the budget accumulates
+  // across idles → CONTINUE attempt 2.
+  const sBeforeB = u4Sends.length;
+  await fire(hooksU4, "ses_u4_noline", [statusEv("ses_u4_noline", "idle")]);
+  const okB = await waitUntil(() => u4Sends.length === sBeforeB + 1 && nolineCont(2), 12000);
+  chk("UNIT 4: second idle (no fresh busy) → CONTINUE attempt 2", okB && u4Sends.length === sBeforeB + 1, `n=${u4Sends.length}`);
+
+  // ---- batch C: a THIRD idle with the cap exhausted (2 CONTINUEs,
+  // still no line) → the restart branch → spawn (lastActivityAt null →
+  // fail-safe spawn even though the successor is tracked).
+  const sBeforeC = u4Sends.length, cBeforeC = u4Creates.length;
+  await fire(hooksU4, "ses_u4_noline", [statusEv("ses_u4_noline", "idle")]);
+  const okC = await waitUntil(
+    () => u4Creates.length === cBeforeC + 1 && readLines().some((l) => l.includes("route= restart spawn sid=ses_u4_noline")),
+    12000,
+  );
+  chk("UNIT 4: third idle, cap exhausted with still no line → restart branch → spawn", okC && u4Creates.length === cBeforeC + 1, `create=${u4Creates.length}`);
+  chk("UNIT 4: send totals — 3 CONTINUE (noline ×2, u3_new ×1) + 2 RESTART spawns, nothing else touched",
+    u4Sends.length === 5 && contSends().length === 3 && spawnSends().length === 2 &&
+      contSends().every((s) => s === "ses_u4_noline" || s === "ses_u3_new") && u4Creates.length === 2,
+    `total=${u4Sends.length} create=${u4Creates.length}`);
 
   // ---- the live log received NO smoke line. The LIVE plugin instance
   // (this host) keeps appending ITS OWN live-session lines in real time
@@ -391,7 +531,7 @@ try {
   } else if (liveBefore === null && liveSizeNow > 0) {
     appended = fs.readFileSync(LIVE_LOG, "utf-8"); // did not exist before — all new
   }
-  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov", "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u3_new", "ses_u3_chk2"];
+  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov", "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_throw", "ses_u4_spawn"];
   chk("LIVE .opencode/temp/auto_resume.log received no smoke line (sandbox got every smoke line)",
     liveBefore === liveSizeNow || !smokeSids.some((s) => appended.includes(s)), `before=${liveBefore} after=${liveSizeNow}`);
   chk("sandbox log path is under the sandbox", sandboxLog.startsWith(base), sandboxLog);

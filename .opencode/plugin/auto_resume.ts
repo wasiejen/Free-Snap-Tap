@@ -1,4 +1,4 @@
-// auto_resume.ts — UNIT 1+2+3 of the auto-resume plugin (approved 2026-09-21,
+// auto_resume.ts — UNIT 1+2+3+4 of the auto-resume plugin (approved 2026-09-21,
 // .opencode/proposals/approved/2026-09-21_opencode-auto-resume-plugin.md).
 //
 // UNIT 1 (the testbed):
@@ -61,9 +61,34 @@
 //   throws outward. The module stays DEFAULT-ONLY exported (a named
 //   export breaks the smoke check).
 //
-// DELIBERATELY ABSENT (Unit 4 slots): abort escalation, subagent
-// special-casing, magic-context handling, aborts, NAP/TODO/maintainer
-// file access (those are Unit 4 / prompts).
+// UNIT 4 (the planner liveness watchdog — who watches the top-level
+// session): a planner-scoped session going idle (or session.error) is
+// routed on the NEXT TICK (the 5s funnel stays the only decision+send
+// funnel; events only set state). SCOPE: a sid is scoped iff it is in
+// the Unit 3 `spawned` map (the self-mark), OR ANY of its user messages
+// (fetched via client.session.messages) contains the literal
+// `<|autonom|>` (the looprunner's launch-message marker); the verdict
+// is cached per watch as scope: "planner" | "none" | "unknown" (fetch
+// pending/failed → unknown, re-checked on the next idle; fail-safe = no
+// action); NON-SCOPED sessions are NEVER acted on. ROUTING on the LAST
+// assistant message's text parts for
+// action:\s*(restart|resume|stop|ask_maintainer) (last match wins):
+// stop / ask_maintainer → NO send, `route= stop|ask` line; resume or NO
+// recognized line → ONE queued CONTINUE prompt (recoveryCount++, cap 2
+// per idle cycle, reset on a fresh busy), `recovery= attempt=N` line;
+// restart, or cap exhausted with still no line → SUCCESSOR CHECK (a
+// DIFFERENT sid tracked in a session.created event since the closed
+// session's lastActivityAt → `skip= successor`) else spawnPlanner with
+// the RESTART prompt + `route= restart spawn` line. session.created
+// events are tracked (sid → epoch) for that check. OVERLAP-ERA CAVEAT
+// (documented, not solved): the looprunner ALSO reacts to
+// `action: restart` — the successor check + the 5s tick grace window
+// mitigate a double-spawn; the residual race is accepted until the
+// maintainer retires the looprunner (his call).
+//
+// DELIBERATELY ABSENT (later units / prompts): abort escalation,
+// subagent special-casing, magic-context handling, busy-silence stall
+// detection, NAP/TODO/maintainer file access.
 //
 // HOOK DISCIPLINE (same as intercept_observer): the handler NEVER throws
 // (try/catch swallow — a throw out of a hook would surface to the
@@ -83,6 +108,7 @@ const SESSION_CANDIDATES: ReadonlyArray<string> = [
   "list",
   "get",
   "message",
+  "messages",
   "todo",
   "command",
   "summarize",
@@ -108,6 +134,16 @@ const RESERVE_MIN_OUTPUT = 20000;
 // busy cycle (attempts zeroed when a fresh busy cycle arms the session).
 const MAX_ATTEMPTS_PER_BUSY_CYCLE = 1;
 
+// Unit 4 constants: the looprunner's launch-message marker (a
+// planner-scoped session carries it in at least one of its user
+// messages; direct/interactive sessions never do), the recovery budget
+// (at most two queued CONTINUE prompts per idle cycle — a fresh busy
+// cycle resets it), and the action-line vocabulary (AGENTS.md
+// §Interaction-contract state machine; the LAST match wins).
+const AUTONOM_MARKER = "<|autonom|>";
+const MAX_RECOVERY_ATTEMPTS = 2;
+const ACTION_RE = /action:\s*(restart|resume|stop|ask_maintainer)/g;
+
 let logDir = "";
 let logPath = "";
 let client: unknown = null;
@@ -124,6 +160,15 @@ interface Watch {
   lastActivityAt: number | null;
   armed: boolean;
   status: "busy" | "idle" | "";
+  // Unit 4: the scope verdict (planner / none / unknown — unknown until
+  // the spawned-map check or a messages() fetch settles it), the
+  // recovery budget (CONTINUE sends this idle cycle; a fresh busy
+  // resets it), and the pending-idle latch (ONE decision per idle
+  // cycle — set by an idle event or session.error, cleared when the
+  // tick makes its decision or the cycle fails).
+  scope: "planner" | "none" | "unknown";
+  recoveryCount: number;
+  idlePending: boolean;
 }
 const watches = new Map<string, Watch>();
 const sending = new Set<string>();
@@ -136,6 +181,12 @@ let tickTimer: ReturnType<typeof setInterval> | null = null;
 // running; held until the trigger file is consumed).
 const spawned = new Map<string, number>();
 let spawnInFlight = false;
+
+// Unit 4 module-level state: the session.created tracking (sid →
+// epoch — the successor check: a DIFFERENT sid created since the
+// closing session's lastActivityAt means someone already replaced it,
+// so the watchdog stays out of the way).
+const createdSessions = new Map<string, number>();
 
 // Append one log line; best-effort — NEVER throws (logging must not
 // break the session).
@@ -181,7 +232,10 @@ function keyFields(props: Record<string, unknown>): string {
 function getWatch(sid: string): Watch {
   let w = watches.get(sid);
   if (!w) {
-    w = { lastTokenTotal: 0, model: null, attempts: 0, lastActivityAt: null, armed: false, status: "" };
+    w = {
+      lastTokenTotal: 0, model: null, attempts: 0, lastActivityAt: null, armed: false, status: "",
+      scope: "unknown", recoveryCount: 0, idlePending: false,
+    };
     watches.set(sid, w);
   }
   return w;
@@ -401,9 +455,175 @@ async function checkSpawnTrigger() {
   }
 }
 
-// Unit 2+3: the ONE 5s tick — the only decision+send funnel. Unit 3's
+// Unit 4: the queued CONTINUE prompt (locked text — the no-line /
+// resume branch): the planner's last turn ended without a recognized
+// action: line (compaction, sudden stop, or protocol gap) — re-read
+// the post-compaction head files, rebuild from committed state,
+// continue or close with an action: line.
+function continueText(sid: string): string {
+  return (
+    `[auto-resume unit 4 — planner liveness watchdog, session ${sid}] Your last turn ended without a recognized action: line ` +
+    "(compaction, sudden stop, or protocol gap). Follow .opencode/agent/prompts/agent_readme_post_compaction.md — " +
+    "re-read the named head files, rebuild from the committed state (git log + NAP + TODO), and continue the current " +
+    "unit or close it with an action: line."
+  );
+}
+
+// Unit 4: the RESTART start prompt for the spawnPlanner call (the
+// restart branch / cap-exhausted branch): carries the looprunner
+// launch marker + the iteration-counter rule + the rebuild-from-
+// committed-state directive.
+function restartText(): string {
+  return (
+    `<|autonom|> Run autonomously. (auto-resume unit 4 restart branch: the previous planner closed with ` +
+    "`action: restart`.) Your iteration number = the largest `planner-N` in the current loop folder's `loop_log.md` " +
+    "plus one (verify from the log; the counter-mismatch rule applies). Rebuild reality from committed state " +
+    "(git log, NAP, TODO.md) and continue per your planner prompt's autonomous mode."
+  );
+}
+
+// Unit 4: the SDK list shape of a messages() result —
+// Array<{info: Message, parts: Array<Part>}> (SessionMessagesData,
+// 200 = the array of message+parts pairs). Defensive: a non-array
+// or malformed entry yields no role / no text.
+type MsgPair = { info?: Record<string, unknown>; parts?: Array<Record<string, unknown>> };
+
+function msgPairs(msgs: unknown): MsgPair[] {
+  return Array.isArray(msgs) ? (msgs as MsgPair[]) : [];
+}
+
+function textParts(pair: MsgPair): string[] {
+  const out: string[] = [];
+  for (const p of pair.parts ?? []) {
+    if (p && typeof p === "object" && p.type === "text" && typeof p.text === "string") out.push(p.text);
+  }
+  return out;
+}
+
+// Unit 4: scope marker scan — true iff ANY user message of the pair
+// list carries the looprunner launch marker (the scope rule (b)).
+function userHasMarker(msgs: unknown): boolean {
+  for (const pair of msgPairs(msgs)) {
+    if (!pair.info || pair.info.role !== "user") continue;
+    for (const t of textParts(pair)) {
+      if (t.includes(AUTONOM_MARKER)) return true;
+    }
+  }
+  return false;
+}
+
+// Unit 4: the routing scan — the LAST assistant message's text parts,
+// the LAST match of the action-line regex wins; null = no assistant
+// message or no recognized line.
+function lastAssistantAction(msgs: unknown): string | null {
+  let last: MsgPair | null = null;
+  for (const pair of msgPairs(msgs)) {
+    if (pair.info && pair.info.role === "assistant") last = pair;
+  }
+  if (!last) return null;
+  const text = textParts(last).join("\n");
+  ACTION_RE.lastIndex = 0; // global regex — reset before each scan
+  let m: RegExpExecArray | null;
+  let found: string | null = null;
+  while ((m = ACTION_RE.exec(text)) !== null) found = m[1];
+  return found;
+}
+
+// Unit 4: the successor check — a DIFFERENT sid tracked in a
+// session.created event since the closing session's lastActivityAt
+// (the most recent such creation wins); null when lastActivityAt is
+// unknown (fail-safe: spawn) or no successor was created.
+function findSuccessor(closingSid: string, since: number | null): string | null {
+  if (since == null) return null;
+  let best: string | null = null;
+  let bestEpoch = -1;
+  for (const [sid, epoch] of createdSessions) {
+    if (sid === closingSid) continue;
+    if (epoch >= since && epoch > bestEpoch) {
+      best = sid;
+      bestEpoch = epoch;
+    }
+  }
+  return best;
+}
+
+// Unit 4: the ONE per-scoped-idle routing decision (the 5s tick is the
+// only decision+send funnel — events stay ARM-only). ONE decision per
+// idle cycle: idlePending is cleared when the decision is made (or the
+// cycle fails); it is only SET again by the next idle event /
+// session.error. A latched (in-flight send) tick leaves it set — the
+// decision is retried next tick. Never throws out; one `err=` line per
+// failed cycle per sid (no log spam).
+async function routeScopedIdle(sid: string, w: Watch) {
+  if (sending.has(sid)) return; // in-flight send — retry next tick (latch)
+  let msgs: unknown;
+  try {
+    const sess = (client as { session?: { messages?: (args: unknown) => Promise<unknown> } } | null)?.session;
+    if (!sess || typeof sess.messages !== "function") {
+      log(`err= sid=${sid} messages missing`);
+      w.idlePending = false;
+      return;
+    }
+    msgs = await sess.messages({ path: { id: sid } });
+  } catch (e) {
+    log(`err= sid=${sid} ${(e as { message?: string } | null)?.message ?? "unknown"}`);
+    w.idlePending = false;
+    return;
+  }
+  // Scope verdict (cached; the fetch above serves BOTH the scope marker
+  // scan and the routing scan — one round trip).
+  if (w.scope === "unknown") {
+    if (spawned.has(sid) || userHasMarker(msgs)) w.scope = "planner";
+    else {
+      w.scope = "none"; // non-scoped: NEVER acted on (fail-safe = no action)
+      w.idlePending = false;
+      return;
+    }
+  }
+  w.idlePending = false; // the decision for this idle cycle is made below
+  const action = lastAssistantAction(msgs);
+  if (action === "stop") {
+    log(`route= stop sid=${sid}`); // left alone (the action state machine)
+    return;
+  }
+  if (action === "ask_maintainer") {
+    log(`route= ask sid=${sid}`); // left alone (waiting on the maintainer)
+    return;
+  }
+  if (action === "resume" || (action === null && w.recoveryCount < MAX_RECOVERY_ATTEMPTS)) {
+    w.recoveryCount += 1;
+    log(`recovery= sid=${sid} attempt=${w.recoveryCount}`);
+    sending.add(sid); // re-entrancy latch (held until the send settles)
+    try {
+      const sess = (client as { session?: { promptAsync?: (args: unknown) => Promise<unknown> } } | null)?.session;
+      if (!sess || typeof sess.promptAsync !== "function") {
+        log(`send-fail= sid=${sid} promptAsync missing`);
+        return;
+      }
+      // QUEUED (promptAsync): the synthetic part lands as the next turn
+      // at idle — the race-free channel (never a synchronous prompt).
+      await sess.promptAsync({ path: { id: sid }, body: { parts: [{ type: "text", text: continueText(sid) }] } });
+    } catch (e) {
+      log(`send-fail= sid=${sid} ${(e as { message?: string} | null)?.message ?? "unknown"}`);
+    } finally {
+      sending.delete(sid);
+    }
+    return;
+  }
+  // restart, or cap exhausted with still no line → successor check.
+  const successor = findSuccessor(sid, w.lastActivityAt);
+  if (successor) {
+    log(`skip= successor sid=${successor}`); // someone already replaced it
+    return;
+  }
+  log(`route= restart spawn sid=${sid}`);
+  await spawnPlanner(restartText()); // Unit 3 helper (never throws outward)
+}
+
+// Unit 2+3+4: the ONE 5s tick — the only decision+send funnel. Unit 3's
 // trigger check runs first (the spawn is a high-priority action), then
-// Unit 2 evaluates every armed watch. Never throws out (an unhandled
+// Unit 2 evaluates every armed watch, then Unit 4 routes every scoped
+// session with a pending idle decision. Never throws out (an unhandled
 // rejection from the timer would take the host down).
 async function tick() {
   try {
@@ -432,6 +652,18 @@ async function tick() {
   } catch {
     // swallow — the timer callback must never reject
   }
+  try {
+    for (const [sid, w] of watches) {
+      try {
+        if (!w.idlePending) continue;
+        await routeScopedIdle(sid, w); // Unit 4 — one decision per idle cycle
+      } catch {
+        // swallow — one session's failure must not block the others
+      }
+    }
+  } catch {
+    // swallow — the timer callback must never reject
+  }
 }
 
 // Unit 2: events only ARM the watch state (never decide, never send —
@@ -443,14 +675,42 @@ function armEvent(type: string, sid: string, props: Record<string, unknown>) {
       const w = getWatch(sid);
       w.armed = true;
       w.attempts = 0; // a fresh busy cycle resets the once-per-cycle budget
+      w.recoveryCount = 0; // Unit 4: a fresh busy cycle resets the recovery budget
+      w.idlePending = false; // a fresh busy cycle: no pending decision
       w.status = "busy";
       log(`arm= sid=${sid}`);
     } else if (status === "idle") {
-      const w = watches.get(sid);
-      if (w) w.status = "idle"; // the tick decides
+      const w = getWatch(sid);
+      w.status = "idle"; // the tick decides
+      w.idlePending = true; // Unit 4: the tick routes scoped sessions
     }
     // any other vocabulary (retry/interrupted/unknown/null): no state
     // change, no log line — the tick stays the only decision+send funnel
+    return;
+  }
+  // Unit 4: a session.error is a trigger too (a dead stream may never
+  // emit its idle) — the tick routes it like an idle.
+  if (type === "session.error") {
+    const w = getWatch(sid);
+    w.idlePending = true;
+    return;
+  }
+  // Unit 4: track session.created events (sid → epoch) for the
+  // successor check. The sid comes from properties.sessionID when
+  // present (the live hook shape), else from the carried info object.
+  if (type === "session.created") {
+    const info = (props.info ?? props.message) as Record<string, unknown> | undefined;
+    const createdSid =
+      typeof props.sessionID === "string" && props.sessionID !== "unknown"
+        ? (props.sessionID as string)
+        : typeof info?.id === "string"
+          ? (info.id as string)
+          : null;
+    if (createdSid) {
+      const t = props.time as Record<string, unknown> | undefined;
+      const epoch = typeof t?.created === "number" && Number.isFinite(t.created) ? (t.created as number) : Date.now();
+      createdSessions.set(createdSid, epoch);
+    }
     return;
   }
   if (type !== "message.updated") return;

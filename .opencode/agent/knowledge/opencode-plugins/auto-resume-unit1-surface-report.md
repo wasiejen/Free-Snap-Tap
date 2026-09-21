@@ -135,3 +135,45 @@ auto-discovered and loaded (first log line `2026-09-21T14:25:48.595Z` UTC).
    `.opencode/temp/auto_resume_unit3_live_acceptance.txt`
    (`unit3-live-acceptance ses_f3b16aa46ffe07iI4CSrScxeWK 2026-09-21
    17:00:55 UTC`).
+
+## UNIT 4 supplement — planner liveness watchdog (worker-verified 2026-09-21, worker-5, ses_f3af705fdffeRiYr9H7FflN0o7)
+
+1. **`session.messages` endpoint (the Unit 4 scope/routing data
+   source):** `client.session.messages({ path: { id } })` (sdk.gen.d.ts:
+   170; `SessionMessagesData`, types.gen.d.ts 2209-2222: path `{id}`,
+   query `{directory?, limit?}`, url `/session/{id}/message`) → 200 =
+   `Array<{info: Message, parts: Array<Part>}>` (types 2234-2242);
+   `Message = UserMessage | AssistantMessage` with `role: "user" |
+   "assistant"` (types 42/101/128). NOTE: the PLURAL `messages` (the
+   list) is a different endpoint from the singular `message` (the
+   single-fetch, sdk.gen.d.ts:178) — the init surface candidates now
+   carry BOTH; the live `messages=function` typeof verdict is pending
+   the next host restart (the smoke pins the candidate).
+2. **Scope rule (implemented):** a sid is planner-scoped iff it is in
+   the module-level `spawned` map (the Unit 3 self-mark) OR ANY of its
+   user messages (the `messages()` fetch — ONE round trip serves both
+   the scope marker scan and the last-assistant-message routing scan)
+   contains the literal `<|autonom|>` (the looprunner's launch-message
+   marker, measured in a planner launch message 2026-09-21; direct/
+   interactive sessions never do). Cached per watch as `scope:
+   "planner" | "none" | "unknown"` (fetch pending/failed → unknown,
+   re-checked on the next idle; fail-safe = no action); non-scoped
+   sessions are NEVER acted on.
+3. **Overlap-era caveat (documented, NOT solved):** the looprunner
+   ALSO reacts to `action: restart` — the successor check (a different
+   sid tracked in a `session.created` event since the closing
+   session's `lastActivityAt` → `skip= successor`) + the 5s tick grace
+   window mitigate a double-spawn; the residual race is accepted until
+   the maintainer retires the looprunner (his call).
+4. **Routing (locked design, smoke-verified 53/53):** on a scoped
+   session idle / `session.error` → ONE decision per idle cycle on the
+   next tick, scanning the LAST assistant message's text parts for
+   `action:\s*(restart|resume|stop|ask_maintainer)` (last match wins):
+   `stop` / `ask_maintainer` → no send (`route= stop|ask` line);
+   `resume` / no line → queued CONTINUE prompt (`recovery= attempt=N`,
+   cap 2 per idle cycle, reset on a fresh busy); `restart` / cap
+   exhausted with still no line → successor check else
+   `spawnPlanner` (RESTART prompt, `route= restart spawn` line). Every
+   failure is one `err=` line per failed cycle per sid; the tick never
+   rejects. Live acceptance PENDING the next host restart (the four
+   acceptance cases, proposal lines 138-142).

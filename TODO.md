@@ -645,9 +645,25 @@ one-shot trigger file → `spawn= sid=ses_f3b16aa46ffe07iI4CSrScxeWK
 agent=planner_Q3S_160K` (log line 163103) + `.consumed` rename + the
 spawned session wrote
 `.opencode/temp/auto_resume_unit3_live_acceptance.txt`; verdict in the
-unit-1 surface report §LIVE ACCEPTANCE supplement). next: Unit 4 spec
-(planner liveness watchdog — its restart
-branches consume this helper). NOTE: unit numbering
+unit-1 surface report §LIVE ACCEPTANCE supplement). Unit 4 LANDED +
+smoke-verified (2026-09-21, plan4, worker-5 `worker_Q3S_160K`
+ses_f3af705fdffeRiYr9H7FflN0o7): the planner liveness watchdog — a
+planner-scoped session (Unit 3 `spawned` self-mark OR a `<|autonom|>`
+launch marker in a user message; cached `scope: planner|none|unknown`)
+going idle / `session.error` is routed on the next tick by the LAST
+assistant message's `action:` line (last match wins): `stop` /
+`ask_maintainer` → left alone (`route= stop|ask`); `resume` / no line →
+queued CONTINUE prompt (recovery cap 2 per idle cycle, reset on a fresh
+busy, `recovery= attempt=N`); `restart` / cap exhausted with still no
+line → successor check (`session.created` tracked since
+lastActivityAt → `skip= successor`) else `spawnPlanner` (RESTART
+prompt, `route= restart spawn`); one `err=` line per failed cycle per
+sid; the tick never rejects. `messages` added to the init surface
+candidates (live typeof verdict pending the next restart). Smoke
+53/53 (40 existing + 13 new UNIT 4 checks); gate: probe 235/235,
+pytest 459+1w, ruff F=0; full smoke suite green (10/10). LIVE
+ACCEPTANCE PENDING the next host restart (the four acceptance cases in
+the proposal lines 138-142). NOTE: unit numbering
 per the revised proposal — Unit 3 = new-planner spawn helper (shared
 building block), Unit 4 = planner liveness watchdog (auto-resume after
 compaction is its first branch); the "unit 3 = auto-resume / unit 4 =
