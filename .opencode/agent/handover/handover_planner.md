@@ -84,14 +84,26 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   drafting, keepMessages preserves drafting; auto session-dumps incomplete
   (missing thinking/writing parts — e.g. archive/sessions/
   ses_f5aefe9e1ffemgTiq9GELiqaGL.md).
-- **NEXT (post-compaction):** (1) cross-check the 3 complete B recipes
-  (_5/_6/_7_1), pick winner, planner spot-verify a few anchors, consolidate
-  into `knowledge/opencode-plugins/auto-resume-deepdive-B.md` (+ fix spec
-  line + TODO entry, same commit); (2) Deep-Dive C spec (generally-useful:
-  1372-1692 idle-scan mega-function by sub-candidate, 2642-2665
-  task_complete, 969-990 celebration, 183-230 done-claim) on a new stable
-  roster agent; (3) Phase 3 consolidation + TODO seed "build our own
-  plugin" (his priority.md item).
+- **Deep-Dive B CONSOLIDATED (this session, post his manual compaction):**
+  all three complete runs cross-checked; winner base = RUN 6 text (richest:
+  10 recipes + full §8 cross-checks), complemented with RUN 5's
+  fit-assessment table (§7.1) + RUN 5's token double-add flag (§8.10);
+  RUN 7_1 (Q2S, parallel run — 7_2 interrupted to speed it up) confirmed
+  every RUN-6 anchor independently. Anchors spot-verified 2026-09-21
+  (1122/1288/2196/2284/2574, raw-grep machine-check incl. post-edit
+  re-check). -> `knowledge/opencode-plugins/auto-resume-deepdive-B.md`
+  (+ README provenance line). Same commit: spec line fix
+  1084→1122-1159 + TODO #74 (write-tool flakiness, his --info
+  26-09-19_18-50; host-side fix = maintainer call, workaround
+  codification pre-approved).
+- **His model map for the test runs (supersedes the workers' self-tagged
+  feedback lines — host mapping authoritative): #5=Q3XS, #6=Q3S,
+  #7_1=Q2S (parallel).**
+- **NEXT:** (1) Deep-Dive C spec (generally-useful: 1372-1692 idle-scan
+  mega-function by sub-candidate, 2642-2665 task_complete, 969-990
+  celebration, 183-230 done-claim) — launch agent pending his answer (his
+  new stable set: Q3XS/Q3S/Q2S); (2) Phase 3 consolidation + TODO seed
+  "build our own plugin" (his priority.md item).
 
 ## Closed session — looprun autorun-2026-09-17_23-58, iteration 2 (ses_f4e47085affelnyR0nKkHeF54M, planner-2, Qwen3.8-27B-IQ4KT-140K) — CLOSED
 - **plan2 closed (2026-09-18): BOTH units LANDED, gate re-verified by the

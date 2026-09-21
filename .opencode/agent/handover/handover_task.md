@@ -28,7 +28,7 @@ Root: `C:/Users/Wasiejen/AppData/Local/Temp/opencode/opencode-auto-resume-master
 
 ## Scope — read ONLY these `src/index.ts` ranges (anchors + map-verified refs)
 1. Context tracking → saturation: 2536-2549 (token tracking in
-   `message.updated`), 1084-1084 (`getUsableContextLimit`), 1093-1113
+   `message.updated`), 1122-1159 (`getUsableContextLimit`), 1093-1113
    (`isMagicContextInstalled`), 2306-2345 (parent → ctx-wrapup command),
    2147-2194 (subagent → native `session.summarize`), 2428-2439
    (`isSubagent` set), 119 (`CTX_WRAPUP_TRIGGER`), 475-479 (options).
