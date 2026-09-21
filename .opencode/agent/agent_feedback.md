@@ -359,3 +359,6 @@ Stale smoke-suite baseline: the NAP "all 10 smokes green" was wrong since ff4c2f
 ### 2026-09-21_20-09 worker_Q3S_160K ses_f3af705fdffeRiYr9H7FflN0o7
 glob tool returns no matches for .opencode/** patterns (hidden dirs seem excluded) — had to fall back to ls via bash for .opencode/plugin/tests/*.smoke.mjs
 
+### 2026-09-21_20-21 planner_Q3S_160K ses_f3b1fb61effes4b4uZhoDYM3ix
+Gate re-run friction: the standard-gate commands (pytest/ruff) need the venv paths (./.venv/Scripts/python.exe, ./.venv/Scripts/ruff.exe) which live only in repo_commands.md — the NAP Standing baseline line carries only the COUNTS, so a fresh planner session burns a call rediscovering the commands (bare `python`/`ruff` fail silently/wrongly). Suggestion: one line in the Standing baseline naming the exact venv-prefixed commands (or an explicit pointer to repo_commands.md §Run/test).
+
