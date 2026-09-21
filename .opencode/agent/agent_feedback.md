@@ -353,3 +353,9 @@ Task-spec SDK facts: a partial .d.ts grep claimed `client.provider.get()`, but t
 ### 2026-09-21_18-25 worker_Q3S_160K ses_f3b555033ffem2gI9qBct1JZwG
 File-tool results display absolute Windows paths with a leading `~` prefix (cosmetic, but it made me re-verify edit landing via relative grep — one wasted call; a one-line note in repo_custom_tools.md or the tool description would kill it).
 
+### 2026-09-21_18-39 planner_Q3S_160K ses_f3b666ca6ffeEbClb1Q3r3gRYQ
+Stale smoke-suite baseline: the NAP "all 10 smokes green" was wrong since ff4c2fc (09-18) — block_transfer.sandbox.smoke sat red (stale description pin) through plan1/plan2 because planner gate re-runs only run the TASK'S own smoke, not the full suite. Action: include the full smoke suite in planner gate re-verification (or state explicitly which smokes were run in the baseline line).
+
+### 2026-09-21_20-09 worker_Q3S_160K ses_f3af705fdffeRiYr9H7FflN0o7
+glob tool returns no matches for .opencode/** patterns (hidden dirs seem excluded) — had to fall back to ls via bash for .opencode/plugin/tests/*.smoke.mjs
+
