@@ -50,7 +50,7 @@ try {
   chk("description: targetMarker sets insertion, else append at EOF", d.includes("targetMarker") && /append at EOF/.test(d));
   chk("description: named buffers, default 'default', multiple per session", d.includes("bufferName") && d.includes("'default'") && /multiple buffers/i.test(d));
   chk("description: sandbox boundary covers reads AND writes (working dir + temp)", /reads AND writes/i.test(d) && /temp/i.test(d));
-  chk("description: housekeeping rule vs write/edit", /write\/edit/.test(d));
+  chk("description: leads with the one-liner (housekeeping rule dropped per ff4c2fc)", d.includes("Move, copy, cut, paste, delete, or clear multi-line blocks in files using short unique line-prefix anchors and named clipboard buffers."));
 
   // ---- args shape
   const args = t.args;
