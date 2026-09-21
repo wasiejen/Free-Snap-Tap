@@ -338,3 +338,9 @@ Re-read a proposal file BEFORE revising it — the maintainer may have commented
 ### 2026-09-21_16-08 worker_Q3S_160K ses_f3bbdd89affeigE26tm2lka7AT
 Task-spec DoD assumed the handover probe was green, but it had a pre-existing stale pin (check [87] iq3→1 vs current classifier iq3→3, 2026-09-21 ruling) in a DO-NOT-TOUCH file — spec baselines should be machine-verified at spec time.
 
+### 2026-09-21_16-37 planner_Q3S_160K ses_f3bd43f5bffe32mM8F3rQfaNh5
+Multi-line status edit on TODO #75 produced a mangled sentence (dangling "**APPROVED") caught only by a follow-up edit — after a multi-line replacement inside an existing entry block, re-read the block before committing.
+
+### 2026-09-21_16-37 planner_Q3S_160K ses_f3bd43f5bffe32mM8F3rQfaNh5
+todo_inbox.md lives at the REPO ROOT, not .opencode/agent/ — my close-out assumed the agent/ path (one failed call); the path is in agent_readme_todo.md, re-read it before curation.
+
