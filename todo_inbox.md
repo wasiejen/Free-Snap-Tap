@@ -83,3 +83,19 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   finding: pre-existing `handover_probe.mjs` check [87] stale pin
   (classifier fixture `iq3` 1 vs 3) → `TODO.md` **#76**, closed same session
   (planner-direct pin fix; probe 235/235 green).
+
+## 2026-09-21 — worker-3 (plan3, autorun-2026-09-21_15-33, auto-resume UNIT 3)
+- Pre-existing red smoke (NOT caused by Unit 3 — verified by re-running with
+  the Unit 3 changes stashed): `block_transfer.sandbox.smoke.mjs` fails ONE
+  check: `description: housekeeping rule vs write/edit` (smoke line 53:
+  `/write\/edit/.test(d)`). Root cause: commit `ff4c2fc` (2026-09-18,
+  maintainer) deliberately dropped the "Housekeeping rule: use this tool …
+  instead of write/edit" sentence from the `block_transfer` tool description
+  (`.opencode/tools/block_transfer.ts` — "prompt text, not contract text; the
+  guidance lives in repo_custom_tools.md"), but the smoke's description pin
+  was never updated → stale pin. Suggested fix (out of my scope —
+  block_transfer is a DO-NOT-touch other tool for the Unit 3 task): delete or
+  re-point that one chk line (e.g. pin the new first sentence instead); the
+  other 50+ checks in that smoke pass. Files:
+  `.opencode/plugin/tests/block_transfer.sandbox.smoke.mjs` line 53,
+  `.opencode/tools/block_transfer.ts` description (read-only reference).

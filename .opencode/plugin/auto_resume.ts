@@ -1,4 +1,4 @@
-// auto_resume.ts — UNIT 1+2 of the auto-resume plugin (approved 2026-09-21,
+// auto_resume.ts — UNIT 1+2+3 of the auto-resume plugin (approved 2026-09-21,
 // .opencode/proposals/approved/2026-09-21_opencode-auto-resume-plugin.md).
 //
 // UNIT 1 (the testbed):
@@ -41,7 +41,27 @@
 //   - Decision log lines (Unit 1 lines unchanged in format): `arm=`,
 //     `saturation=` (with ratio), `trigger=`, `send-fail=`.
 //
-// DELIBERATELY ABSENT (Unit 3/4 slots): abort escalation, subagent
+// UNIT 3 (new-planner spawn helper — the shared building block for
+// Unit 4's restart branches):
+//   The ONE 5s tick (the only decision+send funnel; events stay
+//   ARM-only) checks the one-shot trigger file
+//   `.opencode/temp/auto_resume_spawn_trigger` (same dir as the log):
+//   present + non-empty trimmed → ONE spawn attempt (in-flight latch —
+//   no double-spawn), then the file is renamed to `.consumed` EVEN ON
+//   FAILURE (a failed trigger never re-fires; re-trigger = write a new
+//   file); present but empty trimmed → `spawn-fail= empty trigger` +
+//   consumed; absent → nothing. The spawn is `create()` (no args — the
+//   body is optional, no path → default directory) + ONE QUEUED
+//   `promptAsync` carrying the trigger content as the planner start
+//   prompt, with `agent: "planner_Q3S_160K"` and NO `model` field (the
+//   agent-configured model applies — the host's opencode.jsonc is the
+//   live source of truth). Success → the new sid is self-marked in a
+//   module-level `spawned` map (sid → epoch, for Unit 4) + a `spawn=`
+//   line. Every failure is a `spawn-fail=` line; the helper NEVER
+//   throws outward. The module stays DEFAULT-ONLY exported (a named
+//   export breaks the smoke check).
+//
+// DELIBERATELY ABSENT (Unit 4 slots): abort escalation, subagent
 // special-casing, magic-context handling, aborts, NAP/TODO/maintainer
 // file access (those are Unit 4 / prompts).
 //
@@ -51,7 +71,7 @@
 // timer would take the host down). Best-effort logging only.
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import type { Event } from "@opencode-ai/sdk";
-import { appendFileSync, mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
 
 // The v1 candidate session.* methods probed at init (the design's
@@ -67,7 +87,16 @@ const SESSION_CANDIDATES: ReadonlyArray<string> = [
   "command",
   "summarize",
   "compact",
+  "create",
 ];
+
+// Unit 3 constants: the planner agent id — the live source of truth is
+// the host's opencode.jsonc (re-verified 2026-09-21 at build time:
+// `planner_Q3S_160K`); NO model field is ever sent (the agent-configured
+// model applies), and the one-shot trigger file name (same dir as the
+// log — `.opencode/temp/`).
+const PLANNER_AGENT_ID = "planner_Q3S_160K";
+const SPAWN_TRIGGER_FILE = "auto_resume_spawn_trigger";
 
 // Unit 2 constants (deep-dive B §2): saturation threshold default 0.85;
 // usable window = context - Math.min(20_000, output ?? 0) (mirrors
@@ -100,6 +129,13 @@ const watches = new Map<string, Watch>();
 const sending = new Set<string>();
 const usableCache = new Map<string, number>();
 let tickTimer: ReturnType<typeof setInterval> | null = null;
+
+// Unit 3 module-level state: the spawned self-mark (sid -> epoch — so
+// Unit 4 can recognize a spawn as its own, never as a user session) and
+// the in-flight latch (no double-spawn while one spawn attempt is
+// running; held until the trigger file is consumed).
+const spawned = new Map<string, number>();
+let spawnInFlight = false;
 
 // Append one log line; best-effort — NEVER throws (logging must not
 // break the session).
@@ -256,10 +292,109 @@ async function sendSelfCompact(sid: string, w: Watch, ratio: number, usable: num
   }
 }
 
-// Unit 2: the ONE 5s tick — the only decision+send funnel. Events only ARM
-// watch state; the tick evaluates every armed watch. Never throws out
-// (an unhandled rejection from the timer would take the host down).
+// Unit 3: the new-planner spawn helper (module-INTERNAL — the factory
+// stays the ONLY export): create a fresh session, then ONE queued
+// promptAsync carrying the planner start prompt. QUEUED, never
+// synchronous (KV-cache invalidation). NO `model` field: the
+// agent-configured model applies (the host is the live source of
+// truth). Never throws outward; every failure is a `spawn-fail=` line.
+async function spawnPlanner(startPrompt: string) {
+  const sess = (client as {
+    session?: { create?: () => Promise<unknown>; promptAsync?: (args: unknown) => Promise<unknown> };
+  } | null)?.session;
+  if (!sess || typeof sess.create !== "function") {
+    log("spawn-fail= create missing");
+    return;
+  }
+  let newSid: unknown;
+  try {
+    // No args: body is optional, no path → the default directory.
+    const res = await sess.create();
+    // The static SDK shape is res.data.id (Session); a top-level id is
+    // accepted defensively (live-shape drift).
+    const d = (res as { data?: Record<string, unknown> } | null)?.data;
+    newSid = d?.id ?? (res as { id?: unknown } | null)?.id;
+  } catch (e) {
+    log(`spawn-fail= create: ${(e as { message?: string } | null)?.message ?? "unknown"}`);
+    return;
+  }
+  if (typeof newSid !== "string" || newSid === "") {
+    log("spawn-fail= create no id");
+    return;
+  }
+  if (typeof sess.promptAsync !== "function") {
+    log("spawn-fail= promptAsync missing");
+    return;
+  }
+  try {
+    await sess.promptAsync({
+      path: { id: newSid },
+      body: { parts: [{ type: "text", text: startPrompt }], agent: PLANNER_AGENT_ID },
+    });
+  } catch (e) {
+    log(`spawn-fail= promptAsync: ${(e as { message?: string } | null)?.message ?? "unknown"}`);
+    return;
+  }
+  spawned.set(newSid, Date.now()); // the self-mark (Unit 4)
+  log(`spawn= sid=${newSid} agent=${PLANNER_AGENT_ID}`);
+}
+
+// Unit 3: rename the trigger file to its consumed name; best-effort —
+// a rename failure is a `rename-fail=` line (the file then stays
+// present; the in-flight latch is the double-fire guard while one
+// attempt runs).
+function renameTrigger(triggerPath: string) {
+  try {
+    renameSync(triggerPath, triggerPath + ".consumed");
+  } catch (e) {
+    log(`rename-fail= ${(e as { message?: string } | null)?.message ?? "unknown"}`);
+  }
+}
+
+// Unit 3: the one-shot trigger check (the 5s tick is the ONLY
+// decision+send funnel — events stay ARM-only): the trigger file
+// present + non-empty trimmed → ONE spawn attempt (in-flight latch —
+// no double-spawn) with the (trimmed) content as the start prompt,
+// then the file is renamed to `.consumed` EVEN ON FAILURE (a failed
+// trigger never re-fires; re-trigger = write a new file); present but
+// empty trimmed → `spawn-fail= empty trigger` + consumed; absent →
+// nothing. Never throws out.
+async function checkSpawnTrigger() {
+  if (!logDir) return;
+  const triggerPath = join(logDir, SPAWN_TRIGGER_FILE);
+  let content: string;
+  try {
+    content = readFileSync(triggerPath, "utf-8");
+  } catch {
+    return; // absent → nothing (ENOENT is the expected case)
+  }
+  if (content.trim() === "") {
+    log("spawn-fail= empty trigger");
+    renameTrigger(triggerPath);
+    return;
+  }
+  if (spawnInFlight) return; // one spawn attempt at a time
+  spawnInFlight = true;
+  try {
+    await spawnPlanner(content.trim());
+  } catch {
+    log("spawn-fail= spawn unknown"); // defensive — spawnPlanner never throws
+  } finally {
+    renameTrigger(triggerPath); // consumed EVEN ON FAILURE
+    spawnInFlight = false;
+  }
+}
+
+// Unit 2+3: the ONE 5s tick — the only decision+send funnel. Unit 3's
+// trigger check runs first (the spawn is a high-priority action), then
+// Unit 2 evaluates every armed watch. Never throws out (an unhandled
+// rejection from the timer would take the host down).
 async function tick() {
+  try {
+    await checkSpawnTrigger(); // Unit 3 — the trigger check first
+  } catch {
+    // swallow — the timer callback must never reject
+  }
   try {
     for (const [sid, w] of watches) {
       try {

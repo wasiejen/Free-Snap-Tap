@@ -613,7 +613,30 @@ invariant) — facts cured into the unit-1 surface report §UNIT 2 supplement.
 LIVE ACCEPTANCE for Unit 2 PENDING (a live session crossing 85 % must
 self-compact once per busy cycle, no re-prefill stall — verified from
 `arm=`/`saturation=`/`trigger=` log lines; runs after the host picks up
-the build). next: Unit 3 (new-planner spawn helper). NOTE: unit numbering
+the build). Unit 3 LANDED + smoke-verified (2026-09-21, plan3, worker
+`worker_Q3S_160K` ses_f3b555033ffem2gI9qBct1JZwG, the single UNIT 3 commit
+on `opencode_test` — see the committed handover summary): the new-planner
+spawn helper — the 5s tick (the only decision+send funnel; events stay
+ARM-only) checks the one-shot trigger file
+`.opencode/temp/auto_resume_spawn_trigger` (same dir as the log); a
+present non-empty trigger spawns ONCE (in-flight latch — no double-fire),
+then the file is renamed `.consumed` EVEN ON FAILURE (re-trigger = write
+a new file); the spawn = `create()` (no args) + ONE QUEUED `promptAsync`
+with `agent: "planner_Q3S_160K"` and NO model field (the agent-configured
+model applies — the host's opencode.jsonc is the live source of truth,
+re-verified at build time: no drift); success → the new sid self-marked
+in a module-level `spawned` map (sid → epoch, for Unit 4) + `spawn=`
+line; every failure → `spawn-fail=` line, the helper never throws
+outward; `create` added to the init surface candidates (the live typeof
+verdict is pending for the surface-report supplement). Smoke 39/39 (32
+existing + 7 new UNIT 3 checks; surface pin updated to carry create);
+gate: probe 235/235 UNCHANGED, pytest 459+1w, ruff F=0 (one pre-existing
+red smoke OUT OF SCOPE: block_transfer.sandbox stale description pin —
+todo_inbox entry 2026-09-21). LIVE ACCEPTANCE for Unit 3 PENDING (the
+one-shot trigger file must produce a running fresh planner session,
+verified from the `spawn=` log line; runs after the host picks up the
+build). next: Unit 4 spec (planner liveness watchdog — its restart
+branches consume this helper). NOTE: unit numbering
 per the revised proposal — Unit 3 = new-planner spawn helper (shared
 building block), Unit 4 = planner liveness watchdog (auto-resume after
 compaction is its first branch); the "unit 3 = auto-resume / unit 4 =

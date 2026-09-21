@@ -1,9 +1,13 @@
-// auto_resume.smoke.mjs — UNIT 1+2 of the auto-resume plugin
+// auto_resume.smoke.mjs — UNIT 1+2+3 of the auto-resume plugin
 // (.opencode/plugin/auto_resume.ts; approved 2026-09-21 auto-resume
 // proposal). UNIT 1: skeleton logging plugin + v1 client surface probe.
 // UNIT 2: the context-limit compaction trigger — a live session crossing
 // 85% of its usable window queues ONE self-compact instruction via
 // promptAsync (queued, never synchronous), once per busy cycle.
+// UNIT 3: the new-planner spawn helper — a one-shot trigger file in the
+// log dir, consumed (renamed .consumed) by the 5s tick after ONE spawn
+// attempt (create + queued promptAsync, agent=planner_Q3S_160K, NO model
+// field), even on failure.
 // The plugin factory is called with a SCRATCHPAD sandbox `directory` —
 // auto_resume.log lands in the sandbox (.opencode/temp/auto_resume.log
 // under the sandbox project), NEVER the live .opencode/temp/. Run:
@@ -32,7 +36,7 @@ const readLines = () =>
   fs.existsSync(sandboxLog) ? fs.readFileSync(sandboxLog, "utf-8").split(/\r?\n/).filter((l) => l.length > 0) : [];
 
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z /;
-const CANDIDATES = ["prompt", "promptAsync", "abort", "list", "get", "message", "todo", "command", "summarize", "compact", "app.log"];
+const CANDIDATES = ["prompt", "promptAsync", "abort", "list", "get", "message", "todo", "command", "summarize", "compact", "create", "app.log"];
 
 // A minimal mock client; app.log present only when a fn is passed.
 const mkClient = (session, appLog) => ({
@@ -69,6 +73,7 @@ try {
     todo: function () {},
     command: function () {},
     summarize: function () {},
+    create: function () {},
     // NOTE: no `compact` — the v1-generation client surface
   };
   const hooks = await factory({ directory: proj, client: mkClient(v1Session, () => "log") });
@@ -76,7 +81,7 @@ try {
   const l0 = readLines();
   const surf = l0.find((l) => l.includes("surface="));
   chk("init probe logged the surface= line FIRST (one-shot at load)", l0.length >= 1 && surf === l0[0], `n=${l0.length}`);
-  chk("surface line carries all ten candidates + app.log", surf && CANDIDATES.every((m) => surf.includes(m + "=")), surf ?? "");
+  chk("surface line carries all eleven candidates incl. create + app.log", surf && CANDIDATES.every((m) => surf.includes(m + "=")), surf ?? "");
   chk("probe verdicts by typeof (v1 client: summarize=function, compact=undefined, app.log=function)",
     surf && surf.includes("summarize=function") && surf.includes("compact=undefined") && surf.includes("app.log=function"), surf ?? "");
 
@@ -242,6 +247,118 @@ try {
   chk("UNIT 2: missing provider data → usable null → no send, no trigger line, count unchanged",
     calls.length === 2 && !readLines().some((l) => l.includes("trigger= sid=ses_u2_noprov2")), `n=${calls.length}`);
 
+  // ============================================================
+  // UNIT 3 — new-planner spawn helper
+  //
+  // The factory is re-invoked with a SPYING client: `create` and
+  // `promptAsync` record every call (mutable throw flags per scenario).
+  // The one-shot trigger file lives in the sandbox logDir (same dir as
+  // auto_resume.log). The single 5s tick is the only decision+send
+  // funnel — the smoke waits on it (real time).
+  // ============================================================
+  const triggerFile = path.join(proj, ".opencode", "temp", "auto_resume_spawn_trigger");
+  const TRIGGER_TEXT = "UNIT 3 smoke: fresh planner start — resume the loop from the NAP.";
+
+  const createCalls = [];
+  const spawnCalls = [];
+  let createShouldThrow = false;
+  let promptAsyncShouldThrow = false;
+  const vSess = {
+    prompt: function () {},
+    promptAsync: async (args) => {
+      if (promptAsyncShouldThrow) throw new Error("queued spawn exploded");
+      spawnCalls.push(args);
+      return { data: { id: "queued" } };
+    },
+    abort: function () {},
+    list: function () {},
+    get: function () {},
+    message: function () {},
+    todo: function () {},
+    command: function () {},
+    summarize: function () {},
+    create: async () => {
+      if (createShouldThrow) throw new Error("create exploded");
+      createCalls.push({});
+      return { data: { id: "ses_u3_new" } };
+    },
+  };
+  const hooksSpawn = await factory({ directory: proj, client: { session: vSess, provider: { list: providerList }, app: { log: () => "log" } } });
+  if (typeof hooksSpawn?.event !== "function") throw new Error("UNIT 3: re-factory did not return the event hook");
+
+  // ---- (1) trigger present (non-empty) → ONE create + ONE queued
+  // promptAsync (path.id = the created sid, agent, NO model field,
+  // parts[0].text = the trigger content), spawn= line, file renamed
+  // to .consumed.
+  fs.writeFileSync(triggerFile, TRIGGER_TEXT, "utf-8");
+  const okS1 = await waitUntil(() => spawnCalls.length >= 1 && !fs.existsSync(triggerFile));
+  const spawnLine = readLines().find((l) => l.includes("spawn= sid=ses_u3_new"));
+  chk("UNIT 3: trigger present → ONE create + ONE queued promptAsync (path.id=created sid, agent=planner_Q3S_160K, NO model, parts[0].text=trigger), spawn= line, file renamed .consumed",
+    okS1 && createCalls.length === 1 && spawnCalls.length === 1 &&
+      spawnCalls[0]?.path?.id === "ses_u3_new" &&
+      spawnCalls[0]?.body?.agent === "planner_Q3S_160K" &&
+      !("model" in (spawnCalls[0]?.body ?? {})) &&
+      Array.isArray(spawnCalls[0]?.body?.parts) && spawnCalls[0].body.parts.length === 1 &&
+      spawnCalls[0].body.parts[0].type === "text" && spawnCalls[0].body.parts[0].text === TRIGGER_TEXT &&
+      !!spawnLine && spawnLine.includes("agent=planner_Q3S_160K") &&
+      fs.existsSync(triggerFile + ".consumed"),
+    `create=${createCalls.length} promptAsync=${spawnCalls.length}`);
+
+  // ---- (5) a second tick after consumption → no second spawn (no
+  // double-fire: the consumed file never re-fires).
+  const cBefore5 = createCalls.length, sBefore5 = spawnCalls.length;
+  await sleep(5600); // at least one full tick period after the spawn
+  chk("UNIT 3: second tick after consumption → no second spawn (no double-fire)",
+    createCalls.length === cBefore5 && spawnCalls.length === sBefore5,
+    `create=${createCalls.length} promptAsync=${spawnCalls.length}`);
+
+  // ---- (4) no trigger file → zero create + zero promptAsync calls
+  // (regression pin: the trigger is the only spawn entry point).
+  chk("UNIT 3: no trigger file → zero create + zero promptAsync calls (regression pin)",
+    !fs.existsSync(triggerFile) && createCalls.length === cBefore5 && spawnCalls.length === sBefore5,
+    `create=${createCalls.length} promptAsync=${spawnCalls.length}`);
+
+  // ---- (2) create throws → zero promptAsync calls; a spawn-fail= line;
+  // the tick/handler survive; the file is consumed EVEN ON FAILURE.
+  createShouldThrow = true;
+  fs.writeFileSync(triggerFile, TRIGGER_TEXT, "utf-8");
+  const cBefore2 = createCalls.length, sBefore2 = spawnCalls.length;
+  let threwS2 = false;
+  const okS2 = await waitUntil(() => readLines().some((l) => l.includes("spawn-fail= create:")));
+  try { await hooksSpawn.event({ event: { type: "session.status", properties: { sessionID: "ses_u3_chk2", status: "idle" } } }); } catch { threwS2 = true; }
+  chk("UNIT 3: create throws → zero new promptAsync calls, spawn-fail logged, tick/handler survive, file consumed on failure",
+    threwS2 === false && okS2 && createCalls.length === cBefore2 && spawnCalls.length === sBefore2 && !fs.existsSync(triggerFile) && fs.existsSync(triggerFile + ".consumed"),
+    `create=${createCalls.length} promptAsync=${spawnCalls.length}`);
+
+  // ---- (3) promptAsync throws → a spawn-fail= line; the tick/handler
+  // survive; the file is consumed EVEN ON FAILURE.
+  createShouldThrow = false;
+  promptAsyncShouldThrow = true;
+  fs.writeFileSync(triggerFile, TRIGGER_TEXT, "utf-8");
+  const cBefore3 = createCalls.length, sBefore3 = spawnCalls.length;
+  let threwS3 = false;
+  const okS3 = await waitUntil(() => readLines().some((l) => l.includes("spawn-fail= promptAsync:")));
+  try { await hooksSpawn.event({ event: null }); } catch { threwS3 = true; }
+  chk("UNIT 3: promptAsync throws → create was called once, spawn-fail logged, tick/handler survive, file consumed on failure",
+    threwS3 === false && okS3 && createCalls.length === cBefore3 + 1 && spawnCalls.length === sBefore3 && !fs.existsSync(triggerFile) && fs.existsSync(triggerFile + ".consumed"),
+    `create=${createCalls.length} promptAsync=${spawnCalls.length}`);
+
+  // ---- (6) empty trigger → spawn-fail= empty trigger, NO create /
+  // promptAsync, file consumed.
+  promptAsyncShouldThrow = false;
+  const cBefore6 = createCalls.length, sBefore6 = spawnCalls.length;
+  fs.writeFileSync(triggerFile, "   \n\t  ", "utf-8"); // whitespace only
+  const okS6 = await waitUntil(() => readLines().some((l) => l.includes("spawn-fail= empty trigger")));
+  chk("UNIT 3: empty trigger → spawn-fail= empty trigger logged, NO create/promptAsync, file consumed",
+    okS6 && createCalls.length === cBefore6 && spawnCalls.length === sBefore6 && !fs.existsSync(triggerFile) && fs.existsSync(triggerFile + ".consumed"),
+    `create=${createCalls.length} promptAsync=${spawnCalls.length}`);
+
+  // ---- (7) surface pin updated: `create` is a probed candidate (the v1
+  // mock carries it as a function — the live typeof verdict lands in
+  // the surface report).
+  chk("UNIT 3: surface pin updated — create= in the candidates (v1 mock: create=function)",
+    surf && surf.includes("create=") && surf.includes("create=function"), surf ?? "");
+
   // ---- the live log received NO smoke line. The LIVE plugin instance
   // (this host) keeps appending ITS OWN live-session lines in real time
   // while the smoke runs, so the live size may legitimately grow — the
@@ -257,7 +374,7 @@ try {
   } else if (liveBefore === null && liveSizeNow > 0) {
     appended = fs.readFileSync(LIVE_LOG, "utf-8"); // did not exist before — all new
   }
-  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov", "ses_u2_sendfail", "ses_u2_noprov2"];
+  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov", "ses_u2_sendfail", "ses_u2_noprov2", "ses_u3_new", "ses_u3_chk2"];
   chk("LIVE .opencode/temp/auto_resume.log received no smoke line (sandbox got every smoke line)",
     liveBefore === liveSizeNow || !smokeSids.some((s) => appended.includes(s)), `before=${liveBefore} after=${liveSizeNow}`);
   chk("sandbox log path is under the sandbox", sandboxLog.startsWith(base), sandboxLog);
