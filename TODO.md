@@ -599,11 +599,22 @@ approvable, strict build order, unit 1 launchable on approval. **Status 2026-09-
 LANDED + planner-verified (worker d322927, gate green: smoke 14/14, probe
 235/235, pytest 459+1w, ruff F=0); LIVE ACCEPTANCE PASSED same day (post-restart:
 the init `surface=` line + 12,629 live event lines in
-`.opencode/temp/auto_resume.log`; verdict in the unit-1 surface report);
-next: Unit 2 (context-limit compaction trigger); APPROVED by the maintainer
-(moved to `approved/`), Unit 1 launched in looprun
-`autorun-2026-09-21_15-33` (plan1). NOTE: unit numbering per the revised
-proposal — Unit 3 = new-planner spawn helper (shared building block), Unit 4 =
-planner liveness watchdog (auto-resume after compaction is its first branch);
-the "unit 3 = auto-resume / unit 4 = restart detection" wording above is the
-pre-revision numbering.
+`.opencode/temp/auto_resume.log`; verdict in the unit-1 surface report).
+Unit 2 LANDED + planner-verified (2026-09-21, plan2, worker
+`worker_Q3S_160K` ses_f3b8c19e9ffe2IoV4S9lrx0vSi, code `d90973b`): the
+context-limit compaction trigger — queued `promptAsync` self-compact
+instruction (`compact_memory` SELF path) at ratio >= 0.85 of the usable
+window, once per busy cycle, one 5s tick as the sole gated send funnel
+(smoke 32/32 all 7 DoD cases pinned; gate re-verified by the planner:
+probe 235/235, pytest 459+1w, ruff F=0). Three spec-vs-reality
+discrepancies resolved defensively (SDK `provider.list()` not `get()`;
+model pair top-level on the message, not `info.model`; smoke live-log
+invariant) — facts cured into the unit-1 surface report §UNIT 2 supplement.
+LIVE ACCEPTANCE for Unit 2 PENDING (a live session crossing 85 % must
+self-compact once per busy cycle, no re-prefill stall — verified from
+`arm=`/`saturation=`/`trigger=` log lines; runs after the host picks up
+the build). next: Unit 3 (new-planner spawn helper). NOTE: unit numbering
+per the revised proposal — Unit 3 = new-planner spawn helper (shared
+building block), Unit 4 = planner liveness watchdog (auto-resume after
+compaction is its first branch); the "unit 3 = auto-resume / unit 4 =
+restart detection" wording above is the pre-revision numbering.

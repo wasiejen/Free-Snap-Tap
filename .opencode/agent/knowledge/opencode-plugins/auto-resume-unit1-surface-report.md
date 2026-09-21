@@ -81,3 +81,23 @@ auto-discovered and loaded (first log line `2026-09-21T14:25:48.595Z` UTC).
    verifying session itself (`ses_f3bd43f5bffe32mM8F3rQfaNh5`,
    `message.part.updated` events) — the stream is DENSE (per-part
    updates); Unit 2/3 consumers must FILTER events, not count raw lines.
+
+## UNIT 2 supplement — live SDK/event facts (worker-verified 2026-09-21, ses_f3b8c19e9ffe2IoV4S9lrx0vSi)
+
+1. **Provider namespace:** the installed @opencode-ai/sdk 1.18.29 client
+   exposes `client.provider.list()` (NOT `get()`), returning
+   `{data: {all: Provider[], default, connected}}`; `Provider = {id,
+   models: {[modelID]: {limit: {context, output}}}}` — the client method
+   wraps the 200 body in `res.data`.
+2. **LIVE `message.updated` shape:** `properties.sessionID` IS present (the
+   static .d.ts only shows `properties.info` — the live host sends more;
+   same live-more-than-static pattern as `session.message` being
+   callable). The assistant message object carries `role` + TOP-LEVEL
+   `providerID`/`modelID` + `tokens {total?, input, output, reasoning,
+   cache{read, write}}` — there is NO `model` sub-object (a unit-2 trigger
+   keyed only on `info.model` would have silently never fired).
+3. **Smoke/live-log invariant:** the live `.opencode/temp/auto_resume.log`
+   keeps growing in real time while the host runs (the live plugin logs
+   every event) — a smoke asserting "live log size unchanged" FAILS on any
+   multi-second smoke; the correct invariant is "no smoke-session line in
+   the newly appended bytes" (measured: +696 B over a ~30s smoke).
