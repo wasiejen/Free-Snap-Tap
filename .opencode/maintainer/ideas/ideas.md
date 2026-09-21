@@ -5,6 +5,7 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
+- might be worth to think about a tool that codifies the first steps of creating realiaty from commit state via automated read and git diff etc, maintainer marker check and create a return that directly injects all these seperate tool call into the session?
 
 - we might need an information in tool call that something was replaced
   - or else the agents will get confused
