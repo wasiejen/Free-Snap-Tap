@@ -249,7 +249,7 @@ smokes, pytest 459+1w, ruff F=0).
   acted on and recorded in the decision record (§6.5) — do not re-act the
   `--comment` markers there (they are his input record).
 
-## 70. compact_memory rework: cross-compact by session_id only + Gemma worker compaction + no-wait flow (2026-09-16, new priority.md item)
+## 70. compact_memory rework: config-resolved summarizer + queued message + dump diagnostics (2026-09-16, new priority.md item; re-scoped 2026-09-21 by his priority.md #1)
 - **Problem / evidence:** maintainer priority.md addition: context_limit
   error → compact the worker (use the Gemma compaction model per
   opencode.jsonc `agent.compaction`); the flow is SERIAL (compaction active
@@ -258,18 +258,46 @@ smokes, pytest 459+1w, ruff F=0).
   compact_memory parameter list — resolved from opencode.jsonc; the
   parameter descriptions were "described badly" — #55 item). Plan2 hit the
   friction live: the dispatch resolved the SUMMARIZER to the same model as
-  the target session (Qwen) and I had to wait for the single slot.
-- **Outcome:** compact_memory parameter rework (session_id-only cross
-  path; summarizer model from `agent.compaction` unless explicitly
-  overridden) + planner-prompt line (on context_limit: compact the worker
-  by session_id, do NOT wait/sleep — continue other work that needs no
-  model slot, resume via task_id after the COMPACT line).
-- **Acceptance:** param rework landed + probe/smoke green; prompt line in
-  `prompt_agent_planner.md`; a cross-compact dispatch in the next looprun
-  uses Gemma and needs only the session_id.
-- **Scope:** `.opencode/plugin/compact_memory.ts` (or tools/ home — verify
-  current location), `prompt_agent_planner.md`.
-- **Status:** OPEN (approved — rides the #55 approved-improvements batch).
+  the target session (Qwen) and I had to wait for the single slot. HIS
+  2026-09-21 priority.md #1 ADDITIONS: (1) BOTH providerID and modelID
+  REMOVED from the exposed parameter list — the summarizer resolves from
+  opencode.jsonc `agent.compaction.model` ("provider/model"); absent /
+  malformed → the COMPACTING session's own model (his ruling: same-model
+  compaction gives better results even if slower); the LIVE config has
+  `agent.compaction` commented out → the fallback path is currently
+  active; (2) the `message` arg does NOT arrive in the compacted session
+  (it only rides the caller's tool result) — change to a direct QUEUED
+  prompt message (promptAsync, no await — delivered on resume);
+  (3) DUMP-FAIL evidence (ctx.log 2026-09-16/17: 2× `spawnSync node
+  ETIMEDOUT`; measured: the dump script is 0.12 s standalone — a HUNG
+  CHILD INSIDE THE HOST, not script slowness; the hook logs failures
+  only, no DUMP-OK line → add DUMP-OK + duration for self-diagnosis;
+  defensive spawn stdio pipe→ignore); (4) auto-compaction on context
+  limit = an option togglable via a parameter in the budget file
+  (`.opencode/temp/compact_budget.json`); (5) research spec requested: a
+  small research on compact_memory + block_transfer (he wrote
+  "buffer_transfer") — up/downs, what is problematic and why,
+  alternatives.
+- **Outcome (goal):** param rework landed (4-key schema:
+  sessionID/keepTokens/keepMessages/message; config resolution with
+  session-model fallback) + the message queued to the compacted session +
+  DUMP-OK diagnostics + (follow-on) the budget-file auto-compact toggle +
+  (follow-on) the requested research spec; probe/smoke green; live
+  acceptance after a host restart.
+- **Acceptance:** param rework landed + probe/smoke green; a cross-compact
+  dispatch needs only the session_id; the queued message reaches the
+  compacted session (live, post-restart); the toggle readable from the
+  budget file (follow-on unit); the research spec filed + run (follow-on
+  unit).
+- **Scope:** `.opencode/plugin/compact_memory.ts`,
+  `.opencode/plugin/tests/compact_memory.smoke.mjs`,
+  `.opencode/plugin/probes/handover_probe.mjs`, (follow-on:
+  `.opencode/plugin/auto_resume.ts` + the budget store).
+- **Status:** OPEN (approved — priority.md #1, top of his active list).
+  **Unit A build in flight (plan5, 2026-09-21, looprun 2026-09-21_15-33):**
+  the param rework + config resolution + queued message + DUMP-OK
+  diagnostics — spec committed this iteration; follow-on: the auto-compact
+  toggle unit, the research spec, live acceptance post-restart.
 
 ## 71. Stale probe totals in repo_commands.md (maintainer file — needs his tasking; 2026-09-16)
 - **Problem / evidence:** `repo_commands.md` §Run/test still quotes "~376"
