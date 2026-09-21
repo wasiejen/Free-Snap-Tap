@@ -326,3 +326,9 @@ write/edit tool JSON-arg serialization failed twice on long content in Deep-Dive
 ### 2026-09-21_05-56 planner_Q3XS_160k_mtp ses_f4a3f85e1ffeO9206c9ENvkK0f
 Write-tool JSON flakiness hit this PLANNER session too (spec draft write refused with the logged "Text: {." signature); chunked bash heredoc fallback worked both times. Guidance currently lives only in worker-facing DoDs + agent_feedback.md — a one-liner in repo_commands.md (host tooling caveats: long write payloads unreliable; default to printf/heredoc-create + small edit-append batches) would cover ALL roles including planner spec authoring without re-discovery each session.
 
+### 2026-09-21_13-37 planner_Q3S_160K ses_f3cb105d3ffetOmzWtMuDVBFN5
+Two more flaky tool calls in this planner session (grep + webfetch, identical "JSON parsing failed: Text: {." signature; the webfetch one had SHORT args — the "long payload" pattern does not hold) — evidence now in TODO #74 with the ik_llama fork hypothesis; next isolation step is the direct-to-server probe bypassing opencode.
+
+### 2026-09-21_14-11 planner_Q3S_160K ses_f3cb105d3ffetOmzWtMuDVBFN5
+Server-side A/B testing gotcha: after a fork/build swap a running session keeps its previously loaded model — my 4 "old build" test failures were actually served by the stale buggy model until his explicit unload+reload. Now codified in knowledge_tools.md (single-slot section, item 5).
+
