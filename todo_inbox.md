@@ -78,14 +78,8 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   for-each-ref membership) → recorded in decision-record §5 R2 (design
   source), trimmed here.
 
-## 2026-09-21 — worker_Q3S_160K (auto-resume UNIT 1, ses_f3bbdd89affeigE26tm2lka7AT)
-- Pre-existing gate failure (NOT caused by UNIT 1): `handover_probe.mjs`
-  check [87] FAILS — classifier fixtures expect `iq3`→1 but the current
-  `compact_memory.ts` classifier (line 82, `/iq3|q3/` → cap 3, per the
-  2026-09-21 ruling — `compact_memory.smoke.mjs` line 86 already pins
-  `clf IQ3 -> 3`) returns 3. Only the probe pin (line 2377,
-  `caps.iq3 === 1`) is stale. Verified pre-existing at this session's HEAD:
-  the probe references none of UNIT 1's files, and `compact_memory.ts` was
-  untouched. Both the probe file and `compact_memory.ts` are DO-NOT-TOUCH
-  for UNIT 1, so left as-is. Rest of the gate green: UNIT 1 smoke 14/14,
-  pytest 459 passed + 1 warning, ruff F=0.
+## 2026-09-21 — planner curation (plan1, autorun-2026-09-21_15-33)
+- worker_Q3S_160K (auto-resume UNIT 1, ses_f3bbdd89affeigE26tm2lka7AT)
+  finding: pre-existing `handover_probe.mjs` check [87] stale pin
+  (classifier fixture `iq3` 1 vs 3) → `TODO.md` **#76**, closed same session
+  (planner-direct pin fix; probe 235/235 green).

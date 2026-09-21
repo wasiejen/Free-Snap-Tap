@@ -2358,7 +2358,8 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   );
 }
 
-// 87 — the classifier fixtures (the exported rule table): IQ4→3, IQ3→1,
+// 87 — the classifier fixtures (the exported rule table): IQ4→3, IQ3→3 (the
+//      2026-09-21 quant-class budget ruling raised the 3-bit cap to 3),
 //      Q4KM→3, CPU-…→0 (the prefix rule FIRST), unknown→1, and the ordering
 //      trap "Qwen3.8-27B-IQ4KT-120K"→3 (the 4-bit row wins, not the 3-bit one)
 {
@@ -2373,8 +2374,8 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   check(
     "87",
     "S13",
-    "classifier fixtures: IQ4→3, IQ3→1, Q4KM→3, CPU-…→0, unknown→1, the Qwen3.8-27B-IQ4KT-120K ordering trap→3 (the 4-bit row wins)",
-    caps.iq4 === 3 && caps.iq3 === 1 && caps.q4km === 3 && caps.cpu === 0 && caps.unknown === 1 && caps.trap === 3,
+    "classifier fixtures: IQ4→3, IQ3→3, Q4KM→3, CPU-…→0, unknown→1, the Qwen3.8-27B-IQ4KT-120K ordering trap→3 (the 4-bit row wins)",
+    caps.iq4 === 3 && caps.iq3 === 3 && caps.q4km === 3 && caps.cpu === 0 && caps.unknown === 1 && caps.trap === 3,
     JSON.stringify(caps),
   );
 }

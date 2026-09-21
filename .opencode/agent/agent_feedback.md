@@ -335,3 +335,6 @@ Server-side A/B testing gotcha: after a fork/build swap a running session keeps 
 ### 2026-09-21_15-01 planner_Q3S_160K ses_f3cb105d3ffetOmzWtMuDVBFN5
 Re-read a proposal file BEFORE revising it — the maintainer may have commented in-file since the last read (this session: one failed edit before noticing the in-file --comment lines had landed; the proposals/commented/ flow then applied).
 
+### 2026-09-21_16-08 worker_Q3S_160K ses_f3bbdd89affeigE26tm2lka7AT
+Task-spec DoD assumed the handover probe was green, but it had a pre-existing stale pin (check [87] iq3→1 vs current classifier iq3→3, 2026-09-21 ruling) in a DO-NOT-TOUCH file — spec baselines should be machine-verified at spec time.
+

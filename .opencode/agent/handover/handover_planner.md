@@ -5,7 +5,8 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 ## Current session — looprun autorun-2026-09-21_15-33, iteration 1 (ses_f3bd43f5bffe32mM8F3rQfaNh5, planner-1, Qwen3.8-27B-Q3S-160K)
 - **Maintainer task handled (his --maintainer marker in `memory/planner/destilled_mem.md` + launch message):** the destill is FILLED (three condensed MEM-010x lines + pointers to `memory.md`/README; all comments removed; the two `--comment` ideas PARKED below, not lost); the memory-folder README gained a "The destill" section (format + maintenance rules — the `--comment` "codify in the readme" idea honored). The destill is already wired into BOTH planner agents' prompts in `opencode.jsonc` (loads on next compact/restart — his words).
 - **Knowledge curation (his note: "not well integrated and curated"):** all 4 `knowledge_inbox.md` entries cured (two new entries + a description-section merge in `knowledge_tools.md`; the `test(`-vs-`it(` layout note in `opencode-plugins/auto-resume-map.md`); the knowledge README file list updated (was stale — missing knowledge_context/inbox + the three subfolders); a host-tooling caveat line (the TODO #74 workaround for long write payloads) added to `repo_commands.md` — covers all roles incl. planner spec authoring.
-- **Continue = auto-resume Unit 1 (the proposal is APPROVED — he moved it to `approved/`):** the proposal's Status line + TODO #75 status updated (unit numbering note: Unit 3 = spawn helper, Unit 4 = planner liveness watchdog); the Unit 1 spec written + delegated; verify on the worker's return.
+- **AUTO-RESUME UNIT 1 LANDED + PLANNER-VERIFIED** (the proposal is APPROVED — he moved it to `approved/`; worker `worker_Q3S_160K` ses_f3bbdd89affeigE26tm2lka7AT, code `d322927`): spec `f39117a` + loop-folder copy, worker delegated; verified from files: smoke 14/14, gate green (probe 235/235, pytest 459+1w, ruff F=0). Files: `.opencode/plugin/auto_resume.ts` (event log to `.opencode/temp/auto_resume.log` + one-shot init `surface=` probe), `tests/auto_resume.smoke.mjs`, the static surface report in `knowledge/opencode-plugins/`. Planner-direct fix of a PRE-EXISTING gate failure the worker's gate run surfaced: probe check [87] stale classifier pin `iq3` 1→3 (TODO #76 closed). Flag: installed SDK 1.18.29 vs the doc's 1.18.31 (both v1-generation; the live probe is the authority). This session hit the context limit after the worker's return (opencode restarted; the maintainer compacted) — section brought current in the post-compaction pass.
+- **PENDING (maintainer domain) — Unit 1 LIVE ACCEPTANCE, after his host restart** (the plugin auto-discovers, no registration needed): (a) live event lines in `.opencode/temp/auto_resume.log`, (b) the init `surface=` line → then the live confirmation is appended to the unit-1 surface report (its "LIVE CONFIRMATION PENDING" section). Then Unit 2 (context-limit compaction trigger) per the proposal's strict order; unit numbering: Unit 3 = spawn helper, Unit 4 = planner liveness watchdog.
 - **Open questions (his two `--comment` ideas from destilled_mem.md — commentary, no explicit request to act; parked, not actioned):** (1) a smaller NAP snapshot that gets loaded directly via the agent prompt in opencode.jsonc (survives compaction/restart without re-reading); (2) a tool that codifies the first reality-rebuild steps (auto-reads + git + the marker sweep) and injects the results into the session.
 
 
@@ -115,11 +116,12 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Standing
-- Baselines (re-verified 2026-09-18 by the planner post-#0-escape, plan2):
-  probe **two-three-five** [2-3-5; S1–S24 (no S5) incl. the new S24 escape
-  pin (6 checks); the header annotation total is the source and agrees with
-  the reported total — machine-verified]; smokes **all 9 green**
-  (intercept_observer 39/39, submit 20/20; the per-suite counts are in each
+- Baselines (re-verified 2026-09-21 by the planner, plan1 — UNIT 1):
+  probe **two-three-five** [2-3-5; S1–S24 (no S5) incl. the S24 escape pin
+  (6 checks); the header annotation total is the source and agrees with the
+  reported total — machine-verified; the [87] classifier pin refreshed 1→3
+  in the same pass (TODO #76)]; smokes **all 10 green** (auto_resume 14/14,
+  intercept_observer 39/39, submit 20/20; the per-suite counts are in each
   smoke's own readout — no total kept here); pytest **459 passed + 1 warning
   (the known #10 coroutine warning)**; ruff **F=0**.
 - Cross-compaction (measured 2026-09-18, plan2): `compact_memory` with a
