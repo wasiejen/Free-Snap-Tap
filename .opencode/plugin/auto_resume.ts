@@ -40,6 +40,14 @@
 //     queued promptAsync (latch held until it settles), attempts++.
 //   - Decision log lines (Unit 1 lines unchanged in format): `arm=`,
 //     `saturation=` (with ratio), `trigger=`, `send-fail=`.
+//   - Toggle (maintainer priority #1): an OPTIONAL top-level
+//     `autoCompact` flag in `.opencode/temp/compact_budget.json` (the
+//     compact_memory budget store — read-only here) gates the trigger:
+//     absent/`true` → current behavior; `false` → the tick logs
+//     `skip= autoCompact-off sid=<sid> ratio=<3-decimals>` and neither
+//     sends nor consumes the once-per-busy-cycle attempts budget; a
+//     missing/unreadable/malformed file fails OPEN (current behavior).
+//     The file is read per tick (small file — per-tick read is fine).
 //
 // UNIT 3 (new-planner spawn helper — the shared building block for
 // Unit 4's restart branches):
@@ -129,6 +137,10 @@ const SPAWN_TRIGGER_FILE = "auto_resume_spawn_trigger";
 // OpenCode's own overflow math).
 const SATURATION_THRESHOLD = 0.85;
 const RESERVE_MIN_OUTPUT = 20000;
+// The optional autoCompact toggle file (same dir as the log — the
+// compact_memory budget store; we only READ its optional top-level
+// `autoCompact` key, never write the file).
+const COMPACT_BUDGET_FILE = "compact_budget.json";
 
 // The once-per-busy-cycle budget gate: at most ONE self-compact send per
 // busy cycle (attempts zeroed when a fresh busy cycle arms the session).
@@ -320,6 +332,24 @@ async function getUsable(model: { providerID: string; modelID: string }): Promis
     return null;
   } catch {
     return null;
+  }
+}
+
+// Unit 2: the optional autoCompact toggle (maintainer priority #1) — a
+// per-tick read of `.opencode/temp/compact_budget.json` (the
+// compact_memory budget store — READ-ONLY here, never written; small
+// file, a per-tick read is fine). Lenient parse: file missing /
+// unreadable / JSON parse failure → ON (fail-open, status quo); key
+// absent → ON; key present → Boolean(value).
+function autoCompactEnabled(): boolean {
+  try {
+    const data: unknown = JSON.parse(readFileSync(join(logDir, COMPACT_BUDGET_FILE), "utf-8"));
+    if (typeof data !== "object" || data === null) return true; // scalar root → no key → ON
+    const v = (data as Record<string, unknown>)["autoCompact"];
+    if (v === undefined) return true; // key absent → ON (status quo)
+    return Boolean(v);
+  } catch {
+    return true; // missing / unreadable / malformed → fail OPEN (status quo)
   }
 }
 
@@ -642,6 +672,12 @@ async function tick() {
         const ratio = w.lastTokenTotal / usable;
         if (ratio < SATURATION_THRESHOLD) {
           log(`saturation= sid=${sid} ratio=${ratio.toFixed(3)} tokens=${w.lastTokenTotal} usable=${usable}`);
+          continue;
+        }
+        if (!autoCompactEnabled()) {
+          // Toggle OFF: suppressed — no send, and the once-per-busy-cycle
+          // attempts budget is NOT consumed (kept for a later ON state).
+          log(`skip= autoCompact-off sid=${sid} ratio=${ratio.toFixed(3)}`);
           continue;
         }
         await sendSelfCompact(sid, w, ratio, usable);

@@ -273,6 +273,83 @@ try {
   chk("UNIT 2: missing provider data → usable null → no send, no trigger line, count unchanged",
     calls.length === cBeforeFail && !readLines().some((l) => l.includes("trigger= sid=ses_u2_noprov2")), `n=${calls.length}`);
 
+  // ---- autoCompact toggle (maintainer priority #1): an OPTIONAL
+  // top-level `autoCompact` key in `.opencode/temp/compact_budget.json`
+  // (the sandbox's budget file — NEVER the live one) gates the 0.85
+  // trigger: absent/true → status quo; false → suppressed with a
+  // `skip= autoCompact-off` line and the attempts budget NOT consumed;
+  // missing/unreadable/malformed file → fail OPEN (status quo).
+  // A FRESH spying client — the fail-safety section above re-factored
+  // with the throwing v3Session, so the module-level client is NOT the
+  // v2 spy anymore.
+  const tCalls = [];
+  const vTSession = {
+    prompt: function () {},
+    promptAsync: async (args) => { tCalls.push(args); return { data: { id: "queued" } }; },
+    abort: function () {},
+    list: function () {},
+    get: function () {},
+    message: function () {},
+    todo: function () {},
+    command: function () {},
+    summarize: function () {},
+  };
+  const hooksUT = await factory({ directory: proj, client: { session: vTSession, provider: { list: providerList }, app: { log: () => "log" } } });
+  const budgetFile = path.join(proj, ".opencode", "temp", "compact_budget.json");
+  const writeBudget = (content) => fs.writeFileSync(budgetFile, content, "utf-8");
+
+  // case 1: NO budget file + ratio >= 0.85 → trigger fires (explicit
+  // status-quo regression — the file is absent in the sandbox)
+  fs.rmSync(budgetFile, { force: true });
+  const nNoFile = tCalls.length;
+  await fire(hooksUT, "ses_u2_tgnof", [statusEv("ses_u2_tgnof", "busy"), msgUpdated("ses_u2_tgnof", "assistant", { total: 80000 }, MODEL), statusEv("ses_u2_tgnof", "idle")]);
+  const okNoFile = await waitUntil(() => tCalls.length >= nNoFile + 1);
+  chk("UNIT 2: autoCompact — NO budget file (key absent) → trigger fires (status quo)",
+    okNoFile && tCalls.length === nNoFile + 1 && tCalls[tCalls.length - 1]?.path?.id === "ses_u2_tgnof", `n=${tCalls.length}`);
+  chk("UNIT 2: autoCompact — NO budget file → trigger= log line for the send",
+    readLines().some((l) => l.includes("trigger= sid=ses_u2_tgnof") && l.includes(RATIO_HI)), "");
+
+  // case 2: autoCompact:false + ratio >= 0.85 → ZERO sends, the skip
+  // line present (ratio still observable), the attempts budget NOT
+  // consumed (a second idle in the same cycle is skipped again, and a
+  // flip back ON sends from the retained budget)
+  writeBudget(JSON.stringify({ autoCompact: false }));
+  const nOff = tCalls.length;
+  await fire(hooksUT, "ses_u2_tgoff", [statusEv("ses_u2_tgoff", "busy"), msgUpdated("ses_u2_tgoff", "assistant", { total: 80000 }, MODEL), statusEv("ses_u2_tgoff", "idle")]);
+  await sleep(5600); // at least one full tick period with the toggle OFF
+  chk("UNIT 2: autoCompact:false + ratio >= 0.85 → ZERO promptAsync calls", tCalls.length === nOff, `n=${tCalls.length}`);
+  chk("UNIT 2: autoCompact:false → skip= autoCompact-off line present (ratio still observable)",
+    readLines().some((l) => l.includes("skip= autoCompact-off sid=ses_u2_tgoff") && l.includes(RATIO_HI)), "");
+  await fire(hooksUT, "ses_u2_tgoff", [statusEv("ses_u2_tgoff", "idle")]); // second idle, same busy cycle
+  await sleep(5600);
+  chk("UNIT 2: autoCompact:false — second idle in the same cycle also skipped (attempts budget NOT consumed)",
+    tCalls.length === nOff, `n=${tCalls.length}`);
+  fs.rmSync(budgetFile, { force: true }); // flip back ON (key absent)
+  await fire(hooksUT, "ses_u2_tgoff", [statusEv("ses_u2_tgoff", "idle")]);
+  const okOn = await waitUntil(() => tCalls.length >= nOff + 1);
+  chk("UNIT 2: toggle flipped back ON → the retained budget sends (once-per-cycle holds)",
+    okOn && tCalls.length === nOff + 1 && tCalls[tCalls.length - 1]?.path?.id === "ses_u2_tgoff", `n=${tCalls.length}`);
+
+  // case 3: autoCompact:true + ratio >= 0.85 → trigger fires (explicit ON)
+  writeBudget(JSON.stringify({ autoCompact: true }));
+  const nOn = tCalls.length;
+  await fire(hooksUT, "ses_u2_tgon", [statusEv("ses_u2_tgon", "busy"), msgUpdated("ses_u2_tgon", "assistant", { total: 80000 }, MODEL), statusEv("ses_u2_tgon", "idle")]);
+  const okOn2 = await waitUntil(() => tCalls.length >= nOn + 1);
+  chk("UNIT 2: autoCompact:true + ratio >= 0.85 → trigger fires",
+    okOn2 && tCalls.length === nOn + 1 && tCalls[tCalls.length - 1]?.path?.id === "ses_u2_tgon", `n=${tCalls.length}`);
+  chk("UNIT 2: autoCompact:true → trigger= log line for the send",
+    readLines().some((l) => l.includes("trigger= sid=ses_u2_tgon") && l.includes(RATIO_HI)), "");
+
+  // case 4: MALFORMED budget file content + ratio >= 0.85 → fail OPEN
+  // (trigger fires — the status quo)
+  writeBudget("{ this is not valid json !!!");
+  const nMal = tCalls.length;
+  await fire(hooksUT, "ses_u2_tgmal", [statusEv("ses_u2_tgmal", "busy"), msgUpdated("ses_u2_tgmal", "assistant", { total: 80000 }, MODEL), statusEv("ses_u2_tgmal", "idle")]);
+  const okMal = await waitUntil(() => tCalls.length >= nMal + 1);
+  chk("UNIT 2: autoCompact — MALFORMED file → fail OPEN, trigger fires",
+    okMal && tCalls.length === nMal + 1 && tCalls[tCalls.length - 1]?.path?.id === "ses_u2_tgmal", `n=${tCalls.length}`);
+  fs.rmSync(budgetFile, { force: true }); // leave the sandbox clean
+
   // ============================================================
   // UNIT 3 — new-planner spawn helper
   //
@@ -531,7 +608,7 @@ try {
   } else if (liveBefore === null && liveSizeNow > 0) {
     appended = fs.readFileSync(LIVE_LOG, "utf-8"); // did not exist before — all new
   }
-  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov", "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_throw", "ses_u4_spawn"];
+  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_throw", "ses_u4_spawn"];
   chk("LIVE .opencode/temp/auto_resume.log received no smoke line (sandbox got every smoke line)",
     liveBefore === liveSizeNow || !smokeSids.some((s) => appended.includes(s)), `before=${liveBefore} after=${liveSizeNow}`);
   chk("sandbox log path is under the sandbox", sandboxLog.startsWith(base), sandboxLog);

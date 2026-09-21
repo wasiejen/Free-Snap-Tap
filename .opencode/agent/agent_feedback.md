@@ -374,3 +374,6 @@ Pre-compaction dump hook times out on large sessions (DUMP-FAIL spawnSync node E
 ### 2026-09-21_23-20 planner_Q3S_160K ses_f3a51aedcffeSa0cwt8PmwlXAr
 A dead sub-agent with an EMPTY Task-tool result (worker-8: host stream-cut mid tool-call emission, zero work) left no diagnostic — I had to rebuild the cause from the DB part-table (final assistant part = a literal '</function>' fragment). The known failure signatures (context-limit, Task cancelled) are documented; the empty-result / stream-cut signature is not — add it to the failure-message interpretation guide (knowledge base or repo_gotchas) so the next dead-worker triage does not re-derive it.
 
+### 2026-09-22_00-11 worker_Q3S_160K ses_f3a03af20ffe1bRa56xVl143VG
+auto_resume.smoke.mjs: the module-level `client` is swapped by every re-factory, so a new section after the fail-safety block must re-factory with its own spy client (1 full smoke cycle lost to this on the first run — the spec's smoke section note didn't mention the client swap).
+
