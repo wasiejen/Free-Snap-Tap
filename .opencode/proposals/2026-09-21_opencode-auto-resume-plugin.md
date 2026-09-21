@@ -42,8 +42,15 @@ events only ARM state on a per-session watch object; ONE 5s tick is the only
 decision+send funnel; every send passes one gated send path (re-entrancy latch +
 cancel/completion gate, re-validated right before send); timers `.unref()`-ed;
 plugin self-actions (prompts/aborts) self-marked so they never collide with
-user ESC. The plugin NEVER touches NAP/TODO/maintainer files (that is the
-prompts' job); logging via `app.log` as upstream does.
+user ESC. **Prompt injection MUST be queued** — `client.session.promptAsync`
+(the same race-free delivery channel the ctx_watchdog nudge ladder uses: the
+synthetic part queues as the next turn at idle) — never a synchronous prompt:
+an immediate injection invalidates the session KV cache and forces a full
+re-prefill (measured by the maintainer: 3-4 min at 90% fill; the earlier
+ctx_watchdog nudge era hit exactly this). Where Unit 1 finds a host-side
+command surface, prefer the command over a prompt (commands do not re-prefill).
+The plugin NEVER touches NAP/TODO/maintainer files (that is the prompts' job);
+logging via `app.log` as upstream does.
 
 **Unit 1 — skeleton logging plugin (the testbed).** Small plugin in
 `.opencode/plugin/`: log every event it receives (name + sid + key fields) and
@@ -55,26 +62,63 @@ v1/v2 question was answered from source; this verifies it live).
 
 **Unit 2 — context-limit compaction trigger (gap 2).** Token tracking on
 `message.updated` (B §2 step 1); on status→idle, if the last assistant token
-total ≥ 85% of the usable window (B §2 step 2) → dispatch compaction ONCE per
-busy cycle (B §1 #1 reset pattern). Parent path: since the host-side compaction
-command surface is unknown until Unit 1, the first working form is a prompt that
-instructs the session to self-compact via the `compact_memory` tool (SELF path).
-DoD: a live session crossing the threshold compacts itself, unattended, once
-per busy cycle.
+total ≥ 85% of the usable window (B §2 step 2) → trigger compaction ONCE per
+busy cycle (B §1 #1 reset pattern). **Mechanism (per maintainer 2026-09-21
+comment): host-side command if Unit 1 finds one** (upstream's ctx-wrapup
+pattern — no re-prefill); **otherwise a QUEUED prompt** (`promptAsync`)
+instructing the session to self-compact via the `compact_memory` tool (SELF
+path) — never a synchronous prompt (cache invalidation → 3-4 min re-prefill at
+90% fill, the old ctx_watchdog nudge failure mode). DoD: a live session
+crossing the threshold compacts itself, unattended, once per busy cycle, with
+NO re-prefill stall.
+--comment: prompt needs to be queued or it will trigger a complete invalidation of sessions cache and thus a complete re prefill - takes a long time (3-4 minutes on 90% context fill). the nudges we used in earlier versions of the ctx_watchdog caused exactly this. --info also a prompt (message or the starting prompt on delegation or re-delegation) is for me as maintainer the only place i can enter and revert to in the session of a sub-agent - in case it is needed to give instructions. so sometimes a queued prompt in the middle of the session or before work starts might be useful for me. (sorry idle thoughts again - an idea for later maybe if i observe an actual need for it)
+Planner replies (2026-09-21, direct session): adopted as a shared architecture
+rule — every prompt the plugin injects is QUEUED (`client.session.promptAsync`,
+the ctx_watchdog nudge's race-free channel: the synthetic part queues as the
+next turn at idle) — never synchronous. Unit 2 additionally prefers a host-side
+command where Unit 1 finds one (the upstream ctx-wrapup pattern — no
+re-prefill). Your deferred idea (a maintainer prompt-injection channel into
+sub-agent sessions — the mid-session queued prompt / starting prompt as the
+only re-entry point) is noted and PARKED as an observation — not actioned
+until an actual need shows up.
 
-**Unit 3 — auto-resume after compaction (gap 1).** On compaction completion
-(detect via the events Unit 1 confirms — status transition out of compacting) →
-send the post-compaction-protocol prompt (re-read the NAP head files, continue
-the current unit). DoD: a compacted session resumes unattended and completes its
-current work unit.
+**Unit 3 — new planner spawn mechanism (shared building block).** A single
+helper that starts a fresh planner session (new session + planner prompt
+injection — mechanism per Unit 1's surface report; upstream analog = prompt a
+new session + discovery pickup, A §3). Used by both the `action: restart`
+branch and the unrecoverable-stop restart in Unit 4. DoD: invoking the helper
+produces a running fresh planner session.
 
-**Unit 4 — restart detection + new planner (gap 3).** Pattern-scan recent
-assistant text for the `action:` line (AGENTS.md §Interaction-contract state
-machine; upstream analog = C §2.5/§2.6 done-claim pattern scanning). On an
-`action: restart` close of an idle planner session → start a NEW planner
-session (mechanism per Unit 1's surface report; upstream analog = prompt a new
-session + discovery pickup, A §3). DoD: a planner closing with `action: restart`
-spawns the next planner session unattended.
+**Unit 4 — planner liveness watchdog (gap 1 + sudden stop — who watches the
+top-level session).** On planner status→idle / error, route by state:
+- **Just compacted** (status transition out of compacting, no `action:` line):
+  send the post-compaction-protocol resume prompt (QUEUED; re-read the NAP
+  head files, continue the current unit), with backoff.
+- **Last message carries a recognized `action:` line** (AGENTS.md
+  §Interaction-contract state machine): `stop` → do nothing; `ask_maintainer`
+  → do nothing (wait for the maintainer); `restart` → spawn a new planner
+  (Unit 3).
+- **No recognized `action:` line** (sudden stop / stall / death — e.g. a
+  truncated tool call killed the turn): recovery — send a "continue the current
+  unit from the NAP" resume prompt (QUEUED, backoff, retry cap); on retries
+  exhausted → restart via a new planner (Unit 3).
+This is the lightweight planner-scoped analog of upstream's auto-start family
+(A): it tracks whether the planner is actually active and restarts on sudden
+stop. DoD: (a) a compacted planner resumes unattended; (b) a planner that
+suddenly stops without an `action:` line is recovered or restarted unattended;
+(c) a planner closing with `action: restart` spawns the next planner; (d) a
+`stop` / `ask_maintainer` close is left alone.
+--comment: we had some sudden stops - but might be connected to failed tool calls caused by JSON truncation and the session just stopped. as a sub-agent the control would be returned to the planner. but what happens when the planner suddently stops? is there a watchdog that keeps track if the planner is actually active? and restarts in need of sudden stop?
+Planner replies (2026-09-21, direct session): yes — that gap is now Unit 4
+(the planner liveness watchdog; the old Unit 3 auto-resume became its first
+branch). On planner status→idle / error it routes: just-compacted → queued
+post-compaction resume; a recognized `action:` line → `stop` / `ask_maintainer`
+left alone, `restart` spawns a new planner; NO recognized `action:` line (the
+sudden-stop case, e.g. a truncated tool call killed the turn) → queued recovery
+prompt with backoff + retry cap, then restart via a fresh planner on retries
+exhausted. The old Unit 4 (restart detection) became the shared spawn helper
+(new Unit 3). The busy-silence sub-case (A P1, still-busy-with-dead-stream)
+stays parked as a Unit 4 secondary case.
 
 **Explicitly NOT ported from upstream** (scope discipline): the watchdog
 abort-escalation chain (A §4 P2) and the orphaned parent/child watch (P3) — we
@@ -84,14 +128,18 @@ and the done-claim/ready-to-continue heuristics (C) — we have our own
 TODO/NAP protocol. Busy-silence stall detection (A P1) is revisited later only
 if stalls prove a real problem.
 
+
 ## Acceptance
 
 - Unit 1: live event log + surface report in `knowledge/opencode-plugins/`.
 - Unit 2: one live demo — a session crosses the threshold and self-compacts
-  (log line + gauge readout before/after).
-- Unit 3: a compacted session resumes unattended (session dump / loop-style
-  observation shows continued work).
-- Unit 4: an `action: restart` close spawns the next planner session.
+  (log line + gauge readout before/after), with NO re-prefill stall.
+- Unit 3: invoking the spawn helper produces a running fresh planner session.
+- Unit 4: (a) a compacted planner resumes unattended (session dump / loop-style
+  observation shows continued work); (b) a planner that suddenly stops without
+  an `action:` line is recovered or restarted unattended; (c) an `action:
+  restart` close spawns the next planner session; (d) a `stop` /
+  `ask_maintainer` close is left alone.
 - All units: standard gates stay green (plugin-only, no product code touched);
   opencode restarts cleanly with the plugin auto-discovered from
   `.opencode/plugin/`.
