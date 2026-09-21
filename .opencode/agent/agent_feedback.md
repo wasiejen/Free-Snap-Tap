@@ -332,3 +332,6 @@ Two more flaky tool calls in this planner session (grep + webfetch, identical "J
 ### 2026-09-21_14-11 planner_Q3S_160K ses_f3cb105d3ffetOmzWtMuDVBFN5
 Server-side A/B testing gotcha: after a fork/build swap a running session keeps its previously loaded model — my 4 "old build" test failures were actually served by the stale buggy model until his explicit unload+reload. Now codified in knowledge_tools.md (single-slot section, item 5).
 
+### 2026-09-21_15-01 planner_Q3S_160K ses_f3cb105d3ffetOmzWtMuDVBFN5
+Re-read a proposal file BEFORE revising it — the maintainer may have commented in-file since the last read (this session: one failed edit before noticing the in-file --comment lines had landed; the proposals/commented/ flow then applied).
+

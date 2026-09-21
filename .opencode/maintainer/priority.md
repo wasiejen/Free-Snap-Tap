@@ -45,17 +45,6 @@
 - you are intelligent - you will find something to do
   - go through my ideas for new research on functions. create a folder in research for each if you find something worthwhile
 
-26-09-19_18-50
---info: fuzzy_numword intercept deactivated for now 
-  - seems like the path resolution interferes with the write tool and in temp folder lets it fail to work.
-  - write tool still fails to work for multiline write operations:
-  - "invalid [tool=write, error=Invalid input for tool write: JSON parsing failed: Text: {.
-  Error message: JSON Parse error: Expected '}']"
-
-# 0 fuzzy_numword escape output option - DONE
-  numword escape implementation .opencode\proposals\approved\2026-09-17_numword-escape-output.md
-  Infos on bitdrift .opencode\maintainer\draft\26-09-17_20-05_bitdrift_observations.md
-
 # 1 compact_memory additions/fix messages (your todo ##70 likely needs an update)
 - autocompact on context limit option, toggable via parameter in the budget file
 - (1)add a fallback to fetch the providerID and modelID as fallback for cross-session compaction (so only session_id needs to be set) 
@@ -116,8 +105,6 @@
     - and giving explicit diretory to C:\Users\Wasiejen\Projects\Repos\ or based on what repos to work on
       - path variable would be an option to make this in general more independent?
     - I would create a copy of the FST repo in github and clone it into this new folder and move the old FST into C:\Users\Wasiejen\Projects\Repos\Free-Snap-Tap (might defer move to not to have to update all the references at once?)
-
-# research on event hook messages.updated (each research should be at least a single run)
 
 
 --defer # 3 3 destillation worker runs for now - to much work right now. 
