@@ -31,3 +31,4 @@
 2026-09-21_22-03 -RETURN- looprunner ses_f3bd58b59ffeAWRrlA5xnOd4I5 Qwen3.8-27B-Q3S-160K planner-5 ses_f3acaf402ffexZ2GH0r5N0ZEWm Qwen3.8-27B-Q3S-160K
 2026-09-21_22-03 --INFO-- looprunner ses_f3bd58b59ffeAWRrlA5xnOd4I5 Qwen3.8-27B-Q3S-160K maintainer temporary stop after iteration 5 (host restart to activate plugin); loop paused, no iteration 6 launch
 2026-09-21_22-53 -->START planner-6 ses_f3a51aedcffeSa0cwt8PmwlXAr Qwen3.8-27B-Q3S-160K Unit: Unit A live acceptance (post-restart) — found live bug: cross model read never unwraps the RequestResult {data} shape; fix worker + UNIT B auto-compact toggle worker
+2026-09-21_22-57 DONE<--- worker-7 ses_f3a4006ceffeLKWk1NqL9dMgX1 Qwen3.8-27B-Q3S-160K cross model read dual-shape fix done; commit 280b8d0; gates: smoke 53/53, pytest 459+1w, ruff F=0, probe 241/241 (==annotation); handover written
