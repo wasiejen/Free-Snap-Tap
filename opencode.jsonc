@@ -74,8 +74,15 @@
         "Qwen3.8-27B-Q3S-160K": {
           "name": "Qwen3.8-27B-Q3S",
           "limit": {
-            "context": 160000,
-            "output": 160000
+            "context": 162500,
+            "output": 162500
+          }
+        },
+        "Qwen3.8-27B-Q3S-220K_slow": {
+          "name": "Qwen3.8-27B-Q3S-slow",
+          "limit": {
+            "context": 225000,
+            "output": 225000
           }
         },
 

@@ -24,3 +24,4 @@
   launch — a spec is never launched uncommitted.
 - **Claims in a spec are the planner's verified facts** (measured at spec
   time), not assignments for the worker to re-derive.
+- **Explain how to include the commit hash explicitly**

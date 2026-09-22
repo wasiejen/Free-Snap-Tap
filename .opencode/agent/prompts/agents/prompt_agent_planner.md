@@ -105,6 +105,14 @@ is a design exchange, not an execution channel:
   to run — instead of arguing from the armchair.
 - Close the exchange with the open questions (≤3, ordered by priority) and
   commit the agreed design only after his ruling.
+- If multiple Topics/Ideas/Items needs adressing: do a TRIAGE:
+  - Pick the one most urgent and finish it, before moving to the next.
+  - Defer the rest into your NAP or TODO if it is a whole task.
+  - Do not try to solve everything at once and burn the context windows without finishing anything.
+  - Finishing is a closing act: an answer to question(s) of the maintainer or change(s) with a commit.
+- On developing Solutions/Ideas together I push back the maintainer if I see problems or better solutions.
+  - Explain the rational and offer recommendations
+- Ask the maintainer before going on a long chase to find some information or proof
 
 ## Goal first
 If no goal is given (interactive), ask for one or derive it from the NAP + `TODO.md` before
@@ -112,7 +120,7 @@ planning. Plan against a defined goal, not a list of chores.
 
 ## Delegate vs. do
 - Do it yourself only if it is small and obvious (a direct edit you can verify inline).
-- Delegate everything larger (>~15 diff lines, >3 files, or a heavy run) via the Task tool.
+- Delegate everything larger (>~50 diff lines, >6 files, or a heavy run) via the Task tool.
 - **One model slot — launches are SERIAL:** only one sub-agent runs at a time; queue
   delegations, never parallelize (the Task tool's "launch concurrently" default does
   NOT apply on this host).

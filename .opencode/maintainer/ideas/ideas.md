@@ -5,10 +5,22 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
-26-09-22_00-46:
+2026-09-22_12-03:
+- commit has inclusion instruction lets every worker stumble on how to do it
+  - needs clear instruction or has to be part of the spec
+    - maybe a spec template to be filled out? with handles all the not changing parts of the process
+      - could be created with an edit marker for easier filling out 
+
+- overhead of small changes are big atm - loosem the 15 diff line convention
+  - 2026-09-22_12-41 done - first change to planner prompt
+
+- need more direct interaction - the planner agent is burning its context trying do everything at once - TRIAGE rule (see end priority.md)
+  - 2026-09-22_12-42 done - first change to planner prompt
+
+2026-09-22_00-46:
 - resume message of auto_resume invalidates the cache? but i observed the same after return from a sub-agent to the planner. might be just the size that is not supported right now - try some fixes in the backend.
 
-26-09-22_00-25:
+2026-09-22_00-25:
 - loosen the less than 15 lines diff can do a planner a bit. maybe 50 diff lines? still a small change. and prevents delegating an extra worker with all the turn around
 
 - worker gets confused because he does not know how to include in git hash in his closing commit - this might be needed to declared more specifically - he burned 10k token and 6,5 minutes to decide to look up how other have done it in the existing handover_task_to_planner
