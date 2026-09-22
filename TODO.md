@@ -867,8 +867,8 @@ restart detection" wording above is the pre-revision numbering.
 - **Suggested scope:** `.opencode/plugin/probes/handover_probe.mjs` (check
   [97]), `.opencode/plugin/tests/compact_memory.smoke.mjs`;
   `compact_memory.ts` only if the message path is restored.
-- **Status:** LANDED 2026-09-22 (worker-1 commit — the planner records
-  the hash on return, #80 precedent) — re-pinned per the ruling (NOT
+- **Status:** LANDED 2026-09-22 (af38e2f, worker_Q3S_160K — the planner records
+  ses_f36d1ca53ffe0GXACaVwW9iCJO — planner re-verified: probe 241/241, smoke 53/53, pytest 459+1w, ruff F=0; hash recorded in the planner's bookkeeping commit, #80 precedent) — re-pinned per the ruling (NOT
   deactivated/skipped, promptAsync NOT restored): probe [97] + the smoke
   message pin now assert the temp-fix behavior (dispatch line + the
   queued note byte-exact, NO queued promptAsync); gate green: probe

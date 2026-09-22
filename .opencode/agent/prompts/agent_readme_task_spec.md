@@ -24,4 +24,11 @@
   launch — a spec is never launched uncommitted.
 - **Claims in a spec are the planner's verified facts** (measured at spec
   time), not assignments for the worker to re-derive.
-- **Explain how to include the commit hash explicitly**
+- **Commit hash in the DoD (codified 2026-09-22 after two worker stumbles):**
+  a worker's commit can NEVER contain its own hash — the hash exists only
+  AFTER the commit, and the TODO/handover files ride in that same commit.
+  A DoD that needs the hash says: status → `LANDED` (hash recorded in the
+  planner's follow-up bookkeeping commit); the planner records the hash in
+  its own bookkeeping commit (the #80 precedent: 1fd3726 recorded 4098253).
+  Never write "LANDED (commit hash)" as a same-commit requirement — it is
+  unsatisfiable by construction.

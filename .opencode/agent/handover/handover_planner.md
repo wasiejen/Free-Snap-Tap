@@ -77,6 +77,15 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   (0f192e5) works — the queued-message race is gone. His FYI: a gauge
   readout immediately post-compaction = the compaction MODEL's own
   context fill (2-tool-call lag), not the target session's new fill.
+- #81 LANDED + planner-verified (af38e2f, worker_Q3S_160K
+  ses_f36d1ca53ffe0GXACaVwW9iCJO): probe [97] + the compact_memory smoke
+  pin re-pinned to the temp-fix behavior (NOT deactivated) — gate
+  re-run by the planner: 241/241 / 53/53 / 459+1w / F=0. Codified in
+  this commit: the `--info` marker (his announcement — no immediate
+  action; addressed once the current task concludes) is in the
+  canonical marker table + ladder + sweep, and the commit-hash DoD rule
+  is in agent_readme_task_spec.md (after two worker stumbles — the #80
+  precedent + the af38e2f stumble).
 - compact_memory SELF race measured this session (logged: feedback +
   knowledge inbox): the queued message delivers BEFORE the background
   compaction → cache invalidation → 160k hard-limit stall. Maintainer's
@@ -84,14 +93,14 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   is gone and SELF compaction should work again (unverified); side effect:
   probe [97] + compact_memory smoke pin red → #81 (his call: re-pin to the
   temp-fix behavior, or re-pin at the proper message fix).
-- NEXT (his priority order): (1) #81 pin fix — DELEGATED this turn
-  (worker_Q3S_160K, spec committed); (2) #82 scope fail-safe spec —
-  WAITING his `<|Direct|>` toggle ruling (asymmetric vs bidirectional,
-  unit-2 suppression, own-line anchor); (3) #80 close (his confirm —
-  (b) verified, (c) gated on #82); (4) TODO.md shrink (~40k tokens —
-  closed entries → todo_records.md, one-line records); (5) research
-  spec (compact_memory + block_transfer — priority.md #1); (6) TODO
-  #78 scoping.
+- NEXT (his priority order): (1) #81 LANDED + planner-verified
+  (af38e2f — gate 241/241); (2) #82 scope fail-safe spec — WAITING his
+  `<|Direct|>` toggle ruling (asymmetric vs bidirectional, unit-2
+  suppression, own-line anchor); (3) #80 close (his confirm — (b)
+  verified, (c) gated on #82); (4) TODO.md shrink (~40k tokens — closed
+  entries → todo_records.md, one-line records); (5) research spec
+  (compact_memory + block_transfer — priority.md #1); (6) TODO #78
+  scoping.
 - Carried parked ideas (unchanged): smaller NAP snapshot via opencode.jsonc
   agent prompt; reality-rebuild tool; pathfinder-mentality prompt part;
   looprunner-retirement decision; feedback integration on planner close-up;
@@ -181,14 +190,14 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Standing
-- Baselines (re-verified 2026-09-21 by the planner, plan4 — UNIT 4):
-  probe **two-three-five** [2-3-5; S1–S24 (no S5) incl. the S24 escape pin
-  (6 checks); the header annotation total is the source and agrees with the
-  reported total — machine-verified; the [87] classifier pin refreshed 1→3
-  in plan1 (TODO #76)]; smokes **all 10 green** (auto_resume 53/53 after
-  UNIT 4, intercept_observer 39/39, submit 20/20; the per-suite counts are
-  in each smoke's own readout — no total kept here); pytest **459 passed +
-  1 warning (the known #10 coroutine warning)**; ruff **F=0**.
+- Baselines (re-verified 2026-09-22 by the planner, post-#81):
+  probe **241** [two-four-one; self-annotated header total is the source
+  and agrees with the reported total — machine-verified; [97] re-pinned
+  to the temp-fix behavior in #81]; smokes **all green** (auto_resume
+  76/76 post-#80, compact_memory 53/53, intercept_observer 39/39,
+  submit 20/20; the per-suite counts are in each smoke's own readout —
+  no total kept here); pytest **459 passed + 1 warning (the known #10
+  coroutine warning)**; ruff **F=0**.
 - Cross-compaction (measured 2026-09-18 plan2; re-verified live 2026-09-22):
   `compact_memory` with a foreign sessionID — no model args in the tool
   schema; the summarizer model resolves per `agent.compaction.model` (set in

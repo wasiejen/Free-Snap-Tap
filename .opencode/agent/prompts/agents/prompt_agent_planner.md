@@ -267,15 +267,16 @@ one at a 90 %.
   | marker | meaning | action |
   |---|---|---|
   | `--maintainer` / `--main` | top priority | act FIRST, before other queued work; may interrupt |
-  | `--now` | important, but the current unit finishes first | act after the current verified unit, before other queued work |
-  | `--todo` | capture | add a self-contained `TODO.md` entry (standard fields, next ID); no immediate work |
+   | `--now` | important, but the current unit finishes first | act after the current verified unit, before other queued work |
+   | `--info` | no immediate action needed; address it once the current task is concluded (his announcement 2026-09-22) | handle it after the current task concludes, before other queued work of the same tier; never interrupts the current unit |
+   | `--todo` | capture | add a self-contained `TODO.md` entry (standard fields, next ID); no immediate work |
   | `--deferred` (alias `--defer`) | not for now | DEFERRED-flagged `TODO.md` entry; picked up only when nothing else is open |
   | `--wip` | file live-edited by the maintainer | READ ok, EDIT NO — if a task requires editing that file, stop and flag it in the summary/NAP; in afk/autorun it MAY BE IGNORED when it blocks work (his ruling 2026-09-15); the marker is removed only by the maintainer |
   | `--comment` | maintainer COMMENTARY on the content (NOT an instruction — contrast `--maintainer` = he did/directs something) | read + acknowledge; act only if it contains an explicit request; MAY BE REMOVED once acted on / acknowledged (his ruling 2026-09-15 — supersedes the earlier never-remove) |
   | (no marker) | background | queue; small items (≤ a few lines of effect) may be done inline |
 - **Priority ladder (canonical — autonomous AND direct sessions):** direct
-  maintainer message in a primary session > `--maintainer`/`--main` > `--now`
-  > unmarked inbox items (small first) > `--todo` capture > `--deferred`.
+   maintainer message in a primary session > `--maintainer`/`--main` > `--now`
+   > `--info` > unmarked inbox items (small first) > `--todo` capture > `--deferred`.
 - **Inbox cadence:** the session-start scan = TRIAGE by the ladder, not execution; an
   inbox item is handled when nothing more important is pending; small items (≤ a few
   lines of effect) may be handled inline.
@@ -288,7 +289,7 @@ one at a 90 %.
   `--maintainer` too, `--defer` matches `--deferred` too; the filter removes
   known non-live references, not his live files):
   ```
-  grep -rn -- "--main\|--now\|--todo\|--defer\|--wip\|--comment" \
+   grep -rn -- "--main\|--now\|--info\|--todo\|--defer\|--wip\|--comment" \
     --include="*.md" .opencode/ TODO.md README.md WIKI.md 2>/dev/null \
     | grep -v "_past_priorities\|/done/\|agent_feedback\|nap_direct\|archive/"
   ```
