@@ -87,3 +87,65 @@ Smoke changes (auto_resume.smoke.mjs):
    - Also: unit-4 routes for these: scope= none lines for both new sids; route= stop for ses_u3_new; no extra u2ag sends (u2agCalls.length stays 3).
 6. surface check: chk("surface line carries the v= code version identifier (8-char sha256 prefix)", surf && /\bv=[0-9a-f]{8}\b/.test(surf), surf ?? "").
 7. Strengthen ses_u4_plain check: add readLines().some(l => l.includes("scope= none sid=ses_u4_plain")) to existing conditions (keep existing parts
+
+
+--- manual compaction summery (added 2026-09-22_13-19)
+
+Objective
+- Implement TODO #80 (auto_resume fix) per the committed task spec: agent-preservation in promptAsync bodies, recovery-cap semantics fix, scope verification of the mis-scoping incident, surface= version identifier, and smoke-test extension. Work on opencode_test branch, verify against gates, make ONE commit, write handover file.
+Important Details
+- Task spec: .opencode/agent/handover/handover_task.md — the contract with ordered changes, definition of done, DO-NOT-touch list, baselines.
+- Plugin location: .opencode/plugin/deactivated/auto_resume.ts (deactivated since commit a000dfd; must stay deactivated).
+- Smoke path mismatch: .opencode/plugin/tests/auto_resume.smoke.mjs line 40 loads .opencode/plugin/auto_resume.ts (old path) — file was moved to deactivated/ by a000dfd but smoke path never updated. Must fix to deactivated/auto_resume.ts.
+- Branch: opencode_test at ef03bd0 (ahead 44, behind 1). Verify with git branch -v before committing.
+- Baseline smoke: 63 checks green at eaef397 (pre-deactivation); current smoke is broken (import path).
+- DO-NOT-touch: .opencode/maintainer/**, live config, other plugins. Modified .opencode/maintainer/priority.md and untracked compaction dumps are pre-existing — do NOT commit them.
+- Shell: Git-Bash (bash 3.6, MINGW64); node for smoke; file tools for writes (no > redirection).
+- Commit routine: ONE commit containing code + TODO.md #80 status update + handover file.
+- Final message must include: what changed, item-3 verdict, smoke/gate results, commit hash.
+- Unit 4 scope gate (from 8e4f778): spawned.has(sid) || userHasMarker(msgs) → planner; else none → no action. Scope cached per watch.
+- msgPairs unwraps SDK RequestResult { data } wrapper (fix from eaef397).
+- recoveryCount (L182, cap check L631-633): currently reset on every new busy (L722) → cap unreachable while plugin keeps injecting.
+- spawned Map (L194): populated only by spawnPlanner (L438).
+- Commit hash in TODO/handover: circular reference problem (hash unknown before commit); need to check repo precedent for how prior entries handled this.
+Work State
+Completed
+- Read task spec, repo overview parts (commands, testgate), plugin source (truncated at ~L27), smoke test (truncated at ~L31), _smoke_base.mjs.
+- Confirmed on-disk state: auto_resume.ts only in deactivated/; top-level .opencode/plugin/ has no auto_resume.ts.
+- Confirmed branch: opencode_test at ef03bd0.
+- Git history established: d322927 → d90973b → ee75861 → 4b1a965 → 8e4f778 → d4ef76e → eaef397 → a000dfd (deactivation) → 05a3bde → 0273249 → ef03bd0 (spec).
+- Confirmed a000dfd did NOT update smoke path (only moved file + edited ideas.md).
+- Confirmed Unit 4 scope gate exists since 8e4f778 (committed code always has scope check).
+- Read deactivated/dev_plugin_hot_loaded.ts — a hot-reload dev plugin (untested, likely irrelevant to the incident).
+- Extensive implementation design reasoning completed for all 4 changes (agent resolution, pendingInject TTL map, scope log line, codeVersion hash, smoke check additions).
+Active
+- Evidence gathering for item 3 (scope verification): was about to run bounded greps on:
+- Live log .opencode/temp/auto_resume.log (grep for ses_f39d250e9ffeheip2FVEeY5Fk6, surface=, recovery= lines).
+- Session dump .opencode/archive/sessions/compaction_dumps/ses_f39d250e9ffeheip2FVEeY5Fk6_c0.md (grep for autonom, auto-resume, user parts).
+- opencode.jsonc for plugin path references.
+- TODO.md #80 current text + precedent for commit-hash references in status lines.
+- No code changes made yet — all edits still pending.
+Blocked
+- Smoke is currently red (broken import path) — must fix as part of the work.
+- Item 3 verdict depends on evidence not yet collected (live log, session dump, config).
+- Commit-hash circular reference in TODO/handover needs precedent check.
+- opencode.jsonc grep returned no "plugin" matches in the output shown (truncated) — need to verify how plugins are discovered (auto-scan vs. explicit path list).
+Next Move
+1. Collect item-3 evidence (bounded greps): live log for sid ses_f39d250e9ffeheip2FVEeY5Fk6 + surface= lines; session dump for autonom/marker in user parts; opencode.jsonc plugin discovery mechanism; TODO.md #80 current text + hash-reference precedent.
+2. Implement all 4 changes in .opencode/plugin/deactivated/auto_resume.ts: (a) resolveInjectAgent() helper + firstUserAgent() + w.userAgent cache + agent in Unit 2 & Unit 4 promptAsync bodies; (b) pendingInject Map with 120s TTL in busy handler (injected busy skips recoveryCount reset); (c) scope= verdict log line; (d) codeVersion() sha256 hash in surface= line. Add userAgent?: string | null to Watch interface.
+3. Fix smoke import path → deactivated/auto_resume.ts; extend smoke with ~10-11 new checks (agent in Unit 2/4 bodies, cap semantics with injected-vs-genuine busy, scope line, version identifier); update contSends/spawnSends classifiers (now both carry agent); add new sids to smokeSids.
+4. Run smoke (node .opencode/plugin/tests/auto_resume.smoke.mjs) → must be green.
+5. Run gates (pytest + ruff + handover_probe per repo_commands.md).
+6. Update TODO.md #80 status line + write .opencode/agent/handover/handover_task_to_planner.md.
+7. ONE commit on opencode_test (code + smoke + TODO + handover only; NOT the pre-existing modified/untracked files).
+Relevant Files
+- .opencode/agent/handover/handover_task.md: the task spec (contract).
+- .opencode/plugin/deactivated/auto_resume.ts: the plugin to modify (all 4 changes land here).
+- .opencode/plugin/tests/auto_resume.smoke.mjs: smoke suite to fix (import path) + extend (new checks).
+- .opencode/plugin/tests/_smoke_base.mjs: shared smoke helpers (loadRepo, freshSandbox, makeChecker).
+- TODO.md: entry #80 status line to update in the commit.
+- .opencode/agent/handover/handover_task_to_planner.md: handover file to write (in the commit).
+- .opencode/temp/auto_resume.log: live log (evidence for item 3; read-only grep).
+- .opencode/archive/sessions/compaction_dumps/ses_f39d250e9ffeheip2FVEeY5Fk6_c0.md: mis-scoped session dump (evidence for item 3).
+- opencode.jsonc: live config (verify plugin discovery; DO-NOT-touch).
+- .opencode/agent/prompts/repo/repo_commands.md: gate commands, shell conventions, commit routine.
