@@ -207,17 +207,47 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - #85 scope GENERALIZED (his ruling 2026-09-22): unit-4 scope = actual PLANNER
   (always) ∪ `<|Autorun|>`-toggled sessions (the #82 own-line toggle) — NO new
   marker; drop the planner-only gate so unit 4 follows the #82 scope for ANY
-  agent type → he can run prompt_builder / a future researcher / etc. in a loop
-  by toggling them with `<|Autorun|>`. Freshly-spawned + unmarked worker
-  sessions stay OUT of scope (not a planner, not `<|Autorun|>`-marked) → fixes
-  #85 (the spawn loop) AND the spurious worker-resume. Same auto_resume.ts
-  scope-refinement task as #85's fix.
-- NEXT (his priority order): (1) #81 LANDED + verified (af38e2f — gate
-  241/241); (2) #82 scope rework spec — design AGREED (above) —
-  spec-able now except the unit-2-suppression scope (his call); (3)
-  #80 close (his confirm — (b) verified, (c) gated on #82); (4) TODO.md
-  shrink (~40k tokens); (5) research spec (priority.md #1); (6) TODO
-  #78 scoping.
+   agent type → he can run prompt_builder / a future researcher / etc. in a loop
+   by toggling them with `<|Autorun|>`. Freshly-spawned + unmarked worker
+   sessions stay OUT of scope (not a planner, not `<|Autorun|>`-marked) → fixes
+   #85 (the spawn loop) AND the spurious worker-resume. Same auto_resume.ts
+   scope-refinement task as #85's fix.
+- #85 part 1 LANDED + VERIFIED (97fccfc, worker_Q3S_170K
+   ses_f351feb02ffeScmZIiycmB79GD — the worker COMMITTED then hit the limit on
+   its result; I rebuilt from files per MEM-0104, never relaunched): unit-4
+   scope = actual PLANNER (agent field) ∪ `<|Autorun|>`-toggled sessions (any
+   agent); self-spawned + unmarked worker sessions OUT of scope → the spawn
+   loop is gone. The #82 scope-toggle (last-toggle-wins, own-line, ON =
+   `<|autonom|>`/`<|Autorun|>` ci, OFF = `<|Direct|>` ci) was BUILT in-task —
+   my spec (d1566eb) misstated #82 as LANDED when it was unimplemented
+   (friction 7ce94f3). Gate: auto_resume smoke 97/97 (was 89; +8 scope/toggle
+   checks), probe 241/241, pytest 459+1w, ruff F=0. #82 status: scope-toggle
+   LANDED; remaining = live acceptance (his post-restart test) + the
+   unit-2-suppression question (his call).
+- Planner memory recording (his ask, 2026-09-22 "do not explain these again"):
+   MEM-0104 addendum (a context-limit failure can arrive AFTER the work is
+   COMMITTED — check git log before relaunching) + MEM-0105 (in the serial
+   one-slot setup a delegation is INSTANT to the planner — the worker
+   experiences the runtime; judge from files/logs, not perceived time) +
+   MEM-0106 (a self-compacted sub-agent returns the COMPACTION SUMMARY as the
+   Task result — recognize it by the `## Objective` Work State form + the
+   guaranteed ctx.log `COMPACT <sessionID>` line, then resume via task_id).
+   Committed by the maintainer in 8356cc9 (with his compaction_prompt.md /
+   ideas.md / priority.md).
+- #85 UnknownError bug RE-TRIGGERED this turn: I hit my context limit
+   mid-verification → the OLD live auto_resume code (pre-restart) tried a
+   recovery → the UnknownError (the #85 loop). The maintainer ran a manual
+   compaction on me + RESTARTED opencode → the NEW code (97fccfc, #85 part 1)
+   is now LIVE. #85 part 2 (global cap + dead-mark) still OPEN — the safety for
+   a single failed recovery attempt that part 1 does not eliminate.
+- NEXT (his priority order): (1) #85 part 2 (global cap + dead-mark) —
+   spec + delegate (the safety for a single failed recovery; the scope
+   refinement (part 1) already removes the loop); (2) #82 live acceptance
+   (his post-restart test) + the unit-2-suppression question (his call);
+   (3) #80 close (his confirm — (b) verified, (c) gated on #82); (4) #83
+   context_recovery backstop (his activation + the live session.error
+   check); (5) TODO.md shrink (~40k tokens); (6) research spec (priority.md
+   #1); (7) TODO #78 scoping.
 - Carried parked ideas (unchanged): smaller NAP snapshot via opencode.jsonc
   agent prompt; reality-rebuild tool; pathfinder-mentality prompt part;
   looprunner-retirement decision; feedback integration on planner close-up;
@@ -309,12 +339,12 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 ## Standing
 - Baselines (re-verified 2026-09-22 by the planner, post-#81):
   probe **241** [two-four-one; self-annotated header total is the source
-  and agrees with the reported total — machine-verified; [97] re-pinned
-  to the temp-fix behavior in #81]; smokes **all green** (auto_resume
-  76/76 post-#80, compact_memory 53/53, intercept_observer 39/39,
-  submit 20/20; the per-suite counts are in each smoke's own readout —
-  no total kept here); pytest **459 passed + 1 warning (the known #10
-  coroutine warning)**; ruff **F=0**.
+   and agrees with the reported total — machine-verified; [97] re-pinned
+   to the temp-fix behavior in #81]; smokes **all green** (auto_resume
+   97/97 post-#85 part 1, compact_memory 57/57 post-#84, intercept_observer
+   39/39, submit 20/20; the per-suite counts are in each smoke's own
+   readout — no total kept here); pytest **459 passed + 1 warning (the known
+   #10 coroutine warning)**; ruff **F=0**.
 - Cross-compaction (measured 2026-09-18 plan2; re-verified live 2026-09-22):
   `compact_memory` with a foreign sessionID — no model args in the tool
   schema; the summarizer model resolves per `agent.compaction.model` (set in
