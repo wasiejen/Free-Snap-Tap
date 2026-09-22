@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #78, new
-entries start at #79 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #80, new
+entries start at #81 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -788,3 +788,44 @@ per the revised proposal — Unit 3 = new-planner spawn helper (shared
 building block), Unit 4 = planner liveness watchdog (auto-resume after
 compaction is its first branch); the "unit 3 = auto-resume / unit 4 =
 restart detection" wording above is the pre-revision numbering.
+
+## 80. (open, 2026-09-22, planner; HIGH — investigated, fix pending) auto_resume inject calls lose the session agent → turns run as "build"
+- **Problem + evidence:** the Unit 2 (L387) + Unit 4 (L643) `promptAsync`
+  calls in `.opencode/plugin/deactivated/auto_resume.ts` send NO `agent`
+  field (the Unit 3 spawn does, L432). opencode's prompt path defaults a
+  missing agent to "build" → the injected turn runs as Build (DB, 2026-09-22
+  direct session ses_f39d250e9ffeheip2FVEeY5Fk6: injected user msgs + the
+  following assistant turns carry agent=build/mode=build, 23:58 ×4;
+  planner-6's session record agent=build). Impact: per-injected-turn
+  system-prompt change → whole prompt-cache invalidation + the planner loses
+  its system prompt (the planner-worker workflow is broken for those turns).
+- **Related open anomaly:** unit 4 acted on a direct (non-autorun) session
+  despite the scope=none fail-safe (5× `recovery= attempt=1`; the cap resets
+  on each injected busy → unreachable as-is). NO user text part of that
+  session carries `<|autonom|>` (all 15 checked) and the spawned map never
+  held it → the behavior is NOT reproducible from the committed file: the
+  running code in the 23:12–23:58 window was likely a mid-debug variant
+  (three plugin reloads at 23:12:03 / 23:42:21 / 23:58:52, matching
+  maintainer interventions). Resolve before re-activation (suggested: a
+  version hash in the `surface=` line).
+- **Desired outcome:** injected messages preserve the session's agent (cache
+  warm, role prompt intact); a direct session ends idle untouched.
+- **Acceptance criteria:** (a) the unit 2/4 `promptAsync` body carries an
+  explicit agent — scoped sessions: the spawn-side `PLANNER_AGENT_ID`; other
+  sessions: the first user message's agent from the existing `messages()`
+  fetch (`session.agent` is UNRELIABLE — it tracks the LAST prompt; proven
+  lock-in to "build" on planner-6); (b) live (post re-activation): the
+  injected message + turn show the session's original agent in the DB and
+  cache-read tokens stay high (no full re-prefill); (c) a direct session ends
+  idle with no recovery/trigger injection.
+- **Open design questions (maintainer, undecided):** recovery-cap semantics
+  (reset-on-busy makes the cap unreachable while the plugin keeps injecting);
+  direct session = new "autorun" entry with direct interaction (his
+  stop/interrupt + `ask_maintainer` must stop the loop); planner compaction
+  budget exhaustion (keep=0 + same-session resume + budget reset vs. higher
+  cap — bit-rot risk).
+- **Status:** investigated 2026-09-22 (planner, direct session); fix pending
+  — plugin DEACTIVATED by the maintainer (a000dfd, moved to
+  `.opencode/plugin/deactivated/`).
+- **Suggested scope:** `.opencode/plugin/deactivated/auto_resume.ts` (L387,
+  L643; scope scan L543-551).

@@ -2,40 +2,43 @@
 
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
-## Current session — looprun autorun-2026-09-21_15-33, iteration 7 (ses_f3a24dc3bffe59B5xpa0Ho3XZd, planner-7, Qwen3.8-27B-Q3S-160K)
-- UNIT B LANDED + planner re-verified (d4ef76e, worker-10 `worker_Q3S_160K`
-  ses_f3a03af20ffe1bRa56xVl143VG): the autoCompact toggle (per-tick reader
-  `autoCompactEnabled()`, fail-open; OFF → `skip= autoCompact-off` line, no
-  send, the once-per-busy-cycle attempts budget retained; 4 new smoke
-  cases → 62/62; probe 241/241, pytest 459+1w, ruff F=0). Worker-9 was
-  CANCELLED mid-run by the maintainer interrupt (the #79 ping-pong
-  incident) with a partial diff (header comment + constant) — worker-10
-  carried it from the working tree.
-- Maintainer interrupt incident: the auto-resume plugin repeatedly
-  re-resumed planner-6 after its valid `action: restart` (ping-pong risk
-  on the single serial slot). Planner-6 filed TODO #79 (HIGH) — the real
-  cause: `msgPairs` never unwraps the SDK `{ data }` wrapper (the earlier
-  "read-race" INFO line was WRONG, corrected in the loop log).
-- The #79 fix LANDED + planner re-verified (eaef397, worker-11
-  `worker_Q3S_110K_mtp` ses_f39eef70effefmk8Bt598jhqwK): the dual-shape
-  unwrap in `msgPairs` + the wrapper-shape smoke case (smoke 63/63, probe
-  241/241, pytest 459+1w, ruff F=0).
-- Open questions (his parked ideas, carried): (1) smaller NAP snapshot via
-  agent prompt in opencode.jsonc; (2) reality-rebuild tool; (3)
-  pathfinder-mentality prompt part; (4) looprunner-retirement decision;
-  (5) feedback integration on planner close-up; (6) worker git-hash closing
-  confusion (ideas.md — no marker, not a task).
-- NEXT (in order): (1) live acceptance after the next host restart — Unit A
-  cross re-acceptance, Unit 2 saturation+trigger, Unit 4 route lines, and
-  the #79 `route=`/`skip=` lines for the planner-7 close (verify from
-  auto_resume.log + ctx.log); (2) the requested research spec (compact_
-  memory + block_transfer up/downs — priority.md #1) still unwritten;
-  (3) TODO #78 scoping (dump completeness).
-- NOTE for my close: the still-live buggy plugin (pre-restart host) may
-  fire 1-2 spurious recovery prompts at THIS finished session (cap 2 per
-  idle cycle, recoveryCount resets on every busy) — do not treat a
-  revival of this session as a real resume; the looprunner's action-line
-  handling is authoritative.
+## Current session — direct, 2026-09-22 (ses_f39d250e9ffeheip2FVEeY5Fk6, planner Qwen3.8-27B-Q3S-160K)
+- Live acceptance (this host, 22:50:11 start): unit 2 trigger LIVE
+  (23:40:41, this session, ratio 1.032 — I missed the self-compact, he
+  compacted manually 23:43:26); unit 4 recovery LIVE (5× attempt=1 on this
+  session); unit 3 spawn: ONE log line total (17:00:21, pre-restart era);
+  unit 4 route= stop/ask/restart still unproven. Cross-compact LIVE: my
+  worker-11 dispatch landed (COMPACT line; model = the target session's own
+  per config — his "default behavior of opencode"); the resumed worker-11
+  ran its post-compaction turn (ratio 0.094), idle, untouched (scope none)
+  → #70 cross path effectively verified (close pending his confirm).
+- #1 investigated (his request) → TODO #80: injected `promptAsync` (unit
+  2/4) omits `agent` → default "build" → injected turns run as Build
+  (DB-proven) → system-prompt change → whole-cache invalidation + planner
+  loses its prompt. Fix design in the #80 entry. Open anomaly: unit 4 acted
+  on this direct session despite the scope=none fail-safe — NOT
+  reproducible from the committed file (no marker in any user text part,
+  spawned map empty for this sid) → mid-debug running variant suspected
+  (three reloads 23:12:03/23:42:21/23:58:52 ≈ his interventions); a version
+  hash in the `surface=` line suggested.
+- His rulings this session: auto-resume DEACTIVATED (a000dfd, file moved to
+  `.opencode/plugin/deactivated/`; he had to exit opencode to stop the
+  resume storm). Workflow binding for direct sessions: one item at a time,
+  ask to clarify, follow the stop line (I broke it — 88%→103%), direct
+  sessions are for interaction.
+- Open design questions (his, undecided): direct session = new "autorun"
+  entry (his stop/interrupt + `ask_maintainer` must stop the loop); planner
+  compaction budget exhaustion (keep=0 + same-session resume + budget reset
+  vs. higher cap — bit-rot risk).
+- NEXT (his priority order): (1) #80 fix-design ruling, then implement post
+  re-activation; (2) TODO.md shrink (~40k tokens — closed entries →
+  todo_records.md, one-line records); (3) unit 4 route= live proof + #70
+  close confirm; (4) research spec (compact_memory + block_transfer —
+  priority.md #1); (5) TODO #78 scoping.
+- Carried parked ideas (unchanged): smaller NAP snapshot via opencode.jsonc
+  agent prompt; reality-rebuild tool; pathfinder-mentality prompt part;
+  looprunner-retirement decision; feedback integration on planner close-up;
+  worker git-hash closing confusion (ideas.md).
 
 
 
@@ -43,6 +46,7 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Compressed archive (one line each — details in git log + TODO/records)
+- 2026-09-21 looprun autorun-2026-09-21_15-33, iteration 7 (ses_f3a24dc3bffe59B5xpa0Ho3XZd, planner-7, Qwen3.8-27B-Q3S-160K) — plan7: UNIT B LANDED + re-verified (d4ef76e, worker-10, after the worker-9 cancel); #79 root cause (msgPairs `{data}` wrapper) + fix LANDED + re-verified (eaef397, worker-11); live acceptance deferred to the post-restart direct session — details: loop folder plan7_summary.md + git 05e62ed
 - 2026-09-21 looprun 2026-09-21_15-33, iteration 6 (ses_f3a51aedcffeSa0cwt8PmwlXAr, planner-6, Qwen3.8-27B-Q3S-160K) — plan6: post-restart live acceptance (DUMP-OK LIVE PASS; the CROSS MODEL-READ live bug found + fixed 280b8d0 — dual-shape unwrap, the SAME root cause later filed as #79 for auto_resume `msgPairs`; Unit 2 `arm=` lines live; the Unit-4 spurious-recovery finding — corrected by planner-6 to the #79 shape bug) + the UNIT B spec committed (1c599a6; worker-8 stream-cut, zero loss; UNIT B toggle design decision recorded in plan6_summary.md: top-level optional `autoCompact` in the budget file, absent/true = ON, false = suppressed + `skip=` line, malformed = fail-open) + #78 filed, #70/#75 statuses — details: loop folder plan6_summary.md + git 280b8d0/a475d8a
 - 2026-09-21 looprun 2026-09-21_15-33, iteration 5 (ses_f3acaf402ffexZ2GH0r5N0ZEWm, planner-5, Qwen3.8-27B-Q3S-160K) — plan5: Compact_memory UNIT A LANDED + planner-verified + landed-by-planner after the worker's context-limit death (6864bc0; 4-key args, config-resolved summarizer, queued message, DUMP-OK, stdio ignore; probe 241/241, 10/10 smokes, pytest 459+1w, ruff F=0) — details: loop folder plan5_summary.md + git 6864bc0/ab01f57
 - 2026-09-21 looprun 2026-09-21_15-33, iteration 4 (ses_f3b1fb61effes4b4uZhoDYM3ix, planner-4, Qwen3.8-27B-Q3S-160K) — plan4: UNIT 3 live acceptance PASSED (trigger → spawn + marker file, both sides verified); UNIT 2 live acceptance FAILED → the live `session.status` shape bug found + fixed (`4b1a965`, smoke 40/40, live re-acceptance pending the next restart); UNIT 4 planner-liveness watchdog LANDED + planner-verified (`8e4f778`, smoke 53/53); gate green (probe 235/235, pytest 459+1w, ruff F=0); closed at the 90% stop line — details: loop folder plan4_summary.md + git bd5dfbe
