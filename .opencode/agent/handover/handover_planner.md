@@ -158,8 +158,14 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   plugin (consolidate summarize/budget/config), aligning context_recovery's
   message handling to the temp-fix behavior. PREREQ: verify the host
   actually calls the `session.error` hook on overflow (live check — his
-  action). NOT implemented — design phase. Tasks: (1) config consolidation
+  action). NOT implemented — design phase. Tasks:   (1) config consolidation
   (small), (2) live hook verification (his), (3) the merge (contingent).
+  EXTENSION (his, 2026-09-22): Task 1 also adds a `model_budget` map to
+  compact_budget.json — explicit per-model-ID → cap, REPLACING the
+  QUANT_CLASS_RULES substring table (compact_memory.ts L79-86: cpu→0,
+  q4→3, q3→3, q2→1, default 1; has a probe-pinned trap). Unlisted model →
+  default 1; wrong key → fails safe (no match). CPU cap-0 to be kept as a
+  guard (his call). Trap probe pin updates to "configured value".
 - NEXT (his priority order): (1) #81 LANDED + verified (af38e2f — gate
   241/241); (2) #82 scope rework spec — design AGREED (above) —
   spec-able now except the unit-2-suppression scope (his call); (3)
