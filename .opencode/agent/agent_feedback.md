@@ -392,3 +392,21 @@ compact_memory SELF (2026-09-22, ses_f39d250e): the queued continuation message 
 ### 2026-09-22_13-59 planner_Q3S_160K ses_f39d250e9ffeheip2FVEeY5Fk6
 Two friction points, 2026-09-22 direct session: (1) worker-1 (worker_Q3S_110K_mtp, 110k) burned its whole window on DESIGN for an investigate-then-implement plugin spec and died with zero code changes — 110k is too tight for that task shape; default such specs to worker_Q3S_160K or split spec into design-checkpoint + implementation (the checkpoint-draft salvage worked, but only because the maintainer saved the partial draft). (2) auto_resume smoke suite now runs >2 min (my 120s default bash timeout cut the verification run mid-suite) — repo_commands.md gate section should note the expected suite duration / a larger timeout (maintainer file, flag only).
 
+### 2026-09-22_15-00 worker_Q3S_160K ses_f36d1ca53ffe0GXACaVwW9iCJO
+#81 spec DoD "LANDED (commit hash)" in the SAME commit is impossible (hash can't reference itself) — spec wording should use the #80 precedent ("planner records the hash on return") to save the worker an improvise cycle.
+
+### 2026-09-22_15-10 planner_Q3S_160K ses_f39d250e9ffeheip2FVEeY5Fk6
+Planner dropped the planned closing text after the last tool result — twice this session (turns ended at a tool result without the planned summary/action: line, so unit 4 re-fired a recovery injection after the first). The close must be authored as the turn's final message, not planned "after" the last tool call.
+
+### 2026-09-22_19-13 worker_Q3S_170K ses_f35f82abdffeyz62ZF4NLW3qZy
+Spec baseline claim unreachable: "baseline 76/76" for auto_resume.smoke.mjs, but commit 380e326 (plugin reactivation) left the smoke loading the old deactivated path → ERR_MODULE_NOT_FOUND before any check; worker had to fix the load path first. Verify cited baselines are runnable before delegating.
+
+### 2026-09-22_19-25 planner_Q3S_170K ses_f39d250e9ffeheip2FVEeY5Fk6
+Stale roster in spec/launch: after the maintainer's e10eefe rename, the spec's "Worker: worker_Q3S_160K" and my launch used a name that no longer exists (Task tool rejected: "Unknown agent type"). Verify the live worker roster in opencode.jsonc agents before writing a spec's Worker line / launching — model/worker names change when he edits the config.
+
+### 2026-09-22_21-06 worker_Q3S_170K ses_f359ce94dffeQcs03QW2YSgtSe
+Spec DoD said "TODO.md: this entry -> status LANDED" but no such entry existed (file ended at #83) — the worker had to create #84 instead; consider pre-creating the entry in the spec commit. Also: the injected ctx gauge readout lagged badly (stuck at 37% across several edit turns, then jumped), making stop-line planning unreliable — the self-gauge was the only trustworthy source.
+
+### 2026-09-22_23-32 worker_Q3S_170K ses_f351feb02ffeScmZIiycmB79GD
+Spec-vs-code drift cost a design cycle: the #85 part-1 spec listed "#82 scope toggle already LANDED" as a verified fact, but TODO #82 + the committed code had no toggle implementation — the worker had to implement the agreed #82 own-line toggle design as part of the scope rework to meet the spec's own smoke requirements.
+
