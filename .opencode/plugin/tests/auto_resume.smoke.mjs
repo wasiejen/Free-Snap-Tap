@@ -2,8 +2,9 @@
 // (.opencode/plugin/auto_resume.ts; approved 2026-09-21 auto-resume
 // proposal). UNIT 1: skeleton logging plugin + v1 client surface probe.
 // UNIT 2: the context-limit compaction trigger — a live session crossing
-// 85% of its usable window queues ONE self-compact instruction via
-// promptAsync (queued, never synchronous), once per busy cycle.
+// its saturation threshold (configurable per tick, default 0.95 of the
+// usable window) queues ONE self-compact instruction via promptAsync
+// (queued, never synchronous), once per busy cycle.
 // UNIT 3: the new-planner spawn helper — a one-shot trigger file in the
 // log dir, consumed (renamed .consumed) by the 5s tick after ONE spawn
 // attempt (create + queued promptAsync, agent=planner_Q3S_160K, NO model
@@ -37,7 +38,7 @@ const proj = path.join(base, "proj");
 fs.mkdirSync(proj, { recursive: true });
 const sandboxLog = path.join(proj, ".opencode", "temp", "auto_resume.log");
 
-const mod = await loadRepo(".opencode/plugin/deactivated/auto_resume.ts");
+const mod = await loadRepo(".opencode/plugin/auto_resume.ts");
 const factory = mod.default;
 
 const readLines = () =>
@@ -138,17 +139,18 @@ try {
   // ============================================================
   // UNIT 2 — context-limit compaction trigger
   //
-  // The factory is re-invoked with a SPYING client: promptAsync records
-  // every call; the provider mock supplies limit data in the LIVE SDK
-  // shape (res.data.all[] → models[modelID].limit.{context,output}; the
-  // installed SDK names the method `list`). usable = 100000 -
-  // min(20000, 16000) = 84000; threshold 0.85 → fire at >= 71400.
-  // The single 5s tick is the only decision+send funnel — the smoke
-  // waits on it (real time; the timer is unref'd).
-  // ============================================================
-  const CONTEXT = 100000, OUTPUT = 16000;
-  const USABLE = CONTEXT - Math.min(20000, OUTPUT); // 84000
-  const RATIO_HI = (80000 / USABLE).toFixed(3); // 0.952
+   // The factory is re-invoked with a SPYING client: promptAsync records
+   // every call; the provider mock supplies limit data in the LIVE SDK
+   // shape (res.data.all[] → models[modelID].limit.{context,output}; the
+   // installed SDK names the method `list`). Default config (no budget
+   // file — fail-open): usable = 100000 - min(20000, 16000) = 84000;
+   // threshold 0.95 → fire at >= 79800.
+   // The single 5s tick is the only decision+send funnel — the smoke
+   // waits on it (real time; the timer is unref'd).
+   // ============================================================
+   const CONTEXT = 100000, OUTPUT = 16000;
+   const USABLE = CONTEXT - Math.min(20000, OUTPUT); // 84000
+   const RATIO_HI = (80000 / USABLE).toFixed(3); // 0.952
 
   const calls = [];
   const v2Session = {
@@ -211,7 +213,7 @@ try {
 
   // ---- tick 1: exactly ONE send, the saturated session
   const ok1 = await waitUntil(() => calls.length >= 1);
-  chk("UNIT 2: idle at ratio >= 0.85 → exactly ONE promptAsync call", ok1 && calls.length === 1, `n=${calls.length}`);
+  chk("UNIT 2: idle at ratio >= 0.95 (default) → exactly ONE promptAsync call", ok1 && calls.length === 1, `n=${calls.length}`);
   const c0 = calls[0] ?? {};
   chk("UNIT 2: send targets the saturated session (path.id)", c0.path?.id === "ses_u2_sat", JSON.stringify(c0.path ?? null));
   const text0 = c0.body?.parts?.[0]?.text ?? "";
@@ -223,7 +225,7 @@ try {
     JSON.stringify(Object.keys(c0.body ?? {})));
   chk("UNIT 2: trigger= log line present for the send (with the ratio)", readLines().some((l) => l.includes(`trigger= sid=ses_u2_sat`) && l.includes(RATIO_HI)), "");
   const sentSids = calls.map((c) => c.path?.id);
-  chk("UNIT 2: sub-threshold session (ratio < 0.85) → zero promptAsync calls", !sentSids.includes("ses_u2_low"), JSON.stringify(sentSids));
+  chk("UNIT 2: sub-threshold session (ratio < 0.95 default) → zero promptAsync calls", !sentSids.includes("ses_u2_low"), JSON.stringify(sentSids));
   chk("UNIT 2: user-role update did not arm a send (not the saturation input)", !sentSids.includes("ses_u2_low"), JSON.stringify(sentSids));
   chk("UNIT 2: lastTokenTotal OVERWRITTEN (80000 then 40000 → below threshold → no send)", !sentSids.includes("ses_u2_over"), JSON.stringify(sentSids));
   chk("UNIT 2: no model info → usable null → no send", !sentSids.includes("ses_u2_nomodel"), JSON.stringify(sentSids));
@@ -236,21 +238,21 @@ try {
   // ---- fresh busy cycle → budget reset → sends again
   await fire(hooksU2, "ses_u2_sat", [statusEv("ses_u2_sat", "busy"), statusEv("ses_u2_sat", "idle")]);
   const ok3 = await waitUntil(() => calls.length >= 2);
-  chk("UNIT 2: fresh busy → idle at ratio >= 0.85 → sends again (budget reset)", ok3 && calls.length === 2, `n=${calls.length}`);
+  chk("UNIT 2: fresh busy → idle at ratio >= 0.95 (default) → sends again (budget reset)", ok3 && calls.length === 2, `n=${calls.length}`);
   chk("UNIT 2: second send is the same session with the same ratio text",
     calls[1]?.path?.id === "ses_u2_sat" && ((calls[1]?.body?.parts?.[0]?.text ?? "")).includes(RATIO_HI), "");
 
   // ---- dual-shape acceptance: a STRING-shape "busy" event (older host
-  // shape / mocks) still arms + fires a trigger= line for a >= 0.85
-  // session (the LIVE object shape is what statusEv pins above; the
-  // idle leg here is sent in the live shape).
+  // shape / mocks) still arms + fires a trigger= line for a >= 0.95
+  // (default) session (the LIVE object shape is what statusEv pins
+  // above; the idle leg here is sent in the live shape).
   await fire(hooksU2, "ses_u2_str", [
     { event: { type: "session.status", properties: { sessionID: "ses_u2_str", status: "busy" } } },
     msgUpdated("ses_u2_str", "assistant", { total: 80000 }, MODEL),
     statusEv("ses_u2_str", "idle"),
   ]);
   const ok5 = await waitUntil(() => calls.length >= 3 && readLines().some((l) => l.includes("trigger= sid=ses_u2_str")));
-  chk("UNIT 2: STRING-shape busy event still arms + fires trigger= for a >= 0.85 session (dual-shape acceptance)",
+  chk("UNIT 2: STRING-shape busy event still arms + fires trigger= for a >= 0.95 (default) session (dual-shape acceptance)",
     ok5 && calls.length === 3 && readLines().some((l) => l.includes("arm= sid=ses_u2_str")), `n=${calls.length}`);
 
   // ---- fail-safety: a throwing send + a missing provider → no throw,
@@ -279,8 +281,8 @@ try {
 
   // ---- autoCompact toggle (maintainer priority #1): an OPTIONAL
   // top-level `autoCompact` key in `.opencode/temp/compact_budget.json`
-  // (the sandbox's budget file — NEVER the live one) gates the 0.85
-  // trigger: absent/true → status quo; false → suppressed with a
+  // (the sandbox's budget file — NEVER the live one) gates the default
+  // 0.95 trigger: absent/true → status quo; false → suppressed with a
   // `skip= autoCompact-off` line and the attempts budget NOT consumed;
   // missing/unreadable/malformed file → fail OPEN (status quo).
   // A FRESH spying client — the fail-safety section above re-factored
@@ -302,7 +304,8 @@ try {
   const budgetFile = path.join(proj, ".opencode", "temp", "compact_budget.json");
   const writeBudget = (content) => fs.writeFileSync(budgetFile, content, "utf-8");
 
-  // case 1: NO budget file + ratio >= 0.85 → trigger fires (explicit
+  // case 1: NO budget file + ratio >= 0.95 (default) → trigger fires
+  // (explicit
   // status-quo regression — the file is absent in the sandbox)
   fs.rmSync(budgetFile, { force: true });
   const nNoFile = tCalls.length;
@@ -313,7 +316,8 @@ try {
   chk("UNIT 2: autoCompact — NO budget file → trigger= log line for the send",
     readLines().some((l) => l.includes("trigger= sid=ses_u2_tgnof") && l.includes(RATIO_HI)), "");
 
-  // case 2: autoCompact:false + ratio >= 0.85 → ZERO sends, the skip
+  // case 2: autoCompact:false + ratio >= 0.95 (default) → ZERO sends,
+  // the skip
   // line present (ratio still observable), the attempts budget NOT
   // consumed (a second idle in the same cycle is skipped again, and a
   // flip back ON sends from the retained budget)
@@ -321,7 +325,7 @@ try {
   const nOff = tCalls.length;
   await fire(hooksUT, "ses_u2_tgoff", [statusEv("ses_u2_tgoff", "busy"), msgUpdated("ses_u2_tgoff", "assistant", { total: 80000 }, MODEL), statusEv("ses_u2_tgoff", "idle")]);
   await sleep(5600); // at least one full tick period with the toggle OFF
-  chk("UNIT 2: autoCompact:false + ratio >= 0.85 → ZERO promptAsync calls", tCalls.length === nOff, `n=${tCalls.length}`);
+  chk("UNIT 2: autoCompact:false + ratio >= 0.95 (default) → ZERO promptAsync calls", tCalls.length === nOff, `n=${tCalls.length}`);
   chk("UNIT 2: autoCompact:false → skip= autoCompact-off line present (ratio still observable)",
     readLines().some((l) => l.includes("skip= autoCompact-off sid=ses_u2_tgoff") && l.includes(RATIO_HI)), "");
   await fire(hooksUT, "ses_u2_tgoff", [statusEv("ses_u2_tgoff", "idle")]); // second idle, same busy cycle
@@ -334,17 +338,19 @@ try {
   chk("UNIT 2: toggle flipped back ON → the retained budget sends (once-per-cycle holds)",
     okOn && tCalls.length === nOff + 1 && tCalls[tCalls.length - 1]?.path?.id === "ses_u2_tgoff", `n=${tCalls.length}`);
 
-  // case 3: autoCompact:true + ratio >= 0.85 → trigger fires (explicit ON)
+  // case 3: autoCompact:true + ratio >= 0.95 (default) → trigger fires
+  // (explicit ON)
   writeBudget(JSON.stringify({ autoCompact: true }));
   const nOn = tCalls.length;
   await fire(hooksUT, "ses_u2_tgon", [statusEv("ses_u2_tgon", "busy"), msgUpdated("ses_u2_tgon", "assistant", { total: 80000 }, MODEL), statusEv("ses_u2_tgon", "idle")]);
   const okOn2 = await waitUntil(() => tCalls.length >= nOn + 1);
-  chk("UNIT 2: autoCompact:true + ratio >= 0.85 → trigger fires",
+  chk("UNIT 2: autoCompact:true + ratio >= 0.95 (default) → trigger fires",
     okOn2 && tCalls.length === nOn + 1 && tCalls[tCalls.length - 1]?.path?.id === "ses_u2_tgon", `n=${tCalls.length}`);
   chk("UNIT 2: autoCompact:true → trigger= log line for the send",
     readLines().some((l) => l.includes("trigger= sid=ses_u2_tgon") && l.includes(RATIO_HI)), "");
 
-  // case 4: MALFORMED budget file content + ratio >= 0.85 → fail OPEN
+  // case 4: MALFORMED budget file content + ratio >= 0.95 (default) →
+  // fail OPEN
   // (trigger fires — the status quo)
   writeBudget("{ this is not valid json !!!");
   const nMal = tCalls.length;
@@ -352,6 +358,108 @@ try {
   const okMal = await waitUntil(() => tCalls.length >= nMal + 1);
   chk("UNIT 2: autoCompact — MALFORMED file → fail OPEN, trigger fires",
     okMal && tCalls.length === nMal + 1 && tCalls[tCalls.length - 1]?.path?.id === "ses_u2_tgmal", `n=${tCalls.length}`);
+  fs.rmSync(budgetFile, { force: true }); // leave the sandbox clean
+
+  // ============================================================
+  // UNIT 2 (cont.) — configurable threshold + output reserve
+  // (maintainer ruling 2026-09-22: "only trigger it past the 95% line")
+  // Optional top-level keys in the SANDBOX budget file — read per tick,
+  // fail-open (absent / unparseable / out-of-range → the defaults
+  // 0.95 / 20000). Reuses hooksUT + tCalls (same spying client). Node-
+  // computed expectations: usable (default reserve) = 84000:
+  // 80000/84000 = 0.952 (fires), 79000/84000 = 0.940 (no fire — WOULD
+  // fire at the old 0.85 default); 55000/84000 = 0.655 (fires at 0.60,
+  // no fire at 0.95); 40000/84000 = 0.476 (no fire even at 0.60).
+  // Usable (reserve 0) = 100000: 96000/100000 = 0.960 (fires),
+  // 82000/100000 = 0.820 (no fire — whereas 82000/84000 = 0.976 WOULD
+  // fire at the default reserve).
+  // ============================================================
+
+  // case (a): NO config → fail-open defaults 0.95 / 20000 — both
+  // sessions evaluated on ONE tick: 79000 (0.940) below, 80000 (0.952)
+  // above.
+  fs.rmSync(budgetFile, { force: true });
+  const nCfgA = tCalls.length;
+  await fire(hooksUT, "ses_u2_cfa_low", [statusEv("ses_u2_cfa_low", "busy"), msgUpdated("ses_u2_cfa_low", "assistant", { total: 79000 }, MODEL), statusEv("ses_u2_cfa_low", "idle")]);
+  await fire(hooksUT, "ses_u2_cfa_hi", [statusEv("ses_u2_cfa_hi", "busy"), msgUpdated("ses_u2_cfa_hi", "assistant", { total: 80000 }, MODEL), statusEv("ses_u2_cfa_hi", "idle")]);
+  const okCfgA = await waitUntil(() => tCalls.length >= nCfgA + 1);
+  const sentA = tCalls.slice(nCfgA).map((c) => c.path?.id);
+  chk("UNIT 2 config: no config → fail-open 0.95/20000 — 80000 (0.952) fires exactly once",
+    okCfgA && tCalls.length === nCfgA + 1 && sentA.includes("ses_u2_cfa_hi"), `n=${tCalls.length}`);
+  chk("UNIT 2 config: no config — 79000 (0.940 < 0.95 default) does NOT fire (would at the old 0.85)",
+    !sentA.includes("ses_u2_cfa_low"), JSON.stringify(sentA));
+  chk("UNIT 2 config: no config — saturation= line carries the ratio at the default usable",
+    readLines().some((l) => l.includes("saturation= sid=ses_u2_cfa_low") && l.includes("0.940")), "");
+
+  // case (b): per-tick LIVE EDIT — ses_u2_cfb_edit armed at 55000
+  // (0.655) while NO config (below the 0.95 default) → one tick of
+  // silence; then saturationThreshold 0.60 is written → the NEXT tick
+  // fires it (read per tick — no restart needed).
+  const nCfgB0 = tCalls.length;
+  await fire(hooksUT, "ses_u2_cfb_edit", [statusEv("ses_u2_cfb_edit", "busy"), msgUpdated("ses_u2_cfb_edit", "assistant", { total: 55000 }, MODEL), statusEv("ses_u2_cfb_edit", "idle")]);
+  await sleep(5600); // one full tick under the 0.95 default
+  chk("UNIT 2 config: live edit — armed at 0.655 while no config → one tick of silence (0.95 default)",
+    tCalls.length === nCfgB0, `n=${tCalls.length}`);
+  writeBudget(JSON.stringify({ saturationThreshold: 0.60 }));
+  const nCfgB = tCalls.length;
+  const okCfgB = await waitUntil(() => tCalls.length >= nCfgB + 1);
+  // The next tick re-evaluates EVERY armed+idle watch at the new
+  // threshold: ses_u2_cfb_edit (0.655) fires AND the lingering
+  // ses_u2_cfa_low from case (a) (0.940, never sent — attempts still 0)
+  // now crosses 0.60 too (watch insertion order → cfa_low first,
+  // cfb_edit last).
+  const sentB = tCalls.slice(nCfgB).map((c) => c.path?.id);
+  chk("UNIT 2 config: LIVE EDIT saturationThreshold 0.60 → the armed 0.655 session fires on the NEXT tick (the lingering 0.940 session crosses too)",
+    okCfgB && tCalls.length === nCfgB + 2 && tCalls[tCalls.length - 1]?.path?.id === "ses_u2_cfb_edit" && sentB.includes("ses_u2_cfa_low"), `n=${tCalls.length}`);
+  chk("UNIT 2 config: live-edit send text names ratio 0.655",
+    ((tCalls[tCalls.length - 1]?.body?.parts?.[0]?.text ?? "")).includes("0.655"), "");
+
+  // case (b, cont.): threshold 0.60 in force — 55000 (0.655) fires,
+  // 40000 (0.476) does NOT (both on the same tick).
+  const nCfgB2 = tCalls.length;
+  await fire(hooksUT, "ses_u2_cfb_fire", [statusEv("ses_u2_cfb_fire", "busy"), msgUpdated("ses_u2_cfb_fire", "assistant", { total: 55000 }, MODEL), statusEv("ses_u2_cfb_fire", "idle")]);
+  await fire(hooksUT, "ses_u2_cfb_no", [statusEv("ses_u2_cfb_no", "busy"), msgUpdated("ses_u2_cfb_no", "assistant", { total: 40000 }, MODEL), statusEv("ses_u2_cfb_no", "idle")]);
+  const okCfgB2 = await waitUntil(() => tCalls.length >= nCfgB2 + 1);
+  const sentB2 = tCalls.slice(nCfgB2).map((c) => c.path?.id);
+  chk("UNIT 2 config: saturationThreshold 0.60 → 55000 (0.655) fires",
+    okCfgB2 && tCalls.length === nCfgB2 + 1 && sentB2.includes("ses_u2_cfb_fire"), `n=${tCalls.length}`);
+  chk("UNIT 2 config: saturationThreshold 0.60 → 40000 (0.476) does NOT fire", !sentB2.includes("ses_u2_cfb_no"), JSON.stringify(sentB2));
+
+  // case (c): outputReserve 0 → usable = 100000 - min(0, 16000) = 100000:
+  // 96000 (0.960) fires with usable 100000 in the text; 82000 (0.820)
+  // does NOT — whereas 82000/84000 = 0.976 WOULD fire at the default
+  // reserve (both on the same tick).
+  writeBudget(JSON.stringify({ outputReserve: 0 }));
+  const nCfgC = tCalls.length;
+  await fire(hooksUT, "ses_u2_cfc_fire", [statusEv("ses_u2_cfc_fire", "busy"), msgUpdated("ses_u2_cfc_fire", "assistant", { total: 96000 }, MODEL), statusEv("ses_u2_cfc_fire", "idle")]);
+  await fire(hooksUT, "ses_u2_cfc_no", [statusEv("ses_u2_cfc_no", "busy"), msgUpdated("ses_u2_cfc_no", "assistant", { total: 82000 }, MODEL), statusEv("ses_u2_cfc_no", "idle")]);
+  const okCfgC = await waitUntil(() => tCalls.length >= nCfgC + 1);
+  const sentC = tCalls.slice(nCfgC).map((c) => c.path?.id);
+  chk("UNIT 2 config: outputReserve 0 → usable 100000 — 96000 (0.960) fires",
+    okCfgC && tCalls.length === nCfgC + 1 && sentC.includes("ses_u2_cfc_fire"), `n=${tCalls.length}`);
+  chk("UNIT 2 config: outputReserve 0 — send text names the usable window (96000 of 100000)",
+    ((tCalls[tCalls.length - 1]?.body?.parts?.[0]?.text ?? "")).includes("96000 of 100000"), "");
+  chk("UNIT 2 config: outputReserve 0 — 82000 (0.820) does NOT fire (0.976 at the default reserve WOULD)",
+    !sentC.includes("ses_u2_cfc_no"), JSON.stringify(sentC));
+
+  // case (d): OUT-OF-RANGE values → fail-open defaults: saturationThreshold
+  // "high" (not a number) + outputReserve -5 (negative) are both ignored
+  // → 79000 (0.940) no fire, 80000 (0.952) fires at usable 84000 (same
+  // tick).
+  writeBudget(JSON.stringify({ saturationThreshold: "high", outputReserve: -5 }));
+  const nCfgD = tCalls.length;
+  await fire(hooksUT, "ses_u2_cfd_low", [statusEv("ses_u2_cfd_low", "busy"), msgUpdated("ses_u2_cfd_low", "assistant", { total: 79000 }, MODEL), statusEv("ses_u2_cfd_low", "idle")]);
+  await fire(hooksUT, "ses_u2_cfd_hi", [statusEv("ses_u2_cfd_hi", "busy"), msgUpdated("ses_u2_cfd_hi", "assistant", { total: 80000 }, MODEL), statusEv("ses_u2_cfd_hi", "idle")]);
+  const okCfgD = await waitUntil(() => tCalls.length >= nCfgD + 1);
+  // The fail-open defaults re-arm the default 0.95/20000 math: the
+  // lingering ses_u2_cfc_no from case (c) (82000 — 0.820 under reserve 0,
+  // but 0.976 at the default reserve 84000) fires again, alongside
+  // ses_u2_cfd_hi (insertion order → cfc_no first, cfd_hi last).
+  const sentD = tCalls.slice(nCfgD).map((c) => c.path?.id);
+  chk("UNIT 2 config: out-of-range values (string threshold, negative reserve) → fail-open defaults — 80000 fires at usable 84000 (the lingering 0.976-at-default session crosses too)",
+    okCfgD && tCalls.length === nCfgD + 2 && tCalls[tCalls.length - 1]?.path?.id === "ses_u2_cfd_hi" && sentD.includes("ses_u2_cfc_no") && ((tCalls[tCalls.length - 1]?.body?.parts?.[0]?.text ?? "")).includes("80000 of 84000"), `n=${tCalls.length}`);
+  chk("UNIT 2 config: out-of-range values → 79000 (0.940 < 0.95 default) does NOT fire",
+    !sentD.includes("ses_u2_cfd_low"), JSON.stringify(sentD));
   fs.rmSync(budgetFile, { force: true }); // leave the sandbox clean
 
   // ============================================================

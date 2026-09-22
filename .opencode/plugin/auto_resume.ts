@@ -15,8 +15,10 @@
 //       (knowledge_plugins.md "The plugin ctx client on THIS host").
 //
 // UNIT 2 (context-limit compaction trigger):
-//   A live session crossing 85% of its usable context window queues a
-//   SELF-compact instruction via `client.session.promptAsync` — never a
+//   A live session crossing its saturation threshold (configurable per
+//   tick — default 0.95 — via the budget-file keys described below) of
+//   its usable context window queues a SELF-compact instruction via
+//   `client.session.promptAsync` — never a
 //   synchronous prompt (an immediate injection invalidates the session KV
 //   cache → full re-prefill, 3-4 min at 90% fill, the ctx_watchdog failure
 //   mode). No host-side compaction command exists (Unit 1 surface report:
@@ -34,15 +36,25 @@
 //     counter; session.status idle → the tick decides.
 //   - ONE 5s setInterval (.unref()-ed) evaluates every armed watch:
 //     skip if lastTokenTotal <= 0, or attempts already 1 for this busy
-//     cycle, or usable window null (model/provider data missing or ANY
-//     throw — fail-safe, no intervention), or ratio < 0.85; else
-//     re-entrancy latch + gate re-check right before send, then ONE
+//     cycle, or model limits null (model/provider data missing or ANY
+//     throw — fail-safe, no intervention), or usable window <= 0, or
+//     ratio < threshold (the per-tick configurable value, default 0.95);
+//     else re-entrancy latch + gate re-check right before send, then ONE
 //     queued promptAsync (latch held until it settles), attempts++.
+//     Usable window = context - Math.min(reserve, output ?? 0), computed
+//     per tick from the (cached) model limits + the per-tick reserve.
 //   - Decision log lines (Unit 1 lines unchanged in format): `arm=`,
 //     `saturation=` (with ratio), `trigger=`, `send-fail=`.
+//   - Config (maintainer ruling 2026-09-22: "only trigger it past the
+//     95% line"): OPTIONAL top-level keys in
+//     `.opencode/temp/compact_budget.json` (the compact_memory budget
+//     store — read-only here, read per tick — a live edit takes effect
+//     on the next tick): `saturationThreshold` (number, valid
+//     0 < t < 1, default 0.95) and `outputReserve` (non-negative
+//     number, default 20_000). Fail-open: file missing / unreadable /
+//     malformed / key absent / unparseable / out-of-range → the default.
 //   - Toggle (maintainer priority #1): an OPTIONAL top-level
-//     `autoCompact` flag in `.opencode/temp/compact_budget.json` (the
-//     compact_memory budget store — read-only here) gates the trigger:
+//     `autoCompact` flag in the SAME budget file gates the trigger:
 //     absent/`true` → current behavior; `false` → the tick logs
 //     `skip= autoCompact-off sid=<sid> ratio=<3-decimals>` and neither
 //     sends nor consumes the once-per-busy-cycle attempts budget; a
@@ -134,11 +146,13 @@ const SESSION_CANDIDATES: ReadonlyArray<string> = [
 const PLANNER_AGENT_ID = "planner_Q3S_160K";
 const SPAWN_TRIGGER_FILE = "auto_resume_spawn_trigger";
 
-// Unit 2 constants (deep-dive B §2): saturation threshold default 0.85;
-// usable window = context - Math.min(20_000, output ?? 0) (mirrors
-// OpenCode's own overflow math).
-const SATURATION_THRESHOLD = 0.85;
-const RESERVE_MIN_OUTPUT = 20000;
+// Unit 2 defaults (deep-dive B §2): the saturation threshold and the
+// output reserve are configurable per tick via the optional budget-file
+// keys `saturationThreshold` / `outputReserve` (see the header); these
+// are the FAIL-OPEN defaults. Usable window = context -
+// Math.min(reserve, output ?? 0) (mirrors OpenCode's own overflow math).
+const DEFAULT_SATURATION_THRESHOLD = 0.95;
+const DEFAULT_OUTPUT_RESERVE = 20000;
 // The optional autoCompact toggle file (same dir as the log — the
 // compact_memory budget store; we only READ its optional top-level
 // `autoCompact` key, never write the file).
@@ -164,7 +178,7 @@ let client: unknown = null;
 
 // Unit 2 module-level state (all state at module level — the file's
 // Unit 1 shape): per-session watches, the re-entrancy latch, the
-// usable-window cache (read-through, computed once per model, successful
+// model-limits cache (read-through, computed once per model, successful
 // values only — a fail-safe null is never cached so a transient failure
 // can be re-checked on the next tick), the single tick timer.
 interface Watch {
@@ -190,7 +204,7 @@ interface Watch {
 }
 const watches = new Map<string, Watch>();
 const sending = new Set<string>();
-const usableCache = new Map<string, number>();
+const limitsCache = new Map<string, { context: number; output: number }>();
 let tickTimer: ReturnType<typeof setInterval> | null = null;
 
 // Unit 3 module-level state: the spawned self-mark (sid -> epoch — so
@@ -294,17 +308,18 @@ function modelPair(info: Record<string, unknown>, props: Record<string, unknown>
   return null;
 }
 
-// Unit 2: the usable context window for a model pair
-// (deep-dive B §2 step 2): client provider list → provider by id →
-// model entry → entry.limit.{context,output};
-// usable = context - Math.min(20_000, output ?? 0). Fail-safe NULL on
+// Unit 2: the stable context LIMITS for a model pair (deep-dive B §2
+// step 2): client provider list → provider by id → model entry →
+// entry.limit.{context,output}. The usable window is computed per tick
+// in tick() from these limits + the per-tick configurable reserve:
+// usable = context - Math.min(reserve, output). Fail-safe NULL on
 // missing model/provider data, missing/zero context limit, or ANY
 // throw (the saturation check simply does not fire — no intervention).
 // Successful values are cached per providerID/modelID for the plugin's
 // life; nulls are not (transient failures stay re-checkable).
-async function getUsable(model: { providerID: string; modelID: string }): Promise<number | null> {
+async function getModelLimits(model: { providerID: string; modelID: string }): Promise<{ context: number; output: number } | null> {
   const key = model.providerID + "/" + model.modelID;
-  const cached = usableCache.get(key);
+  const cached = limitsCache.get(key);
   if (cached !== undefined) return cached;
   try {
     const prov = (client as { provider?: { list?: unknown; get?: unknown } } | null)?.provider;
@@ -339,10 +354,9 @@ async function getUsable(model: { providerID: string; modelID: string }): Promis
       const lim = (entry.limit ?? {}) as { context?: unknown; output?: unknown };
       if (typeof lim.context !== "number" || !Number.isFinite(lim.context) || lim.context <= 0) return null;
       const out = typeof lim.output === "number" && Number.isFinite(lim.output) && lim.output > 0 ? lim.output : 0;
-      const usable = lim.context - Math.min(RESERVE_MIN_OUTPUT, out);
-      if (!(usable > 0)) return null;
-      usableCache.set(key, usable);
-      return usable;
+      const limits = { context: lim.context, output: out };
+      limitsCache.set(key, limits);
+      return limits;
     }
     return null;
   } catch {
@@ -366,6 +380,30 @@ function autoCompactEnabled(): boolean {
   } catch {
     return true; // missing / unreadable / malformed → fail OPEN (status quo)
   }
+}
+
+// Unit 2: the configurable saturation threshold + output reserve — a
+// per-tick READ-ONLY parse of the SAME budget file (small file, a
+// per-tick read is fine — a live edit takes effect on the next tick).
+// Fail-open: file missing / unreadable / JSON parse failure / key
+// absent / not-a-number / out-of-range → the default (0.95 / 20_000).
+// Valid: `saturationThreshold` 0 < t < 1; `outputReserve` >= 0.
+function saturationConfig(): { threshold: number; reserve: number } {
+  let threshold = DEFAULT_SATURATION_THRESHOLD;
+  let reserve = DEFAULT_OUTPUT_RESERVE;
+  try {
+    const data: unknown = JSON.parse(readFileSync(join(logDir, COMPACT_BUDGET_FILE), "utf-8"));
+    if (typeof data === "object" && data !== null) {
+      const rec = data as Record<string, unknown>;
+      const t = rec["saturationThreshold"];
+      if (typeof t === "number" && Number.isFinite(t) && t > 0 && t < 1) threshold = t;
+      const r = rec["outputReserve"];
+      if (typeof r === "number" && Number.isFinite(r) && r >= 0) reserve = r;
+    }
+  } catch {
+    // missing / unreadable / malformed → fail OPEN (defaults)
+  }
+  return { threshold, reserve };
 }
 
 // Unit 2: the queued self-compact instruction (the locked design's text:
@@ -754,10 +792,15 @@ async function tick() {
         if (!w.armed || w.status !== "idle") continue;
         if (w.lastTokenTotal <= 0 || w.attempts >= MAX_ATTEMPTS_PER_BUSY_CYCLE || sending.has(sid)) continue;
         if (!w.model) continue;
-        const usable = await getUsable(w.model);
-        if (usable === null) continue;
+        const limits = await getModelLimits(w.model);
+        if (limits === null) continue;
+        // Per-tick configurable config (fail-open defaults) + the usable
+        // window for THIS tick: usable = context - min(reserve, output).
+        const { threshold, reserve } = saturationConfig();
+        const usable = limits.context - Math.min(reserve, limits.output);
+        if (!(usable > 0)) continue;
         const ratio = w.lastTokenTotal / usable;
-        if (ratio < SATURATION_THRESHOLD) {
+        if (ratio < threshold) {
           log(`saturation= sid=${sid} ratio=${ratio.toFixed(3)} tokens=${w.lastTokenTotal} usable=${usable}`);
           continue;
         }

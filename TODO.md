@@ -953,7 +953,11 @@ restart detection" wording above is the pre-revision numbering.
   verification (the prototype was working at build time, but the build
   changed since). Effort MEDIUM (the code exists but predates the current
   compact_memory design and is deactivated).
-- **Status:** open — maintainer call (needs his flag in the live
-  opencode.jsonc + the live host-call verification). This is the enabler
-  for raising the threshold to ~0.98. Pairs with the configurable-threshold
-  change (which is delegated separately this turn).
+- **Status:** the paired configurable-threshold change LANDED
+  (2026-09-22, worker: `saturationThreshold` (0 < t < 1, default 0.95) +
+  `outputReserve` (>= 0, default 20_000) as per-tick fail-open keys in the
+  budget file; smoke 89/89 + full gate green; commit hash recorded in the
+  planner's follow-up bookkeeping). The BACKSTOP part remains open —
+  maintainer call (needs his flag in the live opencode.jsonc + the live
+  host-call verification). This is the enabler for raising the threshold
+  to ~0.98.

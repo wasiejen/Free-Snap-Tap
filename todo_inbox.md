@@ -96,3 +96,12 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   compact_memory smoke pin red (maintainer temp fix 0f192e5) → `TODO.md`
   **#81** (maintainer call: re-pin to the temp-fix behavior, or re-pin when
   the compact_memory message feature gets its proper fix).
+
+## 2026-09-22 — worker (configurable unit-2 threshold, ses_f35f82abdffeyz62ZF4NLW3qZy)
+- Stale smoke load path found + FIXED in the task commit: `tests/auto_resume.smoke.mjs`
+  still loaded `.opencode/plugin/deactivated/auto_resume.ts` — the plugin was
+  reactivated (moved to `.opencode/plugin/auto_resume.ts`) in commit 380e326
+  WITHOUT updating the test, so the smoke crashed with ERR_MODULE_NOT_FOUND
+  before any check (the spec's "baseline 76/76" was unreachable on the current
+  checkout). The load path now points at the live file. Suggest: close with a
+  one-line record, or fold into the #83 bookkeeping.
