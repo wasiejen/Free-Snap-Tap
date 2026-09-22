@@ -913,9 +913,14 @@ restart detection" wording above is the pre-revision numbering.
   (context trigger) or only unit 4?
 - **Suggested scope:** `userHasMarker` / scope verdict in
   `.opencode/plugin/auto_resume.ts` (L614, L543-551) + smoke section.
-- **Status:** design AGREED 2026-09-22 (his ruling on all open
-  questions; unit-2-suppression scope pending his call after the
-  85%-trigger info); implementation pending — gate is green (post-#81).
+ - **Status:** design AGREED 2026-09-22 (his ruling on all open
+   questions); the SCOPE-TOGGLE portion LANDED as part of #85 part 1
+   (2026-09-22, worker worker_Q3S_170K — the last-toggle-wins own-line
+   evaluation is in the auto_resume.ts scope verdict, and the smoke pins
+   acceptance (i) mid-sentence quote, (ii) last-toggle-wins ON, plus the
+   own-line/trim + case-insensitive rules and the restart-safe derivation);
+   remaining: live acceptance (his post-restart test) + the unit-2-
+   suppression question (his call after the 85%-trigger info).
 
 ## 83. (open, 2026-09-22, planner; maintainer call — enabler for a ~0.98 threshold) unit-2 backstop: catch the ACTUAL context-limit hit cleanly (revive context_recovery.ts)
 - **Problem + evidence:** the pre-emptive trigger (now configurable, default
@@ -999,7 +1004,7 @@ restart detection" wording above is the pre-revision numbering.
    green as above; the commit hash is recorded by the planner in the
    follow-up bookkeeping commit, not in this entry's commit).
 
-## #85. (OPEN, HIGH priority — maintainer call) — auto_resume unbounded session-spawn loop
+## #85. (part 1 (scope) LANDED 2026-09-22 / part 2 (cap + dead-mark) OPEN, HIGH priority — maintainer call) — auto_resume unbounded session-spawn loop
 - **Problem + evidence:** on 2026-09-22 (~19:57–20:00Z) the LIVE auto_resume
   plugin created a NEW session every ~10s (every 2nd recovery attempt — 2
   attempts per session at 5s each, confirmed by the session naming) —
@@ -1032,6 +1037,13 @@ restart detection" wording above is the pre-revision numbering.
   etc.) in a loop by toggling them with `<|Autorun|>`. Bonus: freshly-spawned
   sessions + unmarked worker sessions stay OUT of scope (not a planner, not
   `<|Autorun|>`-marked) → fixes the #85 loop AND the spurious worker-resume.
-- **Status:** OPEN, HIGH priority — maintainer call (live-behavior fix →
-  approval boundary; needs his go). The orphan-session cleanup is DONE
-  (the maintainer removed all the new sessions, 2026-09-22).
+ - **Status:** part 1 (scope) LANDED 2026-09-22 (worker worker_Q3S_170K —
+   the #82 generalized scope in auto_resume.ts + smoke: real-planner-via-
+   agent-field ∪ last-own-line-toggle-ON for ANY agent type; the `spawned`
+   self-mark is now an EXCLUSION, so a self-spawned successor is never
+   re-scoped → the #85 loop condition is gone — smoke 97/97 + gate green:
+   probe 241/241, all smokes, pytest 459+1w, ruff F=0; the commit hash is
+   recorded by the planner in the follow-up bookkeeping commit). PART 2
+   (global cap + dead-mark) still OPEN — maintainer call for the live-
+   behavior remainder. The orphan-session cleanup is DONE (the maintainer
+   removed all the new sessions, 2026-09-22).

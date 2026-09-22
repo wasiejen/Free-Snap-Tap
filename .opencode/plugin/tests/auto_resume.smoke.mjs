@@ -9,14 +9,19 @@
 // log dir, consumed (renamed .consumed) by the 5s tick after ONE spawn
 // attempt (create + queued promptAsync, agent=planner_Q3S_160K, NO model
 // field), even on failure.
-// UNIT 4: the planner liveness watchdog — a planner-scoped session
-// (spawned-map self-mark OR a `<|autonom|>` launch marker in one of its
-// user messages) going idle (or session.error) is routed on the next
-// tick by the LAST assistant message's action: line: stop / ask → no
-// send; resume / no-line → queued CONTINUE prompt (recovery cap 2,
-// reset on a fresh busy); restart or cap exhausted → successor check
-// (a session.created tracked since lastActivityAt) → skip or
-// spawnPlanner (the RESTART prompt).
+// UNIT 4: the liveness watchdog — an in-scope session going idle (or
+// session.error) is routed on the next tick by the LAST assistant
+// message's action: line: stop / ask → no send; resume / no-line →
+// queued CONTINUE prompt (recovery cap 2, reset on a fresh busy);
+// restart or cap exhausted → successor check (a session.created
+// tracked since lastActivityAt) → skip or spawnPlanner (the RESTART
+// prompt). SCOPE (#85 part 1 — the #82 generalized scope): in-scope
+// iff the session's working agent (the FIRST user message's agent
+// field) is a planner agent (`planner_<model>`), OR the LAST OWN-LINE
+// toggle in the user history is ON (`<|autonom|>` / `<|Autorun|>`,
+// case-insensitive; OFF = `<|Direct|>`; last-toggle-wins, re-evaluated
+// per idle) — ANY agent type; self-spawned sids (the module-level
+// `spawned` self-mark) are NEVER scoped (the #85 loop fix).
 // The plugin factory is called with a SCRATCHPAD sandbox `directory` —
 // auto_resume.log lands in the sandbox (.opencode/temp/auto_resume.log
 // under the sandbox project), NEVER the live .opencode/temp/. Run:
@@ -574,36 +579,51 @@ try {
   chk("UNIT 3: surface pin updated — create= in the candidates (v1 mock: create=function)",
     surf && surf.includes("create=function"), surf ?? "");
 
-  // ============================================================
-  // UNIT 4 — planner liveness watchdog
-  //
-  // The factory is re-invoked with a SPYING client: `messages` is
-  // scripted PER SID (the SDK list shape Array<{info, parts}>),
-  // `create` + `promptAsync` record every call. Scope: a sid is
-  // planner-scoped iff it is in the module-level `spawned` map (the
-  // UNIT 3 spawn `ses_u3_new` is still self-marked there) OR one of
-  // its user messages carries the `<|autonom|>` launch marker. The
-  // single 5s tick is the only decision+send funnel — the smoke waits
-  // on it (real time). Batch A fires every scenario before one tick
-  // pass, so one pass routes them all.
-  // ============================================================
-  const u4Sends = []; // every promptAsync on this client (CONTINUE + spawn)
-  const u4Creates = [];
-  const messagesCalls = [];
-  const MARK = "<|autonom|>";
-  const mkPairs = (entries) => entries.map(([role, text]) => ({ info: { role }, parts: [{ type: "text", text }] }));
-  const msgScript = new Map();
-  msgScript.set("ses_u4_stop", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Unit closed. action: stop"]]));
-  msgScript.set("ses_u4_ask", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Blocked. action: ask_maintainer: which branch?"]]));
-  msgScript.set("ses_u4_restart", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done. action: restart"]]));
-  msgScript.set("ses_u4_sux", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done. action: restart"]]));
-  msgScript.set("ses_u4_noline", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Mid-unit, no closing line."]]));
-  msgScript.set("ses_u4_plain", mkPairs([["user", "plain direct session, no marker"], ["assistant", "Done. action: stop"]]));
-  // wrapper shape (the in-process client's RequestResult { data: [...] }):
-  // the plugin must unwrap it — without the unwrap, scope=none, no route line
-  msgScript.set("ses_u4_wrap", { data: mkPairs([["user", MARK + " iteration 1"], ["assistant", "Unit closed. action: stop"]]) });
-  msgScript.set("ses_u3_new", mkPairs([["user", "plain user message, no marker"], ["assistant", "Working, no closing line."]]));
-  msgScript.set("ses_u4_throw", { throw: "messages exploded for ses_u4_throw" });
+   // ============================================================
+   // UNIT 4 — liveness watchdog (#85 part 1: the #82 generalized scope)
+   //
+   // The factory is re-invoked with a SPYING client: `messages` is
+   // scripted PER SID (the SDK list shape Array<{info, parts}>),
+   // `create` + `promptAsync` record every call. Scope: a sid is
+   // in-scope iff its working agent (the first user message's agent
+   // field) is a planner agent OR its last own-line toggle is ON;
+   // self-spawned sids are NEVER scoped — the UNIT 3 spawn
+   // `ses_u3_new` is still self-marked in the module-level `spawned`
+   // map, so it now falls OUT of scope (the #85 loop fix). The single
+   // 5s tick is the only decision+send funnel — the smoke waits on it
+   // (real time). Batch A fires every scenario before one tick pass,
+   // so one pass routes them all.
+   // ============================================================
+   const u4Sends = []; // every promptAsync on this client (CONTINUE + spawn)
+   const u4Creates = [];
+   const messagesCalls = [];
+   const MARK = "<|autonom|>";
+   const PLANNER_A = "planner_Q3S_160K";
+   const WORKER_A = "worker_Q3S_160K";
+   const PB_A = "prompt_builder_Q3S_160K";
+   // `agent` sets the FIRST user message's agent field (the session's
+   // working agent — scope rule (a) reads it).
+   const mkPairs = (entries, agent) =>
+     entries.map(([role, text]) => ({ info: role === "user" && agent ? { role, agent } : { role }, parts: [{ type: "text", text }] }));
+   const msgScript = new Map();
+   // The batch-A planner scenarios carry the planner agent field (the
+   // FIRST user message's `agent` — the scope rule (a)); the old
+   // launch-marker text is NO LONGER a scope source (it is not an
+   // own-line toggle — #82).
+   msgScript.set("ses_u4_stop", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Unit closed. action: stop"]], PLANNER_A));
+   msgScript.set("ses_u4_ask", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Blocked. action: ask_maintainer: which branch?"]], PLANNER_A));
+   msgScript.set("ses_u4_restart", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done. action: restart"]], PLANNER_A));
+   msgScript.set("ses_u4_sux", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done. action: restart"]], PLANNER_A));
+   msgScript.set("ses_u4_noline", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Mid-unit, no closing line."]], PLANNER_A));
+   msgScript.set("ses_u4_plain", mkPairs([["user", "plain direct session, no marker"], ["assistant", "Done. action: stop"]]));
+   // wrapper shape (the in-process client's RequestResult { data: [...] }):
+   // the plugin must unwrap it — without the unwrap, scope=none, no route line
+   msgScript.set("ses_u4_wrap", { data: mkPairs([["user", MARK + " iteration 1"], ["assistant", "Unit closed. action: stop"]], PLANNER_A) });
+   // A real spawned session's first user message is the planner start
+   // prompt (agent = the spawn agent) — faithful script; the `spawned`
+   // self-mark still keeps it OUT of scope (#85).
+   msgScript.set("ses_u3_new", mkPairs([["user", "plain user message, no marker"], ["assistant", "Working, no closing line."]], PLANNER_A));
+   msgScript.set("ses_u4_throw", { throw: "messages exploded for ses_u4_throw" });
 
   const u4Session = {
     prompt: function () {},
@@ -656,7 +676,7 @@ try {
       readLines().some((l) => l.includes("route= restart spawn sid=ses_u4_restart")) &&
       readLines().some((l) => l.includes("skip= successor sid=ses_u4_succ")) &&
       nolineCont(1) &&
-      readLines().some((l) => l.includes("recovery= sid=ses_u3_new attempt=1")) &&
+      readLines().some((l) => l.includes("scope= none sid=ses_u3_new")) &&
       readLines().some((l) => l.includes("err= sid=ses_u4_throw")) &&
       readLines().some((l) => l.includes("route= stop sid=ses_u4_wrap")),
     12000,
@@ -689,15 +709,17 @@ try {
       messagesCalls.filter((c) => c?.path?.id === "ses_u4_plain").length === 1 &&
       readLines().some((l) => l.includes("scope= none sid=ses_u4_plain")) &&
       !readLines().some((l) => l.includes("sid=ses_u4_plain") && (l.includes("route=") || l.includes("recovery="))), "");
-  chk("UNIT 4: spawned-map scope (UNIT 3 self-mark, user msg carries NO marker) → routes as planner, CONTINUE attempt 1",
-    okA && contSends().includes("ses_u3_new") && readLines().some((l) => l.includes("recovery= sid=ses_u3_new attempt=1")), "");
+  chk("UNIT 4 #85: spawned session (UNIT 3 self-mark, planner agent in its first user msg) is OUT of scope — scope= none, zero sends, no recovery/route line",
+    okA && readLines().some((l) => l.includes("scope= none sid=ses_u3_new")) &&
+      !u4Sends.some((c) => c.path?.id === "ses_u3_new") &&
+      !readLines().some((l) => l.includes("sid=ses_u3_new") && (l.includes("route=") || l.includes("recovery="))), "");
   chk("UNIT 4: messages() throwing → err= line with the error, no action, no throw",
     okA && !u4Sends.some((c) => c.path?.id === "ses_u4_throw") &&
       readLines().some((l) => l.includes("err= sid=ses_u4_throw") && l.includes("messages exploded for ses_u4_throw")), "");
   // #80: every batch-A CONTINUE send carries the EXPLICIT planner agent
-  // (scoped sessions always run as the planner agent).
+  // (planner-scoped sessions always run as the planner agent).
   chk("UNIT 4 #80: batch-A continue sends carry agent=planner_Q3S_160K (explicit)",
-    okA && contSends().length === 2 &&
+    okA && contSends().length === 1 &&
       u4Sends.filter((c) => ((c.body?.parts?.[0]?.text ?? "")).includes("agent_readme_post_compaction.md"))
         .every((c) => c.body?.agent === "planner_Q3S_160K"),
     `contSends=${contSends().join(",")}`);
@@ -719,9 +741,9 @@ try {
     12000,
   );
   chk("UNIT 4: third idle, cap exhausted with still no line → restart branch → spawn", okC && u4Creates.length === cBeforeC + 1, `create=${u4Creates.length}`);
-  chk("UNIT 4: send totals — 3 CONTINUE (noline ×2, u3_new ×1) + 2 RESTART spawns, nothing else touched",
-    u4Sends.length === 5 && contSends().length === 3 && spawnSends().length === 2 &&
-      contSends().every((s) => s === "ses_u4_noline" || s === "ses_u3_new") && u4Creates.length === 2,
+  chk("UNIT 4: send totals — 2 CONTINUE (noline ×2) + 2 RESTART spawns, nothing else touched (spawned ses_u3_new stays OUT of scope)",
+    u4Sends.length === 4 && contSends().length === 2 && spawnSends().length === 2 &&
+      contSends().every((s) => s === "ses_u4_noline") && u4Creates.length === 2,
     `total=${u4Sends.length} create=${u4Creates.length}`);
 
   // ============================================================
@@ -730,11 +752,11 @@ try {
   // the TTL) is the injected turn itself — it must NOT reset the
   // recovery cap (that reset is what made the cap unreachable while
   // the plugin keeps injecting); only a REAL new busy resets it.
-  // ses_u4_cap: user msg carries the launch marker (scoped), the last
-  // assistant line has NO action: line (always the CONTINUE branch
-  // until the cap exhausts).
-  // ============================================================
-  msgScript.set("ses_u4_cap", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Mid-unit, no closing line."]]));
+   // ses_u4_cap: user msg carries the planner agent field (scoped), the
+   // last assistant line has NO action: line (always the CONTINUE
+   // branch until the cap exhausts).
+   // ============================================================
+   msgScript.set("ses_u4_cap", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Mid-unit, no closing line."]], PLANNER_A));
   const capRecovery = (n) => readLines().filter((l) => l.includes(`recovery= sid=ses_u4_cap attempt=${n}`)).length;
   const capInjected = () => readLines().filter((l) => l.includes("arm= sid=ses_u4_cap injected")).length;
 
@@ -773,18 +795,20 @@ try {
     capInjected() === 2, `armInjected=${capInjected()}`);
 
   // ============================================================
-  // #80 — agent retention in the injected promptAsync bodies (the
-  // factory is re-invoked with a fresh spying client — promptAsync +
-  // messages both spied, messages scripted per sid):
-  //  - a PLANNER-SCOPED session (the spawned-map self-mark, cached
-  //    scope=planner from batch A) → body.agent = the planner agent;
-  //  - a NON-scoped session whose first user message carries an
-  //    agent field → body.agent = that agent (the session keeps the
-  //    agent that ran it);
-  //  - a NON-scoped session with NO user agent field → NO agent key
-  //    in the body + an agent-omit= attribution line.
-  // ============================================================
-  msgScript.set("ses_u3_new", mkPairs([["user", "plain direct"], ["assistant", "Done. action: stop"]]));
+   // #80 — agent retention in the injected promptAsync bodies (the
+   // factory is re-invoked with a fresh spying client — promptAsync +
+   // messages both spied, messages scripted per sid):
+   //  - a spawned (OUT-of-scope, #85) session whose first user
+   //    message carries the planner agent → the unit-2 body keeps that
+   //    agent via the first-user-agent retention (NOT via the scope —
+   //    scope is none for self-spawned sids);
+   //  - a NON-scoped session whose first user message carries an
+   //    agent field → body.agent = that agent (the session keeps the
+   //    agent that ran it);
+   //  - a NON-scoped session with NO user agent field → NO agent key
+   //    in the body + an agent-omit= attribution line.
+   // ============================================================
+   msgScript.set("ses_u3_new", mkPairs([["user", "plain direct"], ["assistant", "Done. action: stop"]], PLANNER_A));
   msgScript.set("ses_u2_agnet", [
     { info: { role: "user", agent: "worker_Q3S_160K" }, parts: [{ type: "text", text: "plain" }] },
     { info: { role: "assistant" }, parts: [{ type: "text", text: "Done. action: stop" }] },
@@ -810,18 +834,18 @@ try {
   const hooksU2ag = await factory({ directory: proj, client: { session: u2agSession, provider: { list: providerList }, app: { log: () => "log" } } });
   chk("UNIT 2 #80: re-factory with the agent-retention spying client returns the event hook", typeof hooksU2ag?.event === "function");
 
-  // Every scenario: busy → saturated assistant update → idle. The
-  // tick's unit-2 loop sends the self-compact (agent resolved); then
-  // the unit-4 loop routes: ses_u3_new (spawned, cached scope=planner)
-  // → action: stop, no send; ses_u2_agnet / ses_u2_agnone (no marker)
-  // → scope= none, no action.
+   // Every scenario: busy → saturated assistant update → idle. The
+   // tick's unit-2 loop sends the self-compact (agent resolved); then
+   // the unit-4 loop routes: ses_u3_new (spawned → OUT of scope, #85)
+   // → scope= none, no route line; ses_u2_agnet / ses_u2_agnone (no
+   // marker, no toggle) → scope= none, no action.
   await fire(hooksU2ag, "ses_u3_new", [statusEv("ses_u3_new", "busy"), msgUpdated("ses_u3_new", "assistant", { total: 80000 }, MODEL), statusEv("ses_u3_new", "idle")]);
   await fire(hooksU2ag, "ses_u2_agnet", [statusEv("ses_u2_agnet", "busy"), msgUpdated("ses_u2_agnet", "assistant", { total: 80000 }, MODEL), statusEv("ses_u2_agnet", "idle")]);
   await fire(hooksU2ag, "ses_u2_agnone", [statusEv("ses_u2_agnone", "busy"), msgUpdated("ses_u2_agnone", "assistant", { total: 80000 }, MODEL), statusEv("ses_u2_agnone", "idle")]);
   const okAg = await waitUntil(() => u2agCalls.length === 3, 12000);
   chk("UNIT 2 #80: each saturated session got exactly ONE self-compact send (no extras)", okAg && u2agCalls.length === 3, `n=${u2agCalls.length}`);
   const sendFor = (sid) => u2agCalls.find((c) => c.path?.id === sid);
-  chk("UNIT 2 #80: scoped (spawned-map) session → body carries agent=planner_Q3S_160K + the ratio text",
+  chk("UNIT 2 #80: spawned (OUT-of-scope, #85) session → the unit-2 body keeps the session's agent (planner_Q3S_160K, first-user-agent retention — NOT the scope) + the ratio text",
     okAg && sendFor("ses_u3_new")?.body?.agent === "planner_Q3S_160K" &&
       ((sendFor("ses_u3_new")?.body?.parts?.[0]?.text) ?? "").includes(RATIO_HI),
     JSON.stringify(sendFor("ses_u3_new")?.body ?? null));
@@ -832,12 +856,88 @@ try {
     okAg && sendFor("ses_u2_agnone") && !("agent" in (sendFor("ses_u2_agnone")?.body ?? {})) &&
       readLines().some((l) => l.includes("agent-omit= sid=ses_u2_agnone")),
     JSON.stringify(Object.keys(sendFor("ses_u2_agnone")?.body ?? {})));
-  chk("UNIT 2 #80: unit-4 routes after the sends — ses_u3_new action: stop; the two plain sids scope= none; no extra sends",
-    okAg && readLines().some((l) => l.includes("route= stop sid=ses_u3_new")) &&
+  chk("UNIT 2 #80: unit-4 after the sends — ses_u3_new scope= none (spawned → OUT of scope, #85; no route line); the two plain sids scope= none; no extra sends",
+    okAg && readLines().some((l) => l.includes("scope= none sid=ses_u3_new")) &&
+      !readLines().some((l) => l.includes("sid=ses_u3_new") && (l.includes("route=") || l.includes("recovery="))) &&
       readLines().some((l) => l.includes("scope= none sid=ses_u2_agnet")) &&
       readLines().some((l) => l.includes("scope= none sid=ses_u2_agnone")) &&
       u2agCalls.length === 3,
     `n=${u2agCalls.length}`);
+
+  // ============================================================
+  // UNIT 4 #85 part 1 — the #82 generalized scope (one scenario per
+  // tick wait). The module-level client is whatever the LAST factory
+  // call set (the u2ag client above) — re-factor with the u4 spying
+  // client so this section's sends land in u4Sends (the events and
+  // watch state are module-level; this restores the send destination).
+  // ============================================================
+  const hooksU4b = await factory({ directory: proj, client: { session: u4Session, provider: { list: providerList }, app: { log: () => "log" } } });
+  chk("UNIT 4 #85: re-factory with the u4 spying client returns the event hook", typeof hooksU4b?.event === "function");
+
+  // (1) an unmarked WORKER session → OUT of scope, and NOT
+  // re-triggered on the next tick (the #85 loop: the old code scoped a
+  // freshly-spawned session as a planner and re-triggered the spawn
+  // every 2nd recovery attempt).
+  msgScript.set("ses_u4_worker", mkPairs([["user", "plain worker task"], ["assistant", "Mid-unit, no closing line."]], WORKER_A));
+  await fire(hooksU4b, "ses_u4_worker", [statusEv("ses_u4_worker", "busy"), statusEv("ses_u4_worker", "idle")]);
+  const okW1 = await waitUntil(() => readLines().some((l) => l.includes("scope= none sid=ses_u4_worker")));
+  const wBefore = u4Sends.length, cBeforeW = u4Creates.length;
+  // a SECOND idle cycle (fresh busy) — the tick where the old code
+  // re-triggered the spawn
+  await fire(hooksU4b, "ses_u4_worker", [statusEv("ses_u4_worker", "busy"), statusEv("ses_u4_worker", "idle")]);
+  await sleep(5600); // at least one full tick period
+  chk("UNIT 4 #85: unmarked worker session OUT of scope — scope= none, zero sends",
+    okW1 && !u4Sends.some((c) => c.path?.id === "ses_u4_worker"), `n=${u4Sends.length}`);
+  chk("UNIT 4 #85: unmarked worker session NOT re-triggered on the next tick (no recovery/route/spawn — the #85 loop is gone)",
+    u4Sends.length === wBefore && u4Creates.length === cBeforeW &&
+      !readLines().some((l) => l.includes("sid=ses_u4_worker") && (l.includes("route=") || l.includes("recovery=") || l.includes("spawn="))),
+    `n=${u4Sends.length} create=${u4Creates.length}`);
+
+  // (2) a WORKER session toggled ON (own-line `<|Autonom|>`) → IN
+  // scope (autorun) — CONTINUE carries the session's OWN agent
+  msgScript.set("ses_u4_worker_on", mkPairs([["user", "plain worker task"], ["user", "  <|Autonom|>  "], ["assistant", "Mid-unit, no closing line."]], WORKER_A));
+  await fire(hooksU4b, "ses_u4_worker_on", [statusEv("ses_u4_worker_on", "busy"), statusEv("ses_u4_worker_on", "idle")]);
+  const okWo = await waitUntil(() => readLines().some((l) => l.includes("recovery= sid=ses_u4_worker_on attempt=1")));
+  chk("UNIT 4 #82: worker session + own-line <Autonom|> toggle → IN scope (autorun) — CONTINUE attempt 1",
+    okWo && readLines().some((l) => l.includes("scope= autorun sid=ses_u4_worker_on")), "");
+  chk("UNIT 4 #82: autorun-scoped CONTINUE body carries the session's OWN agent (worker_Q3S_160K), not the planner",
+    okWo && u4Sends.some((c) => c.path?.id === "ses_u4_worker_on" && c.body?.agent === WORKER_A && ((c.body?.parts?.[0]?.text) ?? "").includes("agent_readme_post_compaction.md")),
+    JSON.stringify(u4Sends.find((c) => c.path?.id === "ses_u4_worker_on")?.body ?? null));
+
+  // (3) a NON-planner agent (prompt_builder-style) toggled ON → IN
+  // scope (the planner-only gate is dropped — ANY agent type runs in a
+  // loop when toggled)
+  msgScript.set("ses_u4_pb", mkPairs([["user", "plain prompt-builder task"], ["user", "<|Autonom|>"], ["assistant", "Mid-unit, no closing line."]], PB_A));
+  await fire(hooksU4b, "ses_u4_pb", [statusEv("ses_u4_pb", "busy"), statusEv("ses_u4_pb", "idle")]);
+  const okPb = await waitUntil(() => readLines().some((l) => l.includes("recovery= sid=ses_u4_pb attempt=1")));
+  chk("UNIT 4 #82: non-planner agent (prompt_builder-style) + own-line <Autonom|> → IN scope — CONTINUE attempt 1, body carries its own agent",
+    okPb && readLines().some((l) => l.includes("scope= autorun sid=ses_u4_pb")) &&
+      u4Sends.some((c) => c.path?.id === "ses_u4_pb" && c.body?.agent === PB_A),
+    JSON.stringify(u4Sends.find((c) => c.path?.id === "ses_u4_pb")?.body ?? null));
+
+  // (4) last-toggle-wins: own-line <Autonom|> then a LATER own-line
+  // <Direct|> → OFF (deactivated mid-session — his stated motivation)
+  msgScript.set("ses_u4_lastoff", mkPairs([["user", "task"], ["user", "<|Autonom|>"], ["user", "<|Direct|>"], ["assistant", "Mid-unit, no closing line."]], WORKER_A));
+  await fire(hooksU4b, "ses_u4_lastoff", [statusEv("ses_u4_lastoff", "busy"), statusEv("ses_u4_lastoff", "idle")]);
+  const loBefore = u4Sends.length;
+  const okLo = await waitUntil(() => readLines().some((l) => l.includes("scope= none sid=ses_u4_lastoff")));
+  await sleep(5600); // at least one full tick period
+  chk("UNIT 4 #82: last-toggle-wins — own-line <Autonom|> then own-line <Direct|> → OFF (scope= none, no sends, no re-trigger)",
+    okLo && u4Sends.length === loBefore &&
+      !readLines().some((l) => l.includes("sid=ses_u4_lastoff") && (l.includes("route=") || l.includes("recovery="))),
+    `n=${u4Sends.length}`);
+
+  // (5) a MID-SENTENCE quote (case-variant, not whole-line) is NOT a
+  // toggle — scope stays OUT
+  msgScript.set("ses_u4_mid", mkPairs([["user", "please see <Autonom|> in the docs, thanks"], ["assistant", "Mid-unit, no closing line."]], WORKER_A));
+  await fire(hooksU4b, "ses_u4_mid", [statusEv("ses_u4_mid", "busy"), statusEv("ses_u4_mid", "idle")]);
+  const midBefore = u4Sends.length;
+  const okMid = await waitUntil(() => readLines().some((l) => l.includes("scope= none sid=ses_u4_mid")));
+  await sleep(5600); // at least one full tick period
+  chk("UNIT 4 #82: mid-sentence quote (case-variant, not whole-line) is NOT a toggle — scope= none, no sends, no re-trigger",
+    okMid && u4Sends.length === midBefore &&
+      !readLines().some((l) => l.includes("sid=ses_u4_mid") && (l.includes("route=") || l.includes("recovery="))),
+    `n=${u4Sends.length}`);
 
   // ---- the live log received NO smoke line. The LIVE plugin instance
   // (this host) keeps appending ITS OWN live-session lines in real time
@@ -854,7 +954,7 @@ try {
   } else if (liveBefore === null && liveSizeNow > 0) {
     appended = fs.readFileSync(LIVE_LOG, "utf-8"); // did not exist before — all new
   }
-  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_wrap", "ses_u4_throw", "ses_u4_spawn", "ses_u4_cap", "ses_u2_agnet", "ses_u2_agnone"];
+  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_wrap", "ses_u4_throw", "ses_u4_spawn", "ses_u4_cap", "ses_u2_agnet", "ses_u2_agnone", "ses_u4_worker", "ses_u4_worker_on", "ses_u4_pb", "ses_u4_lastoff", "ses_u4_mid"];
   chk("LIVE .opencode/temp/auto_resume.log received no smoke line (sandbox got every smoke line)",
     liveBefore === liveSizeNow || !smokeSids.some((s) => appended.includes(s)), `before=${liveBefore} after=${liveSizeNow}`);
   chk("sandbox log path is under the sandbox", sandboxLog.startsWith(base), sandboxLog);

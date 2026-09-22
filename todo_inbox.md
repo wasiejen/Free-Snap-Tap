@@ -4,7 +4,7 @@ Drop zone for **worker** / **explorer** findings that are not confidently
 fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
 **no numbering**, append only — no curation, no renumbering here.
 
-- **Who writes:** worker/explorer — this is their APPEND target, NOT `TODO.md`.
+- **Who writes:** worker/explorer — use the submit.todo tool to append here, NOT `TODO.md`.
 - **Who curates:** the planner — curates into `TODO.md`, assigns the stable ID
   at curation time, then trims this inbox.
 - Entry shape: `## <YYYY-MM-DD> — <role>` + problem/evidence + files + why it
@@ -105,3 +105,25 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   before any check (the spec's "baseline 76/76" was unreachable on the current
   checkout). The load path now points at the live file. Suggest: close with a
   one-line record, or fold into the #83 bookkeeping.
+
+## 2026-09-22 — worker_Q3S_170K (TODO #85 part 1, ses_f351feb02ffeScmZIiycmB79GD)
+- Stale `PLANNER_AGENT_ID` in `.opencode/plugin/auto_resume.ts` (value
+  `planner_Q3S_160K`, pinned 2026-09-21 per the constant's own comment): the
+  LIVE `opencode.jsonc` agent list now carries only `planner_Q3S_170K`
+  (verified 2026-09-22 by reading the live config; the live DB
+  `session.agent` values for current planner sessions are
+  `planner_Q3S_170K` too — no `planner_Q3S_160K` agent exists on the host
+  anymore). The spawn path (unit 3 trigger + unit 4 restart branch) and the
+  injected CONTINUE bodies for planner-scoped sessions still send
+  `agent: "planner_Q3S_160K"` — an agent id the host cannot resolve, which is
+  consistent with the #85 `UnknownError` at `SessionPrompt.createUserMessage`
+  on every spawned session's start prompt (the #85 part-1 scope fix stops the
+  re-trigger loop, but a re-triggered spawn would STILL fail on the stale
+  agent). NOT fixed in the #85 part-1 commit (the spec's change list is
+  scope-only; the constant is a pinned copy of a live-config value the
+  maintainer owns). Needs his call: re-pin the constant (code + smoke pins)
+  to the current live agent id, or derive the planner agent from the host
+  agent list at spawn time (no such client surface was visible in the Unit-1
+  surface report — would need a check). Files: `.opencode/plugin/auto_resume.ts`
+  (L146 + spawn path + resolveInjectAgent), `tests/auto_resume.smoke.mjs`
+  (the `planner_Q3S_160K` pins), live `opencode.jsonc` (source of truth).

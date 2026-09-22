@@ -76,21 +76,33 @@
 //   prompt, with `agent: "planner_Q3S_160K"` and NO `model` field (the
 //   agent-configured model applies — the host's opencode.jsonc is the
 //   live source of truth). Success → the new sid is self-marked in a
-//   module-level `spawned` map (sid → epoch, for Unit 4) + a `spawn=`
+//   module-level `spawned` map (sid → epoch — the #85 part-1 EXCLUSION
+//   mark: Unit 4 never scopes a self-spawned session) + a `spawn=`
 //   line. Every failure is a `spawn-fail=` line; the helper NEVER
 //   throws outward. The module stays DEFAULT-ONLY exported (a named
 //   export breaks the smoke check).
 //
-// UNIT 4 (the planner liveness watchdog — who watches the top-level
-// session): a planner-scoped session going idle (or session.error) is
-// routed on the NEXT TICK (the 5s funnel stays the only decision+send
-// funnel; events only set state). SCOPE: a sid is scoped iff it is in
-// the Unit 3 `spawned` map (the self-mark), OR ANY of its user messages
-// (fetched via client.session.messages) contains the literal
-// `<|autonom|>` (the looprunner's launch-message marker); the verdict
-// is cached per watch as scope: "planner" | "none" | "unknown" (fetch
-// pending/failed → unknown, re-checked on the next idle; fail-safe = no
-// action); NON-SCOPED sessions are NEVER acted on. ROUTING on the LAST
+// UNIT 4 (the liveness watchdog — who watches the top-level session):
+// an in-scope session going idle (or session.error) is routed on the
+// NEXT TICK (the 5s funnel stays the only decision+send funnel; events
+// only set state). SCOPE (#85 part 1 — the #82 generalized scope,
+// ruling 2026-09-22): a sid is in-scope iff (a) the session's working
+// agent — the FIRST user message's `agent` field (the DB
+// `session.agent` mirror; verified 2026-09-22 — the plugin cannot read
+// the DB in-process, the message field is the client-reachable source)
+// — is a PLANNER agent (agent ids follow `planner_<model>`; the prefix
+// survives model-generation renames), OR (b) the LAST OWN-LINE TOGGLE
+// in its user history is ON (#82: `<|autonom|>` / `<|Autorun|>`, case-
+// insensitive, whole-line only; OFF = `<|Direct|>`; last-toggle-wins,
+// recomputed from the FRESH messages() fetch on every idle —
+// restart-safe, no in-memory state). The planner-only gate is DROPPED
+// — ANY agent type (prompt_builder, a future researcher, ...) runs in
+// a loop when toggled. Self-spawned sids (the Unit 3 `spawned`
+// self-mark) are NEVER scoped — the #85 loop: a freshly-spawned
+// successor must not be re-triggered. The verdict is cached per watch
+// as scope: "planner" | "autorun" | "none" | "unknown" (unknown until
+// the first settled fetch; fail-safe = no action); NON-SCOPED sessions
+// are NEVER acted on. ROUTING on the LAST
 // assistant message's text parts for
 // action:\s*(restart|resume|stop|ask_maintainer) (last match wins):
 // stop / ask_maintainer → NO send, `route= stop|ask` line; resume or NO
@@ -162,13 +174,19 @@ const COMPACT_BUDGET_FILE = "compact_budget.json";
 // busy cycle (attempts zeroed when a fresh busy cycle arms the session).
 const MAX_ATTEMPTS_PER_BUSY_CYCLE = 1;
 
-// Unit 4 constants: the looprunner's launch-message marker (a
-// planner-scoped session carries it in at least one of its user
-// messages; direct/interactive sessions never do), the recovery budget
-// (at most two queued CONTINUE prompts per idle cycle — a fresh busy
-// cycle resets it), and the action-line vocabulary (AGENTS.md
-// §Interaction-contract state machine; the LAST match wins).
+// Unit 4 constants: the looprunner's launch marker (carried in the
+// RESTART start prompt below — a self-spawned successor's first user
+// message; it is NOT an own-line toggle, so it never flips scope), the
+// #82 OWN-LINE TOGGLE markers (ON counts BOTH spellings, case-
+// insensitive — a marker counts ONLY as the whole line, trim-exact;
+// mid-sentence or bullet-prefixed lines never toggle; OFF is
+// `<|Direct|>`), the recovery budget (at most two queued CONTINUE
+// prompts per idle cycle — a fresh busy cycle resets it), and the
+// action-line vocabulary (AGENTS.md §Interaction-contract state
+// machine; the LAST match wins).
 const AUTONOM_MARKER = "<|autonom|>";
+const TOGGLE_ON_MARKERS: ReadonlyArray<string> = ["<|autonom|>", "<|autorun|>"];
+const TOGGLE_OFF_MARKER = "<|direct|>";
 const MAX_RECOVERY_ATTEMPTS = 2;
 const ACTION_RE = /action:\s*(restart|resume|stop|ask_maintainer)/g;
 
@@ -188,13 +206,14 @@ interface Watch {
   lastActivityAt: number | null;
   armed: boolean;
   status: "busy" | "idle" | "";
-  // Unit 4: the scope verdict (planner / none / unknown — unknown until
-  // the spawned-map check or a messages() fetch settles it), the
+  // Unit 4: the scope verdict (planner / autorun / none / unknown —
+  // unknown until a messages() fetch settles it; RE-evaluated on every
+  // idle — last-toggle-wins can flip with a new user message), the
   // recovery budget (CONTINUE sends this idle cycle; a fresh busy
   // resets it), and the pending-idle latch (ONE decision per idle
   // cycle — set by an idle event or session.error, cleared when the
   // tick makes its decision or the cycle fails).
-  scope: "planner" | "none" | "unknown";
+  scope: "planner" | "autorun" | "none" | "unknown";
   recoveryCount: number;
   idlePending: boolean;
   // #80 (agent retention): the first user message's agent field, cached
@@ -207,10 +226,12 @@ const sending = new Set<string>();
 const limitsCache = new Map<string, { context: number; output: number }>();
 let tickTimer: ReturnType<typeof setInterval> | null = null;
 
-// Unit 3 module-level state: the spawned self-mark (sid -> epoch — so
-// Unit 4 can recognize a spawn as its own, never as a user session) and
-// the in-flight latch (no double-spawn while one spawn attempt is
-// running; held until the trigger file is consumed).
+// Unit 3 module-level state: the spawned self-mark (sid -> epoch — the
+// #85 part-1 EXCLUSION: Unit 4 never scopes a self-spawned session — a
+// freshly-spawned successor must not be re-triggered; a spawn is never
+// confused with a user session either) and the in-flight latch (no
+// double-spawn while one spawn attempt is running; held until the
+// trigger file is consumed).
 const spawned = new Map<string, number>();
 let spawnInFlight = false;
 
@@ -597,16 +618,44 @@ function textParts(pair: MsgPair): string[] {
   return out;
 }
 
-// Unit 4: scope marker scan — true iff ANY user message of the pair
-// list carries the looprunner launch marker (the scope rule (b)).
-function userHasMarker(msgs: unknown): boolean {
+// #82: the last-toggle-wins scan — the LAST own-line toggle marker in
+// the user history wins (bidirectional; restart-safe: no in-memory
+// state — the same scan derives the state after a process restart). A
+// marker counts ONLY as the whole line (trim-exact — mid-sentence or
+// bullet-prefixed lines never toggle).
+function lastToggle(msgs: unknown): "on" | "off" | null {
+  let last: "on" | "off" | null = null;
   for (const pair of msgPairs(msgs)) {
     if (!pair.info || pair.info.role !== "user") continue;
     for (const t of textParts(pair)) {
-      if (t.includes(AUTONOM_MARKER)) return true;
+      for (const line of t.split(/\r?\n/)) {
+        const s = line.trim().toLowerCase();
+        if (TOGGLE_ON_MARKERS.includes(s)) last = "on";
+        else if (s === TOGGLE_OFF_MARKER) last = "off";
+      }
     }
   }
-  return false;
+  return last;
+}
+
+// #85 part 1 (#82 generalized scope): the scope verdict, recomputed
+// from the FRESH messages() fetch (last-toggle-wins can flip with a new
+// user message — no long-lived cache). A sid is in-scope iff (a) the
+// session's working agent — the FIRST user message's `agent` field
+// (the DB `session.agent` mirror — verified 2026-09-22; the plugin
+// cannot read the DB in-process, so the message field is the
+// client-reachable source) — is a PLANNER agent (agent ids follow
+// `planner_<model>`; the prefix survives model-generation renames), OR
+// (b) the last own-line toggle is ON (#82 — ANY agent type; the
+// planner-only gate is DROPPED). Self-spawned sids (the Unit 3
+// `spawned` self-mark) are NEVER scoped: the #85 loop — a
+// freshly-spawned successor must not be re-triggered.
+function scopeVerdict(sid: string, msgs: unknown): "planner" | "autorun" | "none" {
+  if (spawned.has(sid)) return "none";
+  const agent = firstUserAgent(msgs);
+  if (typeof agent === "string" && agent.startsWith("planner")) return "planner";
+  if (lastToggle(msgs) === "on") return "autorun";
+  return "none";
 }
 
 // #80 (agent retention): the FIRST user message's agent field (the
@@ -624,10 +673,12 @@ function firstUserAgent(msgs: unknown): string | null {
 
 // #80 (agent retention): the agent for an injected promptAsync body —
 // planner-scoped sessions always run as the planner agent (no fetch);
-// otherwise the first user message's agent (watch-cached: undefined =
-// unresolved → fetch once; null = resolved, absent). A resolved-null or
-// failed fetch → null (the body carries no agent field — the host
-// default applies) + one agent-omit= attribution line.
+// AUTORUN-scoped (non-planner, #82-toggled) sessions fall through to
+// the first user message's agent (the session keeps the agent that ran
+// it — watch-cached: undefined = unresolved → fetch once; null =
+// resolved, absent). A resolved-null or failed fetch → null (the body
+// carries no agent field — the host default applies) + one agent-omit=
+// attribution line.
 async function resolveInjectAgent(sid: string, w: Watch): Promise<string | null> {
   if (w.scope === "planner") return PLANNER_AGENT_ID;
   if (w.userAgent !== undefined) return w.userAgent;
@@ -712,19 +763,19 @@ async function routeScopedIdle(sid: string, w: Watch) {
   // the same fetch serves the scope scan, the routing scan, and the
   // agent cache (one round trip).
   w.userAgent = firstUserAgent(msgs);
-  // Scope verdict (cached; the fetch above serves BOTH the scope marker
-  // scan and the routing scan — one round trip). The verdict log line
-  // (#80) pins the decision for attribution — no behavior change.
-  if (w.scope === "unknown") {
-    if (spawned.has(sid) || userHasMarker(msgs)) {
-      w.scope = "planner";
-      log(`scope= planner sid=${sid}`);
-    } else {
-      w.scope = "none"; // non-scoped: NEVER acted on (fail-safe = no action)
-      log(`scope= none sid=${sid}`);
-      w.idlePending = false;
-      return;
-    }
+  // #85 part 1 (#82 scope): the verdict is RECOMPUTED from the fresh
+  // fetch (last-toggle-wins can flip with a new user message — no
+  // long-lived cache). The verdict log line (#80) pins the decision for
+  // attribution and lands only on CHANGE (no per-tick spam).
+  const verdict = scopeVerdict(sid, msgs);
+  if (verdict !== w.scope) {
+    w.scope = verdict;
+    log(`scope= ${verdict} sid=${sid}`);
+  }
+  if (w.scope === "none") {
+    // non-scoped: NEVER acted on (fail-safe = no action)
+    w.idlePending = false;
+    return;
   }
   w.idlePending = false; // the decision for this idle cycle is made below
   const action = lastAssistantAction(msgs);

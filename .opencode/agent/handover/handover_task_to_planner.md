@@ -1,105 +1,119 @@
-# Worker handover — consolidate compaction config into compact_budget.json
-STATUS: DONE — task complete, full gate green, committed with this file.
+# Worker handover — #85 part 1: generalize the auto_resume unit-4 scope
+STATUS: DONE — part 1 (scope) LANDED, full gate green, committed with this file.
 
 ## What changed
-One theme (the spec, commit 91d2d0c): `compact_budget.json` is now the SINGLE
-compaction-config source. Top-level optional fail-open keys: `keepTokens`
-(30_000), `keepMessages` (12), `emergencyRecovery` (strictly true, default
-false), `model_budget` (bare model ID → cap + `default` key, default 1).
+One theme (the spec, d1566eb): the auto_resume unit-4 scope is now
+`real PLANNER sessions (always) ∪ sessions whose #82 `<|Autorun|>` own-line
+toggle is ON (last-toggle-wins, ANY agent type)`, and freshly-spawned +
+unmarked worker sessions are OUT of scope. The #85 unbounded-spawn loop
+condition is gone: a self-spawned successor is never re-scoped as a
+planner, so it can never be re-triggered on a later tick.
 
-- `.opencode/plugin/compact_memory.ts`
-  - `QUANT_CLASS_RULES` + `classifyQuantClass` REMOVED → `resolveCap(root,
-    modelName)`: CPU `/^cpu/i` → cap 0 FIRST (the safety invariant), then the
-    EXACT bare-model-id key of the file's `model_budget` map (label
-    "model_budget"), else `model_budget.default` (else 1, label "model_budget
-    default"). Read PER CALL (a mid-run edit applies to the next call).
-  - New `readCompactionConfig(root)`: fail-open reader for the four keys
-    (bad values skipped: non-number / negative / non-object; unparseable
-    file → defaults; never throws).
-  - Keep reporting: `args?.keepTokens ?? cfg.keepTokens` (args still win);
-    same for messages. The COMPACT line + the no-args reporting now carry the
-    configured values.
-  - Budget writes need no special handling: `writeBudget` stringifies the
-    WHOLE parsed object, so the config keys survive every increment.
-  - Header comments + the tool description updated (quant-class → model_budget).
-  - PRESERVED: temp fix 0f192e5 (the commented-out promptAsync) byte-exact,
-    all #81 pins, the no-overwrite dump hook, the fire-and-forget paths.
-- `.opencode/plugin/deactivated/context_recovery.ts` (STAYS in deactivated/)
-  - `KEEP_TOKENS`/`KEEP_MESSAGES` constants, `FLAG_KEY`, `flagEnabled`,
-    `stripJsoncComments` (only used there) REMOVED → local self-contained
-    `readRecoveryConfig(root)` (deliberately NO runtime import from
-    compact_memory.ts — that would pull the tool registration into a
-    hook-only plugin): `{ enabled, keepTokens, keepMessages }` from the SAME
-    budget file, read PER HOOK FIRE. The compact body + the COMPACT line use
-    the configured keeps.
-- `.opencode/plugin/tests/compact_memory.smoke.mjs` (57/57)
-  - Sandbox budget file seeded with `model_budget:
-    { "Qwen3.8-27B-IQ4KT-120K": 3, "Qwen-IQ3-Test": 5, default: 1 }`.
-  - Classifier block → `resolveCap` fixtures (exact→5 / live model→3
-    "configured value" / unlisted→1 / typo→1 / CPU→0) + a `readCompactionConfig`
-    fail-open battery (absent file / valid+bad keys / unparseable).
-  - NEW keep-override case: file `keepTokens: 40_000, keepMessages: 9` →
-    COMPACT line `tokens=40000 messages=9` when args omitted; explicit args
-    still win (555/2); keys removed again after the case.
-  - The lenient-v1-read fixture now carries a `model_budget` key (a real v1
-    file never had one — the point is the lenient read + the bump on write).
-- `.opencode/plugin/tests/context_recovery.smoke.mjs` (ALL PASS, +1 case)
-  - Flag fixture moved from sandbox `opencode.jsonc` to sandbox
-    `compact_budget.json` (the `sessions` key is included so the flag
-    survives the recordSuccess write — case 3 hits the BUDGET gate, not the
-    flag gate). Case 2 keep defaults 30_000/12 unchanged.
-  - NEW case 6: `{emergencyRecovery: true, keepTokens: 45_000,
-    keepMessages: 5}` → compact body `{45000, 5}` + ctx.log line
-    `tokens=45000 messages=5` + budget count 1.
-- `.opencode/plugin/probes/handover_probe.mjs` (241/241)
-  - S11: the JSONC fixture dropped; `rcSetFlag(enabled)` merges the
-    `emergencyRecovery` key into the shared budget file. Check 77 asserts
-    the flag key is absent/not-true; check 78 seeds it ON (keep 30_000/12
-    pins UNCHANGED — no keep keys in the file); 79-81 unchanged (the
-    merge-preserving seed keeps the flag through the exhaustion case).
-  - S13: L2293 `qcClassify` → `qcResolveCap` (root = SANDBOX); check 87
-    seeds `model_budget` into the shared sandbox file (merge) and re-pins
-    to the "configured value" fixtures (exact 5 / live model 3 / unlisted 1
-    / typo 1 / CPU 0); check 92 label → "configured cap 3" (assertions
-    unchanged — 3/3 still); check 95 comment → "the cap lives in the file's
-    model_budget map". No checks added/removed → total stays 241.
-- `TODO.md` — new entry #84 (this task) added with status LANDED (the
-  spec's "this entry" did not exist yet — the file ended at #83; the
-  numbering line corrected up to #83/next #84); #83 gained a NOTE that the
-  live `emergencyRecovery` flag now lives in compact_budget.json. The commit
-  hash is for the planner's follow-up bookkeeping, not written here.
+- `.opencode/plugin/auto_resume.ts`
+  - **Scope verdict (`scopeVerdict`, new — replaces `userHasMarker`):**
+    - self-spawned sids (the Unit 3 `spawned` self-mark) → **NEVER scoped**
+      (the mark changed from an INCLUSION to an EXCLUSION — this was the
+      exact mechanism that mis-scoped freshly-spawned sessions as
+      `planner` in the #85 loop);
+    - else the session's working agent — the FIRST user message's `agent`
+      field (the DB `session.agent` mirror — VERIFIED 2026-09-22 against
+      `opencode.db`: the `session`/`session_v2` tables carry an `agent`
+      column, but the SDK `Session` type and the in-process plugin host
+      (no `node:sqlite`, TODO #37) expose no session-level field, so the
+      message field is the client-reachable source) is a PLANNER agent
+      (prefix `planner_<model>` — survives model-generation renames, e.g.
+      the live host's current `planner_Q3S_170K`);
+    - else the last own-line toggle in the user history is ON (#82
+      design, implemented here: `<|autonom|>` / `<|Autorun|>` both ON,
+      case-insensitive, whole-line trim-exact only; OFF = `<|Direct|>`;
+      last-toggle-wins; restart-safe — no in-memory state).
+  - The verdict is RECOMPUTED from the fresh `messages()` fetch on every
+    idle routing (last-toggle-wins can flip with a new user message);
+    `Watch.scope` gains `"autorun"`; the `scope=` log line lands on change
+    only (no per-tick spam).
+  - `resolveInjectAgent`: planner-scoped → the planner agent (unchanged);
+    autorun-scoped sessions fall through to the session's OWN first-user
+    agent (a toggled worker/prompt_builder keeps running as itself).
+  - Header/section comments updated (unit-3 `spawned`-mark purpose,
+    unit-4 SCOPE paragraph, toggle-marker constants).
+- `.opencode/plugin/tests/auto_resume.smoke.mjs` (89 → 97 checks)
+  - Baseline scenarios updated to the new scope semantics: the unit-4
+    planner scenarios now carry the planner agent field in their first
+    user message (the old launch-marker text is no longer a scope
+    source — it is not an own-line toggle); the spawned `ses_u3_new`
+    check FLIPPED from "routes as planner" to "OUT of scope — scope= none,
+    zero sends, no recovery/route line"; the send totals re-counted
+    (2 CONTINUE + 2 spawns, no u3_new send).
+  - NEW checks (the spec's item 3 + the DoD):
+    - unmarked WORKER session OUT of scope — and NOT re-triggered on the
+      next tick (second idle cycle: no recovery/route/spawn — the #85
+      loop condition is gone, the DoD proof);
+    - WORKER session + own-line `<|Autonom|>` (trim-padded) → IN scope
+      (`scope= autorun`), CONTINUE attempt 1, body carries the session's
+      OWN agent (worker), not the planner;
+    - NON-planner agent (prompt_builder-style) + own-line `<|Autonom|>` →
+      IN scope, body carries its own agent (the planner-only gate is
+      dropped);
+    - last-toggle-wins: own-line `<|Autonom|>` then later own-line
+      `<|Direct|>` → OFF (no sends, no re-trigger);
+    - mid-sentence quote (case-variant, not whole-line) is NOT a toggle.
+  - One harness fix: the new section re-factors with the u4 spying
+    client (the module-level `client` is set by the LAST factory call —
+    the u2ag client otherwise receives the section's sends).
 
-## Measured verification (all run on this host, after the final edits)
-- `node .opencode/plugin/tests/compact_memory.smoke.mjs` → ALL PASS (57/57)
-- `node .opencode/plugin/tests/context_recovery.smoke.mjs` → ALL PASS
-- `node .opencode/plugin/probes/handover_probe.mjs` → PROBE handover: 241/241 PASS
-- all 10 plugin smokes → ALL PASS (89/89, 52/52, 22/22, 57/57, —, 3/3, —, 39/39, 24/24, 20/20)
-- `./.venv/Scripts/python.exe -m pytest -q` → 459 passed, 1 warning in 2.23s
-- `./.venv/Scripts/ruff.exe check --select F .` → All checks passed! (F=0)
+## Measured verification (this checkout, plain system node / repo venv)
+- `node .opencode/plugin/tests/auto_resume.smoke.mjs` → **ALL PASS (97/97)**
+  (baseline before change: 89/89).
+- All 10 plugin smokes green: block_transfer.sandbox 52/52, block_transfer
+  22/22, compact_memory 57/57, context_recovery PASS, ctx_gauge 3/3,
+  gauge_core PASS, intercept_observer 39/39, loop_log 24/24, submit 20/20.
+- Standard gate: probe `handover_probe.mjs` → **241/241 PASS**;
+  `pytest -q` → **459 passed, 1 warning**; `ruff check --select F` →
+  **All checks passed (F=0)**. All match the spec baselines.
 
 ## Commit
-Code + tests + probe + TODO.md + this handover in ONE commit (staged
-explicitly — the other agents' live files: agent_feedback.md,
-knowledge_inbox.md, maintainer/ideas.md + the untracked compaction dumps —
-were NOT staged). Hash: recorded by the planner in the follow-up
-bookkeeping commit (a self-reference is impossible — this file rides in the
-same commit). Preceded by checkpoint commit 340e9a6 (IN PROGRESS handover at
-the ~87 % stop line, before the self-compaction).
+Code + TODO.md + this handover in ONE commit (see `git log -1`; the hash
+is recorded by the planner in the follow-up bookkeeping commit per the
+spec's DoD rule — deliberately NOT written here).
 
-## Deliberately NOT done
-- No touch to: the live `.opencode/temp/compact_budget.json`,
-  `.opencode/maintainer/`, `.opencode/agent/prompts/`, the live
-  `opencode.jsonc`, `auto_resume.ts`, the old `.opencode/tools/
-  compact_memory.ts` (S10 pins a different file), the temp fix 0f192e5, the
-  #81 pins.
-- `context_recovery.ts` was NOT re-activated / merged with compact_memory
-  (that is the contingent Task 3, gated on the maintainer's live
-  `session.error` hook verification — #83).
-- No changes to auto_resume's existing config keys (autoCompact /
-  saturationThreshold / outputReserve already per-tick fail-open there).
+## TODO entries / inbox
+- `TODO.md` **#85** → status "part 1 (scope) LANDED" (heading updated too);
+  part 2 (global cap + dead-mark) left OPEN per the spec.
+- `TODO.md` **#82** → status note: the scope-toggle portion LANDED as part
+  of #85 part 1 (smoke pins acceptance criteria (i)/(ii) + the own-line/
+  case rules); remaining: live acceptance (his post-restart test) + the
+  unit-2-suppression question (his call).
+- `todo_inbox.md` (append) — **stale `PLANNER_AGENT_ID` finding**: the
+  live `opencode.jsonc` now carries only `planner_Q3S_170K` (verified:
+  config read + live DB `session.agent` values), but the spawn path +
+  injected bodies still send `agent: "planner_Q3S_160K"` — an agent the
+  host cannot resolve, consistent with the #85 `UnknownError` at
+  `createUserMessage` on every spawned session's start prompt. NOT fixed
+  here (spec change-list is scope-only; the constant is a pinned copy of
+  a live-config value the maintainer owns) — his call (re-pin vs derive).
 
-Lessons: the flag+budget in ONE file means a lenient store read without a
-`sessions` key drops the top-level keys — both the smoke and the probe now
-seed `sessions` explicitly so the flag-gate vs budget-gate distinction is
-real; a worker reading "set this entry to LANDED" should expect the entry
-may not exist yet (created #84 instead).
+## Deliberately NOT done (per spec)
+- No restart of opencode (the live plugin keeps running the old code until
+  the maintainer's next restart — the live behavior flips then).
+- Part 2 (#85): no global cap, no dead-mark — follows once this is green.
+- `PLANNER_AGENT_ID` / spawn-path agent constant: untouched (see inbox).
+- DO-NOT-touch list respected: temp fix 0f192e5, live compact_budget.json,
+  `.opencode/maintainer/`, `.opencode/agent/prompts/`, live opencode.jsonc,
+  `compact_memory.ts`, `context_recovery.ts` — none edited.
+
+## Discrepancy flagged (spec vs code)
+The spec's "verified spec-time facts" list **#82 as LANDED** ("the
+`<|Autorun|>` own-line toggle … already gates the autorun scope"), but the
+committed code (and TODO #82, "implementation pending") had NO toggle
+implementation — the live scope was still the old all-parts
+`userHasMarker` scan + the `spawned` self-mark. This task implemented the
+agreed #82 toggle design as part of the scope rework (the spec's own smoke
+requirement — "a non-planner agent IN scope when `<|Autorun|>`-toggled" —
+requires it). #82's remaining scope (live acceptance + unit-2
+suppression) is noted in TODO #82.
+
+## Lessons
+Smoke harness gotcha worth a line in the testgate part: the auto_resume
+module's `client` is module-level and set by the LAST factory call — a
+smoke section reusing an older spying client after a re-factory gets its
+sends delivered to the NEW client (re-factor before the section).
