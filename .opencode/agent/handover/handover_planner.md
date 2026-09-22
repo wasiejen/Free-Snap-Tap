@@ -57,6 +57,17 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   + cache-read high; plus the `route=` lines (#70 residue).
 - #81 ruling recorded (his 2026-09-22): re-pin to the temp-fix behavior
   (recommended over deactivation) — next unit.
+- LIVE SCOPE INCIDENT (12:33:18Z, gen v=0bb5c46f): unit 4 fired on this
+  direct session — `scope= planner` verdict + `recovery= attempt=1` +
+  `arm= … injected` (cap fix works live: injected busy consumed). CAUSE
+  identified: his clarifying-question message QUOTES the literal
+  `<|autonom|>` (user part) → `userHasMarker` scans all user parts →
+  scope=planner. → TODO #82: scope verdict = FIRST user message only
+  (fail-safe) + smoke check. Original 2026-09-21 incident remains H2
+  (runtime shape — no user marker at the time). Criterion (b) pending:
+  the injected agent in the DB for the 12:33 recovery message — verify
+  next turn. This turn ends `action: stop` → unit 4 `route= stop`
+  (live-proves the #70 residue route line).
 - compact_memory SELF race measured this session (logged: feedback +
   knowledge inbox): the queued message delivers BEFORE the background
   compaction → cache invalidation → 160k hard-limit stall. Maintainer's

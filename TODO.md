@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #81, new
-entries start at #82 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #82, new
+entries start at #83 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -868,3 +868,30 @@ restart detection" wording above is the pre-revision numbering.
   pending (next unit). Planner recommendation: re-pin (a deactivated check
   silently loses coverage; the gate should pin the current intended
   behavior).
+
+## 82. (open, 2026-09-22, planner live; HIGH) scope verdict flips on ANY user message quoting the marker — fail-safe: first user message only
+- **Problem + evidence:** live incident 2026-09-22T12:33:18Z (gen
+  v=0bb5c46f — the verified #80-fixed build, post-380e326 re-activation):
+  unit 4 injected a recovery prompt into the direct (no-launch) session
+  ses_f39d250e9ffeheip2FVEeY5Fk6. Log: `scope= planner sid=…` →
+  `recovery= attempt=1` → `arm= … injected` (the cap fix worked — the
+  injected busy was consumed, no reset). CAUSE identified live: the
+  maintainer's clarifying-question message contained the literal
+  `<|autonom|>` (a user text part) — `userHasMarker` scans ALL user
+  parts, so any later user message quoting the marker flips a direct
+  session to scope=planner. (The original 2026-09-21 incident — 9×
+  recovery with NO user marker in history at the time — remains H2,
+  runtime-shape, unresolved.)
+- **Desired outcome:** only the LAUNCH (first) user message can establish
+  scope=planner; a later user message quoting the marker never flips a
+  direct session.
+- **Acceptance criteria:** scope verdict targets only the first user
+  message (earliest by time_created); smoke check: a session whose
+  marker appears ONLY in a later user message → scope= none, idle
+  untouched; live re-acceptance: a direct session that quotes the marker
+  stays untouched (this session's `action: stop` turn also live-proves
+  the `route= stop` branch — #70 residue).
+- **Suggested scope:** `userHasMarker` / scope verdict in
+  `.opencode/plugin/auto_resume.ts` (L614, L543-551) + smoke section.
+- **Status:** open — design proposed (first user message only);
+  implementation pending (after #81; small change).
