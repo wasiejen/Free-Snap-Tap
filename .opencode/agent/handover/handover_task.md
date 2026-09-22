@@ -55,4 +55,4 @@ he will raise it further toward ~0.98 once the limit-detection backstop exists).
 - The LIVE `.opencode/temp/compact_budget.json` (tests use a sandbox copy — keep it that way).
 - Anything under `.opencode/maintainer/`, `.opencode/agent/prompts/`, or the live `opencode.jsonc`.
 
-Worker: `worker_Q3S_160K` (precise single-file plugin change + test updates).
+Worker: `worker_Q3S_170K` (precise single-file plugin change + test updates).

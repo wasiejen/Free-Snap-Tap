@@ -138,7 +138,14 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   It's the enabler to raise the threshold to ~0.98. KEY UNCERTAINTY: the
   host must actually call the hook on overflow — needs a live check. His
   side note: backend output limits would also cap ramblers + avoid a long
-  output straddling the threshold (noted, not acted).
+  output straddling the threshold (noted, not acted). LANDED 2026-09-22
+  (86713d8, worker_Q3S_170K): `saturationThreshold` (default 0.95) +
+  `outputReserve` (default 20000) per-tick fail-open; smoke 89/89 + probe
+  241/241 + gate green. FINDING (friction-logged): the auto_resume smoke
+  had a STALE load path since the 380e326 reactivation (pointed at the old
+  deactivated path → ERR_MODULE_NOT_FOUND), so the earlier "76/76" baseline
+  was unreachable/stale; load path now fixed to the live file (89/89 is
+  genuinely live). #83 backstop still open (his call).
 - NEXT (his priority order): (1) #81 LANDED + verified (af38e2f — gate
   241/241); (2) #82 scope rework spec — design AGREED (above) —
   spec-able now except the unit-2-suppression scope (his call); (3)
