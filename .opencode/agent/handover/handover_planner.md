@@ -45,9 +45,18 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - Maintainer's compact_memory temp fix (0f192e5, 2026-09-22_13-21): the
   promptAsync message injection is commented out → the queued-message race
   is gone; SELF compaction should work again until a proper fix (unverified).
-- On worker-2 return: verify (git + smoke + gates) + bookkeeping commit
-  (record the commit hash in #80). Re-activation + live acceptance (#80
-  criteria b/c) stay his call.
+- #80 LIVE (2026-09-22): he re-activated the plugin (380e326 — file moved
+  back to `.opencode/plugin/`; plugins are auto-scanned, no config entry)
+  + restarted opencode. First live gen (12:25:47Z) prints
+  `surface= v=0bb5c46f` — hash-verified BYTE-IDENTICAL to the #80-fixed
+  build (4098253; on-disk hash matches too). The new gen is already
+  watching this session live (12:30:33 part events). Live acceptance
+  pending: (c) this session's next idle → expect `scope= none
+  sid=ses_f39d250e9…` + NO injection (the exact pre-fix failure mode — the
+  strongest live proof); (b) first injection event → injected agent in DB
+  + cache-read high; plus the `route=` lines (#70 residue).
+- #81 ruling recorded (his 2026-09-22): re-pin to the temp-fix behavior
+  (recommended over deactivation) — next unit.
 - compact_memory SELF race measured this session (logged: feedback +
   knowledge inbox): the queued message delivers BEFORE the background
   compaction → cache invalidation → 160k hard-limit stall. Maintainer's
@@ -55,12 +64,14 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   is gone and SELF compaction should work again (unverified); side effect:
   probe [97] + compact_memory smoke pin red → #81 (his call: re-pin to the
   temp-fix behavior, or re-pin at the proper message fix).
-- NEXT (his priority order): (1) #80 re-activation ruling + live
-  acceptance (criteria b/c; the gate is one pin short — #81); (2) TODO.md
-  shrink (~40k tokens — closed entries → todo_records.md, one-line
-  records); (3) unit 4 route= live proof + #70 close confirm; (4) research
-  spec (compact_memory + block_transfer — priority.md #1); (5) TODO #78
-  scoping.
+- NEXT (his priority order): (1) #80 live acceptance from the log — this
+  session's idle → `scope= none` + no injection (pre-fix failure mode),
+  first injection → agent in DB + cache-read high, `route=` lines (closes
+  #70 residue); (2) #81 pin fix (his ruling: re-pin to the temp-fix
+  behavior — recommended over deactivation); (3) TODO.md shrink (~40k
+  tokens — closed entries → todo_records.md, one-line records); (4)
+  research spec (compact_memory + block_transfer — priority.md #1); (5)
+  TODO #78 scoping.
 - Carried parked ideas (unchanged): smaller NAP snapshot via opencode.jsonc
   agent prompt; reality-rebuild tool; pathfinder-mentality prompt part;
   looprunner-retirement decision; feedback integration on planner close-up;

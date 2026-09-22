@@ -386,3 +386,9 @@ Two friction points, 2026-09-22 direct session (ses_f39d250e9): (1) TODO.md is ~
 ### 2026-09-22_03-07 planner_Q3S_160K ses_f39d250e9ffeheip2FVEeY5Fk6
 compact_memory SELF (2026-09-22, ses_f39d250e): the queued continuation message was delivered BEFORE the background compaction applied → cache invalidation + full re-prefill → session ran 96%→100% (160k hard limit) and stopped entirely (a user message was needed to restart); only the summary was produced, no compaction. My stop-line protocol's "self-compact via compact_memory SELF" needs a fallback on this build: maintainer-triggered manual compaction works (dropped to ~52k). A wait/sequencing between message-queue and compaction-apply (his 60s idea) would fix the race at the source.
 
+### 2026-09-22_13-50 worker_Q3S_160K ses_f371e0e23ffe0eza71uD5qWy7K
+#80 spec's gate baseline ("probe 241/241") was stale at tree start — the maintainer's temp fix 0f192e5 (commented-out promptAsync in compact_memory.ts) had already broken probe check [97] before the worker started; the state deltas should list the measured live gate state of the actual tree, not the repo_commands.md baselines.
+
+### 2026-09-22_13-59 planner_Q3S_160K ses_f39d250e9ffeheip2FVEeY5Fk6
+Two friction points, 2026-09-22 direct session: (1) worker-1 (worker_Q3S_110K_mtp, 110k) burned its whole window on DESIGN for an investigate-then-implement plugin spec and died with zero code changes — 110k is too tight for that task shape; default such specs to worker_Q3S_160K or split spec into design-checkpoint + implementation (the checkpoint-draft salvage worked, but only because the maintainer saved the partial draft). (2) auto_resume smoke suite now runs >2 min (my 120s default bash timeout cut the verification run mid-suite) — repo_commands.md gate section should note the expected suite duration / a larger timeout (maintainer file, flag only).
+

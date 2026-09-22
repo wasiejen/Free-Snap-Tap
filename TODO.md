@@ -828,9 +828,13 @@ restart detection" wording above is the pre-revision numbering.
   compaction budget exhaustion (keep=0 + same-session resume + budget reset
   vs. higher cap — bit-rot risk).
 - **Status:** implementation LANDED (4098253, worker-2
-  ses_f371e0e23ffe0eza71uD5qWy7K); live acceptance pending re-activation
-  (maintainer call). Gate note: probe 240/241 — check [97] pre-existing red
-  (maintainer temp fix 0f192e5) → #81. History: investigated 2026-09-22
+  ses_f371e0e23ffe0eza71uD5qWy7K); plugin REACTIVATED 2026-09-22
+  (380e326) — live gen `surface= v=0bb5c46f` hash-verified byte-identical
+  to the #80-fixed build; live acceptance pending: (c) a direct session's
+  next idle → `scope= none` in the log + no injection; (b) first injection
+  → injected agent in DB + cache-read high. Gate note: probe 240/241 —
+  check [97] pre-existing red (maintainer temp fix 0f192e5) → #81.
+  History: investigated 2026-09-22
   (planner, direct session); FIX DESIGN APPROVED by the maintainer
   2026-09-22; plugin DEACTIVATED (a000dfd). Item-3 scope anomaly: H1
   REFUTED 2026-09-22 (DB check — none of the session's 44 user-role parts,
@@ -859,5 +863,8 @@ restart detection" wording above is the pre-revision numbering.
 - **Suggested scope:** `.opencode/plugin/probes/handover_probe.mjs` (check
   [97]), `.opencode/plugin/tests/compact_memory.smoke.mjs`;
   `compact_memory.ts` only if the message path is restored.
-- **Status:** open — maintainer call (his intentional temp fix; the #80
-  re-activation decision can ride this ruling).
+- **Status:** ruling 2026-09-22 (maintainer): the pin can be deactivated
+  OR fixed to match the commented-out `promptAsync` — implementation
+  pending (next unit). Planner recommendation: re-pin (a deactivated check
+  silently loses coverage; the gate should pin the current intended
+  behavior).
