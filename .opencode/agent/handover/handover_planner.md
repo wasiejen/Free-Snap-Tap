@@ -166,6 +166,30 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   q4→3, q3→3, q2→1, default 1; has a probe-pinned trap). Unlisted model →
   default 1; wrong key → fails safe (no match). CPU cap-0 to be kept as a
   guard (his call). Trap probe pin updates to "configured value".
+- Task 1 (config consolidation) LANDED (94029d5, worker_Q3S_170K, VERIFIED:
+  compact_memory 57/57, context_recovery ALL PASS, probe 241/241).
+  compact_budget.json is now the single compaction-config source: model_budget
+  map + default:1, keepTokens/keepMessages defaults, emergencyRecovery moved OUT
+  of opencode.jsonc. TODO #84 LANDED. NOTE: the worker self-compacted mid-task
+  (recon checkpoint 340e9a6) and I resumed via task_id — see the signaling note
+  below. His next step: ACTIVATE context_recovery + run the session.error live
+  check (the backstop / #83 gating question).
+- Worker self-compact SIGNALING shortcoming (his design Q 2026-09-22, design
+  phase): a self-compacted worker returns to the planner with an ambiguous Work
+  State dump (no action line, no closing message); the compact_memory
+  continuation `message` (the worker's "resume-by X" intent) is queued in the
+  WORKER session, NOT visible to the planner. The worker DID commit an IN PROGRESS
+  checkpoint (340e9a6) but didn't clearly signal "resume me." PROPOSAL (Option A,
+  for his ruling): a worker self-compacting mid-task MUST commit a PAUSE handover
+  to handover_task_to_planner.md FIRST ("SELF-COMPACT PAUSE (not done) —
+  checkpoint <hash> — resume via task_id — next X — head files Y"); the planner,
+  on an ambiguous worker return, reads the committed handover for the
+  authoritative state. Alternative (his idea): a cross-session queued message to
+  the planner (needs a new mechanism). NOT implemented — prompt/convention change.
+- --info reading discipline (his note, priority.md 2026-09-22_20-42): the worker
+  burned context on careless greps (20k from TODO.md, then further reads).
+  Strengthen reading discipline in the worker prompt / specs (no wholesale
+  TODO.md greps; targeted reads; use the inventory scripts).
 - NEXT (his priority order): (1) #81 LANDED + verified (af38e2f — gate
   241/241); (2) #82 scope rework spec — design AGREED (above) —
   spec-able now except the unit-2-suppression scope (his call); (3)
