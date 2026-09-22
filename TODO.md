@@ -875,7 +875,7 @@ restart detection" wording above is the pre-revision numbering.
   241/241 (header total agrees), smoke 53/53, pytest 459 passed +
   1 warning, ruff F=0.
 
-## 82. (open, 2026-09-22, planner live; HIGH) scope verdict flips on ANY user message quoting the marker — fail-safe: first user message only
+## 82. (open, 2026-09-22, planner live; HIGH) scope verdict: last-toggle-wins over user history, own-line anchor, bidirectional (on/off markers)
 - **Problem + evidence:** live incident 2026-09-22T12:33:18Z (gen
   v=0bb5c46f — the verified #80-fixed build, post-380e326 re-activation):
   unit 4 injected a recovery prompt into the direct (no-launch) session
@@ -888,16 +888,30 @@ restart detection" wording above is the pre-revision numbering.
   session to scope=planner. (The original 2026-09-21 incident — 9×
   recovery with NO user marker in history at the time — remains H2,
   runtime-shape, unresolved.)
-- **Desired outcome:** only the LAUNCH (first) user message can establish
-  scope=planner; a later user message quoting the marker never flips a
-  direct session.
-- **Acceptance criteria:** scope verdict targets only the first user
-  message (earliest by time_created); smoke check: a session whose
-  marker appears ONLY in a later user message → scope= none, idle
-  untouched; live re-acceptance: a direct session that quotes the marker
-  stays untouched (this session's `action: stop` turn also live-proves
-  the `route= stop` branch — #70 residue).
+- **Desired outcome (his ruling 2026-09-22 — SUPERSEDES the
+  first-message-only proposal):** scope is re-evaluated on EVERY new
+  user message — LAST TOGGLE WINS over the user history (restart-safe:
+  the same scan derives the state after a process restart). Toggle
+  markers count ONLY on their own line (message-start anchors ruled
+  out — the injected `ctx:` gauge line always prefixes the message, so
+  the marker never sits at the start). ON: `<|autonom|>` (the existing
+  launch marker) — plus `<|Autorun|>` if that is the intended spelling
+  (aliased — his one-word confirm pending); OFF: `<|Direct|>`.
+  Bidirectional: he can deactivate AND reactivate mid-session without
+  starting a new session (context preservation — his stated motivation).
+- **Acceptance criteria:** own-line match only (mid-sentence or
+  bullet-prefixed markers never toggle); smoke: (i) mid-sentence quote
+  → scope unchanged; (ii) own-line `<|Direct|>` then own-line
+  `<|autonom|>` → last wins (ON); (iii) restart derives the same state
+  from history (no in-memory persistence). Live: his post-restart test
+  on this session — under the CURRENT code (all-parts scan) autorun WILL
+  re-engage (any quote counts); after #82 it must NOT (his message
+  carries no own-line toggle). `route= stop` live-proven by this
+  session's `action: stop` turns (#70 residue). OPEN (his call, after
+  the 85%-trigger info given 2026-09-22): does OFF also suppress unit 2
+  (context trigger) or only unit 4?
 - **Suggested scope:** `userHasMarker` / scope verdict in
   `.opencode/plugin/auto_resume.ts` (L614, L543-551) + smoke section.
-- **Status:** open — design proposed (first user message only);
-  implementation pending (after #81; small change).
+- **Status:** design AGREED 2026-09-22 (his ruling on all open
+  questions; unit-2-suppression scope pending his call after the
+  85%-trigger info); implementation pending — gate is green (post-#81).

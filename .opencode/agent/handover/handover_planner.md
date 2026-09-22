@@ -93,14 +93,29 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   is gone and SELF compaction should work again (unverified); side effect:
   probe [97] + compact_memory smoke pin red → #81 (his call: re-pin to the
   temp-fix behavior, or re-pin at the proper message fix).
-- NEXT (his priority order): (1) #81 LANDED + planner-verified
-  (af38e2f — gate 241/241); (2) #82 scope fail-safe spec — WAITING his
-  `<|Direct|>` toggle ruling (asymmetric vs bidirectional, unit-2
-  suppression, own-line anchor); (3) #80 close (his confirm — (b)
-  verified, (c) gated on #82); (4) TODO.md shrink (~40k tokens — closed
-  entries → todo_records.md, one-line records); (5) research spec
-  (compact_memory + block_transfer — priority.md #1); (6) TODO #78
-  scoping.
+- Toggle design AGREED (his ruling 2026-09-22, all my open questions):
+  LAST-TOGGLE-WINS over user history (bidirectional — deactivate AND
+  reactivate mid-session; context preservation = his stated
+  motivation), OWN-LINE anchor (message-start ruled out — the ctx:
+  gauge line always prefixes the message), ON = `<|autonom|>`
+  (+`<|Autorun|>` spelling pending his one-word confirm), OFF =
+  `<|Direct|>`; scope re-evaluated on every new user message; #82
+  re-scoped in TODO (first-message-only proposal superseded). His live
+  test: he HIJACKED the unit-2 injection message and will check whether
+  autorun re-engages after a restart — under the CURRENT all-parts
+  scan it WILL (his message quotes the marker); after #82 it must NOT
+  (no own-line toggle in history). OPEN for his call: OFF suppressing
+  unit 2 (85% trigger) as well or only unit 4 — the 85%-trigger
+  behavior was explained in this turn's closing (unit 2 = context
+  trigger on busy events, once per busy cycle; unit 4 = liveness
+  watchdog on idle; `action:` lines route unit 4 ONLY — unit 2 ignores
+  them by design).
+- NEXT (his priority order): (1) #81 LANDED + verified (af38e2f — gate
+  241/241); (2) #82 scope rework spec — design AGREED (above) —
+  spec-able now except the unit-2-suppression scope (his call); (3)
+  #80 close (his confirm — (b) verified, (c) gated on #82); (4) TODO.md
+  shrink (~40k tokens); (5) research spec (priority.md #1); (6) TODO
+  #78 scoping.
 - Carried parked ideas (unchanged): smaller NAP snapshot via opencode.jsonc
   agent prompt; reality-rebuild tool; pathfinder-mentality prompt part;
   looprunner-retirement decision; feedback integration on planner close-up;
