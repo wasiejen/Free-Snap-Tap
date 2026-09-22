@@ -111,6 +111,11 @@ agreed #82 toggle design as part of the scope rework (the spec's own smoke
 requirement — "a non-planner agent IN scope when `<|Autorun|>`-toggled" —
 requires it). #82's remaining scope (live acceptance + unit-2
 suppression) is noted in TODO #82.
+- Bookkeeping note: the todo_inbox.md diff in the task commit also carried a
+  pre-existing uncommitted one-line header fix from an earlier session's
+  working tree ("use the submit.todo tool to append here" in the Who-writes
+  line) — it rode along with my append; content is accurate, no action
+  needed.
 
 ## Lessons
 Smoke harness gotcha worth a line in the testgate part: the auto_resume
