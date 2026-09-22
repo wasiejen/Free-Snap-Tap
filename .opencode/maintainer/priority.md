@@ -46,6 +46,30 @@
 - you are intelligent - you will find something to do
   - go through my ideas for new research on functions. create a folder in research for each if you find something worthwhile
 
+
+
+# 2026-09-22_20-42
+- direct instructions on how to work with the nap and todo efficiently directly in the system prompt of planner and worker
+  - worker tried to grap something in the todo and got 100 matches and loaded 20k tokens in his context
+  - general guideline for handling large files needed.
+    - with bigger context windows the agents get careless with context discipline and then rush the end when the 2 tool call delay hit them hard. he thought he was at 59% while actually already at 79%
+    - 
+# 2026-09-22_19-46
+"UnknownError: UnknownError
+    at <anonymous> (B:/~BUN/root/chunk-d958f9z1.js:1142:2068)
+    at SessionPrompt.createUserMessage (B:/~BUN/root/chunk-d958f9z1.js:1142:9959)
+    at SessionPrompt.createUserMessage (definition) (B:/~BUN/root/chunk-d958f9z1.js:1142:1826)
+    at SessionPrompt.prompt (B:/~BUN/root/chunk-eqzhwexz.js:4:13569)
+    at SessionPrompt.prompt (definition) (B:/~BUN/root/chunk-d958f9z1.js:1142:9844)
+    at SessionHttpApi.promptAsync (B:/~BUN/root/chunk-eqzhwexz.js:2:84461)
+    at SessionHttpApi.promptAsync (definition) (B:/~BUN/root/chunk-eqzhwexz.js:4:13476)"
+
+on each action:stop line now i get this error message shown for some seconds. something in our auto-resume plugin i guess
+
+# 2026-09-22_21-13
+the tests get ridicously long (wall-time)
+- can the check of the planner be done via dump of worker session and check of the last messages for the actual run test results by the planner?
+
 # 1 compact_memory additions/fix messages (your todo ##70 likely needs an update)
 - autocompact on context limit option, toggable via parameter in the budget file
 - (1)add a fallback to fetch the providerID and modelID as fallback for cross-session compaction (so only session_id needs to be set) 

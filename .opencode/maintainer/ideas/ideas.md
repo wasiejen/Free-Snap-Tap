@@ -5,13 +5,16 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
+2026-09-22_17-53
+- might be a good idea to create seperate README.md files for each plugin we have written 
+  - general explanation what is does and how it is implemented
+  - might contain gotchas encountered - lessons learned not to do
+
 2026-09-22_17-41
 - we should move ctx gauge max value not gained from the modelID but from the opencode.jsonc or if their is a field in ctx object to gain the limit directly over it.
   - would allow me to more freely name and rename modelID without needing to update the name in backend AND openconfig to signal the limit via name
 
 
-2026-09-22_14-57
-- direct instructions on how to work with the nap and todo efficiently directly in the system prompt of planner and worker
 
 2026-09-22_14-30:
 "
@@ -164,3 +167,23 @@ Refer to R6 in fuzzy_numword as sketch for a cheap dump file for every edit and 
   - enrich our knowledge base with these informations found 
     - like recepies: this problem is solved here in this way
       - as basis to built our own plugins with working examples
+
+
+  "autoCompact": false,
+  "saturationThreshold": 0.95,
+  "outputReserve": 5000,
+  "keepTokens": 30000,
+  "keepMessages": 12,
+  "emergencyRecovery": false,
+  "model_budget": {
+    "Qwen3.8-27B-Q3XS-160K-MTP": 3,
+    "Qwen3.8-27B-Q3S-110K-MTP": 3,
+    "Qwen3.8-27B-Q2S-128K-x2": 3,
+    "Qwen3.8-27B-Q2S-210K-MTP": 3,
+    "Qwen3.8-27B-Q3S-160K-MTP-Thireus": 3,
+    "Qwen3.8-27B-Q3S-170K": 3,
+    "Qwen3.8-27B-Q3S-230K-slow": 3,
+    "Qwen3.8-27B-Q3XS-262K": 3,
+    "Gemma4-12B-Q4KM-UC-128K": 1,
+    "Gemma4-12B-Q4KXL-MTP-128K": 1
+  },
