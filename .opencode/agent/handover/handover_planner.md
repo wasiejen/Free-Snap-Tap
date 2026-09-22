@@ -192,11 +192,12 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - Gauge lives in `.opencode/plugin/scripts/` (self-gauge:
   `node .opencode/plugin/scripts/peek.mjs`; the file-relative
   `DEFAULT_EXE_PATH` inside `gauge.mjs` must be re-checked if that dir moves).
-- Delegation: Task tool (`subagent_depth` 2); live roster (opencode.jsonc,
-  verified 2026-09-22): `worker_Q3S_160K` / `worker_Q3S_110K_mtp` /
-  `worker_Q2XS_210K_mtp` / `worker_gemma_Q4_128K` (no default — pick per task,
-  verify the roster live); raw `agent_*` = fallback; explorer = fast, less
-  stable — ALWAYS verify its work.
+- Delegation: Task tool (`subagent_depth` 2); the roster is LIVE-edited in
+  opencode.jsonc — verify BEFORE every launch (2026-09-22: active
+  `worker_Q3S_160K` + `worker_gemma_Q4_128K`; `worker_Q3S_110K_mtp` /
+  `worker_Q2XS_210K_mtp` commented out mid-run — a launch against a
+  commented agent fails with "Unknown agent type"); raw `agent_*` =
+  fallback; explorer = fast, less stable — ALWAYS verify its work.
 - NO parsing of `.opencode/plugin.log` (call-1 one-shot only, default SKIP).
 - TODO.md curation: open items + one-line records in TODO.md; full text of
   closed entries in `todo_records.md` (formalized by split proposal part 3).

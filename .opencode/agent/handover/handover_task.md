@@ -1,7 +1,9 @@
 # Task spec — TODO #80 continuation (worker-2; worker-1 died at the limit, zero code changes)
 
-**Worker:** worker_Q3S_110K_mtp. **Branch:** the current checkout
-(`opencode_test` @ a7acd6a — verify with `git branch -v` before committing).
+**Worker:** worker_Q3S_160K (roster changed live 2026-09-22 —
+worker_Q3S_110K_mtp is commented out in opencode.jsonc). **Branch:** the
+current checkout (`opencode_test` @ a7acd6a — verify with `git branch -v`
+before committing).
 
 **Your plan is committed:**
 `.opencode/agent/handover/handover_draft_worker_ses_f3950da93ffeZ6qSsewYup8ElY.md`
