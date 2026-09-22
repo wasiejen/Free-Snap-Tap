@@ -30,8 +30,16 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   entry (his stop/interrupt + `ask_maintainer` must stop the loop); planner
   compaction budget exhaustion (keep=0 + same-session resume + budget reset
   vs. higher cap — bit-rot risk).
-- NEXT (his priority order): (1) #80 fix-design ruling, then implement post
-  re-activation; (2) TODO.md shrink (~40k tokens — closed entries →
+- #80 IN FLIGHT (this turn): fix design APPROVED by him; task spec committed;
+  worker launched (worker_Q3S_110K_mtp) — on return: verify (git + gate) +
+  bookkeeping commit. Implementation lands while the plugin stays deactivated;
+  re-activation + live acceptance (#80 criteria b/c) = his call.
+- compact_memory SELF race measured this session (logged: feedback +
+  knowledge inbox): the queued message delivers BEFORE the background
+  compaction → cache invalidation → 160k hard-limit stall; manual compaction
+  works — do NOT self-compact at the stop line on this build.
+- NEXT (his priority order): (1) #80 worker verification + bookkeeping commit
+  (in flight); (2) TODO.md shrink (~40k tokens — closed entries →
   todo_records.md, one-line records); (3) unit 4 route= live proof + #70
   close confirm; (4) research spec (compact_memory + block_transfer —
   priority.md #1); (5) TODO #78 scoping.
@@ -132,12 +140,16 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   UNIT 4, intercept_observer 39/39, submit 20/20; the per-suite counts are
   in each smoke's own readout — no total kept here); pytest **459 passed +
   1 warning (the known #10 coroutine warning)**; ruff **F=0**.
-- Cross-compaction (measured 2026-09-18, plan2): `compact_memory` with a
-  foreign sessionID still REQUIRES explicit providerID + modelID (else
-  "no resolvable model" — the request is NOT sent); the Gemma compaction
-  model per opencode.jsonc `agent.compaction` =
-  `llama-swap/Gemma4-12B-Q4KXL-MTP-128K`; keep defaults tokens=30000 /
-  messages=12. Feeds the TODO #70 rework (queue #1).
+- Cross-compaction (measured 2026-09-18 plan2; re-verified live 2026-09-22):
+  `compact_memory` with a foreign sessionID — no model args in the tool
+  schema; the summarizer model resolves per `agent.compaction.model` (set in
+  opencode.jsonc) ELSE from the target session's own config (live 2026-09-22:
+  worker-11 dispatch resolved to `Qwen3.8-27B-Q3S-110K-MTP` = the target's
+  own model; compaction applied, session resumed clean). CPU models are
+  denied (cap 0). The SELF path is BROKEN on this build (race: queued message
+  delivers before compaction applies → cache invalidation → hard-limit stall;
+  see 2026-09-22 knowledge-inbox entry) — manual compaction is the working
+  self-path.
 - Corpus refresh cadence (planner call, plan6 — TODO #59 CLOSED): refresh
   BEFORE the #56 distillation runs + after heavy loopruns —
   `node .opencode/agent/scripts/db/dump_session.cjs --all --slim`.
@@ -168,10 +180,11 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - Gauge lives in `.opencode/plugin/scripts/` (self-gauge:
   `node .opencode/plugin/scripts/peek.mjs`; the file-relative
   `DEFAULT_EXE_PATH` inside `gauge.mjs` must be re-checked if that dir moves).
-- Delegation: Task tool (`subagent_depth` 2), default `worker_Q4_120K` (P01
-  re-test PASSED — worker-prompt launches work); raw `agent_*` = fallback;
-  explorer `worker_explorer_Q3_120K_mtp` (fast, less stable — ALWAYS verify its
-  work).
+- Delegation: Task tool (`subagent_depth` 2); live roster (opencode.jsonc,
+  verified 2026-09-22): `worker_Q3S_160K` / `worker_Q3S_110K_mtp` /
+  `worker_Q2XS_210K_mtp` / `worker_gemma_Q4_128K` (no default — pick per task,
+  verify the roster live); raw `agent_*` = fallback; explorer = fast, less
+  stable — ALWAYS verify its work.
 - NO parsing of `.opencode/plugin.log` (call-1 one-shot only, default SKIP).
 - TODO.md curation: open items + one-line records in TODO.md; full text of
   closed entries in `todo_records.md` (formalized by split proposal part 3).

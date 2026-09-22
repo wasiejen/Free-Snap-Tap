@@ -380,3 +380,9 @@ auto_resume.smoke.mjs: the module-level `client` is swapped by every re-factory,
 ### 2026-09-22_00-42 planner_Q3S_160K ses_f3a24dc3bffe59B5xpa0Ho3XZd
 The READY-MADE marker-sweep command in the planner prompt has a flag-order bug: `--include="*.md"` sits AFTER the `--`, which ends option parsing, so grep treats it as a path and scans the whole tree (100k+ lines incl. plugin.log) — I had to re-run with `--include` moved before the pattern. Fix the command in the prompt (measured 2026-09-22, plan7).
 
+### 2026-09-22_02-33 planner_Q3S_160K ses_f39d250e9ffeheip2FVEeY5Fk6
+Two friction points, 2026-09-22 direct session (ses_f39d250e9): (1) TODO.md is ~40k tokens with full closed entries still inline — every planner session pays the prefill; the closed→todo_records.md curation (now queued as NEXT #2) should land before the next heavy run. (2) I broke the 90% stop line in a direct session (88%→103%) and kept working instead of stopping for the maintainer — direct sessions need an explicit "stop and wait" discipline that outranks continuing the current unit; the auto-resume deactivation (a000dfd) removes the resurrection hazard but not the overwork one.
+
+### 2026-09-22_03-07 planner_Q3S_160K ses_f39d250e9ffeheip2FVEeY5Fk6
+compact_memory SELF (2026-09-22, ses_f39d250e): the queued continuation message was delivered BEFORE the background compaction applied → cache invalidation + full re-prefill → session ran 96%→100% (160k hard limit) and stopped entirely (a user message was needed to restart); only the summary was produced, no compaction. My stop-line protocol's "self-compact via compact_memory SELF" needs a fallback on this build: maintainer-triggered manual compaction works (dropped to ~52k). A wait/sequencing between message-queue and compaction-apply (his 60s idea) would fix the race at the source.
+
