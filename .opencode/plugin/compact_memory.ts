@@ -573,7 +573,8 @@ function queueMessage(client: any, sessionID: string, message: unknown, dispatch
   if (typeof message === "string" && message !== "") {
     if (typeof client?.session?.promptAsync === "function") {
       void Promise.resolve(
-        client.session.promptAsync({ path: { id: sessionID }, body: { parts: [{ type: "text", text: message }] } }),
+        //--maintainer 2026-09-22_11-53: deactivated to enable compaction until a way is found to send the message without interfering with the compaction
+        //client.session.promptAsync({ path: { id: sessionID }, body: { parts: [{ type: "text", text: message }] } }),
       ).catch((err: unknown) =>
         console.error(
           `compact_memory: message queue FAILED for ${sessionID}:`,

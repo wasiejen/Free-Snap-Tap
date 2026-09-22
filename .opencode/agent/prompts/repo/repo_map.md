@@ -92,10 +92,7 @@ The delegate targets live in `opencode.jsonc` (mode `all`) — the maintainer ed
 that file live, so **verify the roster there, never trust this section or
 memory**. Model notes for choosing (Q3 = 3bit, higher precision; Q2 = 2bit,
 bigger context, weaker reasoning and stability):
-- **Default for medium to large tasks** `*_Q3S_160K` very high intelligence, speedrating 48, 160k context, very high precision, highest general knowledge: best for very complex coding and code review work 
-- **Default for small to medium tasks** `*_Q3S_110K_mtp` very high intelligence, speedrating 66, 110k context, very high precision, highest general knowledge: best for complex coding and code review work that is workable with reduced context size - makes up for it in higher generation speed
-<!--- `*_Q3XS_160k_mtp` high intelligence, speedrating 66, 160k context, high precision, high general knowledge: use for normal edits / builds / tests.coding - (tends to loop - not recommended for now 26-09-21_14-23)-->
-- `*_Q2S_210K_mtp` intelligent, speedrating 68, 210k context, medium precision, medium general knowledge: (not tested on code yet), reliable so far
+- **Default** `*_Q3S_160K` very high intelligence, speedrating 60-66, 160k context, very high precision, highest general knowledge: best for very complex coding and code review work 
 - `*_gemma_Q4_128K` moderately intelligent, speedrating 160-200, 128k context, lower pecision, lower to medium general knowledge: needs explicit step by step guidance, should do no coding
 - `worker_explorer_*` (explorer mode, `prompt_agent_explorer.md`): audit/map →
   findings to `todo_inbox.md` (the planner curates + assigns the TODO IDs);

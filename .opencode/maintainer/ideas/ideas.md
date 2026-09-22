@@ -12,6 +12,8 @@
 - loosen the less than 15 lines diff can do a planner a bit. maybe 50 diff lines? still a small change. and prevents delegating an extra worker with all the turn around
 
 - worker gets confused because he does not know how to include in git hash in his closing commit - this might be needed to declared more specifically - he burned 10k token and 6,5 minutes to decide to look up how other have done it in the existing handover_task_to_planner
+ - happens nearly every time... and costs token and a lot of time
+
 
 - on planner closeup with enough room to the stop line, maybe add feedback integration. look at the current accumulated agent_feedback and decide if and where it should be integrated.
 

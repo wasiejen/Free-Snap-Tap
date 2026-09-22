@@ -34,6 +34,7 @@
     - e.g. .opencode\archive\sessions\ses_f5aefe9e1ffemgTiq9GELiqaGL.md
   - dumpings in general should be complete. the filtering out of tool calls can be done automatically via scripts on a need basis. the current dumping in the compact tool seems to filter out some parts. if they are in json maybe it is best to just dump this directly as it is to preserve the structure
 
+(i could put this into a readme_maintenance and make an optional read on idle)
 --maintainer: if no actionable item remains in an autorun:
 - --wip/--deferred is lifted if it prevents work
     - e.g. proposals are always allowed to write, test implementations as scripts in tmp also
@@ -121,15 +122,25 @@
 - ps --comment can be removed if acted on or you have aknowledged it - these are more as explanations to you then for me to keep.
 - 
 
-prompt additions/edits/rewrites:
-# 5
-- addition in the agents.md, that general knowledge - actionable items,code,facts that helped to solve a problem should be send via submit directly
+# prompt additions/edits/rewrites:
+## safe knowledge when you gained it! 
+- motivation: when you e.g. researched how an object is resolved and it is needed for solving a problem, this needs to be documented somewhere -> knowledge base
+- addition in the agents.md, that general knowledge - actionable items,code,facts that helped to solve a problem should be send via submit directly after confirming it and it is needed for a problem solution
   - when looking for solutions one of the first things should be to grep the knowledge in the folder for relevant hits (remember to limit outputted lines for first grep call or similar)
     - knowledge folder may need to get keywords? or would a tool with e.g. increasing resolution and window of needle search be useful?
-    - maybe just an knowledge inbox.md to append to to not reduce cognitive load in analysing where it should go -> submit tool
 
+## prompt addition to planner:
+- basis is this experience of a planner who tried to solve all at the same time and wasted his would context window without finishing anything. and also in a direct session - ignoring possible input or clarification i could give.
+- TRIAGE RULE FOR PLANNER (not verbatim but in the best interpretation and implemented in a way that might work)
+ - try not to solve everything in one go. pick on and defer the rest. you have a large context window but you waste it on solving everything and risk finishing nothing. set priorities and focus on one. then answer or do and clarify. finish one with answering or commit etc then move on to the next. and ASK if I might clarify some things - the worst that can happen is that i say i do not know. direct session is for interaction - not for you do waste your whole context window and needing to have an eye on you because you did not follow stop line protokol. triage your own task even if they are coming from me. defer what can wait
+ - e.g. create yourself an session_open_todo.md where you can not down everything that is deferred and arrived e.g. via maintainer
+ - priorities answering first and then doing what needs a commit to conclude
+ - do not work on unclear premised in a direct session until they are adressed by direct interaction
+  - your job is to ask me if something is not clear or seems unlogical
+    - nothing wastes more time than trying to answer questions i could give you instantly
+      - we could even add to ask question a timeout - thus when i am not available then the "autorun" will at least resume after e.g. 5 minutes
 
-# 7 small knowledge / use addition - or more likely do-not addition? 
+  # 7 small knowledge / use addition - or more likely do-not addition? 
 - do we need explicit coding guidelines?
 - The edit tool chokes on non-ASCII chars in oldString (planner working on code failed multiple times to use the code due to this an neede to write a script to replace a textstring - tool block_transfer would be a solution for this case)
   - so do not use non-ASCII chars if possible

@@ -1,0 +1,89 @@
+handover_task_to_planner.md (IN PROGRESS checkpoint)
+- Task: TODO #80 (spec at .opencode/agent/handover/handover_task.md)
+- Status: investigation complete, implementation pending (checkpointed at stop line, self-compacting).
+- What was learned/decided (the plan):
+
+Facts (verified on disk)
+- Branch opencode_test @ ef03bd0 (ahead 44, behind 1) — deliverable commit goes here.
+- Plugin: .opencode/plugin/deactivated/auto_resume.ts (825 lines), stays deactivated.
+- Smoke: .opencode/plugin/tests/auto_resume.smoke.mjs — 63 checks. Note: smoke line 40 loads .opencode/plugin/auto_resume.ts — the path pre-d322927→a000dfd. Since a000dfd moved the plugin into deactivated/ it wasn't updated; the smoke is currently red at import (file not found). First fix: path to deactivated/auto_resume.ts. (Verify by running before editing.)
+- Gates: probe node .opencode/plugin/probes/handover_probe.mjs (241/241), pytest 459+1w ./.venv/Scripts/python.exe -m pytest -q, ruff ./.venv/Scripts/ruff.exe check --select F . (F=0).
+- Working tree: M .opencode/maintainer/priority.md (maintainer's, not mine — leave uncommitted), 2 untracked compaction dumps (not mine — leave alone).
+
+Item 3 verdict: (b) evidence + hypothesis (no forced code fix) + log line of fail-safe attribution added as part of change-1 area (scope= verdict line).
+Evidence (from live log .opencode/temp/auto_resume.log, all UTC; read via node script, limited grep):
+- 9× recovery= sid=ses_f39d250e9ffeheip2FVEeY5Fk6 attempt=1: 2026-09-21T23:11:22/27/32/37 (gen started 22:50:11Z), 23:40:41 (gen 23:12:03Z), 23:58:23/33/38/43 (gen 23:42:21Z). All attempt=1, ~5s apart (tick period).
+- 9 surface= process generations: 14:25:48, 16:42:39, 20:32:42, 21:44:47, 21:49:49, 22:50:11, 23:12:03, 23:42:21, 23:58:52Z. Log's final line 23:58:54Z; deactivation commit a000dfd = 23:59:46Z → no plugin process since deactivation (consistent with it not currently in config, file now outside autoloaded .opencode/plugin top-level).
+- attempt=1 repetition is reproducible under committed code (recoveryCount resets on every new busy L722, including injected-turn busy) = exactly the cap-unreachability root cause (change #2) — not an independent mystery.
+- Scope paradox: for recovery= to be emitted, at routing time spawned.has(sid) || userHasMarker(msgs) must have been TRUE (L614, committed in all unit-4 commits since 8e4f778 — scope gate is in from day 1, verified by git show). Planner: checked 15 user text parts of the window, no marker; sid not in spawned.
+- Hypotheses (ranked): H1 marker in the session's pre-window user history — userHasMarker scans full session messages(), and planner's check only covers 23:40–23:58 window parts (the dump ses_f39d250e..._c0.md contains 68 lines mentioning the marker string, but they appear as ASSISTANT analysis text so far; unverified user parts pre-window — the one open DB check). H2 running variant ≠ committed file (process started from an earlier / dev copy of plugin source). Both become testable: new scope= verdict log line + surface= v=<hash> version ID will pin verdict + code state in the next incident.
+
+Implementation plan (exact)
+Details — changes 1..4, smoke changes, gates, commit plan, hash note
+
+Resume instructions
+1. Read this file + spec (handover_task.md) + the 2 files (plugin + smoke).
+2. Run the smoke as-is → confirm the import-path red baseline (expected).
+3. Apply plugin changes in the order below; apply smoke changes; run smoke until green; run gates; update TODO #80 status line; write final handover (replace this checkpoint content, keep evidence); 1 commit (code + smoke + TODO + handover; exclude .opencode/maintainer/**, leave priority.md alone); final message with hash + item-3 verdict + count.
+
+OK, plugin plan in exact form:
+
+Change 0 (prerequisite): smoke's import path → .opencode/plugin/deactivated/auto_resume.ts (smoke line 40).
+
+Change 1 — Agent retention (plugin):
+- firstUserAgent(msgs): string | null — scan msgPairs in order; the first pair with info.role==="user" and typeof info.agent==="string" and a===…; wait typeof a === "string" && a !== "" → return a; else null.
+- Watch interface: add userAgent?: string | null (undefined = not yet resolved; null = resolved, absent).
+- resolveInjectAgent(sid, w): Promise<string | null>:
+  - if w.scope === "planner" → PLANNER_AGENT_ID (no fetch).
+  - else if w.userAgent !== undefined → return w.userAgent.
+  - else: fetch messages once (client.session.messages({path:{id:sid}})); on success: w.userAgent = firstUserAgent(msgs); return that. On throw / missing messages fn: w.userAgent = null. If the resolved value is null → log agent-omit= sid=${sid} no user agent field (one line). Return null.
+- sendSelfCompact (unit 2): after the trigger log line, const agent = await resolveInjectAgent(sid, w); build body: const body: Record<string, unknown> = { parts: [{ type: "text", text: selfCompactText(...) }] }; if (agent) body.agent = agent; then await sess.promptAsync({ path: { id: sid }, body });.
+- routeScopedIdle (unit 4): after successful msgs fetch → w.userAgent = firstUserAgent(msgs); (cache for unit 2). In the continue branch: const agent = await resolveInjectAgent(sid, w); (scoped → immediately PLANNER_AGENT_ID, no extra fetch) → body with agent, same shape.
+- Also add scope verdict log line: in routeScopedIdle's verdict block, log after decision scope= planner|none sid=${sid}: planner: log(\scope= planner sid=${sid}\`)` / none: `log(\`scope= none sid=${sid}\`)` (also on the none early-return path — the verdict log happens inside both branches before the return).
+- Header comment: add one line documenting #80 in the UNIT 2/UNIT 4 section? (small comment; optional — keep minimal: one comment near the new functions.)
+
+Change 2 — Recovery cap semantics (plugin):
+- Module state: const pendingInject = new Map<string, number>(); + const PENDING_INJECT_TTL = 120_000;
+- busy branch of armEvent:
+w.armed = true;
+w.attempts = 0;
+const sentAt = pendingInject.get(sid);
+if (sentAt !== undefined && Date.now() - sentAt <= PENDING_INJECT_TTL) {
+  pendingInject.delete(sid); // injected turn — not a new busy
+  w.idlePending = false; w.status = "busy";
+  log(`arm= sid=${sid} injected`);
+} else {
+  w.recoveryCount = 0; // only a real new busy resets the cap
+  w.idlePending = false; w.status = "busy";
+  log(`arm= sid=${sid}`);
+}
+- In unit 4's continue send: after await sess.promptAsync(...) succeeds (inside try, after the await): pendingInject.set(sid, Date.now());
+- Cap stays 2.
+
+Change 3 — No forced code fix (verdict (b)); scope= verdict log line added under change 1 (fail-safe / attribution only, no behavior change).
+
+Change 4 — surface= version ID (plugin):
+- imports: add createHash from "node:crypto", fileURLToPath from "node:url" to existing imports (lines 107–108).
+- function codeVersion(): string { try { return createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex").slice(0,8); } catch { return "unknown"; } }
+- probeSurface: log("surface= v=" + codeVersion() + " " + parts.join(" "));
+
+Smoke changes (auto_resume.smoke.mjs):
+1. Line 40: path → deactivated.
+2. Re-derive existing u4 classify (lines 552-553): const contSends = () => u4Sends.filter(c => ((c.body?.parts?.[0]?.text ?? "")).includes("agent_readme_post_compaction.md")); and const spawnSends = () => u4Sends.filter(c => ((c.body?.parts?.[0]?.text ?? "")).startsWith(MARK) && c.body?.agent === "planner_Q3S_160K"); — hmm, note: restartText starts with MARK. Keep both.
+3. New check: "UNIT 4: continue send carries agent=planner_Q3S_160K (explicit)" — all contSends have body.agent === PLANNER (verify on first batch: at check time contSends().length===1? Check at a point where sends are settled, after batch A).
+4. After batch C (after existing send-total check), new cap section, on the u4 client (still active) for new sid ses_u4_cap (before re-factoring the u2ag client):
+   - msgScript.set("ses_u4_cap", mkPairs(["user", MARK + " iteration 1", "assistant", "Mid-unit, no closing line."]));
+   - Fire busy → idle; waitUntil line recovery= sid=ses_u4_cap attempt=1 appears (1st time) waitUntil needs count-aware predicate — line existence + count helper: countRecovery(sid,n) = readLines().filter(l=>l.includes(recovery= sid=ses_u4_cap attempt=${n})).length.
+   - Fire busy (injected — consumed) → idle; waitUntil attempt=2 line exists.
+   - Assert: arm= sid=ses_u4_cap injected line present after busy #2.
+   - Fire busy (injected — consumed) → idle; waitUntil route= restart spawn sid=ses_u4_cap line exists and u4Creates grew by 1. Assert no attempt=3 line.
+   - Fire busy (real — no pending mark) → idle; waitUntil attempt=1 line count === 2 (re-issued after reset).
+   - Assert: exactly 2 arm= ... injected lines for ses_u4_cap.
+5. New section, final factory for the new u2ag client: promptAsync spy u2agCalls, messages spy (script map): ses_u3_new → mkPairs(["user","plain direct", "assistant","Done. action: stop"]) (stop route, no send); ses_u2_agnet → [ {info:{role:"user",agent:"worker_Q3S_160K"},parts:{type:"text",text:"plain"}}, {info:{role:"assistant"},parts:{type:"text",text:"stop test"}} ] hmm — the last assistant for unit-4 routing: to avoid a continue, text needs a recognizable action line: "Done. action: stop". Give each sid's assistant line a action: stop.
+   - ses_u2_agnone → user info {role:"user"} (no agent) + assistant "action: stop".
+   - Fire for each: busy, msgUpdated(sid,"assistant",{total:80000},MODEL), idle.
+   - Wait for u2agCalls.length===3.
+   - Checks: ses_u3_new send (scoped, scope=planner cached from batch A) → body.agent==="planner_Q3S160K", text contains RATIO_HI, path.id OK; ses_u2_agnet send → body.agent==="worker_Q3S160K" (agent of first user message); ses_u2_agnone send → no "agent" key in body + log line agent-omit= sid=ses_u2_agnone present.
+   - Also: unit-4 routes for these: scope= none lines for both new sids; route= stop for ses_u3_new; no extra u2ag sends (u2agCalls.length stays 3).
+6. surface check: chk("surface line carries the v= code version identifier (8-char sha256 prefix)", surf && /\bv=[0-9a-f]{8}\b/.test(surf), surf ?? "").
+7. Strengthen ses_u4_plain check: add readLines().some(l => l.includes("scope= none sid=ses_u4_plain")) to existing conditions (keep existing parts
