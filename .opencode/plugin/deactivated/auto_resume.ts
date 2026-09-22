@@ -104,8 +104,10 @@
 // timer would take the host down). Best-effort logging only.
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import type { Event } from "@opencode-ai/sdk";
+import { createHash } from "node:crypto";
 import { appendFileSync, mkdirSync, readFileSync, renameSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 // The v1 candidate session.* methods probed at init (the design's
 // candidate list; the live typeof verdicts land in the surface report).
@@ -181,6 +183,10 @@ interface Watch {
   scope: "planner" | "none" | "unknown";
   recoveryCount: number;
   idlePending: boolean;
+  // #80 (agent retention): the first user message's agent field, cached
+  // from the messages() fetch: undefined = not yet resolved, null =
+  // resolved, absent.
+  userAgent?: string | null;
 }
 const watches = new Map<string, Watch>();
 const sending = new Set<string>();
@@ -199,6 +205,15 @@ let spawnInFlight = false;
 // closing session's lastActivityAt means someone already replaced it,
 // so the watchdog stays out of the way).
 const createdSessions = new Map<string, number>();
+
+// #80 (unit 4 cap semantics): the pending-inject mark (sid -> epoch) —
+// a CONTINUE send has been queued for this sid but not yet consumed by
+// a fresh busy. The busy of an INJECTED turn is not a real new busy
+// cycle, so it must NOT reset the recovery cap (that reset is what made
+// the cap unreachable while the plugin keeps injecting). A mark older
+// than the TTL is ignored (expired).
+const pendingInject = new Map<string, number>();
+const PENDING_INJECT_TTL = 120_000;
 
 // Append one log line; best-effort — NEVER throws (logging must not
 // break the session).
@@ -384,7 +399,13 @@ async function sendSelfCompact(sid: string, w: Watch, ratio: number, usable: num
     }
     // Queued (promptAsync): the synthetic part lands as the next turn at
     // idle — the race-free channel (no KV-cache invalidation, no re-prefill).
-    await sess.promptAsync({ path: { id: sid }, body: { parts: [{ type: "text", text: selfCompactText(sid, w.lastTokenTotal, usable, ratio) }] } });
+    // #80 (agent retention): the body carries the resolved agent (the
+    // session's working agent; the planner agent for scoped sessions) —
+    // a null agent → no agent field (the host default applies).
+    const agent = await resolveInjectAgent(sid, w);
+    const body: Record<string, unknown> = { parts: [{ type: "text", text: selfCompactText(sid, w.lastTokenTotal, usable, ratio) }] };
+    if (agent) body.agent = agent;
+    await sess.promptAsync({ path: { id: sid }, body });
   } catch (e) {
     log(`send-fail= sid=${sid} ${(e as { message?: string } | null)?.message ?? "unknown"}`);
   } finally {
@@ -550,6 +571,47 @@ function userHasMarker(msgs: unknown): boolean {
   return false;
 }
 
+// #80 (agent retention): the FIRST user message's agent field (the
+// session's working agent) — the injected promptAsync bodies carry it
+// so a resumed turn keeps the agent that ran the session; null when no
+// user message carries a non-empty string agent field.
+function firstUserAgent(msgs: unknown): string | null {
+  for (const pair of msgPairs(msgs)) {
+    if (!pair.info || pair.info.role !== "user") continue;
+    const a = pair.info.agent;
+    if (typeof a === "string" && a !== "") return a;
+  }
+  return null;
+}
+
+// #80 (agent retention): the agent for an injected promptAsync body —
+// planner-scoped sessions always run as the planner agent (no fetch);
+// otherwise the first user message's agent (watch-cached: undefined =
+// unresolved → fetch once; null = resolved, absent). A resolved-null or
+// failed fetch → null (the body carries no agent field — the host
+// default applies) + one agent-omit= attribution line.
+async function resolveInjectAgent(sid: string, w: Watch): Promise<string | null> {
+  if (w.scope === "planner") return PLANNER_AGENT_ID;
+  if (w.userAgent !== undefined) return w.userAgent;
+  try {
+    const sess = (client as { session?: { messages?: (args: unknown) => Promise<unknown> } } | null)?.session;
+    if (!sess || typeof sess.messages !== "function") {
+      w.userAgent = null;
+      log(`agent-omit= sid=${sid} no user agent field`);
+      return null;
+    }
+    const msgs = await sess.messages({ path: { id: sid } });
+    const agent = firstUserAgent(msgs);
+    w.userAgent = agent;
+    if (agent === null) log(`agent-omit= sid=${sid} no user agent field`);
+    return agent;
+  } catch {
+    w.userAgent = null;
+    log(`agent-omit= sid=${sid} no user agent field`);
+    return null;
+  }
+}
+
 // Unit 4: the routing scan — the LAST assistant message's text parts,
 // the LAST match of the action-line regex wins; null = no assistant
 // message or no recognized line.
@@ -608,12 +670,20 @@ async function routeScopedIdle(sid: string, w: Watch) {
     w.idlePending = false;
     return;
   }
+  // #80: cache the first user message's agent for the injected bodies —
+  // the same fetch serves the scope scan, the routing scan, and the
+  // agent cache (one round trip).
+  w.userAgent = firstUserAgent(msgs);
   // Scope verdict (cached; the fetch above serves BOTH the scope marker
-  // scan and the routing scan — one round trip).
+  // scan and the routing scan — one round trip). The verdict log line
+  // (#80) pins the decision for attribution — no behavior change.
   if (w.scope === "unknown") {
-    if (spawned.has(sid) || userHasMarker(msgs)) w.scope = "planner";
-    else {
+    if (spawned.has(sid) || userHasMarker(msgs)) {
+      w.scope = "planner";
+      log(`scope= planner sid=${sid}`);
+    } else {
       w.scope = "none"; // non-scoped: NEVER acted on (fail-safe = no action)
+      log(`scope= none sid=${sid}`);
       w.idlePending = false;
       return;
     }
@@ -640,7 +710,16 @@ async function routeScopedIdle(sid: string, w: Watch) {
       }
       // QUEUED (promptAsync): the synthetic part lands as the next turn
       // at idle — the race-free channel (never a synchronous prompt).
-      await sess.promptAsync({ path: { id: sid }, body: { parts: [{ type: "text", text: continueText(sid) }] } });
+      // #80 (agent retention): the body carries the resolved agent (the
+      // planner agent for scoped sessions) — a null agent → no agent
+      // field (the host default applies).
+      const agent = await resolveInjectAgent(sid, w);
+      const body: Record<string, unknown> = { parts: [{ type: "text", text: continueText(sid) }] };
+      if (agent) body.agent = agent;
+      await sess.promptAsync({ path: { id: sid }, body });
+      // #80 (cap semantics): mark the pending injection — the busy of
+      // this injected turn must not reset the recovery cap.
+      pendingInject.set(sid, Date.now());
     } catch (e) {
       log(`send-fail= sid=${sid} ${(e as { message?: string} | null)?.message ?? "unknown"}`);
     } finally {
@@ -719,10 +798,22 @@ function armEvent(type: string, sid: string, props: Record<string, unknown>) {
       const w = getWatch(sid);
       w.armed = true;
       w.attempts = 0; // a fresh busy cycle resets the once-per-cycle budget
-      w.recoveryCount = 0; // Unit 4: a fresh busy cycle resets the recovery budget
-      w.idlePending = false; // a fresh busy cycle: no pending decision
-      w.status = "busy";
-      log(`arm= sid=${sid}`);
+      // #80 (cap semantics): only a REAL new busy resets the recovery
+      // cap — a busy that consumes a still-pending CONTINUE injection
+      // (within the TTL) is the injected turn itself, not a fresh
+      // cycle, so the cap keeps accumulating.
+      const sentAt = pendingInject.get(sid);
+      if (sentAt !== undefined && Date.now() - sentAt <= PENDING_INJECT_TTL) {
+        pendingInject.delete(sid);
+        w.idlePending = false; // an injected busy: no pending decision
+        w.status = "busy";
+        log(`arm= sid=${sid} injected`);
+      } else {
+        w.recoveryCount = 0; // Unit 4: a fresh busy cycle resets the recovery budget
+        w.idlePending = false; // a fresh busy cycle: no pending decision
+        w.status = "busy";
+        log(`arm= sid=${sid}`);
+      }
     } else if (status === "idle") {
       const w = getWatch(sid);
       w.status = "idle"; // the tick decides
@@ -792,6 +883,19 @@ const onEvent = async (input: { event: Event }) => {
   }
 };
 
+// #80 (code state pin): the running plugin source's 8-char sha256
+// prefix — the `surface=` line carries it so the NEXT incident pins
+// WHICH source the logging process actually ran (the H2 hypothesis:
+// running variant ≠ committed file). Best-effort: any failure →
+// "unknown" (the line still lands).
+function codeVersion(): string {
+  try {
+    return createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex").slice(0, 8);
+  } catch {
+    return "unknown";
+  }
+}
+
 // One-shot init surface probe (runs ONCE at plugin load): the `surface=`
 // line. `typeof` ONLY — prototype methods are invisible to Object.keys.
 function probeSurface(input: PluginInput) {
@@ -802,7 +906,7 @@ function probeSurface(input: PluginInput) {
     };
     const parts = SESSION_CANDIDATES.map((m) => `${m}=${typeof client?.session?.[m]}`);
     parts.push(`app.log=${typeof client?.app?.log}`);
-    log(`surface= ` + parts.join(" "));
+    log(`surface= v=${codeVersion()} ` + parts.join(" "));
   } catch {
     // swallow — a probe failure must not break plugin load
   }

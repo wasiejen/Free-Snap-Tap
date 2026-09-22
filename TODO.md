@@ -827,11 +827,13 @@ restart detection" wording above is the pre-revision numbering.
   available, the loop/autorun resumes after the timeout); planner
   compaction budget exhaustion (keep=0 + same-session resume + budget reset
   vs. higher cap — bit-rot risk).
-- **Status:** investigated 2026-09-22 (planner, direct session); FIX DESIGN
-  APPROVED by the maintainer 2026-09-22 ("nothing to change so far — seems
-  good"); plugin DEACTIVATED (a000dfd, moved to
-  `.opencode/plugin/deactivated/`) — implementation next (worker task:
-  agent-preservation + cap semantics + scope verification + `surface=`
-  version hash), then re-activation + live acceptance (maintainer call).
+- **Status:** implementation LANDED (worker commit — the planner records
+  the hash in a follow-up); live acceptance pending re-activation
+  (maintainer call). History: investigated 2026-09-22 (planner, direct
+  session); FIX DESIGN APPROVED by the maintainer 2026-09-22; plugin
+  DEACTIVATED (a000dfd). Item-3 scope anomaly: H1 REFUTED 2026-09-22 (DB
+  check — none of the session's 44 user-role parts, every part type,
+  contains `<|autonom|>`); the new `scope=` verdict log line + `surface=`
+  v= version ID will pin verdict + code state on the next incident.
 - **Suggested scope:** `.opencode/plugin/deactivated/auto_resume.ts` (L387,
   L643; scope scan L543-551).

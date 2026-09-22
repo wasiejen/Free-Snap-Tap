@@ -99,3 +99,22 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   other 50+ checks in that smoke pass. Files:
   `.opencode/plugin/tests/block_transfer.sandbox.smoke.mjs` line 53,
   `.opencode/tools/block_transfer.ts` description (read-only reference).
+
+## 2026-09-22 — worker-2 (TODO #80, ses_f371e0e23ffe0eza71uD5qWy7K)
+- PRE-EXISTING gate failure (NOT caused by #80 work — the probe does not
+  load auto_resume.ts; verified by inspection + the failing check's target
+  file): `handover_probe.mjs` check [97] "message (unit A): response =
+  dispatch line + the queued note (byte-exact) + exactly ONE queued
+  promptAsync carrying the text part" now FAILS at HEAD (tree 5d17ad0;
+  probe 240/241, only [97] red). Root cause: maintainer temp fix commit
+  `0f192e5` (2026-09-22_11-53) commented out the `promptAsync` call inside
+  `queueMessage` in `.opencode/plugin/compact_memory.ts` ("deactivated to
+  enable compaction until a way is found to send the message without
+  interfering with the compaction") — the probe still pins the pre-fix
+  behavior (one queued promptAsync). The `compact_memory.smoke.mjs` message
+  check fails the same way (verified: 1 FAIL, everything else pass).
+  Suggested disposition (planner/maintainer call): either update probe
+  [97] + the smoke pin to the temp-fix behavior (no promptAsync recorded;
+  the "queued note" line is still emitted), or re-pin them when the
+  maintainer restores promptAsync. The spec's "probe 241/241" baseline is
+  therefore stale for the current tree.

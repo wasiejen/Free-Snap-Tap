@@ -37,7 +37,7 @@ const proj = path.join(base, "proj");
 fs.mkdirSync(proj, { recursive: true });
 const sandboxLog = path.join(proj, ".opencode", "temp", "auto_resume.log");
 
-const mod = await loadRepo(".opencode/plugin/auto_resume.ts");
+const mod = await loadRepo(".opencode/plugin/deactivated/auto_resume.ts");
 const factory = mod.default;
 
 const readLines = () =>
@@ -93,6 +93,10 @@ try {
   chk("surface line carries all twelve candidates incl. create + messages + app.log", surf && CANDIDATES.every((m) => surf.includes(m + "=")), surf ?? "");
   chk("probe verdicts by typeof (v1 client: summarize=function, compact=undefined, app.log=function)",
     surf && surf.includes("summarize=function") && surf.includes("compact=undefined") && surf.includes("app.log=function"), surf ?? "");
+  // #80: the surface= line carries the v= code version identifier
+  // (8-char sha256 prefix of the running source) — the next incident
+  // pins WHICH source the logging process actually ran.
+  chk("surface line carries the v= code version identifier (8-char sha256 prefix)", surf && /\bv=[0-9a-f]{8}\b/.test(surf), surf ?? "");
 
   // ---- event logging: one line per event, type + sid + key fields
   const n1 = readLines().length;
@@ -549,8 +553,12 @@ try {
       readLines().some((l) => l.includes("route= stop sid=ses_u4_wrap")),
     12000,
   );
-  const contSends = () => u4Sends.filter((c) => !(c.body && c.body.agent)).map((c) => c.path?.id);
-  const spawnSends = () => u4Sends.filter((c) => c.body?.agent === "planner_Q3S_160K");
+  // #80: CONTINUE sends now carry agent=planner (scoped sessions) —
+  // classify by the locked text, not by an absent agent field.
+  const contSends = () =>
+    u4Sends.filter((c) => ((c.body?.parts?.[0]?.text ?? "")).includes("agent_readme_post_compaction.md")).map((c) => c.path?.id);
+  const spawnSends = () =>
+    u4Sends.filter((c) => ((c.body?.parts?.[0]?.text ?? "")).startsWith(MARK) && c.body?.agent === "planner_Q3S_160K");
   chk("UNIT 4: batch-A scenarios all routed (stop / ask / restart / skip / continue / spawned-scope / err lines present)", okA, okA ? "" : "missing line(s)");
   chk("UNIT 4: action: stop → NO send, route= stop logged", okA && !u4Sends.some((c) => c.path?.id === "ses_u4_stop"), "");
   chk("UNIT 4: wrapper shape { data: [...] } (in-process RequestResult) → unwrapped, action: stop → route= stop, NO send",
@@ -568,15 +576,23 @@ try {
   chk("UNIT 4: no action: line → CONTINUE attempt 1 (queued, locked text names the post-compaction head)",
     okA && contSends().includes("ses_u4_noline") &&
       ((u4Sends.find((c) => c.path?.id === "ses_u4_noline")?.body?.parts?.[0]?.text) ?? "").includes("agent_readme_post_compaction.md"), "");
-  chk("UNIT 4: non-scoped (no marker, not spawned) → zero sends, no route/recovery line (scope=none after ONE fetch)",
+  chk("UNIT 4: non-scoped (no marker, not spawned) → zero sends, no route/recovery line (scope= none logged after ONE fetch)",
     okA && !u4Sends.some((c) => c.path?.id === "ses_u4_plain") &&
       messagesCalls.filter((c) => c?.path?.id === "ses_u4_plain").length === 1 &&
+      readLines().some((l) => l.includes("scope= none sid=ses_u4_plain")) &&
       !readLines().some((l) => l.includes("sid=ses_u4_plain") && (l.includes("route=") || l.includes("recovery="))), "");
   chk("UNIT 4: spawned-map scope (UNIT 3 self-mark, user msg carries NO marker) → routes as planner, CONTINUE attempt 1",
     okA && contSends().includes("ses_u3_new") && readLines().some((l) => l.includes("recovery= sid=ses_u3_new attempt=1")), "");
   chk("UNIT 4: messages() throwing → err= line with the error, no action, no throw",
     okA && !u4Sends.some((c) => c.path?.id === "ses_u4_throw") &&
       readLines().some((l) => l.includes("err= sid=ses_u4_throw") && l.includes("messages exploded for ses_u4_throw")), "");
+  // #80: every batch-A CONTINUE send carries the EXPLICIT planner agent
+  // (scoped sessions always run as the planner agent).
+  chk("UNIT 4 #80: batch-A continue sends carry agent=planner_Q3S_160K (explicit)",
+    okA && contSends().length === 2 &&
+      u4Sends.filter((c) => ((c.body?.parts?.[0]?.text ?? "")).includes("agent_readme_post_compaction.md"))
+        .every((c) => c.body?.agent === "planner_Q3S_160K"),
+    `contSends=${contSends().join(",")}`);
 
   // ---- batch B: a SECOND idle (no fresh busy) → the budget accumulates
   // across idles → CONTINUE attempt 2.
@@ -600,6 +616,121 @@ try {
       contSends().every((s) => s === "ses_u4_noline" || s === "ses_u3_new") && u4Creates.length === 2,
     `total=${u4Sends.length} create=${u4Creates.length}`);
 
+  // ============================================================
+  // #80 — recovery cap semantics (on the u4 client, still active):
+  // a busy that consumes a still-pending CONTINUE injection (within
+  // the TTL) is the injected turn itself — it must NOT reset the
+  // recovery cap (that reset is what made the cap unreachable while
+  // the plugin keeps injecting); only a REAL new busy resets it.
+  // ses_u4_cap: user msg carries the launch marker (scoped), the last
+  // assistant line has NO action: line (always the CONTINUE branch
+  // until the cap exhausts).
+  // ============================================================
+  msgScript.set("ses_u4_cap", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Mid-unit, no closing line."]]));
+  const capRecovery = (n) => readLines().filter((l) => l.includes(`recovery= sid=ses_u4_cap attempt=${n}`)).length;
+  const capInjected = () => readLines().filter((l) => l.includes("arm= sid=ses_u4_cap injected")).length;
+
+  // step 1: real busy → CONTINUE attempt 1 (the injection is marked pending)
+  await fire(hooksU4, "ses_u4_cap", [statusEv("ses_u4_cap", "busy"), statusEv("ses_u4_cap", "idle")]);
+  const okCap1 = await waitUntil(() => capRecovery(1) === 1, 12000);
+  chk("UNIT 4 #80: real busy → CONTINUE attempt 1 (pending injection marked)", okCap1 && capRecovery(1) === 1, `n=${capRecovery(1)}`);
+
+  // step 2: the injected busy (consumes the pending mark — NO cap
+  // reset) → attempt 2
+  await fire(hooksU4, "ses_u4_cap", [statusEv("ses_u4_cap", "busy"), statusEv("ses_u4_cap", "idle")]);
+  const okCap2 = await waitUntil(() => capRecovery(2) === 1, 12000);
+  chk("UNIT 4 #80: injected busy (pending mark consumed) → NO cap reset → CONTINUE attempt 2",
+    okCap2 && capInjected() === 1 && capRecovery(2) === 1,
+    `armInjected=${capInjected()} n2=${capRecovery(2)}`);
+
+  // step 3: a second injected busy → cap exhausted (2 CONTINUEs,
+  // still no line) → restart branch → spawn (no attempt 3)
+  await fire(hooksU4, "ses_u4_cap", [statusEv("ses_u4_cap", "busy"), statusEv("ses_u4_cap", "idle")]);
+  const cBeforeCap3 = u4Creates.length;
+  const okCap3 = await waitUntil(
+    () => readLines().some((l) => l.includes("route= restart spawn sid=ses_u4_cap")) && u4Creates.length === cBeforeCap3 + 1,
+    12000,
+  );
+  chk("UNIT 4 #80: second injected busy → cap exhausted (no attempt 3) → restart branch → spawn",
+    okCap3 && capRecovery(3) === 0 && u4Creates.length === cBeforeCap3 + 1,
+    `n3=${capRecovery(3)} create=${u4Creates.length}`);
+
+  // step 4: a REAL busy (no pending mark) resets the cap → attempt 1
+  // is re-issued
+  await fire(hooksU4, "ses_u4_cap", [statusEv("ses_u4_cap", "busy"), statusEv("ses_u4_cap", "idle")]);
+  const okCap4 = await waitUntil(() => capRecovery(1) === 2, 12000);
+  chk("UNIT 4 #80: real busy (no pending mark) → cap reset → CONTINUE attempt 1 re-issued",
+    okCap4 && capRecovery(1) === 2, `n1=${capRecovery(1)}`);
+  chk("UNIT 4 #80: exactly the two injected busies were consumed (arm= ... injected ×2)",
+    capInjected() === 2, `armInjected=${capInjected()}`);
+
+  // ============================================================
+  // #80 — agent retention in the injected promptAsync bodies (the
+  // factory is re-invoked with a fresh spying client — promptAsync +
+  // messages both spied, messages scripted per sid):
+  //  - a PLANNER-SCOPED session (the spawned-map self-mark, cached
+  //    scope=planner from batch A) → body.agent = the planner agent;
+  //  - a NON-scoped session whose first user message carries an
+  //    agent field → body.agent = that agent (the session keeps the
+  //    agent that ran it);
+  //  - a NON-scoped session with NO user agent field → NO agent key
+  //    in the body + an agent-omit= attribution line.
+  // ============================================================
+  msgScript.set("ses_u3_new", mkPairs([["user", "plain direct"], ["assistant", "Done. action: stop"]]));
+  msgScript.set("ses_u2_agnet", [
+    { info: { role: "user", agent: "worker_Q3S_160K" }, parts: [{ type: "text", text: "plain" }] },
+    { info: { role: "assistant" }, parts: [{ type: "text", text: "Done. action: stop" }] },
+  ]);
+  msgScript.set("ses_u2_agnone", [
+    { info: { role: "user" }, parts: [{ type: "text", text: "plain" }] },
+    { info: { role: "assistant" }, parts: [{ type: "text", text: "Done. action: stop" }] },
+  ]);
+  const u2agCalls = [];
+  const u2agSession = {
+    prompt: function () {},
+    promptAsync: async (args) => { u2agCalls.push(args); return { data: { id: "queued" } }; },
+    abort: function () {},
+    list: function () {},
+    get: function () {},
+    message: function () {},
+    messages: async (args) => msgScript.get(args?.path?.id) ?? [],
+    todo: function () {},
+    command: function () {},
+    summarize: function () {},
+    create: async () => ({ data: { id: "ses_u2ag_spawn" } }),
+  };
+  const hooksU2ag = await factory({ directory: proj, client: { session: u2agSession, provider: { list: providerList }, app: { log: () => "log" } } });
+  chk("UNIT 2 #80: re-factory with the agent-retention spying client returns the event hook", typeof hooksU2ag?.event === "function");
+
+  // Every scenario: busy → saturated assistant update → idle. The
+  // tick's unit-2 loop sends the self-compact (agent resolved); then
+  // the unit-4 loop routes: ses_u3_new (spawned, cached scope=planner)
+  // → action: stop, no send; ses_u2_agnet / ses_u2_agnone (no marker)
+  // → scope= none, no action.
+  await fire(hooksU2ag, "ses_u3_new", [statusEv("ses_u3_new", "busy"), msgUpdated("ses_u3_new", "assistant", { total: 80000 }, MODEL), statusEv("ses_u3_new", "idle")]);
+  await fire(hooksU2ag, "ses_u2_agnet", [statusEv("ses_u2_agnet", "busy"), msgUpdated("ses_u2_agnet", "assistant", { total: 80000 }, MODEL), statusEv("ses_u2_agnet", "idle")]);
+  await fire(hooksU2ag, "ses_u2_agnone", [statusEv("ses_u2_agnone", "busy"), msgUpdated("ses_u2_agnone", "assistant", { total: 80000 }, MODEL), statusEv("ses_u2_agnone", "idle")]);
+  const okAg = await waitUntil(() => u2agCalls.length === 3, 12000);
+  chk("UNIT 2 #80: each saturated session got exactly ONE self-compact send (no extras)", okAg && u2agCalls.length === 3, `n=${u2agCalls.length}`);
+  const sendFor = (sid) => u2agCalls.find((c) => c.path?.id === sid);
+  chk("UNIT 2 #80: scoped (spawned-map) session → body carries agent=planner_Q3S_160K + the ratio text",
+    okAg && sendFor("ses_u3_new")?.body?.agent === "planner_Q3S_160K" &&
+      ((sendFor("ses_u3_new")?.body?.parts?.[0]?.text) ?? "").includes(RATIO_HI),
+    JSON.stringify(sendFor("ses_u3_new")?.body ?? null));
+  chk("UNIT 2 #80: non-scoped session with a first-user agent → body carries that agent (worker_Q3S_160K)",
+    okAg && sendFor("ses_u2_agnet")?.body?.agent === "worker_Q3S_160K",
+    JSON.stringify(sendFor("ses_u2_agnet")?.body?.agent ?? null));
+  chk("UNIT 2 #80: non-scoped session with NO user agent → NO agent key in the body + agent-omit= line",
+    okAg && sendFor("ses_u2_agnone") && !("agent" in (sendFor("ses_u2_agnone")?.body ?? {})) &&
+      readLines().some((l) => l.includes("agent-omit= sid=ses_u2_agnone")),
+    JSON.stringify(Object.keys(sendFor("ses_u2_agnone")?.body ?? {})));
+  chk("UNIT 2 #80: unit-4 routes after the sends — ses_u3_new action: stop; the two plain sids scope= none; no extra sends",
+    okAg && readLines().some((l) => l.includes("route= stop sid=ses_u3_new")) &&
+      readLines().some((l) => l.includes("scope= none sid=ses_u2_agnet")) &&
+      readLines().some((l) => l.includes("scope= none sid=ses_u2_agnone")) &&
+      u2agCalls.length === 3,
+    `n=${u2agCalls.length}`);
+
   // ---- the live log received NO smoke line. The LIVE plugin instance
   // (this host) keeps appending ITS OWN live-session lines in real time
   // while the smoke runs, so the live size may legitimately grow — the
@@ -615,7 +746,7 @@ try {
   } else if (liveBefore === null && liveSizeNow > 0) {
     appended = fs.readFileSync(LIVE_LOG, "utf-8"); // did not exist before — all new
   }
-  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_wrap", "ses_u4_throw", "ses_u4_spawn"];
+  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_wrap", "ses_u4_throw", "ses_u4_spawn", "ses_u4_cap", "ses_u2_agnet", "ses_u2_agnone"];
   chk("LIVE .opencode/temp/auto_resume.log received no smoke line (sandbox got every smoke line)",
     liveBefore === liveSizeNow || !smokeSids.some((s) => appended.includes(s)), `before=${liveBefore} after=${liveSizeNow}`);
   chk("sandbox log path is under the sandbox", sandboxLog.startsWith(base), sandboxLog);
