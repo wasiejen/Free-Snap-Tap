@@ -1,58 +1,67 @@
-# Task: make unit-2 saturation threshold + output reserve configurable
+# Task: consolidate ALL compaction config into compact_budget.json
 
-Goal: the auto_resume **unit 2** (context-saturation trigger) fires too early — at
-ratio 0.85 of a usable window that already subtracts `min(20000, output)`, so on a
-170k-context model it fires at ~127.5k and wastes ~28% of the usable window. Make the
-threshold and the reserve **configurable** (per-tick, fail-open) and **raise the default
-threshold to 0.95** (maintainer ruling 2026-09-22: "only trigger it past the 95% line";
-he will raise it further toward ~0.98 once the limit-detection backstop exists).
+Goal: one config source of truth. Move the compaction knobs out of code and out of
+`opencode.jsonc` into `.opencode/temp/compact_budget.json` (optional top-level keys,
+per-tick, fail-open defaults). Includes the new `model_budget` map (maintainer GO
+2026-09-22). This unblocks him activating the plugin to test.
 
 ## Verified current state (spec-time facts — do not re-derive)
-- `.opencode/plugin/auto_resume.ts`:
-  - L140 `const SATURATION_THRESHOLD = 0.85;` and L141 `const RESERVE_MIN_OUTPUT = 20000;`
-  - L193 `const usableCache = new Map<string, number>();` (caches the FINAL usable number).
-  - L305-351 `getUsable(model)`: fetches provider list → model entry → `limit.{context,output}`;
-    returns `context - Math.min(RESERVE_MIN_OUTPUT, output)`; fail-safe null; caches the number.
-  - L359-369 `autoCompactEnabled()`: per-tick READ-ONLY parse of `.opencode/temp/compact_budget.json`
-    (fail-open: missing/malformed/key-absent → ON). This is the pattern to reuse.
-  - L752-774 `tick()`: per armed+idle watch → `getUsable(w.model)` → `ratio = lastTokenTotal/usable`
-    → if `ratio >= SATURATION_THRESHOLD` and `autoCompactEnabled()` → `sendSelfCompact` (once per busy cycle).
-- Budget file live shape: top-level keys `["version","sessions"]` (no `autoCompact`/threshold keys yet).
-- Test pattern: `tests/auto_resume.smoke.mjs` UNIT-2 section (~L140-350) uses a **sandbox** budget
-  file (never the live one) and a mocked provider; the current checks assume the 0.85 threshold +
-  20000 reserve.
+- `compact_memory.ts`: `QUANT_CLASS_RULES` (L79-86) = ordered substring table
+  (`/cpu/`→0, `/iq4|q4/`→3, `/iq3|q3/`→3, `/iq2|q2/`→1, default 1); `classifyQuantClass`
+  (L91-96) resolves the cap; the cap is NOT in the file (L121). Budget store =
+  per-session `{count, updated, model}`, increment-on-success (L112-121). The stored
+  `model` is the BARE model ID (e.g. `Qwen3.8-27B-Q3S-160K`). Temp fix `0f192e5`
+  (the `queueMessage` promptAsync is commented out) is LIVE — preserve it.
+- `deactivated/context_recovery.ts`: `KEEP_TOKENS=30000` (L46), `KEEP_MESSAGES=12`
+  (L47) hardcoded; `FLAG_KEY="emergencyRecovery"` read from `opencode.jsonc` (L50).
+- `auto_resume.ts`: already reads `autoCompact` / `saturationThreshold` (0.95) /
+  `outputReserve` (20000) per tick (the 86713d8 change) — leave those alone.
+- `compact_budget.json`: top-level keys `["version","sessions"]` (+ the 3 auto_resume keys).
+
+## Config keys (all optional top-level, fail-open defaults)
+`autoCompact` (bool, true) · `saturationThreshold` (num, 0.95) · `outputReserve`
+(num, 20000) · `keepTokens` (num, 30000) · `keepMessages` (num, 12) ·
+`emergencyRecovery` (bool, **false** — MOVED out of opencode.jsonc) ·
+`model_budget` (map, see below).
+
+`model_budget` (replaces `QUANT_CLASS_RULES`): map of **bare model ID → cap number**,
+plus a **`default`** key (default value 1). Resolution: exact model-ID match → its
+cap; unlisted → `model_budget.default`; a typo key simply never matches (fails safe).
+**CPU guard (safety invariant):** a model ID matching `/^cpu/i` → cap **0** regardless
+of the map (keep the CPU exclusion; it is not a tunable budget).
 
 ## The change (the WHAT — the HOW is yours inside the DoD)
-1. Add optional top-level keys to the per-tick config (reuse the `autoCompactEnabled` parse):
-   `saturationThreshold` (number, valid 0 < t < 1; **default 0.95**) and
-   `outputReserve` (non-negative number; **default 20000**). Fail-open: absent / unparseable /
-   out-of-range → the default. Read per tick (so a live edit takes effect next tick), read-only.
-2. Cache the **model limits** `{context, output}` (stable) instead of the final usable: rename
-   `usableCache` → `limitsCache` and `getUsable` → `getModelLimits(model)`: `Promise<{context,output}|null>`.
-   In `tick()` compute per tick: `usable = context - Math.min(reserve, output)`; guard `usable > 0`.
-3. Fire when `ratio >= threshold` (the configurable value) and `autoCompactEnabled()`.
-4. Update the file's header comments (L137-149 region) to describe the configurable keys + defaults.
-5. `tests/auto_resume.smoke.mjs` UNIT-2 section: update the existing fire/no-fire token
-   expectations for the **new 0.95 default** and add cases: (a) no config → 0.95/20000 fail-open;
-   (b) `saturationThreshold` set → fires at that value; (c) `outputReserve` set → usable uses it;
-   (d) out-of-range value → fail-open default. Use **node** for the token arithmetic (never
-   hand-compute).
+1. `compact_memory.ts`: replace `QUANT_CLASS_RULES`/`classifyQuantClass` with
+   `resolveCap(modelName)` reading `model_budget` from `compact_budget.json`
+   (fail-open: CPU→0; else exact match → cap; else `default` → 1). Read
+   `keepTokens`/`keepMessages` from the config (defaults 30000/12). Preserve the
+   temp fix `0f192e5` and all #81-pinned behavior.
+2. `deactivated/context_recovery.ts` (DO NOT move it out of `deactivated/` — the
+   maintainer activates it separately): read `keepTokens`/`keepMessages`/
+   `emergencyRecovery` from `compact_budget.json` (instead of the hardcoded constants
+   + the opencode.jsonc `FLAG_KEY`), so activation works off the centralized config.
+3. Tests: `tests/compact_memory.smoke.mjs` — the existing trap pin
+   (`Qwen3.8-27B-IQ4KT-120K` → cap 3) becomes "the configured value for that model ID /
+   default"; add cases: `model_budget` exact match, unlisted→default, typo key→default,
+   CPU→0, `keepTokens`/`keepMessages` override, `emergencyRecovery` from config.
+   `tests/context_recovery.smoke.mjs` — flag + keeps now from config. Use **node** for
+   any arithmetic.
 
 ## Definition of done (measurable)
-- `node .opencode/plugin/tests/auto_resume.smoke.mjs` → ALL green (baseline 76/76, + your new checks).
-- Full gate green: `node .opencode/plugin/probes/handover_probe.mjs` (241/241), all plugin smokes,
-  `pytest -q` (459 passed + 1 warning), `ruff check` (F=0).
-- `auto_resume.ts` loads (the `surface= v=` hash CHANGES — expected for a source change); confirm no
-  OTHER probe pin breaks.
-- TODO.md: this entry → status `LANDED` (the hash is recorded by the planner in the follow-up
-  bookkeeping commit — do NOT write your own hash into the same commit).
+- `node .opencode/plugin/tests/compact_memory.smoke.mjs` and
+  `node .opencode/plugin/tests/context_recovery.smoke.mjs` → ALL green.
+- Full gate green: `node .opencode/plugin/probes/handover_probe.mjs` (241/241, with the
+  trap pin updated), all plugin smokes, `pytest -q` (459 passed + 1 warning),
+  `ruff check` (F=0).
+- TODO.md: this entry → status `LANDED` (the hash is recorded by the planner in the
+  follow-up bookkeeping commit — do NOT write your own hash in the same commit).
 
 ## DO-NOT-touch
-- `.opencode/plugin/compact_memory.ts` (maintainer temp-fix 0f192e5 — hands off).
-- The probe's [97] compact-memory message pin and the #80 agent-retention checks — this change is
-  unit-2-only.
-- Unit 3 / unit 4 / the scope-verdict code paths.
-- The LIVE `.opencode/temp/compact_budget.json` (tests use a sandbox copy — keep it that way).
+- The temp fix `0f192e5` in compact_memory (the commented-out `queueMessage` promptAsync).
+- The #81 pins (probe `[97]` + the compact_memory message pin).
+- `auto_resume.ts` (its 3 config keys stay as-is).
+- Do NOT move `context_recovery.ts` out of `deactivated/`.
+- The LIVE `.opencode/temp/compact_budget.json` (tests use a sandbox copy).
 - Anything under `.opencode/maintainer/`, `.opencode/agent/prompts/`, or the live `opencode.jsonc`.
 
-Worker: `worker_Q3S_170K` (precise single-file plugin change + test updates).
+Worker: `worker_Q3S_170K` (multi-file config refactor + test updates).
