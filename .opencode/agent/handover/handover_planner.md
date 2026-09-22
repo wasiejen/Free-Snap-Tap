@@ -146,6 +146,20 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   deactivated path → ERR_MODULE_NOT_FOUND), so the earlier "76/76" baseline
   was unreachable/stale; load path now fixed to the live file (89/89 is
   genuinely live). #83 backstop still open (his call).
+- Compaction-arch design exchange (2026-09-22, his questions): confirmed
+  (a) `emergencyRecovery` is OUR flag in opencode.jsonc (NOT official) —
+  move to compact_budget.json; (b) context_recovery KEEP_TOKENS=30000 /
+  KEEP_MESSAGES=12 are HARDCODED — move to compact_budget.json defaults;
+  (c) context_recovery's synthetic `promptAsync` directive (L304-315) =
+  the SAME racy pattern the temp fix 0f192e5 disabled in compact_memory →
+  as written it WOULD disrupt compaction (his #6, answered). Direction
+  (his proposal, agreed): centralize ALL compaction config in
+  compact_budget.json + MERGE compact_memory + context_recovery into one
+  plugin (consolidate summarize/budget/config), aligning context_recovery's
+  message handling to the temp-fix behavior. PREREQ: verify the host
+  actually calls the `session.error` hook on overflow (live check — his
+  action). NOT implemented — design phase. Tasks: (1) config consolidation
+  (small), (2) live hook verification (his), (3) the merge (contingent).
 - NEXT (his priority order): (1) #81 LANDED + verified (af38e2f — gate
   241/241); (2) #82 scope rework spec — design AGREED (above) —
   spec-able now except the unit-2-suppression scope (his call); (3)
