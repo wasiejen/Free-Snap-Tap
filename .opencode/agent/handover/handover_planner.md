@@ -238,8 +238,34 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
    mid-verification → the OLD live auto_resume code (pre-restart) tried a
    recovery → the UnknownError (the #85 loop). The maintainer ran a manual
    compaction on me + RESTARTED opencode → the NEW code (97fccfc, #85 part 1)
-   is now LIVE. #85 part 2 (global cap + dead-mark) still OPEN — the safety for
-   a single failed recovery attempt that part 1 does not eliminate.
+   is now LIVE. #85 part 2 still OPEN.
+- #85 part 2 ROOT CAUSE FOUND + DESIGN AGREED (2026-09-23): the UnknownError
+   is PLUGIN-CAUSED, not host-side — `PLANNER_AGENT_ID = "planner_Q3S_160K"`
+   (auto_resume.ts L158, hardcoded) no longer matches the live roster
+   (`planner_Q3S_170K`), so every planner-scoped CONTINUE/spawn sends a
+   non-existent `agent` → `promptAsync` throws. Confirmed: exactly one planner
+   agent in the live roster; 3 stale refs in auto_resume.ts (L76/L155 comments
+   + L158 constant); no other stale agent/model hardcodes in plugin/tool code
+   (the Gemma strings in probe/smoke are intentional test fixtures). SEQUENCE
+   explained: no-line idle → 2 CONTINUE attempts (cap 2) both fail
+   (UnknownError) → cap exhausted → no successor → ONE fallback spawn (not a
+   loop — part 1 removed the loop). RE-SCOPED part 2 (his ruling, better than
+   my roster-planner proposal): (1) the CONTINUE/spawn body carries the
+   CURRENT session agent + modelID (last assistant message `info.agent`/`info.model`,
+   reflects mid-session switches, preserves the resume cache, works for
+   non-planner agents), resolved at fire-time only; fallback = opencode.jsonc
+   lookup, then no field (host default) — NEVER a planner constant. (2)
+   dead-mark on a failed CONTINUE (`send-fail=`), cleared on a fresh busy (same
+   axis as recoveryCount) → no cap-exhaustion fallback spawn; a dead model →
+   session never busy → mark persists → no 5s retry loop. SPEC + delegate next.
+- #86 FILED (deferred, maintainer-proposed): worker audit of all plugin/tool
+   code for stale hardcoded agent/model IDs + code smells (read-only, after
+   #85 part 2 lands).
+- compact_budget.json (2026-09-23, his check): model_budget keys are
+   superset-correct (every live agent model has a cap; unlisted → default:1;
+   CPU → 0). `Qwen3.8-27B-Q3S-140K-HQKV` (the worker_Q3S_140K_HQKV model) is
+   ABSENT → falls to default:1 (safe; optional: add cap 3 to match the other
+   Q3S models). `emergencyRecovery: true` is ON (the #83 gating flag).
 - NEXT (his priority order): (1) #85 part 2 (global cap + dead-mark) —
    spec + delegate (the safety for a single failed recovery; the scope
    refinement (part 1) already removes the loop); (2) #82 live acceptance
