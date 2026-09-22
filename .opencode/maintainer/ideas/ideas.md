@@ -5,6 +5,21 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
+2026-09-22_17-41
+- we should move ctx gauge max value not gained from the modelID but from the opencode.jsonc or if their is a field in ctx object to gain the limit directly over it.
+  - would allow me to more freely name and rename modelID without needing to update the name in backend AND openconfig to signal the limit via name
+
+
+2026-09-22_14-57
+- direct instructions on how to work with the nap and todo efficiently directly in the system prompt of planner and worker
+
+2026-09-22_14-30:
+"
+  4. The compaction question: he reactivated the plugin — which plugin? auto_resume (I assume — "the plugin" = the one we were discussing, the deactivated auto_resume). Also — the compact_memory plugin: his temporary fix (commented-out promptAsync) is still in effect → SELF compact should work. Unverified. I'm at 83% — approaching the 90% stop line. If I need to compact this session, SELF compact_memory should work now (per his temporary fix). But per the triage rule: I should plan the turn to fit without needing to compact. My plan is ~12–15K → end at ~90–92%... hmm, that's tight. The 80% triage rule: "before starting a unit, estimate the remaining tool calls; if the estimate exceeds 10 calls → instead of starting a unit, stop at the last verified checkpoint and fire compact_memory." I'm at 83% with an estimate of 12–14 calls → per the rule, I should compact first (SELF — should work now per his temporary fix, but unverified!).
+"
+- is there a rule to "But per the triage rule: I should plan the turn to fit without needing to compact."??? compact is the go-to mechanism right now to continue
+
+
 2026-09-22_12-03:
 - commit has inclusion instruction lets every worker stumble on how to do it
   - needs clear instruction or has to be part of the spec

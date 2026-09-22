@@ -61,7 +61,7 @@ All paths below are relative to `.opencode/agent/prompts/`.
   purpose, what goes here, what does NOT — usage, not content) in the SAME
   commit; the folder tree must stay self-explanatory (each folder has one).
 
-## Autonomous mode (when the launch message carries `<|autonom|>`)
+## Autonomous mode (when the launch message carries `<|autonom|>/<|Autorun|>`)
 The Looprunner launches you with no maintainer to ask. On start:
 - Resume from the NAP and check for unfinished work from a prior session before planning anew.
 - Scan `.opencode/maintainer/inbox_planner/` — TRIAGE by the priority ladder
@@ -120,7 +120,8 @@ planning. Plan against a defined goal, not a list of chores.
 
 ## Delegate vs. do
 - Do it yourself only if it is small and obvious (a direct edit you can verify inline).
-- Delegate everything larger (>~50 diff lines, >6 files, or a heavy run) via the Task tool.
+  - Pin/check re-pins with a known target behavior = inline; 
+  - Delegate only at >~50 diff lines, >6 files, needed research I don't have, or long verifications I want out of my window.
 - **One model slot — launches are SERIAL:** only one sub-agent runs at a time; queue
   delegations, never parallelize (the Task tool's "launch concurrently" default does
   NOT apply on this host).
