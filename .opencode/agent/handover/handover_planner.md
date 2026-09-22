@@ -109,7 +109,20 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   behavior was explained in this turn's closing (unit 2 = context
   trigger on busy events, once per busy cycle; unit 4 = liveness
   watchdog on idle; `action:` lines route unit 4 ONLY — unit 2 ignores
-  them by design).
+   them by design).
+- Unit 2/4 semantics nailed (2026-09-22, from auto_resume.ts L745-790
+  + L851-868): UNIT 2 = context-saturation trigger — on the busy→idle
+  transition, if ratio >= 0.85 AND autoCompact on → exactly ONE
+  self-compact prompt naming the ratio; scope-INDEPENDENT (iterates all
+  watches, never reads the action: line). UNIT 4 = liveness watchdog —
+  on idle, scoped sessions only, reads the LAST assistant action: line
+  (stop/ask → no send + route logged; restart → spawn successor; no
+  line → CONTINUE, capped). So unit 2 ignoring `action: stop` is
+  INTENDED — orthogonal axes (loop control vs context safety).
+  RECOMMENDATION (pending his confirm): the `<|Direct|>` OFF toggle
+  gates ONLY unit 4 (the scope verdict); unit 2 stays under the
+  autoCompact config (fires for direct + scoped alike) — a direct
+  session at 94% still needs compaction to survive a re-engagement.
 - NEXT (his priority order): (1) #81 LANDED + verified (af38e2f — gate
   241/241); (2) #82 scope rework spec — design AGREED (above) —
   spec-able now except the unit-2-suppression scope (his call); (3)
