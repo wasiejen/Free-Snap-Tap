@@ -97,10 +97,11 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   LAST-TOGGLE-WINS over user history (bidirectional — deactivate AND
   reactivate mid-session; context preservation = his stated
   motivation), OWN-LINE anchor (message-start ruled out — the ctx:
-  gauge line always prefixes the message), ON = `<|autonom|>`
-  (+`<|Autorun|>` spelling pending his one-word confirm), OFF =
-  `<|Direct|>`; scope re-evaluated on every new user message; #82
-  re-scoped in TODO (first-message-only proposal superseded). His live
+   gauge line always prefixes the message), ON = `<|autonom|>` AND
+   `<|Autorun|>` (CONFIRMED 2026-09-22: both recognized, CASE-INSENSITIVE),
+   OFF = `<|Direct|>` (case-insensitive); scope re-evaluated on every new
+   user message; #82 re-scoped in TODO (first-message-only proposal
+   superseded). DESIGN NOW FULLY AGREED (all items incl. markers). His live
   test: he HIJACKED the unit-2 injection message and will check whether
   autorun re-engages after a restart — under the CURRENT all-parts
   scan it WILL (his message quotes the marker); after #82 it must NOT

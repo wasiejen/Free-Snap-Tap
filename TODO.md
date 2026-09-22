@@ -894,11 +894,12 @@ restart detection" wording above is the pre-revision numbering.
   the same scan derives the state after a process restart). Toggle
   markers count ONLY on their own line (message-start anchors ruled
   out — the injected `ctx:` gauge line always prefixes the message, so
-  the marker never sits at the start). ON: `<|autonom|>` (the existing
-  launch marker) — plus `<|Autorun|>` if that is the intended spelling
-  (aliased — his one-word confirm pending); OFF: `<|Direct|>`.
-  Bidirectional: he can deactivate AND reactivate mid-session without
-  starting a new session (context preservation — his stated motivation).
+   the marker never sits at the start). ON: `<|autonom|>` (the existing
+   launch marker) AND `<|Autorun|>` — CONFIRMED 2026-09-22: both count as
+   ON, CASE-INSENSITIVE (his original german wordplay was `autonom`; both
+   spellings stick); OFF: `<|Direct|>` (case-insensitive). Bidirectional:
+   he can deactivate AND reactivate mid-session without starting a new
+   session (context preservation — his stated motivation).
 - **Acceptance criteria:** own-line match only (mid-sentence or
   bullet-prefixed markers never toggle); smoke: (i) mid-sentence quote
   → scope unchanged; (ii) own-line `<|Direct|>` then own-line
