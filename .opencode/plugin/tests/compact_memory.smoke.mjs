@@ -311,16 +311,18 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
     String(res).slice(0, 160));
 }
 
-// ---- the `message` arg (unit A: queued as a direct promptAsync — never
-// awaited, delivered on the compacted session's resume)
+// ---- the `message` arg (unit A): the queued promptAsync is COMMENTED OUT
+// (maintainer temp fix 0f192e5, 2026-09-22 — it killed the SELF-compaction
+// queued-message race): NO prompt is sent, but the response STILL carries
+// the queued note. RE-PINNED 2026-09-22 per the maintainer's ruling
+// (pin the current behavior — do NOT deactivate/skip, do NOT restore the
+// promptAsync; TODO #81)
 {
   const { rec, exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "IQ4-x", providerID: "llama-swap" } }], promptAsync: true });
   const res = await exec({ message: "resume unit-3", sessionID: "ses_sm_msg" });
   await drain();
-  chk("message arg: EXACTLY one queued promptAsync with the byte-exact text part",
-    rec.prompt.length === 1 && rec.prompt[0].path.id === "ses_sm_msg" &&
-    rec.prompt[0].body.parts.length === 1 && rec.prompt[0].body.parts[0].type === "text" &&
-    rec.prompt[0].body.parts[0].text === "resume unit-3",
+  chk("message arg: NO queued promptAsync (temp fix 0f192e5 — the prompt is not sent)",
+    rec.prompt.length === 0,
     JSON.stringify(rec.prompt));
   chk("message arg: response = the dispatch line + the queued note (the message itself NOT in the response)",
     res === `${dispatchLine("ses_sm_msg", "summarize", "IQ4-x")}\nThe message was queued for ses_sm_msg (delivered on its resume).` && !res.startsWith("resume unit-3"),

@@ -2559,18 +2559,21 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
 
 // 97 — the message response shape (cross dispatch, the message arg GIVEN,
 //      unit A): the response is the dispatch line + the queued note (the
-//      message itself is NOT in the response) and EXACTLY ONE queued
-//      promptAsync carries the text part (delivered on the session's resume)
+//      message itself is NOT in the response); the queued promptAsync is
+//      COMMENTED OUT (maintainer temp fix 0f192e5, 2026-09-22 — it killed
+//      the SELF-compaction queued-message race): NO prompt is sent (empty
+//      prompt array). RE-PINNED 2026-09-22 per the maintainer's ruling:
+//      pin the current behavior, do NOT deactivate/skip, do NOT restore
+//      the promptAsync (TODO #81)
 {
   const { rec, res } = await qcExec({ summarize: true, messages: [{ info: { modelID: "IQ4-x", providerID: "llama-swap" } }], promptAsync: true }, { message: "resume unit-3", sessionID: "ses_qc_msg" });
   await qcTick();
   check(
     "97",
     "S13",
-    "message (unit A): response = dispatch line + the queued note (byte-exact) + exactly ONE queued promptAsync carrying the text part",
+    "message (unit A): response = dispatch line + the queued note (byte-exact) + NO queued promptAsync (temp fix 0f192e5 — the prompt is not sent)",
     res === `Compaction dispatched for ses_qc_msg (background, fire-and-forget) — the summarize call was sent (model: IQ4-x); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.\nThe message was queued for ses_qc_msg (delivered on its resume).` &&
-      rec.prompt.length === 1 && rec.prompt[0]?.path?.id === "ses_qc_msg" &&
-      rec.prompt[0]?.body?.parts?.[0]?.type === "text" && rec.prompt[0]?.body?.parts?.[0]?.text === "resume unit-3",
+      rec.prompt.length === 0,
     JSON.stringify({ res: String(res).slice(0, 160), prompt: rec.prompt }),
   );
 }

@@ -867,11 +867,13 @@ restart detection" wording above is the pre-revision numbering.
 - **Suggested scope:** `.opencode/plugin/probes/handover_probe.mjs` (check
   [97]), `.opencode/plugin/tests/compact_memory.smoke.mjs`;
   `compact_memory.ts` only if the message path is restored.
-- **Status:** ruling 2026-09-22 (maintainer): the pin can be deactivated
-  OR fixed to match the commented-out `promptAsync` — implementation
-  pending (next unit). Planner recommendation: re-pin (a deactivated check
-  silently loses coverage; the gate should pin the current intended
-  behavior).
+- **Status:** LANDED 2026-09-22 (worker-1 commit — the planner records
+  the hash on return, #80 precedent) — re-pinned per the ruling (NOT
+  deactivated/skipped, promptAsync NOT restored): probe [97] + the smoke
+  message pin now assert the temp-fix behavior (dispatch line + the
+  queued note byte-exact, NO queued promptAsync); gate green: probe
+  241/241 (header total agrees), smoke 53/53, pytest 459 passed +
+  1 warning, ruff F=0.
 
 ## 82. (open, 2026-09-22, planner live; HIGH) scope verdict flips on ANY user message quoting the marker — fail-safe: first user message only
 - **Problem + evidence:** live incident 2026-09-22T12:33:18Z (gen
