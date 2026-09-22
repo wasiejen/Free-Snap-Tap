@@ -127,3 +127,6 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   surface report — would need a check). Files: `.opencode/plugin/auto_resume.ts`
   (L146 + spawn path + resolveInjectAgent), `tests/auto_resume.smoke.mjs`
   (the `planner_Q3S_160K` pins), live `opencode.jsonc` (source of truth).
+## 2026-09-23_01-08 planner_Q3S_170K ses_f39d250e9ffeheip2FVEeY5Fk6
+#86 (new, deferred, maintainer-proposed): worker audit of ALL `.opencode/plugin/` + `.opencode/agent/scripts/` tools/plugins for (a) stale hardcoded agent IDs (like the found `auto_resume.ts` PLANNER_AGENT_ID `planner_Q3S_160K`), (b) hardcoded model IDs not matching the live backend/roster, (c) general code smells (magic numbers, duplicated config, dead constants). Acceptance: a prioritized list of findings (ID + file + line + suggested fix) filed to todo_inbox.md; no behavior change (audit only). Scope: read-only scan; the found `auto_resume.ts` case is already handled by #85 part 2. Deferred (runs after #85 part 2 lands).
+

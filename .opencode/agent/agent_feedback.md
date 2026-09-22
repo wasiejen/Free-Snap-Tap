@@ -410,3 +410,9 @@ Spec DoD said "TODO.md: this entry -> status LANDED" but no such entry existed (
 ### 2026-09-22_23-32 worker_Q3S_170K ses_f351feb02ffeScmZIiycmB79GD
 Spec-vs-code drift cost a design cycle: the #85 part-1 spec listed "#82 scope toggle already LANDED" as a verified fact, but TODO #82 + the committed code had no toggle implementation — the worker had to implement the agreed #82 own-line toggle design as part of the scope rework to meet the spec's own smoke requirements.
 
+### 2026-09-23_00-18 planner_Q3S_170K ses_f39d250e9ffeheip2FVEeY5Fk6
+Two frictions this session: (1) SPEC — the #85 part-1 spec claimed #82 (the toggle) was "LANDED" but it was unimplemented, so the worker built it in-task (97fccfc), inflating scope and hitting the context limit; a spec must verify a referenced unit's status (LANDED vs. design) before claiming it. (2) CONTEXT-LIMIT FAILURE — I reflexively considered relaunching the worker from the Task failure message without checking git log; the worker had already committed (97fccfc). MEM-0104/0105/0106 now codify "rebuild from files first," but the reflex still fired from the message — make the "check git log before relaunching" step explicit in the failure-message handling.
+
+### 2026-09-23_01-09 planner_Q3S_170K ses_f39d250e9ffeheip2FVEeY5Fk6
+HOST-SIDE MIS-CONCLUSION: I declared the auto_resume UnknownError a "host-side defect, not fixable via the plugin" without inspecting the call's ARGUMENTS. The maintainer challenged it ("does auto-resume cause it? which part?") and the root cause was the plugin's own hardcoded PLANNER_AGENT_ID (a stale model/agent ID). Lesson: when a plugin makes an SDK call that fails, inspect the ARGUMENTS the plugin sets (agent/model fields) before blaming the host — a stale constant was the whole cause. Add this to the failure-diagnosis reflex.
+
