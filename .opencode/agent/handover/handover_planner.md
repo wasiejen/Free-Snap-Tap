@@ -257,7 +257,13 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
    lookup, then no field (host default) — NEVER a planner constant. (2)
    dead-mark on a failed CONTINUE (`send-fail=`), cleared on a fresh busy (same
    axis as recoveryCount) → no cap-exhaustion fallback spawn; a dead model →
-   session never busy → mark persists → no 5s retry loop. SPEC + delegate next.
+   session never busy → mark persists → no 5s retry loop. SPEC LANDED
+   (ff26e0e, handover_task.md) + DELEGATE PENDING (self-compact → resume →
+   delegate worker_Q3S_170K). NOTE: model_budget is NOT read by auto_resume
+   (it reads autoCompact/saturationThreshold/outputReserve only) — the
+   model_budget is live in compact_memory (triggered by unit-2 self-compact),
+   not in auto_resume itself. Two backend stops this session (he applied a
+   fix); compacting to a fresh window before delegating.
 - #86 FILED (deferred, maintainer-proposed): worker audit of all plugin/tool
    code for stale hardcoded agent/model IDs + code smells (read-only, after
    #85 part 2 lands).
