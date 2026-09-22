@@ -1,106 +1,112 @@
-# HANDOVER — configurable unit-2 threshold + output reserve (worker, ses_f35f82abdffeyz62ZF4NLW3qZy)
+# Worker handover — consolidate compaction config into compact_budget.json
+STATUS: IN PROGRESS (checkpoint committed at the ~87 % stop line; self-compacted to continue — resume from THIS file + the task spec, not memory)
 
-Status: DONE — single-file plugin change + test updates per the spec. Gate
-fully green. ONE commit (see "Commit").
+## Task
+Spec: `.opencode/agent/handover/handover_task.md` (commit 91d2d0c) — the source of truth:
+config keys, model_budget semantics, DoD, DO-NOT-touch list. All re-verified by this
+session BEFORE this checkpoint; nothing re-derived yet at the spec's verified facts.
 
-## What changed
+## Done so far (read-only recon, no code changed)
+- Read spec, repo_overview, repo_commands, both smokes, full probe S10/S11/S13/S25
+  regions, auto_resume.ts per-tick config pattern (fail-open style to mirror),
+  live compact_budget.json (keys: version + sessions ONLY — no config keys yet).
+- `classifyQuantClass` referenced only in: compact_memory.ts (live), deactivated
+  frozen copies (leave), compact_memory.smoke.mjs, handover_probe.mjs (L2293).
+- TODO.md: NO entry for this task yet (file ends at #83; header numbering line
+  says "up to #82" — stale). Will add new entry #84 with status LANDED
+  (no own commit hash in the same commit — planner records it in bookkeeping).
 
-`.opencode/plugin/auto_resume.ts` (unit 2 only — units 1/3/4,
-compact_memory.ts, probe pins untouched):
-- `SATURATION_THRESHOLD = 0.85` / `RESERVE_MIN_OUTPUT = 20000` → fail-open
-  defaults `DEFAULT_SATURATION_THRESHOLD = 0.95` /
-  `DEFAULT_OUTPUT_RESERVE = 20000`.
-- New `saturationConfig()` — per-tick READ-ONLY parse of the SAME
-  `compact_budget.json` budget file (reuses the `autoCompactEnabled`
-  pattern): optional top-level `saturationThreshold` (number, 0 < t < 1) +
-  `outputReserve` (number, >= 0); missing / unreadable / malformed / key
-  absent / not-a-number / out-of-range → the default (fail-open). A live
-  edit takes effect on the next tick.
-- `getUsable(model)` → `getModelLimits(model)`: caches the STABLE
-  `{context, output}` limits (`usableCache` → `limitsCache`); the usable
-  window is computed per tick in `tick()`: `usable = context -
-  min(reserve, output)`, guarded `usable > 0`.
-- `tick()` fires when `ratio >= threshold` (the per-tick value) AND
-  `autoCompactEnabled()`. `saturation=` / `trigger=` log-line formats
-  unchanged.
-- Header comments (the UNIT 2 block + the constants region) now describe
-  the configurable keys + defaults (maintainer ruling 2026-09-22).
+## Design (settled — implement exactly this)
+1. `compact_memory.ts`:
+   - Delete `QUANT_CLASS_RULES` + `classifyQuantClass`. New exported
+     `resolveCap(root: string, modelName: string): { cap: number; label: string }`:
+     `/^cpu/i` → cap 0 label "cpu (excluded)" FIRST (safety invariant); else read
+     `model_budget` from `<root>/.opencode/temp/compact_budget.json` (per-call,
+     fail-open): exact bare-model-ID key → its cap (label "model_budget");
+     else `model_budget.default` key (finite number) → it, else 1 (label
+     "model_budget default"). Typo keys simply never match.
+   - New `readCompactionConfig(root)` returning `{ keepTokens, keepMessages,
+     emergencyRecovery, model_budget }` — fail-open defaults 30_000 / 12 / false /
+     {}; validation: keep* = finite number >= 0 else default; emergencyRecovery
+     = strictly `true`; model_budget = plain object, finite-number values only
+     (skip bad entries). Mirror the auto_resume.ts saturationConfig style.
+   - Keep reporting: `tokensToKeep = args?.keepTokens ?? cfg.keepTokens` (same for
+     messages) — args still win.
+   - execute: step 3 uses `resolveCap(root, model)`. Refusal template keeps
+     `model class ${label} (cap ${cap}), used ${count}/${cap}` wording (checks
+     pin only "cap N" + "N/N").
+   - Budget writes PRESERVE top-level config keys automatically: readBudget returns
+     the parsed object (extra keys survive) and writeBudget stringifies it — no
+     change needed.
+   - Update: header comments (L48-56 classifier paragraph, L16-18 "cap lives in the
+     classifier" line), tool description sentence ("per model quant-class" →
+     model_budget map), the `DEFAULT_KEEP_TOKENS/MESSAGES` comments (now the
+     fail-open defaults of the config keys).
+   - PRESERVE: temp fix 0f192e5 (commented promptAsync L576-577) byte-exact,
+     #81 pins, everything else.
+2. `deactivated/context_recovery.ts` (STAYS in deactivated/):
+   - Drop KEEP_TOKENS/KEEP_MESSAGES constants + FLAG_KEY + flagEnabled +
+     stripJsoncComments (only used there). New `readRecoveryConfig(root)` from
+     compact_budget.json: `{ enabled: boolean (strictly true), keepTokens,
+     keepMessages }`, fail-open defaults false/30_000/12 (same validation as
+     compact_memory). Hook: after the overflow-marker gate, `const cfg =
+     readRecoveryConfig(root); if (!cfg.enabled) return;` then keep = cfg values in
+     the compact body + the COMPACT line. Read PER FIRE (mid-run flip = next
+     overflow). Update header comments (flag L12-16, keep L23-25).
+   - Budget read/write unchanged (v1 lenient shape; writes preserve keys).
+3. `tests/compact_memory.smoke.mjs`:
+   - Export check → `typeof mod.resolveCap === "function"`.
+   - Seed the sandbox budget file with
+     `model_budget: { "Qwen3.8-27B-IQ4KT-120K": 3, "Qwen-IQ3-Test": 5,
+     "Qwen-IQ3-Test-typo": 7, "default": 1 }` (merge into storePath early).
+   - Classifier block → resolveCap(SANDBOX, ...) cases: exact→5, live-model→3
+     (configured value), unlisted→1, typo→1, CPU→0.
+   - New: keepTokens/keepMessages override — seed keepTokens 40_000 + keepMessages
+     9, execute WITHOUT keep args → COMPACT line tokens=40000 messages=9;
+     WITH args → args win. (Existing byte-exact line checks all pass keep args —
+     unaffected.)
+4. `tests/context_recovery.smoke.mjs`:
+   - Flag fixture: sandbox compact_budget.json instead of opencode.jsonc.
+     Case 1 no file → OFF. Case 2 write `{emergencyRecovery: true}` → success
+     (keep defaults 30_000/12 — assertions unchanged). Case 3 exhausted (merge-
+     preserving write). Case 4 non-overflow. Case 5 `{emergencyRecovery: false}`
+     → OFF. NEW case 6: keep override `{emergencyRecovery: true, keepTokens:
+     45_000, keepMessages: 5}` → compact body.keep {45000,5} + ctx.log line.
+   - Remove all opencode.jsonc writes + the JSONC comment fixture.
+5. `probes/handover_probe.mjs`:
+   - S11: drop the SB_JSONC/JSONC_FIXTURE use — check 77 asserts the budget file
+     has NO `emergencyRecovery: true` (file exists with S10 entries → OFF);
+     check 78 seeds the budget file `emergencyRecovery: true` (merge, preserve
+     sessions) before firing; keep {30_000,12} + directive + line pins UNCHANGED
+     (checks 79/80/81 keep passing — rcSeedBudget already merges the whole
+     object). rcSeedBudget stays (it preserves top-level keys).
+   - S13: L2293 `qcClassify` → `qcResolveCap = qcMod.resolveCap`; add a model_budget
+     seed block (same 4-key map as the smoke) right before check 86 (merge into
+     the shared sandbox budget file); check 87 → resolveCap(SANDBOX, name)
+     fixtures: exact 5 / live-model 3 / unlisted 1 / typo 1 / CPU 0, label
+     "model_budget fixtures … configured value for that model ID". Check 95
+     label: cap now lives in the file's model_budget map (entry stays
+     {count, updated, model}). Header EXPECTED-OUTPUT line L655 stays 241/241
+     (S11=6 S13=14 unchanged — only labels/fixturing changed, no new checks).
+6. TODO.md: append entry #84 (this task), status LANDED, "hash recorded by the
+   planner in the follow-up bookkeeping" — do NOT write my own commit hash there.
+   Also fix the stale numbering line ("used so far up to #82, new entries start
+   at #83" → up to #83, next #84).
 
-`.opencode/plugin/tests/auto_resume.smoke.mjs`:
-- FIX (found + fixed, in scope): the load path was STALE — it still loaded
-  `.opencode/plugin/deactivated/auto_resume.ts` (the plugin was reactivated
-  into `.opencode/plugin/auto_resume.ts` by commit 380e326 without updating
-  the test) → the smoke crashed with ERR_MODULE_NOT_FOUND before any check;
-  the spec's "baseline 76/76" was unreachable on the current checkout. It
-  now loads the live file.
-- UNIT-2 fire/no-fire expectations + labels updated to the new 0.95 default
-  (all token math node-computed; the existing 80000/50000/40000 values still
-  discriminate at 0.95: 80000/84000 = 0.952 fires, 50000 = 0.595 no, 40000 =
-  0.476 no).
-- New "UNIT 2 (cont.) — configurable threshold + output reserve" section
-  (13 checks): (a) no config → fail-open 0.95/20000 (79000 = 0.940 no fire —
-  would fire at the old 0.85; 80000 = 0.952 fires); (b) per-tick LIVE EDIT of
-  `saturationThreshold` 0.60 → an already-armed 0.655 session fires on the
-  next tick, plus fires at 55000 (0.655) but not 40000 (0.476) at that value;
-  (c) `outputReserve` 0 → usable 100000 (send text "96000 of 100000"), 82000
-  = 0.820 no fire (0.976 at the default reserve WOULD); (d) out-of-range
-  values (string threshold, negative reserve) → fail-open defaults (80000
-  fires at usable 84000, 79000 no fire). The checks account for per-tick
-  re-evaluation of lingering armed sessions (they fire once the new
-  threshold crosses them — correct tick semantics, pinned explicitly).
+## Constraints honored
+- Do NOT touch: live compact_budget.json, .opencode/maintainer/, .opencode/agent/
+  prompts/, live opencode.jsonc, auto_resume.ts, deactivated/ location of
+  context_recovery.ts, temp fix 0f192e5, #81 pins, the old `.opencode/tools/
+  compact_memory.ts` (S10 pins a DIFFERENT file — leave it).
+- Git: stage ONLY my files (agent_feedback.md, knowledge_inbox.md,
+  maintainer/ideas.md + untracked dumps are OTHER agents' live files — do not
+  commit them). One commit: code + tests + probe + TODO.md + handover files.
+- node for any arithmetic (none needed — all literals).
 
-`TODO.md` — entry #83's status line now records the paired
-configurable-threshold part as LANDED (2026-09-22 worker; hash recorded by
-the planner follow-up). #83 itself stays OPEN — its BACKSTOP part (revive
-context_recovery) was not part of this task. INTERPRETATION NOTE: there is
-NO dedicated TODO entry for the threshold change — #83 is the only entry
-that references it ("Pairs with the configurable-threshold change"). If the
-spec intended a different entry, correct me.
-
-`todo_inbox.md` — appended the stale-load-path finding (found + fixed in
-this commit; close/curate as you see fit).
-
-## Verification (measured, in order)
-
-- `node .opencode/plugin/tests/auto_resume.smoke.mjs` → **ALL PASS (89/89)**
-  — the 76 baseline (post load-path fix) + 13 new checks. First run after
-  implementation: 2 FAILs in the new section (my expectations ignored the
-  per-tick re-evaluation of lingering sessions) — expectations corrected,
-  re-run green (one iteration, no loop).
-- All other plugin smokes green: block_transfer 22/22,
-  block_transfer.sandbox 52/52, compact_memory 53/53, context_recovery ALL
-  PASS, ctx_gauge 3/3, gauge_core ALL PASS, intercept_observer 39/39,
-  loop_log 24/24, submit 20/20.
-- `node .opencode/plugin/probes/handover_probe.mjs` → **PROBE handover:
-  241/241 PASS** — no OTHER probe pin breaks; the auto_resume `surface= v=`
-  hash changed 0bb5c46f → b1bfa7f3 (expected for a source change; both
-  machine-computed sha256 of the HEAD file vs the new file).
-- `./.venv/Scripts/python.exe -m pytest -q` → **459 passed, 1 warning**.
-- `./.venv/Scripts/ruff.exe check --select F .` → **All checks passed (F=0)**.
-
-## Commit
-
-ONE commit on `opencode_test` (this checkout — no branch switch): plugin +
-smoke + TODO.md + todo_inbox.md + this handover file. Per the spec the hash
-is NOT self-written into this commit — the planner records it in the
-follow-up bookkeeping (#81 precedent).
-
-## Deliberately NOT done
-
-- #83's backstop (revive context_recovery, `emergencyRecovery` flag) —
-  maintainer call, out of this task's scope.
-- The LIVE `.opencode/temp/compact_budget.json` — the smoke writes the
-  SANDBOX copy only (its live-log guard check is green; live budget file
-  never touched).
-- `compact_memory.ts`, the probe's [97] pin, units 3/4 code paths,
-  `.opencode/maintainer/`, `.opencode/agent/prompts/`, the live
-  `opencode.jsonc` — all untouched.
-- No NAP edits (worker role).
-
-## Lessons
-- Specs citing a smoke baseline should be verified runnable before
-  delegation (380e326's reactivation silently broke this smoke's load
-  path).
-- When adding per-tick config to a tick-driven loop, compute the expected
-  tick SEQUENCE with node first — every lingering armed session is
-  re-evaluated at the new config on the next tick.
+## Verification (DoD)
+- node .opencode/plugin/tests/compact_memory.smoke.mjs → ALL PASS
+- node .opencode/plugin/tests/context_recovery.smoke.mjs → ALL PASS
+- node .opencode/plugin/probes/handover_probe.mjs → 241/241
+- all other plugin smokes (plugin/tests/*.smoke.mjs)
+- ./.venv/Scripts/python.exe -m pytest -q → 459 passed + 1 warning
+- ./.venv/Scripts/ruff.exe check --select F . → F=0
