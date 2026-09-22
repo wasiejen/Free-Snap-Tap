@@ -124,6 +124,21 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   gates ONLY unit 4 (the scope verdict); unit 2 stays under the
   autoCompact config (fires for direct + scoped alike) — a direct
   session at 94% still needs compaction to survive a re-engagement.
+- Unit-2 threshold problem confirmed (2026-09-22, his math machine-checked):
+  at 0.85 the trigger fires at 127.5k of a 150k usable window (170k ctx,
+  20k reserve) → 42.5k (28.3% of usable) never used for work. `min(20000,
+  output)` reserves the CURRENT output limit, not the max a turn can emit —
+  the wrong axis. Action: configurable `saturationThreshold` (default 0.95)
+  + `outputReserve` (default 20000) via the budget file, per-tick fail-open —
+  SPECED + DELEGATED this turn (worker_Q3S_160K). Filed #83 (maintainer
+  call): the limit-detection backstop ALREADY EXISTS — deactivated
+  `context_recovery.ts` (on the overflow `session.error`, compacts + returns
+  `{handled:true,action:retry}` = a single clean retry vs the slow 5-6
+  tail-removal loop; over budget → clean fail/stop; same ≤2/session budget).
+  It's the enabler to raise the threshold to ~0.98. KEY UNCERTAINTY: the
+  host must actually call the hook on overflow — needs a live check. His
+  side note: backend output limits would also cap ramblers + avoid a long
+  output straddling the threshold (noted, not acted).
 - NEXT (his priority order): (1) #81 LANDED + verified (af38e2f — gate
   241/241); (2) #82 scope rework spec — design AGREED (above) —
   spec-able now except the unit-2-suppression scope (his call); (3)

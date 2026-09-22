@@ -916,3 +916,44 @@ restart detection" wording above is the pre-revision numbering.
 - **Status:** design AGREED 2026-09-22 (his ruling on all open
   questions; unit-2-suppression scope pending his call after the
   85%-trigger info); implementation pending — gate is green (post-#81).
+
+## 83. (open, 2026-09-22, planner; maintainer call — enabler for a ~0.98 threshold) unit-2 backstop: catch the ACTUAL context-limit hit cleanly (revive context_recovery.ts)
+- **Problem + evidence:** the pre-emptive trigger (now configurable, default
+  0.95 via the #82-adjacent change) still fires BEFORE the limit, so a
+  chunk of the window is never used. He wants to "use as much of the
+  context window as possible" → move the threshold toward ~0.98 and rely
+  on a CLEAN catch of the real limit hit. That mechanism ALREADY EXISTS
+  (verified 2026-09-22): `.opencode/plugin/deactivated/context_recovery.ts`
+  (324 lines, T5 approved design 2026-09-11, built on the maintainer's
+  prototype) — a hook firing on the overflow `session.error` (activation
+  flag `emergencyRecovery: true` in opencode.jsonc, read per fire; only
+  `true` enables it), which compacts with an informed keep (30k tokens /
+  12 messages), appends its COMPACT line to ctx.log, injects the
+  re-application directive, and returns `{handled:true, action:"retry"}` —
+  a SINGLE clean retry that replaces the slow "opencode removes the tail
+  (last message in generation) and retries 5-6 times" loop. Over budget →
+  CLEAN FAIL (returns unhandled, the error propagates). Budget: the SAME
+  `compact_budget.json`, ≤2 per session id (self + emergency combined).
+  A smoke test exists: `tests/context_recovery.smoke.mjs`. It is
+  currently DEACTIVATED.
+- **Desired outcome:** the pre-emptive threshold can be raised toward ~0.98
+  (configurable) because the actual limit hit is caught cleanly (one
+  compact + single retry) instead of the slow tail-removal loop; and an
+  over-budget session gets a clean STOP (no runaway retries).
+- **Acceptance criteria:** `emergencyRecovery: true` activates it; on an
+  overflow `session.error` it compacts + returns a single retry (not 5-6
+  tail loops); over budget → clean fail (error propagates; the -WARNING is
+  the looprunner's/protocol's job); the shared ≤2/session budget is
+  respected (re-read-then-write, no await between); smoke green.
+- **Suggested scope:** re-activate + adapt
+  `.opencode/plugin/deactivated/context_recovery.ts` to the CURRENT
+  compact_memory summarize path (v1-generation client, config-resolved
+  summarizer); wire the `emergencyRecovery` flag. KEY UNCERTAINTY: the
+  host must actually CALL this hook on overflow — needs a LIVE
+  verification (the prototype was working at build time, but the build
+  changed since). Effort MEDIUM (the code exists but predates the current
+  compact_memory design and is deactivated).
+- **Status:** open — maintainer call (needs his flag in the live
+  opencode.jsonc + the live host-call verification). This is the enabler
+  for raising the threshold to ~0.98. Pairs with the configurable-threshold
+  change (which is delegated separately this turn).
