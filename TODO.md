@@ -803,11 +803,12 @@ restart detection" wording above is the pre-revision numbering.
   despite the scope=none fail-safe (5× `recovery= attempt=1`; the cap resets
   on each injected busy → unreachable as-is). NO user text part of that
   session carries `<|autonom|>` (all 15 checked) and the spawned map never
-  held it → the behavior is NOT reproducible from the committed file: the
-  running code in the 23:12–23:58 window was likely a mid-debug variant
-  (three plugin reloads at 23:12:03 / 23:42:21 / 23:58:52, matching
-  maintainer interventions). Resolve before re-activation (suggested: a
-  version hash in the `surface=` line).
+  held it. Maintainer 2026-09-22: the 5 injections = his 4 interrupt
+  attempts + 1 initial — he tried to interrupt 4 times, then exited
+  opencode; NO scope-logic edits. The scope verdict is single (L614:
+  `spawned.has` || `userHasMarker`; the spawned-map population path is
+  untraced — likely a Map) → verify at fix time. Resolve before
+  re-activation (suggested: a version hash in the `surface=` line).
 - **Desired outcome:** injected messages preserve the session's agent (cache
   warm, role prompt intact); a direct session ends idle untouched.
 - **Acceptance criteria:** (a) the unit 2/4 `promptAsync` body carries an
@@ -821,11 +822,16 @@ restart detection" wording above is the pre-revision numbering.
 - **Open design questions (maintainer, undecided):** recovery-cap semantics
   (reset-on-busy makes the cap unreachable while the plugin keeps injecting);
   direct session = new "autorun" entry with direct interaction (his
-  stop/interrupt + `ask_maintainer` must stop the loop); planner compaction
-  budget exhaustion (keep=0 + same-session resume + budget reset vs. higher
-  cap — bit-rot risk).
-- **Status:** investigated 2026-09-22 (planner, direct session); fix pending
-  — plugin DEACTIVATED by the maintainer (a000dfd, moved to
-  `.opencode/plugin/deactivated/`).
+  stop/interrupt + `ask_maintainer` must stop the loop — NEW (his idea
+  2026-09-22): an `ask_maintainer` timer, e.g. 5 min — if he is not
+  available, the loop/autorun resumes after the timeout); planner
+  compaction budget exhaustion (keep=0 + same-session resume + budget reset
+  vs. higher cap — bit-rot risk).
+- **Status:** investigated 2026-09-22 (planner, direct session); FIX DESIGN
+  APPROVED by the maintainer 2026-09-22 ("nothing to change so far — seems
+  good"); plugin DEACTIVATED (a000dfd, moved to
+  `.opencode/plugin/deactivated/`) — implementation next (worker task:
+  agent-preservation + cap semantics + scope verification + `surface=`
+  version hash), then re-activation + live acceptance (maintainer call).
 - **Suggested scope:** `.opencode/plugin/deactivated/auto_resume.ts` (L387,
   L643; scope scan L543-551).

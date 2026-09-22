@@ -15,12 +15,12 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - #1 investigated (his request) → TODO #80: injected `promptAsync` (unit
   2/4) omits `agent` → default "build" → injected turns run as Build
   (DB-proven) → system-prompt change → whole-cache invalidation + planner
-  loses its prompt. Fix design in the #80 entry. Open anomaly: unit 4 acted
-  on this direct session despite the scope=none fail-safe — NOT
-  reproducible from the committed file (no marker in any user text part,
-  spawned map empty for this sid) → mid-debug running variant suspected
-  (three reloads 23:12:03/23:42:21/23:58:52 ≈ his interventions); a version
-  hash in the `surface=` line suggested.
+  loses its prompt. Fix design in the #80 entry — APPROVED by him
+  2026-09-22. Open anomaly: unit 4 acted on this direct session despite the
+  scope=none fail-safe — his 4× interrupts + exit (no scope-logic edits);
+  scope verdict single (L614), spawned-map population untraced → verify at
+  fix time; `surface=` version hash + `ask_maintainer` timer (~5 min, his
+  idea) proposed.
 - His rulings this session: auto-resume DEACTIVATED (a000dfd, file moved to
   `.opencode/plugin/deactivated/`; he had to exit opencode to stop the
   resume storm). Workflow binding for direct sessions: one item at a time,
