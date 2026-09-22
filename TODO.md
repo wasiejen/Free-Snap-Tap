@@ -830,10 +830,14 @@ restart detection" wording above is the pre-revision numbering.
 - **Status:** implementation LANDED (4098253, worker-2
   ses_f371e0e23ffe0eza71uD5qWy7K); plugin REACTIVATED 2026-09-22
   (380e326) — live gen `surface= v=0bb5c46f` hash-verified byte-identical
-  to the #80-fixed build; live acceptance pending: (c) a direct session's
-  next idle → `scope= none` in the log + no injection; (b) first injection
-  → injected agent in DB + cache-read high. Gate note: probe 240/241 —
-  check [97] pre-existing red (maintainer temp fix 0f192e5) → #81.
+  to the #80-fixed build; **(b) VERIFIED LIVE 2026-09-22 12:33:18Z
+  (DB): both the unit-2 + unit-4 injections carry
+  agent=planner_Q3S_160K (pre-fix behavior: agent=build) and the
+  following assistant turn does too — injected turns keep the session
+  agent; (c) now gated on #82 (his marker-quote message flipped the
+  scope live — a design gap, not a fix failure); close pending his
+  confirm. Gate note: probe 240/241 — check [97] pre-existing red
+  (maintainer temp fix 0f192e5) → #81.
   History: investigated 2026-09-22
   (planner, direct session); FIX DESIGN APPROVED by the maintainer
   2026-09-22; plugin DEACTIVATED (a000dfd). Item-3 scope anomaly: H1

@@ -68,6 +68,15 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   the injected agent in the DB for the 12:33 recovery message — verify
   next turn. This turn ends `action: stop` → unit 4 `route= stop`
   (live-proves the #70 residue route line).
+- Criterion (b) VERIFIED LIVE (DB, 12:33:18Z): both injections
+  (unit-2 trigger 1.020 + unit-4 recovery) carry
+  agent=planner_Q3S_160K — the pre-fix "build" behavior is gone; the
+  following assistant turn same. #80 close = his confirm + (c) after #82.
+- compact_memory SELF path VERIFIED LIVE (2026-09-22 14:42 ctx.log
+  `COMPACT` line, keep messages=12; gauge 144944→~57k): his temp fix
+  (0f192e5) works — the queued-message race is gone. His FYI: a gauge
+  readout immediately post-compaction = the compaction MODEL's own
+  context fill (2-tool-call lag), not the target session's new fill.
 - compact_memory SELF race measured this session (logged: feedback +
   knowledge inbox): the queued message delivers BEFORE the background
   compaction → cache invalidation → 160k hard-limit stall. Maintainer's
@@ -75,14 +84,14 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   is gone and SELF compaction should work again (unverified); side effect:
   probe [97] + compact_memory smoke pin red → #81 (his call: re-pin to the
   temp-fix behavior, or re-pin at the proper message fix).
-- NEXT (his priority order): (1) #80 live acceptance from the log — this
-  session's idle → `scope= none` + no injection (pre-fix failure mode),
-  first injection → agent in DB + cache-read high, `route=` lines (closes
-  #70 residue); (2) #81 pin fix (his ruling: re-pin to the temp-fix
-  behavior — recommended over deactivation); (3) TODO.md shrink (~40k
-  tokens — closed entries → todo_records.md, one-line records); (4)
-  research spec (compact_memory + block_transfer — priority.md #1); (5)
-  TODO #78 scoping.
+- NEXT (his priority order): (1) #81 pin fix — DELEGATED this turn
+  (worker_Q3S_160K, spec committed); (2) #82 scope fail-safe spec —
+  WAITING his `<|Direct|>` toggle ruling (asymmetric vs bidirectional,
+  unit-2 suppression, own-line anchor); (3) #80 close (his confirm —
+  (b) verified, (c) gated on #82); (4) TODO.md shrink (~40k tokens —
+  closed entries → todo_records.md, one-line records); (5) research
+  spec (compact_memory + block_transfer — priority.md #1); (6) TODO
+  #78 scoping.
 - Carried parked ideas (unchanged): smaller NAP snapshot via opencode.jsonc
   agent prompt; reality-rebuild tool; pathfinder-mentality prompt part;
   looprunner-retirement decision; feedback integration on planner close-up;
@@ -186,10 +195,13 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   opencode.jsonc) ELSE from the target session's own config (live 2026-09-22:
   worker-11 dispatch resolved to `Qwen3.8-27B-Q3S-110K-MTP` = the target's
   own model; compaction applied, session resumed clean). CPU models are
-  denied (cap 0). The SELF path is BROKEN on this build (race: queued message
-  delivers before compaction applies → cache invalidation → hard-limit stall;
-  see 2026-09-22 knowledge-inbox entry) — manual compaction is the working
-  self-path.
+   denied (cap 0). The SELF path was BROKEN on this build (race: queued
+   message delivers before compaction applies → cache invalidation →
+   hard-limit stall) — FIXED by the maintainer's temp fix 0f192e5
+   (the queued-message promptAsync commented out) + VERIFIED LIVE
+   2026-09-22 14:42 (COMPACT line landed, gauge dropped 144944→~57k);
+   the proper message-path fix is still open (the gate pins ride the
+   temp-fix behavior via #81 until then).
 - Corpus refresh cadence (planner call, plan6 — TODO #59 CLOSED): refresh
   BEFORE the #56 distillation runs + after heavy loopruns —
   `node .opencode/agent/scripts/db/dump_session.cjs --all --slim`.
