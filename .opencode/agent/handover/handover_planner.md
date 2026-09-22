@@ -30,10 +30,22 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   entry (his stop/interrupt + `ask_maintainer` must stop the loop); planner
   compaction budget exhaustion (keep=0 + same-session resume + budget reset
   vs. higher cap — bit-rot risk).
-- #80 IN FLIGHT (this turn): fix design APPROVED by him; task spec committed;
-  worker launched (worker_Q3S_110K_mtp) — on return: verify (git + gate) +
-  bookkeeping commit. Implementation lands while the plugin stays deactivated;
-  re-activation + live acceptance (#80 criteria b/c) = his call.
+- #80 in flight (worker-2, this turn): worker-1
+  (ses_f3950da93ffeZ6qSsewYup8ElY, worker_Q3S_110K_mtp) died at its 110k limit
+  with ZERO code changes — full checkpoint (verified facts + exact plan +
+  item-3 evidence H1/H2) salvaged by the maintainer into the committed
+  `handover_draft_worker_ses_f3950da93ffeZ6qSsewYup8ElY.md`; no task_id
+  survived the cancelled result → fresh worker continues from the draft
+  (continuation spec committed). Item-3 lead: the post-incident compaction
+  may have injected the literal marker `<|autonom|>` into user parts →
+  `userHasMarker` scope flip (H1; one bounded DB check; fail-safe if
+  confirmed = scope verdict targets the launch message only).
+- Maintainer's compact_memory temp fix (0f192e5, 2026-09-22_13-21): the
+  promptAsync message injection is commented out → the queued-message race
+  is gone; SELF compaction should work again until a proper fix (unverified).
+- On worker-2 return: verify (git + smoke + gates) + bookkeeping commit
+  (record the commit hash in #80). Re-activation + live acceptance (#80
+  criteria b/c) stay his call.
 - compact_memory SELF race measured this session (logged: feedback +
   knowledge inbox): the queued message delivers BEFORE the background
   compaction → cache invalidation → 160k hard-limit stall; manual compaction
