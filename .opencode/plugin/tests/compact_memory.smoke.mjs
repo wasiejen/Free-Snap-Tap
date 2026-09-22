@@ -73,22 +73,50 @@ const readStore = () =>
   existsSync(storePath) ? JSON.parse(readFileSync(storePath, "utf8")) : { version: 2, sessions: {} };
 const readLog = () => (existsSync(logPath) ? readFileSync(logPath, "utf8") : "");
 
+// ---- the compaction-config seed (consolidation 2026-09-22): the caps are
+// CONFIGURED in the sandbox budget file's top-level model_budget map (bare
+// model id → cap + the "default" key). writeBudget stringifies the WHOLE
+// parsed object, so this key survives every budget increment below.
+writeFileSync(storePath, JSON.stringify({
+  version: 2,
+  sessions: {},
+  model_budget: { "Qwen3.8-27B-IQ4KT-120K": 3, "Qwen-IQ3-Test": 5, default: 1 },
+}, null, 2) + "\n");
+
 const mod = await loadRepo(".opencode/plugin/compact_memory.ts");
 const factory = mod.default;
 chk("default export is the async plugin factory", typeof factory === "function" && factory.constructor.name === "AsyncFunction");
-chk("named export classifyQuantClass is a function", typeof mod.classifyQuantClass === "function");
+chk("named export resolveCap is a function", typeof mod.resolveCap === "function");
+chk("named export readCompactionConfig is a function", typeof mod.readCompactionConfig === "function");
 
-// ---- classifier fixtures (order is part of the semantics — the trap must
-// hit the 4-bit row, not the 3-bit one)
+// ---- cap fixtures (model_budget map — the CPU guard is the SAFETY
+// INVARIANT; an unlisted / typo'd id simply never matches → the configured
+// default)
 {
-  const c = mod.classifyQuantClass;
-  chk("clf IQ4 -> 3", c("Qwen-IQ4-Test").cap === 3);
-  chk("clf IQ3 -> 3 (ruling 2026-09-21)", c("Qwen-IQ3-Test").cap === 3);
-  chk("clf IQ2 -> 1", c("Qwen-IQ2-Test").cap === 1);
-  chk("clf Q4KM -> 3", c("Gemma-Q4KM-12B").cap === 3);
-  chk("clf CPU -> 0 (excluded)", c("CPU-Qwen3-0.6B").cap === 0);
-  chk("clf unknown -> 1 (default)", c("Mystery-7B").cap === 1);
-  chk("clf trap Qwen3.8-27B-IQ4KT-120K -> 3 (not the 3-bit row)", c("Qwen3.8-27B-IQ4KT-120K").cap === 3);
+  const c = (name) => mod.resolveCap(SANDBOX, name);
+  chk("cap exact model_budget key -> configured 5", c("Qwen-IQ3-Test").cap === 5 && c("Qwen-IQ3-Test").label === "model_budget");
+  chk("cap configured model id -> 3 (the configured value for that model ID)", c("Qwen3.8-27B-IQ4KT-120K").cap === 3 && c("Qwen3.8-27B-IQ4KT-120K").label === "model_budget");
+  chk("cap unlisted model -> configured default 1", c("Mystery-7B").cap === 1 && c("Mystery-7B").label === "model_budget default");
+  chk("cap typo key -> configured default 1 (wrong key never matches)", c("Qwen-IQ3-Test-typO").cap === 1);
+  chk("cap CPU -> 0 (excluded — the safety invariant)", c("CPU-Qwen3-0.6B").cap === 0 && c("CPU-Qwen3-0.6B").label === "cpu (excluded)");
+}
+
+// ---- readCompactionConfig fail-open (absent file / malformed keys →
+// defaults; valid keys win)
+{
+  const emptyRoot = freshSandbox("compact_memory_cfg");
+  const c0 = mod.readCompactionConfig(emptyRoot);
+  chk("cfg absent file -> defaults 30000/12/false/{}", c0.keepTokens === 30_000 && c0.keepMessages === 12 && c0.emergencyRecovery === false && JSON.stringify(c0.model_budget) === "{}");
+  const p = path.join(emptyRoot, ".opencode", "temp");
+  mkdirSync(p, { recursive: true });
+  writeFileSync(path.join(p, "compact_budget.json"), `{"keepTokens": 40000, "keepMessages": 9, "emergencyRecovery": true, "model_budget": {"M": 5, "bad": "x", "neg": -1}}`, "utf8");
+  const c1 = mod.readCompactionConfig(emptyRoot);
+  chk("cfg valid keys win + bad values skipped (bad/neg dropped, valid kept)",
+    c1.keepTokens === 40_000 && c1.keepMessages === 9 && c1.emergencyRecovery === true && c1.model_budget.M === 5 && c1.model_budget.bad == null && c1.model_budget.neg == null,
+    JSON.stringify(c1));
+  writeFileSync(path.join(p, "compact_budget.json"), `{ oops — not json`, "utf8");
+  const c2 = mod.readCompactionConfig(emptyRoot);
+  chk("cfg unparseable file -> defaults (never throws)", c2.keepTokens === 30_000 && c2.keepMessages === 12 && c2.emergencyRecovery === false);
 }
 
 // ---- the dump hook's node resolver (the live host's execPath is the opencode
@@ -356,6 +384,34 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
   chk("gate: exactly 3 increments", readStore().sessions.ses_sm_gate?.count === 3);
 }
 
+// ---- keep defaults from the budget file config (consolidation 2026-09-22):
+// keepTokens/keepMessages seed the COMPACT line when the args are omitted;
+// explicit args STILL win over the file config (the keys are removed again
+// after the case so the later fixtures see the defaults)
+{
+  const st = readStore();
+  st.keepTokens = 40_000;
+  st.keepMessages = 9;
+  writeFileSync(storePath, JSON.stringify(st, null, 2) + "\n");
+  const { exec } = await withClient({ summarize: true });
+  await exec({ sessionID: "ses_sm_keepcfg" });
+  await drain();
+  const line = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_keepcfg"));
+  chk("config keep: COMPACT line reports the configured 40000/9 when the args are omitted",
+    line != null && /COMPACT ses_sm_keepcfg tokens=40000 messages=9$/.test(line),
+    JSON.stringify(line));
+  await exec({ keepTokens: 555, keepMessages: 2, sessionID: "ses_sm_keepargs" });
+  await drain();
+  const line2 = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_keepargs"));
+  chk("config keep: explicit keep args still win over the file config",
+    line2 != null && /COMPACT ses_sm_keepargs tokens=555 messages=2$/.test(line2),
+    JSON.stringify(line2));
+  const st2 = readStore();
+  delete st2.keepTokens;
+  delete st2.keepMessages;
+  writeFileSync(storePath, JSON.stringify(st2, null, 2) + "\n");
+}
+
 // ---- failing background compaction: NO increment, the failure is console.error'd
 {
   const { rec, exec } = await withClient({ summarize: true, summarizeError: new Error("boom-plain") });
@@ -381,7 +437,10 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
   chk("v2 schema: version 2, count 3, parseable ts, model recorded",
     st.version === 2 && e.count === 3 && !Number.isNaN(Date.parse(e.updated)) && e.model === "Qwen3.8-27B-IQ4KT-120K",
     JSON.stringify({ v: st.version, e }));
-  const v1 = { version: 1, maxPerSession: 2, sessions: { ses_sm_v1: { count: 1, updated: "2026-09-01T00:00:00.000Z" } } };
+  // the synthetic v1 fixture also carries the top-level model_budget config
+  // (a real v1 file never had it — the point is the LENIENT read of the
+  // old shape + the bump on write; the config key is read alongside)
+  const v1 = { version: 1, maxPerSession: 2, model_budget: { "Qwen-IQ4-X": 3, default: 1 }, sessions: { ses_sm_v1: { count: 1, updated: "2026-09-01T00:00:00.000Z" } } };
   writeFileSync(storePath, JSON.stringify(v1, null, 2) + "\n");
   const { exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "Qwen-IQ4-X", providerID: "llama-swap" } }] });
   const res = await exec({ keepTokens: 1, keepMessages: 1, sessionID: "ses_sm_v1" });

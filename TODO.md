@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #82, new
-entries start at #83 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #83, new
+entries start at #84 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -957,7 +957,44 @@ restart detection" wording above is the pre-revision numbering.
   (2026-09-22, worker: `saturationThreshold` (0 < t < 1, default 0.95) +
   `outputReserve` (>= 0, default 20_000) as per-tick fail-open keys in the
   budget file; smoke 89/89 + full gate green; commit hash recorded in the
-  planner's follow-up bookkeeping). The BACKSTOP part remains open —
-  maintainer call (needs his flag in the live opencode.jsonc + the live
-  host-call verification). This is the enabler for raising the threshold
-  to ~0.98.
+   planner's follow-up bookkeeping). The BACKSTOP part remains open —
+   maintainer call (needs his flag in the live opencode.jsonc + the live
+   host-call verification). This is the enabler for raising the threshold
+   to ~0.98. NOTE (2026-09-22, #84): the `emergencyRecovery` flag now lives
+   in the shared compact_budget.json (not opencode.jsonc) — the live-flag
+   part of this entry must be set there.
+
+## 84. (LANDED 2026-09-22, worker `worker_Q3S_170K`) — Compaction config consolidation: ALL compaction config in the shared `compact_budget.json` (replaces the `QUANT_CLASS_RULES` substring table + the opencode.jsonc emergency flag + the hardcoded recovery keeps)
+- **Problem + evidence:** the compaction caps came from a hardcoded ordered
+  substring table (`QUANT_CLASS_RULES`, compact_memory.ts L79-86 — the
+  2026-09-21 quant-class ruling with the probe trap pin); the T5 emergency
+  flag lived in `opencode.jsonc` (read per fire); context_recovery's keep
+  (30_000 / 12) was hardcoded; auto_resume already read its keys from
+  compact_budget.json per tick — the config was split across three files
+  (2026-09-22 design exchange, recorded in the NAP).
+- **Desired outcome:** compact_budget.json is the SINGLE compaction-config
+  source: top-level optional fail-open keys `keepTokens` (default 30_000),
+  `keepMessages` (12), `emergencyRecovery` (strictly `true`, default false),
+  `model_budget` (bare model ID → cap, plus a `default` key, default 1);
+  CPU models stay cap 0 as a SAFETY INVARIANT; an unlisted / typo'd model
+  id → the configured default (fails safe).
+- **Acceptance criteria (all LANDED, measured gate green):**
+  `compact_memory.ts` exposes `resolveCap(root, model)` (per-call
+  model_budget read) + `readCompactionConfig(root)` (fail-open); keep
+  reporting falls back to the file config (explicit args still win);
+  `context_recovery.ts` reads flag + keeps from the SAME file (self-
+  contained local reader — no runtime import from compact_memory.ts; the
+  file STAYS in `deactivated/`); smokes updated (model_budget seed +
+  exact/unlisted/typo/CPU fixtures + keep-override + config fail-open
+  cases); probe 241/241 (check 87 → the "configured value" fixtures; S11
+  checks 77/78 flag from the budget file, the JSONC fixture dropped);
+  full gate green — 10/10 plugin smokes, probe 241/241, pytest 459 passed
+  + 1 warning, ruff F=0.
+- **Suggested scope (actual):** `.opencode/plugin/compact_memory.ts`,
+  `.opencode/plugin/deactivated/context_recovery.ts`,
+  `.opencode/plugin/tests/compact_memory.smoke.mjs`,
+  `.opencode/plugin/tests/context_recovery.smoke.mjs`,
+  `.opencode/plugin/probes/handover_probe.mjs`.
+- **Status:** LANDED (2026-09-22, worker `worker_Q3S_170K` — the gate
+  green as above; the commit hash is recorded by the planner in the
+  follow-up bookkeeping commit, not in this entry's commit).

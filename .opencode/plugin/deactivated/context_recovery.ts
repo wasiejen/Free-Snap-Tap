@@ -9,11 +9,13 @@
 // returns unhandled and the session error propagates (the -WARNING line is
 // the looprunner's/protocol's job, not the plugin's).
 //
-// Activation flag (L5): a top-level BOOLEAN key `emergencyRecovery` in
-// <root>/opencode.jsonc, read PER HOOK FIRE (a mid-run flip takes effect on
-// the next overflow). ONLY the value `true` enables it — missing file /
-// missing key / any other value / unparseable JSONC → OFF (the
-// experiment-phase default: the visible hard stop).
+// Activation flag (L5, consolidated 2026-09-22): a top-level BOOLEAN key
+// `emergencyRecovery` in <root>/.opencode/temp/compact_budget.json (the SAME
+// file as the shared budget store — moved out of <root>/opencode.jsonc),
+// read PER HOOK FIRE (a mid-run flip takes effect on the next overflow).
+// ONLY the value `true` enables it — missing file / missing key / any other
+// value / unparseable JSON → OFF (the experiment-phase default: the visible
+// hard stop).
 //
 // Budget: the SAME file the compact_memory tool uses
 // (<root>/.opencode/temp/compact_budget.json, ≤2 per session id, self +
@@ -22,7 +24,9 @@
 //
 // Keep: the design's measured rebuild profile (system prompt <10K +
 // keep ≈30K + last 12 messages ≈ 31.7K) — it replaces the host's blind
-// opencode.json compaction default.
+// opencode.json compaction default. The keep values are CONFIGURED in the
+// budget file's top-level keepTokens / keepMessages keys (defaults
+// 30_000 / 12 — the measured profile).
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -40,70 +44,50 @@ Context was compacted. Read .opencode\\agent\\prompts\\agent_readme_post_compact
 If your role is Looprunner continue the last restart/resume close message of a Planner you have received.
 `.trim();
 
-// Informed keep (L4): the design's measured rebuild profile — system prompt
-// <10K + keep ≈30K tokens + last 12 messages ≈ 31.7K. Replaces the host's
-// blind opencode.json compaction default.
-const KEEP_TOKENS = 30_000;
-const KEEP_MESSAGES = 12;
-
-// The L5 activation flag key (top level of <root>/opencode.jsonc, boolean).
-const FLAG_KEY = "emergencyRecovery";
-
-// ------------------------------------------------------------------ activation flag (L5)
+// ------------------------------------------------------------------ recovery config (consolidation 2026-09-22)
 //
-// Strip JSONC comments (string-aware: `//` and `/* */` INSIDE a string
-// literal are data, not comments) then JSON.parse. ANY failure → OFF.
+// The activation flag + the informed keep (L4 — the design's measured
+// rebuild profile: system prompt <10K + keep ≈30K + last 12 messages
+// ≈ 31.7K) now live in the SAME file as the shared budget store:
+// <root>/.opencode/temp/compact_budget.json — top-level keys (all optional,
+// fail-open):
+//   emergencyRecovery: strictly `true`   (default false — OFF)
+//   keepTokens: number >= 0              (default 30_000)
+//   keepMessages: number >= 0            (default 12)
+// Read PER HOOK FIRE (a mid-run flip takes effect on the next overflow).
+// This file is deliberately SELF-CONTAINED (it must not runtime-import from
+// compact_memory.ts — that would pull the tool registration into a
+// hook-only plugin), so the reader below is a small local duplicate of the
+// same fail-open pattern.
 
-function stripJsoncComments(src: string): string {
-  let out = "";
-  let i = 0;
-  const n = src.length;
-  while (i < n) {
-    const c = src[i];
-    if (c === '"') {
-      // Copy the string literal verbatim (honoring backslash escapes).
-      out += c;
-      i += 1;
-      while (i < n) {
-        const s = src[i];
-        out += s;
-        i += 1;
-        if (s === "\\") {
-          if (i < n) {
-            out += src[i];
-            i += 1;
-          }
-        } else if (s === '"') {
-          break;
-        }
-      }
-      continue;
-    }
-    if (c === "/" && src[i + 1] === "/") {
-      while (i < n && src[i] !== "\n") i += 1; // line comment (keep the newline)
-      continue;
-    }
-    if (c === "/" && src[i + 1] === "*") {
-      i += 2;
-      while (i < n && !(src[i] === "*" && src[i + 1] === "/")) i += 1;
-      i += 2;
-      continue;
-    }
-    out += c;
-    i += 1;
-  }
-  return out;
-}
+const RECOVERY_DEFAULT_KEEP_TOKENS = 30_000;
+const RECOVERY_DEFAULT_KEEP_MESSAGES = 12;
 
-function flagEnabled(root: string): boolean {
+type RecoveryConfig = {
+  enabled: boolean;
+  keepTokens: number;
+  keepMessages: number;
+};
+
+function readRecoveryConfig(root: string): RecoveryConfig {
+  const cfg: RecoveryConfig = {
+    enabled: false,
+    keepTokens: RECOVERY_DEFAULT_KEEP_TOKENS,
+    keepMessages: RECOVERY_DEFAULT_KEEP_MESSAGES,
+  };
   try {
-    const p = path.join(root, "opencode.jsonc");
-    if (!existsSync(p)) return false;
-    const obj = JSON.parse(stripJsoncComments(readFileSync(p, "utf8")));
-    return obj != null && typeof obj === "object" && obj[FLAG_KEY] === true;
+    const p = budgetPath(root);
+    if (!existsSync(p)) return cfg;
+    const obj = JSON.parse(readFileSync(p, "utf8"));
+    if (obj != null && typeof obj === "object") {
+      if (obj.emergencyRecovery === true) cfg.enabled = true;
+      if (typeof obj.keepTokens === "number" && Number.isFinite(obj.keepTokens) && obj.keepTokens >= 0) cfg.keepTokens = obj.keepTokens;
+      if (typeof obj.keepMessages === "number" && Number.isFinite(obj.keepMessages) && obj.keepMessages >= 0) cfg.keepMessages = obj.keepMessages;
+    }
   } catch {
-    return false;
+    // corrupt/unreadable config → defaults (OFF + default keeps) — never throw
   }
+  return cfg;
 }
 
 // ------------------------------------------------------------------ budget (shared with the tool by FILE)
@@ -264,10 +248,12 @@ export default (async (input: PluginInput) => {
       // Not an overflow → UNHANDLED (the marker gate is in-memory — it comes
       // first so non-overflow errors never touch the fs).
       if (!isOverflowError(error)) return;
-      // L5 flag OFF (read PER FIRE: missing file / missing key / any other
-      // value / unparseable) → the hook does NOTHING (no compact, no
-      // retry) — the session error propagates (the visible hard stop).
-      if (!flagEnabled(root)) return;
+      // L5 flag OFF (read PER FIRE from the budget file: missing file /
+      // missing key / any other value / unparseable) → the hook does
+      // NOTHING (no compact, no retry) — the session error propagates
+      // (the visible hard stop).
+      const recCfg = readRecoveryConfig(root);
+      if (!recCfg.enabled) return;
       const sessionId = typeof context?.sessionId === "string" ? context.sessionId : "";
       if (sessionId === "") return;
       // The hook context's client (the prototype's working shape); the
@@ -285,8 +271,8 @@ export default (async (input: PluginInput) => {
           path: { id: sessionId },
           body: {
             keep: {
-              tokens: KEEP_TOKENS,
-              messages: KEEP_MESSAGES,
+              tokens: recCfg.keepTokens,
+              messages: recCfg.keepMessages,
             },
           },
         });
@@ -299,7 +285,7 @@ export default (async (input: PluginInput) => {
       // Success only: persist the budget increment + write the COMPACT line
       // (both best-effort — the compaction itself already happened).
       recordSuccess(root, sessionId);
-      appendCompactLine(root, context, sessionId, KEEP_TOKENS, KEEP_MESSAGES);
+      appendCompactLine(root, context, sessionId, recCfg.keepTokens, recCfg.keepMessages);
       try {
         await client.session.promptAsync({
           path: { id: sessionId },

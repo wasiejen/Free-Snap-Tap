@@ -4,8 +4,10 @@
 // .opencode/plugin/deactivated/context_recovery.ts (the plugin currently
 // DEACTIVATED — this smoke pins its behavior for re-activation; the import
 // path was rewired from the old .opencode/plugin/context_recovery.ts).
-// The activation-flag fixture is a SANDBOX opencode.jsonc (scratchpad) — the
-// live repo opencode.jsonc is never read or touched by this smoke.
+// The activation-flag + keep fixture is the SANDBOX compact_budget.json
+// (scratchpad — the SAME file as the shared budget store, consolidation
+// 2026-09-22; moved out of opencode.jsonc) — the live repo file is never
+// read or touched by this smoke.
 // Run: node .opencode/plugin/tests/context_recovery.smoke.mjs (plain node, exit 0 iff green).
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
@@ -28,15 +30,19 @@ const hooks = await factory({ directory: SANDBOX, client: fakeClient });
 if (typeof hooks["session.error"] !== "function") throw new Error("no session.error hook");
 const fire = (err, sid, ctx = {}) => hooks["session.error"](err, { sessionId: sid, client: fakeClient, ...ctx });
 
-// 1) flag OFF (no opencode.jsonc) + overflow -> unhandled
+// 1) flag OFF (no compact_budget.json) + overflow -> unhandled
 const r1 = await fire({ message: "context length exceeded" }, "ses_smoke_off");
 console.log("flag-off:", JSON.stringify(r1), "compact:", clientCalls.compact.length, "prompt:", clientCalls.prompt.length);
 if (r1 !== undefined || clientCalls.compact.length !== 0) throw new Error("flag-off must be a no-op");
 
-// 2) flag ON (JSONC fixture with comments) + overflow + fresh budget -> success
+// 2) flag ON (top-level key in compact_budget.json) + overflow + fresh
+// budget -> success (keep defaults 30_000/12 — the measured profile)
+// the file carries the "sessions" key so the lenient store read returns the
+// WHOLE object — the flag key then survives the recordSuccess write (case 3
+// below must hit the BUDGET gate, not the flag gate)
 writeFileSync(
-  path.join(SANDBOX, "opencode.jsonc"),
-  "{\n  // line comment\n  \"emergencyRecovery\": true,\n  /* block */\n  \"other\": \"a // b\"\n}\n",
+  path.join(SANDBOX, ".opencode", "temp", "compact_budget.json"),
+  "{\n  \"emergencyRecovery\": true,\n  \"sessions\": {}\n}\n",
   "utf8",
 );
 const r2 = await fire({ message: "exceeds the available context size" }, "ses_smoke_ok");
@@ -65,10 +71,30 @@ console.log("non-overflow:", JSON.stringify(r4));
 if (r4 !== undefined) throw new Error("non-overflow must be no-op");
 
 // 5) flag value `false` -> OFF
-writeFileSync(path.join(SANDBOX, "opencode.jsonc"), "{\n  \"emergencyRecovery\": false\n}\n", "utf8");
+writeFileSync(path.join(SANDBOX, ".opencode", "temp", "compact_budget.json"), "{\n  \"emergencyRecovery\": false,\n  \"sessions\": {}\n}\n", "utf8");
 const r5 = await fire({ message: "context length exceeded" }, "ses_smoke_false");
 console.log("flag=false:", JSON.stringify(r5));
 if (r5 !== undefined) throw new Error("flag=false must be OFF");
+
+// 6) keep override from the SAME file (consolidation 2026-09-22): the
+// configured keepTokens/keepMessages win over the measured-profile defaults
+// (30_000/12) — both in the compact body and in the COMPACT line
+writeFileSync(
+  path.join(SANDBOX, ".opencode", "temp", "compact_budget.json"),
+  "{\n  \"emergencyRecovery\": true,\n  \"keepTokens\": 45000,\n  \"keepMessages\": 5,\n  \"sessions\": {}\n}\n",
+  "utf8",
+);
+const r6 = await fire({ message: "context length exceeded" }, "ses_smoke_keep");
+console.log("keep-override:", JSON.stringify(r6));
+console.log("compact call:", JSON.stringify(clientCalls.compact.at(-1)));
+const ctxLog2 = readFileSync(path.join(SANDBOX, ".opencode", "temp", "ctx.log"), "utf8");
+const keepLine = ctxLog2.trim().split("\n").find((l) => l.includes("COMPACT ses_smoke_keep"));
+console.log("ctxlog keep line:", JSON.stringify(keepLine));
+const budget6 = JSON.parse(readFileSync(path.join(SANDBOX, ".opencode", "temp", "compact_budget.json"), "utf8"));
+if (r6?.handled !== true || r6?.action !== "retry") throw new Error("keep-override must return handled+retry");
+if (clientCalls.compact.at(-1)?.body?.keep?.tokens !== 45_000 || clientCalls.compact.at(-1)?.body?.keep?.messages !== 5) throw new Error("keep must be the configured {45_000,5}");
+if (budget6.sessions.ses_smoke_keep?.count !== 1) throw new Error("keep-override success must be count=1");
+if (keepLine == null || !/tokens=45000 messages=5$/.test(keepLine)) throw new Error("COMPACT line must report the configured keep");
 
 rmSync(SANDBOX, { recursive: true, force: true });
 console.log("CONTEXT_RECOVERY_SMOKE: ALL PASS");

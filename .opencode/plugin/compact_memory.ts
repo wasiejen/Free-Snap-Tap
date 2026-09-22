@@ -13,9 +13,9 @@
 //       .opencode/temp/compact_budget.json, INCREMENT-ON-SUCCESS only — the
 //       schema is BUMPED to version 2: each session entry is
 //       { count, updated, model } (the model id at the last increment, for
-//       transparency — the cap itself lives in the classifier, not in the
-//       file); READ LENIENT (v1 files with maxPerSession, entries missing
-//       the model key)
+//       transparency — the CAP itself lives in the file's top-level
+//       model_budget map, resolved per call); READ LENIENT (v1 files with
+//       maxPerSession, entries missing the model key)
 //   (2) the COMPACT line in .opencode/temp/ctx.log after each successful
 //       compaction (best-effort append, never throws) — the model field is
 //       POPULATED from the resolved model id (v1 always wrote it empty, its
@@ -45,15 +45,18 @@
 // accepted by this build". An unresolvable model pair → the request is NOT
 // sent (a clear failure, no budget burned).
 //
-// Quant-class compaction budget (Part 2, priority.md #1): the cap is resolved
-// AT CALL TIME from the target session's model name — SELF:
-// c.extra?.model?.id; CROSS: the LAST entry of
-// ctx.client.session.messages({ path: { id } }) (DUAL SHAPE: the bare array,
-// or the in-process client's RequestResult wrapper { data: [...] }) —
-// info.modelID — assistant / info.model — user; RPC failure / no messages →
-// default cap 1 + a note in the response (never a throw). The gate (count from the store vs the cap)
-// comes BEFORE any compact call: denial → clear message naming class + cap +
-// count, ZERO side effects (no increment, no compact call, no COMPACT line).
+// Compaction budget (Part 2, priority.md #1): the cap is resolved AT CALL
+// TIME from the target session's model name — SELF: c.extra?.model?.id;
+// CROSS: the LAST entry of ctx.client.session.messages({ path: { id } })
+// (DUAL SHAPE: the bare array, or the in-process client's RequestResult
+// wrapper { data: [...] }) — info.modelID — assistant / info.model — user;
+// RPC failure / no messages → the configured default cap + a note in the
+// response (never a throw). The cap comes from the budget file's
+// model_budget map (bare model id → cap; unlisted / typo'd id →
+// model_budget.default, else 1; CPU models stay cap 0 — the safety
+// invariant). The gate (count from the store vs the cap) comes BEFORE any
+// compact call: denial → clear message naming class + cap + count, ZERO
+// side effects (no increment, no compact call, no COMPACT line).
 //
 // NOTE (self-location depth): v1's one-level-up fallback assumed its OLD
 // depth (<root>/.opencode/tools/compact_memory.ts); THIS file lives one
@@ -66,34 +69,75 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { tool } from "@opencode-ai/plugin";
 
-// ------------------------------------------------------------------ classifier
+// ------------------------------------------------------------------ compaction config
 //
-// The quant-class compaction budget — an ORDERED rule table (Part 2,
-// priority.md #1). MAINTAINER-EDITABLE: tune the caps here. THE ORDER IS PART
-// OF THE SEMANTICS: "Qwen3.8"/"Qwen3.5" contain the substring "Q3", so CPU
-// must be tested FIRST, then 4-bit, then 3-bit, then the default — the probe
-// pins this with the "Qwen3.8-27B-IQ4KT-120K" trap (it must hit the 4-bit
-// row, not the 3-bit one).
-// Ruling 2026-09-21 (maintainer, direct session): 3-bit cap 1 -> 3 (same
-// budget as 4-bit); 2-bit row added with cap 1 ("for now").
-const QUANT_CLASS_RULES: Array<{ test: (name: string) => boolean; cap: number; label: string }> = [
-  { test: (name) => /^cpu/i.test(name), cap: 0, label: "cpu (excluded)" },
-  // case-insensitive: the LIVE model names are UPPERCASE ("Qwen3.8-27B-IQ4KT-120K")
-  { test: (name) => /iq4|q4/i.test(name), cap: 3, label: "4-bit quant" },
-  { test: (name) => /iq3|q3/i.test(name), cap: 3, label: "3-bit quant" },
-  { test: (name) => /iq2|q2/i.test(name), cap: 1, label: "2-bit quant" },
-  { test: () => true, cap: 1, label: "default" },
-];
+// ALL compaction config lives in the SAME file as the budget store:
+// <root>/.opencode/temp/compact_budget.json — top-level keys (all optional,
+// fail-open defaults):
+//   keepTokens: number >= 0            (default 30_000)
+//   keepMessages: number >= 0          (default 12)
+//   emergencyRecovery: strictly true   (default false)
+//   model_budget: { "<bare model ID>": <cap number>, "default": <cap number> }
+// — the cap for an unlisted / typo'd model id is model_budget.default (else
+// the default 1). Read PER CALL (a mid-run edit applies to the next call);
+// an absent file / unparseable JSON / malformed key fails open to the
+// defaults (never a throw). (Consolidation 2026-09-22 — replaces the old
+// QUANT_CLASS_RULES substring table: the caps are now CONFIGURED per bare
+// model id, not derived from quant substrings.)
+const DEFAULT_KEEP_TOKENS = 30_000;
+const DEFAULT_KEEP_MESSAGES = 12;
+const DEFAULT_MODEL_BUDGET = 1;
 
-// Resolves the compaction cap for a model name: the FIRST matching rule wins
-// (the table's order is the semantics). Exported for the probe's classifier
-// fixtures.
-export function classifyQuantClass(modelName: string): { cap: number; label: string } {
-  const name = typeof modelName === "string" ? modelName : "";
-  for (const rule of QUANT_CLASS_RULES) {
-    if (rule.test(name)) return { cap: rule.cap, label: rule.label };
+type CompactionConfig = {
+  keepTokens: number;
+  keepMessages: number;
+  emergencyRecovery: boolean;
+  model_budget: Record<string, number>;
+};
+
+// Reads the compaction config from the budget file (fail-open). Exported for
+// the smoke checks.
+export function readCompactionConfig(root: string): CompactionConfig {
+  const cfg: CompactionConfig = {
+    keepTokens: DEFAULT_KEEP_TOKENS,
+    keepMessages: DEFAULT_KEEP_MESSAGES,
+    emergencyRecovery: false,
+    model_budget: {},
+  };
+  try {
+    const p = budgetPath(root);
+    if (!existsSync(p)) return cfg;
+    const parsed = JSON.parse(readFileSync(p, "utf8"));
+    if (parsed != null && typeof parsed === "object") {
+      if (typeof parsed.keepTokens === "number" && Number.isFinite(parsed.keepTokens) && parsed.keepTokens >= 0) cfg.keepTokens = parsed.keepTokens;
+      if (typeof parsed.keepMessages === "number" && Number.isFinite(parsed.keepMessages) && parsed.keepMessages >= 0) cfg.keepMessages = parsed.keepMessages;
+      if (parsed.emergencyRecovery === true) cfg.emergencyRecovery = true;
+      const mb = parsed.model_budget;
+      if (mb != null && typeof mb === "object" && !Array.isArray(mb)) {
+        for (const [k, v] of Object.entries(mb)) {
+          // cap 0 is meaningful (a model denied by config); a negative is not
+          if (typeof v === "number" && Number.isFinite(v) && v >= 0) cfg.model_budget[k] = v;
+        }
+      }
+    }
+  } catch {
+    // corrupt/unreadable config → defaults (never throw)
   }
-  return { cap: 1, label: "default" };
+  return cfg;
+}
+
+// Resolves the compaction cap for a model name: the CPU guard is a SAFETY
+// INVARIANT (cap 0, tested FIRST — CPU models are never compacted); then the
+// EXACT bare-model-id key of the file's model_budget map (its configured
+// cap); else model_budget.default (else the default 1) — an unlisted /
+// typo'd id simply never matches. Exported for the probe's cap fixtures.
+export function resolveCap(root: string, modelName: string): { cap: number; label: string } {
+  const name = typeof modelName === "string" ? modelName : "";
+  if (/^cpu/i.test(name)) return { cap: 0, label: "cpu (excluded)" };
+  const mb = readCompactionConfig(root).model_budget;
+  if (name !== "" && typeof mb[name] === "number") return { cap: mb[name], label: "model_budget" };
+  const def = typeof mb.default === "number" ? mb.default : DEFAULT_MODEL_BUDGET;
+  return { cap: def, label: "model_budget default" };
 }
 
 // ------------------------------------------------------------------ responses
@@ -104,10 +148,9 @@ export function classifyQuantClass(modelName: string): { cap: number; label: str
 // carried by the compaction notification → the post-compaction protocol
 // (AGENTS.md Pattern 4 + agent_readme_post_compaction.md) + the NAP.
 
-// v1 reporting defaults — the COMPACT line + the success line report THESE
-// when the keep args are omitted (the v1 reporting shape is preserved).
-const DEFAULT_KEEP_TOKENS = 30_000;
-const DEFAULT_KEEP_MESSAGES = 12;
+// Keep reporting defaults — the COMPACT line reports the keep ARGS WHEN
+// GIVEN, else the fail-open defaults (keepTokens / keepMessages in the
+// budget file — see the compaction-config section above).
 
 // ------------------------------------------------------------------ budget store (v2 schema)
 //
@@ -118,8 +161,10 @@ const DEFAULT_KEEP_MESSAGES = 12;
 // and entries without the model key):
 //   { "version": 2,
 //     "sessions": { "<sid>": { "count": <n>, "updated": "<iso ts>", "model": "<id>" } } }
-// The cap lives in the classifier, NOT in the file; the stored `model` is
-// the id at the last increment (transparency).
+// The cap lives in the file's TOP-LEVEL model_budget map (resolved per
+// call — see the compaction-config section); the session entry stores only
+// count/updated/model (the model = the id at the last increment —
+// transparency).
 
 type BudgetStoreV2 = {
   version: number;
@@ -609,7 +654,7 @@ export default async function CompactMemoryPlugin(ctx: any) {
   return {
     tool: {
       compact_memory: tool({
-        description: "Compacts a session to free context space. Two paths: SELF (sessionID omitted) — your own session ENDS after the compaction; you resume from committed files via the post-compaction protocol. CROSS (explicit sessionID) — a fire-and-forget dispatch: it returns immediately and never blocks (an await would deadlock on the single llama-swap model slot); success is verified ASYNCHRONOUSLY — the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success, and a failed dispatch burns NO budget. The budget is per TARGET session, per model quant-class (CPU models denied — cap 0). Use it at the stop line / near-limit triage (self) or before a task_id resume of a session that died at its limit (cross); do NOT use it as a restart substitute — the recent head stays INTACT and a summary of the dropped tail is auto-created. The summarizer model pair is NOT an argument: it resolves from the root opencode.jsonc agent.compaction.model when set, else from the compacting session's own model.",
+        description: "Compacts a session to free context space. Two paths: SELF (sessionID omitted) — your own session ENDS after the compaction; you resume from committed files via the post-compaction protocol. CROSS (explicit sessionID) — a fire-and-forget dispatch: it returns immediately and never blocks (an await would deadlock on the single llama-swap model slot); success is verified ASYNCHRONOUSLY — the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success, and a failed dispatch burns NO budget. The budget is per TARGET session, per model — the cap comes from the compact_budget.json model_budget map (bare model id → cap; unlisted models get the configured default; CPU models denied — cap 0). Use it at the stop line / near-limit triage (self) or before a task_id resume of a session that died at its limit (cross); do NOT use it as a restart substitute — the recent head stays INTACT and a summary of the dropped tail is auto-created. The summarizer model pair is NOT an argument: it resolves from the root opencode.jsonc agent.compaction.model when set, else from the compacting session's own model.",
         args: {
           sessionID: tool.schema.string().optional().describe("Session to compact. Omit = your own session (the SELF path). An explicit id = ANOTHER session (the CROSS fire-and-forget path)."),
           keepTokens: tool.schema.number().optional().describe("Recent tokens to retain (e.g. 30000). Note: this build's server ignores the keep fields (the compaction floor is server-side) — they are sent, dropped on rejection, and never block the call."),
@@ -672,10 +717,12 @@ export default async function CompactMemoryPlugin(ctx: any) {
               model = cfgPair.modelID;
             }
 
-            // 3. the quant-class cap + the budget gate — BEFORE any compact
+            // 3. the configured cap + the budget gate — BEFORE any compact
             //    call: denial has ZERO side effects (no increment, no compact
-            //    call, no COMPACT line)
-            const { cap, label } = classifyQuantClass(model);
+            //    call, no COMPACT line). The config (keep defaults + the
+            //    model_budget caps) is read PER CALL from the budget file.
+            const cfg = readCompactionConfig(root);
+            const { cap, label } = resolveCap(root, model);
             const count = budgetCount(root, sessionID);
             if (count >= cap) {
               return (
@@ -703,8 +750,8 @@ export default async function CompactMemoryPlugin(ctx: any) {
             if (args?.keepTokens != null) keep.tokens = args.keepTokens;
             if (args?.keepMessages != null) keep.messages = args.keepMessages;
             const keepObj = Object.keys(keep).length > 0 ? keep : undefined;
-            const tokensToKeep = args?.keepTokens ?? DEFAULT_KEEP_TOKENS;
-            const messagesToKeep = args?.keepMessages ?? DEFAULT_KEEP_MESSAGES;
+            const tokensToKeep = args?.keepTokens ?? cfg.keepTokens;
+            const messagesToKeep = args?.keepMessages ?? cfg.keepMessages;
 
             // NO AWAIT on the compaction call — for SELF and CROSS alike
             // (maintainer ruling 2026-09-14, live evidence: an `await` in

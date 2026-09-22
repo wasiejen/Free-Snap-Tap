@@ -1994,12 +1994,12 @@ const cmExec = (args, extra) => cmTool.execute(args, cmCtx(extra));
 // and driven with a FAKE client (records every session.compact /
 // session.promptAsync call) + a sandbox root (directory=SANDBOX steers the
 // flag read, the budget store, and the COMPACT ctx.log line into the
-// sandbox). The activation flag (L5) is SANDBOX/opencode.jsonc, read PER
-// FIRE: absent → OFF (check 77); the JSONC fixture (a real // line comment
-// + a /* */ block comment AND a // INSIDE a string literal) → ON (checks
-// 78-81). The budget is the SAME compact_budget.json the S10 tool uses —
-// the pre-seeded exhausted store (check 79) proves the gate reads from
-// disk, not from module memory.
+// sandbox). The activation flag (L5, consolidated 2026-09-22) is the
+// top-level `emergencyRecovery` key in the SHARED compact_budget.json —
+// the SAME file the S10 tool uses (moved out of the sandbox opencode.jsonc):
+// key absent / not `true` → OFF (check 77); the flag setter (checks 78-81)
+// MERGES (the S10 session entries survive). The pre-seeded exhausted store
+// (check 79) proves the gate reads from disk, not from module memory.
 // REPOINTED 2026-09-12: the maintainer's cleanup (commit 4b44d8c) moved the
 // plugin to plugin/deactivated/ — the probe keeps pinning the frozen
 // artifact from its new home (same pattern as the v1 compact_memory
@@ -2016,16 +2016,23 @@ const RC_TS = path.join(REPO_ROOT, ".opencode", "plugin", "deactivated", "contex
 const RC_DIRECTIVE =
   "[SYSTEM CONTEXT DIRECTIVE]\nContext was compacted. Read .opencode\\agent\\prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.\nIf your role is Looprunner continue the last restart/resume close message of a Planner you have received.";
 const RC_BUDGET = path.join(SANDBOX, ".opencode", "temp", "compact_budget.json");
-const SB_JSONC = path.join(SANDBOX, "opencode.jsonc");
-const JSONC_FIXTURE = [
-  "{",
-  '  // probe fixture (S11): proves the JSONC comment-stripping path',
-  '  "emergencyRecovery": true,',
-  '  /* block comment — the key above must survive both comment forms */',
-  '  "other": "value with // not a comment"',
-  "}",
-  "",
-].join("\n");
+// The activation flag (consolidation 2026-09-22) is the top-level
+// `emergencyRecovery` key in the SHARED budget store — the setter MERGES
+// (the S10 session entries + any previously seeded top-level keys survive).
+const rcSetFlag = (enabled) => {
+  let store = null;
+  try {
+    store = JSON.parse(readFileSync(RC_BUDGET, "utf8"));
+  } catch {
+    store = null;
+  }
+  if (store == null || typeof store !== "object" || store.sessions == null || typeof store.sessions !== "object") {
+    store = { version: 1, maxPerSession: 2, sessions: {} };
+  }
+  store.emergencyRecovery = enabled;
+  mkdirSync(path.dirname(RC_BUDGET), { recursive: true });
+  writeFileSync(RC_BUDGET, JSON.stringify(store, null, 2) + "\n", "utf8");
+};
 const rcCalls = { compact: [], prompt: [] };
 const rcClient = {
   session: {
@@ -2073,29 +2080,37 @@ const rcFire = (error, sessionId) =>
   );
 }
 
-// 77 — flag OFF (NO opencode.jsonc in the sandbox) + overflow → the hook
-//      does NOTHING: unhandled (undefined), no compact, no promptAsync
+// 77 — flag OFF (no `emergencyRecovery: true` key in the shared budget
+//      file) + overflow → the hook does NOTHING: unhandled (undefined), no
+//      compact, no promptAsync
 {
-  if (existsSync(SB_JSONC)) rmSync(SB_JSONC); // the fixture is written only for 78+
+  let store77 = null;
+  try {
+    store77 = JSON.parse(readFileSync(RC_BUDGET, "utf8"));
+  } catch {
+    store77 = null;
+  }
   const before = { c: rcCalls.compact.length, p: rcCalls.prompt.length };
   const res = await rcFire({ message: "context length exceeded" }, "ses_rc_off");
   check(
     "77",
     "S11",
-    "flag OFF (no opencode.jsonc) + overflow: unhandled (undefined), no compact, no promptAsync",
-    !existsSync(SB_JSONC) && res === undefined && rcCalls.compact.length === before.c && rcCalls.prompt.length === before.p,
-    JSON.stringify({ jsonc: existsSync(SB_JSONC), res, dc: rcCalls.compact.length - before.c, dp: rcCalls.prompt.length - before.p }),
+    "flag OFF (no emergencyRecovery: true key in the shared budget file) + overflow: unhandled (undefined), no compact, no promptAsync",
+    (store77 == null || store77.emergencyRecovery !== true) && res === undefined && rcCalls.compact.length === before.c && rcCalls.prompt.length === before.p,
+    JSON.stringify({ flag: store77?.emergencyRecovery, res, dc: rcCalls.compact.length - before.c, dp: rcCalls.prompt.length - before.p }),
   );
 }
 
-// 78 — flag ON (the JSONC fixture with REAL comments, incl. a // inside a
-//      string) + overflow + fresh budget → compact with EXACTLY keep
-//      {30_000, 12}, the promptAsync directive BYTE-MATCHES the plugin's
-//      constant (the tool's 2-line directive + the looprunner continuation
-//      line — synthetic text part), the budget file carries count==1 ON
-//      DISK, and the hook returns {handled:true, action:"retry"}
+// 78 — flag ON (top-level `emergencyRecovery: true` in the shared budget
+//      file) + overflow + fresh budget → compact with EXACTLY keep
+//      {30_000, 12} (the measured-profile defaults — no keepTokens /
+//      keepMessages keys in the file), the promptAsync directive
+//      BYTE-MATCHES the plugin's constant (the tool's 2-line directive +
+//      the looprunner continuation line — synthetic text part), the budget
+//      file carries count==1 ON DISK, and the hook returns
+//      {handled:true, action:"retry"}
 {
-  writeFileSync(SB_JSONC, JSONC_FIXTURE);
+  rcSetFlag(true);
   const before = { c: rcCalls.compact.length, p: rcCalls.prompt.length };
   const res = await rcFire({ message: "exceeds the available context size" }, "ses_rc_ok");
   const cc = rcCalls.compact.slice(before.c);
@@ -2110,7 +2125,7 @@ const rcFire = (error, sessionId) =>
   check(
     "78",
     "S11",
-    'flag ON (JSONC w/ comments) + overflow + fresh budget: compact keep {30_000,12}, directive byte-exact (the plugin constant: tool directive + looprunner line), budget count==1 on disk, {handled:true,action:"retry"}',
+    "flag ON (emergencyRecovery: true in the shared budget file) + overflow + fresh budget: compact keep {30_000,12} (the defaults — no keep keys in the file), directive byte-exact (the plugin constant: tool directive + looprunner line), budget count==1 on disk, {handled:true,action:\"retry\"}",
     cc.length === 1 && cc[0]?.path?.id === "ses_rc_ok" && cc[0]?.body?.keep?.tokens === 30_000 && cc[0]?.body?.keep?.messages === 12 &&
       pc.length === 1 && pc[0]?.path?.id === "ses_rc_ok" && pc[0]?.body?.parts?.length === 1 && p0?.type === "text" && p0?.synthetic === true && p0?.text === RC_DIRECTIVE &&
       budget?.sessions?.ses_rc_ok?.count === 1 &&
@@ -2278,7 +2293,8 @@ const dbPathBeforeS12 = getDbPath(); // the hook-restore capture (cf. check 39)
 
 // ------------------------------------------------------------------ S13 compact_memory plugin tool (15) — the approved v2 proposal + the 2026-09-14 maintainer adaptation (explicit pair; SELF sync / CROSS dispatch)
 //
-// The plugin-registered compact_memory (quant-class budget, approved proposal
+// The plugin-registered compact_memory (the model_budget compaction budget —
+// consolidated 2026-09-22 into the shared budget file; approved proposal
 // .opencode/proposals/approved/2026-09-12_compact_memory_plugin.md, supersedes
 // the v1 artifact pinned by S10): the plugin file is imported DIRECT
 // (type-stripped) — NO hook fires, the S5 tallies are unaffected; ALL the
@@ -2290,7 +2306,10 @@ const dbPathBeforeS12 = getDbPath(); // the hook-restore capture (cf. check 39)
 // checks have run).
 const QC_PLUGIN_TS = path.join(REPO_ROOT, ".opencode", "plugin", "compact_memory.ts");
 const qcMod = await import(pathToFileURL(QC_PLUGIN_TS).href);
-const qcClassify = qcMod.classifyQuantClass;
+// The cap resolver (consolidation 2026-09-22): reads the model_budget map
+// from the SHARED sandbox budget file (root = SANDBOX — every qcExec below
+// steers the tool context's directory there too).
+const qcResolveCap = (name) => qcMod.resolveCap(SANDBOX, name);
 const QC_DIRECTIVE =
   "[SYSTEM CONTEXT DIRECTIVE]\nContext was compacted. Read .opencode\\agent\\prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.";
 const qcMakeClient = (spec = {}) => {
@@ -2375,24 +2394,30 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   );
 }
 
-// 87 — the classifier fixtures (the exported rule table): IQ4→3, IQ3→3 (the
-//      2026-09-21 quant-class budget ruling raised the 3-bit cap to 3),
-//      Q4KM→3, CPU-…→0 (the prefix rule FIRST), unknown→1, and the ordering
-//      trap "Qwen3.8-27B-IQ4KT-120K"→3 (the 4-bit row wins, not the 3-bit one)
+// 87 — the cap fixtures (consolidation 2026-09-22): the caps are CONFIGURED
+//      in the shared sandbox budget file's model_budget map (bare model id
+//      → cap + the "default" key): exact key→5, the live model id
+//      "Qwen3.8-27B-IQ4KT-120K"→3 (the configured value for that model ID),
+//      CPU-…→0 (the SAFETY INVARIANT, never config-driven), unknown→1, typo
+//      key→1 (a wrong key simply never matches)
 {
+  // seed the model_budget map into the shared budget file (merge — the
+  // S10/S11 session entries survive)
+  const seedStore = qcStore();
+  seedStore.model_budget = { "Qwen3.8-27B-IQ4KT-120K": 3, "Qwen-IQ3-Test": 5, default: 1 };
+  writeFileSync(path.join(SANDBOX, ".opencode", "temp", "compact_budget.json"), JSON.stringify(seedStore, null, 2) + "\n", "utf8");
   const caps = {
-    iq4: qcClassify("Qwen-IQ4-Test").cap,
-    iq3: qcClassify("Qwen-IQ3-Test").cap,
-    q4km: qcClassify("Gemma-Q4KM-12B").cap,
-    cpu: qcClassify("CPU-Qwen3-0.6B").cap,
-    unknown: qcClassify("Mystery-7B").cap,
-    trap: qcClassify("Qwen3.8-27B-IQ4KT-120K").cap,
+    exact: qcResolveCap("Qwen-IQ3-Test").cap,
+    live: qcResolveCap("Qwen3.8-27B-IQ4KT-120K").cap,
+    cpu: qcResolveCap("CPU-Qwen3-0.6B").cap,
+    unknown: qcResolveCap("Mystery-7B").cap,
+    typo: qcResolveCap("Qwen-IQ3-Test-typO").cap,
   };
   check(
     "87",
     "S13",
-    "classifier fixtures: IQ4→3, IQ3→3, Q4KM→3, CPU-…→0, unknown→1, the Qwen3.8-27B-IQ4KT-120K ordering trap→3 (the 4-bit row wins)",
-    caps.iq4 === 3 && caps.iq3 === 3 && caps.q4km === 3 && caps.cpu === 0 && caps.unknown === 1 && caps.trap === 3,
+    "cap fixtures (model_budget map in the budget file): exact key→5, the live model id→3 (the configured value for that model ID), CPU-…→0 (the safety invariant), unknown→1, typo key→1 (never matches)",
+    caps.exact === 5 && caps.live === 3 && caps.cpu === 0 && caps.unknown === 1 && caps.typo === 1,
     JSON.stringify(caps),
   );
 }
@@ -2471,11 +2496,12 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   );
 }
 
-// 92 — the gate (IQ4 cap 3, increment-on-verified-success): count=cap−1 (the
-//      3rd call) is DISPATCHED; count=cap (the 4th) is DENIED naming
-//      class+cap+count with ZERO side effects (no compact call, no
-//      increment, no line); the cross increments land in the background
-//      chain (the tick drains it before the 4th call sees count=cap)
+// 92 — the gate (configured cap 3 in the model_budget map, increment-on-
+//      verified-success): count=cap−1 (the 3rd call) is DISPATCHED;
+//      count=cap (the 4th) is DENIED naming class+cap+count with ZERO
+//      side effects (no compact call, no increment, no line); the cross
+//      increments land in the background chain (the tick drains it before
+//      the 4th call sees count=cap)
 {
   const { client, rec } = qcMakeClient({ summarize: true });
   const t = (await qcMod.default({ client })).tool.compact_memory;
@@ -2489,7 +2515,7 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   check(
     "92",
     "S13",
-    "gate (IQ4 cap 3, cross dispatch): count=cap−1 dispatched (the 3rd); count=cap DENIED (the 4th) naming class+cap+count with ZERO side effects; the increments land only on the verified background success",
+    "gate (configured cap 3, cross dispatch): count=cap−1 dispatched (the 3rd); count=cap DENIED (the 4th) naming class+cap+count with ZERO side effects; the increments land only on the verified background success",
     /dispatched/i.test(res3) && rec.summarize.length === 3 && rec.summarize.length === callsBefore4 &&
       /refused/.test(res4) && res4.includes("cap 3") && res4.includes("3/3") &&
       st.sessions.ses_qc_gate?.count === 3,
@@ -2531,7 +2557,8 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
 
 // 95 — the v2 store schema ON DISK: version 2 + the entry shape {count,
 //      updated, model} with the model POPULATED (the resolved model id at the
-//      last increment — the cap lives in the classifier, not the file)
+//      last increment — the CAP lives in the file's top-level model_budget
+//      map, resolved per call)
 {
   const st = qcStore();
   const e = st.sessions.ses_qc_gate;
