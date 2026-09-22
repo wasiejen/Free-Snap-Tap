@@ -186,6 +186,20 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   on an ambiguous worker return, reads the committed handover for the
   authoritative state. Alternative (his idea): a cross-session queued message to
   the planner (needs a new mechanism). NOT implemented — prompt/convention change.
+- SIGNALING RESOLVED (2026-09-22, his design Q): the RELIABLE, non-convention,
+  zero-new-mechanism signal = **grep ctx.log for the worker session's COMPACT line**
+  (our compact_memory tool writes `<date> COMPACT <sessionID> tokens=N messages=N`
+  on verified success). EMPIRICALLY CONFIRMED this turn (the worker's self-compact
+  left `COMPACT ses_f359ce94...` at 20:44). In-result cross-check: the compaction
+  summary (returned as the Task result) starts with `## Objective` (SUMMARY_TEMPLATE
+  forces "Output exactly the structure"; a normal worker closing never uses that
+  form). So on an ambiguous worker return: recognize the Work State form (`##
+  Objective`) → grep ctx.log for the session COMPACT line to CONFIRM → resume via
+  task_id using the summary's `## Next Move`. No new mechanism, no fragile
+  convention. Option B (custom compaction prompt → machine line, wired into the
+  tool call; the 2-prompt first/subsequent distinction handled via the compaction
+  count) = the hardening ONLY if the token must live inside the result (MEDIUM
+  effort, deferred).
 - --info reading discipline (his note, priority.md 2026-09-22_20-42): the worker
   burned context on careless greps (20k from TODO.md, then further reads).
   Strengthen reading discipline in the worker prompt / specs (no wholesale
