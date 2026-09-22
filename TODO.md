@@ -1021,10 +1021,17 @@ restart detection" wording above is the pre-revision numbering.
   retry loop); (d) a test/repro showing the loop stops after the cap.
 - **Suggested scope:** `.opencode/plugin/auto_resume.ts` — the spawn path
   (unit-4 "restart→spawn") + the recovery path; the global cap + dead-mark; the
-  scope logic (skip worker + freshly-spawned sessions). TIES IN with the
-  earlier design issue (unit-4 scope / the spurious worker resume / the
-  action-line dilemma): the scope refinement (unit-4 watches PLANNER sessions
-  only, skips worker + auto-spawned sessions) addresses both.
+  scope logic. TIES IN with the earlier design issue (unit-4 scope / the
+  spurious worker resume / the action-line dilemma) — all resolved by one scope
+  refinement (below).
+- **GENERALIZED SCOPE (his ruling 2026-09-22):** unit-4 scope = actual PLANNER
+  sessions (always) ∪ sessions started/toggled via `<|Autorun|>` (the #82
+  own-line toggle). NO new marker needed — the #82 toggle already gates scope
+  ON/OFF; unit 4 just follows it for ANY agent type (drop the planner-only
+  gate). This lets him run other agents (prompt_builder, a future researcher,
+  etc.) in a loop by toggling them with `<|Autorun|>`. Bonus: freshly-spawned
+  sessions + unmarked worker sessions stay OUT of scope (not a planner, not
+  `<|Autorun|>`-marked) → fixes the #85 loop AND the spurious worker-resume.
 - **Status:** OPEN, HIGH priority — maintainer call (live-behavior fix →
   approval boundary; needs his go). The orphan-session cleanup is DONE
   (the maintainer removed all the new sessions, 2026-09-22).

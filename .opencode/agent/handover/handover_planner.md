@@ -204,6 +204,14 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   burned context on careless greps (20k from TODO.md, then further reads).
   Strengthen reading discipline in the worker prompt / specs (no wholesale
   TODO.md greps; targeted reads; use the inventory scripts).
+- #85 scope GENERALIZED (his ruling 2026-09-22): unit-4 scope = actual PLANNER
+  (always) ∪ `<|Autorun|>`-toggled sessions (the #82 own-line toggle) — NO new
+  marker; drop the planner-only gate so unit 4 follows the #82 scope for ANY
+  agent type → he can run prompt_builder / a future researcher / etc. in a loop
+  by toggling them with `<|Autorun|>`. Freshly-spawned + unmarked worker
+  sessions stay OUT of scope (not a planner, not `<|Autorun|>`-marked) → fixes
+  #85 (the spawn loop) AND the spurious worker-resume. Same auto_resume.ts
+  scope-refinement task as #85's fix.
 - NEXT (his priority order): (1) #81 LANDED + verified (af38e2f — gate
   241/241); (2) #82 scope rework spec — design AGREED (above) —
   spec-able now except the unit-2-suppression scope (his call); (3)
