@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #83, new
-entries start at #84 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #84, new
+entries start at #85 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -996,5 +996,35 @@ restart detection" wording above is the pre-revision numbering.
   `.opencode/plugin/tests/context_recovery.smoke.mjs`,
   `.opencode/plugin/probes/handover_probe.mjs`.
 - **Status:** LANDED (2026-09-22, worker `worker_Q3S_170K` — the gate
-  green as above; the commit hash is recorded by the planner in the
-  follow-up bookkeeping commit, not in this entry's commit).
+   green as above; the commit hash is recorded by the planner in the
+   follow-up bookkeeping commit, not in this entry's commit).
+
+## #85. (OPEN, HIGH priority — maintainer call) — auto_resume unbounded session-spawn loop
+- **Problem + evidence:** on 2026-09-22 (~19:57–20:00Z) the LIVE auto_resume
+  plugin created a NEW session every ~10s (every 2nd recovery attempt — 2
+  attempts per session at 5s each, confirmed by the session naming) —
+  auto_resume.log shows the `ses_f354e4cb… / ses_f354e259… / ses_f354dfe7… / …`
+  series, each logged as `scope= planner` + `recovery= attempt 1` then
+  `attempt 2`, each failing with `UnknownError` at `SessionPrompt.createUserMessage`.
+  The maintainer saw `UnknownError` every 5s in the terminal and had to RESTART
+  opencode to stop it. (Diagnosed from auto_resume.log this turn, 2026-09-22.)
+- **Desired outcome:** auto_resume must never create sessions unboundedly. A
+  spawn / continue / recovery that keeps failing (or keeps re-triggering on
+  freshly-spawned sessions) must STOP: a GLOBAL cap (not just per-session) + a
+  dead-mark (a session whose recovery/continue attempt fails is marked dead and
+  skipped on later cycles), and freshly auto-spawned sessions must NOT be
+  re-scoped as in-scope planners.
+- **Acceptance criteria:** (a) under load a failing spawn/continue is globally
+  capped and the offending session is dead-marked + skipped (no per-cycle
+  retry); (b) auto-spawned sessions are not re-scoped as planners; (c) an
+  `UnknownError` on a failed `createUserMessage` discards the session (no
+  retry loop); (d) a test/repro showing the loop stops after the cap.
+- **Suggested scope:** `.opencode/plugin/auto_resume.ts` — the spawn path
+  (unit-4 "restart→spawn") + the recovery path; the global cap + dead-mark; the
+  scope logic (skip worker + freshly-spawned sessions). TIES IN with the
+  earlier design issue (unit-4 scope / the spurious worker resume / the
+  action-line dilemma): the scope refinement (unit-4 watches PLANNER sessions
+  only, skips worker + auto-spawned sessions) addresses both.
+- **Status:** OPEN, HIGH priority — maintainer call (live-behavior fix →
+  approval boundary; needs his go). The orphan-session cleanup is DONE
+  (the maintainer removed all the new sessions, 2026-09-22).
