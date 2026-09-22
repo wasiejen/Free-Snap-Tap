@@ -85,36 +85,14 @@ fixable in-scope or are out of scope. Loose format: dated, role-tagged blocks,
   (planner-direct pin fix; probe 235/235 green).
 
 ## 2026-09-21 — worker-3 (plan3, autorun-2026-09-21_15-33, auto-resume UNIT 3)
-- Pre-existing red smoke (NOT caused by Unit 3 — verified by re-running with
-  the Unit 3 changes stashed): `block_transfer.sandbox.smoke.mjs` fails ONE
-  check: `description: housekeeping rule vs write/edit` (smoke line 53:
-  `/write\/edit/.test(d)`). Root cause: commit `ff4c2fc` (2026-09-18,
-  maintainer) deliberately dropped the "Housekeeping rule: use this tool …
-  instead of write/edit" sentence from the `block_transfer` tool description
-  (`.opencode/tools/block_transfer.ts` — "prompt text, not contract text; the
-  guidance lives in repo_custom_tools.md"), but the smoke's description pin
-  was never updated → stale pin. Suggested fix (out of my scope —
-  block_transfer is a DO-NOT-touch other tool for the Unit 3 task): delete or
-  re-point that one chk line (e.g. pin the new first sentence instead); the
-  other 50+ checks in that smoke pass. Files:
-  `.opencode/plugin/tests/block_transfer.sandbox.smoke.mjs` line 53,
-  `.opencode/tools/block_transfer.ts` description (read-only reference).
+- (curated 2026-09-22, planner, direct session) block_transfer stale smoke
+  pin → CLOSED: verified by grep that the chk line no longer exists in
+  `block_transfer.sandbox.smoke.mjs` and "Housekeeping" is absent from
+  `.opencode/tools/block_transfer.ts` — the pin was removed out-of-band; no
+  TODO needed.
 
 ## 2026-09-22 — worker-2 (TODO #80, ses_f371e0e23ffe0eza71uD5qWy7K)
-- PRE-EXISTING gate failure (NOT caused by #80 work — the probe does not
-  load auto_resume.ts; verified by inspection + the failing check's target
-  file): `handover_probe.mjs` check [97] "message (unit A): response =
-  dispatch line + the queued note (byte-exact) + exactly ONE queued
-  promptAsync carrying the text part" now FAILS at HEAD (tree 5d17ad0;
-  probe 240/241, only [97] red). Root cause: maintainer temp fix commit
-  `0f192e5` (2026-09-22_11-53) commented out the `promptAsync` call inside
-  `queueMessage` in `.opencode/plugin/compact_memory.ts` ("deactivated to
-  enable compaction until a way is found to send the message without
-  interfering with the compaction") — the probe still pins the pre-fix
-  behavior (one queued promptAsync). The `compact_memory.smoke.mjs` message
-  check fails the same way (verified: 1 FAIL, everything else pass).
-  Suggested disposition (planner/maintainer call): either update probe
-  [97] + the smoke pin to the temp-fix behavior (no promptAsync recorded;
-  the "queued note" line is still emitted), or re-pin them when the
-  maintainer restores promptAsync. The spec's "probe 241/241" baseline is
-  therefore stale for the current tree.
+- (curated 2026-09-22, planner, direct session) probe [97] +
+  compact_memory smoke pin red (maintainer temp fix 0f192e5) → `TODO.md`
+  **#81** (maintainer call: re-pin to the temp-fix behavior, or re-pin when
+  the compact_memory message feature gets its proper fix).

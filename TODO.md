@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #80, new
-entries start at #81 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #81, new
+entries start at #82 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -827,13 +827,37 @@ restart detection" wording above is the pre-revision numbering.
   available, the loop/autorun resumes after the timeout); planner
   compaction budget exhaustion (keep=0 + same-session resume + budget reset
   vs. higher cap — bit-rot risk).
-- **Status:** implementation LANDED (worker commit — the planner records
-  the hash in a follow-up); live acceptance pending re-activation
-  (maintainer call). History: investigated 2026-09-22 (planner, direct
-  session); FIX DESIGN APPROVED by the maintainer 2026-09-22; plugin
-  DEACTIVATED (a000dfd). Item-3 scope anomaly: H1 REFUTED 2026-09-22 (DB
-  check — none of the session's 44 user-role parts, every part type,
-  contains `<|autonom|>`); the new `scope=` verdict log line + `surface=`
-  v= version ID will pin verdict + code state on the next incident.
+- **Status:** implementation LANDED (4098253, worker-2
+  ses_f371e0e23ffe0eza71uD5qWy7K); live acceptance pending re-activation
+  (maintainer call). Gate note: probe 240/241 — check [97] pre-existing red
+  (maintainer temp fix 0f192e5) → #81. History: investigated 2026-09-22
+  (planner, direct session); FIX DESIGN APPROVED by the maintainer
+  2026-09-22; plugin DEACTIVATED (a000dfd). Item-3 scope anomaly: H1
+  REFUTED 2026-09-22 (DB check — none of the session's 44 user-role parts,
+  every part type, contains `<|autonom|>`); H2 (running variant ≠ committed
+  file) leading; the new `scope=` verdict log line + `surface=` v= version
+  ID will pin verdict + code state on the next incident.
 - **Suggested scope:** `.opencode/plugin/deactivated/auto_resume.ts` (L387,
   L643; scope scan L543-551).
+
+## 81. (open, 2026-09-22, worker-2 via inbox; maintainer call) probe [97] + compact_memory smoke pin red since temp fix 0f192e5
+- **Problem + evidence:** `handover_probe.mjs` check [97] (unit A: "exactly
+  ONE queued promptAsync carrying the text part") and the matching
+  `compact_memory.smoke.mjs` message pin FAIL at HEAD (probe 240/241, only
+  [97] red; the smoke: 1 FAIL, everything else pass). Pre-existing — NOT
+  the #80 work (the probe does not load auto_resume.ts): the maintainer's
+  temp fix `0f192e5` (2026-09-22) commented out the `promptAsync` call in
+  `compact_memory.ts` `queueMessage` (to stop the queued-message race — the
+  SELF compaction incident); the pins still expect the pre-fix behavior.
+- **Desired outcome:** the gate green again — either re-pin probe [97] +
+  the smoke to the temp-fix behavior (no queued promptAsync; the queued-note
+  line is still emitted), or re-pin them when the compact_memory message
+  feature gets its proper fix.
+- **Acceptance criteria:** probe 241/241 + `compact_memory.smoke.mjs`
+  green; TODO #80's live acceptance then re-runnable against a full-green
+  gate.
+- **Suggested scope:** `.opencode/plugin/probes/handover_probe.mjs` (check
+  [97]), `.opencode/plugin/tests/compact_memory.smoke.mjs`;
+  `compact_memory.ts` only if the message path is restored.
+- **Status:** open — maintainer call (his intentional temp fix; the #80
+  re-activation decision can ride this ruling).

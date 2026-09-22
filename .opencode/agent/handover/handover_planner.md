@@ -30,16 +30,18 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   entry (his stop/interrupt + `ask_maintainer` must stop the loop); planner
   compaction budget exhaustion (keep=0 + same-session resume + budget reset
   vs. higher cap — bit-rot risk).
-- #80 in flight (worker-2, this turn): worker-1
-  (ses_f3950da93ffeZ6qSsewYup8ElY, worker_Q3S_110K_mtp) died at its 110k limit
-  with ZERO code changes — full checkpoint (verified facts + exact plan +
-  item-3 evidence H1/H2) salvaged by the maintainer into the committed
-  `handover_draft_worker_ses_f3950da93ffeZ6qSsewYup8ElY.md`; no task_id
-  survived the cancelled result → fresh worker continues from the draft
-  (continuation spec committed). Item-3 lead: the post-incident compaction
-  may have injected the literal marker `<|autonom|>` into user parts →
-  `userHasMarker` scope flip (H1; one bounded DB check; fail-safe if
-  confirmed = scope verdict targets the launch message only).
+- #80 LANDED + planner-verified (4098253, worker-2
+  ses_f371e0e23ffe0eza71uD5qWy7K, worker_Q3S_160K): agent-retention in both
+  injected promptAsync bodies (+`agent-omit=` line), cap semantics
+  (pendingInject TTL 120s — an injected busy consumes the mark, only a real
+  busy resets; cap 2), `scope=` verdict line, `surface= v=<8hex>`. Smoke
+  76/76 (planner re-ran), pytest 459+1w, ruff F=0, probe 240/241
+  (pre-existing [97] red → #81). H1 REFUTED (44 user parts, zero marker
+  hits); H2 leading — testable via the new log lines. Worker-1
+  (ses_f3950da93ffeZ6qSsewYup8ElY) had died at its 110k limit with ZERO code
+  changes — the checkpoint-draft salvage mechanism worked (maintainer saved
+  it; no task_id survived the cancelled result). Live acceptance (#80
+  criteria b/c) + re-activation = his call.
 - Maintainer's compact_memory temp fix (0f192e5, 2026-09-22_13-21): the
   promptAsync message injection is commented out → the queued-message race
   is gone; SELF compaction should work again until a proper fix (unverified).
@@ -48,13 +50,17 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   criteria b/c) stay his call.
 - compact_memory SELF race measured this session (logged: feedback +
   knowledge inbox): the queued message delivers BEFORE the background
-  compaction → cache invalidation → 160k hard-limit stall; manual compaction
-  works — do NOT self-compact at the stop line on this build.
-- NEXT (his priority order): (1) #80 worker verification + bookkeeping commit
-  (in flight); (2) TODO.md shrink (~40k tokens — closed entries →
-  todo_records.md, one-line records); (3) unit 4 route= live proof + #70
-  close confirm; (4) research spec (compact_memory + block_transfer —
-  priority.md #1); (5) TODO #78 scoping.
+  compaction → cache invalidation → 160k hard-limit stall. Maintainer's
+  temp fix (0f192e5) commented out the queued-message injection → the race
+  is gone and SELF compaction should work again (unverified); side effect:
+  probe [97] + compact_memory smoke pin red → #81 (his call: re-pin to the
+  temp-fix behavior, or re-pin at the proper message fix).
+- NEXT (his priority order): (1) #80 re-activation ruling + live
+  acceptance (criteria b/c; the gate is one pin short — #81); (2) TODO.md
+  shrink (~40k tokens — closed entries → todo_records.md, one-line
+  records); (3) unit 4 route= live proof + #70 close confirm; (4) research
+  spec (compact_memory + block_transfer — priority.md #1); (5) TODO #78
+  scoping.
 - Carried parked ideas (unchanged): smaller NAP snapshot via opencode.jsonc
   agent prompt; reality-rebuild tool; pathfinder-mentality prompt part;
   looprunner-retirement decision; feedback integration on planner close-up;
