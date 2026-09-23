@@ -437,3 +437,6 @@ THINKING LOOP: near the end of this session I was re-deriving the same Unit-2 de
 ### 2026-09-23_05-44 worker_Q3S_170K ses_f33c05575ffeYtM7PHyL30GgID
 Salvaged worker-12 draft's smoke line-range claims were off by one (said L5-8, actual L4-7) and its stale-check `route=` self-correction was unmarked — the anchor-verified splice caught the ranges before writing; salvaged drafts should carry explicit final-decision markers on mid-design self-corrections.
 
+### 2026-09-23_05-57 planner_Q3S_170K ses_f33f1eb98ffeFvrnTdmTzmyE2x
+1) The planner-prompt READY-MADE marker sweep silently dropped its .md filter: with `--include="*.md"` placed AFTER `--`, grep swallows it as a filename (error to /dev/null) → the whole .opencode tree incl. the multi-MB plugin.log got searched (~50KB noise this session). Fixed in prompt_agent_planner.md (put --include before, pattern via -e) + verified clean — commit 8f21b1e. 2) The edit tool reported "oldString not found" for a TODO.md title edit that HAD applied (line count changed, new text present) — before retrying a "failed" edit, verify the disk state first (the tool report can be wrong).
+
