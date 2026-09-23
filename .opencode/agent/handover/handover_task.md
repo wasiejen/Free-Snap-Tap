@@ -1,105 +1,89 @@
-# Task spec — plan11 / #78 scoping: dump completeness (READ-ONLY research)
+# Task spec — plan11 / #90 implementation: spawned-successor inherit + trigger deactivation
 
-Goal: scope TODO #78 (dump completeness) with bounded measurements — no code edits.
-Worker: `explore` (research/audit; always re-verified by the planner).
-Definition of done: the findings file below exists with every DoD bullet satisfied;
-the handover summary is written; the repo tree is otherwise UNCHANGED.
+Goal: implement the APPROVED proposal
+`.opencode/proposals/approved/2026-09-23_spawned-successor-inherit-deactivate.md`
+(Parts A + B + C — his `--comment` 2026-09-23_15-44: "approved A+B and C also").
+READ THE PROPOSAL FIRST (166 lines — it is the design source; this spec does not
+restate it). Worker: `worker_Q3S_170K`. Stay on the current checkout
+(`opencode_test`) — do not switch branches.
 
-## Context (planner-verified facts — do not re-derive)
+## Definition of done (all of it, one green commit at the end)
 
-- TODO #78 (in `TODO.md`, entry "## 78."): maintainer --info (2026-09-21): the
-  session dumps "seemed to not include any thinking, writing or other parts at
-  all" (his example: `.opencode/archive/sessions/ses_f5aefe9e1ffemgTiq9GELiqaGL.md`);
-  "dumpings in general should be complete … if they are in json maybe it is best
-  to just dump this directly as it is to preserve the structure"; filtering tool
-  calls = a script concern on demand. Live evidence #2 (already in the entry): the
-  compact pre-dump hook `DUMP-FAIL … spawnSync node ETIMEDOUT` on a ~90 % session
-  while a small session dumped in 76 ms — the spawn timeout does not scale with
-  session size.
-- The dump script is `.opencode/agent/scripts/db/dump_session.cjs` (245 lines —
-  you may read the WHOLE file; it is small). Its header claims: single-session
-  mode = "full-detail dump … every message with its text/reasoning"; `--all`
-  backfill is SLIM by default; `--out <relpath>` writes OUT_DIR/<relpath> (OUT_DIR
-  = `<repo>/.opencode/archive/sessions`).
-- Curated read-only DB helpers (USE THESE, never raw SQL against the live DB):
-  `node .opencode/agent/scripts/db/sesdata.cjs <sid>` (slim JSON per message) and
-  `node .opencode/agent/scripts/db/sesinspect.cjs [sid]` (session row + last 14
-  messages). Both open the host DB `C:/Users/Wasiejen/.local/share/opencode/opencode.db`
-  with `readOnly: true` (env `OPENCODE_DB` overrides).
-- The hook call site is in `.opencode/plugin/compact_memory.ts` — BOUNDED grep
-  only (`preCompactionDump`, `execFileSync`, `timeout`, `DUMP-OK`, `DUMP-FAIL`
-  with `| head -30`); do NOT read the whole file.
+1. **Part A** (proposal §Part A): the `spawned` exclusion removed from
+   `scopeVerdict` (auto_resume.ts L807); the `spawned` map (L290, set L663)
+   repurposed as the lineage-depth map (`Map<sid, depth>`); `restartText()`
+   (L736) marker made an EXACT OWN-LINE `<|autonom|>` (prose moves to line 2);
+   the restart/cap-exhaustion branch (L1098-1107) stores the successor's depth
+   = trigger depth + 1 and REFUSES to spawn at depth >= 2 (`skip= depth sid=`
+   line); file-trigger spawns stay depth 0.
+2. **Part B** (proposal §Part B): `spawnPlanner` RETURNS the new sid or null
+   (all failure paths already log `spawn-fail=`); on a successful restart-branch
+   spawn set STICKY `w.deactivated = true` on the TRIGGER watch + `deactivate=
+   sid=` log line (failed spawn → no flag); `routeScopedIdle` checks the flag
+   right after the scope recompute (L1035-1039) → `skip= deactivated sid=`, no
+   send; the flag records the trigger's user-message count at deactivation and
+   clears ONLY when a NEW user message arrived carrying an own-line ON toggle
+   (`<|autonom|>`/`<|Autorun|>`).
+3. **Part C** (proposal §Part C): at init (the factory call, L1262) restore from
+   the plugin's own `auto_resume.log`: each `route= restart spawn sid=X` line
+   paired with the following `spawn= sid=Y` line → deactivated(X) + lineage
+   depth(Y) = depth(X) + 1; unpaired `spawn=` lines → depth 0. Bounded parse
+   (your discretion: whole file or tail; the log lives in the temp dir).
+4. **Smoke** (`.opencode/plugin/tests/auto_resume.smoke.mjs`): the proposal's
+   acceptance pins 1-7 — in particular: (i) autorun-scoped NON-planner-agent
+   trigger → successor verdict "autorun" + RECOVERED after an idle without an
+   action line (the #87 stall case, inverted); (ii) restartText line-1 byte pin
+   + restart-safe derivation with in-memory maps emptied; (iii) trigger
+   deactivated: next idle → `skip= deactivated`; no-toggle ping stays
+   deactivated; own-line-ON-toggle ping clears the flag → routed again →
+   `skip= successor`; (iv) depth cap: depth-2 cap-exhaustion → `skip= depth`,
+   depth-1 spawns its depth-2 successor; (v) failed spawn → NO deactivation;
+   (vi) the OLD spawned-exclusion pins are RE-PINNED to the new behavior; all
+   other existing pins stay green.
+5. **Standard gate green** (run ONCE at the end): probe
+   `.opencode/plugin/probes/handover_probe.mjs` (self-annotated header total —
+   curate-don't-duplicate; the current baseline is 241/241 — if your change
+   legitimately shifts probe expectations, update the probe pins in the same
+   commit), ALL smokes in `.opencode/plugin/tests/`, pytest 459 passed +
+   1 warning (the known #10 coroutine warning), ruff F=0. Do NOT run the gate
+   more than twice total (wall-time discipline — #88).
+6. **Bookkeeping in the SAME commit:** `TODO.md` — #90 status → LANDED (the
+   commit hash is recorded by the PLANNER in its follow-up bookkeeping commit —
+   do NOT write your own hash); #87 → closed one-liner + its full entry text
+   appended to `todo_records.md` FIRST; your handover to
+   `.opencode/agent/handover/handover_task_to_planner.md` (executive summary,
+   measured verification incl. the exact smoke counts, commit subject, what was
+   deliberately not done).
+7. **Friction check** (mandatory, your role prompt): before your closing
+   message — did real friction occur? If yes, fire `submit(feedback=...)`; if
+   nothing, no entry.
 
-## Findings to produce (the DoD — all five, in this order)
+## DO-NOT-touch
 
-Write ONE findings file:
-`.opencode/loop/autorun-2026-09-21_15-33/plan11_78_scope.md`
+- `.opencode/plugin/compact_memory.ts`, the gauge plugin, anything under
+  `.opencode/maintainer/`, `opencode.jsonc`, the proposal file (READ-ONLY
+  reference), `.opencode/agent/prompts/**` (you have no edit access there —
+  if a prompt line seems stale, note it in the handover instead).
+- No removals of deactivated/commented-out alternative implementations.
+- No behavior changes beyond the proposal (the file-trigger path stays
+  unchanged — proposal §Part A.4).
 
-1. **Exclusion list (code):** for the single-session full mode of
-   dump_session.cjs — enumerate the DB message `parts` types the script
-   handles and the ones it DROPS, each with a line reference in the script
-   (e.g. "type reasoning: emitted at L__" / "type tool: DROPPED (no case)" ).
-   Also: what `--all`/slim mode emits vs full mode (one compact table).
-2. **Empirical check (his example + one current session):**
-   a) Re-dump `ses_f5aefe9e1ffemgTiq9GELiqaGL` via
-      `node .opencode/agent/scripts/db/dump_session.cjs ses_f5aefe9e1ffemgTiq9GELiqaGL --out scratch_78/check.md`
-      (the file lands in `.opencode/archive/sessions/scratch_78/check.md`),
-      compare its part coverage against `sesdata.cjs` output for the same sid,
-      then DELETE the generated file and verify `git status --short` shows no
-      corpus residue (the corpus .md files are tracked; an untracked scratch
-      file must be removed). Note: the on-disk corpus file for this sid is a
-      PRE-2026-09-21 backfill dump — state whether the CURRENT script would
-      now include what that old file lacks (the maintainer's complaint may be
-      stale — say so explicitly with evidence).
-   b) Pick ONE recently updated session that has reasoning parts (use
-      `sesinspect.cjs` no-arg list to choose; bounded reads). Same comparison.
-3. **Timeout behavior (measure, don't guess):** the fixed timeout value at the
-   hook call site (from the bounded grep of compact_memory.ts) + a measured
-   timing table: wall-time of a single-session dump for (i) a SMALL session
-   (< ~100 messages) and (ii) a LARGE session (most messages in the DB —
-   pick via the sesinspect list), via `time node …` (or node `Date.now()`
-   before/after in a one-liner) into `--out scratch_78/…` (DELETE both after,
-   git-status-clean). State whether a ~90 %-size session can exceed the hook
-   timeout, with the measured ratio.
-4. **Raw-JSON mode:** answer yes/no — does any current mode dump the parts as
-   raw JSON as-is? (Header says no; `sesdata.cjs` emits slim JSON LINES —
-   reference it as the closest existing thing + what it omits.)
-5. **Recommendation (ranked, 2-4 options):** aligned with his lean
-   ("dump raw as it is"; markdown filtering on demand): e.g. (1) add a
-   `--json` raw-mode to dump_session.cjs (all parts, no filtering — the
-   default for the hook? his call), (2) fix the hook timeout (scale / raise /
-   stream), (3) keep markdown full-completeness. Each option: what changes,
-   which file, effort (S/M/L). NO implementation — scoping only.
+## Context discipline
 
-## Hard rules
-
-- READ-ONLY repo: no edits to any tracked file; the ONLY writable targets are
-  the findings file (new) + `handover_task_to_planner.md`.
-- Scratch dumps: ONLY via `--out scratch_78/<name>.md`, ALWAYS deleted before
-  close; finish with `git status --short` proving the tree is clean apart from
-  the two new files.
-- Bounded output discipline: every grep carries `| head -30` (or an explicit
-  line range); never read a DB dump / corpus .md whole — grep/slice it
-  (AGENTS.md pattern 2); the sesdata/sesinspect outputs are already slim —
-  do not pipe them through anything that dumps more.
-- The maintainer's live files (`.opencode/maintainer/**`, `opencode.jsonc`,
-  `ideas/**`) — read the cited files only if the task names them; never edit.
-- Context budget: if you approach your stop line (gauge ~90 % or the ctx: nudge
-  says REM <= 15k), STOP at the last complete findings section, write the
-  handover with what is done + what remains, and end the session cleanly there
-  (the planner decides the resume).
+- Bounded reads: auto_resume.ts sections named above (the file is 1286 lines —
+  never read it whole); the smoke file: locate sections by grep
+  (`spawned`, `scope=`, `restart`, `UNIT`, with `| head -30`).
+- First greps always output-limited; no whole-file reads of logs/DB dumps.
+- Write-tool flakiness (#74): if a write payload fails with a JSON parse
+  error, fall back to small write/edit batches or bash heredoc (see
+  knowledge_tools.md) — never re-emit the same big payload twice.
+- Near-limit: if your gauge readout reaches ~80 %, estimate ~10 remaining
+  calls to the DoD; if it exceeds that, stop at the last green checkpoint,
+  write the handover (what is done / what remains), and end cleanly.
 
 ## Verification (planner, after your return)
 
-- Findings file exists, all five sections present, claims carry line refs /
-  measured numbers.
-- `git status --short` clean apart from the two new files.
-- The planner re-checks the exclusion list against dump_session.cjs himself
-  (bounded re-read of the cited lines) before acting on it.
-
-## Handover
-
-Write `.opencode/agent/handover/handover_task_to_planner.md`: executive summary
-(what was found, the headline recommendation, measured numbers), the findings
-file path, any deliberately-not-done remainder, and your final message = a
-short pointer to the handover file (never a re-dump).
+`git log` + the committed diff against the proposal's Parts A/B/C, the smoke
+counts you report vs a planner re-run of `auto_resume.smoke.mjs` only (12.5 s
+wall — do NOT re-run the full suite in this session if time-constrained; the
+planner re-runs the gate in its bookkeeping).
