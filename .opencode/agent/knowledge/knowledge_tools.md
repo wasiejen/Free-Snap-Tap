@@ -230,25 +230,40 @@ instructions/protocol — facts that save lookups. Format per the README:
 - **Do:** the hook fires BEFORE ANY compaction dispatch (just before the
   client call, after the budget gate): `preCompactionDump(root, sessionID,
   count)` runs `dump_session.cjs <sid> --out <relpath>` via execFileSync
-  (timeout 60 s, best-effort — NEVER throws / blocks). The name is
+  (#78 2026-09-23: timeout **120 s** — was 60 s; `stdio: "pipe"` — was
+  "ignore"; best-effort — NEVER throws / blocks). The name is
   `compaction_dumps/<sid>_c<count>.md` (count = the budget count at dispatch
   time); if that exact file already exists, a `_<YYYYMMDDTHHmmss>` stamp is
-  added (BEFORE the `.md`) — one dump never overwrites another. On failure a
-  `DUMP-FAIL <sid> <error>` line goes to `.opencode/temp/ctx.log` and the
-  dispatch response gains a WARNING line; on success the response is
-  UNCHANGED. The dump script's plain `<sid>` mode keeps "current state"
+  added (BEFORE the `.md`) — one dump never overwrites another. Log lines in
+  `.opencode/temp/ctx.log` (#78 forms): success =
+  `<stamp> DUMP-OK <sid> <relfile> ms=<ms>` (the `ms=` prefix replaced the
+  bare `<ms>`); first-attempt failure =
+  `<stamp> DUMP-RETRY=1 <sid> ms=<ms> err=<one-line>` (then ONE retry);
+  final failure = `DUMP-FAIL <sid> <error> | stderr: <captured one-line
+  stderr>` + the dispatch response gains a WARNING line; on success the
+  response is UNCHANGED. The hook's markdown backup renders with the
+  LOSSLESS full mode of the dump script (raw JSON is the on-demand
+  `--json` mode). The dump script's plain `<sid>` mode keeps "current state"
   semantics (refresh may overwrite) — compaction awareness lives ONLY in the
   hook's `compaction_dumps/` namespace.
 - **Why (evidence):** TODO #152 (approved 2026-09-15) + the maintainer's
-  --comment (no-overwrite across compactions of the same sid); probe S14
-  (checks 101-107, 106/106 green 2026-09-15) pins the name function
-  byte-exact + the no-overwrite proof; the S13 preamble places a stub dump
-  script in the sandbox so the byte-exact dispatch responses stay clean (a
-  missing script would append a WARNING).
+  --comment (no-overwrite across compactions of the same sid); the #78
+  ruling (planner-12 direct, 2026-09-23) on the live
+  `DUMP-FAIL … spawnSync node ETIMEDOUT` = a SPAWN-LEVEL STALL (measured dump
+  wall-times 64–87 ms vs the 60 s budget — the raise + retry + stderr
+  capture diagnose it). Probe S14 (checks 101-107; 104 re-pinned 2026-09-23
+  for the DUMP-RETRY= line) pins the name function byte-exact + the
+  no-overwrite proof; the S13 preamble places a stub dump script in the
+  sandbox so the byte-exact dispatch responses stay clean (a missing script
+  would append a WARNING).
 - **Ref:** `.opencode/plugin/compact_memory.ts` (`preCompactionDumpName` /
-  `preCompactionDump`); `handover_probe.mjs` S14; `dump_session.cjs` `--out`.
+  `preCompactionDump` / `runDumpSpawn`); `handover_probe.mjs` S14 + S25 (255
+  re-pinned for `ms=`); `compact_memory.smoke.mjs` (DUMP-OK + stdio pins
+  re-pinned); `dump_session.cjs` `--out`; #78 worker session
+  ses_f30807a16ffelPQPUBH50wiXBe (2026-09-23).
 - **Keys:** compact_memory, pre-compaction dump, compaction_dumps, no
-  overwrite, --out, DUMP-FAIL, S14, naming.
+  overwrite, --out, DUMP-OK, DUMP-RETRY, DUMP-FAIL, stderr, 120 s, S14,
+  naming, #78.
 
 ## The IQ3KT-MTP model variant crashed/corrupted — recovery from committed state
 - **Do:** when a session (or a worker launched on the 3bit-MTP variant)
@@ -365,3 +380,31 @@ instructions/protocol — facts that save lookups. Format per the README:
   config in `opencode.jsonc`.
 - **Keys:** half-prefill, context size, cost, time, energy, optimization
   framing.
+
+## dump_session.cjs modes (#78, 2026-09-23): --json raw / lossless full / --lite + the byte-identical verify recipe
+- **Do:** the single-session modes are: default = LOSSLESS full markdown
+  (every part's content — tool `state.input`/`state.output` emitted verbatim,
+  no caps, orphan parts rendered); `--lite` = the filtered preset (text +
+  reasoning verbatim, tool header-only, step-start/step-finish skipped,
+  other types 400-capped, meta 600-capped); `--json` = RAW JSON document
+  (`{session, messages: [{…, parts: [{id, time_created, data}]}],
+  orphan_parts}`) — the `data` values are the parsed part/message `data`
+  column (raw string when unparseable), uncapped, `--out` appends `.json`
+  when the relpath has no extension; `--json`/`--lite` are single-session
+  only (mutually exclusive with each other and with --all/--full/--slim).
+  To verify a dump against the LIVE DB (read-only): re-serialize each
+  dumped `data` value compactly (`JSON.stringify(parsed)`) and compare it
+  to the raw DB `data` column string — measured 263/263 parts + 58/58
+  messages byte-identical (opencode stores compact JSON, so the compact
+  re-serialization round-trips exactly). For a substring spot-check inside
+  the markdown, remember the values are JSON-escaped there (backslashes →
+  `\`).
+- **Why (evidence):** #78 spec (handover_task.md 2f64d76) + scoping
+  plan11_78_scope.md; verified 2026-09-23 on
+  ses_f31a5dee5ffe1DIBxZzEDZF8aF (58 msgs / 263 parts: 62 tool with
+  input/output, 57 step-start, 57 step-finish, 57 reasoning, 30 text).
+- **Ref:** `.opencode/agent/scripts/db/dump_session.cjs`; verify script
+  (deleted scratch): scratch_78/a.json + b_full + b_lite, 2026-09-23,
+  worker ses_f30807a16ffelPQPUBH50wiXBe.
+- **Keys:** dump_session, --json, --lite, lossless, byte-identical,
+  JSON.stringify, part data, #78.

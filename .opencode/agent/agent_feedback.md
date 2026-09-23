@@ -464,3 +464,6 @@ plan11 #90: the worker session died at the context limit mid-work (code + smoke 
 ### 2026-09-23_17-58 planner_Q3S_170K ses_f318f0d77ffer6kIwqiNvE1xau
 Self-compaction close protocol gap: ending the turn on the compact_memory TOOL CALL (no Work State dump text after the dispatch) left unit 4 with no action line → it fired BOTH the recovery-continue (which correctly resumed the compacted session) AND the restart-branch ghost spawn (ses_f3144d9d6 "planner-12") on the same idle episode. The prompt's stop-line section should state: after a self-compact dispatch, the Work State dump MUST be the final TEXT message of the turn (the tool returns before compaction completes). Secondary: my own pre-compaction dump failed ETIMEDOUT (the #78 spawn stall, 3rd live occurrence) — the dropped head is recorded only by the compaction summary.
 
+### 2026-09-23_20-39 worker_Q3S_170K ses_f30807a16ffelPQPUBH50wiXBe
+#78 spec ambiguity: "the DUMP-OK line gains `ms=`" — the line already carried a bare `<ms>` field; I read it as changing the field to `ms=<n>` (re-pinning smoke+probe). Also "state.input byte-identical to the DB" left the comparison basis open — I used the strongest form (compact re-serialization of every dumped data value === the raw DB `data` column string, 263/263) plus the JSON-escaped substring note.
+

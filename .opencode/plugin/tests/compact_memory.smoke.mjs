@@ -195,8 +195,9 @@ const withClient = async (spec = {}) => {
   chk("dump hook fired on the tool path: compaction_dumps/ses_sm_self_c0.md exists (the stub dump, no WARNING appended)", existsSync(dumpFile), dumpFile);
   const DT = "\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}";
   const dumpOk = readLog().trim().split("\n").find((l) => l.includes("DUMP-OK ses_sm_self"));
-  chk("DUMP-OK line on success: `<stamp> DUMP-OK ses_sm_self compaction_dumps/ses_sm_self_c0.md <ms>`",
-    dumpOk != null && new RegExp(`^${DT} DUMP-OK ses_sm_self compaction_dumps/ses_sm_self_c0\\.md \\d+$`).test(dumpOk),
+  // #78 re-pin: the elapsed-ms field gained the `ms=` prefix (was bare `<ms>`)
+  chk("DUMP-OK line on success: `<stamp> DUMP-OK ses_sm_self compaction_dumps/ses_sm_self_c0.md ms=<ms>`",
+    dumpOk != null && new RegExp(`^${DT} DUMP-OK ses_sm_self compaction_dumps/ses_sm_self_c0\\.md ms=\\d+$`).test(dumpOk),
     JSON.stringify(dumpOk));
 }
 
@@ -451,15 +452,16 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
     JSON.stringify(st2));
 }
 
-// ---- the dump spawn's defensive stdio (unit A: "pipe" → "ignore" — the
-// pipe-buffer deadlock failure mode; pinned on the source — the live spawn
-// is exercised by the DUMP-OK case above)
+// ---- the dump spawn's stderr capture (#78: "ignore" → "pipe" — a DUMP-FAIL
+// now carries the child's stderr; the child writes one stdout line + repo
+// files, so no pipe-buffer risk at the measured tens-of-ms dump cost; pinned
+// on the source — the live spawn is exercised by the DUMP-OK case above)
 {
   const src = readFileSync(path.join(REPO_ROOT, ".opencode", "plugin", "compact_memory.ts"), "utf8");
   const spawnIdx = src.indexOf("execFileSync(resolveNodeExe()");
   const spawn = src.slice(spawnIdx, spawnIdx + 260);
-  chk("dump spawn: stdio 'ignore' (no stdio 'pipe' anywhere in the source)",
-    spawnIdx >= 0 && /stdio:\s*"ignore"/.test(spawn) && !src.includes('stdio: "pipe"'),
+  chk("dump spawn: stdio 'pipe' (stderr capture for the DUMP-FAIL detail)",
+    spawnIdx >= 0 && /stdio:\s*"pipe"/.test(spawn),
     spawn);
 }
 

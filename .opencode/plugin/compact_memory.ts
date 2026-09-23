@@ -298,16 +298,33 @@ export function preCompactionDumpName(sessionID: string, count: number, stamp: s
   return stamp != null ? `${core}_${stamp}.md` : `${core}.md`;
 }
 
-// Best-effort append of a DUMP-OK line to the ctx log (unit A, 2026-09-21):
-// same local-stamp prefix style as the DUMP-FAIL line —
-// `<stamp> DUMP-OK <sid> <relfile> <ms>` (relfile = the corpus-relative dump
-// path, ms = elapsed milliseconds). Never throws.
+// Best-effort append of a DUMP-OK line to the ctx log (unit A, 2026-09-21;
+// #78: the elapsed-ms field gained the `ms=` prefix): same local-stamp
+// prefix style as the DUMP-FAIL line —
+// `<stamp> DUMP-OK <sid> <relfile> ms=<ms>` (relfile = the corpus-relative
+// dump path, ms = elapsed milliseconds). Never throws.
 function appendDumpOkLine(root: string, sessionID: string, relFile: string, ms: number): void {
   try {
     const dir = tempDir(root);
     mkdirSync(dir, { recursive: true });
     const p = path.join(dir, "ctx.log");
-    appendFileSync(p, `${localStamp()} DUMP-OK ${sessionID} ${relFile} ${ms}\n`, "utf8");
+    appendFileSync(p, `${localStamp()} DUMP-OK ${sessionID} ${relFile} ms=${ms}\n`, "utf8");
+  } catch {
+    // best effort — never break the tool over a write failure
+  }
+}
+
+// Best-effort append of a DUMP-RETRY= line to the ctx log (#78: the ONE dump
+// retry — the first attempt failed, a second spawn is tried): same local-
+// stamp prefix style —
+// `<stamp> DUMP-RETRY=1 <sid> ms=<ms> err=<one-line error>`. Never throws.
+function appendDumpRetryLine(root: string, sessionID: string, ms: number, error: string): void {
+  try {
+    const dir = tempDir(root);
+    mkdirSync(dir, { recursive: true });
+    const p = path.join(dir, "ctx.log");
+    const oneLine = String(error).replace(/\s+/g, " ").trim();
+    appendFileSync(p, `${localStamp()} DUMP-RETRY=1 ${sessionID} ms=${ms} err=${oneLine}\n`, "utf8");
   } catch {
     // best effort — never break the tool over a write failure
   }
@@ -341,7 +358,10 @@ export function resolveNodeExe(execPath: string = process.execPath): string {
 // The hook: run the dump script for the target session. Returns { ok, file } on
 // success or { ok:false, error } on ANY failure (NEVER throws, NEVER blocks).
 // The no-overwrite rule: if the base-name target already exists on disk, the
-// name is STAMPED so this dump lands in a fresh file.
+// name is STAMPED so this dump lands in a fresh file. #78: 120 s spawn budget
+// (was 60 s), `stdio: "pipe"` stderr capture (was "ignore"), and ONE retry —
+// the live DUMP-FAIL ETIMEDOUT was a spawn-level stall (measured dump
+// wall-times 64–87 ms), so the retry + the captured stderr trace the root cause.
 export function preCompactionDump(root: string, sessionID: string, count: number): { ok: boolean; file?: string; error?: string } {
   const scriptPath = path.join(root, ".opencode", "agent", "scripts", "db", "dump_session.cjs");
   const archiveDir = path.join(root, ".opencode", "archive", "sessions");
@@ -350,21 +370,54 @@ export function preCompactionDump(root: string, sessionID: string, count: number
   const stamp = existsSync(baseTarget) ? dumpStamp() : null;
   const name = preCompactionDumpName(sessionID, count, stamp);
   const target = path.join(archiveDir, name);
-  try {
-    // stdio "ignore" (unit A, 2026-09-21): the "pipe" setting buffered the
-    // child's output into a dead pipe inside the host — a pipe-buffer
-    // deadlock failure mode (the ETIMEDOUT evidence: the hung child in
-    // host; the script runs 0.12 s standalone).
-    const t0 = Date.now();
-    execFileSync(resolveNodeExe(), [scriptPath, sessionID, "--out", name], { timeout: 60_000, stdio: "ignore" });
-    appendDumpOkLine(root, sessionID, name, Date.now() - t0);
+  const first = runDumpSpawn(scriptPath, sessionID, name);
+  if (first.error == null) {
+    appendDumpOkLine(root, sessionID, name, first.ms);
     return { ok: true, file: target };
+  }
+  // #78: ONE retry — the DUMP-RETRY= line records the first failure, then the
+  // second spawn gets a full budget of its own.
+  appendDumpRetryLine(root, sessionID, first.ms, first.error);
+  const second = runDumpSpawn(scriptPath, sessionID, name);
+  if (second.error == null) {
+    appendDumpOkLine(root, sessionID, name, second.ms);
+    return { ok: true, file: target };
+  }
+  const detail = dumpFailDetail(second);
+  appendDumpFailLine(root, sessionID, detail);
+  return { ok: false, error: detail };
+}
+
+// The fixed dump-spawn budget (#78: raised from 60 s to 120 s — measured dump
+// wall-times are 64–87 ms, so the live DUMP-FAIL is a spawn-level stall, not
+// budget exhaustion; the raise is cheap insurance).
+const DUMP_SPAWN_TIMEOUT_MS = 120_000;
+
+// One dump-spawn attempt. `stdio: "pipe"` (#78: was "ignore" in unit A — the
+// pipe capture is what lets a DUMP-FAIL carry the child's stderr; the child
+// writes one stdout line + repo files, so no pipe-buffer risk at the
+// measured tens-of-ms dump cost). NEVER throws: returns the elapsed ms, and
+// on failure the error text + the captured stderr.
+function runDumpSpawn(scriptPath: string, sessionID: string, name: string): { ms: number; error?: string; stderr?: string } {
+  const t0 = Date.now();
+  try {
+    execFileSync(resolveNodeExe(), [scriptPath, sessionID, "--out", name], { timeout: DUMP_SPAWN_TIMEOUT_MS, stdio: "pipe" });
+    return { ms: Date.now() - t0 };
   } catch (err: any) {
+    const stderr = err?.stderr != null ? String(err.stderr) : "";
     const error =
       typeof err?.message === "string" && err.message !== "" ? err.message : err != null ? String(err) : "dump script failed";
-    appendDumpFailLine(root, sessionID, error);
-    return { ok: false, error };
+    return { ms: Date.now() - t0, error, stderr };
   }
+}
+
+// The DUMP-FAIL detail (#78): the error text + the child's captured stderr
+// (each one-lined, joined) — unit A's `stdio: "ignore"` swallowed the stderr,
+// leaving a stall with no trace.
+function dumpFailDetail(r: { ms: number; error?: string; stderr?: string }): string {
+  const error = r.error ?? "dump script failed";
+  const stderr = (r.stderr ?? "").replace(/\s+/g, " ").trim();
+  return stderr !== "" ? `${error} | stderr: ${stderr}` : error;
 }
 
 // ------------------------------------------------------------------ the client call

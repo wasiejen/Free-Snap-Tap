@@ -364,9 +364,14 @@ All those IDs stay reserved — see the numbering rule in the header.
   spawnSync node ETIMEDOUT` (ctx.log) on a ~90 % session while a small
   session dumped in 76 ms (`DUMP-OK`) — the dump's spawn timeout does not
   scale with session size (same script family as the corpus dumps).
-- **Status:** SCOPED 2026-09-23 (plan11, explore
-  ses_f317d80c2ffeMGup4T9z5IvUs2 — findings:
-  `.opencode/loop/autorun-2026-09-21_15-33/plan11_78_scope.md`. Headline: his
+- **Status:** LANDED 2026-09-23 (worker_Q3S_170K
+   ses_f30807a16ffelPQPUBH50wiXBe — A+B+C per spec 2f64d76: `--json` raw mode
+   + lossless full markdown + `--lite` preset + hook 120 s budget / pipe
+   stderr capture / one retry; DUMP-OK `ms=` + stdio + S14-104 re-pins
+   (recorded in the worker handover); gate green — the code commit hash is
+   recorded in the planner's follow-up bookkeeping). Was SCOPED 2026-09-23
+   (plan11, explore ses_f317d80c2ffeMGup4T9z5IvUs2 — findings:
+   `.opencode/loop/autorun-2026-09-21_15-33/plan11_78_scope.md`. Headline: his
   cited corpus file is a STALE 2026-09-15 slim backfill — the CURRENT full
   mode emits all 141 parts of that session (30 reasoning + 16 text verbatim);
   residual gaps = tool `state.input`/`state.output` never emitted + 400/600-

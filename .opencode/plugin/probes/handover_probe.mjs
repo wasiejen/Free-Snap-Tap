@@ -2700,7 +2700,10 @@ let s14Body1 = null;
 
 // 104 — the no-script case: the S13 stub is REMOVED from the sandbox script
 //      path → the hook must NOT throw, returns { ok:false, error }, and
-//      appends a DUMP-FAIL line to the sandbox ctx.log (best-effort logging)
+//      appends a DUMP-RETRY= line (#78: the ONE retry) + a DUMP-FAIL line
+//      carrying the captured stderr to the sandbox ctx.log (best-effort
+//      logging) — RE-PINNED 2026-09-23 (#78: the retry is part of the
+//      failure shape now)
 {
   rmSync(QC_DUMP_SCRIPT, { force: true });
   let r = null;
@@ -2714,9 +2717,9 @@ let s14Body1 = null;
   check(
     "104",
     "S14",
-    "sandbox root WITHOUT the script → NO throw, {ok:false} with an error, a DUMP-FAIL line appended to the sandbox ctx.log",
-    !threw && r != null && r.ok === false && r.error != null && /DUMP-FAIL ses_pc_noscript/.test(ctxLog),
-    JSON.stringify({ threw, r, dumpFailTail: ctxLog.split("\n").filter((l) => l.includes("DUMP-FAIL")).slice(-1) }),
+    "sandbox root WITHOUT the script → NO throw, {ok:false} with an error, a DUMP-RETRY= line (the #78 one-retry) + a DUMP-FAIL line (the captured stderr detail) appended to the sandbox ctx.log",
+    !threw && r != null && r.ok === false && r.error != null && /DUMP-RETRY=1 ses_pc_noscript/.test(ctxLog) && /DUMP-FAIL ses_pc_noscript/.test(ctxLog),
+    JSON.stringify({ threw, r, retryTail: ctxLog.split("\n").filter((l) => l.includes("DUMP-RETRY")).slice(-1), dumpFailTail: ctxLog.split("\n").filter((l) => l.includes("DUMP-FAIL")).slice(-1) }),
   );
 }
 
@@ -5194,8 +5197,8 @@ let n24 = 239;
   check(
     "255",
     "S25",
-    "DUMP-OK line on success: `<dt> DUMP-OK ses_qc_dumpok compaction_dumps/ses_qc_dumpok_c0.md <ms>` (ms numeric, the DUMP-FAIL prefix style)",
-    r.ok === true && line != null && new RegExp(`^${DT} DUMP-OK ses_qc_dumpok compaction_dumps/ses_qc_dumpok_c0\\.md \\d+$`).test(line),
+    "DUMP-OK line on success: `<dt> DUMP-OK ses_qc_dumpok compaction_dumps/ses_qc_dumpok_c0.md ms=<ms>` (the #78 ms= form, the DUMP-FAIL prefix style)",
+    r.ok === true && line != null && new RegExp(`^${DT} DUMP-OK ses_qc_dumpok compaction_dumps/ses_qc_dumpok_c0\\.md ms=\\d+$`).test(line),
     JSON.stringify(line),
   );
 }
