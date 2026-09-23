@@ -199,3 +199,26 @@ Gained, verified knowledge for opencode plugins. Format per the README:
 - **Keys:** post-mutation, state.input, intercept.log, orig, display,
   self-diagnosis, bitdrift, producer-drift, indistinguishable, escape,
   numword, sentinel, false-repetition, pre-correction-perception.
+
+## `session.create()` title param + the vendored SDK types (plan9 unit A)
+- **Do:** to name a freshly-created session, pass
+  `session.create({ body: { title } })` — `title` is a supported field of
+  `SessionCreateData` (`body?: { parentID?: string; title?: string }`,
+  url `/session`). For bounded SDK-surface lookups, use the VENDORED types
+  in the repo at `.opencode/node_modules/@opencode-ai/sdk/dist/gen/{sdk,types}.gen.d.ts`
+  (1.18.29, v1 generation) — the npm-global `opencode-ai@1.18.32` install at
+  `C:\Users\Wasiejen\AppData\Roaming\npm` ships ONLY the CLI binary, NO
+  `@opencode-ai/sdk` package (and `~/.config` is off-limits — maintainer
+  ruling 2026-09-23).
+- **Why (evidence):** bounded grep 2026-09-23 (worker-15, plan9 unit A,
+  ses_f32120a60ffeoM8J0xg8Sb5Yym): `types.gen.d.ts` L1811-1821 carries
+  `body.title`; the plugin passes it and the smoke pins the landing
+  (104/104, UNIT 3 plan9 checks). The task spec's "the repo has NO
+  node_modules" was stale — the vendored copy exists (flagged in the
+  handover).
+- **Ref:** `.opencode/node_modules/@opencode-ai/sdk/dist/gen/types.gen.d.ts`
+  (L1811-1821); `.opencode/plugin/auto_resume.ts` (`spawnTitleFor` +
+  `spawnPlanner`, 2026-09-23); `.opencode/plugin/tests/auto_resume.smoke.mjs`
+  (UNIT 3 plan9 checks).
+- **Keys:** session.create, title, SessionCreateData, vendored SDK,
+  node_modules, plugin session naming, plan9, bounded-check.

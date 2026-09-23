@@ -163,7 +163,7 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import type { Event } from "@opencode-ai/sdk";
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdirSync, readFileSync, renameSync } from "node:fs";
+import { appendFileSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -561,6 +561,47 @@ async function onToolAfterNudge(
   }
 }
 
+// plan9 unit A: the autorun-identifiable spawn TITLE —
+// `<loop-folder> planner-<N>` where N = the largest `planner-<N>` found
+// in the current loop folder's `loop_log.md`, + 1 (the same derivation
+// the planner uses for its iteration number). Detection mirrors
+// `.opencode/tools/loop_log.ts` (~L75): readdirSync the loop root
+// (the factory's `input.directory`), exactly-one `autorun-*` folder →
+// it, several → the most-recently-modified (the tool's anomaly rule).
+// NO loop folder / no `loop_log.md` / no `planner-<N>` line → null
+// (the spawn stays un-named, exactly as before). Never throws out —
+// a title failure must not break the spawn.
+function spawnTitleFor(): string | null {
+  try {
+    if (!projectDir) return null;
+    const loopRoot = join(projectDir, ".opencode", "loop");
+    const folders = readdirSync(loopRoot, { withFileTypes: true })
+      .filter((e) => e.isDirectory() && e.name.startsWith("autorun-"))
+      .map((e) => e.name);
+    if (folders.length === 0) return null;
+    let folder: string;
+    if (folders.length === 1) {
+      folder = folders[0];
+    } else {
+      // Several → the most-recently-modified (mirrors the loop_log tool).
+      folder = folders
+        .map((n) => ({ n, m: statSync(join(loopRoot, n)).mtimeMs }))
+        .sort((a, b) => b.m - a.m)[0].n;
+    }
+    // Missing loop_log.md throws → caught below → null (no identifier).
+    const logText = readFileSync(join(loopRoot, folder, "loop_log.md"), "utf-8");
+    let max = 0;
+    for (const m of logText.matchAll(/planner-(\d+)/g)) {
+      const n = parseInt(m[1], 10);
+      if (n > max) max = n;
+    }
+    if (max === 0) return null; // no planner-<N> line → no identifier
+    return `${folder} planner-${max + 1}`;
+  } catch {
+    return null; // unreadable dir/log → no identifier
+  }
+}
+
 // Unit 3: the new-planner spawn helper (module-INTERNAL — the factory
 // stays the ONLY export): create a fresh session, then ONE queued
 // promptAsync carrying the planner start prompt. QUEUED, never
@@ -573,16 +614,26 @@ async function onToolAfterNudge(
 // outward; every failure is a `spawn-fail=` line.
 async function spawnPlanner(startPrompt: string, sourceMsgs?: unknown) {
   const sess = (client as {
-    session?: { create?: () => Promise<unknown>; promptAsync?: (args: unknown) => Promise<unknown> };
+    session?: {
+      create?: (options?: unknown) => Promise<unknown>;
+      promptAsync?: (args: unknown) => Promise<unknown>;
+    };
   } | null)?.session;
   if (!sess || typeof sess.create !== "function") {
     log("spawn-fail= create missing");
     return;
   }
+  // plan9 unit A: the autorun-identifiable title (null → the spawn is
+  // exactly as before, no body).
+  const identName = spawnTitleFor();
   let newSid: unknown;
   try {
-    // No args: body is optional, no path → the default directory.
-    const res = await sess.create();
+    // No args unless the identifier resolved: SessionCreateData is
+    // `body?: { parentID?, title? }` (the vendored @opencode-ai/sdk
+    // types — the bounded SDK answer, 2026-09-23).
+    const res = identName
+      ? await sess.create({ body: { title: identName } })
+      : await sess.create();
     // The static SDK shape is res.data.id (Session); a top-level id is
     // accepted defensively (live-shape drift).
     const d = (res as { data?: Record<string, unknown> } | null)?.data;
@@ -613,6 +664,8 @@ async function spawnPlanner(startPrompt: string, sourceMsgs?: unknown) {
   const identBits: string[] = [];
   if (ident.agent) identBits.push(`agent=${ident.agent}`);
   if (ident.model) identBits.push(`model=${ident.model.providerID}/${ident.model.modelID}`);
+  // plan9 unit A: the identifier bit (present only when resolved).
+  if (identName) identBits.push(`ident=${identName}`);
   log(`spawn= sid=${newSid}${identBits.length ? " " + identBits.join(" ") : ""}`);
 }
 

@@ -604,9 +604,9 @@ try {
     todo: function () {},
     command: function () {},
     summarize: function () {},
-    create: async () => {
+    create: async (args) => {
       if (createShouldThrow) throw new Error("create exploded");
-      createCalls.push({});
+      createCalls.push(args ?? null); // plan9 unit A: record the call args (the title assertions below)
       return { data: { id: "ses_u3_new" } };
     },
   };
@@ -684,11 +684,56 @@ try {
   // ---- (7) surface pin updated: `create` is a probed candidate (the v1
   // mock carries it as a function — the live typeof verdict lands in
   // the surface report).
-  chk("UNIT 3: surface pin updated — create= in the candidates (v1 mock: create=function)",
-    surf && surf.includes("create=function"), surf ?? "");
+   chk("UNIT 3: surface pin updated — create= in the candidates (v1 mock: create=function)",
+     surf && surf.includes("create=function"), surf ?? "");
 
-   // ============================================================
-   // UNIT 4 — liveness watchdog (#85 part 1: the #82 generalized scope)
+   // ---- (8) plan9 unit A: a DETERMINISTIC loop folder in the sandbox
+   // project → the spawn carries the identifier as the create TITLE
+   // (the vendored SDK answer: SessionCreateData.body.title) + the
+   // ident= bit in the spawn= line. The folder + log pin the
+   // derivation: planner-7 → next is planner-8. The queued prompt
+   // text is UNCHANGED (title mechanism, not a prompt prefix).
+   const loopDir = path.join(proj, ".opencode", "loop", "autorun-test_0-0");
+   fs.mkdirSync(loopDir, { recursive: true });
+   fs.writeFileSync(path.join(loopDir, "loop_log.md"),
+     "2026-09-21_15-33 -->START planner-7 unknown Qwen3.8-27B-Q3S-170K task oneliner\n", "utf-8");
+   const cBefore8 = createCalls.length, sBefore8 = spawnCalls.length;
+   const spawnLinesBefore8 = readLines().filter((l) => l.includes("spawn= sid=ses_u3_new")).length;
+   fs.writeFileSync(triggerFile, TRIGGER_TEXT, "utf-8");
+   const okS8 = await waitUntil(() => spawnCalls.length >= sBefore8 + 1 && !fs.existsSync(triggerFile));
+   const identName = "autorun-test_0-0 planner-8";
+   const lastCreate8 = createCalls[createCalls.length - 1];
+   const newSpawnLines8 = readLines().filter((l) => l.includes("spawn= sid=ses_u3_new")).length - spawnLinesBefore8;
+   chk("UNIT 3 plan9: loop folder present → create carries the autorun-identifiable title (folder + next planner-<N>: planner-7 → planner-8) + ident= bit in the spawn= line; queued prompt text UNCHANGED (no prefix)",
+     okS8 && createCalls.length === cBefore8 + 1 && spawnCalls.length === sBefore8 + 1 &&
+       (lastCreate8?.body?.title ?? null) === identName &&
+       spawnCalls[spawnCalls.length - 1]?.body?.parts?.[0]?.text === TRIGGER_TEXT &&
+       newSpawnLines8 === 1 &&
+       readLines().some((l) => l.includes("spawn= sid=ses_u3_new") && l.includes(`ident=${identName}`)),
+     `create=${createCalls.length} promptAsync=${spawnCalls.length}`);
+
+   // ---- (9) plan9 unit A: the same folder but a loop log with NO
+   // planner-<N> line → NO identifier (the create gets NO title — the
+   // spawn is exactly as before; no prompt-text prefix either).
+   fs.writeFileSync(path.join(loopDir, "loop_log.md"),
+     "2026-09-21_15-33 -->START worker-1 unknown Qwen3.8-27B-Q3S-170K task oneliner\n", "utf-8");
+   const cBefore9 = createCalls.length, sBefore9 = spawnCalls.length;
+   fs.writeFileSync(triggerFile, TRIGGER_TEXT, "utf-8");
+   const okS9 = await waitUntil(() => spawnCalls.length >= sBefore9 + 1 && !fs.existsSync(triggerFile));
+   const lastCreate9 = createCalls[createCalls.length - 1];
+   chk("UNIT 3 plan9: loop log without any planner-<N> line → no identifier (create called with no title, queued prompt text unchanged)",
+     okS9 && createCalls.length === cBefore9 + 1 && spawnCalls.length === sBefore9 + 1 &&
+       (lastCreate9?.body?.title ?? undefined) === undefined &&
+       spawnCalls[spawnCalls.length - 1]?.body?.parts?.[0]?.text === TRIGGER_TEXT,
+     `create=${createCalls.length} promptAsync=${spawnCalls.length}`);
+
+   // Leave the sandbox clean for the UNIT 4 sections below: the loop
+   // dir is removed (no folder → no identifier — the pre-plan9 spawn
+   // behavior those sections pin).
+   fs.rmSync(path.join(proj, ".opencode", "loop"), { recursive: true, force: true });
+
+    // ============================================================
+    // UNIT 4 — liveness watchdog (#85 part 1: the #82 generalized scope)
    //
    // The factory is re-invoked with a SPYING client: `messages` is
    // scripted PER SID (the SDK list shape Array<{info, parts}>),
