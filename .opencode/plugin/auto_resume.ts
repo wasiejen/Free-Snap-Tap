@@ -921,10 +921,14 @@ function firstUserAgent(msgs: unknown): string | null {
 // #85 part 2 (current agent+modelID): the LAST assistant message's info
 // object (the session's CURRENT working agent+model — reflects
 // mid-session switches); null when no assistant message exists.
+// #91: the COMPACTION SUMMARY (an assistant message with
+// agent="compaction" — a synthetic summary, not a real turn) is
+// SKIPPED — it must never supply the inject/spawn identity (the
+// 2026-09-23 live incident: a successor spawned with agent=compaction).
 function lastAssistantInfo(msgs: unknown): Record<string, unknown> | null {
   let last: Record<string, unknown> | null = null;
   for (const pair of msgPairs(msgs)) {
-    if (pair.info && pair.info.role === "assistant") last = pair.info;
+    if (pair.info && pair.info.role === "assistant" && pair.info.agent !== "compaction") last = pair.info;
   }
   return last;
 }
@@ -1061,11 +1065,15 @@ function resolveInjectIdentity(msgs: unknown): { agent: string | null; model: { 
 
 // Unit 4: the routing scan — the LAST assistant message's text parts,
 // the LAST match of the action-line regex wins; null = no assistant
-// message or no recognized line.
+// message or no recognized line. #91: the COMPACTION SUMMARY
+// (agent="compaction") is SKIPPED — its QUOTED action lines (a summary
+// of a predecessor's close) must never drive the routing (the
+// 2026-09-23 live incident: a quoted "action: restart" mis-routed a
+// recovery into a restart spawn).
 function lastAssistantAction(msgs: unknown): string | null {
   let last: MsgPair | null = null;
   for (const pair of msgPairs(msgs)) {
-    if (pair.info && pair.info.role === "assistant") last = pair;
+    if (pair.info && pair.info.role === "assistant" && pair.info.agent !== "compaction") last = pair;
   }
   if (!last) return null;
   const text = textParts(last).join("\n");

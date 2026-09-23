@@ -1195,8 +1195,28 @@ try {
    ]);
    // (b-d) dead-mark: planner-scoped, no closing line; the CONTINUE
    // send THROWS (a dead model — the session never goes busy).
-   msgScript.set("ses_p2_dm", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Mid-unit, no closing line."]], PLANNER_A));
-   p2ThrowSids.add("ses_p2_dm");
+    msgScript.set("ses_p2_dm", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Mid-unit, no closing line."]], PLANNER_A));
+    p2ThrowSids.add("ses_p2_dm");
+    // #91: the COMPACTION SUMMARY (an assistant message with
+    // agent="compaction") must never drive routing or identity.
+    // (e1) ROUTING: the last REAL assistant has no action line; the
+    // summary (the last message) QUOTES "action: restart" — the routing
+    // must read the real turn (no line → CONTINUE), not the quote.
+    msgScript.set("ses_p2_cmp", [
+      { info: { role: "user", agent: PLANNER_A }, parts: [{ type: "text", text: MARK + " iteration 1" }] },
+      { info: { role: "assistant", agent: WORKER_A, model: MODEL }, parts: [{ type: "text", text: "Mid-unit, no closing line." }] },
+      { info: { role: "assistant", agent: "compaction", model: { providerID: "prov_c", modelID: "model_c" } }, parts: [{ type: "text", text: "Compaction summary: the previous planner-10 closed with `action: restart`; bookkeeping committed." }] },
+    ]);
+    // (e2) IDENTITY: the last REAL assistant carries the switched pair
+    // + action: restart; the summary (the last message) carries
+    // agent="compaction" — the routing must still find the real line,
+    // and the spawn must carry the REAL pair, never the compaction
+    // agent.
+    msgScript.set("ses_p2_cmp2", [
+      { info: { role: "user", agent: PLANNER_A }, parts: [{ type: "text", text: MARK + " iteration 1" }] },
+      { info: { role: "assistant", agent: WORKER_A, model: MODEL }, parts: [{ type: "text", text: "Done. action: restart" }] },
+      { info: { role: "assistant", agent: "compaction", model: { providerID: "prov_c", modelID: "model_c" } }, parts: [{ type: "text", text: "Compaction summary: previous work recap, no closing line." }] },
+    ]);
 
    // All four scenarios armed before one tick pass (the single tick —
    // short tickMs here, 5000ms default in live — is the only
@@ -1204,8 +1224,10 @@ try {
    await fire(hooksP2, "ses_p2_cur", [statusEv("ses_p2_cur", "busy"), statusEv("ses_p2_cur", "idle")]);
    await fire(hooksP2, "ses_p2_rs", [statusEv("ses_p2_rs", "busy"), statusEv("ses_p2_rs", "idle")]);
    await fire(hooksP2, "ses_p2_fb", [statusEv("ses_p2_fb", "busy"), statusEv("ses_p2_fb", "idle")]);
-   await fire(hooksP2, "ses_p2_dm", [statusEv("ses_p2_dm", "busy"), statusEv("ses_p2_dm", "idle")]);
-   const okP2 = await waitUntil(
+    await fire(hooksP2, "ses_p2_dm", [statusEv("ses_p2_dm", "busy"), statusEv("ses_p2_dm", "idle")]);
+    await fire(hooksP2, "ses_p2_cmp", [statusEv("ses_p2_cmp", "busy"), statusEv("ses_p2_cmp", "idle")]);
+    await fire(hooksP2, "ses_p2_cmp2", [statusEv("ses_p2_cmp2", "busy"), statusEv("ses_p2_cmp2", "idle")]);
+    const okP2 = await waitUntil(
      () =>
        readLines().some((l) => l.includes("recovery= sid=ses_p2_cur attempt=1")) &&
        readLines().some((l) => l.includes("route= restart spawn sid=ses_p2_rs")) &&
@@ -1229,9 +1251,32 @@ try {
        p2SpawnSend?.body?.model?.providerID === MODEL.providerID && p2SpawnSend?.body?.model?.modelID === MODEL.modelID &&
        !!p2SpawnLine && p2SpawnLine.includes("agent=" + WORKER_A) && p2SpawnLine.includes("model=prov_x/model_x"),
      JSON.stringify(p2SpawnSend?.body ?? null));
-   chk("#85 part 2 (a): the JSONC fallback — no last-assistant agent+model → the working agent (first user) + its CONFIGURED model from opencode.jsonc",
-     okP2 && p2Fb?.body?.agent === "worker_fb_test" && p2Fb?.body?.model?.providerID === "prov_x" && p2Fb?.body?.model?.modelID === "model_x",
-     JSON.stringify(p2Fb?.body ?? null));
+    chk("#85 part 2 (a): the JSONC fallback — no last-assistant agent+model → the working agent (first user) + its CONFIGURED model from opencode.jsonc",
+      okP2 && p2Fb?.body?.agent === "worker_fb_test" && p2Fb?.body?.model?.providerID === "prov_x" && p2Fb?.body?.model?.modelID === "model_x",
+      JSON.stringify(p2Fb?.body ?? null));
+
+    // #91 — the compaction summary is invisible to routing + identity.
+    const okP2E = await waitUntil(
+      () =>
+        readLines().some((l) => l.includes("recovery= sid=ses_p2_cmp attempt=1")) &&
+        readLines().some((l) => l.includes("route= restart spawn sid=ses_p2_cmp2")),
+      12000,
+    );
+    const p2CmpSend = p2Sends.find((c) => c.path?.id === "ses_p2_cmp");
+    const p2MarkSends = p2Sends.filter((c) => ((c.body?.parts?.[0]?.text ?? "")).startsWith(MARK));
+    chk("#91 (e1): a quoted `action: restart` in the COMPACTION SUMMARY does not drive the routing — the real turn (no line) → CONTINUE attempt 1, no restart spawn",
+      okP2E && readLines().some((l) => l.includes("recovery= sid=ses_p2_cmp attempt=1")) &&
+        !readLines().some((l) => l.includes("route= restart spawn sid=ses_p2_cmp") && !l.includes("sid=ses_p2_cmp2")) &&
+        !!p2CmpSend && ((p2CmpSend?.body?.parts?.[0]?.text) ?? "").includes("agent_readme_post_compaction.md") &&
+        p2CmpSend?.body?.agent === WORKER_A,
+      JSON.stringify(p2CmpSend?.body ?? null));
+    chk("#91 (e2): the restart routing reads the last REAL assistant (the action line survives a trailing compaction summary) → spawn",
+      okP2E && readLines().some((l) => l.includes("route= restart spawn sid=ses_p2_cmp2")), "");
+    chk("#91 (e2): no injected/spawned body ever carries the compaction agent — every restart spawn carries the real assistant's agent+model",
+      okP2E && !p2Sends.some((c) => c.body?.agent === "compaction") &&
+        p2MarkSends.length >= 2 &&
+        p2MarkSends.every((c) => c.body?.agent === WORKER_A && c.body?.model?.modelID === MODEL.modelID),
+      JSON.stringify(p2MarkSends.map((c) => ({ a: c.body?.agent, m: c.body?.model }))));
 
    // (b) the host re-arms the failed session (a session.error — a dead
    // stream may never emit its idle): the NEXT tick must log the
