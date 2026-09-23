@@ -5,13 +5,7 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
-2026-09-23_14-19:
-- suggest testing new commands with unknown or potential big return with output into a temp file and check size before reading
-  - to conserve context from misfired or wrong arguments
-  - do not let untested shell commands or untested scripts directly output to your context
-    - only allow overview information to directly enter context like e.g. how many lines where saved in the output file
-- or always use bounds on untested greps etc that might result in higher than expected content return
-- needs to be codified
+
 
 2026-09-23_05-19:
 try to be more creative and experiment a bit with different appoaches to problems - to use context this was is never a waste - when you learn something from it save it in memories.
