@@ -452,3 +452,6 @@ Plan9 spec claim "the repo has NO node_modules" was stale — the vendored @open
 ### 2026-09-23_14-44 worker_Q3S_170K ses_f31c9b422ffe1juyFaqGyKXRFl
 read tool truncates >2000-char lines (TODO.md #74 ~4k line only fully visible via unbounded rg output) — a line-extraction helper (or read offset-within-line) would save context on long-line files.
 
+### 2026-09-23_15-21 planner_Q3S_170K ses_f31a5dee5ffe1DIBxZzEDZF8aF
+TODO.md line-count bookkeeping cost two aborted script iterations: wc -l (702) vs node array length (703, trailing newline) mismatched, and boundary line numbers were taken from memory instead of fresh grep/awk output - the built-in abort checks caught both before damage; rule of thumb: always re-derive file boundaries from a fresh bounded read immediately before a line-range script.
+
