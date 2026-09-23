@@ -56,23 +56,8 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
 
 ## Loop & coordination (open)
 
-## 53. Agent-feedback protocol: mandatory close-down step + small write-tool (DEFERRED 2026-09-12, **DEFERRAL LIFTED 2026-09-17** — direct session; maintainer: "it did not even know anymore that i deferred it") — the optional `agent_feedback.md` entries get discarded by the early-close-at-stop-line discipline; make it a NON-optional part of the close-down phase (directly before the closing message), full date_time on each entry, and a small tool that writes the entry (no file fiddling / accidental reads). **Proposal FILED 2026-09-17** (`proposals/2026-09-17_agent-feedback-closedown.md` —
-Part A: mandatory close-down prompt step, full date_time auto-stamped; Part B:
-unified `submit` tool per his #5 sketch; recommendation: both as one unit)
-— **ruled 2026-09-17: approved both parts in one unit**.
-**Status 2026-09-18 (plan1, looprun 2026-09-17_23-58):** Part A LANDED
-(5e29cb0 — friction close-down step in all 4 role prompts) + Part B LANDED
-(b83b34f — `submit` tool + 20/20 smoke + probe S23 pin; gate re-verified
-green by planner: probe annotation-agree, all 9 smokes, pytest 459+1w,
-ruff F=0). REMAINING (maintainer domain): registration in live
-`opencode.jsonc` + per-agent tool grant at restart; live acceptance after
-restart. **Status 2026-09-18 (plan2/iter2):** maintainer inbox instruction
-(session/role autofill) LANDED (86a977f — `submit` derives role from
-context.agent / session from context.sessionID; role+session REMOVED from the
-args schema; smoke 20/20 + probe S23 re-pinned to 3 args + context stamps;
-gate green: probe two-two-nine (2-2-9) annotation-agree [worker's "239/239"
-was a dense-numeral drift — the planner's re-run measured 2-2-9], all 9
-smokes, pytest 459+1w, ruff F=0).
+
+## 53. (closed 2026-09-23, planner-13 bookkeeping; full text in todo_records.md) — Agent-feedback protocol: the mandatory close-down friction step (Part A, 5e29cb0, all 4 role prompts) + the `submit` write-tool (Part B, b83b34f + session/role autofill 86a977f); maintainer-domain tail closed (registration live in the role toolsets, AGENTS.md paste LANDED 2026-09-18, machine-stamped entries firing in live sessions since).
 
 ## 56. (DEFERRED 2026-09-15, maintainer `--defer` in priority.md) — Distillation worker runs over the session dumps (his # 3 3 mandate)
 
@@ -130,25 +115,8 @@ smokes, pytest 459+1w, ruff F=0).
 
 ## 65. (closed 2026-09-17, maintainer-ruled — NOT a tool bug, see todo_records.md for the full entry if needed) — loop_log tool folder-detection bug: spurious folders on the maintainer-renamed loop folder (2026-09-16, plan2)
 
-## 66. 5.3+5.4 restart acceptance (open — PENDING RESTART, 2026-09-16 direct session)
-- **Problem / evidence:** the observer plugin failed to LOAD on the first
-  live check ("Plugin export is not a function" — fixed by the core split,
-  `4719cc5`); the read-scope mutation channel (5.4 one-shot) is still
-  unproven. No `.opencode/temp/intercept.log` exists yet.
-- **Outcome:** at the next restart: (1) first `intercept.log` lines appear
-  (dense/numword/dense-date triggers — any session with dense args);
-  (2) the mutation-channel verdict: read the scratchpad sentinel
-  `C:/Users/Wasiejen/AppData/Local/Temp/opencode/fuzzy_accept/file-four.txt`
-  via a d<=2 mistyped path → if the tool result is the TWIN content
-  (`file-4.txt`) AND a `fuzzy-resolved` line is logged → mutation channel
-  LIVE (write-scope #68 unblocked); else NOT live (5.3 stays log-only,
-  redundancy-naming route #69 becomes primary). Record the verdict in
-  TODO + the research doc; then tear down the sentinel per §5.4.
-- **Acceptance:** verdict line in TODO.md + one line in the research doc
-  dated section; fixture state noted.
-- **Scope:** none (read the log + one controlled read) — planner at the
-  restart.
-- **Status:** PENDING RESTART.
+
+## 66. (closed 2026-09-23, planner-13 bookkeeping; full text in todo_records.md) — 5.3+5.4 restart acceptance was stale: the read-scope mutation channel was proven LIVE by #68's one-shot live-acceptance (2026-09-17); the §5.4 sentinel torn down; intercept.log accumulated to 3076 lines / 139 sessions by 2026-09-23.
 
 ## 67. Fuzzy scope extension: glob / grep / section-anchor resolvers (2026-09-16, plan2 queue)
 - **Problem / evidence:** plan2 wired ONLY `read` (+string filePath) — the
@@ -404,52 +372,8 @@ All those IDs stay reserved — see the numbering rule in the header.
 
 
 
-## 82. (open — scope-toggle LANDED 2026-09-22 via #85 part 1; live acceptance + unit-2 suppression question pending; 2026-09-22, planner live; HIGH) scope verdict: last-toggle-wins over user history, own-line anchor, bidirectional (on/off markers)
-- **Problem + evidence:** live incident 2026-09-22T12:33:18Z (gen
-  v=0bb5c46f — the verified #80-fixed build, post-380e326 re-activation):
-  unit 4 injected a recovery prompt into the direct (no-launch) session
-  ses_f39d250e9ffeheip2FVEeY5Fk6. Log: `scope= planner sid=…` →
-  `recovery= attempt=1` → `arm= … injected` (the cap fix worked — the
-  injected busy was consumed, no reset). CAUSE identified live: the
-  maintainer's clarifying-question message contained the literal
-  `<|autonom|>` (a user text part) — `userHasMarker` scans ALL user
-  parts, so any later user message quoting the marker flips a direct
-  session to scope=planner. (The original 2026-09-21 incident — 9×
-  recovery with NO user marker in history at the time — remains H2,
-  runtime-shape, unresolved.)
-- **Desired outcome (his ruling 2026-09-22 — SUPERSEDES the
-  first-message-only proposal):** scope is re-evaluated on EVERY new
-  user message — LAST TOGGLE WINS over the user history (restart-safe:
-  the same scan derives the state after a process restart). Toggle
-  markers count ONLY on their own line (message-start anchors ruled
-  out — the injected `ctx:` gauge line always prefixes the message, so
-   the marker never sits at the start). ON: `<|autonom|>` (the existing
-   launch marker) AND `<|Autorun|>` — CONFIRMED 2026-09-22: both count as
-   ON, CASE-INSENSITIVE (his original german wordplay was `autonom`; both
-   spellings stick); OFF: `<|Direct|>` (case-insensitive). Bidirectional:
-   he can deactivate AND reactivate mid-session without starting a new
-   session (context preservation — his stated motivation).
-- **Acceptance criteria:** own-line match only (mid-sentence or
-  bullet-prefixed markers never toggle); smoke: (i) mid-sentence quote
-  → scope unchanged; (ii) own-line `<|Direct|>` then own-line
-  `<|autonom|>` → last wins (ON); (iii) restart derives the same state
-  from history (no in-memory persistence). Live: his post-restart test
-  on this session — under the CURRENT code (all-parts scan) autorun WILL
-  re-engage (any quote counts); after #82 it must NOT (his message
-  carries no own-line toggle). `route= stop` live-proven by this
-  session's `action: stop` turns (#70 residue). OPEN (his call, after
-  the 85%-trigger info given 2026-09-22): does OFF also suppress unit 2
-  (context trigger) or only unit 4?
-- **Suggested scope:** `userHasMarker` / scope verdict in
-  `.opencode/plugin/auto_resume.ts` (L614, L543-551) + smoke section.
- - **Status:** design AGREED 2026-09-22 (his ruling on all open
-   questions); the SCOPE-TOGGLE portion LANDED as part of #85 part 1
-   (2026-09-22, worker worker_Q3S_170K — the last-toggle-wins own-line
-   evaluation is in the auto_resume.ts scope verdict, and the smoke pins
-   acceptance (i) mid-sentence quote, (ii) last-toggle-wins ON, plus the
-   own-line/trim + case-insensitive rules and the restart-safe derivation);
-   remaining: live acceptance (his post-restart test) + the unit-2-
-   suppression question (his call after the 85%-trigger info). **Unit-2 suppression RULING 2026-09-23 (planner-12 direct): YES — Direct suppresses Unit 2** (his rationale: otherwise he would toggle autoCompact off in compact_budget.json and forget to re-enable it). That is ALREADY the landed behavior since #85 part 3 (the onToolAfterNudge verdict-none gate — the passive ctx-line nudge is Direct-gated; NO code change needed). Live evidence 2026-09-23: the Direct session ses_f3144d9d6… judged scope=none (17:08:57Z), idle-untouched under the post-#90 build. Remaining: the full post-restart live acceptance rides the #90 new-build spawn tail (the restartText line-1 own-line marker as a spawned successor's first message).
+
+## 82. (closed 2026-09-23, planner-13 bookkeeping; full text in todo_records.md) — scope toggle (last-toggle-wins, own-line anchor, bidirectional) LANDED as #85 part 1 (97fccfc) + the unit-2 suppression ruling (Direct suppresses Unit 2 = the already-landed #85 part 3 behavior, no code change); FULL live acceptance 2026-09-23 on the #90 spawn tail (own-line toggle judged scope=autorun, route= restart spawn, successor's first message carries the own-line marker, trigger deactivate=).
 
 ## 83. (open, 2026-09-22, planner; maintainer call — enabler for a ~0.98 threshold) unit-2 backstop: catch the ACTUAL context-limit hit cleanly (revive context_recovery.ts)
 - **Problem + evidence:** the pre-emptive trigger (now configurable, default
@@ -593,8 +517,8 @@ All those IDs stay reserved — see the numbering rule in the header.
 ## #89. (closed 2026-09-23 - live-accepted plan10; full text in todo_records.md) - autorun-identifiable names for plugin-spawned sessions (title <loop-folder> planner-<N>): LIVE - the first named spawn verified 2026-09-23 13:00:08Z (the spawn= line carries ident=autorun-2026-09-21_15-33 planner-10 + the session title in the DB)
 
 
-## #90. (LANDED 2026-09-23, worker `worker_Q3S_170K`) - plugin-spawned successors inherit the trigger's Autorun state + the trigger deactivates (approved proposal Parts A+B+C): (A) the `spawned` self-mark EXCLUSION removed from `scopeVerdict` (now a 1-arg function of the messages only), the `spawned` map REPURPOSED as the LINEAGE-DEPTH map (sid→depth), `restartText()` LINE 1 = the exact own-line `<|autonom|>` (prose moved to line 2) so every restart-spawned successor derives scope "autorun" from its first user message ALONE (restart-safe — no in-memory state), and a LINEAGE-DEPTH CAP (N=2) on the restart/cap-exhaustion spawn branch REPLACES the #85 exclusion's loop guard (`skip= depth sid=` at depth≥2; a file-trigger spawn stays depth 0); (B) `spawnPlanner` RETURNS the new sid (null on every failure path — the `spawn-fail=` lines are unchanged), a SUCCESSFUL spawn STICKY-deactivates the TRIGGER (`deactivate= sid=` line; a failed spawn changes nothing) and `routeScopedIdle` skips the deactivated trigger right after the scope recompute (`skip= deactivated sid=` — no send, no re-spawn, the session stays manually usable); the flag records the trigger's user-message count at deactivation and clears ONLY on a NEW user message carrying an own-line ON toggle; (C) at init (the factory call) the plugin RESTORES the in-memory depth map + deactivation flags from its own `auto_resume.log` (each `route= restart spawn sid=X` line paired with the following `spawn= sid=Y` → deactivated(X) + depth(Y)=depth(X)+1; an unpaired `spawn=` → depth 0; once per process). Smoke re-pinned: auto_resume.smoke.mjs 118/118 (the old #85 spawned-exclusion pins flipped to the new behavior + the proposal's acceptance pins 1-7 added). Gate green: probe 241/241, all 10 smokes, pytest 459 passed + 1 warning, ruff F=0. SUBSUMES #87 (now closed). Commit **c4b244d** (planner-verified 2026-09-23: independent smoke re-run 118/118).
-   **Live acceptance (2026-09-23, planner-12 direct ses_f3144d9d6…, post-restart):** the live build v=ef8c6149 IS the #90 build (sha256 prefix of the on-disk auto_resume.ts = the surface= v= line; process starts 16:32:37Z + 16:37:45Z, both after c4b244d 15:53:06Z). PART A verified by A/B contrast on the SAME successor session — the old build (d2b9d510) judged it scope=none (14:46:16Z, the spawn exclusion) vs the new build scope=autorun (16:37:07Z) + recovery= attempt=1 (the #87 stall case INVERTED: the successor is tracked + recoverable; the cap held at attempt=1). PART B/C verified — the new process's init log-restore (the old route= + spawn= pair) → zero re-routing/spawn against the trigger (planner-11) after the restart + zero spawn= lines in the new process (no unbounded loop; the trigger's own final close was correctly route= stop at 15:59:27Z under the old process). NOT YET exercised live by the new build: its own restart spawn (the deactivate= line on success, the new restartText line-1 exact-own-line marker as the successor's first message, the depth-cap skip=) — awaits the next autorun action:restart close. ADJACENT LIVE FINDING → TODO #91 (the compaction summary leaked into the spawn identity + routing during the 14:46Z episode — STILL LATENT in the live build).
+
+## #90. (closed 2026-09-23, planner-13 bookkeeping; full text in todo_records.md) — spawned successors inherit the trigger's Autorun state + the trigger deactivates (Parts A+B+C, commit c4b244d, worker_Q3S_170K) — FULL live acceptance 2026-09-23 (planner-13, build v=7d2e6207): `route= restart spawn` + `spawn= agent=planner_Q3S_170K ident=autorun-2026-09-21_15-33 planner-13` + `deactivate=` (19:20:55Z) + the restartText own-line `<|autonom|>` as the successor's first message + zero `skip=` depth-cap lines; subsumes #87 (closed).
 
 ## #91. (open, 2026-09-23, planner-12 direct; live incident 14:44–14:46Z; HIGH) compaction summary leaks into spawn identity + unit-4 routing (agent=compaction successor; mis-route on a quoted action line)
 - **Problem / evidence:** live incident 2026-09-23 14:44–14:46Z (pre-#90 build d2b9d510): planner-11 (ses_f318f0d77…) self-compacted (14:44:19Z) → the compaction summary is stored as an ASSISTANT message with info.agent=compaction + info.model=<session model> (the same-model fallback — agent.compaction.model is commented out). The summary text QUOTES "Previous planner-10 … closed with `action: restart`" (6612 chars). The unit-4 tick (14:46:06Z) then: (1) `lastAssistantAction` scanned the summary (the last assistant message) → found the QUOTED `action: restart` → ROUTE= RESTART SPAWN (mis-route — the planner's actual last real turn, 14:44:12Z, was a 76-char no-action-line close; the loop log records "self-compact + unit-4 resume per maintainer inbox"); (2) `resolveInjectIdentity` → the summary's info → the spawn body agent=compaction + model=Qwen3.8-27B-Q3S-170K (the spawn= line 14:46:06.647Z). "compaction" is NOT an agent defined in the live opencode.jsonc → the successor (ses_f3144d9d6…, ident=…planner-12) ran with the WRONG agent + mode (maintainer: "i started the session prior with autorun but the wrong agent and mode. thus reverted and then started you with direct"). DB evidence: the ses_f318f0d77 message 14:44:19.866Z (assistant / agent=compaction) + the auto_resume.log lines 14:46:06.629–647Z.
@@ -603,7 +527,7 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Fix design (recommended — maintainer call, observable behavior change):** skip assistant messages with info.agent === "compaction" in BOTH `lastAssistantInfo` (→ the spawn/inject identity falls back to the last real assistant message: the planner's agent+model) and `lastAssistantAction` (→ the routing reads the pre-compact close: a no-action-line Work State dump → recovery, as intended). One guard each; smoke fixture: a messages() shape whose last assistant message = a compaction summary (agent=compaction, text quoting "action: restart") → (a) the routing returns null (recovery), (b) the spawn body agent = the preceding real assistant's agent.
 - **Acceptance criteria:** the smoke pins above + gate green; LIVE: the next autorun self-compact→idle cycle (a) routes correctly (no mis-spawn from a quoted line), (b) the spawn= line carries agent=planner_* (not compaction).
 - **Suggested scope:** `.opencode/plugin/auto_resume.ts` (L921-930, L1052-1060, L1065-1077), `.opencode/plugin/tests/auto_resume.smoke.mjs`.
-- **Status:** fix LANDED 2026-09-23 (planner-12 direct, planner-implemented after his "approved") — the one-guard-each fix per the design (skip agent="compaction" in `lastAssistantInfo` + `lastAssistantAction`, auto_resume.ts); smoke re-pinned 121/121 (+3 #91 pins e1/e2) + gate green (probe 241/241, all smokes, pytest 459+1w, ruff F=0). Commit **2fa4bb6**. REMAINING — live acceptance (needs his restart to the new build + the next autorun cycle): a self-compact→idle cycle must (a) route from the real close (no mis-spawn from a quoted line), (b) the spawn= line carries agent=planner_* (not compaction) — this also completes the #90 new-build spawn tail.
+- **Status:** fix LANDED 2026-09-23 (planner-12 direct, planner-implemented after his "approved") — the one-guard-each fix per the design (skip agent="compaction" in `lastAssistantInfo` + `lastAssistantAction`, auto_resume.ts); smoke re-pinned 121/121 (+3 #91 pins e1/e2) + gate green (probe 241/241, all smokes, pytest 459+1w, ruff F=0). Commit **2fa4bb6**. REMAINING — live acceptance (needs his restart to the new build + the next autorun cycle): a self-compact→idle cycle must (a) route from the real close (no mis-spawn from a quoted line), (b) the spawn= line carries agent=planner_* (not compaction) — this also completes the #90 new-build spawn tail (DONE 2026-09-23). **Spawn-tail live acceptance (planner-13, build v=7d2e6207 live, process start 19:13:25Z):** the `spawn=` line carried `agent=planner_Q3S_170K` (the real agent, not compaction) and `route= restart spawn` came from the real close — no mis-route off the quoted 17:32Z compaction summary in this episode. NOT YET live-discriminated: the failure case needs the compaction summary to be the LAST evaluated turn (a self-compact then idle cycle in an autorun-scoped session) — the maintainer's re-engagement + own-line toggle + real close all followed the 17:32Z summary, so the guard was not the deciding factor here; the guard is smoke-covered (3 pins) and the discriminating cycle will occur naturally under the near-limit protocol.
 
 ## #92. (open, 2026-09-23, planner-12 direct; his question; SMALL) pre-compaction hook should save BOTH the lossless full markdown AND a raw `--json` snapshot
 - **Problem / evidence:** after #78 the hook keeps only the markdown backup. His question (2026-09-23): with raw JSON as the on-demand `--json` mode (DB-sourced), how do you get the pre-compaction JSON later — "the db is overwritten by the compacted session"? MEASURED on this session (compacted 17:32:02Z): the DB is NOT overwritten — 36 pre-compaction messages + 170 parts are still in the DB, 76 reasoning parts whole-session (the compaction summary is an ADDED assistant message, agent=compaction; planner-11's session showed the same). So on-demand `--json` of a compacted session works TODAY. BUT the DB is a live host-managed store (session deletion / pruning / migration / corruption can lose the rows) — the hook's _c0 snapshot is the only PINNED "state at compaction time" record; markdown-only forfeits the lossless source at exactly that moment.
