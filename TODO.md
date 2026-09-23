@@ -393,91 +393,11 @@ All those IDs stay reserved — see the numbering rule in the header.
   - Unit 4 (planner liveness watchdog): LANDED + smoke-verified; LIVE ACCEPTANCE PENDING the next host restart (the four acceptance cases in the proposal lines 138-142).
 - **NOTE:** unit numbering per the revised proposal — Unit 3 = new-planner spawn helper (shared building block), Unit 4 = planner liveness watchdog (auto-resume after compaction is its first branch); the "unit 3 = auto-resume / unit 4 = restart detection" wording is the pre-revision numbering.
 
-## 80. (open — fix LANDED 2026-09-22 + plugin reactivated, live acceptance (b) verified, close pending maintainer confirm; 2026-09-22, planner; HIGH) auto_resume inject calls lose the session agent → turns run as "build"
-- **Problem + evidence:** the Unit 2 (L387) + Unit 4 (L643) `promptAsync`
-  calls in `.opencode/plugin/deactivated/auto_resume.ts` send NO `agent`
-  field (the Unit 3 spawn does, L432). opencode's prompt path defaults a
-  missing agent to "build" → the injected turn runs as Build (DB, 2026-09-22
-  direct session ses_f39d250e9ffeheip2FVEeY5Fk6: injected user msgs + the
-  following assistant turns carry agent=build/mode=build, 23:58 ×4;
-  planner-6's session record agent=build). Impact: per-injected-turn
-  system-prompt change → whole prompt-cache invalidation + the planner loses
-  its system prompt (the planner-worker workflow is broken for those turns).
-- **Related open anomaly:** unit 4 acted on a direct (non-autorun) session
-  despite the scope=none fail-safe (5× `recovery= attempt=1`; the cap resets
-  on each injected busy → unreachable as-is). NO user text part of that
-  session carries `<|autonom|>` (all 15 checked) and the spawned map never
-  held it. Maintainer 2026-09-22: the 5 injections = his 4 interrupt
-  attempts + 1 initial — he tried to interrupt 4 times, then exited
-  opencode; NO scope-logic edits. The scope verdict is single (L614:
-  `spawned.has` || `userHasMarker`; the spawned-map population path is
-  untraced — likely a Map) → verify at fix time. Resolve before
-  re-activation (suggested: a version hash in the `surface=` line).
-- **Desired outcome:** injected messages preserve the session's agent (cache
-  warm, role prompt intact); a direct session ends idle untouched.
-- **Acceptance criteria:** (a) the unit 2/4 `promptAsync` body carries an
-  explicit agent — scoped sessions: the spawn-side `PLANNER_AGENT_ID`; other
-  sessions: the first user message's agent from the existing `messages()`
-  fetch (`session.agent` is UNRELIABLE — it tracks the LAST prompt; proven
-  lock-in to "build" on planner-6); (b) live (post re-activation): the
-  injected message + turn show the session's original agent in the DB and
-  cache-read tokens stay high (no full re-prefill); (c) a direct session ends
-  idle with no recovery/trigger injection.
-- **Open design questions (maintainer, undecided):** recovery-cap semantics
-  (reset-on-busy makes the cap unreachable while the plugin keeps injecting);
-  direct session = new "autorun" entry with direct interaction (his
-  stop/interrupt + `ask_maintainer` must stop the loop — NEW (his idea
-  2026-09-22): an `ask_maintainer` timer, e.g. 5 min — if he is not
-  available, the loop/autorun resumes after the timeout); planner
-  compaction budget exhaustion (keep=0 + same-session resume + budget reset
-  vs. higher cap — bit-rot risk).
-- **Status:** implementation LANDED (4098253, worker-2
-  ses_f371e0e23ffe0eza71uD5qWy7K); plugin REACTIVATED 2026-09-22
-  (380e326) — live gen `surface= v=0bb5c46f` hash-verified byte-identical
-  to the #80-fixed build; **(b) VERIFIED LIVE 2026-09-22 12:33:18Z
-  (DB): both the unit-2 + unit-4 injections carry
-  agent=planner_Q3S_160K (pre-fix behavior: agent=build) and the
-  following assistant turn does too — injected turns keep the session
-  agent; (c) now gated on #82 (his marker-quote message flipped the
-  scope live — a design gap, not a fix failure); close pending his
-  confirm. Gate note: probe 240/241 — check [97] pre-existing red
-  (maintainer temp fix 0f192e5) → #81.
-  History: investigated 2026-09-22
-  (planner, direct session); FIX DESIGN APPROVED by the maintainer
-  2026-09-22; plugin DEACTIVATED (a000dfd). Item-3 scope anomaly: H1
-  REFUTED 2026-09-22 (DB check — none of the session's 44 user-role parts,
-  every part type, contains `<|autonom|>`); H2 (running variant ≠ committed
-  file) leading; the new `scope=` verdict log line + `surface=` v= version
-  ID will pin verdict + code state on the next incident.
-- **Suggested scope:** `.opencode/plugin/deactivated/auto_resume.ts` (L387,
-  L643; scope scan L543-551).
+## 80. (closed 2026-09-23 - fix LANDED 4098253 (worker-2) + plugin reactivated, live-accepted: (b) the injected turns keep the session agent (DB, 2026-09-22) + (c) the Direct session idle-untouched under the post-#90 build (scope=none 17:08:57Z, zero recovery/route/spawn); maintainer confirm 2026-09-23; full text in todo_records.md) - auto_resume inject calls lost the session agent → the turns ran as "build" (the prompt-cache invalidation + the planner lost its system prompt); fixed: the injected bodies carry the session's CURRENT agent+model (the last REAL assistant's info — #91: the compaction summary is skipped; else the JSONC configured-model fallback; else the host default — never a planner constant)
 
-## 81. (open — re-pin LANDED 2026-09-22 (af38e2f), gate green; maintainer call — close pending his confirm; 2026-09-22, worker-2 via inbox) probe [97] + compact_memory smoke pin red since temp fix 0f192e5
-- **Problem + evidence:** `handover_probe.mjs` check [97] (unit A: "exactly
-  ONE queued promptAsync carrying the text part") and the matching
-  `compact_memory.smoke.mjs` message pin FAIL at HEAD (probe 240/241, only
-  [97] red; the smoke: 1 FAIL, everything else pass). Pre-existing — NOT
-  the #80 work (the probe does not load auto_resume.ts): the maintainer's
-  temp fix `0f192e5` (2026-09-22) commented out the `promptAsync` call in
-  `compact_memory.ts` `queueMessage` (to stop the queued-message race — the
-  SELF compaction incident); the pins still expect the pre-fix behavior.
-- **Desired outcome:** the gate green again — either re-pin probe [97] +
-  the smoke to the temp-fix behavior (no queued promptAsync; the queued-note
-  line is still emitted), or re-pin them when the compact_memory message
-  feature gets its proper fix.
-- **Acceptance criteria:** probe 241/241 + `compact_memory.smoke.mjs`
-  green; TODO #80's live acceptance then re-runnable against a full-green
-  gate.
-- **Suggested scope:** `.opencode/plugin/probes/handover_probe.mjs` (check
-  [97]), `.opencode/plugin/tests/compact_memory.smoke.mjs`;
-  `compact_memory.ts` only if the message path is restored.
-- **Status:** LANDED 2026-09-22 (af38e2f, worker_Q3S_160K — the planner records
-  ses_f36d1ca53ffe0GXACaVwW9iCJO — planner re-verified: probe 241/241, smoke 53/53, pytest 459+1w, ruff F=0; hash recorded in the planner's bookkeeping commit, #80 precedent) — re-pinned per the ruling (NOT
-  deactivated/skipped, promptAsync NOT restored): probe [97] + the smoke
-  message pin now assert the temp-fix behavior (dispatch line + the
-  queued note byte-exact, NO queued promptAsync); gate green: probe
-  241/241 (header total agrees), smoke 53/53, pytest 459 passed +
-  1 warning, ruff F=0.
+## 81. (closed 2026-09-23 - re-pin LANDED af38e2f (worker_Q3S_160K), gate green (probe 241/241, smoke 53/53, pytest 459+1w, ruff F=0), maintainer confirm 2026-09-23; full text in todo_records.md) - probe [97] + the compact_memory smoke message pin red since the maintainer's temp fix 0f192e5 (the queued promptAsync commented out); re-pinned to the temp-fix behavior (the dispatch line + the queued note byte-exact, NO queued promptAsync — NOT deactivated, promptAsync NOT restored)
+
+
 
 ## 82. (open — scope-toggle LANDED 2026-09-22 via #85 part 1; live acceptance + unit-2 suppression question pending; 2026-09-22, planner live; HIGH) scope verdict: last-toggle-wins over user history, own-line anchor, bidirectional (on/off markers)
 - **Problem + evidence:** live incident 2026-09-22T12:33:18Z (gen
@@ -524,7 +444,7 @@ All those IDs stay reserved — see the numbering rule in the header.
    acceptance (i) mid-sentence quote, (ii) last-toggle-wins ON, plus the
    own-line/trim + case-insensitive rules and the restart-safe derivation);
    remaining: live acceptance (his post-restart test) + the unit-2-
-   suppression question (his call after the 85%-trigger info).
+   suppression question (his call after the 85%-trigger info). **Unit-2 suppression RULING 2026-09-23 (planner-12 direct): YES — Direct suppresses Unit 2** (his rationale: otherwise he would toggle autoCompact off in compact_budget.json and forget to re-enable it). That is ALREADY the landed behavior since #85 part 3 (the onToolAfterNudge verdict-none gate — the passive ctx-line nudge is Direct-gated; NO code change needed). Live evidence 2026-09-23: the Direct session ses_f3144d9d6… judged scope=none (17:08:57Z), idle-untouched under the post-#90 build. Remaining: the full post-restart live acceptance rides the #90 new-build spawn tail (the restartText line-1 own-line marker as a spawned successor's first message).
 
 ## 83. (open, 2026-09-22, planner; maintainer call — enabler for a ~0.98 threshold) unit-2 backstop: catch the ACTUAL context-limit hit cleanly (revive context_recovery.ts)
 - **Problem + evidence:** the pre-emptive trigger (now configurable, default
@@ -678,4 +598,4 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Fix design (recommended — maintainer call, observable behavior change):** skip assistant messages with info.agent === "compaction" in BOTH `lastAssistantInfo` (→ the spawn/inject identity falls back to the last real assistant message: the planner's agent+model) and `lastAssistantAction` (→ the routing reads the pre-compact close: a no-action-line Work State dump → recovery, as intended). One guard each; smoke fixture: a messages() shape whose last assistant message = a compaction summary (agent=compaction, text quoting "action: restart") → (a) the routing returns null (recovery), (b) the spawn body agent = the preceding real assistant's agent.
 - **Acceptance criteria:** the smoke pins above + gate green; LIVE: the next autorun self-compact→idle cycle (a) routes correctly (no mis-spawn from a quoted line), (b) the spawn= line carries agent=planner_* (not compaction).
 - **Suggested scope:** `.opencode/plugin/auto_resume.ts` (L921-930, L1052-1060, L1065-1077), `.opencode/plugin/tests/auto_resume.smoke.mjs`.
-- **Status:** OPEN — fix design awaiting the maintainer's ruling (he is available in the 2026-09-23 direct session); a clean next autorun restart-spawn is blocked until it lands (the #90 live-acceptance tail).
+- **Status:** fix LANDED 2026-09-23 (planner-12 direct, planner-implemented after his "approved") — the one-guard-each fix per the design (skip agent="compaction" in `lastAssistantInfo` + `lastAssistantAction`, auto_resume.ts); smoke re-pinned 121/121 (+3 #91 pins e1/e2) + gate green (probe 241/241, all smokes, pytest 459+1w, ruff F=0). Commit **2fa4bb6**. REMAINING — live acceptance (needs his restart to the new build + the next autorun cycle): a self-compact→idle cycle must (a) route from the real close (no mis-spawn from a quoted line), (b) the spawn= line carries agent=planner_* (not compaction) — this also completes the #90 new-build spawn tail.
