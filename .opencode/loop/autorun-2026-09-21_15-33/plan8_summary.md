@@ -48,6 +48,26 @@
 - Live activation of part 3 = the next opencode restart (changes are on disk;
   the live plugin still runs the old code until then).
 
-## Next (this iteration)
-- Unit 2: reduce the auto_resume smoke wall-time (his 2026-09-23_00-12) —
-  spec + delegate.
+## Unit 2 — smoke wall-time reduction LANDED + verified
+- Spec: `plan8_ho_task2.md`. worker-14 (ses_f3237593effeGgPtp8RtS0ftQl,
+  worker_Q3S_170K, closed at 49%): LANDED `532ddbc` (plugin + smoke) +
+  `739d8a1` (TODO #88 + handover).
+- Result: 145.5 s → 12.5 s wall (91.4 % off — target was ≥50 %). Lever:
+  default-preserving `tickMs` factory option (default 5000 — live
+  unchanged; first factory call sets the module-level tick) + the 7×
+  `sleep(5600)` became `tickWait()` (2 ticks + margin, same pin
+  semantics), smoke runs with `tickMs: 300`.
+- Planner verification: commits present; `tickMs` default-preservation
+  confirmed in source (L1219-1224); I re-ran the smoke myself:
+  ALL PASS 102/102 in 13.0 s; the worker's own gate output in its dump
+  (probe 241/241, pytest 459 passed, ALL PASS).
+
+## For the next iteration (planner-9)
+- TODO.md shrink + curation (the review is in todo_inbox 2026-09-23_02-51;
+  header note now stale again — next ID is #89).
+- Research spec (priority.md #1: ups+downs of compact_memory +
+  block_transfer).
+- #87 ruling (dead-successor semantics) + #82/#80 live acceptance + #83
+  backstop = maintainer calls (he was AFK).
+- Live activation of #85 part 3 + the tickMs option = the next opencode
+  restart (on disk; the live plugin is the pre-part-3 build until then).

@@ -28,8 +28,11 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   plugin.log was searched; the fix puts `--include` before the pattern via
   `-e`, verified clean).
 - TODO #85: part 3 hashes recorded (ded7245/5992f38) in this bookkeeping.
-- NEXT (this iteration, unit 2): reduce the auto_resume smoke wall-time
-  (his 2026-09-23_00-12 priority note) — spec + delegate.
+- Unit 2 LANDED + verified: smoke wall-time 145.5 s → 12.5 s (91.4 %) —
+  worker-14 ses_f3237593effeGgPtp8RtS0ftQl (closed 49%), commits 532ddbc
+  (plugin `tickMs` default-preserving option + smoke `tickWait()`) +
+  739d8a1 (TODO #88 + handover). Verified from files + my own smoke run
+  (ALL PASS 102/102 in 13.0 s) + the worker's gate output in its dump.
 - LIVE FINDING (his Unit-4 question, answered from the plugin log): my
   session was SPAWNED by the Unit-4 restart branch (log `spawn=`
   02:17:49Z; first user msg = the locked restartText) → the #85 part-1
