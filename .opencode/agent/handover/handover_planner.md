@@ -2,63 +2,44 @@
 
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
-## Current session — autorun, 2026-09-23 (ses_f33f1eb98ffeFvrnTdmTzmyE2x, planner-8, Qwen3.8-27B-Q3S-170K)
-- #85 part 3 LANDED + planner-verified (ded7245 code+smoke+TODO + 5992f38
-  handover; worker-13 ses_f33c05575ffeYtM7PHyL30GgID, worker_Q3S_170K, closed
-  at 94%): the Unit-2 tick leg is REMOVED — the nudge is a PASSIVE ctx-line
-  SUFFIX on the session's own tool-call return (tool.execute.after, the gauge
-  plugin's ctx: channel), per busy session, ladder (>=0.95 "self-compact now"
-  / >=0.98 --maintainer line), scope "none" (Direct) suppresses it (c),
-  scopeVerdict checks the LAST OWN-LINE TOGGLE FIRST (d — Direct deactivates
-  Unit 4 for the planner), Unit-4 scope unchanged, NO promptAsync on the
-  Unit-2 path. Verified from files: commits + the worker's own gate output in
-  its session dump (smoke 102/102, probe 241/241, pytest 459+1w, ruff F=0) +
-  spot checks (tick leg gone, hook registered, promptAsync only on the spawn
-  path, toggle-first verdict order). Smoke count 105→102: the old
-  promptAsync-era unit-2 checks adapted to the passive mechanism.
-- worker-12 (ses_f33ee8eabffeaE0xuwZ7lc65NR) DIED at the context wall mid
-  smoke-write (step-finish reason=length, output=23,156, total=170,238):
-  forensics (MEM-0107) — ~34k tokens were two planning-prose messages + the
-  whole-smoke read; the auto_resume.ts code diff was COMPLETE on disk; the
-  in-flight smoke was salvaged verbatim (plan8_worker12_smoke_draft.md);
-  worker-13 took over from the salvage — zero rework.
-- Fixed the planner-prompt marker-sweep command (verified broken this
-  session: `--include="*.md"` after `--` is swallowed as a FILE argument →
-  the md filter silently dropped → the whole tree incl. the multi-MB
-  plugin.log was searched; the fix puts `--include` before the pattern via
-  `-e`, verified clean).
-- TODO #85: part 3 hashes recorded (ded7245/5992f38) in this bookkeeping.
-- Unit 2 LANDED + verified: smoke wall-time 145.5 s → 12.5 s (91.4 %) —
-  worker-14 ses_f3237593effeGgPtp8RtS0ftQl (closed 49%), commits 532ddbc
-  (plugin `tickMs` default-preserving option + smoke `tickWait()`) +
-  739d8a1 (TODO #88 + handover). Verified from files + my own smoke run
-  (ALL PASS 102/102 in 13.0 s) + the worker's gate output in its dump.
-- LIVE FINDING (his Unit-4 question, answered from the plugin log): my
-  session was SPAWNED by the Unit-4 restart branch (log `spawn=`
-  02:17:49Z; first user msg = the locked restartText) → the #85 part-1
-  `spawned` self-mark (L754 check, L612 set, no clear path) scopes it
-  "none" PERMANENTLY — Unit 4 never routes a self-spawned successor
-  (measured: 3 idle events, `scope= none` 03:00:03Z, no recovery=/route=
-  lines). A self-compaction close WITHOUT an action line therefore
-  STALLS the plugin-driven loop (no live looprunner in this mode to
-  resume via task_id); his `<|Autorun|>` "continue" rescued it but does
-  NOT re-scope it (spawned check precedes the toggle). Design question
-  filed as TODO #87 (4 options: stall / bounded re-spawn / looprunner
-  handoff / re-arm on fresh busy). Also curated #86 (deferred worker
-  audit) from todo_inbox 2026-09-23_01-08. NOTE: the LIVE plugin is still
-  the PRE-part-3 build (opencode started before the ded7245 commit —
-  log shows the old tick leg `skip= autoCompact-off` lines, 5s period);
-  part 3 is on disk, live-activation = the next restart. The maintainer's
-  autoCompact=OFF setting means the new Unit-2 nudge is also skipped
-  live until he turns it on.
-- Parked (need him, AFK): #82 live acceptance + (now resolved by design:
-  Direct gates Unit 2); #80 close (his confirm); #83 backstop (his
-  activation); the TODO.md curation review is in todo_inbox
-  (2026-09-23_02-51) for the shrink unit.
+## Current session — autorun, 2026-09-23 (ses_f322793f5ffeI34HE19SEmxU43, planner-9, Qwen3.8-27B-Q3S-170K)
+- Unit-4 restart branch (after planner-8's `action: restart`). Triage:
+  priority.md # 2026-09-23_04-20 (marker-sweep noise) CLOSED — the fixed
+  command verified committed (8f21b1e) + re-run clean (only legitimate
+  .md hits) → line moved to _past_priorities.md.
+- plan9 UNIT A LANDED + planner-verified (2240d00, worker-15
+  ses_f32120a60ffeoM8J0xg8Sb5Yym, worker_Q3S_170K): spawned sessions now
+  carry the title `<loop-folder> planner-<N>` — `body.title` in the SHARED
+  spawnPlanner helper (both spawn paths) + `ident=` bit in the `spawn=`
+  line; no loop folder / no planner-<N> line → no identifier (spawn
+  exactly as before). The bounded SDK answer was YES (vendored
+  `@opencode-ai/sdk` types in `.opencode/node_modules/` — MY SPEC CLAIM
+  "repo has NO node_modules" was stale; the worker flagged it, logged as
+  friction). Two new smoke checks (deterministic loop folder `autorun-test_0-0`
+  → `autorun-test_0-0 planner-8`; no-planner-line regression). Verified:
+  the commit (5 named paths, no maintainer files) + MY OWN smoke run
+  ALL PASS 104/104 in 13.1 s + the worker's gate output in its dump.
+  TODO #89 (hash recorded in this bookkeeping).
+- worker-15's launch DIED on a backend crash (connection error — host
+  side, the maintainer applied a first fix and is investigating): the
+  session had 33 msgs / ~54k at death with a COMPLETE planning phase and
+  ZERO file changes → resumed via task_id per his order, finished in one
+  go (the resume carried the intact planning — zero rework).
+- NEXT: TODO.md shrink curation (the todo_inbox 2026-09-23_02-51 review —
+  6 explicit findings: stale header numbering, ~40 closed full-text
+  entries in open sections, status-marker drift, #74 split/section, #75
+  changelog collapse) + the two --info items (worker compaction timing —
+  adopted in the worker-15 launch spec; dump completeness = already
+  tracked as TODO #78).
+- LIVE acceptance pending (next host restart): the first named spawn —
+  `ident=` line in `.opencode/temp/auto_resume.log` + the session title in
+  the DB. (Also still pending from earlier: #82/#80/#83 maintainer items,
+  #79/#82/#85 live-acceptance tails.)
 
 
 
 ## Compressed archive (one line each — details in git log + TODO/records)
+- 2026-09-23 autorun (ses_f33f1eb98ffeFvrnTdmTzmyE2x, planner-8, Qwen3.8-27B-Q3S-170K) — #85 part 3 LANDED + verified (ded7245+5992f38: Unit-2 passive ctx-line suffix, Direct gates it, scopeVerdict toggle-first) + Unit-2 smoke wall 145.5s→12.5s (91.4 %, 532ddbc+739d8a1, TODO #88) + LIVE FINDING: the plugin-spawned session is permanently `spawned`-scoped → a no-action-line close STALLS the plugin-driven loop (TODO #87, 4 options, maintainer call) + #86 deferred worker-audit curated + worker-12 limit-death forensics (MEM-0107) + marker-sweep command fix — details: loop folder plan8_summary.md + git 725ab3a
 - 2026-09-22/23 direct (ses_f39d250e9ffeheip2FVEeY5Fk6, planner Qwen3.8-27B-Q3S-160K, auto-resume branch — restarted mid-session into the planner-8 autorun) — #80 LIVE + live scope incident (quoted `<|autonom|>` → #82 root cause) + toggle design fully agreed (last-toggle-wins, own-line, ON=autonom/Autorun ci, OFF=Direct ci) + unit 2/4 semantics nailed + #85 parts 1+2 LANDED (97fccfc, b038b92) + part-3 final design (Unit-2 passive ctx-line suffix, no resume; Direct gates Unit 2 + beats planner in scopeVerdict; no <|Off|>) + spec written for the new planner; excess appended to nap_direct.md — details: git 8ae3ff3 + TODO #80/#82/#85
 - 2026-09-21 looprun autorun-2026-09-21_15-33, iteration 7 (ses_f3a24dc3bffe59B5xpa0Ho3XZd, planner-7, Qwen3.8-27B-Q3S-160K) — plan7: UNIT B LANDED + re-verified (d4ef76e, worker-10, after the worker-9 cancel); #79 root cause (msgPairs `{data}` wrapper) + fix LANDED + re-verified (eaef397, worker-11); live acceptance deferred to the post-restart direct session — details: loop folder plan7_summary.md + git 05e62ed
 - 2026-09-21 looprun 2026-09-21_15-33, iteration 6 (ses_f3a51aedcffeSa0cwt8PmwlXAr, planner-6, Qwen3.8-27B-Q3S-160K) — plan6: post-restart live acceptance (DUMP-OK LIVE PASS; the CROSS MODEL-READ live bug found + fixed 280b8d0 — dual-shape unwrap, the SAME root cause later filed as #79 for auto_resume `msgPairs`; Unit 2 `arm=` lines live; the Unit-4 spurious-recovery finding — corrected by planner-6 to the #79 shape bug) + the UNIT B spec committed (1c599a6; worker-8 stream-cut, zero loss; UNIT B toggle design decision recorded in plan6_summary.md: top-level optional `autoCompact` in the budget file, absent/true = ON, false = suppressed + `skip=` line, malformed = fail-open) + #78 filed, #70/#75 statuses — details: loop folder plan6_summary.md + git 280b8d0/a475d8a

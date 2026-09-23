@@ -443,3 +443,9 @@ Salvaged worker-12 draft's smoke line-range claims were off by one (said L5-8, a
 ### 2026-09-23_12-34 worker_Q3S_170K ses_f3237593effeGgPtp8RtS0ftQl
 Task spec DoD required a "TODO.md close note" but the smoke wall-time complaint (2026-09-23_00-12) had no numbered entry in TODO.md — worker had to self-assign #88; number complaint entries at spec time.
 
+### 2026-09-23_14-14 worker_Q3S_170K ses_f32120a60ffeoM8J0xg8Sb5Yym
+Task spec's bounded-check pointer said "the repo has NO node_modules" — stale: `.opencode/node_modules/@opencode-ai/{sdk,plugin}` (1.18.29) is the fast path for SDK type questions (one grep, one answer); the npm-global install is CLI-binary-only and `~/.config` is off-limits — cost ~4 extra bounded-check calls.
+
+### 2026-09-23_14-18 planner_Q3S_170K ses_f322793f5ffeI34HE19SEmxU43
+Plan9 spec claim "the repo has NO node_modules" was stale — the vendored @opencode-ai/sdk types live in .opencode/node_modules/ (the worker found them; a spec pointer to the vendored types dir would have saved the hunt). Spec claims should be machine-checked at spec time for exactly this kind of existence claim.
+
