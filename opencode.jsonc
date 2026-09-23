@@ -5,7 +5,9 @@
       "C:/Users/Wasiejen/Projects/OpenCodeProjects/Free-Snap-Tap/Free-Snap-Tap": "allow",
       "C:/Users/Wasiejen/AppData/Local/Temp/opencode": "allow",
       "C:/Users/Wasiejen/.local/share/opencode/log": "allow",
-      "C:/Users/Wasiejen/AppData/Roaming/npm": "allow"
+      "C:/Users/Wasiejen/AppData/Roaming/npm": "allow",
+      "C:/Users/Wasiejen/AppData/Roaming/npm/*": "allow",
+      "C:/Users/Wasiejen/AppData/Roaming/npm/node_modules/opencode-ai/*": "allow"
     }
   },
   "snapshots": false,
@@ -66,13 +68,6 @@
           "limit": {
             "context": 170000,
             "output": 170000
-          }
-        },
-        "Qwen3.8-27B-Q3S-170K": {
-          "name": "Qwen3.8-27B-Q3S-50k",
-          "limit": {
-            "context": 50000,
-            "output": 50000
           }
         },
         "Qwen3.8-27B-Q3S-230K-slow": {
@@ -143,45 +138,45 @@
     //   "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
     //   "temperature": 0.1
     // },
-    "looprunner_Q3S_170K": {
-      "description": "Just restarts the Planner in autonomous mode",
-      "mode": "primary",
-      "model": "llama-swap/Qwen3.8-27B-Q3S-170K",
-      "temperature": 0.1, // set a bit higher - was really a bit easy to confuse with low temp
-      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_looprunner.md}",
-      "tools": {
-        "*": true,
-        "write_file": false,
-        "edit": false,
-        "bash": false,
-        "block_transfer": false,
-      },
-      "permission": {
-        "*": "deny",
-        "task": "allow",
-        "read": {
-          "*": "deny",
-          ".opencode/loop/**": "allow",
-          ".opencode/loop": "allow",
-          ".opencode/archive/loop/**": "allow",
-          ".opencode/archive/loop": "allow",
-          ".opencode/agent/prompts/agent_readme_loop.md": "allow",
-          ".opencode/agent/prompts/agent_readme_post_compaction.md": "allow",
-          ".opencode/temp/ctx.log": "allow",
-          ".opencode/agent/prompts/skill/skill_autorun_summary.md": "allow",
-          "opencode.jsonc": "allow",
-        },
-        "list_dir": "allow",
-        "glob": "allow",
-        "loop_log" : "allow",
-        "compact_memory" : "allow",
-      },
-      "options": {
-        "load_project_docs": false,
-        "load_agents_md": false,
-        "load_workspace_tree": false
-      }
-    },
+    // "looprunner_Q3S_170K": {
+    //   "description": "Just restarts the Planner in autonomous mode",
+    //   "mode": "primary",
+    //   "model": "llama-swap/Qwen3.8-27B-Q3S-170K",
+    //   "temperature": 0.1, // set a bit higher - was really a bit easy to confuse with low temp
+    //   "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_looprunner.md}",
+    //   "tools": {
+    //     "*": true,
+    //     "write_file": false,
+    //     "edit": false,
+    //     "bash": false,
+    //     "block_transfer": false,
+    //   },
+    //   "permission": {
+    //     "*": "deny",
+    //     "task": "allow",
+    //     "read": {
+    //       "*": "deny",
+    //       ".opencode/loop/**": "allow",
+    //       ".opencode/loop": "allow",
+    //       ".opencode/archive/loop/**": "allow",
+    //       ".opencode/archive/loop": "allow",
+    //       ".opencode/agent/prompts/agent_readme_loop.md": "allow",
+    //       ".opencode/agent/prompts/agent_readme_post_compaction.md": "allow",
+    //       ".opencode/temp/ctx.log": "allow",
+    //       ".opencode/agent/prompts/skill/skill_autorun_summary.md": "allow",
+    //       "opencode.jsonc": "allow",
+    //     },
+    //     "list_dir": "allow",
+    //     "glob": "allow",
+    //     "loop_log" : "allow",
+    //     "compact_memory" : "allow",
+    //   },
+    //   "options": {
+    //     "load_project_docs": false,
+    //     "load_agents_md": false,
+    //     "load_workspace_tree": false
+    //   }
+    // },
     "planner_Q3S_170K": {
       "description": "plans tasks and delegates to sub-agents: very high intelligence, speedrating 60, 170k context, high precision, highest general knowledge: best for very complex coding and code review work",
       "mode": "all",
@@ -205,28 +200,6 @@
       "description": "very high intelligence, speedrating 60, 170k context, high precision, highest general knowledge: best for very complex coding and code review work",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-Q3S-170K",
-      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
-      "temperature": 1.0,
-      "permission": {
-        "task": "allow",
-        "edit": {
-          "*": "allow",
-          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
-          "AGENTS.md": "deny",
-          ".opencode/agent/prompts/**": "deny",
-          ".opencode/agent/handover/handover_planner.md": "deny",
-          ".git/**": "deny",
-          ".github/**": "deny"
-        },
-        "bash": "allow",
-        "webfetch": "allow"
-      },
-      "color": "accent"
-    },
-    "worker_Q3S_140K_HQKV": {
-      "description": "very high intelligence, speedrating 57, 140k context, very high precision, highest general knowledge: best for very complex coding and code review work",
-      "mode": "all",
-      "model": "llama-swap/Qwen3.8-27B-Q3S-140K-HQKV",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
       "temperature": 1.0,
       "permission": {
@@ -284,6 +257,91 @@
         },
       },
       "color": "#ff6b6b"
+    },
+    "worker_Q3S_140K_HQKV": {
+      "description": "very high intelligence, speedrating 57, 140k context, very high precision, highest general knowledge: best for very complex coding and code review work",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-Q3S-140K-HQKV",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
+      "temperature": 1.0,
+      "permission": {
+        "task": "allow",
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          "AGENTS.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
+    },
+    "worker_Q3S_230K_slow": {
+      "description": "very high intelligence, speedrating 45, 230k context, high precision, highest general knowledge: best for very complex coding and code review work",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-Q3S-230K-slow",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
+      "temperature": 1.0,
+      "permission": {
+        "task": "allow",
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          "AGENTS.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
+    },
+    "planner_Q3XS_262K": {
+      "description": "plans tasks and delegates to sub-agents: high intelligence, speedrating 62, 262k context, medium-high precision, medium-high general knowledge: best for very complex coding and code review work",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-Q3XS-262K",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_planner.md}\n{file:.opencode/agent/memory/planner/destilled_mem.md}",
+      // "prompt": "{file:./prompts/base.txt}\n{file:./prompts/rules.txt}\n{file:./prompts/examples.txt}"
+      "temperature": 1.0,
+      "permission": {
+        "task": "allow",
+        "edit": {
+          "*": "allow",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
+    },
+    "worker_Q3XS_262K": {
+      "description": "high intelligence, speedrating 62, 262k context, medium-high precision, medium-high general knowledge",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-Q3XS-262K",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
+      "temperature": 1.0,
+      "permission": {
+        "task": "allow",
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          "AGENTS.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
     },
     "worker_gemma_Q4_128K": {
       "description": "moderately intelligent, speedrating 160-200, 128k context, lower pecision, lower to medium general knowledge: needs explicit step by step guidance, should do no coding",

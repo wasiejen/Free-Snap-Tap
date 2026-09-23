@@ -46,6 +46,20 @@
 - you are intelligent - you will find something to do
   - go through my ideas for new research on functions. create a folder in research for each if you find something worthwhile
 
+# loop logging as one of the first actions on delegation as a worker
+- normally the worker would only fire loop_log start when he is finished with planning
+  - is this the intended function? because if he is interrupted before than the task_id to resume worker has to be searched for
+    - interrupted task delegations do not return the session_id/task_id itself
+      - so an early loop_log makes it way easier to find
+
+# compaction guideline needs to be codified (direct session)
+- reasoning on when to use compaction and its effects have to be clarified with the agent and codified in system prompt for planner and worker to effecitively use this central mechanism
+
+# spawned new session by the auto-resume plugin should be tracked also and not set to "none"
+- they should inherit the settings/state from the session that triggered the new session via action: restart
+  - so in the next session the same Autorun / Direct setting will be transmitted
+  - and deactivated for the old session (i assume to prevent an unintentional resume) (if not already the case)
+
 # 2026-09-23_04-34:
 - would be nice if the names of the new sessions spawned in autorun would include the name of the autorun - so the folder name in loop and then added the current session number of the loop? if this is feasable to keep track ...
   - just cosmetic to better find the sessions that are part of a loop autorun later

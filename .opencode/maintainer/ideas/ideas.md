@@ -5,6 +5,9 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
+2026-09-23_05-19:
+try to be more creative and experiment a bit with different appoaches to problems - to use context this was is never a waste - when you learn something from it save it in memories.
+
 2026-09-23_04-53:
 - ctx-gauge should be based on context parameter in openjson and not the number in the name??
   - just for convienience for me ... so not dringend
