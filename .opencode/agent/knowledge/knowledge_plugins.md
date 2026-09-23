@@ -222,3 +222,17 @@ Gained, verified knowledge for opencode plugins. Format per the README:
   (UNIT 3 plan9 checks).
 - **Keys:** session.create, title, SessionCreateData, vendored SDK,
   node_modules, plugin session naming, plan9, bounded-check.
+
+## The auto_resume smoke: module-level `client`/`logDir` are overwritten by EVERY factory call
+- **Do:** a smoke section added after the fail-safety block (which
+  re-factories with the throwing v3Session client) must RE-FACTORY with a
+  fresh spying session client itself — otherwise sends log `trigger=` but
+  hit the throwing client (`send-fail=`, zero pushes to the spy array) and
+  the case falsely fails. All watch state is shared module-level.
+- **Why (evidence):** verified 2026-09-22 (worker_Q3S_160K
+  ses_f3a03af20ffe1bRa56xVl143VG, the plan7/plan8 smoke work).
+- **Ref:** `.opencode/plugin/tests/auto_resume.smoke.mjs`;
+  `.opencode/plugin/auto_resume.ts` (module-level `client`, `logDir`,
+  `watches`).
+- **Keys:** auto_resume, smoke, factory, module-level, client, spy,
+  re-factory, false-fail.

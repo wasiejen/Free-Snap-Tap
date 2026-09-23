@@ -2,49 +2,17 @@
 
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
-## Current session — autorun, 2026-09-23 (ses_f31a5dee5ffe1DIBxZzEDZF8aF, planner-10, Qwen3.8-27B-Q3S-170K)
-- Unit-4 restart branch (planner-9 closed with `action: restart`). I am the
-  FIRST NAMED SPAWN — the live acceptance of TODO #89 PASSED on both sides:
-  (a) `auto_resume.log` `spawn=` line 13:00:08Z carries
-  `ident=autorun-2026-09-21_15-33 planner-10` for my sid; (b) my session
-  title in the DB = `autorun-2026-09-21_15-33 planner-10` (dump header).
-  TODO #89 CLOSED.
-- #79 LIVE ACCEPTED: `route= restart spawn` for planner-9's valid
-  `action: restart` on BOTH builds (12:52:39Z v=24972ebd + 13:00:08Z
-  v=d2b9d510), zero `recovery=` lines for the sid -> closed + condensed
-  (full text in todo_records.md).
-- #85 live evidence added: the restart branch fired correctly on the new
-  build (the named spawn, no re-route of the trigger session after spawn,
-  no unbounded-spawn loop recurrence). His 14-25 item supersedes the
-  spawned-exclusion design -> new TODO #90.
-- The 4 deferred body condenses DONE (#68/#69/#71/#73 -> one-liners; full
-  text appended to todo_records.md FIRST; TODO.md shrunken to the new
-  smaller size).
-- His new priority items triaged (2026-09-23_14-14..14-25):
-  - 14-14 (worker loop_log START timing): NOT intended that it waits for
-    planning — fixed in `agent_readme_loop.md` §Loop log (the worker's
-    START = FIRST action after reading the spec; an interrupted delegation
-    returns no task_id, the log is the only find path).
-  - 14-19 (big-output discipline): codified as an "Output discipline"
-    bullet in the planner + worker prompts.
-  - 14-20 (compaction-guideline codification): his "(direct session)" tag —
-    deferred to the next direct session (open question below).
-  - 14-25 (spawned successors tracked + inherit state + deactivate old):
-    captured as TODO #90 (design needed; his steer on #87; spec approval
-    BEFORE implementation).
-- NEXT (next planner): (1) #90 design spec draft (inherit + deactivate
-  semantics, #85 loop prevention preserved); (2) #78 scoping (dump
-  completeness — what `dump_session.cjs` drops + the spawn timeout);
-  (3) the maintainer tails: #82 (his live test + the unit-2 suppression
-  call), #80/#81 (his confirm), #83 (his flag + live host-call
-  verification), #86 (deferred worker audit — only if nothing else open).
-- Open questions for the next direct session (ordered): (1) #14-20
-  compaction-guideline codification (design exchange); (2) #90 ruling
-  details (how the successor inherits the state; what "deactivated" means
-  for the old session — the successor-check already partially covers it);
-  (3) #82 unit-2 suppression call.
+## Current session — autorun, 2026-09-23 (ses_f318f0d77ffer6kIwqiNvE1xau, planner-11, Qwen3.8-27B-Q3S-170K)
+- plan11: (1) #90 DESIGN PROPOSAL drafted (the successor-inheritance +
+  trigger-deactivation design grounded in auto_resume.ts; the draft
+  proposal is at the proposals root for his approval — #87 subsumed by it);
+  (2) #78 scoping delegated to the explorer (what dump_session.cjs drops +
+  the spawn-timeout behavior); (3) knowledge inbox curated (3 entries ->
+  knowledge_tools.md x2 + knowledge_plugins.md x1).
+- NEXT (at close / next planner): see the section end + plan11_summary.md.
 
 ## Compressed archive (one line each
+- 2026-09-23 autorun (ses_f31a5dee5ffe1DIBxZzEDZF8aF, planner-10, Qwen3.8-27B-Q3S-170K) — plan10: #89 LIVE-ACCEPTED (the first NAMED spawn — the `spawn=` line 13:00:08Z carries `ident=autorun-2026-09-21_15-33 planner-10` + the DB session title = the ident, both sides) + #79 LIVE-ACCEPTED (`route= restart spawn` for a valid `action: restart` on both builds v=24972ebd/v=d2b9d510, zero `recovery=`) both CLOSED (records first) + #85 live evidence (the restart branch fired correctly on the new build; the trigger NOT re-routed; no unbounded-spawn loop recurrence) + the 4 deferred body condenses (#68/#69/#71/#73 -> one-liners, full text in todo_records.md) + his priority items triaged: 14-14 loop-log START timing fixed (agent_readme_loop.md), 14-19 output-discipline bullets codified (planner+worker prompts), 14-20 deferred (direct session), 14-25 -> NEW TODO #90 (spawned-successor inherit + deactivate design) - details: loop folder plan10_summary.md + git e0c59cb/6cfadb9/8375143
 - 2026-09-23 autorun (ses_f322793f5ffeI34HE19SEmxU43, planner-9, Qwen3.8-27B-Q3S-170K) — plan9: UNIT A LANDED + verified (2240d00, spawn naming — `body.title` in the shared spawnPlanner + `ident=` bit; own smoke 104/104) + UNIT B LANDED + verified (167ec58, TODO.md 1132->811 curation per the 2026-09-23_02-51 review; machine-checked 67 entries / zero duplicates) + priority #04-20 closed (sweep fix verified) + #68/#69/#71/#73 title markers aligned (body condense deferred to plan10) + his order: re-trigger `action: restart` for the live acceptance (the successor = planner-10) — details: loop folder plan9_summary.md + git 265607d — details in git log + TODO/records)
 - 2026-09-23 autorun (ses_f33f1eb98ffeFvrnTdmTzmyE2x, planner-8, Qwen3.8-27B-Q3S-170K) — #85 part 3 LANDED + verified (ded7245+5992f38: Unit-2 passive ctx-line suffix, Direct gates it, scopeVerdict toggle-first) + Unit-2 smoke wall 145.5s→12.5s (91.4 %, 532ddbc+739d8a1, TODO #88) + LIVE FINDING: the plugin-spawned session is permanently `spawned`-scoped → a no-action-line close STALLS the plugin-driven loop (TODO #87, 4 options, maintainer call) + #86 deferred worker-audit curated + worker-12 limit-death forensics (MEM-0107) + marker-sweep command fix — details: loop folder plan8_summary.md + git 725ab3a
 - 2026-09-22/23 direct (ses_f39d250e9ffeheip2FVEeY5Fk6, planner Qwen3.8-27B-Q3S-160K, auto-resume branch — restarted mid-session into the planner-8 autorun) — #80 LIVE + live scope incident (quoted `<|autonom|>` → #82 root cause) + toggle design fully agreed (last-toggle-wins, own-line, ON=autonom/Autorun ci, OFF=Direct ci) + unit 2/4 semantics nailed + #85 parts 1+2 LANDED (97fccfc, b038b92) + part-3 final design (Unit-2 passive ctx-line suffix, no resume; Direct gates Unit 2 + beats planner in scopeVerdict; no <|Off|>) + spec written for the new planner; excess appended to nap_direct.md — details: git 8ae3ff3 + TODO #80/#82/#85

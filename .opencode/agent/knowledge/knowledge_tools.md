@@ -151,8 +151,18 @@ instructions/protocol — facts that save lookups. Format per the README:
   worker cross-compact + resume) + probe S13 (15 checks, 98→99): the
   same-model hang case is real (llama-swap single slot) → the dispatch
   avoids blocking the controller's turn.
+- **SELF-path race (measured 2026-09-22, ses_f39d250e):** the fire-and-
+  forget dispatch queued the continuation message, which was DELIVERED
+  BEFORE the background compaction applied (between the tool call and the
+  compaction) → cache invalidation → full re-prefill of the UN-compacted
+  history → hard-limit stall (only a user message restarted it); the
+  summarizer ran but no compaction landed. FIXED by the maintainer's temp
+  fix 0f192e5 (the queued promptAsync commented out) + live-verified the
+  same day (gauge 144944→~57k); the temp-fix behavior is gate-pinned via
+  TODO #81 — the proper message-path fix is still open. Manual (UI)
+  compaction works correctly on this build (96%→~52k).
 - **Ref:** `proposals/implemented/2026-09-12_compact_memory_plugin.md`
-  (Revision 2026-09-14); `handover_probe.mjs` S13; commit `22268de`.
+   (Revision 2026-09-14); `handover_probe.mjs` S13; commit `22268de`.
 - **Keys:** compact_memory, cross-session, dispatch, fire-and-forget,
   explicit pair, budget, target session, increment-on-verified-success.
 
@@ -206,10 +216,15 @@ instructions/protocol — facts that save lookups. Format per the README:
   `ctx_gauge` and the inline `ctx:` replay lag a large context increase by
   ~2 tool calls — planner and worker consistently misjudge how close they
   are to the window end.
+- **After a compaction:** the FIRST gauge readout reflects the COMPACTING
+  model's own context fill, not the compacted session's new fill
+  (measured 2026-09-22: readout 57570/35% right after a compaction of a
+  144944-token session). Budget decisions must wait ~2 tool calls for the
+  settled readout.
 - **Ref:** priority.md # 9 (2026-09-15); the same session's stop-line
-  incident (real wall ≈ 90% gauge reading, see NAP Standing).
+   incident (real wall ≈ 90% gauge reading, see NAP Standing).
 - **Keys:** ctx_gauge, gauge, lag, context window, stop line, 90%,
-  margin, REM.
+  margin, REM, post-compaction.
 
 ## compact_memory: the pre-compaction dump hook (no-overwrite corpus naming)
 - **Do:** the hook fires BEFORE ANY compaction dispatch (just before the
