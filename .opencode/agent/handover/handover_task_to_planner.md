@@ -1,7 +1,9 @@
-# Worker summary — #85 part 2 (IN PROGRESS at this commit)
+# Worker summary — #85 part 2 (DONE — full gate green)
 
 Task spec: `handover_task.md` (#85 part 2 — current session agent+modelID in
 injected bodies + dead-mark on failed send). Branch: `opencode_test`.
+Code commit: `b038b92` (this follow-up commit carries only the finalized
+handover; the planner records the hash in the bookkeeping per the task).
 
 ## What changed
 
@@ -53,18 +55,22 @@ injected bodies + dead-mark on failed send). Branch: `opencode_test`.
 `TODO.md`: #85 title + status → "part 2 (current-agent+modelID + dead-mark)
 LANDED 2026-09-23" (no commit hash in this commit — planner records it).
 
-## Measured verification (at this commit)
+## Measured verification (final)
 
 - **auto_resume smoke: 105/105 PASS** (existing 97 — the one stale
-  trigger-spawn agent pin updated per the fix — + 8 new checks). Run:
-  `node .opencode/plugin/tests/auto_resume.smoke.mjs` (300s timeout).
+  trigger-spawn agent pin updated per the fix — + 8 new checks: current-
+  agent+model CONTINUE body, source-carrying restart spawn, JSONC
+  fallback, dead-mark skip, no-fallback-spawn for dead-marked, fresh-busy
+  clear). Run: `node .opencode/plugin/tests/auto_resume.smoke.mjs` (300s
+  timeout — it is slow).
+- **handover probe: 241/241 PASS** (`node .opencode/plugin/probes/handover_probe.mjs`).
+- **All plugin smokes PASS**: block_transfer.sandbox 52/52, block_transfer
+  22/22, compact_memory 57/57, context_recovery ALL PASS, ctx_gauge 3/3,
+  gauge_core ALL PASS, intercept_observer 39/39, loop_log 24/24, submit
+  20/20.
+- **pytest: 459 passed, 1 warning** (`./.venv/Scripts/python.exe -m pytest -q`).
+- **ruff F: All checks passed (0 findings)** (`./.venv/Scripts/ruff.exe check --select F .`).
 - TS import check clean (node 24 type-stripping, default export only).
-
-## Still pending (next unit of this session)
-
-- Full gate: handover_probe (expect 241/241), all other plugin smokes,
-  pytest (expect 459 passed + 1 warning), ruff F=0.
-- Final handover update (gate numbers) + final commit + friction check.
 
 ## What was deliberately NOT done
 
