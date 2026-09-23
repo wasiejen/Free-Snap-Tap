@@ -369,7 +369,7 @@ All those IDs stay reserved — see the numbering rule in the header.
    + lossless full markdown + `--lite` preset + hook 120 s budget / pipe
    stderr capture / one retry; DUMP-OK `ms=` + stdio + S14-104 re-pins
    (recorded in the worker handover); gate green — the code commit hash is
-   recorded in the planner's follow-up bookkeeping). Was SCOPED 2026-09-23
+   recorded in the planner's follow-up bookkeeping — Commit **6b33907** (planner-verified 2026-09-23: compact_memory smoke re-run 57/57; `--json` spot-check on the trigger session: 70 msgs / 337 parts, JSON.parse OK, counts exact-match the live DB)). Was SCOPED 2026-09-23
    (plan11, explore ses_f317d80c2ffeMGup4T9z5IvUs2 — findings:
    `.opencode/loop/autorun-2026-09-21_15-33/plan11_78_scope.md`. Headline: his
   cited corpus file is a STALE 2026-09-15 slim backfill — the CURRENT full
