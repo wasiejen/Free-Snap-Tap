@@ -9,8 +9,9 @@
 // ladder (>= 0.95 "self-compact now"; >= 0.98 --maintainer-flagged);
 // scope "none" (Direct) suppresses it (c).
 // UNIT 3: the new-planner spawn helper — a one-shot trigger file in the
-// log dir, consumed (renamed .consumed) by the 5s tick after ONE spawn
-// attempt (create + queued promptAsync; #85 part 2: NO agent/model for
+// log dir, consumed (renamed .consumed) by the tick (5000ms default;
+// short tickMs in this smoke) after ONE spawn attempt (create + queued
+// promptAsync; #85 part 2: NO agent/model for
 // the file-trigger spawn — no source session → host default; the Unit
 // 4 successor spawn carries the SOURCE session's current agent+model),
 // even on failure.
@@ -70,8 +71,13 @@ const mkClient = (session, appLog) => ({
   app: appLog === undefined ? {} : { log: appLog },
 });
 
-// Unit 2 helpers: the tick fires every 5s — poll up to 8s for a condition.
+// Tick period for this smoke: the factory below is instantiated with a
+// SHORT tickMs (the plugin default stays 5000 — live behavior unchanged),
+// so the "at least one full tick period" waits are sub-second. waitUntil
+// polls up to 8s for a condition.
+const TICK = 300;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const tickWait = () => sleep(2 * TICK + 200); // at least one full tick period
 const waitUntil = async (cond, ms = 8000) => {
   const t0 = Date.now();
   while (Date.now() - t0 < ms) {
@@ -103,7 +109,9 @@ try {
     create: function () {},
     // NOTE: no `compact` — the v1-generation client surface
   };
-  const hooks = await factory({ directory: proj, client: mkClient(v1Session, () => "log") });
+  // tickMs: the test-only short tick (the module-level tick is set by the
+  // FIRST factory call — later re-factories don't re-arm it).
+  const hooks = await factory({ directory: proj, tickMs: TICK, client: mkClient(v1Session, () => "log") });
   chk("factory returns the event hook (function)", typeof hooks === "object" && typeof hooks.event === "function");
   const l0 = readLines();
   const surf = l0.find((l) => l.includes("surface="));
@@ -376,7 +384,7 @@ try {
    const hooksU2b = await factory({ directory: proj, client: { session: v2Session, provider: { list: providerList }, app: { log: () => "log" } } });
    await fire(hooksU2b, "ses_u2_stale", [statusEv("ses_u2_stale", "busy"), msgUpdated("ses_u2_stale", "assistant", { total: 80000 }, MODEL), statusEv("ses_u2_stale", "idle")]);
    const cBeforeStale = calls.length;
-   await sleep(5600); // at least one full tick period (the old design fired on the tick)
+    await tickWait(); // at least one full tick period (the old design fired on the tick)
    chk("UNIT 2 #85 part 3: stale armed session (armed at a high ratio, goes idle, stays armed; autoCompact on) → NO fire (no nudge, no resume — no promptAsync, no nudge= line)",
      calls.length === cBeforeStale && nudgeLine("ses_u2_stale") === 0,
      `n=${calls.length} nudge=${nudgeLine("ses_u2_stale")}`);
@@ -571,8 +579,9 @@ try {
   // The factory is re-invoked with a SPYING client: `create` and
   // `promptAsync` record every call (mutable throw flags per scenario).
   // The one-shot trigger file lives in the sandbox logDir (same dir as
-  // auto_resume.log). The single 5s tick is the only decision+send
-  // funnel — the smoke waits on it (real time).
+  // auto_resume.log). The single tick (short tickMs here — 5000ms
+  // default in live) is the only decision+send funnel — the smoke
+  // waits on it (real time).
   // ============================================================
   const triggerFile = path.join(proj, ".opencode", "temp", "auto_resume_spawn_trigger");
   const TRIGGER_TEXT = "UNIT 3 smoke: fresh planner start — resume the loop from the NAP.";
@@ -626,7 +635,7 @@ try {
   // ---- (5) a second tick after consumption → no second spawn (no
   // double-fire: the consumed file never re-fires).
   const cBefore5 = createCalls.length, sBefore5 = spawnCalls.length;
-  await sleep(5600); // at least one full tick period after the spawn
+  await tickWait(); // at least one full tick period after the spawn
   chk("UNIT 3: second tick after consumption → no second spawn (no double-fire)",
     createCalls.length === cBefore5 && spawnCalls.length === sBefore5,
     `create=${createCalls.length} promptAsync=${spawnCalls.length}`);
@@ -689,9 +698,10 @@ try {
    // self-spawned sids are NEVER scoped — the UNIT 3 spawn
    // `ses_u3_new` is still self-marked in the module-level `spawned`
    // map, so it now falls OUT of scope (the #85 loop fix). The single
-   // 5s tick is the only decision+send funnel — the smoke waits on it
-   // (real time). Batch A fires every scenario before one tick pass,
-   // so one pass routes them all.
+   // tick (short tickMs here — 5000ms default in live) is the only
+   // decision+send funnel — the smoke waits on it (real time). Batch A
+   // fires every scenario before one tick pass, so one pass routes them
+   // all.
    // ============================================================
    const u4Sends = []; // every promptAsync on this client (CONTINUE + spawn)
    const u4Creates = [];
@@ -984,7 +994,7 @@ try {
   // a SECOND idle cycle (fresh busy) — the tick where the old code
   // re-triggered the spawn
   await fire(hooksU4b, "ses_u4_worker", [statusEv("ses_u4_worker", "busy"), statusEv("ses_u4_worker", "idle")]);
-  await sleep(5600); // at least one full tick period
+  await tickWait(); // at least one full tick period
   chk("UNIT 4 #85: unmarked worker session OUT of scope — scope= none, zero sends",
     okW1 && !u4Sends.some((c) => c.path?.id === "ses_u4_worker"), `n=${u4Sends.length}`);
   chk("UNIT 4 #85: unmarked worker session NOT re-triggered on the next tick (no recovery/route/spawn — the #85 loop is gone)",
@@ -1020,7 +1030,7 @@ try {
   await fire(hooksU4b, "ses_u4_lastoff", [statusEv("ses_u4_lastoff", "busy"), statusEv("ses_u4_lastoff", "idle")]);
   const loBefore = u4Sends.length;
   const okLo = await waitUntil(() => readLines().some((l) => l.includes("scope= none sid=ses_u4_lastoff")));
-  await sleep(5600); // at least one full tick period
+  await tickWait(); // at least one full tick period
   chk("UNIT 4 #82: last-toggle-wins — own-line <Autonom|> then own-line <Direct|> → OFF (scope= none, no sends, no re-trigger)",
     okLo && u4Sends.length === loBefore &&
       !readLines().some((l) => l.includes("sid=ses_u4_lastoff") && (l.includes("route=") || l.includes("recovery="))),
@@ -1032,7 +1042,7 @@ try {
   await fire(hooksU4b, "ses_u4_mid", [statusEv("ses_u4_mid", "busy"), statusEv("ses_u4_mid", "idle")]);
   const midBefore = u4Sends.length;
   const okMid = await waitUntil(() => readLines().some((l) => l.includes("scope= none sid=ses_u4_mid")));
-  await sleep(5600); // at least one full tick period
+  await tickWait(); // at least one full tick period
   chk("UNIT 4 #82: mid-sentence quote (case-variant, not whole-line) is NOT a toggle — scope= none, no sends, no re-trigger",
     okMid && u4Sends.length === midBefore &&
       !readLines().some((l) => l.includes("sid=ses_u4_mid") && (l.includes("route=") || l.includes("recovery="))),
@@ -1057,7 +1067,7 @@ try {
    const directBefore = u4Sends.length;
    await fire(hooksU4b, "ses_p3_pldirect", [statusEv("ses_p3_pldirect", "idle")]);
    const okDirect = await waitUntil(() => readLines().some((l) => l.includes("scope= none sid=ses_p3_pldirect")), 12000);
-   await sleep(5600); // at least one full tick period (the old code CONTINUEd on the tick)
+    await tickWait(); // at least one full tick period (the old code CONTINUEd on the tick)
    chk("UNIT 4 #85 part 3 (d): Direct (scope none) on a PLANNER session → NO Unit-4 CONTINUE (Unit 4 deactivated for the planner — the toggle beats the planner test)",
      okDirect && u4Sends.length === directBefore &&
        !readLines().some((l) => l.includes("sid=ses_p3_pldirect") && (l.includes("route=") || l.includes("recovery="))),
@@ -1121,8 +1131,9 @@ try {
    msgScript.set("ses_p2_dm", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Mid-unit, no closing line."]], PLANNER_A));
    p2ThrowSids.add("ses_p2_dm");
 
-   // All four scenarios armed before one tick pass (the single 5s tick
-   // is the only decision+send funnel — the smoke waits on it).
+   // All four scenarios armed before one tick pass (the single tick —
+   // short tickMs here, 5000ms default in live — is the only
+   // decision+send funnel; the smoke waits on it).
    await fire(hooksP2, "ses_p2_cur", [statusEv("ses_p2_cur", "busy"), statusEv("ses_p2_cur", "idle")]);
    await fire(hooksP2, "ses_p2_rs", [statusEv("ses_p2_rs", "busy"), statusEv("ses_p2_rs", "idle")]);
    await fire(hooksP2, "ses_p2_fb", [statusEv("ses_p2_fb", "busy"), statusEv("ses_p2_fb", "idle")]);
@@ -1173,7 +1184,7 @@ try {
    const cBeforeP2C = p2Creates.length;
    await hooksP2.event({ event: { type: "session.error", properties: { sessionID: "ses_p2_dm" } } });
    const okP2C = await waitUntil(() => dmSkip() >= 2, 12000);
-   await sleep(5600); // at least one full tick period — no spawn may follow
+    await tickWait(); // at least one full tick period — no spawn may follow
    chk("#85 part 2 (c): the cap-exhaustion branch does NOT spawn for a dead-marked session (no doomed successor; the mark persists — no 5s retry loop)",
      okP2C && dmSkip() === 2 && dmAttempt(2) === 0 && p2Creates.length === cBeforeP2C &&
        !readLines().some((l) => l.includes("route= restart spawn sid=ses_p2_dm")) &&

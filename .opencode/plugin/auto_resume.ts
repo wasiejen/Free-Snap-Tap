@@ -1054,7 +1054,8 @@ async function routeScopedIdle(sid: string, w: Watch) {
   await spawnPlanner(restartText(), msgs); // Unit 3 helper (never throws outward)
 }
 
-// Unit 3+4: the ONE 5s tick — the only decision+send funnel. Unit 3's
+// Unit 3+4: the ONE tick (5000ms default, per-factory tickMs option) —
+// the only decision+send funnel. Unit 3's
 // trigger check runs first (the spawn is a high-priority action), then
 // Unit 4 routes every scoped session with a pending idle decision.
 // (#85 part 3: Unit 2 has no tick leg anymore — the nudge is a passive
@@ -1211,10 +1212,16 @@ export default (async (input: PluginInput) => {
   projectDir = input?.directory ?? ""; // #85 part 2: the opencode.jsonc fallback path
   client = input?.client ?? null;
   probeSurface(input); // one-shot at load
+  // The tick period is a per-factory-call option: the live host never
+  // passes tickMs → the 5000ms default (live behavior unchanged); the
+  // smoke passes a short tick so its tick-waits stay sub-second
+  // (test-only lever).
+  const tickOpt: unknown = (input as Record<string, unknown> | undefined)?.tickMs;
+  const tickMs = typeof tickOpt === "number" && Number.isFinite(tickOpt) && tickOpt > 0 ? tickOpt : 5000;
   if (!tickTimer) {
     tickTimer = setInterval(() => {
-      void tick(); // the 5s tick — the only decision+send funnel
-    }, 5000);
+      void tick(); // the tick (5000ms by default) — the only decision+send funnel
+    }, tickMs);
     tickTimer.unref(); // must not keep the host process alive
   }
   return {
