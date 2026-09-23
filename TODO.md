@@ -377,7 +377,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   `--json` raw-as-is mode to `dump_session.cjs` (S; hook-default = his call),
   (2) raise/diagnose the hook timeout (S–M), (3) make markdown full mode
   lossless (S) + (4) later an on-demand markdown filter over the raw JSON.)
-  Awaiting his ruling on the options.
+   Awaiting his ruling on the options. **RULING 2026-09-23 (planner-12 direct): go for 1 + 2, plus 3+4 unified** (his 3/4 intuition confirmed — unfiltered vs filtered = a renderer toggle: 3 = lossless full markdown AT DUMP TIME, 4 = a `--lite` filtered preset on the same script). Spec written (handover_task.md) + `worker_Q3S_170K` launched; the pre-compaction hook keeps its markdown backup rendered with the lossless full mode (raw JSON stays the on-demand `--json` mode — planner call, veto-able).
 
 ## 79. (closed 2026-09-23 - live-accepted, full text in todo_records.md) - auto_resume Unit 4 msgPairs never unwrapped the SDK { data } wrapper -> action lines were NEVER recognized (spurious recovery prompts / context drain); fixed eaef397 (dual-shape unwrap + ses_u4_wrap smoke) + LIVE ACCEPTED 2026-09-23 (route= restart spawn for a valid action: restart on both builds: v=24972ebd 12:52:39Z + v=d2b9d510 13:00:08Z, no recovery= lines for the sid)
 
