@@ -164,3 +164,6 @@ TODO #90/#87 status; the NAP. Worker per the live roster (verify before launch).
 DRAFT — awaiting his approval (Parts A+B are the core; Part C is his call:
 log-restore or accept the gap). Implementation only after approval (the #90
 acceptance criterion).
+
+--comment:
+2026-09-23_15-44: approved A+B and C also

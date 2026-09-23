@@ -3,13 +3,37 @@
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 ## Current session — autorun, 2026-09-23 (ses_f318f0d77ffer6kIwqiNvE1xau, planner-11, Qwen3.8-27B-Q3S-170K)
-- plan11: (1) #90 DESIGN PROPOSAL drafted (the successor-inheritance +
-  trigger-deactivation design grounded in auto_resume.ts; the draft
-  proposal is at the proposals root for his approval — #87 subsumed by it);
-  (2) #78 scoping delegated to the explorer (what dump_session.cjs drops +
-  the spawn-timeout behavior); (3) knowledge inbox curated (3 entries ->
-  knowledge_tools.md x2 + knowledge_plugins.md x1).
-- NEXT (at close / next planner): see the section end + plan11_summary.md.
+- plan11: (1) #90 DESIGN PROPOSAL drafted (b81775b) — the maintainer MOVED
+  it to `proposals/approved/` + approved "A+B and C also" (`--comment`
+  15-44) via inbox `2026-09-23_15-46.md` (STAYS IN PLACE until #90 lands —
+  his instruction; it also forbids `action: restart` until #90 is live —
+  I close via SELF-COMPACT + unit-4 resume instead). (2) #90 IMPLEMENTATION
+  spec committed (81ed057); worker ses_f3170a3bdffe1OD5gPCr6PehAQ
+  (`worker_Q3S_170K`) landed Parts A+B+C in the WORKING TREE (uncommitted;
+  the gate/TODO/handover steps were NOT done) before dying at its context
+  limit — session dumped (252626 B corpus) + CROSS compact dispatched
+  (same-model: runs after my turn frees the slot). (3) #78 SCOPING done via
+  explorer ses_f317d80c2ffeMGup4T9z5IvUs2 — findings verified
+  (`.opencode/loop/autorun-2026-09-21_15-33/plan11_78_scope.md`; headline:
+  the cited corpus file is a stale slim backfill — current full mode is
+  complete for text/reasoning; residual gaps = tool input/output + caps, no
+  raw-JSON mode; DUMP-FAIL = spawn stall, not the 60 s budget). (4)
+  Knowledge inbox curated (3 entries -> tools x2 / plugins x1, a840839).
+- NEXT (after the compaction — I resume via unit-4 recovery): (1) RE-ATTEMPT
+  the worker resume `task_id ses_f3170a3bdffe1OD5gPCr6PehAQ` (the
+  post-compaction request must now fit the 170240 window; verify the
+  COMPACT line in `.opencode/temp/ctx.log` first; if it still overflows:
+  launch a FRESH worker on a handoff spec — the uncommitted diff on disk +
+  spec 81ed057 + "run the gate once, bookkeeping, commit" — MEM-0107
+  style); (2) verify the worker's commit (git log + diff vs the approved
+  proposal + one smoke re-run) and land #90 (its hash in MY bookkeeping
+  commit); #87 closes then; move the proposal to `implemented/` with a
+  verdict note; the inbox file may then move to `maintainer/done/`;
+  (3) #78: awaiting his ruling on the ranked options (the raw-JSON default
+  question); (4) maintainer tails unchanged: #82 live test + unit-2
+  suppression call, #80/#81 confirms, #83 flag + live host-call, #86
+  deferred audit; (5) the 14-20 compaction-guideline codification waits for
+  the next DIRECT session.
 
 ## Compressed archive (one line each
 - 2026-09-23 autorun (ses_f31a5dee5ffe1DIBxZzEDZF8aF, planner-10, Qwen3.8-27B-Q3S-170K) — plan10: #89 LIVE-ACCEPTED (the first NAMED spawn — the `spawn=` line 13:00:08Z carries `ident=autorun-2026-09-21_15-33 planner-10` + the DB session title = the ident, both sides) + #79 LIVE-ACCEPTED (`route= restart spawn` for a valid `action: restart` on both builds v=24972ebd/v=d2b9d510, zero `recovery=`) both CLOSED (records first) + #85 live evidence (the restart branch fired correctly on the new build; the trigger NOT re-routed; no unbounded-spawn loop recurrence) + the 4 deferred body condenses (#68/#69/#71/#73 -> one-liners, full text in todo_records.md) + his priority items triaged: 14-14 loop-log START timing fixed (agent_readme_loop.md), 14-19 output-discipline bullets codified (planner+worker prompts), 14-20 deferred (direct session), 14-25 -> NEW TODO #90 (spawned-successor inherit + deactivate design) - details: loop folder plan10_summary.md + git e0c59cb/6cfadb9/8375143

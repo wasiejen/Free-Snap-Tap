@@ -364,8 +364,20 @@ All those IDs stay reserved — see the numbering rule in the header.
   spawnSync node ETIMEDOUT` (ctx.log) on a ~90 % session while a small
   session dumped in 76 ms (`DUMP-OK`) — the dump's spawn timeout does not
   scale with session size (same script family as the corpus dumps).
-- **Status:** OPEN — needs scoping (measure what dump_session.cjs currently
-  drops + the spawn timeout behavior; his lean: dump raw as it is).
+- **Status:** SCOPED 2026-09-23 (plan11, explore
+  ses_f317d80c2ffeMGup4T9z5IvUs2 — findings:
+  `.opencode/loop/autorun-2026-09-21_15-33/plan11_78_scope.md`. Headline: his
+  cited corpus file is a STALE 2026-09-15 slim backfill — the CURRENT full
+  mode emits all 141 parts of that session (30 reasoning + 16 text verbatim);
+  residual gaps = tool `state.input`/`state.output` never emitted + 400/600-
+  char caps on other types; NO raw-JSON mode exists. Hook timeout = fixed
+  60 s (`compact_memory.ts` L359) vs measured 64–87 ms dump wall-times → the
+  live DUMP-FAIL ETIMEDOUT is a SPAWN-LEVEL STALL, not budget exhaustion
+  (`stdio: "ignore"` hides the child stderr). Ranked recs: (1) add a
+  `--json` raw-as-is mode to `dump_session.cjs` (S; hook-default = his call),
+  (2) raise/diagnose the hook timeout (S–M), (3) make markdown full mode
+  lossless (S) + (4) later an on-demand markdown filter over the raw JSON.)
+  Awaiting his ruling on the options.
 
 ## 79. (closed 2026-09-23 - live-accepted, full text in todo_records.md) - auto_resume Unit 4 msgPairs never unwrapped the SDK { data } wrapper -> action lines were NEVER recognized (spurious recovery prompts / context drain); fixed eaef397 (dual-shape unwrap + ses_u4_wrap smoke) + LIVE ACCEPTED 2026-09-23 (route= restart spawn for a valid action: restart on both builds: v=24972ebd 12:52:39Z + v=d2b9d510 13:00:08Z, no recovery= lines for the sid)
 
@@ -692,4 +704,15 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Desired outcome (his words, parsed):** a spawned successor (1) is tracked/in-scope, (2) inherits the trigger session's last own-line Autorun/Direct state, (3) the trigger session is deactivated (its scope off) to prevent an unintentional resume - with the #85 unbounded-spawn loop prevention preserved.
 - **Acceptance:** the design ruling/spec is approved BEFORE implementation (observable behavior change); the #85 global cap + dead-mark stay effective; smoke pins for the inherit + deactivate behavior.
 - **Suggested scope:** `auto_resume.ts` (scope verdict + `spawnPlanner`) + the auto_resume smoke.
-- **Status:** open - design needed; this item is his steer on the #87 dead-successor question (recorded for the next direct session) - #87 stays open until the ruling is recorded and a spec is approved.
+- **Status:** APPROVED 2026-09-23 (his `--comment` 15-44 on the proposal:
+  "approved A+B and C also"; the proposal moved to
+  `proposals/approved/`). Implementation spec committed (81ed057). Worker
+  ses_f3170a3bdffe1OD5gPCr6PehAQ (`worker_Q3S_170K`) landed Parts A+B+C in
+  the WORKING TREE (auto_resume.ts +273/-108, smoke +360/-108, uncommitted)
+  before dying at its context limit mid-work — session dumped to the corpus
+  + CROSS compact dispatched (2026-09-23); the task_id RESUME is pending the
+  compaction completing (planner-11 closes via self-compact + unit-4 resume
+  per his inbox instruction — NO `action: restart` until #90 is live).
+  Landing = the resumed worker's green commit; #87 closes then. The
+  maintainer's inbox file `2026-09-23_15-46.md` stays in place until #90
+  lands (his instruction).
