@@ -152,7 +152,12 @@ planning. Plan against a defined goal, not a list of chores.
   an output limit (`| head -30`); a worker reads only the relevant sections.
   For bounded DB / binary / log inspection, point the worker at the curated
   helper collection `.opencode/agent/scripts/` (README + INVENTORY.md) instead
-  of letting it re-derive throwaway scripts.
+   of letting it re-derive throwaway scripts.
+- **Output discipline (his # 2026-09-23_14-19):** untested shell commands or
+   commands with unknown / potentially big output -> run them with the output
+   redirected to a temp file, check the size first, and let only an overview
+   (e.g. line count) into the context; always bound untested greps
+   (`| head -30`) and similar.
 - **Branch truth (plan3 lesson):** never name a working branch in a launch
   message or task spec from memory — verify the actual checkout first
   (`git branch -v`) and say "stay on the current checkout" only when that is

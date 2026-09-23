@@ -1,6 +1,6 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #89, new
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #90, new
 entries start at #90 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
@@ -166,54 +166,9 @@ smokes, pytest 459+1w, ruff F=0).
   `research/fuzzy-numword/spec_R3_arg_scope_extension.md`; gated on R1 + R2
   green + R4 log-volume data).
 
-## 68. (CLOSED 2026-09-16 — R2 approved + landed) — Write-scope fuzzy (step 2 of the Q3 roadmap)
-- **Problem / evidence:** maintainer ruling (addendum Q3, 2026-09-16): read
-  AND write scope, one step after the other — "too useful to degrade to
-  observer permanently". Write-scope needs the mutation-channel verdict
-  (#66) AND its own approval (write-scope fuzzy on edit/write/delete is a
-  data-loss hazard per research §2.3 — the existence-gate + correction-log
-  discipline of §4.2 must be specced).
-- **Outcome:** spec for write-scope resolution (scope rule, existence gate,
-  correction log, fail-closed) → maintainer approval → build.
-- **Acceptance:** approved spec + landed build + gate green (per spec).
-- **Scope:** research doc §2.3/§3.4/§4.2 as the design source; staged spec
-  `research/fuzzy-numword/spec_R2_write_scope.md`.
-- **Status:** CLOSED 2026-09-16 — approved ("R2 approved") + build landed
- GREEN (35f8143: probe 206/206 S20, smoke 35/35 8f, pytest 459, ruff
-  clean); acceptance met per spec. Deviation accepted: ref gate =
-  `for-each-ref` membership (rev-parse 40-hex ambiguity measured,
-  decision-record §5). **ONE-SHOT ACCEPTANCE MET 2026-09-17** (direct
-  session, post-restart): write-scope LIVE — benign mistype corrected
-  (`file-for→file-four d=1 gap=2`) AND the #72 hazard live-measured
-  (`file-5→file-4 d=1 gap=3` hijack); display finding: tool results show
-  the POST-MUTATION path (log field 5 = sole authority — decision-record
-  §5 R2). Residual hazard → #72 (M1 ruling recorded).
+## 68. (closed 2026-09-16, full text in todo_records.md) - Write-scope fuzzy (R2): approved + build landed green (35f8143) + one-shot live-accepted 2026-09-17 (benign mistype corrected; the #72 hazard live-measured; residual hazard -> #72 M1)
 
-## 69. (CLOSED 2026-09-16 — AGENTS.md paste, acceptance fully met) — Redundancy form codification: `[left:right]` (SUPERSEDES the `<4|four>` Q2 form)
-- **Problem / evidence:** the addendum Q2 form `<4|four>` (angle brackets +
-  pipe) was REJECTED by measurement 2026-09-16 (direct session): unquoted
-  in Git-Bash, `<...>` = syntax error (exit 2) and `|` = pipe break (exit
- 127) — both measured; `[left:right]` survives (exit 0) with one known
-  glob edge (single-char cwd file) mitigated by a quote-when-bash rule.
-  Full table + reasoning: `research/fuzzy-numword/decision-record.md` §2.4.
-  His FB grammar comments (`<8-6-1>` fallback, adder-left `[800+50+11:…]`,
-  right-wins, "to be discussed in direct session") were DISCUSSED and
-  ruled: single-digit dash form recommended, full map = accepted fallback,
-  pair-left ∈ {as-seen | adder | numword}, right = numword, right-wins.
-- **Outcome:** codify the convention where it survives compaction of ANY
-  agent: (a) AGENTS.md — maintainer PASTE (draft in decision-record §4,
-  his action); (b) the observer form switch + read-scope resolution =
-  spec_R1 (launch-ready); (c) role-prompt pointer lines (planner-direct or
-  planner-as-text-worker, after R1 — worker edit-deny on prompts/).
-- **Acceptance:** his AGENTS.md paste landed + R1 green + pointer lines in
-  planner/worker/looprunner prompts.
-- **Scope:** AGENTS.md (maintainer), spec_R1 build, `prompt_agent_*.md`
-  pointer lines.
-- **Status:** CLOSED 2026-09-16 — acceptance fully met: AGENTS.md paste
-  landed (bf18f14); R1 GREEN (96bb173, probe 193/193); pointer lines in
-  planner+worker prompt index (3e0406c). NOTE: ALL FB-file comments are
-  acted on and recorded in the decision record (§6.5) — do not re-act the
-  `--comment` markers there (they are his input record).
+## 69. (closed 2026-09-16, full text in todo_records.md) - Redundancy form codification (the [left:right] pair convention, supersedes the Q2 angle-pipe form): AGENTS.md paste landed (bf18f14) + R1 green (96bb173) + role-prompt pointer lines (3e0406c); acceptance fully met
 
 ## 70. compact_memory rework: config-resolved summarizer + queued message + dump diagnostics (2026-09-16, new priority.md item; re-scoped 2026-09-21 by his priority.md #1)
 - **Problem / evidence:** maintainer priority.md addition: context_limit
@@ -308,21 +263,7 @@ smokes, pytest 459+1w, ruff F=0).
    worker-10. Live acceptance pending the next host restart. Follow-on:
    the requested research spec (compact_memory + block_transfer up/downs).
 
-## 71. (CLOSED 2026-09-17, planner-direct) — Stale probe totals in repo_commands.md (maintainer file)
-- **Problem / evidence:** `repo_commands.md` §Run/test still quotes "~376"
-  and "one hundred twenty-two (plan7…)" — mutually inconsistent stale
-  numbers; the declared source (the probe's self-annotation) is 180/180
-  (plan2). Worker-13 flagged; the file is maintainer-maintained (agents do
-  not edit the repo parts directly).
-- **Outcome:** refresh the section to the curate-don't-duplicate pointer
-  (per #64 convention: point at the self-annotation, no moving number).
-- **Acceptance:** section reads the pointer; no duplicated total.
-- **Scope:** `repo_commands.md` §Run/test (maintainer or an explicitly
-  tasked agent).
-- **Status:** CLOSED (2026-09-17, planner-direct — maintainer ruled the
-  planner is allowed to update this file): §Run/test now carries the
-  curate-don't-duplicate pointer (no duplicated moving number at all — the
-  probe's self-annotation is the sole source), per the #58/#64 convention.
+## 71. (closed 2026-09-17, planner-direct, full text in todo_records.md) - Stale probe totals in repo_commands.md: section now carries the curate-don't-duplicate pointer (per #58/#64; maintainer ruled the planner is allowed to update the file)
 
 ## 72. Write-scope residual hazard: new-file near-miss (maintainer decision; 2026-09-17)
 - **Problem / evidence:** the write-fuzzy channel (and the pair gate) cannot
@@ -357,57 +298,7 @@ smokes, pytest 459+1w, ruff F=0).
    (substitution bar approved 09-17, decision-record §5); R9 documented-
    optional. See NAP 2026-09-17 direct session.
 
-## #73. (LANDED 2026-09-17, planner-verified) — R7 realistic doubled case: the segment channel's gap rule fails
-## when the target's parent DIR is a corpus entry (measured 09-17)
-- **Problem + evidence:** the shipped R7 (ee19a84; gates 216/216 + 37/37
-  green) does NOT resolve the realistic nested doubling. Repro
-  (scratchpad `r7_realistic_repro.mjs`, still there): repo
-  `Projects/OpenCodeProjects/{Free-Snap-Tap/TODO.md, SiblingProj/…}` +
-  doubled arg `…/OpenCodeProjects/OpenCodeProjects/Free-Snap-Tap/TODO.md`
-  → `fuzzy-rejected` for read AND edit. Root cause: the corpus (built
-  from the nearest existing ancestor) contains the target's parent DIR
-  entry at seg-d=2; the target sits at seg-d=1 → gap 1 <
-  FUZZY_MIN_GAP=2 → `gap-too-small`. S21 pins 210/211 pass only because
-  their fixture corpus is FLAT files (second-best at seg-d=3) — the
-  pin-fixture design gap is the planner's (spec'd the shapes, not the
-  corpus realism).
-- **Desired outcome:** the doubled-folder case (the maintainer's most
-  observed error) resolves at hook level in a real nested repo.
-- **Design (planner 09-17):** a STRUCTURAL pre-check before corpus
-  matching in `runFuzzyRead`/`runFuzzyWrite`: if the arg's segments
-  contain an adjacent identical pair (case-insensitive), collapse one
-  copy; the collapsed path must EXIST (strict gate, no corpus, no gap
-  rule) → resolve; else fail-closed and fall through to the existing
-  matchers. Verdict reuses `fuzzy-resolved` with a `kind=dedup` evidence
-  flag (9-verdict vocabulary untouched; `write` stays M1-excluded).
-  S21 gains the REALISTIC nested fixture pin (parent-dir corpus entry +
-  sibling project) for read + edit + write-zero-lines.
-- **Acceptance:** the 3 repro cases behave per the design (read/edit
-  resolved, write zero lines); new S21 realistic pin green; full gate
-  green; repro torn down.
-- **Suggested scope:** `intercept_observer_core.ts` (the collapse
-  helper), `intercept_observer.ts` (pre-check in both fuzzy runners),
-  the S21 section.
-- **Status:** LANDED + planner-verified (2026-09-17, ses_f510a…, code
-  dce82ad, bookkeeping 9c701ed): the `collapseAdjacentDup` existence-gated
-  pre-check in `runFuzzyRead`/`runFuzzyWrite` (BEFORE the seg/char matchers)
-  resolves the realistic nested doubling with a `kind=dedup` evidence line
-  (d=0, no gap); a doubled `write` stays ZERO lines (M1 extends to the dedup).
-  Gate: probe two-one-six → two-two-zero (216), smoke 37/37, pytest 459+1w,
-  ruff F=0; S21 8 → 12 (re-pins 210/211 + smoke 8g to kind=dedup, 4 new pins
-  218 read / 219 edit / 220 collapse-target-absent stays rejected / 21 write
-  zero-lines + realistic-nested fixture). Repro torn down. **LIVE ACCEPTED
-  (2026-09-17, ses_f4f539d7c… post-restart one-shot, scratchpad fixture, torn
-  down):** doubled nested `read` resolved `kind=dedup scope=read d=0` (log
-  `orig=` doubled → corrected, file content returned); doubled `edit` resolved
-  `kind=dedup scope=write d=0` (applied to the real file). Doubled `write`
-  NOT live-proven via the planner's own emission — 5/5 attempts collapsed the
-  doubled segment at emission (log-verified `orig=` single each time; the
-  single writes landed literal + zero lines, M1 guard held). Hook-level
-  doubled-write coverage stands on pins 21/218–220 (same runner as the
-  live-proven edit path — the guard is the shared dispatch condition).
-  Emission data point: the collapse bias is STRONGEST on write calls
-  (read doubled 1st try, edit 3rd, write 5/5 collapsed).
+## #73. (closed 2026-09-17, full text in todo_records.md) - R7 realistic doubled case: the collapse-adjacent-dup existence-gated pre-check (dce82ad) resolves the doubled-folder case (kind=dedup evidence); live-accepted 2026-09-17 (read/edit proven live; doubled-write pinned 21/218-220)
 
 ## Closed entries
 
@@ -476,23 +367,7 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Status:** OPEN — needs scoping (measure what dump_session.cjs currently
   drops + the spawn timeout behavior; his lean: dump raw as it is).
 
-## 79. (open — LANDED 2026-09-22, live acceptance pending; 2026-09-21, planner; HIGH — live, measured) — auto_resume Unit 4 `msgPairs` never unwraps the SDK `{ data }` wrapper → action lines are NEVER recognized (spurious recovery prompts / context drain)
-- **Problem / evidence (measured live, plan6, 2026-09-21):** after closing TWO consecutive turns each ending in a valid `action: restart`, `auto_resume.log` shows two `recovery= … attempt=1` lines (the counter RESET between them — `armEvent` busy resets `recoveryCount` at line 679 on every busy cycle) and `route=` count = **0** across the whole looprun — i.e. NO action line was ever recognized.
-- **Root cause:** `auto_resume.ts` line 492 `msgPairs(msgs) = Array.isArray(msgs) ? msgs : []`. But `sess.messages()` (line 567) returns the SDK `RequestResult` wrapper `{ data: [...] }`, never a bare array — so `msgPairs` always returns `[]` → `lastAssistantAction` (line 518) always returns null → `userHasMarker` (line 505) always returns false. **Same root cause as the `compact_memory` `resolveModel` bug fixed in 280b8d0 — NOT covered in auto_resume.**
-- **Consequence:** Unit 4 can never read restart/resume/stop/ask_maintainer → always the recovery branch; since `recoveryCount` resets on every busy cycle, the cap (2) is never reached → a FINISHED session gets re-woken with spurious recovery prompts (context drain). The loop itself still progresses via the **looprunner** (a separate mechanism with correct parsing) — the auto-resume plugin's own routing is broken.
-- **Desired outcome:** the messages-RPC result is unwrapped (bare array + `{ data }` wrapper) at the single `msgPairs` site, so Unit 4 routing reads action lines correctly: stop/ask → no send (`route= stop|ask`); resume/null → bounded recovery; restart → `route= restart spawn`.
-- **Acceptance:** a planner closing `action: restart` produces `route= restart spawn` (not a recovery prompt); `action: stop` → `route= stop`, no send; a smoke case pins the wrapper shape; standard gate green (smoke + probe + pytest + ruff).
-- **Suggested scope:** `.opencode/plugin/auto_resume.ts` (`msgPairs` line 492 — the single consumer fix; verify no other messages-RPC site), `.opencode/plugin/tests/auto_resume.smoke.mjs` (add a wrapper-shape case), probe pins.
-  - **Status:** LANDED + planner-verified (2026-09-22, plan7, worker-11
-    `worker_Q3S_110K_mtp` ses_f39eef70effefmk8Bt598jhqwK, code `eaef397`):
-    the dual-shape unwrap in `msgPairs` (bare array + `{ data }` wrapper —
-    the same normalization as 280b8d0) + the `ses_u4_wrap` wrapper-shape
-    smoke case (smoke 63/63, probe 241/241, pytest 459+1w, ruff F=0). LIVE
-    ACCEPTANCE pending the next host restart (the running host is pre-fix;
-    the post-restart planner verifies `route=`/`skip=` lines for the
-    planner-7 close from `auto_resume.log`). NOTE: an earlier plan6 INFO
-    line attributed this to a "read-race" — that was WRONG; this shape bug
-    is the real cause.
+## 79. (closed 2026-09-23 - live-accepted, full text in todo_records.md) - auto_resume Unit 4 msgPairs never unwrapped the SDK { data } wrapper -> action lines were NEVER recognized (spurious recovery prompts / context drain); fixed eaef397 (dual-shape unwrap + ses_u4_wrap smoke) + LIVE ACCEPTED 2026-09-23 (route= restart spawn for a valid action: restart on both builds: v=24972ebd 12:52:39Z + v=d2b9d510 13:00:08Z, no recovery= lines for the sid)
 
 ## 75. (open, 2026-09-21, planner) — **Build our own auto-resume plugin** (opencode-auto-resume research, Phase 3 seed).
 - **Problem / evidence:** the looprunner is a mechanical relay; the maintainer wants infinite direct planner sessions (his ideas.md item 2026-09-18). Three measured gaps: no auto-resume after compaction, no auto compaction trigger on context limit, no auto-restart on `action: restart`. A working reference exists and is vendored in-repo (opencode-auto-resume v1.1.16, v1-era API surface, verified compatible with our opencode-ai@1.18.31).
@@ -753,6 +628,7 @@ All those IDs stay reserved — see the numbering rule in the header.
       the 2026-09-23 bookkeeping commit). The post-restart live
       verification stays a maintainer call.
      The orphan-session cleanup is DONE (the maintainer removed all the
+  - **LIVE EVIDENCE 2026-09-23 (plan10, new build v=d2b9d510):** the Unit-4 restart branch fired correctly on planner-9 close (`route= restart spawn` 13:00:08Z -> the named spawn `ident=autorun-2026-09-21_15-33 planner-10`, session ses_f31a5dee5ffe1DIBxZzEDZF8aF); the trigger session was NOT re-routed afterwards (no recovery=/route= lines for its sid) and no unbounded-spawn loop recurred. His 2026-09-23_14-25 item now directs a change to the spawned-exclusion design (TODO #90).
      new sessions, 2026-09-22).
 
 ## #86. (DEFERRED — maintainer-proposed 2026-09-23, curated from todo_inbox 2026-09-23_01-08) — worker audit of ALL `.opencode/plugin/` + `.opencode/agent/scripts/` tools/plugins
@@ -808,4 +684,12 @@ All those IDs stay reserved — see the numbering rule in the header.
 
 ## #88. (LANDED 2026-09-23, worker-14 `worker_Q3S_170K`) — auto_resume smoke wall-time cut 91.4 %: 145.5 s → 12.5 s (his 2026-09-23_00-12 complaint measured at 145.5 s, not ~300 s) — the tick period is now a DEFAULT-PRESERVING factory option (`tickMs`, default 5000 ms — the live tick is unchanged; first factory call sets the module-level tick); the smoke instantiates with `tickMs: 300` and its 7× `sleep(5600)` became `tickWait()` (2 ticks + margin — same "at least one full tick period" pin semantics); no check removed (102/102 before AND after); gate re-verified: probe 241/241, all 10 smokes, pytest 459+1w, ruff F=0. Commit 532ddbc.
 
-## #89. (LANDED 2026-09-23, worker-15 `worker_Q3S_170K`) — autorun-identifiable names for plugin-spawned sessions: the auto_resume spawns carry the title `<loop-folder> planner-<N>` (his # 2026-09-23_04-34)
+## #89. (closed 2026-09-23 - live-accepted plan10; full text in todo_records.md) - autorun-identifiable names for plugin-spawned sessions (title <loop-folder> planner-<N>): LIVE - the first named spawn verified 2026-09-23 13:00:08Z (the spawn= line carries ident=autorun-2026-09-21_15-33 planner-10 + the session title in the DB)
+
+
+## #90. (open - maintainer item 2026-09-23_14-25; design needed; related #87) - plugin-spawned successors should be tracked (not scope "none") and inherit the trigger session's Autorun/Direct state
+- **Problem / evidence:** his priority.md item 2026-09-23_14-25: "spawned new session by the auto-resume plugin should be tracked also and not set to 'none' - they should inherit the settings/state from the session that triggered the new session via action: restart - so in the next session the same Autorun / Direct setting will be transmitted - and deactivated for the old session (i assume to prevent an unintentional resume) (if not already the case)". Current behavior: the `spawned` self-mark (set in `spawnPlanner`, checked FIRST in the scope verdict, auto_resume.ts) is an EXCLUSION (the #85 part-1 loop prevention) -> a plugin-spawned successor is scope "none" and is never re-routed (measured live 2026-09-23: the self-spawned planner-8 session stalled at scope=none - TODO #87).
+- **Desired outcome (his words, parsed):** a spawned successor (1) is tracked/in-scope, (2) inherits the trigger session's last own-line Autorun/Direct state, (3) the trigger session is deactivated (its scope off) to prevent an unintentional resume - with the #85 unbounded-spawn loop prevention preserved.
+- **Acceptance:** the design ruling/spec is approved BEFORE implementation (observable behavior change); the #85 global cap + dead-mark stay effective; smoke pins for the inherit + deactivate behavior.
+- **Suggested scope:** `auto_resume.ts` (scope verdict + `spawnPlanner`) + the auto_resume smoke.
+- **Status:** open - design needed; this item is his steer on the #87 dead-successor question (recorded for the next direct session) - #87 stays open until the ruling is recorded and a spec is approved.

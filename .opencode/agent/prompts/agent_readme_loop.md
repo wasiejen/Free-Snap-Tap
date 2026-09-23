@@ -65,7 +65,10 @@ not here.
     message / task spec), role only for direct runs.
   - `<content>` per status:
     - `-->START` — looprunner, planner, and worker each write one at their own
-      session/task start; content = the task oneliner.
+      session/task start (the WORKER'S is its FIRST action after reading the
+      task spec - before planning or heavy tool calls, because an interrupted
+      delegation does not return the task_id and the log is the only way to
+      find the session); content = the task oneliner.
     - `DONE<---` — every agent WITH loop-folder write access (planner, worker)
       writes one on task completion; content = the final gauge readout
       `<CTX>%/<REM>K` — verbatim from the gauge command, never guessed.

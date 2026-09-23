@@ -50,6 +50,11 @@ All paths below are relative to `.opencode/agent/prompts/`.
   resource — first greps output-limited (`| head -30`); read only the task
   spec's named area (bounded line range), never a whole big file; dense /
   numeric content via scripts, not inline reads (`knowledge_context.md`).
+- **Output discipline (maintainer # 2026-09-23_14-19):** untested shell
+  commands or commands with unknown / potentially big output -> run them with
+  the output redirected to a temp file, check the size first, and let only an
+  overview (e.g. line count) into the context; always bound untested greps
+  (`| head -30`) and similar.
 - Helper scripts (bounded DB / binary / log inspection, output-limited): use
   the curated collection `.opencode/agent/scripts/` (README + INVENTORY.md) —
   reuse, do not re-derive throwaway scripts.
