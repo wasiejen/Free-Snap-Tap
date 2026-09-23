@@ -434,3 +434,6 @@ SMOKE GAP vs LIVE: the auto_resume smoke passed 105/105 but the maintainer's LIV
 ### 2026-09-23_04-17 planner_Q3S_170K ses_f39d250e9ffeheip2FVEeY5Fk6
 THINKING LOOP: near the end of this session I was re-deriving the same Unit-2 design points repeatedly in my thinking instead of moving to the spec (the maintainer called it out: "you are starting to loop in your thinking"). Actionable: once all open questions are answered and the design is settled, STOP re-analyzing — write the spec + close. The loop cost context with no new information. Also: the #85 part 3 design went through 3 rescopes (a/b/c → ctx-line-suffix → final) as the maintainer refined it live; each rescope re-triggered analysis. A tighter "lock the decision, then spec" discipline (one round per ruling, no re-derivation) would have saved the loop.
 
+### 2026-09-23_05-44 worker_Q3S_170K ses_f33c05575ffeYtM7PHyL30GgID
+Salvaged worker-12 draft's smoke line-range claims were off by one (said L5-8, actual L4-7) and its stale-check `route=` self-correction was unmarked — the anchor-verified splice caught the ranges before writing; salvaged drafts should carry explicit final-decision markers on mid-design self-corrections.
+
