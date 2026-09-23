@@ -2,40 +2,14 @@
 
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
-## Current session — autorun, 2026-09-23 (ses_f318f0d77ffer6kIwqiNvE1xau, planner-11, Qwen3.8-27B-Q3S-170K)
-- plan11: (1) #90 DESIGN PROPOSAL drafted (b81775b) — the maintainer MOVED
-  it to `proposals/approved/` + approved "A+B and C also" (`--comment`
-  15-44) via inbox `2026-09-23_15-46.md` (STAYS IN PLACE until #90 lands —
-  his instruction; it also forbids `action: restart` until #90 is live —
-  I close via SELF-COMPACT + unit-4 resume instead). (2) #90 IMPLEMENTATION
-  spec committed (81ed057); worker ses_f3170a3bdffe1OD5gPCr6PehAQ
-  (`worker_Q3S_170K`) landed Parts A+B+C in the WORKING TREE (uncommitted;
-  the gate/TODO/handover steps were NOT done) before dying at its context
-  limit — session dumped (252626 B corpus) + CROSS compact dispatched
-  (same-model: runs after my turn frees the slot). (3) #78 SCOPING done via
-  explorer ses_f317d80c2ffeMGup4T9z5IvUs2 — findings verified
-  (`.opencode/loop/autorun-2026-09-21_15-33/plan11_78_scope.md`; headline:
-  the cited corpus file is a stale slim backfill — current full mode is
-  complete for text/reasoning; residual gaps = tool input/output + caps, no
-  raw-JSON mode; DUMP-FAIL = spawn stall, not the 60 s budget). (4)
-  Knowledge inbox curated (3 entries -> tools x2 / plugins x1, a840839).
-- NEXT (after the compaction — I resume via unit-4 recovery): (1) RE-ATTEMPT
-  the worker resume `task_id ses_f3170a3bdffe1OD5gPCr6PehAQ` (the
-  post-compaction request must now fit the 170240 window; verify the
-  COMPACT line in `.opencode/temp/ctx.log` first; if it still overflows:
-  launch a FRESH worker on a handoff spec — the uncommitted diff on disk +
-  spec 81ed057 + "run the gate once, bookkeeping, commit" — MEM-0107
-  style); (2) verify the worker's commit (git log + diff vs the approved
-  proposal + one smoke re-run) and land #90 (its hash in MY bookkeeping
-  commit); #87 closes then; move the proposal to `implemented/` with a
-  verdict note; the inbox file may then move to `maintainer/done/`;
-  (3) #78: awaiting his ruling on the ranked options (the raw-JSON default
-  question); (4) maintainer tails unchanged: #82 live test + unit-2
-  suppression call, #80/#81 confirms, #83 flag + live host-call, #86
-  deferred audit; (5) the 14-20 compaction-guideline codification waits for
-  the next DIRECT session.
+## Closed session — autorun, 2026-09-23 (ses_f318f0d77ffer6kIwqiNvE1xau, planner-11, Qwen3.8-27B-Q3S-170K)
+- CLOSED 2026-09-23 with `action: stop` (maintainer AFK; no restart until
+  the live plugin carries #90). Full detail: the 2026-09-23 plan11 line
+  in the Compressed archive below + `plan11_summary.md` (incl. the
+  post-compaction-resume incident section).
 
 ## Compressed archive (one line each
+- 2026-09-23 autorun (ses_f318f0d77ffer6kIwqiNvE1xau, planner-11, Qwen3.8-27B-Q3S-170K) — plan11: #90 APPROVED (his 15-44 inbox: A+B+C) + LANDED (c4b244d, worker_Q3S_170K ses_f3170a3b resumed post-compaction, spec 81ed057 — smoke 118/118 planner-re-verified, gate green, #87 closed, proposal → implemented/ + verdict, his inbox → done/) + #78 SCOPED (plan11_78_scope.md: cited corpus file = stale slim backfill, current full mode complete for text/reasoning, no raw-JSON mode, DUMP-FAIL = spawn stall not the 60 s budget — awaiting his ruling) + knowledge curation (a840839) + compaction-resume incident (unit-4 recovery-continue resumed THIS session after my self-compact — the intended mode WORKED; the restart branch ALSO spawned a short-lived ghost ses_f3144d9d6 "planner-12" on the same idle episode — both paths fire, not mutually exclusive; my own pre-compact DUMP-FAIL ETIMEDOUT recurred = the #78 stall) — details: loop folder plan11_summary.md + git a840839/b81775b/41e006f/81ed057/2b067e6/c4b244d
 - 2026-09-23 autorun (ses_f31a5dee5ffe1DIBxZzEDZF8aF, planner-10, Qwen3.8-27B-Q3S-170K) — plan10: #89 LIVE-ACCEPTED (the first NAMED spawn — the `spawn=` line 13:00:08Z carries `ident=autorun-2026-09-21_15-33 planner-10` + the DB session title = the ident, both sides) + #79 LIVE-ACCEPTED (`route= restart spawn` for a valid `action: restart` on both builds v=24972ebd/v=d2b9d510, zero `recovery=`) both CLOSED (records first) + #85 live evidence (the restart branch fired correctly on the new build; the trigger NOT re-routed; no unbounded-spawn loop recurrence) + the 4 deferred body condenses (#68/#69/#71/#73 -> one-liners, full text in todo_records.md) + his priority items triaged: 14-14 loop-log START timing fixed (agent_readme_loop.md), 14-19 output-discipline bullets codified (planner+worker prompts), 14-20 deferred (direct session), 14-25 -> NEW TODO #90 (spawned-successor inherit + deactivate design) - details: loop folder plan10_summary.md + git e0c59cb/6cfadb9/8375143
 - 2026-09-23 autorun (ses_f322793f5ffeI34HE19SEmxU43, planner-9, Qwen3.8-27B-Q3S-170K) — plan9: UNIT A LANDED + verified (2240d00, spawn naming — `body.title` in the shared spawnPlanner + `ident=` bit; own smoke 104/104) + UNIT B LANDED + verified (167ec58, TODO.md 1132->811 curation per the 2026-09-23_02-51 review; machine-checked 67 entries / zero duplicates) + priority #04-20 closed (sweep fix verified) + #68/#69/#71/#73 title markers aligned (body condense deferred to plan10) + his order: re-trigger `action: restart` for the live acceptance (the successor = planner-10) — details: loop folder plan9_summary.md + git 265607d — details in git log + TODO/records)
 - 2026-09-23 autorun (ses_f33f1eb98ffeFvrnTdmTzmyE2x, planner-8, Qwen3.8-27B-Q3S-170K) — #85 part 3 LANDED + verified (ded7245+5992f38: Unit-2 passive ctx-line suffix, Direct gates it, scopeVerdict toggle-first) + Unit-2 smoke wall 145.5s→12.5s (91.4 %, 532ddbc+739d8a1, TODO #88) + LIVE FINDING: the plugin-spawned session is permanently `spawned`-scoped → a no-action-line close STALLS the plugin-driven loop (TODO #87, 4 options, maintainer call) + #86 deferred worker-audit curated + worker-12 limit-death forensics (MEM-0107) + marker-sweep command fix — details: loop folder plan8_summary.md + git 725ab3a

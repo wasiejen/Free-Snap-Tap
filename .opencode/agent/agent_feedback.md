@@ -455,3 +455,12 @@ read tool truncates >2000-char lines (TODO.md #74 ~4k line only fully visible vi
 ### 2026-09-23_15-21 planner_Q3S_170K ses_f31a5dee5ffe1DIBxZzEDZF8aF
 TODO.md line-count bookkeeping cost two aborted script iterations: wc -l (702) vs node array length (703, trailing newline) mismatched, and boundary line numbers were taken from memory instead of fresh grep/awk output - the built-in abort checks caught both before damage; rule of thumb: always re-derive file boundaries from a fresh bounded read immediately before a line-range script.
 
+### 2026-09-23_16-44 planner_Q3S_170K ses_f318f0d77ffer6kIwqiNvE1xau
+Worker limit-death mid-implementation: the task_id resume attempt failed with "request (170752 tokens) exceeds the available context size" — looks like a launch failure but is actually the resumed session's history over the window (MEM-0104 family); the dump→cross-compact→re-resume protocol is the only path, and a same-model cross compaction only RUNS after the compacting turn ends — the planner must plan the resume for the NEXT turn (queued message does not survive per the temp fix), so the Work State dump / NAP NEXT block must carry the exact task_id + fallback.
+
+### 2026-09-23_17-52 worker_Q3S_170K ses_f3170a3bdffe1OD5gPCr6PehAQ
+plan11 #90: the worker session died at the context limit mid-work (code + smoke were complete in the tree, but the gate + bookkeeping never ran); the resume had to rebuild from disk (re-read spec + proposal, self-audit the diff, re-run the whole gate). No early-handover checkpoint had been written before the stop line — consider enforcing the 70 % early-handover so a limit-death resume is cheaper (the resumed session spent its first ~5 calls re-deriving state that a committed handover would have carried).
+
+### 2026-09-23_17-58 planner_Q3S_170K ses_f318f0d77ffer6kIwqiNvE1xau
+Self-compaction close protocol gap: ending the turn on the compact_memory TOOL CALL (no Work State dump text after the dispatch) left unit 4 with no action line → it fired BOTH the recovery-continue (which correctly resumed the compacted session) AND the restart-branch ghost spawn (ses_f3144d9d6 "planner-12") on the same idle episode. The prompt's stop-line section should state: after a self-compact dispatch, the Work State dump MUST be the final TEXT message of the turn (the tool returns before compaction completes). Secondary: my own pre-compaction dump failed ETIMEDOUT (the #78 spawn stall, 3rd live occurrence) — the dropped head is recorded only by the compaction summary.
+

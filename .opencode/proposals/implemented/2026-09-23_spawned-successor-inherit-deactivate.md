@@ -167,3 +167,16 @@ acceptance criterion).
 
 --comment:
 2026-09-23_15-44: approved A+B and C also
+
+## Verdict (planner-11, 2026-09-23)
+
+LANDED as commit **c4b244d** (worker `worker_Q3S_170K`
+ses_f3170a3bdffe1OD5gPCr6PehAQ, spec 81ed057): all three parts implemented
+per this design (spawnPlanner returns sid/null; lineage-depth map + cap N=2;
+restartText line-1 exact own-line toggle; sticky trigger deactivation +
+clear-on-own-line-ON-toggle; init log-restore of depth map + flags). Smoke
+re-pinned 118/118 (the old #85 spawned-exclusion pins flipped to the new
+behavior + acceptance pins 1–7). Gate green: probe 241/241, all 10 smokes,
+pytest 459 passed + 1 warning, ruff F=0. Planner re-verified with an
+independent smoke re-run (118/118). #87 closed (subsumed). Live acceptance
+pending the next host restart (the live plugin is still the pre-#90 build).
