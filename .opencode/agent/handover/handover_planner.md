@@ -286,19 +286,25 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
    global cap (unlike Unit 4). (3) `<|Direct|>` only gates Unit 4
    (routeScopedIdle), NOT Unit 2 (sendSelfCompact never consults the scope
    verdict) → Direct kills the CONTINUE spam but the saturation nudge
-   continues. FIX DESIGN (all additive in auto_resume.ts): (a) "current
-   session" gate for Unit 2 = the sid of the most recent REAL `arm=` event
-   (last session the user actually worked); only fire sendSelfCompact for
-   that sid (a stale armed watch never fires). (b) global cap + dead-mark
-   for Unit 2 (mirror Unit 4: a nudge not consumed by a real fresh busy
-   dead-marks it; cleared on a real fresh busy, not the injected one). (c)
-   route Unit 2 through the scope verdict — scope==="none" (Direct)
-   suppresses the saturation nudge too. MAINTAINER ACTIONS (this turn): set
-   the model context to 50000 (ratio 2.238 was from usable 45000 vs a
-   100701-token session), deactivated autoCompact in the json config, and is
-   doing a CLEAN RESTART to stop Unit 4 (I was being nudged into a loop by
-   the injected messages). NEXT: his 2 answers (see open questions) → spec +
-   delegate (a)+(b)+(c).
+   continues. FIX DESIGN (RESCOPED 2026-09-23, maintainer rulings): Unit 2
+   REDESIGN — the nudge is PASSIVE (appended to the tool-call return, the
+   same channel as the ctx: line), PER busy session, NO promptAsync, NO
+   resume (resuming is Unit 4's domain) — this eliminates the loop + the
+   stale-session revival by construction (a session only emits a ctx line
+   while actively working). Nudge LADDER (like ctx_gauge): ≥
+   saturationThreshold (0.95) → "self-compact now" suffix; a higher rung
+   (≥ 0.98) → a --maintainer-flagged line. Multiple active workers each get
+   their own nudge independently (future parallel-worker proof). (c) Direct
+   suppresses the Unit-2 ctx-line suffix. (d) scopeVerdict checks the LAST
+   OWN-LINE TOGGLE first (Direct beats the planner test) → Direct deactivates
+   Unit 4 for the planner. NO <|Off|> (Direct already covers it — dropped
+   per maintainer). Unit 4 scope UNCHANGED (wherever the last busy→idle
+   happened). MAINTAINER ACTIONS (this turn): set the model context to 50000
+   (ratio 2.238 was from usable 45000 vs a 100701-token session), deactivated
+   autoCompact in the json config, and did a CLEAN RESTART (I was being
+   nudged into a loop by the injected messages). NEXT: spec written
+   (handover_task.md) + a NEW PLANNER session takes over (this session was
+   looping in its thinking).
  - #86 FILED (deferred, maintainer-proposed): worker audit of all plugin/tool
    code for stale hardcoded agent/model IDs + code smells (read-only, after
    #85 part 2 lands).
