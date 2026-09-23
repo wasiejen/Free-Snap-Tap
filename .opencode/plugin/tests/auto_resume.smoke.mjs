@@ -7,15 +7,22 @@
 // (queued, never synchronous), once per busy cycle.
 // UNIT 3: the new-planner spawn helper — a one-shot trigger file in the
 // log dir, consumed (renamed .consumed) by the 5s tick after ONE spawn
-// attempt (create + queued promptAsync, agent=planner_Q3S_160K, NO model
-// field), even on failure.
+// attempt (create + queued promptAsync; #85 part 2: NO agent/model for
+// the file-trigger spawn — no source session → host default; the Unit
+// 4 successor spawn carries the SOURCE session's current agent+model),
+// even on failure.
 // UNIT 4: the liveness watchdog — an in-scope session going idle (or
 // session.error) is routed on the next tick by the LAST assistant
 // message's action: line: stop / ask → no send; resume / no-line →
-// queued CONTINUE prompt (recovery cap 2, reset on a fresh busy);
+// queued CONTINUE prompt (recovery cap 2, reset on a fresh busy; #85
+// part 2: a FAILED send dead-marks the idle cycle — remaining retries
+// + the fallback spawn are skipped, cleared on a fresh busy);
 // restart or cap exhausted → successor check (a session.created
 // tracked since lastActivityAt) → skip or spawnPlanner (the RESTART
-// prompt). SCOPE (#85 part 1 — the #82 generalized scope): in-scope
+// prompt). #85 part 2 (current agent+modelID): the injected bodies
+// carry the session's CURRENT agent+model — the last assistant's
+// info, the opencode.jsonc agent-config fallback, host default (never
+// a planner constant). SCOPE (#85 part 1 — the #82 generalized scope): in-scope
 // iff the session's working agent (the FIRST user message's agent
 // field) is a planner agent (`planner_<model>`), OR the LAST OWN-LINE
 // toggle in the user history is ON (`<|autonom|>` / `<|Autorun|>`,
@@ -465,10 +472,23 @@ try {
     okCfgD && tCalls.length === nCfgD + 2 && tCalls[tCalls.length - 1]?.path?.id === "ses_u2_cfd_hi" && sentD.includes("ses_u2_cfc_no") && ((tCalls[tCalls.length - 1]?.body?.parts?.[0]?.text ?? "")).includes("80000 of 84000"), `n=${tCalls.length}`);
   chk("UNIT 2 config: out-of-range values → 79000 (0.940 < 0.95 default) does NOT fire",
     !sentD.includes("ses_u2_cfd_low"), JSON.stringify(sentD));
-  fs.rmSync(budgetFile, { force: true }); // leave the sandbox clean
+   fs.rmSync(budgetFile, { force: true }); // leave the sandbox clean
 
-  // ============================================================
-  // UNIT 3 — new-planner spawn helper
+   // #85 part 2: the sandbox opencode.jsonc — the JSONC fallback
+   // target (comments + trailing commas on purpose: the plugin's
+   // parser must handle both). Written BEFORE the first fallback read
+   // (the batch-A CONTINUE) so the module-level cache picks up THIS
+   // agents map. NEVER the live opencode.jsonc — the sandbox project
+   // dir only.
+   const sandboxJsonc = path.join(proj, "opencode.jsonc");
+   fs.writeFileSync(
+     sandboxJsonc,
+     '{\n  // sandbox test config for the #85 part 2 fallback lookup\n  "agent": {\n    "worker_fb_test": { "model": "prov_x/model_x", }\n  },\n}\n',
+     "utf-8",
+   );
+
+   // ============================================================
+   // UNIT 3 — new-planner spawn helper
   //
   // The factory is re-invoked with a SPYING client: `create` and
   // `promptAsync` record every call (mutable throw flags per scenario).
@@ -506,23 +526,24 @@ try {
   const hooksSpawn = await factory({ directory: proj, client: { session: vSess, provider: { list: providerList }, app: { log: () => "log" } } });
   if (typeof hooksSpawn?.event !== "function") throw new Error("UNIT 3: re-factory did not return the event hook");
 
-  // ---- (1) trigger present (non-empty) → ONE create + ONE queued
-  // promptAsync (path.id = the created sid, agent, NO model field,
-  // parts[0].text = the trigger content), spawn= line, file renamed
-  // to .consumed.
-  fs.writeFileSync(triggerFile, TRIGGER_TEXT, "utf-8");
-  const okS1 = await waitUntil(() => spawnCalls.length >= 1 && !fs.existsSync(triggerFile));
-  const spawnLine = readLines().find((l) => l.includes("spawn= sid=ses_u3_new"));
-  chk("UNIT 3: trigger present → ONE create + ONE queued promptAsync (path.id=created sid, agent=planner_Q3S_160K, NO model, parts[0].text=trigger), spawn= line, file renamed .consumed",
-    okS1 && createCalls.length === 1 && spawnCalls.length === 1 &&
-      spawnCalls[0]?.path?.id === "ses_u3_new" &&
-      spawnCalls[0]?.body?.agent === "planner_Q3S_160K" &&
-      !("model" in (spawnCalls[0]?.body ?? {})) &&
-      Array.isArray(spawnCalls[0]?.body?.parts) && spawnCalls[0].body.parts.length === 1 &&
-      spawnCalls[0].body.parts[0].type === "text" && spawnCalls[0].body.parts[0].text === TRIGGER_TEXT &&
-      !!spawnLine && spawnLine.includes("agent=planner_Q3S_160K") &&
-      fs.existsSync(triggerFile + ".consumed"),
-    `create=${createCalls.length} promptAsync=${spawnCalls.length}`);
+   // ---- (1) trigger present (non-empty) → ONE create + ONE queued
+   // promptAsync (path.id = the created sid, NO agent, NO model —
+   // #85 part 2: a file-trigger spawn has no source session → the
+   // host default applies, parts[0].text = the trigger content),
+   // spawn= line, file renamed to .consumed.
+   fs.writeFileSync(triggerFile, TRIGGER_TEXT, "utf-8");
+   const okS1 = await waitUntil(() => spawnCalls.length >= 1 && !fs.existsSync(triggerFile));
+   const spawnLine = readLines().find((l) => l.includes("spawn= sid=ses_u3_new"));
+   chk("UNIT 3: trigger present → ONE create + ONE queued promptAsync (path.id=created sid, NO agent, NO model — host default for a file-trigger spawn, parts[0].text=trigger), spawn= line, file renamed .consumed",
+     okS1 && createCalls.length === 1 && spawnCalls.length === 1 &&
+       spawnCalls[0]?.path?.id === "ses_u3_new" &&
+       !("agent" in (spawnCalls[0]?.body ?? {})) &&
+       !("model" in (spawnCalls[0]?.body ?? {})) &&
+       Array.isArray(spawnCalls[0]?.body?.parts) && spawnCalls[0].body.parts.length === 1 &&
+       spawnCalls[0].body.parts[0].type === "text" && spawnCalls[0].body.parts[0].text === TRIGGER_TEXT &&
+       !!spawnLine && !spawnLine.includes("agent=") && !spawnLine.includes("model=") &&
+       fs.existsSync(triggerFile + ".consumed"),
+     `create=${createCalls.length} promptAsync=${spawnCalls.length}`);
 
   // ---- (5) a second tick after consumption → no second spawn (no
   // double-fire: the consumed file never re-fires).
@@ -937,9 +958,141 @@ try {
   chk("UNIT 4 #82: mid-sentence quote (case-variant, not whole-line) is NOT a toggle — scope= none, no sends, no re-trigger",
     okMid && u4Sends.length === midBefore &&
       !readLines().some((l) => l.includes("sid=ses_u4_mid") && (l.includes("route=") || l.includes("recovery="))),
-    `n=${u4Sends.length}`);
+     `n=${u4Sends.length}`);
 
-  // ---- the live log received NO smoke line. The LIVE plugin instance
+   // ============================================================
+   // #85 part 2 — the CURRENT session agent+modelID in the injected
+   // bodies (the root-cause fix) + the DEAD-MARK on a failed send.
+   // The factory is re-invoked with a fresh spying client:
+   // promptAsync + messages spied (messages scripted per sid from the
+   // shared msgScript), a per-sid throw flag (the dead-mark scenario),
+   // create recorded (the no-fallback-spawn pin).
+   // ============================================================
+   const p2Sends = [];
+   const p2Creates = [];
+   const p2ThrowSids = new Set();
+   const p2Session = {
+     prompt: function () {},
+     promptAsync: async (args) => {
+       if (p2ThrowSids.has(args?.path?.id)) throw new Error("send exploded");
+       p2Sends.push(args);
+       return { data: { id: "queued" } };
+     },
+     abort: function () {},
+     list: function () {},
+     get: function () {},
+     message: function () {},
+     messages: async (args) => msgScript.get(args?.path?.id) ?? [],
+     todo: function () {},
+     command: function () {},
+     summarize: function () {},
+     create: async () => { p2Creates.push({}); return { data: { id: "ses_p2_spawn" } }; },
+   };
+   const hooksP2 = await factory({ directory: proj, client: { session: p2Session, provider: { list: providerList }, app: { log: () => "log" } } });
+   chk("#85 part 2: re-factory with the spying client returns the event hook", typeof hooksP2?.event === "function");
+
+   // (a1) CONTINUE: planner-scoped (first user agent PLANNER_A) but the
+   // LAST assistant message carries a DIFFERENT agent+model (a
+   // mid-session switch) — the injected body must carry THAT current
+   // pair, not a planner constant.
+   msgScript.set("ses_p2_cur", [
+     { info: { role: "user", agent: PLANNER_A }, parts: [{ type: "text", text: MARK + " iteration 1" }] },
+     { info: { role: "assistant", agent: WORKER_A, model: MODEL }, parts: [{ type: "text", text: "Mid-unit, no closing line." }] },
+   ]);
+   // (a2) SPAWN: planner-scoped, action: restart, the last assistant
+   // carries the switched agent+model — the successor keeps them.
+   msgScript.set("ses_p2_rs", [
+     { info: { role: "user", agent: PLANNER_A }, parts: [{ type: "text", text: MARK + " iteration 1" }] },
+     { info: { role: "assistant", agent: WORKER_A, model: MODEL }, parts: [{ type: "text", text: "Done. action: restart" }] },
+   ]);
+   // (a3) JSONC fallback: the last assistant carries NO agent+model →
+   // the working agent (first user) + its CONFIGURED model from the
+   // sandbox opencode.jsonc (the parser: comments + trailing commas).
+   msgScript.set("ses_p2_fb", [
+     { info: { role: "user", agent: "worker_fb_test" }, parts: [{ type: "text", text: "plain task" }] },
+     { info: { role: "user" }, parts: [{ type: "text", text: MARK }] },
+     { info: { role: "assistant" }, parts: [{ type: "text", text: "Mid-unit, no closing line." }] },
+   ]);
+   // (b-d) dead-mark: planner-scoped, no closing line; the CONTINUE
+   // send THROWS (a dead model — the session never goes busy).
+   msgScript.set("ses_p2_dm", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Mid-unit, no closing line."]], PLANNER_A));
+   p2ThrowSids.add("ses_p2_dm");
+
+   // All four scenarios armed before one tick pass (the single 5s tick
+   // is the only decision+send funnel — the smoke waits on it).
+   await fire(hooksP2, "ses_p2_cur", [statusEv("ses_p2_cur", "busy"), statusEv("ses_p2_cur", "idle")]);
+   await fire(hooksP2, "ses_p2_rs", [statusEv("ses_p2_rs", "busy"), statusEv("ses_p2_rs", "idle")]);
+   await fire(hooksP2, "ses_p2_fb", [statusEv("ses_p2_fb", "busy"), statusEv("ses_p2_fb", "idle")]);
+   await fire(hooksP2, "ses_p2_dm", [statusEv("ses_p2_dm", "busy"), statusEv("ses_p2_dm", "idle")]);
+   const okP2 = await waitUntil(
+     () =>
+       readLines().some((l) => l.includes("recovery= sid=ses_p2_cur attempt=1")) &&
+       readLines().some((l) => l.includes("route= restart spawn sid=ses_p2_rs")) &&
+       readLines().some((l) => l.includes("recovery= sid=ses_p2_fb attempt=1")) &&
+       readLines().some((l) => l.includes("send-fail= sid=ses_p2_dm") && l.includes("send exploded")),
+     12000,
+   );
+   const p2Cur = p2Sends.find((c) => c.path?.id === "ses_p2_cur");
+   const p2Fb = p2Sends.find((c) => c.path?.id === "ses_p2_fb");
+   const p2SpawnSend = p2Sends.find((c) => ((c.body?.parts?.[0]?.text ?? "")).startsWith(MARK));
+   const p2SpawnLine = readLines().find((l) => l.includes("spawn= sid=ses_p2_spawn"));
+   chk("#85 part 2 (a): all four scenarios routed on one tick pass (continue / restart-spawn / fallback-continue / failed send)",
+     okP2, okP2 ? "" : "missing line(s)");
+   chk("#85 part 2 (a): CONTINUE body carries the session's CURRENT agent+model (the last assistant's switched pair — not a planner constant)",
+     okP2 && p2Cur?.body?.agent === WORKER_A && p2Cur?.body?.agent !== PLANNER_A &&
+       p2Cur?.body?.model?.providerID === MODEL.providerID && p2Cur?.body?.model?.modelID === MODEL.modelID &&
+       ((p2Cur?.body?.parts?.[0]?.text) ?? "").includes("agent_readme_post_compaction.md"),
+     JSON.stringify(p2Cur?.body ?? null));
+   chk("#85 part 2 (a): the restart spawn carries the SOURCE session's current agent+model (the successor keeps them — not a planner constant)",
+     okP2 && p2SpawnSend?.path?.id === "ses_p2_spawn" && p2SpawnSend?.body?.agent === WORKER_A && p2SpawnSend?.body?.agent !== PLANNER_A &&
+       p2SpawnSend?.body?.model?.providerID === MODEL.providerID && p2SpawnSend?.body?.model?.modelID === MODEL.modelID &&
+       !!p2SpawnLine && p2SpawnLine.includes("agent=" + WORKER_A) && p2SpawnLine.includes("model=prov_x/model_x"),
+     JSON.stringify(p2SpawnSend?.body ?? null));
+   chk("#85 part 2 (a): the JSONC fallback — no last-assistant agent+model → the working agent (first user) + its CONFIGURED model from opencode.jsonc",
+     okP2 && p2Fb?.body?.agent === "worker_fb_test" && p2Fb?.body?.model?.providerID === "prov_x" && p2Fb?.body?.model?.modelID === "model_x",
+     JSON.stringify(p2Fb?.body ?? null));
+
+   // (b) the host re-arms the failed session (a session.error — a dead
+   // stream may never emit its idle): the NEXT tick must log the
+   // dead-mark skip — no attempt 2, no send.
+   const dmSkip = () => readLines().filter((l) => l.includes("skip= dead sid=ses_p2_dm")).length;
+   const dmAttempt = (n) => readLines().filter((l) => l.includes(`recovery= sid=ses_p2_dm attempt=${n}`)).length;
+   await hooksP2.event({ event: { type: "session.error", properties: { sessionID: "ses_p2_dm" } } });
+   const okP2B = await waitUntil(() => dmSkip() >= 1, 12000);
+   chk("#85 part 2 (b): a failed CONTINUE dead-marks the session — the next tick logs the dead-mark skip (no attempt 2, no send)",
+     okP2B && dmSkip() === 1 && dmAttempt(2) === 0 && !p2Sends.some((c) => c.path?.id === "ses_p2_dm"),
+     `skip=${dmSkip()} attempt2=${dmAttempt(2)}`);
+
+   // (c) a SECOND re-arm (what would exhaust the cap in the old code):
+   // still only the dead-mark skip — NO recovery attempt 2, NO
+   // cap-exhaustion fallback spawn (no doomed successor), the mark
+   // persists (no 5s retry loop).
+   const cBeforeP2C = p2Creates.length;
+   await hooksP2.event({ event: { type: "session.error", properties: { sessionID: "ses_p2_dm" } } });
+   const okP2C = await waitUntil(() => dmSkip() >= 2, 12000);
+   await sleep(5600); // at least one full tick period — no spawn may follow
+   chk("#85 part 2 (c): the cap-exhaustion branch does NOT spawn for a dead-marked session (no doomed successor; the mark persists — no 5s retry loop)",
+     okP2C && dmSkip() === 2 && dmAttempt(2) === 0 && p2Creates.length === cBeforeP2C &&
+       !readLines().some((l) => l.includes("route= restart spawn sid=ses_p2_dm")) &&
+       !p2Sends.some((c) => c.path?.id === "ses_p2_dm"),
+     `skip=${dmSkip()} create=${p2Creates.length}`);
+
+   // (d) a FRESH busy (no pending injection — the send failed) clears
+   // the dead-mark: the next idle cycle retries normally (the throw
+   // flag is lifted — the CONTINUE lands).
+   p2ThrowSids.delete("ses_p2_dm");
+   const dmArmed = () => readLines().filter((l) => l.includes("arm= sid=ses_p2_dm") && !l.includes("injected")).length;
+   const dmInjected = () => readLines().filter((l) => l.includes("arm= sid=ses_p2_dm injected")).length;
+   const n1Before = dmAttempt(1);
+   await fire(hooksP2, "ses_p2_dm", [statusEv("ses_p2_dm", "busy"), statusEv("ses_p2_dm", "idle")]);
+   const okP2D = await waitUntil(() => dmAttempt(1) === n1Before + 1 && p2Sends.some((c) => c.path?.id === "ses_p2_dm"), 12000);
+   const p2Dm = p2Sends.find((c) => c.path?.id === "ses_p2_dm");
+   chk("#85 part 2 (d): a fresh busy clears the dead-mark — the next idle cycle retries normally (the CONTINUE lands)",
+     okP2D && !!p2Dm && p2Dm?.body?.agent === PLANNER_A &&
+       dmArmed() === 2 && dmInjected() === 0,
+     JSON.stringify(p2Dm?.body ?? null));
+
+   // ---- the live log received NO smoke line. The LIVE plugin instance
   // (this host) keeps appending ITS OWN live-session lines in real time
   // while the smoke runs, so the live size may legitimately grow — the
   // invariant is that no SMOKE session line ever lands in it (the
@@ -954,7 +1107,7 @@ try {
   } else if (liveBefore === null && liveSizeNow > 0) {
     appended = fs.readFileSync(LIVE_LOG, "utf-8"); // did not exist before — all new
   }
-  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_wrap", "ses_u4_throw", "ses_u4_spawn", "ses_u4_cap", "ses_u2_agnet", "ses_u2_agnone", "ses_u4_worker", "ses_u4_worker_on", "ses_u4_pb", "ses_u4_lastoff", "ses_u4_mid"];
+  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_wrap", "ses_u4_throw", "ses_u4_spawn", "ses_u4_cap", "ses_u2_agnet", "ses_u2_agnone", "ses_u4_worker", "ses_u4_worker_on", "ses_u4_pb", "ses_u4_lastoff", "ses_u4_mid", "ses_p2_cur", "ses_p2_rs", "ses_p2_fb", "ses_p2_dm", "ses_p2_spawn"];
   chk("LIVE .opencode/temp/auto_resume.log received no smoke line (sandbox got every smoke line)",
     liveBefore === liveSizeNow || !smokeSids.some((s) => appended.includes(s)), `before=${liveBefore} after=${liveSizeNow}`);
   chk("sandbox log path is under the sandbox", sandboxLog.startsWith(base), sandboxLog);

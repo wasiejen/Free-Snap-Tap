@@ -73,14 +73,16 @@
 //   consumed; absent → nothing. The spawn is `create()` (no args — the
 //   body is optional, no path → default directory) + ONE QUEUED
 //   `promptAsync` carrying the trigger content as the planner start
-//   prompt, with `agent: "planner_Q3S_160K"` and NO `model` field (the
-//   agent-configured model applies — the host's opencode.jsonc is the
-//   live source of truth). Success → the new sid is self-marked in a
-//   module-level `spawned` map (sid → epoch — the #85 part-1 EXCLUSION
-//   mark: Unit 4 never scopes a self-spawned session) + a `spawn=`
-//   line. Every failure is a `spawn-fail=` line; the helper NEVER
-//   throws outward. The module stays DEFAULT-ONLY exported (a named
-//   export breaks the smoke check).
+//   prompt, with the SOURCE session's CURRENT agent+model (#85 part 2
+//   fire-time resolution — the Unit 4 successor spawn passes the
+//   closing session's fresh fetch; a file-trigger spawn has no source
+//   session → NO `agent`/`model` field — the host default applies).
+//   Success → the new sid is self-marked in a module-level `spawned`
+//   map (sid → epoch — the #85 part-1 EXCLUSION mark: Unit 4 never
+//   scopes a self-spawned session) + a `spawn=` line. Every failure is
+//   a `spawn-fail=` line; the helper NEVER throws outward. The module
+//   stays DEFAULT-ONLY exported (a named export breaks the smoke
+//   check).
 //
 // UNIT 4 (the liveness watchdog — who watches the top-level session):
 // an in-scope session going idle (or session.error) is routed on the
@@ -108,7 +110,14 @@
 // stop / ask_maintainer → NO send, `route= stop|ask` line; resume or NO
 // recognized line → ONE queued CONTINUE prompt (recoveryCount++, cap 2
 // per idle cycle, reset on a fresh busy), `recovery= attempt=N` line;
-// restart, or cap exhausted with still no line → SUCCESSOR CHECK (a
+// a FAILED CONTINUE send (`send-fail=`) DEAD-MARKS the session for the
+// current idle cycle (#85 part 2): the next routed tick logs
+// `skip= dead` — the remaining recovery retries AND the
+// cap-exhaustion fallback spawn are skipped (no doomed successor);
+// cleared on a fresh busy (the same reset axis as the recovery
+// budget); a dead model never goes busy → the mark persists → no 5s
+// retry loop. restart, or cap exhausted with still no line →
+// SUCCESSOR CHECK (a
 // DIFFERENT sid tracked in a session.created event since the closed
 // session's lastActivityAt → `skip= successor`) else spawnPlanner with
 // the RESTART prompt + `route= restart spawn` line. session.created
@@ -150,13 +159,17 @@ const SESSION_CANDIDATES: ReadonlyArray<string> = [
   "create",
 ];
 
-// Unit 3 constants: the planner agent id — the live source of truth is
-// the host's opencode.jsonc (re-verified 2026-09-21 at build time:
-// `planner_Q3S_160K`); NO model field is ever sent (the agent-configured
-// model applies), and the one-shot trigger file name (same dir as the
-// log — `.opencode/temp/`).
-const PLANNER_AGENT_ID = "planner_Q3S_160K";
+// Unit 3 constants (#85 part 2: the injected bodies carry the SOURCE
+// session's CURRENT agent+model — resolved at fire-time from the
+// last-assistant info, with the opencode.jsonc agent-config lookup as
+// the fallback; NEVER a hardcoded planner constant — the live roster
+// moves under model-generation renames). The one-shot trigger file
+// name (same dir as the log — `.opencode/temp/`).
 const SPAWN_TRIGGER_FILE = "auto_resume_spawn_trigger";
+// #85 part 2: the opencode.jsonc fallback target (the project root —
+// the factory's `input.directory`; the live roster is the live source
+// of truth for the configured agent models).
+const OPENCODE_CONFIG_FILE = "opencode.jsonc";
 
 // Unit 2 defaults (deep-dive B §2): the saturation threshold and the
 // output reserve are configurable per tick via the optional budget-file
@@ -193,6 +206,13 @@ const ACTION_RE = /action:\s*(restart|resume|stop|ask_maintainer)/g;
 let logDir = "";
 let logPath = "";
 let client: unknown = null;
+// #85 part 2: the project root (the factory's `input.directory`) — the
+// opencode.jsonc fallback lookup path.
+let projectDir = "";
+// #85 part 2: the CACHED opencode.jsonc agents map (undefined = not yet
+// read, null = read but no usable agents map / parse failure, object =
+// the agents map) — read only when the fallback fires (never per tick).
+let jsoncAgentsCache: Record<string, unknown> | null | undefined;
 
 // Unit 2 module-level state (all state at module level — the file's
 // Unit 1 shape): per-session watches, the re-entrancy latch, the
@@ -216,10 +236,11 @@ interface Watch {
   scope: "planner" | "autorun" | "none" | "unknown";
   recoveryCount: number;
   idlePending: boolean;
-  // #80 (agent retention): the first user message's agent field, cached
-  // from the messages() fetch: undefined = not yet resolved, null =
-  // resolved, absent.
-  userAgent?: string | null;
+  // #85 part 2 (dead-mark): a FAILED CONTINUE send marked the current
+  // idle cycle — the remaining recovery retries AND the
+  // cap-exhaustion fallback spawn are skipped (`skip= dead` line);
+  // cleared on a fresh busy (the same reset axis as recoveryCount).
+  deadMarked: boolean;
 }
 const watches = new Map<string, Watch>();
 const sending = new Set<string>();
@@ -296,7 +317,7 @@ function getWatch(sid: string): Watch {
   if (!w) {
     w = {
       lastTokenTotal: 0, model: null, attempts: 0, lastActivityAt: null, armed: false, status: "",
-      scope: "unknown", recoveryCount: 0, idlePending: false,
+      scope: "unknown", recoveryCount: 0, idlePending: false, deadMarked: false,
     };
     watches.set(sid, w);
   }
@@ -458,12 +479,16 @@ async function sendSelfCompact(sid: string, w: Watch, ratio: number, usable: num
     }
     // Queued (promptAsync): the synthetic part lands as the next turn at
     // idle — the race-free channel (no KV-cache invalidation, no re-prefill).
-    // #80 (agent retention): the body carries the resolved agent (the
-    // session's working agent; the planner agent for scoped sessions) —
-    // a null agent → no agent field (the host default applies).
-    const agent = await resolveInjectAgent(sid, w);
+    // #85 part 2 (current agent+modelID): the body carries the
+    // session's CURRENT working agent+model — resolved at FIRE-TIME
+    // (only because this send is actually queued — never per tick); a
+    // null agent → no agent field (the host default applies) + an
+    // agent-omit= attribution line.
+    const ident = resolveInjectIdentity(await fetchMsgs(sid));
     const body: Record<string, unknown> = { parts: [{ type: "text", text: selfCompactText(sid, w.lastTokenTotal, usable, ratio) }] };
-    if (agent) body.agent = agent;
+    if (ident.agent) body.agent = ident.agent;
+    else log(`agent-omit= sid=${sid} no current agent+model`);
+    if (ident.model) body.model = ident.model;
     await sess.promptAsync({ path: { id: sid }, body });
   } catch (e) {
     log(`send-fail= sid=${sid} ${(e as { message?: string } | null)?.message ?? "unknown"}`);
@@ -475,10 +500,14 @@ async function sendSelfCompact(sid: string, w: Watch, ratio: number, usable: num
 // Unit 3: the new-planner spawn helper (module-INTERNAL — the factory
 // stays the ONLY export): create a fresh session, then ONE queued
 // promptAsync carrying the planner start prompt. QUEUED, never
-// synchronous (KV-cache invalidation). NO `model` field: the
-// agent-configured model applies (the host is the live source of
-// truth). Never throws outward; every failure is a `spawn-fail=` line.
-async function spawnPlanner(startPrompt: string) {
+// synchronous (KV-cache invalidation). #85 part 2 (current
+// agent+modelID): the body carries the SOURCE session's CURRENT
+// agent+model (the fresh fetch passed in by the Unit 4 restart /
+// cap-exhausted branch — the successor keeps the agent+model that ran
+// the closing session); a file-trigger spawn passes none → NO
+// `agent`/`model` field (the host default applies). Never throws
+// outward; every failure is a `spawn-fail=` line.
+async function spawnPlanner(startPrompt: string, sourceMsgs?: unknown) {
   const sess = (client as {
     session?: { create?: () => Promise<unknown>; promptAsync?: (args: unknown) => Promise<unknown> };
   } | null)?.session;
@@ -506,17 +535,21 @@ async function spawnPlanner(startPrompt: string) {
     log("spawn-fail= promptAsync missing");
     return;
   }
+  const ident = resolveInjectIdentity(sourceMsgs);
+  const body: Record<string, unknown> = { parts: [{ type: "text", text: startPrompt }] };
+  if (ident.agent) body.agent = ident.agent;
+  if (ident.model) body.model = ident.model;
   try {
-    await sess.promptAsync({
-      path: { id: newSid },
-      body: { parts: [{ type: "text", text: startPrompt }], agent: PLANNER_AGENT_ID },
-    });
+    await sess.promptAsync({ path: { id: newSid }, body });
   } catch (e) {
     log(`spawn-fail= promptAsync: ${(e as { message?: string } | null)?.message ?? "unknown"}`);
     return;
   }
   spawned.set(newSid, Date.now()); // the self-mark (Unit 4)
-  log(`spawn= sid=${newSid} agent=${PLANNER_AGENT_ID}`);
+  const identBits: string[] = [];
+  if (ident.agent) identBits.push(`agent=${ident.agent}`);
+  if (ident.model) identBits.push(`model=${ident.model.providerID}/${ident.model.modelID}`);
+  log(`spawn= sid=${newSid}${identBits.length ? " " + identBits.join(" ") : ""}`);
 }
 
 // Unit 3: rename the trigger file to its consumed name; best-effort —
@@ -671,34 +704,143 @@ function firstUserAgent(msgs: unknown): string | null {
   return null;
 }
 
-// #80 (agent retention): the agent for an injected promptAsync body —
-// planner-scoped sessions always run as the planner agent (no fetch);
-// AUTORUN-scoped (non-planner, #82-toggled) sessions fall through to
-// the first user message's agent (the session keeps the agent that ran
-// it — watch-cached: undefined = unresolved → fetch once; null =
-// resolved, absent). A resolved-null or failed fetch → null (the body
-// carries no agent field — the host default applies) + one agent-omit=
-// attribution line.
-async function resolveInjectAgent(sid: string, w: Watch): Promise<string | null> {
-  if (w.scope === "planner") return PLANNER_AGENT_ID;
-  if (w.userAgent !== undefined) return w.userAgent;
+// #85 part 2 (current agent+modelID): the LAST assistant message's info
+// object (the session's CURRENT working agent+model — reflects
+// mid-session switches); null when no assistant message exists.
+function lastAssistantInfo(msgs: unknown): Record<string, unknown> | null {
+  let last: Record<string, unknown> | null = null;
+  for (const pair of msgPairs(msgs)) {
+    if (pair.info && pair.info.role === "assistant") last = pair.info;
+  }
+  return last;
+}
+
+// #85 part 2: a fresh messages() fetch for a fire-time identity
+// resolution (only called when a send is actually queued — never
+// per tick); null when the client has no messages() or the fetch
+// fails (the resolution then falls through the fallback order).
+async function fetchMsgs(sid: string): Promise<unknown> {
   try {
     const sess = (client as { session?: { messages?: (args: unknown) => Promise<unknown> } } | null)?.session;
-    if (!sess || typeof sess.messages !== "function") {
-      w.userAgent = null;
-      log(`agent-omit= sid=${sid} no user agent field`);
-      return null;
-    }
-    const msgs = await sess.messages({ path: { id: sid } });
-    const agent = firstUserAgent(msgs);
-    w.userAgent = agent;
-    if (agent === null) log(`agent-omit= sid=${sid} no user agent field`);
-    return agent;
+    if (!sess || typeof sess.messages !== "function") return null;
+    return await sess.messages({ path: { id: sid } });
   } catch {
-    w.userAgent = null;
-    log(`agent-omit= sid=${sid} no user agent field`);
     return null;
   }
+}
+
+// #85 part 2 (JSONC fallback): strip comments + trailing commas (the
+// live opencode.jsonc shape — comments, trailing commas) into strict
+// JSON. String-aware (a `//` inside a string literal is not a
+// comment); a parse failure throws (the caller swallows → null).
+function parseJsonc(text: string): unknown {
+  let out = "";
+  let i = 0;
+  let inStr = false;
+  while (i < text.length) {
+    const ch = text[i];
+    if (inStr) {
+      out += ch;
+      if (ch === "\\" && i + 1 < text.length) {
+        i += 1;
+        out += text[i];
+      } else if (ch === '"') {
+        inStr = false;
+      }
+      i += 1;
+      continue;
+    }
+    if (ch === '"') {
+      inStr = true;
+      out += ch;
+      i += 1;
+      continue;
+    }
+    if (ch === "/" && text[i + 1] === "/") {
+      while (i < text.length && text[i] !== "\n") i += 1;
+      continue;
+    }
+    if (ch === "/" && text[i + 1] === "*") {
+      i += 2;
+      while (i < text.length && !(text[i] === "*" && text[i + 1] === "/")) i += 1;
+      i += 2;
+      continue;
+    }
+    if (ch === "}" || ch === "]") {
+      while (out.endsWith(" ") || out.endsWith("\n") || out.endsWith("\t")) out = out.slice(0, -1);
+      if (out.endsWith(",")) out = out.slice(0, -1);
+    }
+    out += ch;
+    i += 1;
+  }
+  return JSON.parse(out);
+}
+
+// #85 part 2 (JSONC fallback): the project's opencode.jsonc AGENT MAP —
+// CACHED (undefined = not yet read, null = read but no usable agents
+// map / parse failure) — read only when the fallback fires (never per
+// tick). The live opencode.jsonc is the live source of truth for the
+// roster.
+function jsoncAgents(): Record<string, unknown> | null {
+  if (jsoncAgentsCache !== undefined) return jsoncAgentsCache;
+  jsoncAgentsCache = null;
+  try {
+    const raw = readFileSync(join(projectDir, OPENCODE_CONFIG_FILE), "utf-8");
+    const data = parseJsonc(raw);
+    const agents = (data as { agent?: unknown } | null)?.agent;
+    if (agents && typeof agents === "object" && !Array.isArray(agents)) {
+      jsoncAgentsCache = agents as Record<string, unknown>;
+    }
+  } catch {
+    // missing / unreadable / malformed → null (cached)
+  }
+  return jsoncAgentsCache;
+}
+
+// #85 part 2 (JSONC fallback): an agent's CONFIGURED model from the
+// cached agents map — the live opencode.jsonc stores it as a
+// `"providerID/modelID"` string (an object pair is accepted
+// defensively); null when the agent or its model is absent /
+// malformed.
+function configuredModelForAgent(agent: string): { providerID: string; modelID: string } | null {
+  const agents = jsoncAgents();
+  if (!agents) return null;
+  const cfg = agents[agent];
+  if (!cfg || typeof cfg !== "object") return null;
+  const m = (cfg as Record<string, unknown>).model;
+  if (typeof m === "string") {
+    const slash = m.indexOf("/");
+    if (slash > 0 && slash < m.length - 1) return { providerID: m.slice(0, slash), modelID: m.slice(slash + 1) };
+    return null;
+  }
+  const o = m as { providerID?: unknown; modelID?: unknown } | null;
+  if (o && typeof o.providerID === "string" && typeof o.modelID === "string" && o.providerID !== "" && o.modelID !== "") {
+    return { providerID: o.providerID, modelID: o.modelID };
+  }
+  return null;
+}
+
+// #85 part 2 (current agent+modelID — the root-cause fix for the
+// stale-agent UnknownError): the injected body's agent+model, resolved
+// at FIRE-TIME (only when a send is actually queued, never per tick).
+// Source order — NEVER a planner constant:
+//   1. the LAST assistant message's info.agent + info.model (the
+//      session's CURRENT working pair — reflects mid-session switches;
+//      for a spawn: the SOURCE session's pair carries over to the
+//      successor);
+//   2. if absent: the session's working agent (the FIRST user message's
+//      agent field) + that agent's configured model from
+//      opencode.jsonc (cached; read only when the fallback fires);
+//   3. if still absent: NEITHER field (the host default applies — the
+//      send site logs an agent-omit= line).
+function resolveInjectIdentity(msgs: unknown): { agent: string | null; model: { providerID: string; modelID: string } | null } {
+  const last = lastAssistantInfo(msgs);
+  const a1 = last?.agent;
+  const m1 = last ? modelPair(last, {}) : null;
+  if (typeof a1 === "string" && a1 !== "" && m1) return { agent: a1, model: m1 };
+  const agent = (typeof a1 === "string" && a1 !== "" ? a1 : null) ?? firstUserAgent(msgs);
+  if (!agent) return { agent: null, model: null };
+  return { agent, model: configuredModelForAgent(agent) };
 }
 
 // Unit 4: the routing scan — the LAST assistant message's text parts,
@@ -759,10 +901,9 @@ async function routeScopedIdle(sid: string, w: Watch) {
     w.idlePending = false;
     return;
   }
-  // #80: cache the first user message's agent for the injected bodies —
-  // the same fetch serves the scope scan, the routing scan, and the
-  // agent cache (one round trip).
-  w.userAgent = firstUserAgent(msgs);
+  // #85 part 2: the SAME fresh fetch also serves the fire-time
+  // identity resolution below (the injected body's current agent+model
+  // — one round trip, no extra fetch).
   // #85 part 1 (#82 scope): the verdict is RECOMPUTED from the fresh
   // fetch (last-toggle-wins can flip with a new user message — no
   // long-lived cache). The verdict log line (#80) pins the decision for
@@ -778,6 +919,14 @@ async function routeScopedIdle(sid: string, w: Watch) {
     return;
   }
   w.idlePending = false; // the decision for this idle cycle is made below
+  // #85 part 2 (dead-mark): a FAILED CONTINUE send marked the current
+  // idle cycle — skip the remaining recovery retries AND the
+  // cap-exhaustion fallback spawn (no doomed successor); cleared on a
+  // fresh busy (the same reset axis as recoveryCount).
+  if (w.deadMarked) {
+    log(`skip= dead sid=${sid}`);
+    return;
+  }
   const action = lastAssistantAction(msgs);
   if (action === "stop") {
     log(`route= stop sid=${sid}`); // left alone (the action state machine)
@@ -795,22 +944,28 @@ async function routeScopedIdle(sid: string, w: Watch) {
       const sess = (client as { session?: { promptAsync?: (args: unknown) => Promise<unknown> } } | null)?.session;
       if (!sess || typeof sess.promptAsync !== "function") {
         log(`send-fail= sid=${sid} promptAsync missing`);
+        w.deadMarked = true; // #85 part 2: a failed CONTINUE dead-marks the idle cycle
         return;
       }
       // QUEUED (promptAsync): the synthetic part lands as the next turn
       // at idle — the race-free channel (never a synchronous prompt).
-      // #80 (agent retention): the body carries the resolved agent (the
-      // planner agent for scoped sessions) — a null agent → no agent
-      // field (the host default applies).
-      const agent = await resolveInjectAgent(sid, w);
+      // #85 part 2 (current agent+modelID): the body carries the
+      // session's CURRENT working agent+model — resolved from the SAME
+      // fresh fetch (no extra round trip; fire-time only); a null
+      // agent → no agent field (the host default applies) + an
+      // agent-omit= attribution line.
+      const ident = resolveInjectIdentity(msgs);
       const body: Record<string, unknown> = { parts: [{ type: "text", text: continueText(sid) }] };
-      if (agent) body.agent = agent;
+      if (ident.agent) body.agent = ident.agent;
+      else log(`agent-omit= sid=${sid} no current agent+model`);
+      if (ident.model) body.model = ident.model;
       await sess.promptAsync({ path: { id: sid }, body });
       // #80 (cap semantics): mark the pending injection — the busy of
       // this injected turn must not reset the recovery cap.
       pendingInject.set(sid, Date.now());
     } catch (e) {
       log(`send-fail= sid=${sid} ${(e as { message?: string} | null)?.message ?? "unknown"}`);
+      w.deadMarked = true; // #85 part 2: a failed CONTINUE dead-marks the idle cycle
     } finally {
       sending.delete(sid);
     }
@@ -823,7 +978,9 @@ async function routeScopedIdle(sid: string, w: Watch) {
     return;
   }
   log(`route= restart spawn sid=${sid}`);
-  await spawnPlanner(restartText()); // Unit 3 helper (never throws outward)
+  // #85 part 2: the SOURCE session's fresh fetch — its current
+  // agent+modelID carries over to the successor.
+  await spawnPlanner(restartText(), msgs); // Unit 3 helper (never throws outward)
 }
 
 // Unit 2+3+4: the ONE 5s tick — the only decision+send funnel. Unit 3's
@@ -904,6 +1061,7 @@ function armEvent(type: string, sid: string, props: Record<string, unknown>) {
         log(`arm= sid=${sid} injected`);
       } else {
         w.recoveryCount = 0; // Unit 4: a fresh busy cycle resets the recovery budget
+        w.deadMarked = false; // #85 part 2: a fresh busy clears the dead-mark
         w.idlePending = false; // a fresh busy cycle: no pending decision
         w.status = "busy";
         log(`arm= sid=${sid}`);
@@ -1009,6 +1167,7 @@ function probeSurface(input: PluginInput) {
 export default (async (input: PluginInput) => {
   logDir = join(input?.directory ?? "", ".opencode", "temp");
   logPath = join(logDir, "auto_resume.log");
+  projectDir = input?.directory ?? ""; // #85 part 2: the opencode.jsonc fallback path
   client = input?.client ?? null;
   probeSurface(input); // one-shot at load
   if (!tickTimer) {

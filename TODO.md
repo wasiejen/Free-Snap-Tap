@@ -1004,7 +1004,7 @@ restart detection" wording above is the pre-revision numbering.
    green as above; the commit hash is recorded by the planner in the
    follow-up bookkeeping commit, not in this entry's commit).
 
-## #85. (part 1 (scope) LANDED 2026-09-22 / part 2 (cap + dead-mark) OPEN, HIGH priority — maintainer call) — auto_resume unbounded session-spawn loop
+## #85. (part 1 (scope) LANDED 2026-09-22 / part 2 (current-agent+modelID + dead-mark) LANDED 2026-09-23, HIGH priority — maintainer call) — auto_resume unbounded session-spawn loop
 - **Problem + evidence:** on 2026-09-22 (~19:57–20:00Z) the LIVE auto_resume
   plugin created a NEW session every ~10s (every 2nd recovery attempt — 2
   attempts per session at 5s each, confirmed by the session naming) —
@@ -1041,9 +1041,18 @@ restart detection" wording above is the pre-revision numbering.
    the #82 generalized scope in auto_resume.ts + smoke: real-planner-via-
    agent-field ∪ last-own-line-toggle-ON for ANY agent type; the `spawned`
    self-mark is now an EXCLUSION, so a self-spawned successor is never
-   re-scoped → the #85 loop condition is gone — smoke 97/97 + gate green:
-   probe 241/241, all smokes, pytest 459+1w, ruff F=0; the commit hash is
-   recorded by the planner in the follow-up bookkeeping commit). PART 2
-   (global cap + dead-mark) still OPEN — maintainer call for the live-
-   behavior remainder. The orphan-session cleanup is DONE (the maintainer
-   removed all the new sessions, 2026-09-22).
+    re-scoped → the #85 loop condition is gone — smoke 97/97 + gate green:
+    probe 241/241, all smokes, pytest 459+1w, ruff F=0; the commit hash is
+    recorded by the planner in the follow-up bookkeeping commit). PART 2
+    (current-agent+modelID in the injected bodies + dead-mark on a failed
+    send) LANDED 2026-09-23 (worker worker_Q3S_170K — the hardcoded
+    PLANNER_AGENT_ID is replaced by the session's CURRENT agent+modelID,
+    resolved at fire-time: last-assistant info → opencode.jsonc agent-
+    config fallback (cached) → host default (NEVER a planner constant); a
+    failed CONTINUE dead-marks the idle cycle — remaining retries + the
+    cap-exhaustion fallback spawn are skipped (no doomed successor),
+    cleared on a fresh busy — auto_resume smoke 105/105; the commit hash
+    is recorded by the planner in the follow-up bookkeeping commit). The
+    post-restart live verification stays a maintainer call. The orphan-
+    session cleanup is DONE (the maintainer removed all the new sessions,
+    2026-09-22).
