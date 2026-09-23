@@ -166,7 +166,7 @@ smokes, pytest 459+1w, ruff F=0).
   `research/fuzzy-numword/spec_R3_arg_scope_extension.md`; gated on R1 + R2
   green + R4 log-volume data).
 
-## 68. Write-scope fuzzy (step 2 of the Q3 roadmap; GATED; 2026-09-16)
+## 68. (CLOSED 2026-09-16 — R2 approved + landed) — Write-scope fuzzy (step 2 of the Q3 roadmap)
 - **Problem / evidence:** maintainer ruling (addendum Q3, 2026-09-16): read
   AND write scope, one step after the other — "too useful to degrade to
   observer permanently". Write-scope needs the mutation-channel verdict
@@ -189,7 +189,7 @@ smokes, pytest 459+1w, ruff F=0).
   the POST-MUTATION path (log field 5 = sole authority — decision-record
   §5 R2). Residual hazard → #72 (M1 ruling recorded).
 
-## 69. Redundancy form codification: `[left:right]` (SUPERSEDES the `<4|four>` Q2 form; 2026-09-16 direct session)
+## 69. (CLOSED 2026-09-16 — AGENTS.md paste, acceptance fully met) — Redundancy form codification: `[left:right]` (SUPERSEDES the `<4|four>` Q2 form)
 - **Problem / evidence:** the addendum Q2 form `<4|four>` (angle brackets +
   pipe) was REJECTED by measurement 2026-09-16 (direct session): unquoted
   in Git-Bash, `<...>` = syntax error (exit 2) and `|` = pipe break (exit
@@ -308,7 +308,7 @@ smokes, pytest 459+1w, ruff F=0).
    worker-10. Live acceptance pending the next host restart. Follow-on:
    the requested research spec (compact_memory + block_transfer up/downs).
 
-## 71. Stale probe totals in repo_commands.md (maintainer file — needs his tasking; 2026-09-16)
+## 71. (CLOSED 2026-09-17, planner-direct) — Stale probe totals in repo_commands.md (maintainer file)
 - **Problem / evidence:** `repo_commands.md` §Run/test still quotes "~376"
   and "one hundred twenty-two (plan7…)" — mutually inconsistent stale
   numbers; the declared source (the probe's self-annotation) is 180/180
@@ -357,7 +357,7 @@ smokes, pytest 459+1w, ruff F=0).
    (substitution bar approved 09-17, decision-record §5); R9 documented-
    optional. See NAP 2026-09-17 direct session.
 
-## #73 — R7 realistic doubled case: the segment channel's gap rule fails
+## #73. (LANDED 2026-09-17, planner-verified) — R7 realistic doubled case: the segment channel's gap rule fails
 ## when the target's parent DIR is a corpus entry (measured 09-17)
 - **Problem + evidence:** the shipped R7 (ee19a84; gates 216/216 + 37/37
   green) does NOT resolve the realistic nested doubling. Repro

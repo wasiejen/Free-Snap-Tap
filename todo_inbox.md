@@ -143,3 +143,4 @@ Executed the 2026-09-23_02-51 review (worker-16 `worker_Q3S_170K`, plan9 unit B)
 (6) machine check: every ID 1..89 appears exactly once as an entry in TODO.md (script-verified, not counted by eye).
 Stale/ambiguous findings (left untouched — their TITLE line carries no closed/landed/superseded marker, per the curation rule): #68 (status line CLOSED 2026-09-16, title marker only "GATED"), #69 (status CLOSED 2026-09-16, acceptance fully met — "SUPERSEDES" in the title refers to the old Q2 form, not this entry), #71 (status CLOSED 2026-09-17, maintainer ruled), #73 (status LANDED 2026-09-17) — flagged for the planner's next curation call.
 
+Planner-9 addendum (2026-09-23): the four flagged entries had their TITLE markers aligned by the planner (CLOSED 2026-09-16 for #68/#69, CLOSED 2026-09-17 for #71, LANDED 2026-09-17 for #73); their FULL-BODY condensation (append to todo_records.md + one-line title) is deferred to the next curation unit.

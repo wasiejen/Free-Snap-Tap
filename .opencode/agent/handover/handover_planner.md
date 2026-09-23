@@ -25,12 +25,24 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   session had 33 msgs / ~54k at death with a COMPLETE planning phase and
   ZERO file changes → resumed via task_id per his order, finished in one
   go (the resume carried the intact planning — zero rework).
-- NEXT: TODO.md shrink curation (the todo_inbox 2026-09-23_02-51 review —
-  6 explicit findings: stale header numbering, ~40 closed full-text
-  entries in open sections, status-marker drift, #74 split/section, #75
-  changelog collapse) + the two --info items (worker compaction timing —
-  adopted in the worker-15 launch spec; dump completeness = already
-  tracked as TODO #78).
+- plan9 UNIT B LANDED + planner-verified (167ec58, worker-16
+  ses_f31c9b422ffe1juyFaqGyKXRFl, worker_Q3S_170K): the todo_inbox
+  2026-09-23_02-51 curation review executed — TODO.md 1132 → 811 lines
+  (no open content lost): header numbering note fixed (#89/#90); 12
+  closed entries condensed (full text appended to todo_records.md FIRST);
+  status markers aligned (#66/#79/#80/#81/#82/#85); #74 split + moved to
+  "Plugin & gauge"; #75 collapsed (history in todo_records.md).
+  Machine-verified: 67 entries, zero duplicates, 22 absent IDs = exactly
+  the documented reserved set. Planner addendum: #68/#69/#71/#73 title
+  markers aligned (CLOSED/LANDED); their FULL-BODY condensation deferred
+  to the next curation unit.
+- NEXT: (1) the four deferred full-body condensions (#68/#69/#71/#73);
+  (2) live acceptance after the next host restart — the FIRST NAMED
+  SPAWN for unit A (`ident=` line in `.opencode/temp/auto_resume.log` +
+  the session title in the DB) + the #82/#80/#79/#85/#81 tails;
+  (3) the --info items: dump completeness = already TODO #78; worker
+  compaction timing adopted in the worker-15/16 launch specs (compact
+  after planning/drafting, before the heavy tool calls).
 - LIVE acceptance pending (next host restart): the first named spawn —
   `ident=` line in `.opencode/temp/auto_resume.log` + the session title in
   the DB. (Also still pending from earlier: #82/#80/#83 maintainer items,

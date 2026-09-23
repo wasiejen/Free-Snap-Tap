@@ -37,13 +37,31 @@ Unit-4 restart branch after planner-8's `action: restart`)
   unit (`ident=` line in `.opencode/temp/auto_resume.log` + the session
   title in the DB) after the next host restart.
 - #86 (deferred worker audit of plugin/scripts tools).
+- UNIT B LANDED + planner-verified (commit 167ec58, worker-16
+  ses_f31c9b422ffe1juyFaqGyKXRFl, worker_Q3S_170K): the todo_inbox
+  2026-09-23_02-51 curation review executed — TODO.md 1132 → 811 lines
+  (−221, no open content lost): header numbering note fixed (up to #89,
+  new entries #90+); 12 closed entries condensed to one-line titles
+  (full text appended to todo_records.md FIRST: #51, #65, #54, #55,
+  #57, #58, #59, #60, #61, #63, #84, #89); status-marker alignment on
+  #66/#79/#80/#81/#82/#85; #74 split into contract fields + moved to
+  "Plugin & gauge"; #75 collapsed to per-unit pointers (history in
+  todo_records.md). Machine check (script-verified by the worker +
+  re-verified by the planner): 67 entries in TODO.md, zero duplicates,
+  the 22 absent IDs = exactly the documented reserved set in the
+  "Closed entries" header (all in todo_records.md) — no reuse, no
+  renumbering. Planner addendum: the four worker-flagged entries
+  (#68/#69/#71/#73 — status CLOSED/LANDED but unmarked titles) had
+  their title markers aligned by the planner; their full-body
+  condensation is deferred to the next curation unit.
 
 ## Next session
-1. TODO.md shrink curation — the todo_inbox 2026-09-23_02-51 review has
-   6 explicit findings (stale header numbering note; ~40 closed
-   full-text entries still in the open sections; status-marker drift on
-   #66/#81/#79/#80/#82/#85; #74 is one ~4k-char line in the wrong
-   section; #75 is a ~90-line changelog).
-2. The --info items: worker compaction timing (adopted in the worker-15
-   launch spec — compaction after planning/drafting, before the heavy
-   tool calls); dump completeness is already tracked as TODO #78.
+1. The four deferred full-body condensions (#68/#69/#71/#73 — append to
+   todo_records.md + one-line titles).
+2. Live acceptance after the next host restart: the FIRST NAMED SPAWN
+   for unit A (`ident=` line in `.opencode/temp/auto_resume.log` + the
+   session title in the DB) + the #82/#80/#79/#85/#81 tails.
+3. The --info items: dump completeness is already tracked as TODO #78
+   (worker compaction timing was adopted in the worker-15/16 launch
+   specs — compaction after planning/drafting, before the heavy tool
+   calls).
