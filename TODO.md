@@ -132,7 +132,17 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   S18 section.
 - **Status:** OPEN (this is the scope of staged spec R3,
   `research/fuzzy-numword/spec_R3_arg_scope_extension.md`; gated on R1 + R2
-  green + R4 log-volume data).
+  green + R4 log-volume data). R4 LANDED 2026-09-23 (planner-13,
+  worker-13 ses_f30310096, commit dde74b9, planner-verified): the mining
+  scriptlet `scripts/log/summarize_intercept.cjs` + fixture pin (6/6 smoke) +
+  INVENTORY/README; the gate data is in hand (run output: verdict counts,
+  fuzzy-rejected d/gap lines, out-of-sandbox prefixes, per-session counts —
+  counts move, the log grows live). Census-basis note (worker finding): the
+  spec's "139 distinct session ids" was a substring census; the script's
+  field-2 census reads 86 at 3130 lines — the field-2 census is the R4
+  per-session basis (the gate is met on either basis). R3 is UNBLOCKED —
+  the build awaits maintainer approval (the plugin-scope extension is an
+  observable behavior change).
 
 ## 68. (closed 2026-09-16, full text in todo_records.md) - Write-scope fuzzy (R2): approved + build landed green (35f8143) + one-shot live-accepted 2026-09-17 (benign mistype corrected; the #72 hazard live-measured; residual hazard -> #72 M1)
 

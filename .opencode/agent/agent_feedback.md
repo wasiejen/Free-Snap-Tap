@@ -470,3 +470,6 @@ Self-compaction close protocol gap: ending the turn on the compact_memory TOOL C
 ### 2026-09-23_22-07 worker_Q3S_170K ses_f30310096ffeugJAZl7bCrNYo1
 R4 gate verification: probe + context_recovery.smoke.mjs both red from the maintainer's uncommitted context_recovery.ts move (ERR_MODULE_NOT_FOUND deactivated/context_recovery.ts) — standard gate couldn't be measured fully green mid-task.
 
+### 2026-09-23_22-11 planner_Q3S_170K ses_f30493f9effeuQRFc3ijNON166
+The loop launch formula "largest planner-N in loop_log.md + 1" is ambiguous when the log contains non-START mentions (the ghost-title "planner-12" on line 74 vs largest -->START planner-11) — the plugin's ident computation and a literal token scan agree (13), but a START-line reading gives 12; pinning the formula to one basis (or having the launch message carry the plugin-computed ident) would remove the per-successor re-derivation.
+
