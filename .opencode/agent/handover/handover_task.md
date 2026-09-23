@@ -1,73 +1,105 @@
-# TASK: TODO.md shrink curation (execute the review in todo_inbox 2026-09-23_02-51)
+# Task spec — plan11 / #78 scoping: dump completeness (READ-ONLY research)
 
-**Worker:** worker_Q3S_170K (worker-16). **Branch:** stay on the current
-checkout (`opencode_test` — verified, do not switch).
+Goal: scope TODO #78 (dump completeness) with bounded measurements — no code edits.
+Worker: `explore` (research/audit; always re-verified by the planner).
+Definition of done: the findings file below exists with every DoD bullet satisfied;
+the handover summary is written; the repo tree is otherwise UNCHANGED.
 
-## Goal
-Execute a PLANNER's curation review (already done — you execute, you do
-not re-decide): read the entry `## 2026-09-23_02-51` in `todo_inbox.md`
-FIRST — it is the findings list (6 findings) + the target "net open
-set". Shrink `TODO.md` (1125 lines) roughly in half WITHOUT losing any
-open content.
+## Context (planner-verified facts — do not re-derive)
 
-## Definition of done
-1. Header numbering note: "used so far up to #84, new entries start at
-   #85" → "up to #89, new entries start at #90" (#89 is the highest
-   existing entry).
-2. Closed-entry condensation: for every entry whose TITLE line marks it
-   closed / LANDED / superseded, condense the body down to the one-line
-   title form — but FIRST verify the full text exists in
-   `todo_records.md` (repo root):
-   - title already says "full text in todo_records.md" → just drop the
-     body (keep the title line);
-   - NO such pointer → APPEND the full entry text to `todo_records.md`
-     (append-only) FIRST, then condense in `TODO.md`.
-   - Only condense entries whose own title line carries a
-     closed/landed/superseded marker. When in doubt → LEAVE IT open and
-     untouched. Never delete open content.
-3. Status-marker alignment (review findings 3): reconcile the drifted
-   markers so title truth and status line agree — #66 (title CLOSED
-   verdict LIVE vs status PENDING RESTART), #81 (title "(open)" but the
-   re-pin LANDED with full gate green — it STAYS open as a maintainer
-   call: keep the entry, fix the marker to show the LANDED sub-status),
-   #79 (title "(open HIGH)" but LANDED with live-acceptance pending —
-   same pattern), #80/#82/#85 (title markers lag their LANDED
-   sub-statuses). The review's net-open list is the target: every
-   member (#56, #66, #67, #70 follow-ons, #74, #75, #78, #79/#82/#85,
-   #80, #81, #83 — plus #86/#87/#88/#89 which post-date the review)
-   stays present with a clear status.
-4. #74: split the single ~4k-char line into the contract fields (title /
-   problem+evidence / desired outcome / acceptance / suggested scope /
-   status) and MOVE it out of "FST behavior decisions" (it is an
-   opencode host-side tool issue) to the "Plugin & gauge" section.
-5. #75: collapse the ~90-line running changelog into a short status
-   pointer (per unit, one line each); APPEND the unit-history text to
-   `todo_records.md` first.
-6. `todo_inbox.md`: APPEND a planner-curation block (2026-09-23,
-   planner-9, plan9) recording the 2026-09-23_02-51 review as executed
-   (finding by finding, where each landed). Do NOT delete or edit
-   existing inbox entries (append-only file).
-7. Commit: `TODO.md` + `todo_records.md` + `todo_inbox.md` (named paths
-   only). No code changes — no gates. Verification in the handover:
-   before/after line counts of TODO.md, the condensed-entry list (IDs),
-   the net-open set as it stands, and a machine check that every ID
-   1..89 appears exactly once as an entry in TODO.md (script it — do
-   not count by eye).
+- TODO #78 (in `TODO.md`, entry "## 78."): maintainer --info (2026-09-21): the
+  session dumps "seemed to not include any thinking, writing or other parts at
+  all" (his example: `.opencode/archive/sessions/ses_f5aefe9e1ffemgTiq9GELiqaGL.md`);
+  "dumpings in general should be complete … if they are in json maybe it is best
+  to just dump this directly as it is to preserve the structure"; filtering tool
+  calls = a script concern on demand. Live evidence #2 (already in the entry): the
+  compact pre-dump hook `DUMP-FAIL … spawnSync node ETIMEDOUT` on a ~90 % session
+  while a small session dumped in 76 ms — the spawn timeout does not scale with
+  session size.
+- The dump script is `.opencode/agent/scripts/db/dump_session.cjs` (245 lines —
+  you may read the WHOLE file; it is small). Its header claims: single-session
+  mode = "full-detail dump … every message with its text/reasoning"; `--all`
+  backfill is SLIM by default; `--out <relpath>` writes OUT_DIR/<relpath> (OUT_DIR
+  = `<repo>/.opencode/archive/sessions`).
+- Curated read-only DB helpers (USE THESE, never raw SQL against the live DB):
+  `node .opencode/agent/scripts/db/sesdata.cjs <sid>` (slim JSON per message) and
+  `node .opencode/agent/scripts/db/sesinspect.cjs [sid]` (session row + last 14
+  messages). Both open the host DB `C:/Users/Wasiejen/.local/share/opencode/opencode.db`
+  with `readOnly: true` (env `OPENCODE_DB` overrides).
+- The hook call site is in `.opencode/plugin/compact_memory.ts` — BOUNDED grep
+  only (`preCompactionDump`, `execFileSync`, `timeout`, `DUMP-OK`, `DUMP-FAIL`
+  with `| head -30`); do NOT read the whole file.
 
-## DO-NOT-touch
-- `.opencode/maintainer/**`, `opencode.jsonc`, the maintainer's
-  uncommitted live files (verify `git status` before committing — ideas.
-  md, knowledge_inbox.md, repo_opencode.md were live-edited mid-run)
-  and the archive dumps (gitignored by his dba6973 — still never stage).
-- Open entries on the net-open list: content preserved VERBATIM — only
-  their status/marker lines change, plus the #74 restructure and the
-  #75 collapse (history preserved in todo_records.md).
-- No renumbering — IDs are stable and never reused.
+## Findings to produce (the DoD — all five, in this order)
 
-## Notes
-- Bounded reads: TODO.md is 1125 lines — read it in section windows
-  (the section headers at the top of each grep `^## ` output are your
-  map), never whole-file. Chunked writes ≤ ~8KB per call.
-- The review's findings are the CONTRACT — if a finding turns out stale
-  (e.g. an entry already condensed), note it in the handover and move
-  on; do not re-derive the review.
+Write ONE findings file:
+`.opencode/loop/autorun-2026-09-21_15-33/plan11_78_scope.md`
+
+1. **Exclusion list (code):** for the single-session full mode of
+   dump_session.cjs — enumerate the DB message `parts` types the script
+   handles and the ones it DROPS, each with a line reference in the script
+   (e.g. "type reasoning: emitted at L__" / "type tool: DROPPED (no case)" ).
+   Also: what `--all`/slim mode emits vs full mode (one compact table).
+2. **Empirical check (his example + one current session):**
+   a) Re-dump `ses_f5aefe9e1ffemgTiq9GELiqaGL` via
+      `node .opencode/agent/scripts/db/dump_session.cjs ses_f5aefe9e1ffemgTiq9GELiqaGL --out scratch_78/check.md`
+      (the file lands in `.opencode/archive/sessions/scratch_78/check.md`),
+      compare its part coverage against `sesdata.cjs` output for the same sid,
+      then DELETE the generated file and verify `git status --short` shows no
+      corpus residue (the corpus .md files are tracked; an untracked scratch
+      file must be removed). Note: the on-disk corpus file for this sid is a
+      PRE-2026-09-21 backfill dump — state whether the CURRENT script would
+      now include what that old file lacks (the maintainer's complaint may be
+      stale — say so explicitly with evidence).
+   b) Pick ONE recently updated session that has reasoning parts (use
+      `sesinspect.cjs` no-arg list to choose; bounded reads). Same comparison.
+3. **Timeout behavior (measure, don't guess):** the fixed timeout value at the
+   hook call site (from the bounded grep of compact_memory.ts) + a measured
+   timing table: wall-time of a single-session dump for (i) a SMALL session
+   (< ~100 messages) and (ii) a LARGE session (most messages in the DB —
+   pick via the sesinspect list), via `time node …` (or node `Date.now()`
+   before/after in a one-liner) into `--out scratch_78/…` (DELETE both after,
+   git-status-clean). State whether a ~90 %-size session can exceed the hook
+   timeout, with the measured ratio.
+4. **Raw-JSON mode:** answer yes/no — does any current mode dump the parts as
+   raw JSON as-is? (Header says no; `sesdata.cjs` emits slim JSON LINES —
+   reference it as the closest existing thing + what it omits.)
+5. **Recommendation (ranked, 2-4 options):** aligned with his lean
+   ("dump raw as it is"; markdown filtering on demand): e.g. (1) add a
+   `--json` raw-mode to dump_session.cjs (all parts, no filtering — the
+   default for the hook? his call), (2) fix the hook timeout (scale / raise /
+   stream), (3) keep markdown full-completeness. Each option: what changes,
+   which file, effort (S/M/L). NO implementation — scoping only.
+
+## Hard rules
+
+- READ-ONLY repo: no edits to any tracked file; the ONLY writable targets are
+  the findings file (new) + `handover_task_to_planner.md`.
+- Scratch dumps: ONLY via `--out scratch_78/<name>.md`, ALWAYS deleted before
+  close; finish with `git status --short` proving the tree is clean apart from
+  the two new files.
+- Bounded output discipline: every grep carries `| head -30` (or an explicit
+  line range); never read a DB dump / corpus .md whole — grep/slice it
+  (AGENTS.md pattern 2); the sesdata/sesinspect outputs are already slim —
+  do not pipe them through anything that dumps more.
+- The maintainer's live files (`.opencode/maintainer/**`, `opencode.jsonc`,
+  `ideas/**`) — read the cited files only if the task names them; never edit.
+- Context budget: if you approach your stop line (gauge ~90 % or the ctx: nudge
+  says REM <= 15k), STOP at the last complete findings section, write the
+  handover with what is done + what remains, and end the session cleanly there
+  (the planner decides the resume).
+
+## Verification (planner, after your return)
+
+- Findings file exists, all five sections present, claims carry line refs /
+  measured numbers.
+- `git status --short` clean apart from the two new files.
+- The planner re-checks the exclusion list against dump_session.cjs himself
+  (bounded re-read of the cited lines) before acting on it.
+
+## Handover
+
+Write `.opencode/agent/handover/handover_task_to_planner.md`: executive summary
+(what was found, the headline recommendation, measured numbers), the findings
+file path, any deliberately-not-done remainder, and your final message = a
+short pointer to the handover file (never a re-dump).
