@@ -30,6 +30,24 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - TODO #85: part 3 hashes recorded (ded7245/5992f38) in this bookkeeping.
 - NEXT (this iteration, unit 2): reduce the auto_resume smoke wall-time
   (his 2026-09-23_00-12 priority note) — spec + delegate.
+- LIVE FINDING (his Unit-4 question, answered from the plugin log): my
+  session was SPAWNED by the Unit-4 restart branch (log `spawn=`
+  02:17:49Z; first user msg = the locked restartText) → the #85 part-1
+  `spawned` self-mark (L754 check, L612 set, no clear path) scopes it
+  "none" PERMANENTLY — Unit 4 never routes a self-spawned successor
+  (measured: 3 idle events, `scope= none` 03:00:03Z, no recovery=/route=
+  lines). A self-compaction close WITHOUT an action line therefore
+  STALLS the plugin-driven loop (no live looprunner in this mode to
+  resume via task_id); his `<|Autorun|>` "continue" rescued it but does
+  NOT re-scope it (spawned check precedes the toggle). Design question
+  filed as TODO #87 (4 options: stall / bounded re-spawn / looprunner
+  handoff / re-arm on fresh busy). Also curated #86 (deferred worker
+  audit) from todo_inbox 2026-09-23_01-08. NOTE: the LIVE plugin is still
+  the PRE-part-3 build (opencode started before the ded7245 commit —
+  log shows the old tick leg `skip= autoCompact-off` lines, 5s period);
+  part 3 is on disk, live-activation = the next restart. The maintainer's
+  autoCompact=OFF setting means the new Unit-2 nudge is also skipped
+  live until he turns it on.
 - Parked (need him, AFK): #82 live acceptance + (now resolved by design:
   Direct gates Unit 2); #80 close (his confirm); #83 backstop (his
   activation); the TODO.md curation review is in todo_inbox
