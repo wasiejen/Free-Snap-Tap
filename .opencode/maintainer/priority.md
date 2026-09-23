@@ -51,12 +51,6 @@
   - just cosmetic to better find the sessions that are part of a loop autorun later
   - currently the naming is automatically resolved via opencode based on context
 
-# 2026-09-23_04-20:
-- marker sweep of a planner took 17k token as result
-  - $ grep -rn -- "--main\|--now\|--info\|--todo\|--defer\|--wip\|--comment" --include="*.md" .opencode/ TODO.md README.md WIKI.md 2>/dev/null | grep -v "_past_priorities\|/done/\|agent_feedback\|nap_direct\|archive/"
-  - The output of the marker sweep got polluted with plugin.log noise 
-  - needs to be adressed
-
 
 # 2026-09-23_00-12
 - bounded reading!! for fucks sake ... the planner again read the whole NAP - 18k token in one go ...
