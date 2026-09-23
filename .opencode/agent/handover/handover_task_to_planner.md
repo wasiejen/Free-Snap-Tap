@@ -1,101 +1,85 @@
-# Handover — #78 dump completeness (A `--json` + B lossless full / `--lite` + C hook timeout/diagnostics/retry)
+# HANDOVER worker-13 → planner — R4: intercept.log mining scriptlet (LANDED)
 
-Worker: `worker_Q3S_170K` (ses_f30807a16ffelPQPUBH50wiXBe), 2026-09-23.
-Branch `opencode_test` (current checkout, no new branch).
-Task spec: `.opencode/agent/handover/handover_task.md` (2f64d76). Scoping:
-`.opencode/loop/autorun-2026-09-21_15-33/plan11_78_scope.md`.
-Commit: hash below (one code commit — A+B+C + TODO #78 + this handover + the
-doc/knowledge updates).
+Status: **LANDED** (one commit on `opencode_test` — hash recorded by planner
+per DoD-5; it is the commit whose subject starts with
+`add summarize_intercept.cjs`).
 
-## Executive summary
-- **A — `--json` raw mode** (`.opencode/agent/scripts/db/dump_session.cjs`):
-  new single-session flag emits `{ session, messages: [{ id,
-  time_created, time_updated, data, parts: [{ id, time_created, data }] }],
-  orphan_parts }` — every `data` value as parsed JSON (raw string when
-  unparseable), unfiltered, uncapped, structure preserved. `--out` appends
-  `.json` when the relpath has no extension (default file `<sid>.json`).
-  `--json`/`--lite` are single-session only and mutually exclusive (with
-  each other and with `--all`/`--full`/`--slim` → exit 2).
-- **B — lossless full markdown + `--lite`** (same file): the default
-  single-session full mode is now LOSSLESS — tool `state.input`/`state.output`
-  emitted verbatim (`[tool input]` / `[tool output]` lines), no caps anywhere
-  (meta 600 and the 400 unknown-type caps removed in full mode; unparseable
-  parts keep their raw data string; orphan parts rendered). New `--lite`
-  filtered preset: text + reasoning verbatim, tool header-only (no
-  input/output), step-start/step-finish skipped, other types 400-capped,
-  meta 600-capped (the old mid-rendering shape). The `# dumped:` line now
-  says `mode=full|lite|slim`; the script's stdout line gained `mode=<mode>`.
-- **C — pre-compaction dump hook** (`.opencode/plugin/compact_memory.ts`):
-  timeout 60 s → **120 s** (`DUMP_SPAWN_TIMEOUT_MS`); `stdio: "ignore"` →
-  **`"pipe"`** (stderr capture); **one retry** on first-attempt failure.
-  Log lines in `.opencode/temp/ctx.log`: `DUMP-OK <sid> <relfile> ms=<ms>`
-  (the `ms=` prefix replaced the bare `<ms>`), `DUMP-RETRY=1 <sid> ms=<ms>
-  err=<one-line>` before the retry, and `DUMP-FAIL <sid> <error> | stderr:
-  <captured one-line stderr>` after it. The hook keeps its markdown backup,
-  rendered by the new lossless full mode.
+## What changed
+- **`.opencode/agent/scripts/log/summarize_intercept.cjs`** (new) — read-only
+  scriptlet: `node …/summarize_intercept.cjs [logfile]` (default
+  `.opencode/temp/intercept.log`). Prints the 6 spec'd sections with
+  machine-stable lines: (1) verdict counts — the 9 frozen VERDICTS in
+  byte-stable order, zero-included, NEW verdicts after; (2) fuzzy-rejected
+  per-event `d`/`gap` + best-cand census (threshold-tuning input);
+  (3) redundancy-mismatch lines verbatim (380-char cap, logctx convention);
+  (4) adder-form usage in pair args (`pair-events` / `adder-left`, decision-record
+  §2.5 incident-density metric); (5) out-of-sandbox count by path prefix
+  (normalized first 3 segments; short/junk values kept raw so noise sources
+  stay visible); (6) per-session_id line counts.
+  Generic: no hardcoded counts/session ids; the only constant is the frozen
+  VERDICTS mirror (documented as a mirror of
+  `.opencode/plugin/intercept_observer_core.ts` `VERDICTS`). Parsed
+  right-anchored (verdict/scope/evidence = last 3 fields) so an args-json
+  containing ` | ` cannot shift the evidence fields; `<8`-field lines are
+  counted `malformed`.
+- **`.opencode/agent/scripts/log/tests/`** (new) — `intercept_fixture.log`
+  (13 synthetic lines covering every frozen verdict, one NEW verdict, one
+  adder-left pair, one malformed line, 3 out-of-sandbox prefix buckets),
+  `expected_summary.txt` (byte-exact pin), `summarize_intercept.smoke.cjs`
+  (6 checks: in-process byte-exact, CLI exit 0 + byte-exact stdout,
+  missing-file exit 1 / empty stdout / stderr names the file).
+- **`.opencode/agent/scripts/log/README.md`** — table row + usage + tests/
+  pointer. **`.opencode/agent/scripts/INVENTORY.md`** — promoted-table row.
 
-## Re-pins (the #81 precedent; the pinned behavior changed by the spec)
-- `compact_memory.smoke.mjs`: the DUMP-OK regex re-pinned to `ms=\d+$`; the
-  stdio source pin flipped from `stdio: "ignore"` to `stdio: "pipe"`.
-- `handover_probe.mjs`: check 255 re-pinned to the `ms=<ms>` DUMP-OK form;
-  check 104 (no-script case) extended — the failure shape now includes the
-  `DUMP-RETRY=1` line. Probe total UNCHANGED (241).
-- Docs kept current: `scripts/db/README.md` (dump_session row),
-  `knowledge_tools.md` (hook entry updated + new #78 modes entry).
+## Pinned-check choice (DoD-3)
+Pinned as the **fixture test** (not a probe section). Reason: both probe
+homes (`.opencode/plugin/probes/handover_probe.mjs`, `.opencode/plugin/tests/`)
+live under `.opencode/plugin/**`, which the task spec lists in DO-NOT-touch;
+a self-contained smoke under the scripts `log/` home pins the same output in
+the established smoke style (chk/finish, exit 0 iff green) without touching
+plugin territory. The standard gate was then verified separately.
 
-## Measured verification (session ses_f31a5dee5ffe1DIBxZzEDZF8aF, 58 msgs / 263 parts)
-- A: `--json --out scratch_78/a` → `scratch_78/a.json`, `JSON.parse` OK,
-  messages=58 / parts=263. **58/58 message + 263/263 part `data` values
-  byte-identical to the live DB** (compact `JSON.stringify` of the dumped
-  value === the raw DB `data` column string — opencode stores compact JSON).
-  The tool spot-check (part prt_0ce5a7744001NN85DPk7ATjZyl, `state.input`)
-  is covered by the whole-part byte-identity; note the values are
-  JSON-escaped inside the markdown (backslash → `\\`) for substring greps.
-- B: full dump (411 751 bytes): **0/263 parts missing or truncated** (every
-  text/reasoning body, every tool input/output serialization, every
-  step-start/step-finish JSON present); `[tool input]`=62, `[tool output]`=62,
-  step-start=57, step-finish=57. Lite dump: `[tool]` headers=62, tool
-  input/output=0, step-start/step-finish lines=0, `[text]`=30,
-  `[reasoning]`=57.
-- C: exercised by the sandbox smokes/probe (stub success → `DUMP-OK … ms=`;
-  no-script failure → `DUMP-RETRY=1` + `DUMP-FAIL … | stderr:`). No live
-  compaction dispatch was triggered (would need a real self-compact — the
-  stall itself only reproduces live).
+## Measured verification (all run from repo root, plain node / venv)
+- Fixture smoke: `node .opencode/agent/scripts/log/tests/summarize_intercept.smoke.cjs`
+  → **6/6 PASS**, exit 0.
+- Real log: `node .opencode/agent/scripts/log/summarize_intercept.cjs` → exit 0,
+  all 6 sections. At run time: 3130 lines, 86 sessions, 0 malformed;
+  `ambiguous 0` (the frozen zero-included case); pair-events 107, adder-left 2;
+  out-of-sandbox 722, top buckets `398 (empty)`, `61 C:/Users/Wasiejen`,
+  `30 c/Users/Wasiejen`. (Counts move — the log grows live; the run output is
+  reproducible at any moment.)
+- Standard gate, measured at commit time:
+  - pytest: **459 passed, 1 warning** (matches baseline) ✓
+  - ruff `--select F .`: **All checks passed** (F=0) ✓
+  - plugin smokes: **9/10 PASS** — `context_recovery.smoke.mjs` FAILs with
+    `ERR_MODULE_NOT_FOUND .opencode/plugin/deactivated/context_recovery.ts`
+  - `handover_probe.mjs`: **FAILS with the same** `ERR_MODULE_NOT_FOUND`
+  - Both failures are the maintainer's UNCOMMITTED `context_recovery.ts` move
+    (git: `D .opencode/plugin/deactivated/context_recovery.ts`,
+    `?? .opencode/plugin/context_recovery.ts`) — a pre-existing environment
+    state named in the task spec's DO-NOT-touch list, NOT caused by this task
+    (no `.opencode/plugin/**` file was modified). Gate is otherwise green and
+    was green before this task's change; it should read fully green once the
+    maintainer commits the move.
 
-## Gate (all green, measured 2026-09-23)
-- probe: **241/241 PASS** (exit 0)
-- smokes: compact_memory **57/57**, auto_resume 121/121, block_transfer
-  22/22 + sandbox 52/52, context_recovery ALL PASS, ctx_gauge 3/3,
-  gauge_core ALL PASS, intercept_observer 39/39, loop_log 24/24, submit 20/20
-- pytest: **459 passed, 1 warning**
-- ruff F: **0** ("All checks passed!")
+## Findings (for #67 / curation — loose todo entries appended via submit)
+1. Session-count basis differs from the spec's measured value: the spec says
+   "139 distinct session ids" (planner-measured 2026-09-23); the script's
+   field-2 census reads **86** distinct session_id values at 3130 lines, and
+   a substring census of `ses_*` anywhere in lines reads 120. The script
+   counts the session_id FIELD (the per-session metric R4 needs); the spec's
+   139 likely used a different measure. Worth a one-line basis note in #67.
+2. The `context_recovery.ts` move leaves probe + one smoke red until
+   committed (evidence above) — gate baseline is blocked by maintainer state.
 
 ## TODO entries
-- `TODO.md` #78 status → **LANDED** (per spec, the code commit hash is
-  recorded in YOUR follow-up bookkeeping commit, not mine). No other TODO
-  changes; nothing appended to `todo_inbox.md` (no loose findings).
+None appended to `TODO.md` directly (planner updates #67); the two findings
+above were sent to `todo_inbox.md` via `submit`.
 
-## Deliberately NOT done
-- No live hook dispatch / live compaction (out of scope; the spec's
-  verification for C = re-pins + gate).
-- No `--all --json` / `--all --lite` corpus backfill modes (spec:
-  single-session only).
-- No NEW probe/smoke checks beyond the re-pins (DoD pins the probe total at
-  241/241).
-- Untouched per the DO-NOT-touch list: `.opencode/maintainer/**` (the two
-  dirty files stay unstaged), the live DB (readOnly helpers only),
-  `.opencode/plugin/auto_resume.ts`, `.opencode/agent/prompts/**` (no edit
-  access needed; nothing blocked).
-- Scratch deleted before close: `.opencode/archive/sessions/scratch_78/`
-  (a.json, b_full, b_lite) + the scratchpad verify/output files.
-
-## Commit
-Subject: `dump #78 LANDED: --json raw mode + lossless full markdown + --lite
-preset + hook timeout/diagnostic/retry`. Files: `dump_session.cjs`,
-`compact_memory.ts`, `compact_memory.smoke.mjs`, `handover_probe.mjs`,
-`TODO.md`, this handover, `scripts/db/README.md`, `knowledge_tools.md`.
-Hash: __FILL_AFTER_COMMIT__
-
-Lessons: the byte-identical dump-verify recipe (compact re-serialization ===
-raw `data` column) is actionable for future dump-fidelity checks — appended
-to `knowledge_tools.md` (#78 entry).
+## Deliberately not done
+- No probe section / no new file under `.opencode/plugin/**` (DO-NOT-touch;
+  see pinned-check choice).
+- No edit of the R4 spec's stale `Worker: worker_Q4_140K` line (planner's).
+- No staging of the maintainer's live changes (`context_recovery.ts` move,
+  `ideas.md`, `my_todos.md`, loop_log.md) — only the five named paths above
+  were staged.

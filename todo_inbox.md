@@ -144,3 +144,8 @@ Executed the 2026-09-23_02-51 review (worker-16 `worker_Q3S_170K`, plan9 unit B)
 Stale/ambiguous findings (left untouched — their TITLE line carries no closed/landed/superseded marker, per the curation rule): #68 (status line CLOSED 2026-09-16, title marker only "GATED"), #69 (status CLOSED 2026-09-16, acceptance fully met — "SUPERSEDES" in the title refers to the old Q2 form, not this entry), #71 (status CLOSED 2026-09-17, maintainer ruled), #73 (status LANDED 2026-09-17) — flagged for the planner's next curation call.
 
 Planner-9 addendum (2026-09-23): the four flagged entries had their TITLE markers aligned by the planner (CLOSED 2026-09-16 for #68/#69, CLOSED 2026-09-17 for #71, LANDED 2026-09-17 for #73); their FULL-BODY condensation (append to todo_records.md + one-line title) is deferred to the next curation unit.
+## 2026-09-23_22-07 worker_Q3S_170K ses_f30310096ffeugJAZl7bCrNYo1
+R4 bookkeeping findings for #67 (worker-13, 2026-09-23):
+1. Session-count basis: spec_R4 gate evidence says "139 distinct session ids" (planner-measured); the landed script's field-2 census reads 86 distinct session_id values at 3130 lines (substring census of ses_* anywhere: 120). The script counts the session_id FIELD (the R4 per-session metric). Suggest a one-line basis note in #67 so future R4 runs don't look like a regression. Acceptance: #67 states which census basis the session gate uses.
+2. Gate baseline blocked: handover_probe.mjs + context_recovery.smoke.mjs both fail with ERR_MODULE_NOT_FOUND on .opencode/plugin/deactivated/context_recovery.ts until the maintainer's uncommitted move (now .opencode/plugin/context_recovery.ts) is committed. Acceptance: after the move commits, probe 241/241 + all smokes green again (or probe updated to the new path).
+

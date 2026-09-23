@@ -1,0 +1,31 @@
+INTERCEPT SUMMARY .opencode/agent/scripts/log/tests/intercept_fixture.log
+lines 13  sessions 3  malformed 1
+== 1. verdict counts ==
+observed-redundancy-ok  1
+redundancy-mismatch     1
+no-candidate            1
+ambiguous               1
+out-of-sandbox          3
+path-anomaly            1
+fuzzy-resolved          1
+fuzzy-rejected          1
+pair-resolved           1
+NEW fixture-new-verdict 1
+== 2. fuzzy-rejected (1) ==
+# per event: d = best-cand dist, gap = 2nd-best minus best, ? = cut off
+d=13 gap=1 cand=todo_records.md
+# best-cand census (count desc, name asc)
+todo_records.md d=13 x1
+== 3. redundancy-mismatch (1) verbatim ==
+2026-09-20_10-04 | ses_fixb | Q3S-170K | bash | {"command":"echo '5|four'"} | pair=5|four cand=4 dist=1 | arg | redundancy-mismatch
+== 4. adder-form usage (pair args) ==
+pair-events 3
+adder-left 1
+== 5. out-of-sandbox by path prefix (3) ==
+1  (empty)
+1  C:/Users/W
+1  tmp/opencode/x
+== 6. per-session line counts (3 sessions) ==
+5  ses_fixc
+4  ses_fixa
+4  ses_fixb

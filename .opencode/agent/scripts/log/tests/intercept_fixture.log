@@ -1,0 +1,13 @@
+2026-09-20_10-00 | ses_fixa | Q3S-170K | read | {"filePath":"/repo/num-861.md"} | dense date=2026-09 | path | no-candidate
+2026-09-20_10-01 | ses_fixa | Q3S-170K | read | {"filePath":"/repo/file-4.tx"} | fuzzy orig=/repo/file-4.tx -> file-4.txt d=1 gap=4 | path | fuzzy-resolved
+2026-09-20_10-02 | ses_fixb | Q3S-170K | read | {"filePath":"/repo/repo_overview.md"} | fuzzy orig=/repo/repo_overview.md cands=todo_records.md 13,SPEC_FEATURES.md 14 | path | fuzzy-rejected
+2026-09-20_10-03 | ses_fixb | Q3S-170K | bash | {"command":"echo '[800+50+11:eight-six-one]'"} | pair=[800+50+11:eight-six-one] canon=861 dist=0 | arg | pair-resolved
+2026-09-20_10-04 | ses_fixb | Q3S-170K | bash | {"command":"echo '5|four'"} | pair=5|four cand=4 dist=1 | arg | redundancy-mismatch
+2026-09-20_10-05 | ses_fixc | Q3S-170K | bash | {"command":"ls /tmp/opencode/x"} | path=/tmp/opencode/x root=/repo | path | out-of-sandbox
+2026-09-20_10-06 | ses_fixc | Q3S-170K | bash | {"command":"cat C:/Users/W/app/data/db.sqlite"} | path=C:/Users/W/app/data/db.sqlite root=/repo | path | out-of-sandbox
+2026-09-20_10-07 | ses_fixc | Q3S-170K | bash | {"command":"grep -rn x ."} | path=// root=/repo | path | out-of-sandbox
+2026-09-20_10-08 | ses_fixa | Q3S-170K | read | {"filePath":"/repo/doubled/one.md"} | doubled=repo,one | path | path-anomaly
+2026-09-20_10-09 | ses_fixa | Q3S-170K | bash | {"command":"echo '<9|nine>'"} | pair=9|nine cand=9 dist=0 | arg | observed-redundancy-ok
+2026-09-20_10-10 | ses_fixb | Q3S-170K | task | {"description":"fixture ambiguous"} | ambiguous-evidence | arg | ambiguous
+2026-09-20_10-11 | ses_fixc | Q3S-170K | write | {"filePath":"/repo/new.md"} | fixture-new-verdict evidence | path | fixture-new-verdict
+2026-09-20_10-12 | ses_fixc | Q3S-170K | write | {"broken":true}

@@ -467,3 +467,6 @@ Self-compaction close protocol gap: ending the turn on the compact_memory TOOL C
 ### 2026-09-23_20-39 worker_Q3S_170K ses_f30807a16ffelPQPUBH50wiXBe
 #78 spec ambiguity: "the DUMP-OK line gains `ms=`" — the line already carried a bare `<ms>` field; I read it as changing the field to `ms=<n>` (re-pinning smoke+probe). Also "state.input byte-identical to the DB" left the comparison basis open — I used the strongest form (compact re-serialization of every dumped data value === the raw DB `data` column string, 263/263) plus the JSON-escaped substring note.
 
+### 2026-09-23_22-07 worker_Q3S_170K ses_f30310096ffeugJAZl7bCrNYo1
+R4 gate verification: probe + context_recovery.smoke.mjs both red from the maintainer's uncommitted context_recovery.ts move (ERR_MODULE_NOT_FOUND deactivated/context_recovery.ts) — standard gate couldn't be measured fully green mid-task.
+

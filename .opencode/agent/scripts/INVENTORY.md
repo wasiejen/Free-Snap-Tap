@@ -17,6 +17,7 @@ the helper-script collection was curated from. **Originals are NOT deleted**
 | compact_dir.cjs | .opencode/agent/scripts/db/ |
 | probe_schema.cjs | .opencode/agent/scripts/db/ |
 | logctx.cjs | .opencode/agent/scripts/log/ |
+| summarize_intercept.cjs | .opencode/agent/scripts/log/ |
 | numword.cjs | .opencode/agent/scripts/numword/ |
 | w2n.py | .opencode/agent/scripts/numword/ |
 
