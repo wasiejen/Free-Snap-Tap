@@ -1377,3 +1377,45 @@ pytest 459+1w, ruff F=0; full smoke suite green (10/10). LIVE
     is the real cause. **LIVE ACCEPTED 2026-09-23 (plan10):** `route= restart spawn`
     for planner-9's valid `action: restart` on both builds (12:52:39Z on
     v=24972ebd, 13:00:08Z on v=d2b9d510), no recovery= lines for the sid.
+
+## 2026-09-23 (plan11, worker `worker_Q3S_170K`) — full text of closed entry #87 (subsumed by #90, moved from TODO.md):
+
+## #87. (open — maintainer call) — Unit-4 cannot revive a dead self-spawned successor: the plugin-driven loop stalls (finding 2026-09-23, planner-8)
+- **Problem + evidence:** `scopeVerdict`'s FIRST check is the `spawned`
+  self-mark (`auto_resume.ts` L754; set in `spawnPlanner` L612; NO
+  clear/expiration path) → any session the plugin spawned itself
+  (Unit-3/4 `spawnPlanner`) is scope "none" — never recovered, never
+  restart-spawned (#85 part-1 loop-prevention: "a freshly-spawned
+  successor must not be re-triggered"). Measured live (2026-09-23):
+  planner-8's session (ses_f33f1eb98ffeFvrnTdmTzmyE2x) was spawned by the
+  Unit-4 RESTART branch (log `spawn=` 02:17:49Z; its first user message
+  is the locked restartText); it went idle 3× — once after a self-
+  compaction close WITHOUT an action line — and the plugin never routed
+  it (log: `scope= none` 03:00:03Z; no `recovery=`/`route=` lines for the
+  sid). Consequence: the L3 self-compaction continue protocol ("the
+  looprunner RESUMEs via task_id") has no live looprunner in
+  plugin-driven mode — only a maintainer message rescued the session.
+  NOTE: a toggle in a maintainer message (`<|Autorun|>`) does NOT re-scope
+  a self-spawned session (the spawned check precedes the toggle check).
+- **Desired outcome:** his ruling on dead-successor semantics (options
+  below); then spec + landing.
+- **Options (his ruling):** (a) keep the stall — a dead loop is visible,
+  he restarts (no code); (b) bounded restart-spawn of a dead self-spawned
+  successor (e.g. ONE re-spawn per successor, or only if the session made
+  a committed progress since spawn — preserving #85's loop prevention);
+  (c) keep the looprunner in the loop after a plugin spawn (hand off to
+  the looprunner instead of self-spawning — it already has
+  resume-from-death semantics); (d) re-arm on a fresh busy after
+  compaction (clear the spawned mark on the self-spawned session's first
+  busy — revives L3 continuation; risks the #85 loop unless bounded).
+- **Acceptance:** ruling recorded; spec written; the behavior change is
+  approved BEFORE implementation (observable behavior).
+- **Status:** open — maintainer call (he is AFK; recorded for the next
+  direct session).
+- **Closed:** 2026-09-23 — SUBSUMED by #90 (the approved proposal, Parts
+  A+B+C). Part A removes the `spawned` exclusion so the self-spawned
+  successor is now TRACKED (its first user message is the RESTART prompt,
+  line 1 = the exact own-line toggle → scope "autorun") and is RECOVERED
+  after an idle without an action line (the #87 stall case, inverted);
+  option (b)'s "committed progress" idea is replaced by the LINEAGE-DEPTH
+  cap (N=2) on the spawn branch. Options (a)/(c)/(d) are superseded.

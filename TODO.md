@@ -661,58 +661,11 @@ All those IDs stay reserved — see the numbering rule in the header.
   2026-09-23_01-08 inbox entry; runs after #85 part 3 lands — now clear
   of that constraint).
 
-## #87. (open — maintainer call) — Unit-4 cannot revive a dead self-spawned successor: the plugin-driven loop stalls (finding 2026-09-23, planner-8)
-- **Problem + evidence:** `scopeVerdict`'s FIRST check is the `spawned`
-  self-mark (`auto_resume.ts` L754; set in `spawnPlanner` L612; NO
-  clear/expiration path) → any session the plugin spawned itself
-  (Unit-3/4 `spawnPlanner`) is scope "none" — never recovered, never
-  restart-spawned (#85 part-1 loop-prevention: "a freshly-spawned
-  successor must not be re-triggered"). Measured live (2026-09-23):
-  planner-8's session (ses_f33f1eb98ffeFvrnTdmTzmyE2x) was spawned by the
-  Unit-4 RESTART branch (log `spawn=` 02:17:49Z; its first user message
-  is the locked restartText); it went idle 3× — once after a self-
-  compaction close WITHOUT an action line — and the plugin never routed
-  it (log: `scope= none` 03:00:03Z; no `recovery=`/`route=` lines for the
-  sid). Consequence: the L3 self-compaction continue protocol ("the
-  looprunner RESUMEs via task_id") has no live looprunner in
-  plugin-driven mode — only a maintainer message rescued the session.
-  NOTE: a toggle in a maintainer message (`<|Autorun|>`) does NOT re-scope
-  a self-spawned session (the spawned check precedes the toggle check).
-- **Desired outcome:** his ruling on dead-successor semantics (options
-  below); then spec + landing.
-- **Options (his ruling):** (a) keep the stall — a dead loop is visible,
-  he restarts (no code); (b) bounded restart-spawn of a dead self-spawned
-  successor (e.g. ONE re-spawn per successor, or only if the session made
-  a committed progress since spawn — preserving #85's loop prevention);
-  (c) keep the looprunner in the loop after a plugin spawn (hand off to
-  the looprunner instead of self-spawning — it already has
-  resume-from-death semantics); (d) re-arm on a fresh busy after
-  compaction (clear the spawned mark on the self-spawned session's first
-  busy — revives L3 continuation; risks the #85 loop unless bounded).
-- **Acceptance:** ruling recorded; spec written; the behavior change is
-  approved BEFORE implementation (observable behavior).
-- **Status:** open — maintainer call (he is AFK; recorded for the next
-  direct session).
+## #87. (closed 2026-09-23 - subsumed by #90; full text in todo_records.md) - Unit-4 cannot revive a dead self-spawned successor (the plugin-driven loop stalls): RESOLVED by #90 Part A — the self-spawned successor is now TRACKED (scope "autorun" via the restart prompt's own-line toggle) and RECOVERED after an idle without an action line (the #87 stall case, inverted); option (b)'s "committed progress" idea is replaced by the lineage-depth cap (N=2) on the spawn branch.
 
 ## #88. (LANDED 2026-09-23, worker-14 `worker_Q3S_170K`) — auto_resume smoke wall-time cut 91.4 %: 145.5 s → 12.5 s (his 2026-09-23_00-12 complaint measured at 145.5 s, not ~300 s) — the tick period is now a DEFAULT-PRESERVING factory option (`tickMs`, default 5000 ms — the live tick is unchanged; first factory call sets the module-level tick); the smoke instantiates with `tickMs: 300` and its 7× `sleep(5600)` became `tickWait()` (2 ticks + margin — same "at least one full tick period" pin semantics); no check removed (102/102 before AND after); gate re-verified: probe 241/241, all 10 smokes, pytest 459+1w, ruff F=0. Commit 532ddbc.
 
 ## #89. (closed 2026-09-23 - live-accepted plan10; full text in todo_records.md) - autorun-identifiable names for plugin-spawned sessions (title <loop-folder> planner-<N>): LIVE - the first named spawn verified 2026-09-23 13:00:08Z (the spawn= line carries ident=autorun-2026-09-21_15-33 planner-10 + the session title in the DB)
 
 
-## #90. (open - maintainer item 2026-09-23_14-25; design needed; related #87) - plugin-spawned successors should be tracked (not scope "none") and inherit the trigger session's Autorun/Direct state
-- **Problem / evidence:** his priority.md item 2026-09-23_14-25: "spawned new session by the auto-resume plugin should be tracked also and not set to 'none' - they should inherit the settings/state from the session that triggered the new session via action: restart - so in the next session the same Autorun / Direct setting will be transmitted - and deactivated for the old session (i assume to prevent an unintentional resume) (if not already the case)". Current behavior: the `spawned` self-mark (set in `spawnPlanner`, checked FIRST in the scope verdict, auto_resume.ts) is an EXCLUSION (the #85 part-1 loop prevention) -> a plugin-spawned successor is scope "none" and is never re-routed (measured live 2026-09-23: the self-spawned planner-8 session stalled at scope=none - TODO #87).
-- **Desired outcome (his words, parsed):** a spawned successor (1) is tracked/in-scope, (2) inherits the trigger session's last own-line Autorun/Direct state, (3) the trigger session is deactivated (its scope off) to prevent an unintentional resume - with the #85 unbounded-spawn loop prevention preserved.
-- **Acceptance:** the design ruling/spec is approved BEFORE implementation (observable behavior change); the #85 global cap + dead-mark stay effective; smoke pins for the inherit + deactivate behavior.
-- **Suggested scope:** `auto_resume.ts` (scope verdict + `spawnPlanner`) + the auto_resume smoke.
-- **Status:** APPROVED 2026-09-23 (his `--comment` 15-44 on the proposal:
-  "approved A+B and C also"; the proposal moved to
-  `proposals/approved/`). Implementation spec committed (81ed057). Worker
-  ses_f3170a3bdffe1OD5gPCr6PehAQ (`worker_Q3S_170K`) landed Parts A+B+C in
-  the WORKING TREE (auto_resume.ts +273/-108, smoke +360/-108, uncommitted)
-  before dying at its context limit mid-work — session dumped to the corpus
-  + CROSS compact dispatched (2026-09-23); the task_id RESUME is pending the
-  compaction completing (planner-11 closes via self-compact + unit-4 resume
-  per his inbox instruction — NO `action: restart` until #90 is live).
-  Landing = the resumed worker's green commit; #87 closes then. The
-  maintainer's inbox file `2026-09-23_15-46.md` stays in place until #90
-  lands (his instruction).
+## #90. (LANDED 2026-09-23, worker `worker_Q3S_170K`) - plugin-spawned successors inherit the trigger's Autorun state + the trigger deactivates (approved proposal Parts A+B+C): (A) the `spawned` self-mark EXCLUSION removed from `scopeVerdict` (now a 1-arg function of the messages only), the `spawned` map REPURPOSED as the LINEAGE-DEPTH map (sid→depth), `restartText()` LINE 1 = the exact own-line `<|autonom|>` (prose moved to line 2) so every restart-spawned successor derives scope "autorun" from its first user message ALONE (restart-safe — no in-memory state), and a LINEAGE-DEPTH CAP (N=2) on the restart/cap-exhaustion spawn branch REPLACES the #85 exclusion's loop guard (`skip= depth sid=` at depth≥2; a file-trigger spawn stays depth 0); (B) `spawnPlanner` RETURNS the new sid (null on every failure path — the `spawn-fail=` lines are unchanged), a SUCCESSFUL spawn STICKY-deactivates the TRIGGER (`deactivate= sid=` line; a failed spawn changes nothing) and `routeScopedIdle` skips the deactivated trigger right after the scope recompute (`skip= deactivated sid=` — no send, no re-spawn, the session stays manually usable); the flag records the trigger's user-message count at deactivation and clears ONLY on a NEW user message carrying an own-line ON toggle; (C) at init (the factory call) the plugin RESTORES the in-memory depth map + deactivation flags from its own `auto_resume.log` (each `route= restart spawn sid=X` line paired with the following `spawn= sid=Y` → deactivated(X) + depth(Y)=depth(X)+1; an unpaired `spawn=` → depth 0; once per process). Smoke re-pinned: auto_resume.smoke.mjs 118/118 (the old #85 spawned-exclusion pins flipped to the new behavior + the proposal's acceptance pins 1-7 added). Gate green: probe 241/241, all 10 smokes, pytest 459 passed + 1 warning, ruff F=0. SUBSUMES #87 (now closed). Commit hash recorded by the planner in its bookkeeping commit.

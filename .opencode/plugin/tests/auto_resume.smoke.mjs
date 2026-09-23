@@ -33,8 +33,16 @@
 // "autorun" (ANY agent type), OFF → "none" (beats the planner test — a
 // Direct planner is OUT of scope); with NO toggle, the working agent
 // (the FIRST user message's agent field) being a planner agent
-// (`planner_<model>`) → "planner". Self-spawned sids (the module-level
-// `spawned` self-mark) are NEVER scoped (the #85 loop fix).
+// (`planner_<model>`) → "planner". #90: the old self-spawned exclusion
+// is REMOVED — the module-level `spawned` map is now the LINEAGE-DEPTH
+// map (a restart/cap-exhaustion spawn stores depth(trigger) + 1; depth
+// cap 2 on the spawn branch — the replacement loop guard); a
+// restart-spawned successor derives scope "autorun" from the RESTART
+// prompt's own-line toggle (line 1) + inherits the trigger's state; a
+// SUCCESSFUL spawn STICKY-deactivates the TRIGGER (`skip=
+// deactivated` — cleared only by a NEW user message with an own-line
+// ON toggle); the in-memory state is restored at init from the plugin's
+// own log (part C, once per process).
 // The plugin factory is called with a SCRATCHPAD sandbox `directory` —
 // auto_resume.log lands in the sandbox (.opencode/temp/auto_resume.log
 // under the sandbox project), NEVER the live .opencode/temp/. Run:
@@ -735,14 +743,14 @@ try {
     // ============================================================
     // UNIT 4 — liveness watchdog (#85 part 1: the #82 generalized scope)
    //
-   // The factory is re-invoked with a SPYING client: `messages` is
-   // scripted PER SID (the SDK list shape Array<{info, parts}>),
-   // `create` + `promptAsync` record every call. Scope: a sid is
-   // in-scope iff its working agent (the first user message's agent
-   // field) is a planner agent OR its last own-line toggle is ON;
-   // self-spawned sids are NEVER scoped — the UNIT 3 spawn
-   // `ses_u3_new` is still self-marked in the module-level `spawned`
-   // map, so it now falls OUT of scope (the #85 loop fix). The single
+    // The factory is re-invoked with a SPYING client: `messages` is
+    // scripted PER SID (the SDK list shape Array<{info, parts}>),
+    // `create` + `promptAsync` record every call. Scope: a sid is
+    // in-scope iff its working agent (the first user message's agent
+    // field) is a planner agent OR its last own-line toggle is ON.
+    // #90: the old self-spawned exclusion is GONE — the UNIT 3 spawn
+    // `ses_u3_new` (planner agent in its first user msg, no toggle) is
+    // now IN scope (planner) and gets a CONTINUE on idle. The single
    // tick (short tickMs here — 5000ms default in live) is the only
    // decision+send funnel — the smoke waits on it (real time). Batch A
    // fires every scenario before one tick pass, so one pass routes them
@@ -773,10 +781,11 @@ try {
    // wrapper shape (the in-process client's RequestResult { data: [...] }):
    // the plugin must unwrap it — without the unwrap, scope=none, no route line
    msgScript.set("ses_u4_wrap", { data: mkPairs([["user", MARK + " iteration 1"], ["assistant", "Unit closed. action: stop"]], PLANNER_A) });
-   // A real spawned session's first user message is the planner start
-   // prompt (agent = the spawn agent) — faithful script; the `spawned`
-   // self-mark still keeps it OUT of scope (#85).
-   msgScript.set("ses_u3_new", mkPairs([["user", "plain user message, no marker"], ["assistant", "Working, no closing line."]], PLANNER_A));
+    // A real spawned session's first user message is the spawn start
+    // prompt (agent = the source session's current agent) — faithful
+    // script; #90: the old self-spawned exclusion is GONE — the
+    // planner agent field scopes it IN (planner).
+    msgScript.set("ses_u3_new", mkPairs([["user", "plain user message, no marker"], ["assistant", "Working, no closing line."]], PLANNER_A));
    msgScript.set("ses_u4_throw", { throw: "messages exploded for ses_u4_throw" });
 
   const u4Session = {
@@ -830,7 +839,7 @@ try {
       readLines().some((l) => l.includes("route= restart spawn sid=ses_u4_restart")) &&
       readLines().some((l) => l.includes("skip= successor sid=ses_u4_succ")) &&
       nolineCont(1) &&
-      readLines().some((l) => l.includes("scope= none sid=ses_u3_new")) &&
+      readLines().some((l) => l.includes("scope= planner sid=ses_u3_new")) && // #90: the spawned successor is now IN scope
       readLines().some((l) => l.includes("err= sid=ses_u4_throw")) &&
       readLines().some((l) => l.includes("route= stop sid=ses_u4_wrap")),
     12000,
@@ -863,17 +872,20 @@ try {
       messagesCalls.filter((c) => c?.path?.id === "ses_u4_plain").length === 1 &&
       readLines().some((l) => l.includes("scope= none sid=ses_u4_plain")) &&
       !readLines().some((l) => l.includes("sid=ses_u4_plain") && (l.includes("route=") || l.includes("recovery="))), "");
-  chk("UNIT 4 #85: spawned session (UNIT 3 self-mark, planner agent in its first user msg) is OUT of scope — scope= none, zero sends, no recovery/route line",
-    okA && readLines().some((l) => l.includes("scope= none sid=ses_u3_new")) &&
-      !u4Sends.some((c) => c.path?.id === "ses_u3_new") &&
-      !readLines().some((l) => l.includes("sid=ses_u3_new") && (l.includes("route=") || l.includes("recovery="))), "");
+  chk("UNIT 4 #90 (re-pin of the #85 spawned-exclusion pin): the UNIT 3 spawned successor (planner agent in its first user msg) is IN scope — scope= planner + CONTINUE attempt 1 (the #87 stall case, inverted)",
+    okA && readLines().some((l) => l.includes("scope= planner sid=ses_u3_new")) &&
+      u4Sends.some((c) => c.path?.id === "ses_u3_new") &&
+      readLines().some((l) => l.includes("recovery= sid=ses_u3_new attempt=1")), "");
   chk("UNIT 4: messages() throwing → err= line with the error, no action, no throw",
     okA && !u4Sends.some((c) => c.path?.id === "ses_u4_throw") &&
       readLines().some((l) => l.includes("err= sid=ses_u4_throw") && l.includes("messages exploded for ses_u4_throw")), "");
   // #80: every batch-A CONTINUE send carries the EXPLICIT planner agent
-  // (planner-scoped sessions always run as the planner agent).
-  chk("UNIT 4 #80: batch-A continue sends carry agent=planner_Q3S_160K (explicit)",
-    okA && contSends().length === 1 &&
+  // (planner-scoped sessions always run as the planner agent). #90:
+  // batch-A now has TWO continue sends (ses_u4_noline + the in-scope
+  // spawned successor ses_u3_new).
+  chk("UNIT 4 #80: batch-A continue sends (noline + spawned successor) carry agent=planner_Q3S_160K (explicit)",
+    okA && contSends().length === 2 &&
+      contSends().includes("ses_u4_noline") && contSends().includes("ses_u3_new") &&
       u4Sends.filter((c) => ((c.body?.parts?.[0]?.text ?? "")).includes("agent_readme_post_compaction.md"))
         .every((c) => c.body?.agent === "planner_Q3S_160K"),
     `contSends=${contSends().join(",")}`);
@@ -895,9 +907,10 @@ try {
     12000,
   );
   chk("UNIT 4: third idle, cap exhausted with still no line → restart branch → spawn", okC && u4Creates.length === cBeforeC + 1, `create=${u4Creates.length}`);
-  chk("UNIT 4: send totals — 2 CONTINUE (noline ×2) + 2 RESTART spawns, nothing else touched (spawned ses_u3_new stays OUT of scope)",
-    u4Sends.length === 4 && contSends().length === 2 && spawnSends().length === 2 &&
-      contSends().every((s) => s === "ses_u4_noline") && u4Creates.length === 2,
+  chk("UNIT 4: send totals — 3 CONTINUE (noline ×2 + the in-scope spawned successor ses_u3_new ×1) + 2 RESTART spawns (#90 re-pin: the successor is now tracked, not excluded)",
+    u4Sends.length === 5 && contSends().length === 3 && spawnSends().length === 2 &&
+      contSends().filter((s) => s === "ses_u4_noline").length === 2 &&
+      contSends().includes("ses_u3_new") && u4Creates.length === 2,
     `total=${u4Sends.length} create=${u4Creates.length}`);
 
   // ============================================================
@@ -939,26 +952,33 @@ try {
     okCap3 && capRecovery(3) === 0 && u4Creates.length === cBeforeCap3 + 1,
     `n3=${capRecovery(3)} create=${u4Creates.length}`);
 
-  // step 4: a REAL busy (no pending mark) resets the cap → attempt 1
-  // is re-issued
+  // step 4 (#90 re-pin of the #80 step-4 pin): a REAL busy (no pending
+  // mark) resets the cap (the arm event) — but the cap-exhaustion
+  // spawn in step 3 DEACTIVATED the trigger (part B): the routing now
+  // skips it (skip= deactivated — no attempt re-issue, no send).
+  const capArmReal = () => readLines().filter((l) => l.includes("arm= sid=ses_u4_cap") && !l.includes("injected")).length;
+  const sBeforeCap4 = u4Sends.length;
   await fire(hooksU4, "ses_u4_cap", [statusEv("ses_u4_cap", "busy"), statusEv("ses_u4_cap", "idle")]);
-  const okCap4 = await waitUntil(() => capRecovery(1) === 2, 12000);
-  chk("UNIT 4 #80: real busy (no pending mark) → cap reset → CONTINUE attempt 1 re-issued",
-    okCap4 && capRecovery(1) === 2, `n1=${capRecovery(1)}`);
+  const okCap4 = await waitUntil(() => readLines().some((l) => l.includes("skip= deactivated sid=ses_u4_cap")), 12000);
+  chk("UNIT 4 #90 (re-pin): the cap-exhaustion spawn deactivated ses_u4_cap — the real busy arms (cap reset) but the routing skips (skip= deactivated, no attempt re-issue, no send)",
+    okCap4 && capRecovery(1) === 1 && capArmReal() === 2 && u4Sends.length === sBeforeCap4,
+    `n1=${capRecovery(1)} arm=${capArmReal()} sends=${u4Sends.length}`);
   chk("UNIT 4 #80: exactly the two injected busies were consumed (arm= ... injected ×2)",
     capInjected() === 2, `armInjected=${capInjected()}`);
 
    // ============================================================
-   // UNIT 2 #85 part 3 — the nudge's scope gate (the factory is re-
-   // invoked with a fresh spying client — promptAsync + messages both
-   // spied, messages scripted per sid from the shared msgScript):
-   //  - a spawned (OUT-of-scope, #85) session whose first user
-   //    message carries the planner agent → verdict "none" (the
-   //    self-mark) → no suffix;
-   //  - a NON-scoped session whose first user message carries an
-   //    agent field (no toggle) → verdict "none" → no suffix;
-   //  - a NON-scoped session with NO user agent field (no toggle) →
-   //    verdict "none" → no suffix.
+    // UNIT 2 #85 part 3 — the nudge's scope gate (the factory is re-
+    // invoked with a fresh spying client — promptAsync + messages both
+    // spied, messages scripted per sid from the shared msgScript):
+    //  - a PLUGIN-SPAWNED (UNIT 3) session whose first user message
+    //    carries the planner agent → verdict "planner" (the #90 re-pin:
+    //    the self-mark exclusion is GONE — the successor INHERITS the
+    //    nudge; proposal note: Unit 2 is scope-gated via the same
+    //    scopeVerdict) → suffix PRESENT;
+    //  - a NON-scoped session whose first user message carries an
+    //    agent field (no toggle) → verdict "none" → no suffix;
+    //  - a NON-scoped session with NO user agent field (no toggle) →
+    //    verdict "none" → no suffix.
    // The old #80 agent-retention checks pinned the agent field in the
    // unit-2 SEND body — the send is gone (#85 part 3: passive nudge,
    // no body): the equivalent pin is the verdict gate on the fresh
@@ -990,31 +1010,33 @@ try {
    const hooksU2ag = await factory({ directory: proj, client: { session: u2agSession, provider: { list: providerList }, app: { log: () => "log" } } });
    chk("UNIT 2 #85 part 3: re-factory with the scope-gate spying client returns the event hook", typeof hooksU2ag?.event === "function");
 
-   // Every scenario: busy → saturated assistant update (NO idle yet —
-   // the nudge fires on the tool result, not the tick). Then the
-   // tool-result pass: all three verdicts are "none" → no suffix. Then
-   // the idle: Unit 4 routes all three as scope= none (no route line,
-   // no send — Unit 4 scope unchanged).
-   await fire(hooksU2ag, "ses_u3_new", [statusEv("ses_u3_new", "busy"), msgUpdated("ses_u3_new", "assistant", { total: 80000 }, MODEL)]);
-   await fire(hooksU2ag, "ses_u2_agnet", [statusEv("ses_u2_agnet", "busy"), msgUpdated("ses_u2_agnet", "assistant", { total: 80000 }, MODEL)]);
-   await fire(hooksU2ag, "ses_u2_agnone", [statusEv("ses_u2_agnone", "busy"), msgUpdated("ses_u2_agnone", "assistant", { total: 80000 }, MODEL)]);
-   const outAg1 = await toolAfter(hooksU2ag, "ses_u3_new");
-   const outAg2 = await toolAfter(hooksU2ag, "ses_u2_agnet");
-   const outAg3 = await toolAfter(hooksU2ag, "ses_u2_agnone");
-   chk("UNIT 2 #85 part 3: the nudge's scope gate — spawned / no-toggle worker / no-toggle no-agent saturated sessions → NO suffix (verdict none), zero promptAsync",
-     !hasSuffix(outAg1) && !hasSuffix(outAg2) && !hasSuffix(outAg3) && u2agCalls.length === 0, `n=${u2agCalls.length}`);
+    // Every scenario: busy → saturated assistant update (NO idle yet —
+    // the nudge fires on the tool result, not the tick). Then the
+    // tool-result pass: the spawned successor's verdict is "planner"
+    // (#90) → suffix; the two non-scoped sessions stay "none" → no
+    // suffix. Then the idle: Unit 4 routes the successor as scope=
+    // planner (action: stop → no send), the others as scope= none.
+    await fire(hooksU2ag, "ses_u3_new", [statusEv("ses_u3_new", "busy"), msgUpdated("ses_u3_new", "assistant", { total: 80000 }, MODEL)]);
+    await fire(hooksU2ag, "ses_u2_agnet", [statusEv("ses_u2_agnet", "busy"), msgUpdated("ses_u2_agnet", "assistant", { total: 80000 }, MODEL)]);
+    await fire(hooksU2ag, "ses_u2_agnone", [statusEv("ses_u2_agnone", "busy"), msgUpdated("ses_u2_agnone", "assistant", { total: 80000 }, MODEL)]);
+    const outAg1 = await toolAfter(hooksU2ag, "ses_u3_new");
+    const outAg2 = await toolAfter(hooksU2ag, "ses_u2_agnet");
+    const outAg3 = await toolAfter(hooksU2ag, "ses_u2_agnone");
+    chk("UNIT 2 #90 (re-pin of the #85 spawned-gate pin): the nudge's scope gate — the plugin-spawned successor INHERITS the nudge (verdict planner → suffix, no send); the no-toggle worker / no-toggle no-agent sessions stay suppressed (verdict none), zero promptAsync",
+      hasSuffix(outAg1) && !hasSuffix(outAg2) && !hasSuffix(outAg3) && u2agCalls.length === 0, `n=${u2agCalls.length}`);
    await fire(hooksU2ag, "ses_u3_new", [statusEv("ses_u3_new", "idle")]);
    await fire(hooksU2ag, "ses_u2_agnet", [statusEv("ses_u2_agnet", "idle")]);
    await fire(hooksU2ag, "ses_u2_agnone", [statusEv("ses_u2_agnone", "idle")]);
-   const okAg = await waitUntil(
-     () =>
-       readLines().some((l) => l.includes("scope= none sid=ses_u3_new")) &&
-       readLines().some((l) => l.includes("scope= none sid=ses_u2_agnet")) &&
-       readLines().some((l) => l.includes("scope= none sid=ses_u2_agnone")),
-     12000,
-   );
-   chk("UNIT 2 #85 part 3: unit-4 after the nudge pass — all three scope= none (spawned / no-toggle worker / no-toggle no-agent), no sends, no route/recovery line",
-     okAg && u2agCalls.length === 0 &&
+    const okAg = await waitUntil(
+      () =>
+        readLines().some((l) => l.includes("scope= planner sid=ses_u3_new")) && // #90: the successor is in scope
+        readLines().some((l) => l.includes("route= stop sid=ses_u3_new")) &&
+        readLines().some((l) => l.includes("scope= none sid=ses_u2_agnet")) &&
+        readLines().some((l) => l.includes("scope= none sid=ses_u2_agnone")),
+      12000,
+    );
+    chk("UNIT 2 #90 (re-pin): unit-4 after the nudge pass — the spawned successor is scope= planner (routes to action: stop, no send), the other two stay scope= none; no sends, no route/recovery line for the non-scoped worker",
+      okAg && u2agCalls.length === 0 &&
        !readLines().some((l) => l.includes("sid=ses_u2_agnet") && (l.includes("route=") || l.includes("recovery="))),
      `n=${u2agCalls.length}`);
 
@@ -1251,7 +1273,217 @@ try {
        dmArmed() === 2 && dmInjected() === 0,
      JSON.stringify(p2Dm?.body ?? null));
 
-   // ---- the live log received NO smoke line. The LIVE plugin instance
+    // ============================================================
+    // #90 — spawned-successor inherit + trigger deactivation (the
+    // approved 2026-09-23 proposal, plan11): the old #85 spawned
+    // exclusion is GONE — the `spawned` map is now the LINEAGE-DEPTH
+    // map (a restart/cap-exhaustion spawn stores depth(trigger) + 1;
+    // the depth cap 2 on the spawn branch is the replacement loop
+    // guard), the RESTART prompt's line 1 is the exact own-line toggle
+    // (the successor derives scope "autorun" from that message alone —
+    // restart-safe), a SUCCESSFUL spawn STICKY-deactivates the TRIGGER
+    // (cleared only by a NEW user message with an own-line ON toggle),
+    // and the in-memory state is restored at init from the plugin's
+    // own log (part C — once per process; a no-op here because the
+    // sandbox log is empty at the FIRST factory call).
+    // ============================================================
+    const c90Sends = [];
+    const c90Creates = [];
+    let c90CreateShouldThrow = false;
+    const c90CreateQueue = [];
+    const c90Session = {
+      prompt: function () {},
+      promptAsync: async (args) => { c90Sends.push(args); return { data: { id: "queued" } }; },
+      abort: function () {},
+      list: function () {},
+      get: function () {},
+      message: function () {},
+      messages: async (args) => msgScript.get(args?.path?.id) ?? [],
+      todo: function () {},
+      command: function () {},
+      summarize: function () {},
+      create: async () => {
+        if (c90CreateShouldThrow) throw new Error("create exploded (c90)");
+        c90Creates.push({});
+        return { data: { id: c90CreateQueue.length ? c90CreateQueue.shift() : "ses_90_spawn" } };
+      },
+    };
+    const hooks90 = await factory({ directory: proj, client: { session: c90Session, provider: { list: providerList }, app: { log: () => "log" } } });
+    chk("#90: re-factory with the spying client returns the event hook", typeof hooks90?.event === "function");
+
+    // ---- (i)+(ii): an autorun-scoped NON-planner (worker) trigger
+    // closes with action: restart → the restart branch spawns; the
+    // successor's FIRST user message is restartText() (line 1 = the
+    // exact own-line toggle) → the successor derives scope "autorun"
+    // from that message ALONE (restart-safe — no in-memory state) and
+    // is RECOVERED after an idle without an action line (the #87 stall
+    // case, inverted).
+    msgScript.set("ses_90_worker", mkPairs([["user", MARK + "\nworker task, iteration 1"], ["assistant", "Done. action: restart"]], WORKER_A));
+    await fire(hooks90, "ses_90_worker", [statusEv("ses_90_worker", "busy"), statusEv("ses_90_worker", "idle")]);
+    const ok90a = await waitUntil(
+      () => readLines().some((l) => l.includes("route= restart spawn sid=ses_90_worker")) &&
+             readLines().some((l) => l.includes("deactivate= sid=ses_90_worker")),
+      12000,
+    );
+    // (ii) byte pin: the restart spawn's start prompt — line 1 is the
+    // EXACT own-line toggle, the prose moved to line 2.
+    const wSpawn = c90Sends.find((c) => c.path?.id === "ses_90_spawn" && ((c.body?.parts?.[0]?.text ?? "")).includes("auto-resume unit 4 restart branch"));
+    const wLines = ((wSpawn?.body?.parts?.[0]?.text) ?? "").split(/\r?\n/);
+    chk("#90 (ii): restartText line 1 = the EXACT own-line toggle (byte pin) + the prose on line 2",
+      ok90a && wLines.length >= 2 && wLines[0] === MARK && wLines[1].startsWith("Run autonomously."),
+      JSON.stringify(wLines.slice(0, 2)));
+    chk("#90 (i): an autorun-scoped NON-planner (worker) trigger → restart spawn (route= restart spawn, ONE create, body carries the source's current agent) + trigger deactivation (deactivate= line)",
+      ok90a && c90Creates.length === 1 && c90Sends.length === 1 &&
+        readLines().some((l) => l.includes("scope= autorun sid=ses_90_worker")) &&
+        readLines().some((l) => l.includes("deactivate= sid=ses_90_worker")) &&
+        c90Sends[0]?.path?.id === "ses_90_spawn" && c90Sends[0]?.body?.agent === WORKER_A,
+      `create=${c90Creates.length}`);
+    // the successor's faithful first user message = restartText() (the
+    // spawn body) + the source's current agent (WORKER_A — no
+    // last-assistant agent → the first-user fallback) → the scope
+    // derives from the message ALONE (the in-memory maps are
+    // irrelevant — the restart-safe derivation).
+    msgScript.set("ses_90_spawn", mkPairs([["user", wLines.join("\n")], ["assistant", "Mid-unit, no closing line."]], WORKER_A));
+    await fire(hooks90, "ses_90_spawn", [statusEv("ses_90_spawn", "busy"), statusEv("ses_90_spawn", "idle")]);
+    const ok90b = await waitUntil(() => readLines().some((l) => l.includes("recovery= sid=ses_90_spawn attempt=1")), 12000);
+    chk("#90 (i)+(ii): the restart-spawned successor derives scope autorun from its first user message ALONE (restart-safe) and is RECOVERED after an idle without an action line (the #87 stall case, inverted)",
+      ok90b && readLines().some((l) => l.includes("scope= autorun sid=ses_90_spawn")) &&
+        c90Sends.some((c) => c.path?.id === "ses_90_spawn" && ((c.body?.parts?.[0]?.text ?? "")).includes("agent_readme_post_compaction.md")),
+      `sends=${c90Sends.length}`);
+
+    // ---- (iii): the trigger deactivates after a successful spawn:
+    // the next idle → skip= deactivated (no send, no re-spawn); a ping
+    // WITHOUT a toggle keeps the flag; a ping WITH an own-line ON
+    // toggle clears it → routed again → the successor check yields
+    // skip= successor (no duplicate spawn).
+    const TRIG = "ses_90_trig";
+    msgScript.set(TRIG, mkPairs([["user", MARK + "\niteration 1"], ["assistant", "Done. action: restart"]], PLANNER_A));
+    await fire(hooks90, TRIG, [statusEv(TRIG, "busy"), msgUpdated(TRIG, "assistant", { total: 100 }), statusEv(TRIG, "idle")]);
+    const ok90c = await waitUntil(() => readLines().some((l) => l.includes("deactivate= sid=" + TRIG)), 12000);
+    const trigRoutes = () => readLines().filter((l) => l.includes("sid=" + TRIG) && l.includes("route=")).length;
+    chk("#90 (iii): a successful restart spawn STICKY-deactivates the trigger (deactivate= line, ONE create, route= restart spawn logged)",
+      ok90c && c90Creates.length === 2 && c90Sends.length === 3 &&
+        readLines().some((l) => l.includes("route= restart spawn sid=" + TRIG)),
+      `create=${c90Creates.length} sends=${c90Sends.length}`);
+    // the successor's session.created lands AFTER the trigger's
+    // lastActivityAt (the successor window).
+    await hooks90.event({ event: { type: "session.created", properties: { sessionID: "ses_90_spawn" } } });
+    // the next idle (no new user message) → skip= deactivated (no
+    // send, no re-spawn).
+    await fire(hooks90, TRIG, [statusEv(TRIG, "idle")]);
+    const trigSkip = () => readLines().filter((l) => l.includes("skip= deactivated sid=" + TRIG)).length;
+    const ok90c2 = await waitUntil(() => trigSkip() === 1, 12000);
+    chk("#90 (iii): the deactivated trigger's next idle → skip= deactivated (no send, no re-spawn — the route= line stays the one from the spawn)",
+      ok90c2 && trigSkip() === 1 && trigRoutes() === 1 && c90Sends.length === 3,
+      `skip=${trigSkip()} route=${trigRoutes()}`);
+    // a ping WITHOUT a toggle (a new user message, no own-line marker)
+    // → the flag stays (a plain ping keeps the trigger deactivated).
+    msgScript.set(TRIG, mkPairs([["user", MARK + "\niteration 1"], ["assistant", "Done. action: restart"], ["user", "plain ping, no toggle"]], PLANNER_A));
+    await fire(hooks90, TRIG, [statusEv(TRIG, "busy"), statusEv(TRIG, "idle")]);
+    const ok90c3 = await waitUntil(() => trigSkip() === 2, 12000);
+    chk("#90 (iii): a ping WITHOUT a toggle stays deactivated (a second skip= deactivated, no send)",
+      ok90c3 && trigSkip() === 2 && c90Sends.length === 3, `skip=${trigSkip()}`);
+    // a ping WITH an own-line ON toggle → the flag clears → routed
+    // again → the successor check yields skip= successor.
+    msgScript.set(TRIG, mkPairs([["user", MARK + "\niteration 1"], ["assistant", "Done. action: restart"], ["user", "plain ping, no toggle"], ["user", MARK]], PLANNER_A));
+    await fire(hooks90, TRIG, [statusEv(TRIG, "busy"), statusEv(TRIG, "idle")]);
+    const ok90c4 = await waitUntil(() => readLines().some((l) => l.includes("skip= successor sid=ses_90_spawn")), 12000);
+    chk("#90 (iii): a ping WITH an own-line ON toggle clears the flag → routed again → the successor check yields skip= successor (no duplicate spawn)",
+      ok90c4 && c90Creates.length === 2 && c90Sends.length === 3,
+      `create=${c90Creates.length} sends=${c90Sends.length}`);
+
+    // ---- (iv) the LINEAGE-DEPTH cap: a depth-0 user session spawns
+    // its depth-1 successor; the depth-1 successor spawns its depth-2
+    // successor; the depth-2 session at cap exhaustion is REFUSED
+    // (skip= depth — no spawn; the chain stalls visibly). The
+    // cap-exhaustion cadence is the #80 pattern: busy→idle ×3 → two
+    // CONTINUEs, then the restart/cap-exhaustion branch.
+    const T0 = "ses_90_t0";
+    msgScript.set(T0, mkPairs([["user", MARK + "\nt0 task"], ["assistant", "Mid-unit, no closing line."]], WORKER_A));
+    c90CreateQueue.push("ses_90_d1", "ses_90_d2");
+    // cadence: await BETWEEN each cycle (the #80 pattern) — a busy
+    // fired before the previous cycle's tick ran would look REAL (no
+    // pending injection yet) and reset the cap instead of consuming
+    // the injection.
+    const t0Cont = (n) => readLines().some((l) => l.includes(`recovery= sid=${T0} attempt=${n}`));
+    await fire(hooks90, T0, [statusEv(T0, "busy"), statusEv(T0, "idle")]);
+    const ok90d1a = await waitUntil(() => t0Cont(1), 12000);
+    await fire(hooks90, T0, [statusEv(T0, "busy"), statusEv(T0, "idle")]);
+    const ok90d1 = await waitUntil(() => t0Cont(2), 12000);
+    await fire(hooks90, T0, [statusEv(T0, "busy"), statusEv(T0, "idle")]);
+    const ok90d2 = await waitUntil(() => readLines().some((l) => l.includes("route= restart spawn sid=" + T0)), 12000);
+    chk("#90 (iv): a depth-0 session at cap exhaustion spawns its depth-1 successor (route= restart spawn, create)",
+      ok90d1a && ok90d1 && ok90d2 && c90Creates.length === 3, `create=${c90Creates.length}`);
+    const D1 = "ses_90_d1";
+    msgScript.set(D1, mkPairs([["user", wLines.join("\n")], ["assistant", "Mid-unit, no closing line."]], WORKER_A));
+    const d1Cont = (n) => readLines().some((l) => l.includes(`recovery= sid=${D1} attempt=${n}`));
+    await fire(hooks90, D1, [statusEv(D1, "busy"), statusEv(D1, "idle")]);
+    const ok90d3a = await waitUntil(() => d1Cont(1), 12000);
+    await fire(hooks90, D1, [statusEv(D1, "busy"), statusEv(D1, "idle")]);
+    const ok90d3 = await waitUntil(() => d1Cont(2), 12000);
+    await fire(hooks90, D1, [statusEv(D1, "busy"), statusEv(D1, "idle")]);
+    const ok90d4 = await waitUntil(() => readLines().some((l) => l.includes("route= restart spawn sid=" + D1)), 12000);
+    chk("#90 (iv): a depth-1 session at cap exhaustion spawns its depth-2 successor (route= restart spawn, create)",
+      ok90d3a && ok90d3 && ok90d4 && c90Creates.length === 4, `create=${c90Creates.length}`);
+    const D2 = "ses_90_d2";
+    msgScript.set(D2, mkPairs([["user", wLines.join("\n")], ["assistant", "Mid-unit, no closing line."]], WORKER_A));
+    const d2Cont = (n) => readLines().some((l) => l.includes(`recovery= sid=${D2} attempt=${n}`));
+    await fire(hooks90, D2, [statusEv(D2, "busy"), statusEv(D2, "idle")]);
+    const ok90d5a = await waitUntil(() => d2Cont(1), 12000);
+    await fire(hooks90, D2, [statusEv(D2, "busy"), statusEv(D2, "idle")]);
+    const ok90d5 = await waitUntil(() => d2Cont(2), 12000);
+    const cBeforeD2 = c90Creates.length;
+    await fire(hooks90, D2, [statusEv(D2, "busy"), statusEv(D2, "idle")]);
+    const ok90d6 = await waitUntil(() => readLines().some((l) => l.includes("skip= depth sid=" + D2) && l.includes("depth=2")), 12000);
+    chk("#90 (iv): the depth-2 session at cap exhaustion is REFUSED (skip= depth, no spawn — the lineage chain stalls visibly)",
+      ok90d5a && ok90d5 && ok90d6 && c90Creates.length === cBeforeD2, `create=${c90Creates.length}`);
+
+    // ---- (v): a FAILED spawn (create throws) → NO deactivation of
+    // the trigger — the trigger is still routed normally on the next
+    // idle (its last assistant flips to action: stop → route= stop).
+    const FAIL = "ses_90_fail";
+    msgScript.set(FAIL, mkPairs([["user", MARK + "\nfail task"], ["assistant", "Done. action: restart"]], PLANNER_A));
+    c90CreateShouldThrow = true;
+    await fire(hooks90, FAIL, [statusEv(FAIL, "busy"), statusEv(FAIL, "idle")]);
+    const ok90e = await waitUntil(
+      () => readLines().some((l) => l.includes("route= restart spawn sid=" + FAIL)) &&
+             readLines().some((l) => l.includes("spawn-fail= create:") && l.includes("create exploded (c90)")),
+      12000,
+    );
+    chk("#90 (v): a failed spawn (create throws) → route= restart spawn + spawn-fail=, NO deactivation of the trigger (no deactivate= line)",
+      ok90e && c90Creates.length === 4 && !readLines().some((l) => l.includes("deactivate= sid=" + FAIL)),
+      `create=${c90Creates.length}`);
+    c90CreateShouldThrow = false;
+    msgScript.set(FAIL, mkPairs([["user", MARK + "\nfail task"], ["assistant", "Done. action: stop"]], PLANNER_A));
+    await fire(hooks90, FAIL, [statusEv(FAIL, "busy"), statusEv(FAIL, "idle")]);
+    const ok90e2 = await waitUntil(() => readLines().some((l) => l.includes("route= stop sid=" + FAIL)), 12000);
+    chk("#90 (v): the non-deactivated trigger routes normally on the next idle (route= stop — the failed spawn changed nothing)",
+      ok90e2 && !readLines().some((l) => l.includes("skip= deactivated sid=" + FAIL)), "");
+
+    // ---- (vii): the file-trigger path is UNCHANGED (no source session
+    // → no lineage parent: the successor is absent from the `spawned`
+    // map → depth 0) and a content ON toggle is RESPECTED (the
+    // successor's scope derives from the trigger content alone).
+    // Simulated: a fresh (never plugin-spawned) session whose first
+    // user message is a file-trigger content carrying an own-line ON
+    // toggle and NO agent field (a file-trigger spawn body carries no
+    // agent/model).
+    const FILE = "ses_90_file";
+    msgScript.set(FILE, [
+      { info: { role: "user" }, parts: [{ type: "text", text: MARK + "\nfile trigger content" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "Mid-unit, no closing line." }] },
+    ]);
+    await fire(hooks90, FILE, [statusEv(FILE, "busy"), statusEv(FILE, "idle")]);
+    const ok90f = await waitUntil(
+      () => readLines().some((l) => l.includes("scope= autorun sid=" + FILE)) &&
+             readLines().some((l) => l.includes(`recovery= sid=${FILE} attempt=1`)),
+      12000,
+    );
+    chk("#90 (vii): the file-trigger path is unchanged — no lineage parent (depth 0), the content ON toggle is respected (scope= autorun + CONTINUE)",
+      ok90f && c90Sends.some((c) => c.path?.id === FILE && ((c.body?.parts?.[0]?.text ?? "")).includes("agent_readme_post_compaction.md")),
+      `sends=${c90Sends.length}`);
+
+    // ---- the live log received NO smoke line. The LIVE plugin instance
   // (this host) keeps appending ITS OWN live-session lines in real time
   // while the smoke runs, so the live size may legitimately grow — the
   // invariant is that no SMOKE session line ever lands in it (the
@@ -1266,7 +1498,7 @@ try {
   } else if (liveBefore === null && liveSizeNow > 0) {
     appended = fs.readFileSync(LIVE_LOG, "utf-8"); // did not exist before — all new
   }
-  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_wrap", "ses_u4_throw", "ses_u4_spawn", "ses_u4_cap", "ses_u2_agnet", "ses_u2_agnone", "ses_u4_worker", "ses_u4_worker_on", "ses_u4_pb", "ses_u4_lastoff", "ses_u4_mid", "ses_p2_cur", "ses_p2_rs", "ses_p2_fb", "ses_p2_dm", "ses_p2_spawn", "ses_u2_hi98", "ses_u2_two", "ses_u2_direct", "ses_u2_stale", "ses_u2_cfa_low", "ses_u2_cfa_hi", "ses_u2_cfb_edit", "ses_u2_cfb_fire", "ses_u2_cfb_no", "ses_u2_cfc_fire", "ses_u2_cfc_no", "ses_u2_cfd_low", "ses_u2_cfd_hi", "ses_p3_pldirect"];
+  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_wrap", "ses_u4_throw", "ses_u4_spawn", "ses_u4_cap", "ses_u2_agnet", "ses_u2_agnone", "ses_u4_worker", "ses_u4_worker_on", "ses_u4_pb", "ses_u4_lastoff", "ses_u4_mid", "ses_p2_cur", "ses_p2_rs", "ses_p2_fb", "ses_p2_dm", "ses_p2_spawn", "ses_u2_hi98", "ses_u2_two", "ses_u2_direct", "ses_u2_stale", "ses_u2_cfa_low", "ses_u2_cfa_hi", "ses_u2_cfb_edit", "ses_u2_cfb_fire", "ses_u2_cfb_no", "ses_u2_cfc_fire", "ses_u2_cfc_no", "ses_u2_cfd_low", "ses_u2_cfd_hi", "ses_p3_pldirect", "ses_90_worker", "ses_90_spawn", "ses_90_trig", "ses_90_t0", "ses_90_d1", "ses_90_d2", "ses_90_fail", "ses_90_file"];
   chk("LIVE .opencode/temp/auto_resume.log received no smoke line (sandbox got every smoke line)",
     liveBefore === liveSizeNow || !smokeSids.some((s) => appended.includes(s)), `before=${liveBefore} after=${liveSizeNow}`);
   chk("sandbox log path is under the sandbox", sandboxLog.startsWith(base), sandboxLog);

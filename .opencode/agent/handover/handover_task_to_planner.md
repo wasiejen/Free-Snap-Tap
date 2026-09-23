@@ -1,97 +1,75 @@
-# HANDOVER — worker-16 `worker_Q3S_170K` (plan9 unit B: TODO.md shrink curation)
+# Handover — plan11 / #90 implementation (spawned-successor inherit + trigger deactivation)
 
-Executed the planner's review in `todo_inbox.md` entry 2026-09-23_02-51
-(findings 1–6) on the `opencode_test` checkout (verified, not switched).
-No code changes — no gates. Commit: `TODO.md` + `todo_records.md` +
-`todo_inbox.md` + this file (named paths only; live maintainer files
-untouched — `git status` verified before staging: `knowledge_inbox.md`,
-`opencode.jsonc`, `repo_map.md` were live-edited mid-run and NOT staged).
+Worker: `worker_Q3S_170K`, 2026-09-23. Branch `opencode_test`.
+Task spec: `.opencode/agent/handover/handover_task.md`. Design source:
+`.opencode/proposals/approved/2026-09-23_spawned-successor-inherit-deactivate.md`.
 
-## What changed
-1. **Header numbering note:** "used so far up to #84, new entries start at
-   #85" → "up to #89, new entries start at #90".
-2. **Closed-entry condensation (12 entries)** — for each, the FULL entry
-   text was verified absent from `todo_records.md` (scripted greps) →
-   appended there FIRST (append-only), then condensed to its one-line
-   title in `TODO.md`: **#51, #65, #54, #55, #57, #58, #59, #60, #61, #63,
-   #84, #89**. All other closed entries were already one-line records
-   (or carried a live `todo_records.md` pointer) — nothing else condensed.
-   Stale finding: **#65's** title pointer "see todo_records.md for the
-   full entry if needed" pointed at nothing — the append made it true.
-3. **Status-marker alignment (review finding 3):**
-   - **#66** title "CLOSED 2026-09-16 direct session; verdict LIVE" →
-     "open — PENDING RESTART, 2026-09-16 direct session" — the status line
-     (PENDING RESTART) is the live state; the body records no verdict
-     (no `intercept.log`, no verdict line).
-   - **#79** title gains "LANDED 2026-09-22, live acceptance pending".
-   - **#80** title gains "fix LANDED 2026-09-22 + plugin reactivated, live
-     acceptance (b) verified, close pending maintainer confirm".
-   - **#81** title gains "re-pin LANDED 2026-09-22 (af38e2f), gate green" —
-     STAYS open as a maintainer call (per spec, not closed).
-   - **#82** title gains "scope-toggle LANDED 2026-09-22 via #85 part 1;
-     live acceptance + unit-2 suppression question pending".
-   - **#85** title marker gains "live verification PENDING post-restart" —
-     was already largely aligned (stale finding noted in the curation block).
-   Status lines themselves already agreed with the body — only titles changed.
-4. **#74:** the single ~4k-char line split into the contract fields (title /
-   **Problem / evidence** / **Outcome** / **Acceptance** / **Suggested
-   scope** / **Status**) and moved from "FST behavior decisions" to
-   "Plugin & gauge" (it is an opencode host-side tool issue). Content
-   verbatim — only field breaks inserted.
-5. **#75:** the ~90-line running changelog collapsed to per-unit status
-   pointers (one line per unit + the numbering NOTE); the full unit
-   history (89 lines) appended to `todo_records.md` first.
-6. **`todo_inbox.md`:** planner-curation block appended
-   (2026-09-23, planner-9, plan9) recording the review as executed, finding
-   by finding. Existing inbox entries untouched (append-only).
-7. **Mechanical moves done by a node line-index script** (bit-exact moves,
-   no re-typed file content); judgment edits (titles, #74 field breaks, #75
-   pointer text, curation block) done via the edit tool.
+## Executive summary
+Implemented the approved proposal's Parts A+B+C in
+`.opencode/plugin/auto_resume.ts` and re-pinned
+`.opencode/plugin/tests/auto_resume.smoke.mjs`:
+- **Part A** — the `spawned` self-mark EXCLUSION is removed from `scopeVerdict`
+  (now a 1-arg function of the messages only). The `spawned` map is repurposed as
+  the LINEAGE-DEPTH map (`sid → depth`). `restartText()` LINE 1 is now the exact
+  own-line `<|autonom|>` (prose moved to line 2), so EVERY restart-spawned
+  successor derives scope "autorun" from its first user message ALONE
+  (restart-safe — no in-memory state). A LINEAGE-DEPTH CAP (N=2) on the
+  restart/cap-exhaustion spawn branch replaces the #85 exclusion's loop guard
+  (`skip= depth sid=` at depth ≥ 2); a file-trigger spawn stays depth 0.
+- **Part B** — `spawnPlanner` RETURNS the new sid (null on every failure path;
+  the `spawn-fail=` lines are unchanged). A SUCCESSFUL spawn STICKY-deactivates
+  the TRIGGER (`deactivate= sid=` line; a failed spawn changes nothing) and
+  `routeScopedIdle` skips the deactivated trigger right after the scope
+  recompute (`skip= deactivated sid=` — no send, no re-spawn; the session stays
+  manually usable). The flag records the trigger's user-message count at
+  deactivation and clears ONLY on a NEW user message carrying an own-line ON
+  toggle.
+- **Part C** — at init (the factory call) the plugin RESTORES the in-memory
+  depth map + deactivation flags from its own `auto_resume.log`: each
+  `route= restart spawn sid=X` line paired with the following `spawn= sid=Y`
+  → deactivated(X) + depth(Y)=depth(X)+1; an unpaired `spawn=` → depth 0; run
+  ONCE per process (best-effort, no log / unreadable → nothing restored).
 
-## Measured verification
-- **Line counts (wc -l):** `TODO.md` 1132 → 811 (−221); `todo_records.md`
-  877 → 1240 (+363); `todo_inbox.md` 134 → 145.
-- **Machine ID check (scripted, not counted by eye):** 67 entry IDs present
-  in `TODO.md`, ZERO duplicates, none above 89. The 22 IDs absent from
-  `TODO.md` are EXACTLY the documented reserved set in the "Closed
-  entries" header (2, 5, 10, 12–16, 18–29, 31, 32 — moved to
-  `todo_records.md` on 2026-09-10, pre-existing, untouched by this run);
-  all 22 verified present in `todo_records.md`. Union = 89 distinct IDs,
-  no reuse, no renumbering.
-- **Net-open set as it stands:** #56 (deferred), #66 (open — PENDING
-  RESTART), #67, #70 follow-ons, #74, #75 (units 1–4 LANDED; live
-  acceptance pending for units 2+4), #78, #79 (LANDED, live acceptance
-  pending), #80 (LANDED, close pending maintainer confirm), #81 (LANDED,
-  maintainer call), #82 (scope-toggle LANDED, live acceptance pending),
-  #83 (backstop, maintainer call), #85 (all parts LANDED, live
-  verification pending, maintainer call), #86 (deferred), #87 (open,
-  maintainer call).
-- **Stale/ambiguous findings (left untouched, flagged in the curation
-  block):** #68, #69, #71, #73 — their STATUS lines say CLOSED/LANDED but
-  their TITLE lines carry no closed/landed/superseded marker, so the
-  curation rule ("only condense on a title-line marker; when in doubt →
-  leave open") was applied and they stay for the planner's next call.
-  Note: the review's "roughly half" estimate assumed ~40 full-text closed
-  entries — most were already one-line records at run time, so the
-  achievable cut was the 12 full bodies + the #75 changelog (1132 → 811).
+## Measured verification (standard gate, run ONCE)
+- **Probe** `.opencode/plugin/probes/handover_probe.mjs`: `PROBE handover:
+  241/241 PASS` (matches the 241/241 baseline — no probe expectation shifted,
+  so no probe pins updated).
+- **ALL 10 smokes** in `.opencode/plugin/tests/`: auto_resume **118/118** (was
+  102/102 — the old #85 spawned-exclusion pins re-pinned to the new behavior +
+  the proposal's acceptance pins 1-7 added), block_transfer.sandbox 52/52,
+  block_transfer 22/22, compact_memory 57/57, context_recovery ALL PASS,
+  ctx_gauge 3/3, gauge_core ALL PASS, intercept_observer 39/39, loop_log 24/24,
+  submit 20/20.
+- **pytest** `./.venv/Scripts/python.exe -m pytest -q`: **459 passed, 1 warning**
+  (the known #10 coroutine warning — matches baseline).
+- **ruff** `./.venv/Scripts/ruff.exe check --select F .`: **All checks passed**
+  (F=0).
 
-## Commit
-`TODO.md` + `todo_records.md` + `todo_inbox.md` + this handover file, one
-commit on `opencode_test`. Commit hash: recorded by the planner in the
-follow-up bookkeeping commit (per the #80/#84 precedent).
+## TODO entries (same commit)
+- `TODO.md` #90 → **LANDED** (dense entry; the commit hash is recorded by the
+  planner in its follow-up bookkeeping commit — NOT written here).
+- `TODO.md` #87 → **closed** one-liner (subsumed by #90); its FULL entry text
+  appended to `todo_records.md` FIRST (new dated group heading, plan11 worker),
+  with a `**Closed:**` note explaining the Part A resolution.
 
-## Deliberately NOT done
-- No renumbering / ID reuse; no content deletion of any open entry
-  (net-open set preserved verbatim — only status/marker lines, the #74
-  restructure, and the #75 collapse touched them).
-- #68/#69/#71/#73 left with full bodies (title-marker rule above).
-- The "Maintainer calls (open, in order)" section item 1 ("none open as of
-  2026-09-15") is stale but out of this task's scope — not touched.
-- No code, no gates, no branch switch; `.opencode/maintainer/**`,
-  `opencode.jsonc`, `ideas.md`, `knowledge_inbox.md`, `repo_opencode.md`,
-  `repo_map.md` and the gitignored archive dumps never staged.
+## Commit subject (this commit)
+`auto_resume #90 LANDED: spawned successors inherit Autorun state + trigger deactivates (Parts A+B+C)`
 
-Lessons: for long-line TODO curation the read tool truncates >2000-char
-lines (#74 was only fully visible via unbounded `rg` output) and a
-node line-index script is the drift-safe way to move/condense multi-line
-blocks — large oldString edits on dense text are the risk.
+## Deliberately not done
+- The file-trigger spawn path is UNCHANGED (no source session → no lineage
+  parent → depth 0; a content own-line toggle is still respected) — per
+  proposal §Part A.4 and the DO-NOT-touch list.
+- No removals of deactivated/commented-out alternative implementations.
+- No behavior change beyond the proposal.
+- Did NOT touch the DO-NOT-touch set: `compact_memory.ts`, the gauge plugin,
+  `.opencode/maintainer/**`, `opencode.jsonc`, the proposal file,
+  `.opencode/agent/prompts/**`.
+- Excluded from this commit the files modified by other concurrent roles
+  (`.opencode/maintainer/ideas/ideas.md`, `.opencode/maintainer/my_todos.md`,
+  `.opencode/maintainer/inbox_planner/2026-09-23_15-46.md`,
+  `.opencode/agent/agent_feedback.md`,
+  `.opencode/loop/autorun-2026-09-21_15-33/loop_log.md`) — they are not part of
+  this task.
+- LIVE acceptance is pending the next host restart (the running host is
+  pre-#90): the post-restart planner verifies the successor in-scope + the
+  trigger untouched from `auto_resume.log` (proposal §Acceptance, live item).

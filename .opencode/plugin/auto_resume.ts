@@ -97,12 +97,14 @@
 //   fire-time resolution — the Unit 4 successor spawn passes the
 //   closing session's fresh fetch; a file-trigger spawn has no source
 //   session → NO `agent`/`model` field — the host default applies).
-//   Success → the new sid is self-marked in a module-level `spawned`
-//   map (sid → epoch — the #85 part-1 EXCLUSION mark: Unit 4 never
-//   scopes a self-spawned session) + a `spawn=` line. Every failure is
-//   a `spawn-fail=` line; the helper NEVER throws outward. The module
-//   stays DEFAULT-ONLY exported (a named export breaks the smoke
-//   check).
+//   Success → the helper RETURNS the new sid (string) — the CALLER
+//   (the Unit 4 restart/cap-exhaustion branch) records the successor's
+//   lineage depth in the module-level `spawned` map (sid → depth — #90
+//   part A: repurposed from the old #85 part-1 EXCLUSION epoch mark) and
+//   STICKY-deactivates the trigger (a failed spawn changes nothing) —
+//   plus a `spawn=` line. Every failure is a `spawn-fail=` line (the
+//   helper RETURNS null); it NEVER throws outward. The module stays
+//   DEFAULT-ONLY exported (a named export breaks the smoke check).
 //
 // UNIT 4 (the liveness watchdog — who watches the top-level session):
 // an in-scope session going idle (or session.error) is routed on the
@@ -124,9 +126,12 @@
 // reachable source) — is a PLANNER agent (agent ids follow
 // `planner_<model>`; the prefix survives model-generation renames).
 // The planner-only gate is DROPPED — ANY agent type (prompt_builder, a
-// future researcher, ...) runs in a loop when toggled. Self-spawned
-// sids (the Unit 3 `spawned` self-mark) are NEVER scoped — the #85
-// loop: a freshly-spawned successor must not be re-triggered. The verdict is cached per watch
+// future researcher, ...) runs in a loop when toggled. #90 part A: the
+// old #85 part-1 self-spawned exclusion is REMOVED — a plugin-spawned
+// successor is tracked + inherits the trigger's state (its first user
+// message is the RESTART prompt, line 1 = the exact own-line toggle);
+// the loop guard moves to the LINEAGE-DEPTH cap on the spawn branch.
+// The verdict is cached per watch
 // as scope: "planner" | "autorun" | "none" | "unknown" (unknown until
 // the first settled fetch; fail-safe = no action); NON-SCOPED sessions
 // are NEVER acted on. ROUTING on the LAST
@@ -144,9 +149,17 @@
 // retry loop. restart, or cap exhausted with still no line →
 // SUCCESSOR CHECK (a
 // DIFFERENT sid tracked in a session.created event since the closed
-// session's lastActivityAt → `skip= successor`) else spawnPlanner with
-// the RESTART prompt + `route= restart spawn` line. session.created
-// events are tracked (sid → epoch) for that check. OVERLAP-ERA CAVEAT
+// session's lastActivityAt → `skip= successor`) else the
+// LINEAGE-DEPTH CAP (#90 part A: a session at depth >= 2 does not
+// spawn → `skip= depth sid=` line) else spawnPlanner with the RESTART
+// prompt + `route= restart spawn` line. A SUCCESSFUL spawn records the
+// successor's lineage depth (trigger depth + 1) and STICKY-deactivates
+// the TRIGGER (part B: `deactivate= sid=` line — the trigger is never
+// re-routed/re-spawned from again; the flag clears ONLY on a NEW user
+// message carrying an own-line ON toggle → `skip= deactivated sid=`).
+// session.created events are tracked (sid → epoch) for the successor
+// check; the in-memory depth map + deactivation flags are restored at
+// init from the plugin's own log (part C, ONCE per host process). OVERLAP-ERA CAVEAT
 // (documented, not solved): the looprunner ALSO reacts to
 // `action: restart` — the successor check + the 5s tick grace window
 // mitigate a double-spawn; the residual race is accepted until the
@@ -223,18 +236,27 @@ const MAX_ATTEMPTS_PER_BUSY_CYCLE = 1;
 
 // Unit 4 constants: the looprunner's launch marker (carried in the
 // RESTART start prompt below — a self-spawned successor's first user
-// message; it is NOT an own-line toggle, so it never flips scope), the
-// #82 OWN-LINE TOGGLE markers (ON counts BOTH spellings, case-
-// insensitive — a marker counts ONLY as the whole line, trim-exact;
-// mid-sentence or bullet-prefixed lines never toggle; OFF is
-// `<|Direct|>`), the recovery budget (at most two queued CONTINUE
-// prompts per idle cycle — a fresh busy cycle resets it), and the
-// action-line vocabulary (AGENTS.md §Interaction-contract state
-// machine; the LAST match wins).
+// message; #90 part A: it now sits on its OWN LINE there — the #82
+// own-line rule COUNTS it, so EVERY restart-spawned successor derives
+// scope "autorun" from that message alone — restart-safe), the #82
+// OWN-LINE TOGGLE markers (ON counts BOTH spellings, case-insensitive —
+// a marker counts ONLY as the whole line, trim-exact; mid-sentence or
+// bullet-prefixed lines never toggle; OFF is `<|Direct|>`), the
+// recovery budget (at most two queued CONTINUE prompts per idle cycle —
+// a fresh busy cycle resets it), and the action-line vocabulary
+// (AGENTS.md §Interaction-contract state machine; the LAST match wins).
 const AUTONOM_MARKER = "<|autonom|>";
 const TOGGLE_ON_MARKERS: ReadonlyArray<string> = ["<|autonom|>", "<|autorun|>"];
 const TOGGLE_OFF_MARKER = "<|direct|>";
 const MAX_RECOVERY_ATTEMPTS = 2;
+// #90 part A: the LINEAGE-DEPTH cap (the replacement of the #85
+// part-1 exclusion's loop-prevention role): a session at depth >= N
+// does NOT spawn its successor — N = 2: original → successor → last;
+// a chain of cap-exhausted empty sessions stops at the 3rd generation
+// and stalls visibly for the maintainer. A session never
+// plugin-spawned (a user session, a file-trigger spawn) is absent from
+// the `spawned` map → depth 0.
+const LINEAGE_MAX_DEPTH = 2;
 const ACTION_RE = /action:\s*(restart|resume|stop|ask_maintainer)/g;
 
 let logDir = "";
@@ -275,18 +297,31 @@ interface Watch {
   // cap-exhaustion fallback spawn are skipped (`skip= dead` line);
   // cleared on a fresh busy (the same reset axis as recoveryCount).
   deadMarked: boolean;
+  // #90 part B: the STICKY trigger deactivation — a SUCCESSFUL
+  // restart/cap-exhaustion spawn hands the session off to its
+  // successor: the deactivated trigger is never re-routed or re-spawned
+  // from (`skip= deactivated` line — no send, no route=); the flag
+  // clears ONLY when a NEW user message (count > deactivatedUserCount)
+  // carries an own-line ON toggle (explicit maintainer re-engage). A
+  // FAILED spawn changes nothing. Restored at init from the plugin's
+  // own log (part C — the user count is unknown there → 0).
+  deactivated: boolean;
+  deactivatedUserCount: number;
 }
 const watches = new Map<string, Watch>();
 const sending = new Set<string>();
 const limitsCache = new Map<string, { context: number; output: number }>();
 let tickTimer: ReturnType<typeof setInterval> | null = null;
 
-// Unit 3 module-level state: the spawned self-mark (sid -> epoch — the
-// #85 part-1 EXCLUSION: Unit 4 never scopes a self-spawned session — a
-// freshly-spawned successor must not be re-triggered; a spawn is never
-// confused with a user session either) and the in-flight latch (no
-// double-spawn while one spawn attempt is running; held until the
-// trigger file is consumed).
+// Unit 3 module-level state: the LINEAGE-DEPTH map (sid -> depth — #90
+// part A repurposes the old #85 part-1 EXCLUSION self-mark: a
+// restart/cap-exhaustion spawn stores depth(trigger) + 1 on its
+// successor at the spawn branch; a session never plugin-spawned — a
+// user session, a file-trigger spawn — is ABSENT → depth 0; the depth
+// cap on the spawn branch is the replacement loop guard; part C
+// restores the map + the deactivation flags from the plugin's own log
+// at init) and the in-flight latch (no double-spawn while one spawn
+// attempt is running; held until the trigger file is consumed).
 const spawned = new Map<string, number>();
 let spawnInFlight = false;
 
@@ -352,6 +387,7 @@ function getWatch(sid: string): Watch {
     w = {
       lastTokenTotal: 0, model: null, attempts: 0, lastActivityAt: null, armed: false, status: "",
       scope: "unknown", recoveryCount: 0, idlePending: false, deadMarked: false,
+      deactivated: false, deactivatedUserCount: 0,
     };
     watches.set(sid, w);
   }
@@ -545,7 +581,7 @@ async function onToolAfterNudge(
     // Direct suppression (c) needs the CURRENT verdict — last-toggle-
     // wins can flip with a new user message mid-turn).
     const msgs = await fetchMsgs(sid);
-    const verdict = scopeVerdict(sid, msgs);
+    const verdict = scopeVerdict(msgs);
     if (verdict === "none") return; // (c) Direct / non-scoped: suppressed
     if (verdict !== w.scope) {
       w.scope = verdict;
@@ -611,8 +647,14 @@ function spawnTitleFor(): string | null {
 // cap-exhausted branch — the successor keeps the agent+model that ran
 // the closing session); a file-trigger spawn passes none → NO
 // `agent`/`model` field (the host default applies). Never throws
-// outward; every failure is a `spawn-fail=` line.
-async function spawnPlanner(startPrompt: string, sourceMsgs?: unknown) {
+// outward; every failure is a `spawn-fail=` line + a NULL return.
+// #90 part B: RETURNS the new sid (string) or null — the Unit 4
+// restart/cap-exhaustion branch records the successor's lineage depth
+// (part A) and STICKY-deactivates the trigger (part B) ON A SUCCESSFUL
+// SPAWN; a failed spawn changes nothing (current semantics). The
+// file-trigger path stays unchanged (no source session, no depth set —
+// the successor is absent from the `spawned` map → depth 0).
+async function spawnPlanner(startPrompt: string, sourceMsgs?: unknown): Promise<string | null> {
   const sess = (client as {
     session?: {
       create?: (options?: unknown) => Promise<unknown>;
@@ -621,7 +663,7 @@ async function spawnPlanner(startPrompt: string, sourceMsgs?: unknown) {
   } | null)?.session;
   if (!sess || typeof sess.create !== "function") {
     log("spawn-fail= create missing");
-    return;
+    return null;
   }
   // plan9 unit A: the autorun-identifiable title (null → the spawn is
   // exactly as before, no body).
@@ -640,15 +682,15 @@ async function spawnPlanner(startPrompt: string, sourceMsgs?: unknown) {
     newSid = d?.id ?? (res as { id?: unknown } | null)?.id;
   } catch (e) {
     log(`spawn-fail= create: ${(e as { message?: string } | null)?.message ?? "unknown"}`);
-    return;
+    return null;
   }
   if (typeof newSid !== "string" || newSid === "") {
     log("spawn-fail= create no id");
-    return;
+    return null;
   }
   if (typeof sess.promptAsync !== "function") {
     log("spawn-fail= promptAsync missing");
-    return;
+    return null;
   }
   const ident = resolveInjectIdentity(sourceMsgs);
   const body: Record<string, unknown> = { parts: [{ type: "text", text: startPrompt }] };
@@ -658,15 +700,15 @@ async function spawnPlanner(startPrompt: string, sourceMsgs?: unknown) {
     await sess.promptAsync({ path: { id: newSid }, body });
   } catch (e) {
     log(`spawn-fail= promptAsync: ${(e as { message?: string } | null)?.message ?? "unknown"}`);
-    return;
+    return null;
   }
-  spawned.set(newSid, Date.now()); // the self-mark (Unit 4)
   const identBits: string[] = [];
   if (ident.agent) identBits.push(`agent=${ident.agent}`);
   if (ident.model) identBits.push(`model=${ident.model.providerID}/${ident.model.modelID}`);
   // plan9 unit A: the identifier bit (present only when resolved).
   if (identName) identBits.push(`ident=${identName}`);
   log(`spawn= sid=${newSid}${identBits.length ? " " + identBits.join(" ") : ""}`);
+  return newSid; // #90 part B: the caller sets depth + deactivation on success
 }
 
 // Unit 3: rename the trigger file to its consumed name; best-effort —
@@ -732,10 +774,24 @@ function continueText(sid: string): string {
 // Unit 4: the RESTART start prompt for the spawnPlanner call (the
 // restart branch / cap-exhausted branch): carries the looprunner
 // launch marker + the iteration-counter rule + the rebuild-from-
-// committed-state directive.
+// committed-state directive. #90 part A: LINE 1 is the EXACT OWN-LINE
+// toggle (`<|autonom|>` alone — the #82 own-line rule counts it, the
+// prose moved to line 2): EVERY restart-spawned successor derives
+// scope "autorun" from its first user message ALONE via the existing
+// last-toggle-wins scan — RESTART-SAFE (no in-memory state needed:
+// after a host restart the same scan over the same message gives the
+// same verdict). The trigger's current agent+model already rides the
+// spawn body (#85 part 2). A Direct (OFF) trigger can never reach the
+// restart branch (scope "none" is never routed) — no OFF marker needed.
+// A scope=planner trigger (no own-line toggle) thus "transmits" its
+// state as autorun-scoped: behaviorally identical today (routeScoped-
+// Idle treats "planner" and "autorun" alike), and the loop
+// self-perpetuates (the successor's own restart spawn carries the same
+// text).
 function restartText(): string {
   return (
-    `<|autonom|> Run autonomously. (auto-resume unit 4 restart branch: the previous planner closed with ` +
+    `<|autonom|>\n` +
+    `Run autonomously. (auto-resume unit 4 restart branch: the previous planner closed with ` +
     "`action: restart`.) Your iteration number = the largest `planner-N` in the current loop folder's `loop_log.md` " +
     "plus one (verify from the log; the counter-mismatch rule applies). Rebuild reality from committed state " +
     "(git log, NAP, TODO.md) and continue per your planner prompt's autonomous mode."
@@ -788,6 +844,40 @@ function lastToggle(msgs: unknown): "on" | "off" | null {
   return last;
 }
 
+// #90 part B: the LAST user message's own-line toggle (the
+// deactivation clear check): a NEW user message clears the flag ONLY
+// when it ITSELF carries an own-line ON toggle — the whole-history
+// scan (lastToggle) would wrongly credit the trigger's
+// pre-deactivation toggle to a plain ping (the trigger was
+// autorun-scoped, so its history always scans "on").
+function lastUserToggle(msgs: unknown): "on" | "off" | null {
+  let last: MsgPair | null = null;
+  for (const pair of msgPairs(msgs)) {
+    if (pair.info && pair.info.role === "user") last = pair;
+  }
+  if (!last) return null;
+  let t: "on" | "off" | null = null;
+  for (const txt of textParts(last)) {
+    for (const line of txt.split(/\r?\n/)) {
+      const s = line.trim().toLowerCase();
+      if (TOGGLE_ON_MARKERS.includes(s)) t = "on";
+      else if (s === TOGGLE_OFF_MARKER) t = "off";
+    }
+  }
+  return t;
+}
+
+// #90 part B: the user-message count (the deactivation's new-message
+// baseline — the flag clears only when a NEW user message arrived:
+// count > the deactivation-time count).
+function userMessageCount(msgs: unknown): number {
+  let n = 0;
+  for (const pair of msgPairs(msgs)) {
+    if (pair.info && pair.info.role === "user") n += 1;
+  }
+  return n;
+}
+
 // #85 part 1 (#82 generalized scope): the scope verdict, recomputed
 // from the FRESH messages() fetch (last-toggle-wins can flip with a new
 // user message — no long-lived cache). #85 part 3 (d): the LAST OWN-
@@ -800,11 +890,13 @@ function lastToggle(msgs: unknown): "on" | "off" | null {
 // `session.agent` mirror — verified 2026-09-22; the plugin cannot read
 // the DB in-process, so the message field is the client-reachable
 // source; agent ids follow `planner_<model>`; the prefix survives
-// model-generation renames) → "planner", else "none". Self-spawned
-// sids (the Unit 3 `spawned` self-mark) are NEVER scoped: the #85
-// loop — a freshly-spawned successor must not be re-triggered.
-function scopeVerdict(sid: string, msgs: unknown): "planner" | "autorun" | "none" {
-  if (spawned.has(sid)) return "none";
+// model-generation renames) → "planner", else "none". #90 part A: the
+// old #85 part-1 self-spawned exclusion is REMOVED — a plugin-spawned
+// successor is tracked (it derives scope from its own history — the
+// RESTART prompt's own-line toggle makes it "autorun") and inherits
+// the trigger's state; the loop guard moved to the LINEAGE-DEPTH cap
+// on the restart/cap-exhaustion spawn branch.
+function scopeVerdict(msgs: unknown): "planner" | "autorun" | "none" {
   const toggle = lastToggle(msgs);
   if (toggle === "off") return "none"; // (d) Direct beats the planner test
   if (toggle === "on") return "autorun"; // #82 — ANY agent type
@@ -1032,10 +1124,28 @@ async function routeScopedIdle(sid: string, w: Watch) {
   // fetch (last-toggle-wins can flip with a new user message — no
   // long-lived cache). The verdict log line (#80) pins the decision for
   // attribution and lands only on CHANGE (no per-tick spam).
-  const verdict = scopeVerdict(sid, msgs);
+  const verdict = scopeVerdict(msgs);
   if (verdict !== w.scope) {
     w.scope = verdict;
     log(`scope= ${verdict} sid=${sid}`);
+  }
+  // #90 part B: the STICKY trigger deactivation — checked right after
+  // the scope recompute: no send, no re-spawn, no route= line; the
+  // session stays MANUALLY usable (a maintainer ping still gets a
+  // normal model response — the plugin simply never injects or spawns
+  // from it). The flag clears ONLY on an explicit re-engage: a NEW
+  // user message (count > the deactivation-time count) that carries an
+  // OWN-LINE ON toggle (checked on the last user message alone — the
+  // whole-history scan would credit the trigger's pre-deactivation
+  // toggle to a plain ping). A plain ping keeps the flag.
+  if (w.deactivated) {
+    if (userMessageCount(msgs) > w.deactivatedUserCount && lastUserToggle(msgs) === "on") {
+      w.deactivated = false; // explicit re-engage — fall through (the successor check prevents duplication)
+    } else {
+      log(`skip= deactivated sid=${sid}`);
+      w.idlePending = false; // the decision for this idle cycle is made
+      return;
+    }
   }
   if (w.scope === "none") {
     // non-scoped: NEVER acted on (fail-safe = no action)
@@ -1101,10 +1211,33 @@ async function routeScopedIdle(sid: string, w: Watch) {
     log(`skip= successor sid=${successor}`); // someone already replaced it
     return;
   }
+  // #90 part A: the LINEAGE-DEPTH cap (the replacement of the #85
+  // part-1 exclusion's loop-prevention role): a session at depth >=
+  // LINEAGE_MAX_DEPTH does NOT spawn its successor — the chain of
+  // cap-exhausted empty sessions stops at the 3rd generation and
+  // stalls visibly for the maintainer. A session never plugin-spawned
+  // (a user session, a file-trigger spawn) is absent from the map →
+  // depth 0.
+  const depth = spawned.get(sid) ?? 0;
+  if (depth >= LINEAGE_MAX_DEPTH) {
+    log(`skip= depth sid=${sid} depth=${depth}`);
+    return;
+  }
   log(`route= restart spawn sid=${sid}`);
   // #85 part 2: the SOURCE session's fresh fetch — its current
   // agent+modelID carries over to the successor.
-  await spawnPlanner(restartText(), msgs); // Unit 3 helper (never throws outward)
+  const newSid = await spawnPlanner(restartText(), msgs); // Unit 3 helper (never throws outward)
+  // #90 part A+B: a SUCCESSFUL spawn records the successor's lineage
+  // depth (trigger depth + 1) and STICKY-deactivates the TRIGGER
+  // (part B: the fresh fetch is already in hand — its user-message
+  // count is the deactivation baseline); a failed spawn (null)
+  // changes nothing (current semantics).
+  if (newSid) {
+    spawned.set(newSid, depth + 1);
+    w.deactivated = true;
+    w.deactivatedUserCount = userMessageCount(msgs);
+    log(`deactivate= sid=${sid}`);
+  }
 }
 
 // Unit 3+4: the ONE tick (5000ms default, per-factory tickMs option) —
@@ -1243,6 +1376,57 @@ function codeVersion(): string {
   }
 }
 
+// #90 part C: the RESTART-SAFE restoration (ONCE per host process —
+// the first factory call; the live host loads the plugin once per
+// process): the plugin reads its OWN auto_resume.log and restores the
+// in-memory #90 state a host restart loses: each `route= restart
+// spawn sid=X` line PAIRED with the following `spawn= sid=Y` line →
+// deactivated(X) + lineage depth(Y) = depth(X) + 1; an UNPAIRED `spawn=`
+// line → depth 0 (the file-trigger path). A `spawn-fail=` line between
+// the pair breaks the pairing (a failed spawn never deactivated —
+// part B semantics). After a host restart the LOG (temp dir) outlives
+// the process, so the lineage stays bounded across restarts.
+// Best-effort: no log yet (first boot) / unreadable → nothing restored
+// (empty state = all depth 0, no deactivations).
+let lineageRestored = false;
+function restoreLineageFromLog(): void {
+  if (lineageRestored) return; // ONCE per process (the smoke re-factories — no re-parse)
+  lineageRestored = true;
+  let text: string;
+  try {
+    text = readFileSync(logPath, "utf-8");
+  } catch {
+    return; // no log yet / unreadable → nothing to restore
+  }
+  const lines = text.split(/\r?\n/);
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (line.includes("spawn= sid=")) {
+      const m = line.match(/spawn= sid=(\S+)/);
+      // UNPAIRED spawn= line → depth 0 (the file-trigger path — a
+      // child already paired by an earlier route= line keeps its depth).
+      if (m && !spawned.has(m[1])) spawned.set(m[1], 0);
+      continue;
+    }
+    const rt = line.match(/route= restart spawn sid=(\S+)/);
+    if (!rt) continue;
+    // look ahead for the PAIRING spawn= line (no spawn-fail= in
+    // between — a failed spawn never deactivated, part B).
+    for (let j = i + 1; j < lines.length; j += 1) {
+      const lj = lines[j];
+      if (lj.includes("spawn-fail=")) break;
+      const sj = lj.match(/spawn= sid=(\S+)/);
+      if (sj) {
+        const parent = rt[1];
+        const w = getWatch(parent);
+        w.deactivated = true; // the restored STICKY flag (user count unknown → 0)
+        spawned.set(sj[1], (spawned.get(parent) ?? 0) + 1); // depth(parent) + 1
+        break;
+      }
+    }
+  }
+}
+
 // One-shot init surface probe (runs ONCE at plugin load): the `surface=`
 // line. `typeof` ONLY — prototype methods are invisible to Object.keys.
 function probeSurface(input: PluginInput) {
@@ -1264,6 +1448,7 @@ export default (async (input: PluginInput) => {
   logPath = join(logDir, "auto_resume.log");
   projectDir = input?.directory ?? ""; // #85 part 2: the opencode.jsonc fallback path
   client = input?.client ?? null;
+  restoreLineageFromLog(); // #90 part C: ONCE per process (before any routing can happen)
   probeSurface(input); // one-shot at load
   // The tick period is a per-factory-call option: the live host never
   // passes tickMs → the 5000ms default (live behavior unchanged); the
