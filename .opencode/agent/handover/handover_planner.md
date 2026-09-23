@@ -2,6 +2,12 @@
 
 FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
+## Current session — direct, 2026-09-23 (ses_f3144d9d6ffe8HbOlnQsKD2tq9, planner-12, Qwen3.8-27B-Q3S-170K)
+- THIS session = the "planner-12" ghost spawned 14:46:06Z by the pre-#90 build (d2b9d510) with agent=compaction (the #91 incident — wrong agent + mode); the maintainer reverted it and re-engaged it DIRECT ("opencode restarted. new auto-resume plugin live. continue" + "i am available").
+- **#90 live acceptance (post-restart):** the live plugin v=ef8c6149 IS the #90 build (sha256 prefix of the on-disk auto_resume.ts = the surface= v= line; process starts 16:32:37Z + 16:37:45Z, both after c4b244d 15:53:06Z). PART A verified by A/B contrast on the SAME successor session — old build judged it scope=none (14:46:16Z, spawn exclusion) vs new build scope=autorun (16:37:07Z) + recovery= attempt=1 (the #87 stall case INVERTED — successor tracked + recoverable; cap held). PART B/C verified — init log-restore (the old route=+spawn= pair) → zero re-routing/spawn against the trigger (planner-11) after the restart + zero spawn= lines in the new process (no unbounded loop; the trigger's final close correctly route= stop at 15:59:27Z under the old process). NOT YET exercised live by the new build: its own restart spawn (deactivate= line, new restartText line-1 own-line marker, depth-cap skip=) — awaits the next autorun action:restart.
+- **NEW live finding → TODO #91 (HIGH):** the compaction summary (an assistant message, agent=compaction) leaked into `resolveInjectIdentity` (the spawn's agent=compaction) + `lastAssistantAction` (the routing — the summary's QUOTED "action: restart" caused the mis-route to restart-spawn instead of the intended recovery). STILL LATENT in the live build ef8c6149 (no compaction-agent guard in lastAssistantInfo / lastAssistantAction). Fix design in #91 (skip agent=compaction in both) — maintainer call.
+- **Awaiting the maintainer (this session, he is available):** (1) #91 fix approval — blocks a clean next autorun restart-spawn; (2) #78 ruling (ranked options, plan11_78_scope.md); (3) #80/#81 confirms + #82 unit-2 suppression call.
+
 ## Closed session — autorun, 2026-09-23 (ses_f318f0d77ffer6kIwqiNvE1xau, planner-11, Qwen3.8-27B-Q3S-170K)
 - CLOSED 2026-09-23 with `action: stop` (maintainer AFK; no restart until
   the live plugin carries #90). Full detail: the 2026-09-23 plan11 line
