@@ -43,9 +43,20 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   (3) the --info items: dump completeness = already TODO #78; worker
   compaction timing adopted in the worker-15/16 launch specs (compact
   after planning/drafting, before the heavy tool calls).
-- LIVE acceptance pending (next host restart): the first named spawn —
-  `ident=` line in `.opencode/temp/auto_resume.log` + the session title in
-  the DB. (Also still pending from earlier: #82/#80/#83 maintainer items,
+- LIVE STATE after the maintainer's restart (his message this session):
+  the live plugin is now the NEW build — `surface=` v=d2b9d510 at
+  12:53:42Z (prior build 24972ebd) → unit A title + #85 part 3 are
+  LIVE. HIS ORDER: re-trigger `action: restart` so the Unit-4 spawn
+  live-accepts the naming. THE NEXT PLANNER (the spawned successor,
+  likely planner-10) verifies FIRST: (a) the `spawn=` line carrying
+  `ident=autorun-2026-09-21_15-33 planner-10` in
+  `.opencode/temp/auto_resume.log`, (b) its OWN session title in the DB
+  (`autorun-2026-09-21_15-33 planner-10` — e.g. via the session dump
+  header / the DB), then closes TODO #89 (live-acceptance done) and
+  continues the queue (the 4 deferred body condenses #68/#69/#71/#73,
+  then the #82/#80/#79/#85/#81 tails if his config has autoCompact on).
+- LIVE acceptance pending: the first named spawn (above) —
+  (also still pending from earlier: #82/#80/#83 maintainer items,
   #79/#82/#85 live-acceptance tails.)
 
 
