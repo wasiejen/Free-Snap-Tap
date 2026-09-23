@@ -46,7 +46,31 @@
 - you are intelligent - you will find something to do
   - go through my ideas for new research on functions. create a folder in research for each if you find something worthwhile
 
+# 2026-09-23_04-34:
+- would be nice if the names of the new sessions spawned in autorun would include the name of the autorun - so the folder name in loop and then added the current session number of the loop? if this is feasable to keep track ...
+  - just cosmetic to better find the sessions that are part of a loop autorun later
+  - currently the naming is automatically resolved via opencode based on context
 
+# 2026-09-23_04-20:
+- marker sweep of a planner took 17k token as result
+  - $ grep -rn -- "--main\|--now\|--info\|--todo\|--defer\|--wip\|--comment" --include="*.md" .opencode/ TODO.md README.md WIKI.md 2>/dev/null | grep -v "_past_priorities\|/done/\|agent_feedback\|nap_direct\|archive/"
+  - The output of the marker sweep got polluted with plugin.log noise 
+  - needs to be adressed
+
+
+# 2026-09-23_00-12
+- bounded reading!! for fucks sake ... the planner again read the whole NAP - 18k token in one go ...
+- and for fucks sake reduce the wall-time of the auto_resume.smoke it takes ages ... 
+  - DO NOT RUN THE FUCKING SMOKE IN DIRECT SESSIONS!!!
+- i feel like i explain things and all is forgotten and then they act like the hard worked to achieve context limit is infinite ...
+# 2026-09-22_21-13
+the tests get ridicously long (wall-time)
+- can the check of the planner be done via dump of worker session and check of the last messages for the actual run test results by the planner?
+
+
+# 2026-09-23_00-10 Stale - already the loop folder is used exactly the same as with the looprunner - DONE
+- we need a new way of storing task and handover files in the new AUTORUN mode
+  - use the existing loop folder? simple but must be codified in the prompts?
 
 # 2026-09-22_20-42
 - direct instructions on how to work with the nap and todo efficiently directly in the system prompt of planner and worker
@@ -54,21 +78,16 @@
   - general guideline for handling large files needed.
     - with bigger context windows the agents get careless with context discipline and then rush the end when the 2 tool call delay hit them hard. he thought he was at 59% while actually already at 79%
     - 
-# 2026-09-22_19-46
-"UnknownError: UnknownError
-    at <anonymous> (B:/~BUN/root/chunk-d958f9z1.js:1142:2068)
-    at SessionPrompt.createUserMessage (B:/~BUN/root/chunk-d958f9z1.js:1142:9959)
-    at SessionPrompt.createUserMessage (definition) (B:/~BUN/root/chunk-d958f9z1.js:1142:1826)
-    at SessionPrompt.prompt (B:/~BUN/root/chunk-eqzhwexz.js:4:13569)
-    at SessionPrompt.prompt (definition) (B:/~BUN/root/chunk-d958f9z1.js:1142:9844)
-    at SessionHttpApi.promptAsync (B:/~BUN/root/chunk-eqzhwexz.js:2:84461)
-    at SessionHttpApi.promptAsync (definition) (B:/~BUN/root/chunk-eqzhwexz.js:4:13476)"
 
-on each action:stop line now i get this error message shown for some seconds. something in our auto-resume plugin i guess
+# can we make the auto-resume unit 4 resume messages more destinctive?
+  - it includes post compaction instructions even if it only resumed a stopped agent with not compaction prior
+    - ambiqious source for the resume leads to unnessary confusion and reloading of files
+      - can we destinquish the source for common stops and send a more discriptive message to point to the source that would be helpful to the planner?
+        - if unknown a simple "continue" might suffice to keep interruption of the workflow minimal.
 
-# 2026-09-22_21-13
-the tests get ridicously long (wall-time)
-- can the check of the planner be done via dump of worker session and check of the last messages for the actual run test results by the planner?
+# how to deliver the message of self-compaction and cross-compaction to the compacted session? 
+  - could we quere them and on auto-resume unit 4 resume deliver them?
+  - proposal pls
 
 # 1 compact_memory additions/fix messages (your todo ##70 likely needs an update)
 - autocompact on context limit option, toggable via parameter in the budget file
@@ -102,6 +121,15 @@ the tests get ridicously long (wall-time)
     - this was the second compaction, but there was no ses..._c1.md created in compaction_dumps only ..._c0.md exists
 
   - rework of compact_memory parameter count of remove providerID and modelID from parameter list avaialble -> get them from opencode.json - see # # compact_memory tool dump function
+
+  # log tool v2 proposal implementation:
+    - found it in implemented and moved back to approved because it is not yes implemented
+
+
+# block_transfer extension:
+  - look at ideas.md points::
+    - # 8 write to buffer option?
+    - ## what would be needed to make block_transfer as versatile as edit but less prone to oldstring mismatch?
 
 # fuzzy_numword  
 - R8 (to minimze loop disruptions)

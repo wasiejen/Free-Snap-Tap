@@ -5,6 +5,25 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
+2026-09-23_04-53:
+- ctx-gauge should be based on context parameter in openjson and not the number in the name??
+  - just for convienience for me ... so not dringend
+
+2026-09-23_04-20:
+- marker sweep of a planner took 17k token as result
+  - $ grep -rn -- "--main\|--now\|--info\|--todo\|--defer\|--wip\|--comment" --include="*.md" .opencode/ TODO.md README.md WIKI.md 2>/dev/null | grep -v "_past_priorities\|/done/\|agent_feedback\|nap_direct\|archive/"
+  - The output of the marker sweep got polluted with plugin.log noise 
+
+
+2026-09-23_01-18
+- so the loopguard is interrupting the sessions and the auto-resume unit 4 did not fire for it
+- 70.31.848.027 W slot handle_loop_: id  0 | task 24525 | loop guard force-closing hidden reasoning at token 1152 (interventions=1 token=1558 piece=''): ngram_dominance period=8 coverage=513 score=0.501
+- - draft
+
+
+2026-09-23_00-20
+- submit section for memories that explains it usage and appends it into inbox_memory.md of the agent role automatically
+
 2026-09-22_17-53
 - might be a good idea to create seperate README.md files for each plugin we have written 
   - general explanation what is does and how it is implemented
