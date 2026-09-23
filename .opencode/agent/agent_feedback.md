@@ -449,3 +449,6 @@ Task spec's bounded-check pointer said "the repo has NO node_modules" — stale:
 ### 2026-09-23_14-18 planner_Q3S_170K ses_f322793f5ffeI34HE19SEmxU43
 Plan9 spec claim "the repo has NO node_modules" was stale — the vendored @opencode-ai/sdk types live in .opencode/node_modules/ (the worker found them; a spec pointer to the vendored types dir would have saved the hunt). Spec claims should be machine-checked at spec time for exactly this kind of existence claim.
 
+### 2026-09-23_14-44 worker_Q3S_170K ses_f31c9b422ffe1juyFaqGyKXRFl
+read tool truncates >2000-char lines (TODO.md #74 ~4k line only fully visible via unbounded rg output) — a line-extraction helper (or read offset-within-line) would save context on long-line files.
+
