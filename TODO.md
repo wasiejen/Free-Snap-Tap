@@ -1004,7 +1004,7 @@ restart detection" wording above is the pre-revision numbering.
    green as above; the commit hash is recorded by the planner in the
    follow-up bookkeeping commit, not in this entry's commit).
 
-## #85. (part 1 (scope) LANDED 2026-09-22 / part 2 (current-agent+modelID + dead-mark) LANDED 2026-09-23, HIGH priority — maintainer call) — auto_resume unbounded session-spawn loop
+## #85. (part 1 (scope) LANDED 2026-09-22 / part 2 (current-agent+modelID + dead-mark) LANDED 2026-09-23 / part 3 (Unit-2 ctx-line-suffix + Direct gates) LANDED 2026-09-23, HIGH priority — maintainer call) — auto_resume unbounded session-spawn loop
 - **Problem + evidence:** on 2026-09-22 (~19:57–20:00Z) the LIVE auto_resume
   plugin created a NEW session every ~10s (every 2nd recovery attempt — 2
   attempts per session at 5s each, confirmed by the session naming) —
@@ -1050,9 +1050,22 @@ restart detection" wording above is the pre-revision numbering.
     resolved at fire-time: last-assistant info → opencode.jsonc agent-
     config fallback (cached) → host default (NEVER a planner constant); a
     failed CONTINUE dead-marks the idle cycle — remaining retries + the
-    cap-exhaustion fallback spawn are skipped (no doomed successor),
-    cleared on a fresh busy — auto_resume smoke 105/105; the commit hash
-    is recorded by the planner in the follow-up bookkeeping commit). The
-    post-restart live verification stays a maintainer call. The orphan-
-    session cleanup is DONE (the maintainer removed all the new sessions,
-    2026-09-22).
+     cap-exhaustion fallback spawn are skipped (no doomed successor),
+     cleared on a fresh busy — auto_resume smoke 105/105; the commit hash
+     is recorded by the planner in the follow-up bookkeeping commit).
+     PART 3 (the live test exposed the Unit-2 tick design: re-fire on
+     stale armed sessions + a self-loop) LANDED 2026-09-23 (worker
+     worker_Q3S_170K — the Unit-2 tick leg is REMOVED: the nudge is a
+     PASSIVE ctx-line SUFFIX on the session's OWN tool-call return (the
+     gauge plugin's ctx: line channel — tool.execute.after), per busy
+     session, ladder (>= 0.95 "self-compact now" / >= 0.98 --maintainer-
+     flagged), scope "none" (Direct) suppresses it (c); NO promptAsync on
+     the Unit-2 path (no resume, no loop, stale sessions unreachable by
+     construction); scopeVerdict checks the LAST OWN-LINE TOGGLE FIRST —
+     Direct deactivates Unit 4 for the planner (d); the Unit-4 scope is
+     unchanged — auto_resume smoke 102/102 (baseline 105: the old
+     promptAsync-era checks adapted to the passive mechanism); the commit
+     hash is recorded by the planner in the follow-up bookkeeping
+     commit). The post-restart live verification stays a maintainer call.
+     The orphan-session cleanup is DONE (the maintainer removed all the
+     new sessions, 2026-09-22).

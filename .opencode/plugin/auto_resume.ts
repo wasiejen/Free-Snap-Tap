@@ -14,52 +14,72 @@
 //       function. `typeof` ONLY — Object.keys misses prototype methods
 //       (knowledge_plugins.md "The plugin ctx client on THIS host").
 //
-// UNIT 2 (context-limit compaction trigger):
-//   A live session crossing its saturation threshold (configurable per
-//   tick — default 0.95 — via the budget-file keys described below) of
-//   its usable context window queues a SELF-compact instruction via
-//   `client.session.promptAsync` — never a
-//   synchronous prompt (an immediate injection invalidates the session KV
-//   cache → full re-prefill, 3-4 min at 90% fill, the ctx_watchdog failure
-//   mode). No host-side compaction command exists (Unit 1 surface report:
-//   `session.compact` is undefined), so the queued text instructs the
-//   session to call the `compact_memory` tool NOW with NO sessionID
-//   (SELF path) and a 1-3 line continuation message, then continue per
-//   the post-compaction protocol. The text names the measured ratio.
-//   Shared architecture (deep-dive A §3 — one 5s tick = the only
-//   decision+send funnel):
-//   - EVENTS ONLY ARM per-session watch state (module-level Map keyed by
-//     sid): assistant-role message.updated → lastTokenTotal OVERWRITTEN
-//     (tokens.total if present, else input+output+cache.read+cache.write;
-//     positive only) + the model pair + lastActivityAt; session.status
-//     busy → arm the session + reset the once-per-busy-cycle attempts
-//     counter; session.status idle → the tick decides.
-//   - ONE 5s setInterval (.unref()-ed) evaluates every armed watch:
-//     skip if lastTokenTotal <= 0, or attempts already 1 for this busy
-//     cycle, or model limits null (model/provider data missing or ANY
-//     throw — fail-safe, no intervention), or usable window <= 0, or
-//     ratio < threshold (the per-tick configurable value, default 0.95);
-//     else re-entrancy latch + gate re-check right before send, then ONE
-//     queued promptAsync (latch held until it settles), attempts++.
-//     Usable window = context - Math.min(reserve, output ?? 0), computed
-//     per tick from the (cached) model limits + the per-tick reserve.
+// UNIT 2 (context-limit nudge — #85 part 3: the PASSIVE ctx-line suffix):
+//   The live test (2026-09-22) exposed the old queued-promptAsync design:
+//   the tick looped EVERY armed watch (no current-session concept) — the
+//   nudge RE-FIRED on stale armed sessions and LOOPS (the once-per-
+//   busy-cycle budget reset on every injected busy — the nudge itself
+//   was the busy). #85 part 3 makes the Unit 2 nudge PASSIVE: a SUFFIX
+//   appended to the session's OWN TOOL-CALL RETURN (the same channel the
+//   gauge plugin uses for its `ctx:` line — the tool.execute.after
+//   output.output mutation), PER busy session, when
+//   `ratio >= saturationThreshold && autoCompact on`. NO promptAsync
+//   (no resume, no queued turn, no busy, no budget reset, no loop).
+//   - A tool result IS the activity evidence: the suffix appends on the
+//     session's own tool returns while it is actively working; a
+//     stale/idle session emits no tool results → no nudge (the stale-
+//     session revival is gone by construction). Multiple active workers
+//     each get their own nudge independently (per-session).
+//   - LADDER (the HIGHEST rung met fires): ratio >= 0.98 → the
+//     `--maintainer`-flagged line (`⚠⚠ --maintainer: context saturated
+//     at ratio=<3-decimals> — self-compact NOW`); else ratio >= the
+//     per-call threshold (default 0.95) → `self-compact now
+//     (ratio=<3-decimals>)`. No host-side compaction command exists
+//     (Unit 1 surface report: `session.compact` is undefined) — the
+//     suffix reminds the session to self-compact per its own protocol
+//     (the compact_memory tool, SELF path, no sessionID).
+//   - SCOPE GATE (c): the suffix is NOT appended when the scope verdict
+//     is "none" (Direct / non-scoped). The verdict is RECOMPUTED from a
+//     FRESH messages() fetch per nudge-eligible tool result (last-
+//     toggle-wins can flip with a new user message — a mid-turn
+//     `<|Direct|>` must suppress immediately; the tick-era cached
+//     w.scope is too stale for that).
+//   - Shared event architecture (deep-dive A §3 — events stay ARM-only;
+//     the tool result hook is the Unit 2 decision point): per-session
+//     watch state (module-level Map keyed by sid): assistant-role
+//     message.updated → lastTokenTotal OVERWRITTEN (tokens.total if
+//     present, else input+output+cache.read+cache.write; positive only)
+//     + the model pair + lastActivityAt; session.status busy → arm the
+//     session + reset the once-per-busy-cycle nudge-log dedup counter;
+//     session.status idle → the tick decides (Unit 4 only — Unit 2 has
+//     no tick leg anymore).
+//   - Gate order on a tool result (cheap first; the ONE expensive step
+//     — the fresh messages() fetch + scopeVerdict — runs ONLY for a
+//     saturated, actively-working session): a watch with a positive
+//     token total + a known model; autoCompact ON (per-call budget-file
+//     read); the model limits resolve (cached after the first fetch);
+//     a positive usable window; ratio >= threshold. Usable window =
+//     context - Math.min(reserve, output ?? 0) (mirrors OpenCode's own
+//     overflow math).
 //   - Decision log lines (Unit 1 lines unchanged in format): `arm=`,
-//     `saturation=` (with ratio), `trigger=`, `send-fail=`.
+//     `nudge=` (ONE per busy cycle — the first suffix; the dedup resets
+//     on a fresh busy), `send-fail=` / `err=` on the Unit 3/4 paths.
 //   - Config (maintainer ruling 2026-09-22: "only trigger it past the
 //     95% line"): OPTIONAL top-level keys in
 //     `.opencode/temp/compact_budget.json` (the compact_memory budget
-//     store — read-only here, read per tick — a live edit takes effect
-//     on the next tick): `saturationThreshold` (number, valid
-//     0 < t < 1, default 0.95) and `outputReserve` (non-negative
-//     number, default 20_000). Fail-open: file missing / unreadable /
-//     malformed / key absent / unparseable / out-of-range → the default.
+//     store — read-only here, read PER nudge-eligible call — a live
+//     edit takes effect on the next tool result): `saturationThreshold`
+//     (number, valid 0 < t < 1, default 0.95) and `outputReserve`
+//     (non-negative number, default 20_000). Fail-open: file missing /
+//     unreadable / malformed / key absent / unparseable / out-of-range
+//     → the default.
 //   - Toggle (maintainer priority #1): an OPTIONAL top-level
-//     `autoCompact` flag in the SAME budget file gates the trigger:
-//     absent/`true` → current behavior; `false` → the tick logs
-//     `skip= autoCompact-off sid=<sid> ratio=<3-decimals>` and neither
-//     sends nor consumes the once-per-busy-cycle attempts budget; a
-//     missing/unreadable/malformed file fails OPEN (current behavior).
-//     The file is read per tick (small file — per-tick read is fine).
+//     `autoCompact` flag in the SAME budget file gates the nudge:
+//     absent/`true` → current behavior; `false` → the suffix is
+//     suppressed SILENTLY (no per-tool-result log line — the v1.x
+//     log-growth discipline); a missing/unreadable/malformed file
+//     fails OPEN (current behavior). The file is read per nudge-
+//     eligible call (small file).
 //
 // UNIT 3 (new-planner spawn helper — the shared building block for
 // Unit 4's restart branches):
@@ -88,20 +108,25 @@
 // an in-scope session going idle (or session.error) is routed on the
 // NEXT TICK (the 5s funnel stays the only decision+send funnel; events
 // only set state). SCOPE (#85 part 1 — the #82 generalized scope,
-// ruling 2026-09-22): a sid is in-scope iff (a) the session's working
-// agent — the FIRST user message's `agent` field (the DB
-// `session.agent` mirror; verified 2026-09-22 — the plugin cannot read
-// the DB in-process, the message field is the client-reachable source)
-// — is a PLANNER agent (agent ids follow `planner_<model>`; the prefix
-// survives model-generation renames), OR (b) the LAST OWN-LINE TOGGLE
-// in its user history is ON (#82: `<|autonom|>` / `<|Autorun|>`, case-
+// ruling 2026-09-22; #85 part 3 (d): the toggle is checked FIRST — a
+// trailing own-line `<|Direct|>` → "none" WINS over the planner test
+// (a Direct planner session is OUT of scope — no Unit 4 CONTINUE — and
+// the Unit 2 nudge is suppressed (c)); an own-line ON toggle →
+// "autorun" (any agent type); only NO toggle falls through to the
+// planner test): a sid is in-scope iff the LAST OWN-LINE TOGGLE in its
+// user history is ON (#82: `<|autonom|>` / `<|Autorun|>`, case-
 // insensitive, whole-line only; OFF = `<|Direct|>`; last-toggle-wins,
 // recomputed from the FRESH messages() fetch on every idle —
-// restart-safe, no in-memory state). The planner-only gate is DROPPED
-// — ANY agent type (prompt_builder, a future researcher, ...) runs in
-// a loop when toggled. Self-spawned sids (the Unit 3 `spawned`
-// self-mark) are NEVER scoped — the #85 loop: a freshly-spawned
-// successor must not be re-triggered. The verdict is cached per watch
+// restart-safe, no in-memory state), OR — with NO toggle — the
+// session's working agent — the FIRST user message's `agent` field
+// (the DB `session.agent` mirror; verified 2026-09-22 — the plugin
+// cannot read the DB in-process, the message field is the client-
+// reachable source) — is a PLANNER agent (agent ids follow
+// `planner_<model>`; the prefix survives model-generation renames).
+// The planner-only gate is DROPPED — ANY agent type (prompt_builder, a
+// future researcher, ...) runs in a loop when toggled. Self-spawned
+// sids (the Unit 3 `spawned` self-mark) are NEVER scoped — the #85
+// loop: a freshly-spawned successor must not be re-triggered. The verdict is cached per watch
 // as scope: "planner" | "autorun" | "none" | "unknown" (unknown until
 // the first settled fetch; fail-safe = no action); NON-SCOPED sessions
 // are NEVER acted on. ROUTING on the LAST
@@ -178,13 +203,22 @@ const OPENCODE_CONFIG_FILE = "opencode.jsonc";
 // Math.min(reserve, output ?? 0) (mirrors OpenCode's own overflow math).
 const DEFAULT_SATURATION_THRESHOLD = 0.95;
 const DEFAULT_OUTPUT_RESERVE = 20000;
+// #85 part 3: the nudge LADDER's top rung — ratio >= this appends the
+// `--maintainer`-flagged line instead of the plain self-compact-now
+// suffix (the HIGHEST rung met fires; the 0.95 threshold rung stays
+// per-call configurable — this one is fixed).
+const MAINTAINER_NUDGE_RATIO = 0.98;
 // The optional autoCompact toggle file (same dir as the log — the
 // compact_memory budget store; we only READ its optional top-level
 // `autoCompact` key, never write the file).
 const COMPACT_BUDGET_FILE = "compact_budget.json";
 
-// The once-per-busy-cycle budget gate: at most ONE self-compact send per
-// busy cycle (attempts zeroed when a fresh busy cycle arms the session).
+// #85 part 3: the once-per-busy-cycle NUDGE-LOG dedup: at most ONE
+// `nudge=` log line per busy cycle (the suffix itself appends on EVERY
+// eligible tool result — a per-step reminder — only the log line is
+// deduped); attempts zeroed when a fresh busy cycle arms the session.
+// The old once-per-cycle SEND budget is gone with the promptAsync path
+// (the nudge is passive — no send, no budget).
 const MAX_ATTEMPTS_PER_BUSY_CYCLE = 1;
 
 // Unit 4 constants: the looprunner's launch marker (carried in the
@@ -407,9 +441,9 @@ async function getModelLimits(model: { providerID: string; modelID: string }): P
 }
 
 // Unit 2: the optional autoCompact toggle (maintainer priority #1) — a
-// per-tick read of `.opencode/temp/compact_budget.json` (the
-// compact_memory budget store — READ-ONLY here, never written; small
-// file, a per-tick read is fine). Lenient parse: file missing /
+// per-nudge-eligible-call read of `.opencode/temp/compact_budget.json`
+// (the compact_memory budget store — READ-ONLY here, never written;
+// small file, a per-call read is fine). Lenient parse: file missing /
 // unreadable / JSON parse failure → ON (fail-open, status quo); key
 // absent → ON; key present → Boolean(value).
 function autoCompactEnabled(): boolean {
@@ -425,8 +459,8 @@ function autoCompactEnabled(): boolean {
 }
 
 // Unit 2: the configurable saturation threshold + output reserve — a
-// per-tick READ-ONLY parse of the SAME budget file (small file, a
-// per-tick read is fine — a live edit takes effect on the next tick).
+// per-nudge-eligible-call READ-ONLY parse of the SAME budget file (small
+// file — a live edit takes effect on the next tool result).
 // Fail-open: file missing / unreadable / JSON parse failure / key
 // absent / not-a-number / out-of-range → the default (0.95 / 20_000).
 // Valid: `saturationThreshold` 0 < t < 1; `outputReserve` >= 0.
@@ -448,52 +482,82 @@ function saturationConfig(): { threshold: number; reserve: number } {
   return { threshold, reserve };
 }
 
-// Unit 2: the queued self-compact instruction (the locked design's text:
-// names the measured ratio; compact_memory SELF path with no sessionID;
-// a 1-3 line continuation message; continue per the post-compaction
-// protocol).
-function selfCompactText(sid: string, tokens: number, usable: number, ratio: number): string {
-  const pct = (ratio * 100).toFixed(1);
-  return (
-    `[auto-resume unit 2 — context-limit trigger, session ${sid}] Measured context saturation: ratio=${ratio.toFixed(3)} ` +
-    `(${pct}% of the usable window: ${tokens} of ${usable} tokens).\n` +
-    "Call the `compact_memory` tool NOW with NO sessionID (SELF path); its continuation message must be 1-3 lines: " +
-    "what to resume next and which head files to re-read (task spec / handover files / AGENTS.md as applicable).\n" +
-    "After the compaction summary lands, continue per your post-compaction protocol from committed state — never from the summary alone."
-  );
+// #85 part 3: the passive Unit-2 nudge (the ctx-line suffix ladder — the
+// HIGHEST rung met fires): ratio >= 0.98 → the `--maintainer`-flagged
+// line; else ratio >= the saturation threshold (per-call configurable,
+// default 0.95) → the self-compact-now suffix. The text names the
+// measured ratio (3 decimals).
+function nudgeText(ratio: number): string {
+  if (ratio >= MAINTAINER_NUDGE_RATIO)
+    return `⚠⚠ --maintainer: context saturated at ratio=${ratio.toFixed(3)} — self-compact NOW`;
+  return `self-compact now (ratio=${ratio.toFixed(3)})`;
 }
 
-// Unit 2: the ONE gated send path — re-entrancy latch + gate re-check
-// right before send, then ONE queued promptAsync (latch held until the
-// send settles). Never a synchronous prompt (KV-cache invalidation).
-async function sendSelfCompact(sid: string, w: Watch, ratio: number, usable: number) {
-  if (sending.has(sid) || w.attempts >= MAX_ATTEMPTS_PER_BUSY_CYCLE || !w.armed || w.status !== "idle" || w.lastTokenTotal <= 0) return;
-  w.attempts += 1; // consume the once-per-busy-cycle budget
-  sending.add(sid); // re-entrancy latch
-  log(`trigger= sid=${sid} ratio=${ratio.toFixed(3)} tokens=${w.lastTokenTotal} usable=${usable}`);
+// #85 part 3: the ctx-line-suffix append rule (the gauge plugin's
+// appendReadout rule — the same channel the `ctx:` line rides): empty
+// output → the suffix alone; trailing \n → direct concat; else →
+// \n + suffix. A non-string output (defensive — the SDK declares
+// string) → silent skip (the object untouched). Returns whether the
+// suffix was actually appended.
+function appendNudge(output: { output?: unknown }, suffix: string): boolean {
+  const cur = output.output;
+  if (typeof cur !== "string") return false;
+  output.output = cur === "" ? suffix : cur.endsWith("\n") ? cur + suffix : cur + "\n" + suffix;
+  return true;
+}
+
+// #85 part 3: the Unit-2 nudge hook — the ctx-line channel (the SAME
+// tool.execute.after output.output mutation the gauge plugin uses for
+// its `ctx:` line). PER busy session: a tool result IS the activity
+// evidence — the suffix lands on the session's OWN tool returns while
+// it is actively working; a stale/idle session emits no tool results →
+// no nudge (the stale-session revival is gone by construction). NO
+// promptAsync (no resume, no queued turn, no busy, no budget reset, no
+// loop). GATES in order (cheap first): a watch with a positive token
+// total + a known model; autoCompact ON (per-call budget-file read);
+// the model limits resolve (cached after the first fetch); a positive
+// usable window; ratio >= the per-call saturation threshold. ONLY then
+// the ONE expensive step: the FRESH messages() fetch + scopeVerdict —
+// verdict "none" (Direct / non-scoped) → NO suffix (the (c) Direct
+// suppression — the verdict must be CURRENT, not the tick-era cached
+// one). First suffix of a busy cycle → ONE `nudge=` log line (the
+// once-per-cycle dedup on w.attempts — reset on a fresh busy). NEVER
+// throws (a throw out of a hook would surface to the session).
+async function onToolAfterNudge(
+  input: { tool?: string; sessionID?: string; callID?: string },
+  output: { title?: unknown; output?: unknown; metadata?: unknown },
+): Promise<void> {
   try {
-    const sess = (client as { session?: { promptAsync?: (args: unknown) => Promise<unknown> } } | null)?.session;
-    if (!sess || typeof sess.promptAsync !== "function") {
-      log(`send-fail= sid=${sid} promptAsync missing`);
-      return;
+    const sid = typeof input?.sessionID === "string" && input.sessionID !== "" ? input.sessionID : null;
+    if (!sid) return;
+    const w = watches.get(sid);
+    if (!w || w.lastTokenTotal <= 0 || !w.model) return;
+    if (!autoCompactEnabled()) return;
+    const limits = await getModelLimits(w.model);
+    if (limits === null) return;
+    const { threshold, reserve } = saturationConfig();
+    const usable = limits.context - Math.min(reserve, limits.output);
+    if (!(usable > 0)) return;
+    const ratio = w.lastTokenTotal / usable;
+    if (ratio < threshold) return;
+    // The ONE expensive step — only a saturated, actively-working
+    // session reaches here: the fresh fetch + scope verdict (the
+    // Direct suppression (c) needs the CURRENT verdict — last-toggle-
+    // wins can flip with a new user message mid-turn).
+    const msgs = await fetchMsgs(sid);
+    const verdict = scopeVerdict(sid, msgs);
+    if (verdict === "none") return; // (c) Direct / non-scoped: suppressed
+    if (verdict !== w.scope) {
+      w.scope = verdict;
+      log(`scope= ${verdict} sid=${sid}`);
     }
-    // Queued (promptAsync): the synthetic part lands as the next turn at
-    // idle — the race-free channel (no KV-cache invalidation, no re-prefill).
-    // #85 part 2 (current agent+modelID): the body carries the
-    // session's CURRENT working agent+model — resolved at FIRE-TIME
-    // (only because this send is actually queued — never per tick); a
-    // null agent → no agent field (the host default applies) + an
-    // agent-omit= attribution line.
-    const ident = resolveInjectIdentity(await fetchMsgs(sid));
-    const body: Record<string, unknown> = { parts: [{ type: "text", text: selfCompactText(sid, w.lastTokenTotal, usable, ratio) }] };
-    if (ident.agent) body.agent = ident.agent;
-    else log(`agent-omit= sid=${sid} no current agent+model`);
-    if (ident.model) body.model = ident.model;
-    await sess.promptAsync({ path: { id: sid }, body });
-  } catch (e) {
-    log(`send-fail= sid=${sid} ${(e as { message?: string } | null)?.message ?? "unknown"}`);
-  } finally {
-    sending.delete(sid);
+    if (w.attempts < MAX_ATTEMPTS_PER_BUSY_CYCLE) {
+      w.attempts = MAX_ATTEMPTS_PER_BUSY_CYCLE; // once-per-cycle nudge-log dedup
+      log(`nudge= sid=${sid} ratio=${ratio.toFixed(3)} tokens=${w.lastTokenTotal} usable=${usable}`);
+    }
+    appendNudge(output, nudgeText(ratio));
+  } catch {
+    // never throw out of a hook
   }
 }
 
@@ -673,21 +737,26 @@ function lastToggle(msgs: unknown): "on" | "off" | null {
 
 // #85 part 1 (#82 generalized scope): the scope verdict, recomputed
 // from the FRESH messages() fetch (last-toggle-wins can flip with a new
-// user message — no long-lived cache). A sid is in-scope iff (a) the
-// session's working agent — the FIRST user message's `agent` field
-// (the DB `session.agent` mirror — verified 2026-09-22; the plugin
-// cannot read the DB in-process, so the message field is the
-// client-reachable source) — is a PLANNER agent (agent ids follow
-// `planner_<model>`; the prefix survives model-generation renames), OR
-// (b) the last own-line toggle is ON (#82 — ANY agent type; the
-// planner-only gate is DROPPED). Self-spawned sids (the Unit 3
-// `spawned` self-mark) are NEVER scoped: the #85 loop — a
-// freshly-spawned successor must not be re-triggered.
+// user message — no long-lived cache). #85 part 3 (d): the LAST OWN-
+// LINE TOGGLE is checked BEFORE the planner test — a trailing own-line
+// `<|Direct|>` → "none" WINS over the planner test (Direct deactivates
+// Unit 4 for the planner AND suppresses the Unit 2 nudge (c)); an
+// own-line ON toggle → "autorun" (ANY agent type — #82, the planner-
+// only gate is DROPPED); only NO toggle falls through to the planner
+// test (the FIRST user message's `agent` field — the DB
+// `session.agent` mirror — verified 2026-09-22; the plugin cannot read
+// the DB in-process, so the message field is the client-reachable
+// source; agent ids follow `planner_<model>`; the prefix survives
+// model-generation renames) → "planner", else "none". Self-spawned
+// sids (the Unit 3 `spawned` self-mark) are NEVER scoped: the #85
+// loop — a freshly-spawned successor must not be re-triggered.
 function scopeVerdict(sid: string, msgs: unknown): "planner" | "autorun" | "none" {
   if (spawned.has(sid)) return "none";
+  const toggle = lastToggle(msgs);
+  if (toggle === "off") return "none"; // (d) Direct beats the planner test
+  if (toggle === "on") return "autorun"; // #82 — ANY agent type
   const agent = firstUserAgent(msgs);
   if (typeof agent === "string" && agent.startsWith("planner")) return "planner";
-  if (lastToggle(msgs) === "on") return "autorun";
   return "none";
 }
 
@@ -715,10 +784,12 @@ function lastAssistantInfo(msgs: unknown): Record<string, unknown> | null {
   return last;
 }
 
-// #85 part 2: a fresh messages() fetch for a fire-time identity
-// resolution (only called when a send is actually queued — never
-// per tick); null when the client has no messages() or the fetch
-// fails (the resolution then falls through the fallback order).
+// #85 part 2 (fire-time identity) + #85 part 3 (the Unit-2 nudge scope
+// gate): a fresh messages() fetch — called only when a send is actually
+// queued (Unit 3/4) or a tool result is nudge-eligible (a saturated,
+// actively-working session — never per tick); null when the client has
+// no messages() or the fetch fails (the caller falls through / fails
+// safe).
 async function fetchMsgs(sid: string): Promise<unknown> {
   try {
     const sess = (client as { session?: { messages?: (args: unknown) => Promise<unknown> } } | null)?.session;
@@ -983,46 +1054,16 @@ async function routeScopedIdle(sid: string, w: Watch) {
   await spawnPlanner(restartText(), msgs); // Unit 3 helper (never throws outward)
 }
 
-// Unit 2+3+4: the ONE 5s tick — the only decision+send funnel. Unit 3's
+// Unit 3+4: the ONE 5s tick — the only decision+send funnel. Unit 3's
 // trigger check runs first (the spawn is a high-priority action), then
-// Unit 2 evaluates every armed watch, then Unit 4 routes every scoped
-// session with a pending idle decision. Never throws out (an unhandled
-// rejection from the timer would take the host down).
+// Unit 4 routes every scoped session with a pending idle decision.
+// (#85 part 3: Unit 2 has no tick leg anymore — the nudge is a passive
+// ctx-line suffix on the tool-call return, gated per tool result in
+// onToolAfterNudge.) Never throws out (an unhandled rejection from the
+// timer would take the host down).
 async function tick() {
   try {
     await checkSpawnTrigger(); // Unit 3 — the trigger check first
-  } catch {
-    // swallow — the timer callback must never reject
-  }
-  try {
-    for (const [sid, w] of watches) {
-      try {
-        if (!w.armed || w.status !== "idle") continue;
-        if (w.lastTokenTotal <= 0 || w.attempts >= MAX_ATTEMPTS_PER_BUSY_CYCLE || sending.has(sid)) continue;
-        if (!w.model) continue;
-        const limits = await getModelLimits(w.model);
-        if (limits === null) continue;
-        // Per-tick configurable config (fail-open defaults) + the usable
-        // window for THIS tick: usable = context - min(reserve, output).
-        const { threshold, reserve } = saturationConfig();
-        const usable = limits.context - Math.min(reserve, limits.output);
-        if (!(usable > 0)) continue;
-        const ratio = w.lastTokenTotal / usable;
-        if (ratio < threshold) {
-          log(`saturation= sid=${sid} ratio=${ratio.toFixed(3)} tokens=${w.lastTokenTotal} usable=${usable}`);
-          continue;
-        }
-        if (!autoCompactEnabled()) {
-          // Toggle OFF: suppressed — no send, and the once-per-busy-cycle
-          // attempts budget is NOT consumed (kept for a later ON state).
-          log(`skip= autoCompact-off sid=${sid} ratio=${ratio.toFixed(3)}`);
-          continue;
-        }
-        await sendSelfCompact(sid, w, ratio, usable);
-      } catch {
-        // swallow — one session's failure must not block the others
-      }
-    }
   } catch {
     // swallow — the timer callback must never reject
   }
@@ -1048,7 +1089,7 @@ function armEvent(type: string, sid: string, props: Record<string, unknown>) {
     if (status === "busy") {
       const w = getWatch(sid);
       w.armed = true;
-      w.attempts = 0; // a fresh busy cycle resets the once-per-cycle budget
+      w.attempts = 0; // #85 part 3: a fresh busy cycle resets the once-per-cycle nudge-log dedup
       // #80 (cap semantics): only a REAL new busy resets the recovery
       // cap — a busy that consumes a still-pending CONTINUE injection
       // (within the TTL) is the injected turn itself, not a fresh
@@ -1178,5 +1219,8 @@ export default (async (input: PluginInput) => {
   }
   return {
     event: onEvent,
+    // #85 part 3: the passive Unit-2 nudge — the ctx-line suffix on the
+    // tool-call return (the gauge plugin's ctx: line channel).
+    "tool.execute.after": onToolAfterNudge,
   };
 }) satisfies Plugin;
