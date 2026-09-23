@@ -941,3 +941,345 @@
 - **Phase 3 spec WRITTEN (this session):** `proposals/2026-09-21_opencode-auto-resume-plugin.md` — Problem (3 measured gaps) + four strictly-ordered units (1 skeleton logging plugin/testbed, 2 context-limit compaction trigger, 3 auto-resume after compaction, 4 restart detection + new planner) + explicit NOT-ported list (watchdog abort chain, orphan watch, celebration/todo-nudge heuristics) + per-unit acceptance; A/B/C stay untouched as the reference corpus, referenced by path. TODO #75 seeded (self-contained, points at the proposal).
 - **Proposal revision LANDED (his two in-file comments handled, file back at `proposals/` root for his decision):** queued-prompt shared rule + Unit 2 rewrite + Unit 3/4 restructure (new Unit 3 = spawn helper, new Unit 4 = planner liveness watchdog) + `Planner replies` blocks under both his comments (byte-exact) + Acceptance update. Trivial remainders deferred (not-ported P1 line reword, Status line "revised per comments" note) — do before the approval commit if anything changes.
 - **NEXT:** his decision on the proposal → launch unit 1 (skeleton logging plugin).
+
+## 2026-09-22/23 direct session (ses_f39d250e9ffeheip2FVEeY5Fk6) — excess beyond git, at NAP compression (planner-8, 2026-09-23)
+- Open design questions (his, undecided at the handoff): direct session = a new
+  "autorun" entry (his stop/interrupt + `ask_maintainer` must stop the loop);
+  planner compaction-budget exhaustion (keep=0 + same-session resume + budget
+  reset vs a higher cap — bit-rot risk).
+- NEXT (his priority order at the handoff, before the #85 part-3 redesign):
+  (1) #85 part 2 spec+delegate [DONE — landed b038b92]; (2) #82 live
+  acceptance (his post-restart test) + the unit-2-suppression question (his
+  call — RESOLVED by the part-3 redesign: Direct gates Unit 2); (3) #80 close
+  (his confirm — (b) verified, (c) after #82); (4) #83 context_recovery
+  backstop (his activation + live session.error check); (5) TODO.md shrink;
+  (6) research spec (priority.md #1); (7) TODO #78 scoping.
+- Session ended in a thinking-loop → the maintainer restarted opencode; the
+  spec (handover_task.md, #85 part 3) was committed for the fresh planner
+  (planner-8, which executed it — see the loop folder plan8 files).
+
+--- full section text (verbatim from the NAP):
+
+## Current session — direct, 2026-09-22 (ses_f39d250e9ffeheip2FVEeY5Fk6, planner Qwen3.8-27B-Q3S-160K)
+- Live acceptance (this host, 22:50:11 start): unit 2 trigger LIVE
+  (23:40:41, this session, ratio 1.032 — I missed the self-compact, he
+  compacted manually 23:43:26); unit 4 recovery LIVE (5× attempt=1 on this
+  session); unit 3 spawn: ONE log line total (17:00:21, pre-restart era);
+  unit 4 route= stop/ask/restart still unproven. Cross-compact LIVE: my
+  worker-11 dispatch landed (COMPACT line; model = the target session's own
+  per config — his "default behavior of opencode"); the resumed worker-11
+  ran its post-compaction turn (ratio 0.094), idle, untouched (scope none)
+  → #70 cross path effectively verified (close pending his confirm).
+- #1 investigated (his request) → TODO #80: injected `promptAsync` (unit
+  2/4) omits `agent` → default "build" → injected turns run as Build
+  (DB-proven) → system-prompt change → whole-cache invalidation + planner
+  loses its prompt. Fix design in the #80 entry — APPROVED by him
+  2026-09-22. Open anomaly: unit 4 acted on this direct session despite the
+  scope=none fail-safe — his 4× interrupts + exit (no scope-logic edits);
+  scope verdict single (L614), spawned-map population untraced → verify at
+  fix time; `surface=` version hash + `ask_maintainer` timer (~5 min, his
+  idea) proposed.
+- His rulings this session: auto-resume DEACTIVATED (a000dfd, file moved to
+  `.opencode/plugin/deactivated/`; he had to exit opencode to stop the
+  resume storm). Workflow binding for direct sessions: one item at a time,
+  ask to clarify, follow the stop line (I broke it — 88%→103%), direct
+  sessions are for interaction.
+- Open design questions (his, undecided): direct session = new "autorun"
+  entry (his stop/interrupt + `ask_maintainer` must stop the loop); planner
+  compaction budget exhaustion (keep=0 + same-session resume + budget reset
+  vs. higher cap — bit-rot risk).
+- #80 LANDED + planner-verified (4098253, worker-2
+  ses_f371e0e23ffe0eza71uD5qWy7K, worker_Q3S_160K): agent-retention in both
+  injected promptAsync bodies (+`agent-omit=` line), cap semantics
+  (pendingInject TTL 120s — an injected busy consumes the mark, only a real
+  busy resets; cap 2), `scope=` verdict line, `surface= v=<8hex>`. Smoke
+  76/76 (planner re-ran), pytest 459+1w, ruff F=0, probe 240/241
+  (pre-existing [97] red → #81). H1 REFUTED (44 user parts, zero marker
+  hits); H2 leading — testable via the new log lines. Worker-1
+  (ses_f3950da93ffeZ6qSsewYup8ElY) had died at its 110k limit with ZERO code
+  changes — the checkpoint-draft salvage mechanism worked (maintainer saved
+  it; no task_id survived the cancelled result). Live acceptance (#80
+  criteria b/c) + re-activation = his call.
+- Maintainer's compact_memory temp fix (0f192e5, 2026-09-22_13-21): the
+  promptAsync message injection is commented out → the queued-message race
+  is gone; SELF compaction should work again until a proper fix (unverified).
+- #80 LIVE (2026-09-22): he re-activated the plugin (380e326 — file moved
+  back to `.opencode/plugin/`; plugins are auto-scanned, no config entry)
+  + restarted opencode. First live gen (12:25:47Z) prints
+  `surface= v=0bb5c46f` — hash-verified BYTE-IDENTICAL to the #80-fixed
+  build (4098253; on-disk hash matches too). The new gen is already
+  watching this session live (12:30:33 part events). Live acceptance
+  pending: (c) this session's next idle → expect `scope= none
+  sid=ses_f39d250e9…` + NO injection (the exact pre-fix failure mode — the
+  strongest live proof); (b) first injection event → injected agent in DB
+  + cache-read high; plus the `route=` lines (#70 residue).
+- #81 ruling recorded (his 2026-09-22): re-pin to the temp-fix behavior
+  (recommended over deactivation) — next unit.
+- LIVE SCOPE INCIDENT (12:33:18Z, gen v=0bb5c46f): unit 4 fired on this
+  direct session — `scope= planner` verdict + `recovery= attempt=1` +
+  `arm= … injected` (cap fix works live: injected busy consumed). CAUSE
+  identified: his clarifying-question message QUOTES the literal
+  `<|autonom|>` (user part) → `userHasMarker` scans all user parts →
+  scope=planner. → TODO #82: scope verdict = FIRST user message only
+  (fail-safe) + smoke check. Original 2026-09-21 incident remains H2
+  (runtime shape — no user marker at the time). Criterion (b) pending:
+  the injected agent in the DB for the 12:33 recovery message — verify
+  next turn. This turn ends `action: stop` → unit 4 `route= stop`
+  (live-proves the #70 residue route line).
+- Criterion (b) VERIFIED LIVE (DB, 12:33:18Z): both injections
+  (unit-2 trigger 1.020 + unit-4 recovery) carry
+  agent=planner_Q3S_160K — the pre-fix "build" behavior is gone; the
+  following assistant turn same. #80 close = his confirm + (c) after #82.
+- compact_memory SELF path VERIFIED LIVE (2026-09-22 14:42 ctx.log
+  `COMPACT` line, keep messages=12; gauge 144944→~57k): his temp fix
+  (0f192e5) works — the queued-message race is gone. His FYI: a gauge
+  readout immediately post-compaction = the compaction MODEL's own
+  context fill (2-tool-call lag), not the target session's new fill.
+- #81 LANDED + planner-verified (af38e2f, worker_Q3S_160K
+  ses_f36d1ca53ffe0GXACaVwW9iCJO): probe [97] + the compact_memory smoke
+  pin re-pinned to the temp-fix behavior (NOT deactivated) — gate
+  re-run by the planner: 241/241 / 53/53 / 459+1w / F=0. Codified in
+  this commit: the `--info` marker (his announcement — no immediate
+  action; addressed once the current task concludes) is in the
+  canonical marker table + ladder + sweep, and the commit-hash DoD rule
+  is in agent_readme_task_spec.md (after two worker stumbles — the #80
+  precedent + the af38e2f stumble).
+- compact_memory SELF race measured this session (logged: feedback +
+  knowledge inbox): the queued message delivers BEFORE the background
+  compaction → cache invalidation → 160k hard-limit stall. Maintainer's
+  temp fix (0f192e5) commented out the queued-message injection → the race
+  is gone and SELF compaction should work again (unverified); side effect:
+  probe [97] + compact_memory smoke pin red → #81 (his call: re-pin to the
+  temp-fix behavior, or re-pin at the proper message fix).
+- Toggle design AGREED (his ruling 2026-09-22, all my open questions):
+  LAST-TOGGLE-WINS over user history (bidirectional — deactivate AND
+  reactivate mid-session; context preservation = his stated
+  motivation), OWN-LINE anchor (message-start ruled out — the ctx:
+   gauge line always prefixes the message), ON = `<|autonom|>` AND
+   `<|Autorun|>` (CONFIRMED 2026-09-22: both recognized, CASE-INSENSITIVE),
+   OFF = `<|Direct|>` (case-insensitive); scope re-evaluated on every new
+   user message; #82 re-scoped in TODO (first-message-only proposal
+   superseded). DESIGN NOW FULLY AGREED (all items incl. markers). His live
+  test: he HIJACKED the unit-2 injection message and will check whether
+  autorun re-engages after a restart — under the CURRENT all-parts
+  scan it WILL (his message quotes the marker); after #82 it must NOT
+  (no own-line toggle in history). OPEN for his call: OFF suppressing
+  unit 2 (85% trigger) as well or only unit 4 — the 85%-trigger
+  behavior was explained in this turn's closing (unit 2 = context
+  trigger on busy events, once per busy cycle; unit 4 = liveness
+  watchdog on idle; `action:` lines route unit 4 ONLY — unit 2 ignores
+   them by design).
+- Unit 2/4 semantics nailed (2026-09-22, from auto_resume.ts L745-790
+  + L851-868): UNIT 2 = context-saturation trigger — on the busy→idle
+  transition, if ratio >= 0.85 AND autoCompact on → exactly ONE
+  self-compact prompt naming the ratio; scope-INDEPENDENT (iterates all
+  watches, never reads the action: line). UNIT 4 = liveness watchdog —
+  on idle, scoped sessions only, reads the LAST assistant action: line
+  (stop/ask → no send + route logged; restart → spawn successor; no
+  line → CONTINUE, capped). So unit 2 ignoring `action: stop` is
+  INTENDED — orthogonal axes (loop control vs context safety).
+  RECOMMENDATION (pending his confirm): the `<|Direct|>` OFF toggle
+  gates ONLY unit 4 (the scope verdict); unit 2 stays under the
+  autoCompact config (fires for direct + scoped alike) — a direct
+  session at 94% still needs compaction to survive a re-engagement.
+- Unit-2 threshold problem confirmed (2026-09-22, his math machine-checked):
+  at 0.85 the trigger fires at 127.5k of a 150k usable window (170k ctx,
+  20k reserve) → 42.5k (28.3% of usable) never used for work. `min(20000,
+  output)` reserves the CURRENT output limit, not the max a turn can emit —
+  the wrong axis. Action: configurable `saturationThreshold` (default 0.95)
+  + `outputReserve` (default 20000) via the budget file, per-tick fail-open —
+  SPECED + DELEGATED this turn (worker_Q3S_160K). Filed #83 (maintainer
+  call): the limit-detection backstop ALREADY EXISTS — deactivated
+  `context_recovery.ts` (on the overflow `session.error`, compacts + returns
+  `{handled:true,action:retry}` = a single clean retry vs the slow 5-6
+  tail-removal loop; over budget → clean fail/stop; same ≤2/session budget).
+  It's the enabler to raise the threshold to ~0.98. KEY UNCERTAINTY: the
+  host must actually call the hook on overflow — needs a live check. His
+  side note: backend output limits would also cap ramblers + avoid a long
+  output straddling the threshold (noted, not acted). LANDED 2026-09-22
+  (86713d8, worker_Q3S_170K): `saturationThreshold` (default 0.95) +
+  `outputReserve` (default 20000) per-tick fail-open; smoke 89/89 + probe
+  241/241 + gate green. FINDING (friction-logged): the auto_resume smoke
+  had a STALE load path since the 380e326 reactivation (pointed at the old
+  deactivated path → ERR_MODULE_NOT_FOUND), so the earlier "76/76" baseline
+  was unreachable/stale; load path now fixed to the live file (89/89 is
+  genuinely live). #83 backstop still open (his call).
+- Compaction-arch design exchange (2026-09-22, his questions): confirmed
+  (a) `emergencyRecovery` is OUR flag in opencode.jsonc (NOT official) —
+  move to compact_budget.json; (b) context_recovery KEEP_TOKENS=30000 /
+  KEEP_MESSAGES=12 are HARDCODED — move to compact_budget.json defaults;
+  (c) context_recovery's synthetic `promptAsync` directive (L304-315) =
+  the SAME racy pattern the temp fix 0f192e5 disabled in compact_memory →
+  as written it WOULD disrupt compaction (his #6, answered). Direction
+  (his proposal, agreed): centralize ALL compaction config in
+  compact_budget.json + MERGE compact_memory + context_recovery into one
+  plugin (consolidate summarize/budget/config), aligning context_recovery's
+  message handling to the temp-fix behavior. PREREQ: verify the host
+  actually calls the `session.error` hook on overflow (live check — his
+  action). NOT implemented — design phase. Tasks:   (1) config consolidation
+  (small), (2) live hook verification (his), (3) the merge (contingent).
+  EXTENSION (his, 2026-09-22): Task 1 also adds a `model_budget` map to
+  compact_budget.json — explicit per-model-ID → cap, REPLACING the
+  QUANT_CLASS_RULES substring table (compact_memory.ts L79-86: cpu→0,
+  q4→3, q3→3, q2→1, default 1; has a probe-pinned trap). Unlisted model →
+  default 1; wrong key → fails safe (no match). CPU cap-0 to be kept as a
+  guard (his call). Trap probe pin updates to "configured value".
+- Task 1 (config consolidation) LANDED (94029d5, worker_Q3S_170K, VERIFIED:
+  compact_memory 57/57, context_recovery ALL PASS, probe 241/241).
+  compact_budget.json is now the single compaction-config source: model_budget
+  map + default:1, keepTokens/keepMessages defaults, emergencyRecovery moved OUT
+  of opencode.jsonc. TODO #84 LANDED. NOTE: the worker self-compacted mid-task
+  (recon checkpoint 340e9a6) and I resumed via task_id — see the signaling note
+  below. His next step: ACTIVATE context_recovery + run the session.error live
+  check (the backstop / #83 gating question).
+- Worker self-compact SIGNALING shortcoming (his design Q 2026-09-22, design
+  phase): a self-compacted worker returns to the planner with an ambiguous Work
+  State dump (no action line, no closing message); the compact_memory
+  continuation `message` (the worker's "resume-by X" intent) is queued in the
+  WORKER session, NOT visible to the planner. The worker DID commit an IN PROGRESS
+  checkpoint (340e9a6) but didn't clearly signal "resume me." PROPOSAL (Option A,
+  for his ruling): a worker self-compacting mid-task MUST commit a PAUSE handover
+  to handover_task_to_planner.md FIRST ("SELF-COMPACT PAUSE (not done) —
+  checkpoint <hash> — resume via task_id — next X — head files Y"); the planner,
+  on an ambiguous worker return, reads the committed handover for the
+  authoritative state. Alternative (his idea): a cross-session queued message to
+  the planner (needs a new mechanism). NOT implemented — prompt/convention change.
+- SIGNALING RESOLVED (2026-09-22, his design Q): the RELIABLE, non-convention,
+  zero-new-mechanism signal = **grep ctx.log for the worker session's COMPACT line**
+  (our compact_memory tool writes `<date> COMPACT <sessionID> tokens=N messages=N`
+  on verified success). EMPIRICALLY CONFIRMED this turn (the worker's self-compact
+  left `COMPACT ses_f359ce94...` at 20:44). In-result cross-check: the compaction
+  summary (returned as the Task result) starts with `## Objective` (SUMMARY_TEMPLATE
+  forces "Output exactly the structure"; a normal worker closing never uses that
+  form). So on an ambiguous worker return: recognize the Work State form (`##
+  Objective`) → grep ctx.log for the session COMPACT line to CONFIRM → resume via
+  task_id using the summary's `## Next Move`. No new mechanism, no fragile
+  convention. Option B (custom compaction prompt → machine line, wired into the
+  tool call; the 2-prompt first/subsequent distinction handled via the compaction
+  count) = the hardening ONLY if the token must live inside the result (MEDIUM
+  effort, deferred).
+- --info reading discipline (his note, priority.md 2026-09-22_20-42): the worker
+  burned context on careless greps (20k from TODO.md, then further reads).
+  Strengthen reading discipline in the worker prompt / specs (no wholesale
+  TODO.md greps; targeted reads; use the inventory scripts).
+- #85 scope GENERALIZED (his ruling 2026-09-22): unit-4 scope = actual PLANNER
+  (always) ∪ `<|Autorun|>`-toggled sessions (the #82 own-line toggle) — NO new
+  marker; drop the planner-only gate so unit 4 follows the #82 scope for ANY
+   agent type → he can run prompt_builder / a future researcher / etc. in a loop
+   by toggling them with `<|Autorun|>`. Freshly-spawned + unmarked worker
+   sessions stay OUT of scope (not a planner, not `<|Autorun|>`-marked) → fixes
+   #85 (the spawn loop) AND the spurious worker-resume. Same auto_resume.ts
+   scope-refinement task as #85's fix.
+- #85 part 1 LANDED + VERIFIED (97fccfc, worker_Q3S_170K
+   ses_f351feb02ffeScmZIiycmB79GD — the worker COMMITTED then hit the limit on
+   its result; I rebuilt from files per MEM-0104, never relaunched): unit-4
+   scope = actual PLANNER (agent field) ∪ `<|Autorun|>`-toggled sessions (any
+   agent); self-spawned + unmarked worker sessions OUT of scope → the spawn
+   loop is gone. The #82 scope-toggle (last-toggle-wins, own-line, ON =
+   `<|autonom|>`/`<|Autorun|>` ci, OFF = `<|Direct|>` ci) was BUILT in-task —
+   my spec (d1566eb) misstated #82 as LANDED when it was unimplemented
+   (friction 7ce94f3). Gate: auto_resume smoke 97/97 (was 89; +8 scope/toggle
+   checks), probe 241/241, pytest 459+1w, ruff F=0. #82 status: scope-toggle
+   LANDED; remaining = live acceptance (his post-restart test) + the
+   unit-2-suppression question (his call).
+- Planner memory recording (his ask, 2026-09-22 "do not explain these again"):
+   MEM-0104 addendum (a context-limit failure can arrive AFTER the work is
+   COMMITTED — check git log before relaunching) + MEM-0105 (in the serial
+   one-slot setup a delegation is INSTANT to the planner — the worker
+   experiences the runtime; judge from files/logs, not perceived time) +
+   MEM-0106 (a self-compacted sub-agent returns the COMPACTION SUMMARY as the
+   Task result — recognize it by the `## Objective` Work State form + the
+   guaranteed ctx.log `COMPACT <sessionID>` line, then resume via task_id).
+   Committed by the maintainer in 8356cc9 (with his compaction_prompt.md /
+   ideas.md / priority.md).
+- #85 UnknownError bug RE-TRIGGERED this turn: I hit my context limit
+   mid-verification → the OLD live auto_resume code (pre-restart) tried a
+   recovery → the UnknownError (the #85 loop). The maintainer ran a manual
+   compaction on me + RESTARTED opencode → the NEW code (97fccfc, #85 part 1)
+   is now LIVE. #85 part 2 still OPEN.
+- #85 part 2 ROOT CAUSE FOUND + DESIGN AGREED (2026-09-23): the UnknownError
+   is PLUGIN-CAUSED, not host-side — `PLANNER_AGENT_ID = "planner_Q3S_160K"`
+   (auto_resume.ts L158, hardcoded) no longer matches the live roster
+   (`planner_Q3S_170K`), so every planner-scoped CONTINUE/spawn sends a
+   non-existent `agent` → `promptAsync` throws. Confirmed: exactly one planner
+   agent in the live roster; 3 stale refs in auto_resume.ts (L76/L155 comments
+   + L158 constant); no other stale agent/model hardcodes in plugin/tool code
+   (the Gemma strings in probe/smoke are intentional test fixtures). SEQUENCE
+   explained: no-line idle → 2 CONTINUE attempts (cap 2) both fail
+   (UnknownError) → cap exhausted → no successor → ONE fallback spawn (not a
+   loop — part 1 removed the loop). RE-SCOPED part 2 (his ruling, better than
+   my roster-planner proposal): (1) the CONTINUE/spawn body carries the
+   CURRENT session agent + modelID (last assistant message `info.agent`/`info.model`,
+   reflects mid-session switches, preserves the resume cache, works for
+   non-planner agents), resolved at fire-time only; fallback = opencode.jsonc
+   lookup, then no field (host default) — NEVER a planner constant. (2)
+   dead-mark on a failed CONTINUE (`send-fail=`), cleared on a fresh busy (same
+   axis as recoveryCount) → no cap-exhaustion fallback spawn; a dead model →
+   session never busy → mark persists → no 5s retry    loop. LANDED (code b038b92 + handover 48c7991, worker_Q3S_170K): the stale
+   PLANNER_AGENT_ID is removed; injected bodies carry the session's current
+   agent+modelID (last-assistant info.agent/info.model → opencode.jsonc
+   fallback → no field); dead-mark on a failed CONTINUE (skip retries +
+   fallback spawn; cleared on fresh busy; dead model → mark persists).
+   auto_resume smoke 105/105 (97 kept + 8 new), probe 241/241, all smokes,
+   pytest 459+1w, ruff F=0. NOTE: model_budget is NOT read by auto_resume (it
+   reads autoCompact/saturationThreshold/outputReserve only) — the
+   model_budget is live in compact_memory (triggered by unit-2 self-compact),
+   not in auto_resume itself. (The worker committed code + handover in two
+   commits to satisfy the hash rule; the smoke's "(d)" fixture agent
+    planner_Q3S_160K is a sandbox fixture, not a stale pin — the fix carries
+    the session's current agent.)
+ - #85 part 3 BUG FOUND (2026-09-23, live test by maintainer) + fix design
+   AGREED (awaiting his 2 answers, then spec+delegate): the smoke (105/105)
+   PASSED but the LIVE system exposed a scope bug in Unit 2. ROOT CAUSE:
+   `tick()` (L998) loops over ALL `watches` — Unit 2 fires on ANY watch that
+   is `armed && idle && ratio≥threshold && autoCompact on`, with NO "current
+   session" concept. So: (1) Unit 2 re-fires on STALE sessions (session 1,
+   armed at 114%, went idle, stayed armed → fired the instant autoCompact
+   flipped on, reviving an abandoned session); Unit 4 fired on it too (it's
+   the real planner, in scope — same "no liveness check" gap). (2) Unit 2
+   LOOPS: the once-per-busy-cycle budget (w.attempts, L471/L1051) resets on
+   every fresh busy, and the self-compact nudge itself is what makes the
+   session busy again → nudge→busy→idle→reset→nudge… (his "continuously
+   fired, only an opencode exit stopped it"). Unit 2 has NO dead-mark + NO
+   global cap (unlike Unit 4). (3) `<|Direct|>` only gates Unit 4
+   (routeScopedIdle), NOT Unit 2 (sendSelfCompact never consults the scope
+   verdict) → Direct kills the CONTINUE spam but the saturation nudge
+   continues. FIX DESIGN (RESCOPED 2026-09-23, maintainer rulings): Unit 2
+   REDESIGN — the nudge is PASSIVE (appended to the tool-call return, the
+   same channel as the ctx: line), PER busy session, NO promptAsync, NO
+   resume (resuming is Unit 4's domain) — this eliminates the loop + the
+   stale-session revival by construction (a session only emits a ctx line
+   while actively working). Nudge LADDER (like ctx_gauge): ≥
+   saturationThreshold (0.95) → "self-compact now" suffix; a higher rung
+   (≥ 0.98) → a --maintainer-flagged line. Multiple active workers each get
+   their own nudge independently (future parallel-worker proof). (c) Direct
+   suppresses the Unit-2 ctx-line suffix. (d) scopeVerdict checks the LAST
+   OWN-LINE TOGGLE first (Direct beats the planner test) → Direct deactivates
+   Unit 4 for the planner. NO <|Off|> (Direct already covers it — dropped
+   per maintainer). Unit 4 scope UNCHANGED (wherever the last busy→idle
+   happened). MAINTAINER ACTIONS (this turn): set the model context to 50000
+   (ratio 2.238 was from usable 45000 vs a 100701-token session), deactivated
+   autoCompact in the json config, and did a CLEAN RESTART (I was being
+   nudged into a loop by the injected messages). NEXT: spec written
+   (handover_task.md) + a NEW PLANNER session takes over (this session was
+   looping in its thinking).
+ - #86 FILED (deferred, maintainer-proposed): worker audit of all plugin/tool
+   code for stale hardcoded agent/model IDs + code smells (read-only, after
+   #85 part 2 lands).
+- compact_budget.json (2026-09-23, his check): model_budget keys are
+   superset-correct (every live agent model has a cap; unlisted → default:1;
+   CPU → 0). `Qwen3.8-27B-Q3S-140K-HQKV` (the worker_Q3S_140K_HQKV model) is
+   ABSENT → falls to default:1 (safe; optional: add cap 3 to match the other
+   Q3S models). `emergencyRecovery: true` is ON (the #83 gating flag).
+- NEXT (his priority order): (1) #85 part 2 (global cap + dead-mark) —
+   spec + delegate (the safety for a single failed recovery; the scope
+   refinement (part 1) already removes the loop); (2) #82 live acceptance
+   (his post-restart test) + the unit-2-suppression question (his call);
+   (3) #80 close (his confirm — (b) verified, (c) gated on #82); (4) #83
+   context_recovery backstop (his activation + the live session.error
+   check); (5) TODO.md shrink (~40k tokens); (6) research spec (priority.md
+   #1); (7) TODO #78 scoping.
+- Carried parked ideas (unchanged): smaller NAP snapshot via opencode.jsonc
+  agent prompt; reality-rebuild tool; pathfinder-mentality prompt part;
+  looprunner-retirement decision; feedback integration on planner close-up;
+  worker git-hash closing confusion (ideas.md).

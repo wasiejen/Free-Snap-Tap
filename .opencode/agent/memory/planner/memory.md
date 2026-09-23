@@ -223,3 +223,38 @@ knowledge / NAP) is re-stated.
 - Related: MEM-0104, MEM-0105
 - Review when: the compaction summary template changes (the `## Objective` start)
    or the ctx.log COMPACT line format changes.
+
+## MEM-0107 — Worker limit-death forensics live in the dump's step-finish meta; the in-flight write is salvageable from the last message
+- Memory: when a worker session dies mid-task (empty Task result, NO ctx.log
+  COMPACT line for it), dump it (`node .opencode/agent/scripts/db/dump_session.cjs
+  <sid>`) and read the LAST step-finish meta: `reason=length` + a large
+  `output=N` = the per-turn OUTPUT cap cut the generation (a truncated write
+  tool call → the file change never lands — the tree stays clean for that
+  file), while `tokens.total` at the model's window = the context wall. The
+  dump's per-message byte sizes reveal where the window went — a worker's own
+  giant outputs (design/plan prose, 15k+ tokens per message) can burn MORE
+  than the file reads. The in-flight write is salvageable VERBATIM: the dump's
+  last message = everything from the last `## msg_` header to EOF. Successor
+  handoff = the on-disk uncommitted diff + the salvage file + the spec, with
+  explicit instructions: write in chunks (≤ ~8KB ≈ 2k tokens per write/edit),
+  read ONLY the needed sections (not whole files), run the smoke early and fix
+  reds incrementally. A cross-compact + task_id resume of the dead session does
+  NOT save the rework when the kill was an output-cap mid-write (the text must
+  be re-emitted anyway) AND costs a same-model single-slot flush of your own
+  session — the fresh relaunch with salvage is the cheaper deterministic path.
+- Why it matters: plan8 (2026-09-23) worker-12 died exactly this way (23,156
+  output tokens cut mid-smoke-write, total 170,238 = the 170k wall; ~34k of
+  the window were two planning-prose messages). Compaction could not have
+  saved the smoke re-emission; the salvage made the fresh relaunch near-zero
+  rework.
+- Evidence: 2026-09-23 plan8 (planner ses_f33f1eb98ffeFvrnTdmTzmyE2x): dumped
+  ses_f33ee8eabffeaE0xuwZ7lc65NR — machine pass over per-message bytes
+  (17.2k + 16.4k token output planning messages; final step
+  reason=length output=23156 total=170238); smoke file untouched in the tree;
+  74KB salvage at .opencode/loop/autorun-2026-09-21_15-33/
+  plan8_worker12_smoke_draft.md.
+- Verified: 2026-09-23
+- Related: MEM-0104 (rebuild from files on a limit failure), MEM-0106
+  (self-compaction signals — the COMPACT line is the thing ABSENT here).
+- Review when: the dump format changes (step-finish meta / `## msg_` headers),
+  or chunked-write guidance proves unnecessary in a later looprun.

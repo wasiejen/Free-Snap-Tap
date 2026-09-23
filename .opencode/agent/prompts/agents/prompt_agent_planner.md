@@ -290,8 +290,8 @@ one at a 90 %.
   `--maintainer` too, `--defer` matches `--deferred` too; the filter removes
   known non-live references, not his live files):
   ```
-   grep -rn -- "--main\|--now\|--info\|--todo\|--defer\|--wip\|--comment" \
-    --include="*.md" .opencode/ TODO.md README.md WIKI.md 2>/dev/null \
+   grep -rn --include="*.md" -e "--main\|--now\|--info\|--todo\|--defer\|--wip\|--comment" \
+    .opencode/ TODO.md README.md WIKI.md 2>/dev/null \
     | grep -v "_past_priorities\|/done/\|agent_feedback\|nap_direct\|archive/"
   ```
   He may be pointing your attention to something. (Verified 2026-09-12: no

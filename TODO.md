@@ -1063,9 +1063,10 @@ restart detection" wording above is the pre-revision numbering.
      the Unit-2 path (no resume, no loop, stale sessions unreachable by
      construction); scopeVerdict checks the LAST OWN-LINE TOGGLE FIRST —
      Direct deactivates Unit 4 for the planner (d); the Unit-4 scope is
-     unchanged — auto_resume smoke 102/102 (baseline 105: the old
-     promptAsync-era checks adapted to the passive mechanism); the commit
-     hash is recorded by the planner in the follow-up bookkeeping
-     commit). The post-restart live verification stays a maintainer call.
+      unchanged — auto_resume smoke 102/102 (baseline 105: the old
+      promptAsync-era checks adapted to the passive mechanism) — ded7245
+      (code + smoke + TODO) + 5992f38 (handover), recorded by planner-8 in
+      the 2026-09-23 bookkeeping commit). The post-restart live
+      verification stays a maintainer call.
      The orphan-session cleanup is DONE (the maintainer removed all the
      new sessions, 2026-09-22).
