@@ -1,117 +1,59 @@
-# Worker summary — #85 part 3 (DONE — full gate green)
+# HANDOVER (worker-14, worker_Q3S_170K) — auto_resume smoke wall-time reduction
 
-Task spec: `handover_task.md` (#85 part 3 — Unit 2 nudge as a passive ctx-line
-suffix (no resume) + Direct gates Unit 2 + Direct beats planner in
-scopeVerdict). Branch: `opencode_test`.
-Code commit: `ded7245` (auto_resume.ts + smoke + TODO.md). This follow-up
-commit carries only the finalized handover (the #85 commit hash is recorded
-by the planner in the bookkeeping, per the task).
+**Status: DONE — all DoD points met.** Branch `opencode_test`.
+Code commit: **532ddbc**. (Follow-up commit: this handover + TODO #88 + friction.)
 
-Takeover note: I took over from dead worker-12 (no commit, smoke/TODO
-untouched). Its complete uncommitted `auto_resume.ts` implementation was on
-disk (planner-reviewed) — I kept it, verified changes 2–4 were covered, and
-fixed two stale "per-tick" comments (autoCompact/saturationConfig headers —
-now "per nudge-eligible call").
+## Measured result (DoD 1)
+- **Before:** `time node .opencode/plugin/tests/auto_resume.smoke.mjs` → **2m25.523s (145.5s)**, 102/102.
+  (His complaint said ~300s; the measured baseline on this host was 145.5s — I report the measurement.)
+- **After:** same command → **12.465s** (run 1), **13.123s** (run 2 — stable), 102/102.
+- **Reduction: 91.4 % (11.7× faster)** — target was ≥50 %.
 
 ## What changed
+1. **Plugin (`auto_resume.ts`, default-preserving):** the factory now reads an
+   OPTIONAL `tickMs` from the input object (validated: finite number > 0, else
+   5000). The live host never passes it → the tick stays **5000 ms**; no named
+   export added (the smoke pins default-only exports, L87-88). The module-level
+   `tickTimer` guard is unchanged — the FIRST factory call sets the period
+   (smoke re-factories don't re-arm it).
+2. **Smoke (`auto_resume.smoke.mjs`):** the first factory call passes
+   `tickMs: 300`; the 7× `sleep(5600)` became `tickWait()` = 2 ticks + 200 ms
+   margin (same "at least one full tick period" pin semantics); `waitUntil`
+   (200 ms poll, bounded deadline) is UNCHANGED — it now resolves in ~0.5 s
+   instead of ~5 s because the tick fires every 300 ms.
 
-`.opencode/plugin/auto_resume.ts` (from worker-12's on-disk state, verified):
-1. **Unit 2 redesign — passive ctx-line suffix.** The Unit-2 tick leg is
-   REMOVED from `tick()`; `sendSelfCompact` (promptAsync) is GONE. New
-   `onToolAfterNudge` on `tool.execute.after` (the gauge plugin's `ctx:`
-   line channel — the same `output.output` mutation): per busy session, a
-   tool result IS the activity evidence. GATES in order (cheap first): watch
-   with positive tokens + known model → autoCompact ON (per-call file read)
-   → model limits resolve (cached) → usable window > 0 → ratio ≥ threshold →
-   the ONE expensive step: fresh `messages()` fetch + `scopeVerdict`; verdict
-   "none" (Direct/non-scoped) → no suffix. LADDER (highest rung): ≥ 0.98 →
-   `⚠⚠ --maintainer: context saturated at ratio=… — self-compact NOW`; else
-   ≥ threshold (default 0.95, per-call configurable) → `self-compact now
-   (ratio=…)`. `nudge=` log line ONCE per busy cycle (dedup on `w.attempts`,
-   reset on fresh busy — independent of Unit 4's `recoveryCount`). NO
-   promptAsync (no resume/queued turn/busy/budget-reset/loop); stale idle
-   sessions get no nudge by construction (they emit no tool results). Never
-   throws out of the hook.
-2. **(c) Direct suppresses the Unit-2 nudge** (verdict "none" → silent, no
-   per-tool-result log line — v1.x log-growth discipline).
-3. **(d) `scopeVerdict` toggle-first:** the last own-line toggle is checked
-   BEFORE the planner test — toggle OFF (`<|Direct|>`) → "none" (beats the
-   planner test — a Direct planner is OUT of scope), toggle ON → "autorun"
-   (any agent type), NO toggle → falls through to the planner test →
-   "planner"/"none". (The on-disk code was planner-first — the reorder was
-   needed and done.)
-4. **Unit 4 scope UNCHANGED** (wherever the last busy→idle happened). No
-   `<|Off|>`.
+## Why no check semantics changed (DoD 2 — still 102/102, nothing removed)
+Verified from the plugin source, not assumption: the tick only routes sessions
+with `idlePending === true`, and `routeScopedIdle` clears that flag on EVERY
+decision path (only an in-flight send latches it, held microseconds) — one
+decision per idle cycle, so a faster tick cannot double-route, double-fetch, or
+double-spawn. `checkSpawnTrigger` is silent when the trigger file is absent.
+The NO-fire pins ("one full tick period passed, nothing happened") are
+satisfied by ≥2 ticks during the 600 ms wait — same assertion, fewer seconds.
 
-`.opencode/plugin/tests/auto_resume.smoke.mjs` (baseline 105 checks → 102):
-- Unit-2 section rewritten to the passive mechanism (spying `messages`
-  script + `toolAfter` driver; scenario sessions stay busy — no idle, an
-  idle would route Unit 4). New DoD checks: stale-armed no-fire (+ pin that
-  Unit 4 still routes it — `route= stop`), 0.95/0.98 ladder, per-session
-  independent nudge, (c) Direct worker no-suffix, no promptAsync on the
-  Unit-2 path, per-step suffix re-append + once-per-cycle `nudge=` dedup,
-  fresh-busy dedup reset, dual-shape string-busy, throwing-`messages()`
-  fail-safe, missing-provider.
-- autoCompact + config sections adapted to per-tool-result reads (silent
-  suppression when OFF, no `skip=` line; per-call live-edit of
-  saturationThreshold/outputReserve; fail-open defaults).
-- Old "#80 agent-retention" section (pinned the agent field in the unit-2
-  SEND body — the send no longer exists) replaced by the nudge's scope-gate
-  checks (spawned / no-toggle worker / no-toggle no-agent → verdict none →
-  no suffix; Unit 4 routes all three scope= none, no sends).
-- New Direct DoD section: PLANNER + trailing `<|Direct|>` → no ctx-line
-  suffix (Unit 2 suppressed) AND no Unit-4 CONTINUE (Unit 4 deactivated for
-  the planner) — both units pinned in one scenario.
-- `smokeSids` live-log guard extended: 14 new sids + the config-era sids the
-  old list was missing (ses_u2_cfa/cfb/cfc/cfd — a small guard gap found and
-  fixed in-scope).
-- Smoke header (Unit 2 + SCOPE paragraphs) updated to the passive design.
+## Full gate (DoD 3) — all measured after the change
+- handover_probe: **241/241 PASS**
+- smokes: auto_resume **102/102**; block_transfer.sandbox 52/52; block_transfer
+  22/22; compact_memory 57/57; context_recovery ALL PASS; ctx_gauge 3/3;
+  gauge_core ALL PASS; intercept_observer 39/39; loop_log 24/24; submit 20/20
+- pytest: **459 passed, 1 warning**
+- ruff F: **0** (all checks passed)
 
-`TODO.md`: #85 title + status line — "part 3 (Unit-2 ctx-line-suffix +
-Direct gates) LANDED 2026-09-23" (NO commit hash — the planner records it in
-the follow-up bookkeeping commit, per the task).
+## Default preservation (DoD 4)
+Live tick stays 5000 ms (option absent → default path; validated non-number /
+≤0 → 5000). No nudge/routing logic touched. The option is test-only in effect.
 
-## Measured verification (all green)
-
-- auto_resume smoke: **102/102 ALL PASS** (baseline 105; 47 promptAsync-era
-  checks replaced by 44 adapted/new — net −3; every old intent covered).
-- Gate probe: **241/241 PASS** (the probe's kind-tally line self-annotates
-  `nudge==14` — the hook is covered).
-- All other plugin smokes: block_transfer.sandbox 52/52, block_transfer 22/22,
-  compact_memory 57/57, context_recovery ALL PASS, ctx_gauge 3/3, gauge_core
-  ALL PASS, intercept_observer 39/39, loop_log 24/24, submit 20/20.
-- pytest: **459 passed, 1 warning** in 2.30s.
-- ruff `--select F`: **All checks passed** (F=0).
-
-## Commits
-
-- `ded7245` — auto_resume.ts + smoke + TODO.md (the task commit).
-- (this) handover-only follow-up commit.
-
-## TODO entries
-
-None new. One in-scope fix noted above (smokeSids guard gap) — closed inline.
+## TODO
+- **#88** appended (one-line LANDED record) — the complaint had no prior
+  numbered entry (flagged as friction via submit).
 
 ## Deliberately NOT done
-
-- Did NOT restart opencode (changes take effect on the next restart —
-  DO-NOT-touch). Post-restart live verification stays a maintainer call.
-- Untouched: the #82 scope-toggle logic (built on, not broken),
-  `compact_memory.ts` + `context_recovery.ts`, the Unit-4 scope, the live
-  `.opencode/temp/compact_budget.json`, `opencode.jsonc`,
-  `.opencode/maintainer/`, `.opencode/agent/prompts/`.
-- No new TODO entries: the two stale "per-tick" comments were fixed inline
-  (comments only, pre-approved).
+- No parallelization of sections (shared spy clients + module-level state make
+  isolation non-trivial; unnecessary at 12.5 s).
+- `waitUntil` deadlines (8 s / 12 s) left as-is — safety margins, now mostly
+  unused.
+- No short tick for the probe or other smokes (probe doesn't exercise
+  auto_resume; out of scope).
 
 ## Friction
-
-(Logged via `submit(feedback=…)`: the salvaged worker-12 draft's line-range
-claims for the smoke header were off by one (L5-8 vs actual L4-7) — the
-anchor-verified splice caught it before writing; salvaged drafts should
-carry explicit final-decision markers on their self-corrections, e.g. the
-stale-check `route=` assertion flip.)
-
-Lessons: for a multi-block smoke rewrite, anchor-verified line-range splices
-(machine-checked, bottom-up) beat giant exact-match edits — and running the
-smoke after the first runnable chunk exposed nothing (stage 1 was green
-except the expected old-section reds).
+1 submit(feedback) line fired pre-handover (the #88 numbering gap above).

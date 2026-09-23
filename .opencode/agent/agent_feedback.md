@@ -440,3 +440,6 @@ Salvaged worker-12 draft's smoke line-range claims were off by one (said L5-8, a
 ### 2026-09-23_05-57 planner_Q3S_170K ses_f33f1eb98ffeFvrnTdmTzmyE2x
 1) The planner-prompt READY-MADE marker sweep silently dropped its .md filter: with `--include="*.md"` placed AFTER `--`, grep swallows it as a filename (error to /dev/null) → the whole .opencode tree incl. the multi-MB plugin.log got searched (~50KB noise this session). Fixed in prompt_agent_planner.md (put --include before, pattern via -e) + verified clean — commit 8f21b1e. 2) The edit tool reported "oldString not found" for a TODO.md title edit that HAD applied (line count changed, new text present) — before retrying a "failed" edit, verify the disk state first (the tool report can be wrong).
 
+### 2026-09-23_12-34 worker_Q3S_170K ses_f3237593effeGgPtp8RtS0ftQl
+Task spec DoD required a "TODO.md close note" but the smoke wall-time complaint (2026-09-23_00-12) had no numbered entry in TODO.md — worker had to self-assign #88; number complaint entries at spec time.
+
