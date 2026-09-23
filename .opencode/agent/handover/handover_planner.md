@@ -268,9 +268,38 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
    model_budget is live in compact_memory (triggered by unit-2 self-compact),
    not in auto_resume itself. (The worker committed code + handover in two
    commits to satisfy the hash rule; the smoke's "(d)" fixture agent
-   planner_Q3S_160K is a sandbox fixture, not a stale pin — the fix carries
-   the session's current agent.)
-- #86 FILED (deferred, maintainer-proposed): worker audit of all plugin/tool
+    planner_Q3S_160K is a sandbox fixture, not a stale pin — the fix carries
+    the session's current agent.)
+ - #85 part 3 BUG FOUND (2026-09-23, live test by maintainer) + fix design
+   AGREED (awaiting his 2 answers, then spec+delegate): the smoke (105/105)
+   PASSED but the LIVE system exposed a scope bug in Unit 2. ROOT CAUSE:
+   `tick()` (L998) loops over ALL `watches` — Unit 2 fires on ANY watch that
+   is `armed && idle && ratio≥threshold && autoCompact on`, with NO "current
+   session" concept. So: (1) Unit 2 re-fires on STALE sessions (session 1,
+   armed at 114%, went idle, stayed armed → fired the instant autoCompact
+   flipped on, reviving an abandoned session); Unit 4 fired on it too (it's
+   the real planner, in scope — same "no liveness check" gap). (2) Unit 2
+   LOOPS: the once-per-busy-cycle budget (w.attempts, L471/L1051) resets on
+   every fresh busy, and the self-compact nudge itself is what makes the
+   session busy again → nudge→busy→idle→reset→nudge… (his "continuously
+   fired, only an opencode exit stopped it"). Unit 2 has NO dead-mark + NO
+   global cap (unlike Unit 4). (3) `<|Direct|>` only gates Unit 4
+   (routeScopedIdle), NOT Unit 2 (sendSelfCompact never consults the scope
+   verdict) → Direct kills the CONTINUE spam but the saturation nudge
+   continues. FIX DESIGN (all additive in auto_resume.ts): (a) "current
+   session" gate for Unit 2 = the sid of the most recent REAL `arm=` event
+   (last session the user actually worked); only fire sendSelfCompact for
+   that sid (a stale armed watch never fires). (b) global cap + dead-mark
+   for Unit 2 (mirror Unit 4: a nudge not consumed by a real fresh busy
+   dead-marks it; cleared on a real fresh busy, not the injected one). (c)
+   route Unit 2 through the scope verdict — scope==="none" (Direct)
+   suppresses the saturation nudge too. MAINTAINER ACTIONS (this turn): set
+   the model context to 50000 (ratio 2.238 was from usable 45000 vs a
+   100701-token session), deactivated autoCompact in the json config, and is
+   doing a CLEAN RESTART to stop Unit 4 (I was being nudged into a loop by
+   the injected messages). NEXT: his 2 answers (see open questions) → spec +
+   delegate (a)+(b)+(c).
+ - #86 FILED (deferred, maintainer-proposed): worker audit of all plugin/tool
    code for stale hardcoded agent/model IDs + code smells (read-only, after
    #85 part 2 lands).
 - compact_budget.json (2026-09-23, his check): model_budget keys are
