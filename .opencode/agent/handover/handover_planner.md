@@ -257,13 +257,19 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
    lookup, then no field (host default) — NEVER a planner constant. (2)
    dead-mark on a failed CONTINUE (`send-fail=`), cleared on a fresh busy (same
    axis as recoveryCount) → no cap-exhaustion fallback spawn; a dead model →
-   session never busy → mark persists → no 5s retry loop. SPEC LANDED
-   (ff26e0e, handover_task.md) + DELEGATE PENDING (self-compact → resume →
-   delegate worker_Q3S_170K). NOTE: model_budget is NOT read by auto_resume
-   (it reads autoCompact/saturationThreshold/outputReserve only) — the
+   session never busy → mark persists → no 5s retry    loop. LANDED (code b038b92 + handover 48c7991, worker_Q3S_170K): the stale
+   PLANNER_AGENT_ID is removed; injected bodies carry the session's current
+   agent+modelID (last-assistant info.agent/info.model → opencode.jsonc
+   fallback → no field); dead-mark on a failed CONTINUE (skip retries +
+   fallback spawn; cleared on fresh busy; dead model → mark persists).
+   auto_resume smoke 105/105 (97 kept + 8 new), probe 241/241, all smokes,
+   pytest 459+1w, ruff F=0. NOTE: model_budget is NOT read by auto_resume (it
+   reads autoCompact/saturationThreshold/outputReserve only) — the
    model_budget is live in compact_memory (triggered by unit-2 self-compact),
-   not in auto_resume itself. Two backend stops this session (he applied a
-   fix); compacting to a fresh window before delegating.
+   not in auto_resume itself. (The worker committed code + handover in two
+   commits to satisfy the hash rule; the smoke's "(d)" fixture agent
+   planner_Q3S_160K is a sandbox fixture, not a stale pin — the fix carries
+   the session's current agent.)
 - #86 FILED (deferred, maintainer-proposed): worker audit of all plugin/tool
    code for stale hardcoded agent/model IDs + code smells (read-only, after
    #85 part 2 lands).
