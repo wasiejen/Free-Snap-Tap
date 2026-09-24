@@ -149,3 +149,23 @@ Discrepancies surfaced (evidence-attached):
   override + 1 leftover looprunner row reference; his paste, exact text in the
   wave spec).
 - Next launch: spec 01 (keepTokens removal, `handover_task.md`).
+
+## Clarifications (maintainer, 2026-09-24 post-compact)
+- **Bitdrift numerals block = RETIRED** (the actual models show no such tendency;
+  the fuzzy-resolver + fallback stay in the code and may be reactivated; the
+  primer file stays). Prompt primer references may be removed (wave task g:
+  planner ~L52, worker ~L40).
+- **AGENTS.md = the handout pasted as a test for now** — full integration
+  pending: the Corrections get folded into the body (the handout is now
+  fold-in-complete = paste-ready; the AGENTS.md repaste = wave task f2). The
+  planner/worker prompts were only SURFACE reworks — the Context-budget
+  sections need a deeper compaction-oriented pass (wave task h).
+- **Worker early handover moved 70 % → 80 %** (his test — the old percentages
+  predate the 170k window; verified on disk in prompt_agent_task.md).
+- **Work State dump form:** he only intended to remove the dump-before-compact
+  mentions — the form's removal may be edit crossfire. Ruling PENDING (wave
+  task h): restore the form without the dump/looprunner parts, or confirm the
+  removal.
+- Note: the current planner session still carries the PRE-3c390e7 AGENTS.md +
+  planner prompt in its system prompt — the test is observable from the NEXT
+  fresh session.

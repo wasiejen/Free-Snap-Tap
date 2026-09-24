@@ -19,8 +19,25 @@ original task text — do not rework):**
   Direct-session section + the Order-stop bullet).
 - **f. AGENTS.md** — the handout is now the `# Compaction Guidelines` section
   (incl. Corrections); the old 3-line `Compaction Guideline` section and the
-  looprunner role row are gone. (He also removed the bit-drift numerals block
-  — separate topic, no action.)
+  looprunner role row are gone.
+
+**Clarifications (maintainer, post-compact — supersede the spec text where
+they differ):**
+- The bit-drift numerals block = **RETIRED** (the models show no such tendency;
+  the fuzzy-resolver + fallback stay in the code, reactivatable; the primer
+  file stays) → task g.
+- The AGENTS.md paste = a **test for now** — full integration pending: the
+  Corrections get folded into the body (the handout is now fold-in-complete =
+  paste-ready; the AGENTS.md repaste = task f2).
+- The planner/worker prompts were only **surface** reworks — the
+  Context-budget sections need a deeper compaction-oriented pass → task h.
+- **Worker early handover moved 70 % → 80 %** (his test — the old percentages
+  predate the 170k window; verified on disk).
+- The **Work State dump form** removal may be edit crossfire (he intended only
+  the dump-before-compact mentions) → task h carries his pending ruling.
+- Note: the current planner session still carries the PRE-3c390e7 AGENTS.md +
+  planner prompt in its system prompt — the test is observable from the NEXT
+  fresh session.
 
 ## Tasks (remaining; ordered; text-only — NO code, NO config, NO behavior claims)
 - **c. Repo docs** (`.opencode/agent/prompts/repo/`): `repo_custom_tools.md` —
@@ -43,17 +60,26 @@ original task text — do not rework):**
   `skill/README.md` ~L9; `repo_map.md` ~L105 roster note. The opencode.jsonc
   agent removal = MAINTAINER domain — verify his live file first, note the
   outcome in the handover, do not touch.
-- **f2. AGENTS.md paste follow-up (MAINTAINER pastes — the text-worker only
-  produces the exact replacement text in the handover, NEVER edits AGENTS.md):**
-  (1) the pasted body still carries two lines its own Corrections section
-  overrides — "(keepMessages-capable, default 12)" and "SHARED between your
-  self-triggered emergency … First-come-first-served". Replacement:
-  `- \`normal\`: 5 self-triggered compactions (keepMessages-capable — live default 18).`
-  `- \`emergency\`: 1 — consumed ONLY after the 5 are drained; usable by either
-     system (self via the \`emergency\` arg, or the auto one at the limit), once.`
-  (2) leftover looprunner reference in the role table's planner row:
-  "consumed by: workers, looprunner, next planner session" → "consumed by:
-  workers, next planner session".
+- **f2. AGENTS.md integration (MAINTAINER pastes — the text-worker only prepares
+  the exact text, NEVER edits AGENTS.md):** repaste the now fold-in-complete
+  handout (`draft/compaction_guide/handout.md` — paste-ready; the 2026-09-24
+  corrections are folded into its body) as the `# Compaction Guidelines`
+  section; remove the leftover looprunner reference in the role table's
+  planner row ("consumed by: workers, looprunner, next planner session" →
+  "consumed by: workers, next planner session").
+- **g. Bit-drift references (approved by his ruling):** remove the
+  fuzzy-numword primer lines from the Instruction index —
+  `prompt_agent_planner.md` ~L52, `prompt_agent_task.md` ~L40. The primer file
+  + the `.opencode/agent/research/fuzzy-numword/` area STAY untouched.
+- **h. Phase-2 prompt pass (planner + worker — make the Context-budget
+  sections compaction-oriented per the handout):** default-compact until the
+  budget is spent, distilled→drop (mid-unit ok), stop lines as triage
+  thresholds, the keepMessages heuristic (when in doubt keep more). Worker
+  early handover = 80 % (his test — keep); planner early handover = 70 %
+  (unchanged for now). PENDING his ruling: restore the Work State dump
+  CLOSING FORM without the dump-before-compact + looprunner parts (one short
+  paragraph — the form a self-compacted session uses to say what to resume),
+  or confirm the removal.
 
 ## DoD (per task: grep-clean of the stale strings named above; a read-back of
 each edited file; zero edits outside the named files; zero behavior claims —

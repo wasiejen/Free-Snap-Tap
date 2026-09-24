@@ -19,10 +19,9 @@ files, TODO) and CONTINUE; never re-plan from scratch.
 - Floor: ~25-30k at keepMessages=0. keepMessages is the dial.
 
 ## Budgets (per model, per session — check your own, don't hardcode)
-- `normal`: 5 self-triggered compactions (keepMessages-capable, default 12).
-- `emergency`: 1 — SHARED between your self-triggered emergency (planned `emergency` param) and
-  the AUTO one at the limit (blind, 18-msg default, you cannot trigger it). First-come-first-
-  served.
+- `normal`: 5 self-triggered compactions (keepMessages-capable — live default 18).
+- `emergency`: 1 — consumed ONLY after the 5 are drained (total 6); usable by either system
+  (self via the `emergency` arg, or the auto one at the limit), once.
 - **Why the cap exists: BIT-ROT** — the unknown behavior shift of N-times-chained summaries.
   A safety measure against an unknown; may be raised once stability is proven.
 - Both exhausted → the next limit hit forces a clean NEW session (new planner + directive to
@@ -50,11 +49,9 @@ files, TODO) and CONTINUE; never re-plan from scratch.
 - A dump is created automatically on self/cross compaction; the last session's dump is the
   recovery source for a forced new session.
 
-## Corrections (2026-09-24; supersede earlier text)
-- Emergency 1: consumed ONLY after the normal 5 are drained (total 6), either system, once —
-  not first-come-first-served.
-- Live defaults: keepTokens = 0 / being removed from both stores; keepMessages = 18 in BOTH
-  stores (the "12" above is stale). `agent.compaction.model` commented out → same-model
-  summarizer.
+## Live references
+- The 2026-09-24 corrections are folded into the body above (emergency-1 post-drain,
+  keepMessages 18 live default, same-model summarizer — `agent.compaction.model`
+  commented out).
 - The trusted-system change list (grounded): `maintainer/inbox_planner/
   compaction_feedback_by_planner.md` (planner-consolidated, 2026-09-24).
