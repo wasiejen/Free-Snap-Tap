@@ -9,9 +9,10 @@
 //     on microtasks well before that).
 //   - the retry-keep note + the background failure go to console.log /
 //     console.error — captured, not returned.
-//   - the arg shape is FOUR keys (unit A, 2026-09-21: providerID/modelID
+//   - the arg shape is THREE keys (unit A, 2026-09-21: providerID/modelID
 //     REMOVED — the summarizer resolves from the root config's
-//     agent.compaction.model, falling back to the session model).
+//     agent.compaction.model, falling back to the session model; 2026-09-24:
+//     the tokens keep knob is GONE — keepMessages is the only keep arg).
 //   - the sandbox carries a stub dump_session.cjs so the pre-compaction dump hook (4512fe6) succeeds silently (a dump failure would append a WARNING line and break the byte-exact checks) — mirrors the probe S13 preamble.
 // Idempotent re-runs: the sandbox is a FRESH scratchpad subdir each run.
 // Run: node .opencode/plugin/tests/compact_memory.smoke.mjs (plain node, exit 0 iff green).
@@ -106,17 +107,17 @@ chk("named export readCompactionConfig is a function", typeof mod.readCompaction
 {
   const emptyRoot = freshSandbox("compact_memory_cfg");
   const c0 = mod.readCompactionConfig(emptyRoot);
-  chk("cfg absent file -> defaults 30000/12/false/{}", c0.keepTokens === 30_000 && c0.keepMessages === 12 && c0.emergencyRecovery === false && JSON.stringify(c0.model_budget) === "{}");
+  chk("cfg absent file -> defaults 12/false/{}", c0.keepMessages === 12 && c0.emergencyRecovery === false && JSON.stringify(c0.model_budget) === "{}");
   const p = path.join(emptyRoot, ".opencode", "temp");
   mkdirSync(p, { recursive: true });
-  writeFileSync(path.join(p, "compact_budget.json"), `{"keepTokens": 40000, "keepMessages": 9, "emergencyRecovery": true, "model_budget": {"M": 5, "bad": "x", "neg": -1}}`, "utf8");
+  writeFileSync(path.join(p, "compact_budget.json"), `{"keepMessages": 9, "emergencyRecovery": true, "model_budget": {"M": 5, "bad": "x", "neg": -1}}`, "utf8");
   const c1 = mod.readCompactionConfig(emptyRoot);
   chk("cfg valid keys win + bad values skipped (bad/neg dropped, valid kept)",
-    c1.keepTokens === 40_000 && c1.keepMessages === 9 && c1.emergencyRecovery === true && c1.model_budget.M === 5 && c1.model_budget.bad == null && c1.model_budget.neg == null,
+    c1.keepMessages === 9 && c1.emergencyRecovery === true && c1.model_budget.M === 5 && c1.model_budget.bad == null && c1.model_budget.neg == null,
     JSON.stringify(c1));
   writeFileSync(path.join(p, "compact_budget.json"), `{ oops — not json`, "utf8");
   const c2 = mod.readCompactionConfig(emptyRoot);
-  chk("cfg unparseable file -> defaults (never throws)", c2.keepTokens === 30_000 && c2.keepMessages === 12 && c2.emergencyRecovery === false);
+  chk("cfg unparseable file -> defaults (never throws)", c2.keepMessages === 12 && c2.emergencyRecovery === false);
 }
 
 // ---- the dump hook's node resolver (the live host's execPath is the opencode
@@ -165,13 +166,14 @@ const withClient = async (spec = {}) => {
   return { rec, t, exec: (args, extra) => t.execute(args, toolCtx(extra)) };
 };
 
-// ---- registration shape (unit A: FOUR args — the override pair is GONE)
+// ---- registration shape (unit A: THREE args — the override pair is GONE,
+// the tokens keep knob is GONE)
 {
   const { t } = await withClient({ summarize: true });
   chk("factory returns { tool: { compact_memory } }", t != null);
   chk("reg shape: description string + async execute", typeof t.description === "string" && typeof t.execute === "function" && t.execute.constructor.name === "AsyncFunction");
-  chk("reg args: FOUR keys (sessionID, keepTokens, keepMessages, message)",
-    JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "keepTokens", "keepMessages", "message"]),
+  chk("reg args: THREE keys (sessionID, keepMessages, message)",
+    JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "keepMessages", "message"]),
     JSON.stringify(Object.keys(t.args)));
   chk("reg args: every value is a zod schema (safeParse)", Object.values(t.args).every((s) => typeof s.safeParse === "function"));
 }
@@ -179,18 +181,18 @@ const withClient = async (spec = {}) => {
 // ---- self summarize success (the ACTIVE path on this build)
 {
   const { rec, exec } = await withClient({ summarize: true });
-  const res = await exec({ keepTokens: 42000, keepMessages: 7 });
+  const res = await exec({ keepMessages: 7 });
   await drain();
-  chk("summarize dispatched: call recorded (path + body.keep + providerID/modelID)",
+  chk("summarize dispatched: call recorded (path + body.keep.messages only, NO tokens key + providerID/modelID)",
     rec.summarize.length === 1 && rec.summarize[0].path.id === "ses_sm_self" &&
-    rec.summarize[0].body.keep.tokens === 42000 && rec.summarize[0].body.keep.messages === 7 &&
+    rec.summarize[0].body.keep.messages === 7 && rec.summarize[0].body.keep.tokens == null &&
     rec.summarize[0].body.providerID === "llama-swap" && rec.summarize[0].body.modelID === "Qwen3.8-27B-IQ4KT-120K",
     JSON.stringify(rec.summarize[0]));
   chk("response IS the dispatch line (never a success claim)", res === dispatchLine("ses_sm_self", "summarize", "Qwen3.8-27B-IQ4KT-120K"), JSON.stringify(res.slice(0, 160)));
   const st = readStore();
   chk("budget increment-on-verified-success (count 1 after drain)", st.sessions.ses_sm_self?.count === 1, JSON.stringify(st.sessions.ses_sm_self));
   const line = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_self"));
-  chk("COMPACT line written with model field + keep args", line != null && / COMPACT ses_sm_self tokens=42000 messages=7$/.test(line) && line.includes("Qwen3.8-27B-IQ4KT-120K"), JSON.stringify(line));
+  chk("COMPACT line written with model field + keep args (messages only)", line != null && / COMPACT ses_sm_self messages=7$/.test(line) && line.includes("Qwen3.8-27B-IQ4KT-120K"), JSON.stringify(line));
   const dumpFile = path.join(SANDBOX, ".opencode", "archive", "sessions", "compaction_dumps", "ses_sm_self_c0.md");
   chk("dump hook fired on the tool path: compaction_dumps/ses_sm_self_c0.md exists (the stub dump, no WARNING appended)", existsSync(dumpFile), dumpFile);
   const DT = "\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}";
@@ -206,12 +208,12 @@ const withClient = async (spec = {}) => {
   const boom = Object.assign(new Error("404 unexpected field"), { status: 404 });
   const { rec, exec } = await withClient({ summarize: true, summarizeError: (n) => (n === 1 ? boom : null) });
   const { res, logs } = await captureConsole(async () => {
-    const r = await exec({ keepTokens: 101, keepMessages: 3, sessionID: "ses_sm_retry" });
+    const r = await exec({ keepMessages: 3, sessionID: "ses_sm_retry" });
     await drain();
     return r;
   });
   chk("retry once w/o keep (2nd call carries providerID/modelID)",
-    rec.summarize.length === 2 && rec.summarize[0].body.keep.tokens === 101 && rec.summarize[1].body.keep == null &&
+    rec.summarize.length === 2 && rec.summarize[0].body.keep.messages === 3 && rec.summarize[0].body.keep.tokens == null && rec.summarize[1].body.keep == null &&
     rec.summarize[1].body.providerID === "llama-swap" && rec.summarize[1].body.modelID === "Qwen3.8-27B-IQ4KT-120K",
     JSON.stringify(rec.summarize));
   chk("retry note is console.log'd (not in the response)",
@@ -226,7 +228,7 @@ const withClient = async (spec = {}) => {
 // ---- v2 compact path (flat parameters; no keep fields)
 {
   const { rec, exec } = await withClient({ summarize: true, compact: true });
-  const res = await exec({ keepTokens: 5, keepMessages: 2, sessionID: "ses_sm_v2" });
+  const res = await exec({ keepMessages: 2, sessionID: "ses_sm_v2" });
   await drain();
   chk("compact branch wins: flat call, no summarize",
     rec.compact.length === 1 && rec.compact[0].sessionID === "ses_sm_v2" && rec.summarize.length === 0,
@@ -243,13 +245,13 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
 {
   const { rec, exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "Session-Model-120K", providerID: "llama-swap" } }] });
   writeFileSync(CFG_PATH, `{\n  // root config (JSONC)\n  "agent": { "compaction": { "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K" } }\n}`, "utf8");
-  const res = await exec({ sessionID: "ses_sm_cfg", keepTokens: 7, keepMessages: 3 });
+  const res = await exec({ sessionID: "ses_sm_cfg", keepMessages: 3 });
   await drain();
   rmSync(CFG_PATH, { force: true });
   chk("config set: summarize body carries the CONFIG pair (not the session model)",
     rec.summarize.length === 1 && rec.summarize[0].path.id === "ses_sm_cfg" &&
     rec.summarize[0].body.providerID === "llama-swap" && rec.summarize[0].body.modelID === "Gemma4-12B-Q4KXL-MTP-128K" &&
-    rec.summarize[0].body.keep.tokens === 7 && rec.summarize[0].body.keep.messages === 3,
+    rec.summarize[0].body.keep.messages === 3 && rec.summarize[0].body.keep.tokens == null,
     JSON.stringify(rec.summarize[0]));
   chk("config set: dispatch line names the config model + budget under the target id",
     res === dispatchLine("ses_sm_cfg", "summarize", "Gemma4-12B-Q4KXL-MTP-128K") && readStore().sessions.ses_sm_cfg?.count === 1,
@@ -258,7 +260,7 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
 {
   const { rec, exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "IQ4-fb", providerID: "llama-swap" } }] });
   writeFileSync(CFG_PATH, `{\n  // "agent": {\n  //   "compaction": { "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K" }\n  // },\n  "models": {}\n}`, "utf8");
-  await exec({ sessionID: "ses_sm_cfgco", keepTokens: 1, keepMessages: 1 });
+  await exec({ sessionID: "ses_sm_cfgco", keepMessages: 1 });
   await drain();
   rmSync(CFG_PATH, { force: true });
   chk("config commented-out: the FALLBACK session-model pair is used (comment-aware JSONC parse)",
@@ -268,7 +270,7 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
 {
   const { rec, exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "IQ4-fb", providerID: "llama-swap" } }] });
   writeFileSync(CFG_PATH, "{ oops — not json", "utf8");
-  await exec({ sessionID: "ses_sm_cfgbad", keepTokens: 1, keepMessages: 1 });
+  await exec({ sessionID: "ses_sm_cfgbad", keepMessages: 1 });
   await drain();
   rmSync(CFG_PATH, { force: true });
   chk("config malformed (unparseable): the FALLBACK session-model pair is used (never throws)",
@@ -282,7 +284,7 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
   const reg = await factory({}); // no client, no api
   let threw = false, res = "";
   try {
-    res = await reg.tool.compact_memory.execute({ keepTokens: 30000, keepMessages: 12, sessionID: "ses_sm_nocli" }, toolCtx({ sessionID: "ses_sm_nocli" }));
+    res = await reg.tool.compact_memory.execute({ keepMessages: 12, sessionID: "ses_sm_nocli" }, toolCtx({ sessionID: "ses_sm_nocli" }));
     await drain();
   } catch (e) { threw = true; res = String(e); }
   chk("no-client path never throws", !threw, res);
@@ -306,7 +308,7 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
 // ---- gate: cross-session model read (LAST entry of the messages RPC)
 {
   const { rec, exec } = await withClient({ summarize: true, messages: [{ info: { model: "user-x" } }, { info: { modelID: "Qwen3.8-27B-IQ3KT-210K", providerID: "llama-swap" } }] });
-  const res = await exec({ keepTokens: 1, keepMessages: 1, sessionID: "ses_sm_cross" });
+  const res = await exec({ keepMessages: 1, sessionID: "ses_sm_cross" });
   await drain();
   const st = readStore();
   chk("cross model read: last entry, IQ3 cap 1, one increment",
@@ -320,7 +322,7 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
 // array (the bare-array case above stays the regression pin)
 {
   const { rec, exec } = await withClient({ summarize: true, messages: { data: [{ info: { modelID: "Qwen3.8-27B-IQ3KT-210K", providerID: "llama-swap" }, parts: [] }] } });
-  const res = await exec({ keepTokens: 1, keepMessages: 1, sessionID: "ses_sm_crosswrap" });
+  const res = await exec({ keepMessages: 1, sessionID: "ses_sm_crosswrap" });
   await drain();
   const st = readStore();
   chk("cross model read ({ data } wrapper): same resolution — model + providerID, empty note, IQ3 cap 1, one increment",
@@ -334,7 +336,7 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
 {
   const { exec } = await withClient({ summarize: true, messagesError: new Error("boom-rpc") });
   let threw = false, res = "";
-  try { res = await exec({ keepTokens: 1, keepMessages: 1, sessionID: "ses_sm_rpc" }); await drain(); } catch { threw = true; }
+  try { res = await exec({ keepMessages: 1, sessionID: "ses_sm_rpc" }); await drain(); } catch { threw = true; }
   chk("rpc fail: not sent, never throws, note names the read failure, no budget",
     !threw && /no resolvable model/i.test(res) && /NOT sent/i.test(res) && /model read/i.test(res) && readStore().sessions.ses_sm_rpc == null,
     String(res).slice(0, 160));
@@ -374,10 +376,10 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
   const { rec, exec } = await withClient({ summarize: true });
   let res3 = "";
   for (let i = 0; i < 3; i++) {
-    res3 = await exec({ keepTokens: 1, keepMessages: 1, sessionID: "ses_sm_gate" });
+    res3 = await exec({ keepMessages: 1, sessionID: "ses_sm_gate" });
     await drain();
   }
-  const res4 = await exec({ keepTokens: 1, keepMessages: 1, sessionID: "ses_sm_gate" });
+  const res4 = await exec({ keepMessages: 1, sessionID: "ses_sm_gate" });
   await drain();
   chk("gate: 3rd allowed (dispatched), 4th denied (cap 3, 3/3, hand-over note)",
     rec.summarize.length === 3 && /dispatched/i.test(res3) && /refused/i.test(res4) && res4.includes("cap 3") && res4.includes("3/3") && /hand over/i.test(res4),
@@ -386,29 +388,27 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
 }
 
 // ---- keep defaults from the budget file config (consolidation 2026-09-22):
-// keepTokens/keepMessages seed the COMPACT line when the args are omitted;
-// explicit args STILL win over the file config (the keys are removed again
-// after the case so the later fixtures see the defaults)
+// keepMessages seeds the COMPACT line when the arg is omitted; the explicit
+// arg STILL wins over the file config (the key is removed again after the
+// case so the later fixtures see the defaults)
 {
   const st = readStore();
-  st.keepTokens = 40_000;
   st.keepMessages = 9;
   writeFileSync(storePath, JSON.stringify(st, null, 2) + "\n");
   const { exec } = await withClient({ summarize: true });
   await exec({ sessionID: "ses_sm_keepcfg" });
   await drain();
   const line = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_keepcfg"));
-  chk("config keep: COMPACT line reports the configured 40000/9 when the args are omitted",
-    line != null && /COMPACT ses_sm_keepcfg tokens=40000 messages=9$/.test(line),
+  chk("config keep: COMPACT line reports the configured messages=9 when the arg is omitted",
+    line != null && /COMPACT ses_sm_keepcfg messages=9$/.test(line),
     JSON.stringify(line));
-  await exec({ keepTokens: 555, keepMessages: 2, sessionID: "ses_sm_keepargs" });
+  await exec({ keepMessages: 2, sessionID: "ses_sm_keepargs" });
   await drain();
   const line2 = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_keepargs"));
-  chk("config keep: explicit keep args still win over the file config",
-    line2 != null && /COMPACT ses_sm_keepargs tokens=555 messages=2$/.test(line2),
+  chk("config keep: explicit keep arg still wins over the file config",
+    line2 != null && /COMPACT ses_sm_keepargs messages=2$/.test(line2),
     JSON.stringify(line2));
   const st2 = readStore();
-  delete st2.keepTokens;
   delete st2.keepMessages;
   writeFileSync(storePath, JSON.stringify(st2, null, 2) + "\n");
 }
@@ -417,7 +417,7 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
 {
   const { rec, exec } = await withClient({ summarize: true, summarizeError: new Error("boom-plain") });
   const { res, errors } = await captureConsole(async () => {
-    const r = await exec({ keepTokens: 1, keepMessages: 1, sessionID: "ses_sm_fail" });
+    const r = await exec({ keepMessages: 1, sessionID: "ses_sm_fail" });
     await drain();
     return r;
   });
@@ -444,7 +444,7 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
   const v1 = { version: 1, maxPerSession: 2, model_budget: { "Qwen-IQ4-X": 3, default: 1 }, sessions: { ses_sm_v1: { count: 1, updated: "2026-09-01T00:00:00.000Z" } } };
   writeFileSync(storePath, JSON.stringify(v1, null, 2) + "\n");
   const { exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "Qwen-IQ4-X", providerID: "llama-swap" } }] });
-  const res = await exec({ keepTokens: 1, keepMessages: 1, sessionID: "ses_sm_v1" });
+  const res = await exec({ keepMessages: 1, sessionID: "ses_sm_v1" });
   await drain();
   const st2 = readStore();
   chk("lenient v1 read + bump on write (count 1 -> 2, model from the messages read)",

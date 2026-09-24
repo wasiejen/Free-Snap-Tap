@@ -625,7 +625,7 @@
 //            fast-paths the existing bracketed file);
 //      (245) case variants ESC/Escape/escape → all resolved (one check,
 //            3 kind=escape lines, hits=3 per field).
-//   S25 compact_memory unit A (7) — 2026-09-21 (priority.md #1): the 4-key
+//   S25 compact_memory unit A (7) — 2026-09-21 (priority.md #1): the 3-key
 //      args + the config-resolved summarizer + the DUMP-OK line (the
 //      S13 check 100 explicit-pair override pin is REMOVED):
 //      (250) the new exports: resolveCompactionModel + stripJsoncComments;
@@ -639,7 +639,7 @@
 //      (255) the DUMP-OK line on a successful dump (the DUMP-FAIL prefix
 //          style, the numeric ms field);
 //      (256) tool integration: the sandbox opencode.jsonc config model →
-//          the summarize body carries the config pair (4-key args).
+//          the summarize body carries the config pair (3-key args).
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -2377,8 +2377,8 @@ mkdirSync(path.dirname(QC_DUMP_SCRIPT), { recursive: true });
 writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
 
 // 86 — the registration shape: the default factory (the plugin ctx capture)
-//      returns tool.compact_memory — description + the 4 optional args
-//      (sessionID/keepTokens/keepMessages/message) as zod schemas + execute
+//      returns tool.compact_memory — description + the 3 optional args
+//      (sessionID/keepMessages/message) as zod schemas + execute
 {
   const { client } = qcMakeClient({ summarize: true });
   const reg = await qcMod.default({ client });
@@ -2386,9 +2386,9 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   check(
     "86",
     "S13",
-    "registration shape: default factory → tool.compact_memory (description + args [sessionID, keepTokens, keepMessages, message] as zod schemas + execute)",
+    "registration shape: default factory → tool.compact_memory (description + args [sessionID, keepMessages, message] as zod schemas + execute)",
     t != null && typeof t.description === "string" && typeof t.execute === "function" &&
-      JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "keepTokens", "keepMessages", "message"]) &&
+      JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "keepMessages", "message"]) &&
       Object.values(t.args).every((s) => s != null && typeof s.safeParse === "function"),
     JSON.stringify({ tools: Object.keys(reg?.tool ?? {}), args: Object.keys(t?.args ?? {}) }),
   );
@@ -2426,14 +2426,14 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
 //      ABSENT) is the dispatch line BYTE-EXACT — NO success claim; the
 //      budget increment + the COMPACT line land ASYNCHRONOUSLY (the tick)
 {
-  const { rec, res } = await qcExec({ summarize: true }, { keepTokens: 42000, keepMessages: 7 });
+  const { rec, res } = await qcExec({ summarize: true }, { keepMessages: 7 });
   await qcTick();
   check(
     "88",
     "S13",
-    "summarize path (the ACTIVE build shape, SELF dispatch): called with path.id + body.keep; the response is the dispatch line BYTE-EXACT; the budget increment lands after the tick",
+    "summarize path (the ACTIVE build shape, SELF dispatch): called with path.id + body.keep.messages (NO tokens key); the response is the dispatch line BYTE-EXACT; the budget increment lands after the tick",
     rec.summarize.length === 1 && rec.summarize[0]?.path?.id === "ses_qc_self" &&
-      rec.summarize[0]?.body?.keep?.tokens === 42000 && rec.summarize[0]?.body?.keep?.messages === 7 &&
+      rec.summarize[0]?.body?.keep?.messages === 7 && rec.summarize[0]?.body?.keep?.tokens == null &&
       res === `Compaction dispatched for ses_qc_self (background, fire-and-forget) — the summarize call was sent (model: Qwen3.8-27B-IQ4KT-120K); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.` &&
       qcStore().sessions.ses_qc_self?.count === 1,
     JSON.stringify({ calls: rec.summarize, res: String(res).slice(0, 120) }),
@@ -2449,13 +2449,13 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
 //      terminal log)
 {
   const boom = Object.assign(new Error("400 unexpected field"), { status: 404 });
-  const { rec, res } = await qcExec({ summarize: true, summarizeError: (n) => (n === 1 ? boom : null) }, { keepTokens: 101, keepMessages: 3, sessionID: "ses_qc_retry" });
+  const { rec, res } = await qcExec({ summarize: true, summarizeError: (n) => (n === 1 ? boom : null) }, { keepMessages: 3, sessionID: "ses_qc_retry" });
   await qcTick();
   check(
     "89",
     "S13",
     "keep retry-once (cross dispatch): 404/unexpected-field → the 2nd call keeps providerID+modelID and drops the keep fields; the response is the dispatch line; the budget lands after the tick",
-    rec.summarize.length === 2 && rec.summarize[0]?.body?.keep?.tokens === 101 &&
+    rec.summarize.length === 2 && rec.summarize[0]?.body?.keep?.messages === 3 && rec.summarize[0]?.body?.keep?.tokens == null &&
       rec.summarize[1]?.body?.keep == null && rec.summarize[1]?.body?.providerID === "llama-swap" &&
       rec.summarize[1]?.body?.modelID === "Qwen3.8-27B-IQ4KT-120K" &&
       /dispatched/i.test(res) && qcStore().sessions.ses_qc_retry?.count === 1,
@@ -2466,7 +2466,7 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
 // 90 — the compact flat path (the v2 client shape): compact present →
 //      compact({sessionID}) with FLAT parameters, summarize NOT called
 {
-  const { rec, res } = await qcExec({ summarize: true, compact: true }, { keepTokens: 5, keepMessages: 2, sessionID: "ses_qc_flat" });
+  const { rec, res } = await qcExec({ summarize: true, compact: true }, { keepMessages: 2, sessionID: "ses_qc_flat" });
   await qcTick();
   check(
     "90",
@@ -2506,11 +2506,11 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   const { client, rec } = qcMakeClient({ summarize: true });
   const t = (await qcMod.default({ client })).tool.compact_memory;
   const run = async (args) => { const r = await t.execute(args, qcCtx({})); await qcTick(); return r; };
-  await run({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" });
-  await run({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" });
-  const res3 = await run({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" }); // count=cap−1 → dispatched
+  await run({ keepMessages: 1, sessionID: "ses_qc_gate" });
+  await run({ keepMessages: 1, sessionID: "ses_qc_gate" });
+  const res3 = await run({ keepMessages: 1, sessionID: "ses_qc_gate" }); // count=cap−1 → dispatched
   const callsBefore4 = rec.summarize.length;
-  const res4 = await t.execute({ keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_gate" }, qcCtx({})); // count=cap → denied
+  const res4 = await t.execute({ keepMessages: 1, sessionID: "ses_qc_gate" }, qcCtx({})); // count=cap → denied
   const st = qcStore();
   check(
     "92",
@@ -2543,7 +2543,7 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
 //      the budget is NOT consumed (no store entry after the tick; the
 //      failure lands in the terminal log — "background compaction FAILED")
 {
-  const { rec, res } = await qcExec({ summarize: true, summarizeError: new Error("boom-qc") }, { keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_fail" });
+  const { rec, res } = await qcExec({ summarize: true, summarizeError: new Error("boom-qc") }, { keepMessages: 1, sessionID: "ses_qc_fail" });
   await qcTick();
   const st = qcStore();
   check(
@@ -2572,14 +2572,14 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
 }
 
 // 96 — the COMPACT line WITH the model field POPULATED (the sandbox ctx.log):
-//      `<dt> Qwen3.8-27B-IQ4KT-120K COMPACT ses_qc_self tokens=42000 messages=7`
+//      `<dt> Qwen3.8-27B-IQ4KT-120K COMPACT ses_qc_self messages=7`
 {
   const line = ctxLogLines().find((l) => l.includes("COMPACT ses_qc_self"));
   check(
     "96",
     "S13",
-    "COMPACT line WITH the model field populated (sandbox ctx.log): `<dt> Qwen3.8-27B-IQ4KT-120K COMPACT ses_qc_self tokens=42000 messages=7`",
-    line != null && new RegExp(`^${DT} Qwen3\\.8-27B-IQ4KT-120K COMPACT ses_qc_self tokens=42000 messages=7$`).test(line),
+    "COMPACT line WITH the model field populated (sandbox ctx.log): `<dt> Qwen3.8-27B-IQ4KT-120K COMPACT ses_qc_self messages=7`",
+    line != null && new RegExp(`^${DT} Qwen3\\.8-27B-IQ4KT-120K COMPACT ses_qc_self messages=7$`).test(line),
     JSON.stringify(line),
   );
 }
@@ -2610,7 +2610,7 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
 //      info.modelID (the assistant message) resolves the budget class + the
 //      stored model; the dispatch verifies asynchronously (the tick)
 {
-  const { rec, res } = await qcExec({ summarize: true, messages: [{ info: { model: "user-x" } }, { info: { modelID: "Qwen3.8-27B-IQ3KT-210K", providerID: "llama-swap" } }] }, { keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_cross" });
+  const { rec, res } = await qcExec({ summarize: true, messages: [{ info: { model: "user-x" } }, { info: { modelID: "Qwen3.8-27B-IQ3KT-210K", providerID: "llama-swap" } }] }, { keepMessages: 1, sessionID: "ses_qc_cross" });
   await qcTick();
   const st = qcStore();
   check(
@@ -2634,7 +2634,7 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   let res = "";
   let rec = null;
   try {
-    const r = await qcExec({ summarize: true, messagesError: new Error("boom-rpc-qc") }, { keepTokens: 1, keepMessages: 1, sessionID: "ses_qc_rpc" });
+    const r = await qcExec({ summarize: true, messagesError: new Error("boom-rpc-qc") }, { keepMessages: 1, sessionID: "ses_qc_rpc" });
     res = r.res;
     rec = r.rec;
   } catch {
@@ -5118,14 +5118,14 @@ let n24 = 239;
   );
 }
 
-// ------------------------------------------------------------------ S25 compact_memory unit A (7) — 2026-09-21 (priority.md #1): the 4-key args + the config-resolved summarizer (the exported pure resolver, JSONC-safe) + the DUMP-OK line
+// ------------------------------------------------------------------ S25 compact_memory unit A (7) — 2026-09-21 (priority.md #1): the 3-key args + the config-resolved summarizer (the exported pure resolver, JSONC-safe) + the DUMP-OK line
 //
 // Reuses S13's type-stripped plugin import (qcMod) and the sandbox: the
 // resolver is PURE (driven directly over string fixtures); the DUMP-OK pin
 // drives the exported preCompactionDump with the S14 stub dump script (still
 // in place from check 105); the tool-integration pin writes a SANDBOX
 // opencode.jsonc (removed afterwards) and drives the tool path with the
-// 4-key args.
+// 3-key args.
 {
   check(
     "250",
@@ -5211,7 +5211,7 @@ let n24 = 239;
   check(
     "256",
     "S25",
-    "tool integration: the sandbox opencode.jsonc agent.compaction.model → the summarize body carries the config pair (the 4-key args — no providerID/modelID keys)",
+    "tool integration: the sandbox opencode.jsonc agent.compaction.model → the summarize body carries the config pair (the 3-key args — no providerID/modelID keys)",
     rec.summarize.length === 1 && rec.summarize[0]?.body?.providerID === "llama-swap" &&
       rec.summarize[0]?.body?.modelID === "Gemma4-12B-Q4KXL-MTP-128K" && /dispatched/i.test(res),
     JSON.stringify({ body: rec.summarize[0]?.body, res: String(res).slice(0, 120) }),
