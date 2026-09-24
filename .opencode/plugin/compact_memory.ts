@@ -674,29 +674,37 @@ export function resolveCompactionModel(
   return { providerID: model.slice(0, slash), modelID: model.slice(slash + 1), source: "config" };
 }
 
-// The queued continuation message (unit A, 2026-09-21): when `message` is
-// non-empty, AFTER the compaction dispatch (the void path — no await
-// anywhere) fire EXACTLY ONE queued promptAsync to the compacted session
-// (the auto_resume.ts queued-prompt pattern — delivered on its resume).
-// typeof promptAsync !== "function" → NO prompt sent: the dispatch response
-// gains a WARNING line saying the message was not queued.
-function queueMessage(client: any, sessionID: string, message: unknown, dispatch: string, modelNote: string): string {
+// The queued continuation message (unit A, 2026-09-21 → the item-2 relay,
+// 2026-09-24): when `message` is non-empty, AFTER the compaction dispatch
+// (the void path — no await anywhere) the message is STORED — one
+// per-session file under .opencode/temp/ (the relay's source) — and is
+// delivered at RESUME time by the auto_resume plugin's unit-4 CONTINUE
+// relay: the stored message is the FIRST message of the resumed turn,
+// followed by the one-line post-compaction addendum. NO promptAsync at
+// queue time — the maintainer's temp fix 0f192e5 (2026-09-22) disabled
+// delivery stays gone; the relay is "the way" (it never interferes with
+// the compaction — it fires only on the session's next resume). The
+// dispatch response gains the queued note (UNCHANGED — the relay makes it
+// true now). Best-effort persistence — a write failure never fails the
+// tool.
+function queuedMessagePath(root: string, sessionID: string): string {
+  return path.join(tempDir(root), `compact_message_${sessionID}`);
+}
+
+function storeMessage(root: string, sessionID: string, message: string): void {
+  try {
+    mkdirSync(tempDir(root), { recursive: true });
+    writeFileSync(queuedMessagePath(root, sessionID), message, "utf8");
+  } catch {
+    // best effort — a persistence hiccup never fails the tool
+  }
+}
+
+function queueMessage(root: string, sessionID: string, message: unknown, dispatch: string, modelNote: string): string {
   let body = dispatch;
   if (typeof message === "string" && message !== "") {
-    if (typeof client?.session?.promptAsync === "function") {
-      void Promise.resolve(
-        //--maintainer 2026-09-22_11-53: deactivated to enable compaction until a way is found to send the message without interfering with the compaction
-        //client.session.promptAsync({ path: { id: sessionID }, body: { parts: [{ type: "text", text: message }] } }),
-      ).catch((err: unknown) =>
-        console.error(
-          `compact_memory: message queue FAILED for ${sessionID}:`,
-          err instanceof Error ? err.message : String(err),
-        ),
-      );
-      body += `\nThe message was queued for ${sessionID} (delivered on its resume).`;
-    } else {
-      body += `\nWARNING: the message was NOT queued for ${sessionID} (client.session.promptAsync unavailable).`;
-    }
+    storeMessage(root, sessionID, message);
+    body += `\nThe message was queued for ${sessionID} (delivered on its resume).`;
   }
   return modelNote !== "" ? `${body}\n${modelNote}` : body;
 }
@@ -725,7 +733,7 @@ export default async function CompactMemoryPlugin(ctx: any) {
         args: {
           sessionID: tool.schema.string().optional().describe("Session to compact. Omit = your own session (the SELF path). An explicit id = ANOTHER session (the CROSS fire-and-forget path)."),
           keepMessages: tool.schema.number().optional().describe("Recent messages to retain (e.g. 18) — working, sent in the request body."),
-          message: tool.schema.string().optional().describe("Post-compaction continuation message (1-3 lines: what to resume + which files to re-read) — queued as a direct prompt to the compacted session (delivered on its resume; never awaited). ABSENT → nothing is queued."),
+           message: tool.schema.string().optional().describe("Post-compaction continuation message (1-3 lines: what to resume + which files to re-read) — stored at queue time (one per-session file under .opencode/temp/) and delivered as the FIRST message on the compacted session's next resume by the auto-resume relay (never awaited). ABSENT → nothing is queued."),
           emergency: tool.schema.boolean().optional().describe("Consumes the once-per-session emergency compaction (allowed only when the normal budget is exhausted). Omit = a normal compaction."),
         },
         async execute(args: any, c: any) {
@@ -864,11 +872,11 @@ export default async function CompactMemoryPlugin(ctx: any) {
                      err instanceof Error ? err.message : String(err),
                    ),
                  );
-               const dispatch =
-                 `Compaction dispatched for ${sessionID} (background, fire-and-forget) — the compact call was sent ` +
-                `(model: ${model}); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.` +
-                dumpWarning;
-              return queueMessage(client, sessionID, args?.message, dispatch, modelNote);
+                const dispatch =
+                  `Compaction dispatched for ${sessionID} (background, fire-and-forget) — the compact call was sent ` +
+                 `(model: ${model}); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.` +
+                 dumpWarning;
+               return queueMessage(root, sessionID, args?.message, dispatch, modelNote);
             } else if (typeof client?.session?.summarize === "function") {
               // v1 — THE ACTIVE PATH ON THIS BUILD: the body MUST carry
               // providerID + modelID (REQUIRED by the server payload schema)
@@ -898,7 +906,7 @@ export default async function CompactMemoryPlugin(ctx: any) {
                 `Compaction dispatched for ${sessionID} (background, fire-and-forget) — the summarize call was sent ` +
                 `(model: ${model}); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.` +
                 dumpWarning;
-              return queueMessage(client, sessionID, args?.message, dispatch, modelNote);
+              return queueMessage(root, sessionID, args?.message, dispatch, modelNote);
             } else {
               const compactType = typeof client?.session?.compact;
               const summarizeType = typeof client?.session?.summarize;

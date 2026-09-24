@@ -344,32 +344,42 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
     String(res).slice(0, 160));
 }
 
-// ---- the `message` arg (unit A): the queued promptAsync is COMMENTED OUT
-// (maintainer temp fix 0f192e5, 2026-09-22 — it killed the SELF-compaction
-// queued-message race): NO prompt is sent, but the response STILL carries
-// the queued note. RE-PINNED 2026-09-22 per the maintainer's ruling
-// (pin the current behavior — do NOT deactivate/skip, do NOT restore the
-// promptAsync; TODO #81)
+// ---- the `message` arg (unit A → item 2, 2026-09-24): NO promptAsync at
+// queue time (the maintainer's temp fix 0f192e5 stays in place — the
+// prompt is not sent at queue time); the message is STORED — one
+// per-session file under .opencode/temp/ — and is delivered at RESUME
+// time by the auto_resume unit-4 CONTINUE relay. The response STILL
+// carries the queued note (the relay makes it true now). RE-PINNED
+// 2026-09-24 (item 2).
 {
   const { rec, exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "IQ4-x", providerID: "llama-swap" } }], promptAsync: true });
   const res = await exec({ message: "resume unit-3", sessionID: "ses_sm_msg" });
   await drain();
-  chk("message arg: NO queued promptAsync (temp fix 0f192e5 — the prompt is not sent)",
+  chk("message arg: NO promptAsync at queue time (item 2: the message is STORED — delivered at RESUME time by the auto-resume relay)",
     rec.prompt.length === 0,
     JSON.stringify(rec.prompt));
   chk("message arg: response = the dispatch line + the queued note (the message itself NOT in the response)",
     res === `${dispatchLine("ses_sm_msg", "summarize", "IQ4-x")}\nThe message was queued for ses_sm_msg (delivered on its resume).` && !res.startsWith("resume unit-3"),
     JSON.stringify(res));
+  chk("message arg (item 2): the message is STORED per-session (.opencode/temp/compact_message_<sid>, content exact)",
+    existsSync(path.join(SANDBOX, ".opencode", "temp", "compact_message_ses_sm_msg")) &&
+      readFileSync(path.join(SANDBOX, ".opencode", "temp", "compact_message_ses_sm_msg"), "utf-8") === "resume unit-3", "");
   chk("message arg: budget incremented under the target id", readStore().sessions.ses_sm_msg?.count === 1);
 }
-// ---- message WITHOUT promptAsync on the client: NO prompt sent, the
-// dispatch response carries the WARNING
+// ---- message WITHOUT promptAsync on the client (item 2 re-pin): the
+// relay is client-independent (the delivery is the auto-resume
+// plugin's promptAsync at resume time, not the tool client's) — the
+// message is STILL stored, response = dispatch line + the queued note
+// (the old NOT-queued WARNING is gone).
 {
   const { rec, exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "IQ4-y", providerID: "llama-swap" } }] });
   const res = await exec({ message: "resume unit-4", sessionID: "ses_sm_nomsg" });
   await drain();
-  chk("no promptAsync: NO prompt sent, the response carries the NOT-queued WARNING",
-    rec.prompt.length === 0 && res.includes("WARNING: the message was NOT queued for ses_sm_nomsg (client.session.promptAsync unavailable)."),
+  chk("no promptAsync at queue time (item 2): NO prompt sent, the message is STILL stored for the relay, response = dispatch line + the queued note (the WARNING is gone)",
+    rec.prompt.length === 0 &&
+      res === `${dispatchLine("ses_sm_nomsg", "summarize", "IQ4-y")}\nThe message was queued for ses_sm_nomsg (delivered on its resume).` &&
+      existsSync(path.join(SANDBOX, ".opencode", "temp", "compact_message_ses_sm_nomsg")) &&
+      readFileSync(path.join(SANDBOX, ".opencode", "temp", "compact_message_ses_sm_nomsg"), "utf-8") === "resume unit-4",
     JSON.stringify(res));
 }
 

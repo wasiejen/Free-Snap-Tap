@@ -1,113 +1,108 @@
-# Worker summary — spec 10: the emergency-1 compaction budget (change-list item 10)
+# WORKER SUMMARY — spec 2+11: auto_resume message relay + forced-new-session directive
 
-Status: DONE (LANDED per spec — commit hash recorded by you in the follow-up
-bookkeeping, not by me).
-Commit: this worker commit (branch `opencode_test`, named-path — the three scoped
-files + this summary). Runs AFTER item 1 (7f253ea) — written against the
-post-item-1 state.
-Worker session: `ses_f2b2edff1ffe60GXyVJGzKg17Z` (worker, Qwen3.8-27B-Q3S-170K).
+Status: **LANDED** (hash recorded by the planner's follow-up). Worker worker-10
+(Qwen3.8-27B-Q3S-170K), session ses_f2ae69d1cffeFqogBIbH2xyh0F, branch
+`opencode_test`, one commit (scoped files only).
 
 ## What changed
+1. **Item 2 — message relay** (`.opencode/plugin/auto_resume.ts`):
+   - The unit-4 CONTINUE path (recovery / self-compact resume — the block that
+     serves both `action: resume` and no-line recovery) now reads the stored
+     queued message: `readQueuedMessage(sid)` from
+     `.opencode/temp/compact_message_<sid>`. When present, the CONTINUE prompt
+     text = **stored message FIRST** + the one-line addendum
+     (`post-compaction: re-read your head files per
+     .opencode/agent/prompts/agent_readme_post_compaction.md and CONTINUE —
+     never re-plan from scratch`); otherwise the plain `continueText(sid)`.
+   - New `relay= sid=` log line; the file is renamed `.consumed` ONLY after a
+     successful promptAsync (a failed send keeps it for the next attempt).
+   - Header comment (Unit 4 routing) updated to document item 2.
+2. **Item 11 — forced-new-session directive** (`.opencode/plugin/auto_resume.ts`):
+   - `restartText(sid, exhausted)`: base text byte-identical (line 1 = the
+     own-line toggle, unchanged); when exhausted it appends the directive:
+     "compaction budget exhausted — scan the dump of \<closing sid\> to gain
+     all relevant knowledge (the auto-dump corpus; `dump_session.cjs` in
+     .opencode/agent/scripts/db/ for on-demand dumps); make a clean
+     handover/commit if not present; then continue per the NAP."
+   - `budgetExhausted(sid)`: reads the SAME `compact_budget.json` (read-only,
+     per restart-branch call) — FULLY exhausted = `count > cap` (post-item-10
+     state; `count == cap` leaves the emergency available → NOT exhausted).
+     Cap resolved exactly as compact_memory's `resolveCap` (CPU guard → 0,
+     exact bare-model-id key of `model_budget`, else `model_budget.default`,
+     else 1). Fail-open: file missing/unreadable/malformed/no entry → not
+     exhausted (no directive). The directive's session id = the CLOSING
+     session's sid (the budget store key — the pinned source; ctx.log not
+     used).
+   - The restart branch (both `action: restart` and cap-exhausted-no-line)
+     computes the check, logs `budget= exhausted sid=` when true, and passes
+     it to `restartText`.
+3. **Narrow exception USED — minimal persistence in
+   `.opencode/plugin/compact_memory.ts`**: `queueMessage` now STORES the
+   non-empty `message` at queue time — one per-session file
+   `.opencode/temp/compact_message_<sessionID>` (`storeMessage` +
+   `queuedMessagePath`, best-effort write) — and NO promptAsync at queue time
+   (the temp fix 0f192e5's disabled delivery is REPLACED by the relay, per the
+   spec's "this replaces the temp fix's disabled delivery" — the commented-out
+   promptAsync block was removed). Response lines UNCHANGED (the queued note
+   is now true); the old "NOT queued WARNING" branch (promptAsync-unavailable
+   client) is GONE — the relay is client-independent. The `message` arg
+   description updated to the stored-at-queue-time / relayed-at-resume
+   wording. Both call sites pass `root` (not `client`).
 
-1. `.opencode/plugin/compact_memory.ts`
-   - config section: new top-level key `emergency_budget` (number >= 0, fail-open
-     default `DEFAULT_EMERGENCY_BUDGET = 1`) in the `CompactionConfig` type, the
-     defaults, and the budget-file parsing — parsed exactly like the other keys
-     (absent file / malformed key → default 1). The header config comment lists it.
-   - gate (`count >= cap` area): four states, per the pinned design —
-     - `count < cap` → dispatch normally (increment).
-     - `count === cap` AND `args.emergency === true` AND `emergency_budget >= 1`
-       → dispatch as EMERGENCY (increment to cap+1; `isEmergency` flag).
-     - `count === cap`, no `emergency` arg (and emergency available) → refuse:
-       existing text + one line "…available via the `emergency` argument."
-     - `count > cap` (or `count === cap` with the emergency unavailable / already
-       consumed) → refuse: existing text + one line "…unavailable or already
-       consumed — the budget is fully exhausted." (the item 11 directive state).
-     - NO store-schema bump: the count tracks it (count > cap = exhausted).
-   - tool schema: new arg `emergency: tool.schema.boolean().optional()` — args are
-     now exactly `[sessionID, keepMessages, message, emergency]`; description
-     string gained the one-sentence emergency budget note.
-   - success callbacks (both the v2 compact and the ACTIVE v1 summarize path):
-     `recordSuccess` unchanged (increment-on-verified-success) +
-     `appendCompactLine(…, isEmergency)`.
-   - `appendCompactLine`: new `emergency = false` param — the COMPACT line appends
-     ` emergency` after `messages=<m>` only when the emergency was consumed
-     (`… COMPACT <sid> messages=<m> emergency [(pre-readout)]`); normal lines are
-     byte-identical to before.
-   - header comment (Part 2 budget section): the emergency-1 design + the
-     auto-side note documented (see the #93 carry-over below).
+## Test re-pins
+- **auto_resume.smoke.mjs** (121 → 129): new ITEM 2/ITEM 11 section — relay
+  message FIRST + exact addendum (byte pin `stored\naddendum`), relay body
+  carries the planner agent, file consumed (`.consumed`), `relay=` line;
+  no-stored-message → plain CONTINUE (no addendum, no relay line); exhausted
+  (count 3 > cap 2) → directive in the restart prompt (line 1 = toggle
+  unchanged) + `budget=` line; count == cap → NOT exhausted → plain restart
+  text. New sids added to the live-log `smokeSids` list.
+- **compact_memory.smoke.mjs** (65 → 66): temp-fix 0f192e5 pins UPDATED/REPLACED
+  per the spec — no-promptAsync-at-queue-time label + NEW persistence pin
+  (file content exact); the no-promptAsync-client case re-pinned (message
+  STILL stored, response = dispatch + queued note, the WARNING is gone).
+- **handover_probe.mjs** #97 (S13): comment + label updated to the item-2
+  relay wording; the byte-exact response + empty-prompt-array assertions are
+  UNCHANGED — no check count change, probe annotation untouched (246/246).
+  (Scope note: the "temp-fix pins" named in the spec's auto_resume.smoke.mjs
+  scope item actually live in the compact_memory smoke + probe — that is
+  where they were updated.)
 
-2. `.opencode/plugin/tests/compact_memory.smoke.mjs` — re-pinned (57 → 65 checks):
-   - header comment + registration pin → FOUR keys
-     `[sessionID, keepMessages, message, emergency]`.
-   - NEW gate-sequence section (8 checks, fixture model_budget `{"Gate-M": 2}` +
-     `emergency_budget 1`, cross-read session):
-     - calls 1-2 dispatched (count 2 == cap);
-     - call 3 no-arg REFUSED (cap 2, 2/2, hand-over note + the `emergency`-arg
-       availability line, zero side effects);
-     - call 3 `emergency: true` DISPATCHED (count 3 == cap+1) + the COMPACT line
-       carries ` emergency` (pinned byte-exact `messages=2 emergency$`);
-     - the two normal lines carry NO ` emergency` suffix;
-     - call 4 `emergency: true` REFUSED (count 3 > cap 2 — fully exhausted);
-     - state survives a FRESH module instance (cache-busted re-import still
-       refuses — the count lives on disk);
-     - `emergency_budget 0` → call 3 refused (unavailable);
-     - key ABSENT → fail-open default 1 (the emergency IS consumed).
-     - The fixture (model_budget / emergency_budget) is saved + restored before the
-       later tests (their self-model cap-3 pins survive).
+## Verification (measured, post-edit)
+- `node .opencode/plugin/tests/auto_resume.smoke.mjs` → **129/129 ALL PASS**
+  (baseline at start: 121/121 — the spec's "102/102" predates the newer pins).
+- `node .opencode/plugin/tests/compact_memory.smoke.mjs` → **66/66 ALL PASS**
+  (baseline 65/65).
+- `node .opencode/plugin/probes/handover_probe.mjs` → **246/246 PASS**
+  (baseline 246/246).
+- pytest **459 passed + 1 warning**, ruff **F=0** (baseline run at start; no
+  Python files touched since).
+- Live maintainer files untouched (uncommitted `opencode.jsonc`, `AGENTS.md`,
+  `prompt_agent_task.md`, `agent_feedback.md`, loop_log.md, ideas.md —
+  excluded from the commit).
 
-3. `.opencode/plugin/probes/handover_probe.mjs` — S13/S25 re-pinned (241 → 246
-   checks; the annotation line + S13 header count updated to match):
-   - registration pin (check 86) → 4 keys `[sessionID, keepMessages, message,
-     emergency]`.
-   - NEW checks 222-226 in S13 (the gate-sequence test, fixture model_budget
-     `{"Gate-M": 2}` + `emergency_budget 1`): 222 calls 1-2 ok + call 3 no-arg
-     denied (availability note); 223 call 3 emergency ok (count cap+1, COMPACT
-     line ` emergency`, normal lines suffix-free); 224 call 4 emergency denied
-     (fully exhausted) + fresh-module-instance persistence (cache-busted
-     re-import, the check-73 pattern); 225 `emergency_budget 0` denied; 226 key
-     absent → default 1 consumed.
-   - FINGERPRINT array: the new synthetic ids (ses_qc_emg / ses_qc_emg0 /
-     ses_qc_emgdf) added (check 43).
-   - S25: "3-key args" → "4-key args" in the section header, the tool-path
-     preamble comment, and check 256's label (its assertion pins the body,
-     unchanged).
-   - **S10/S11 left byte-identical** (they pin the frozen artifacts — the spec-01
-     carve-out).
+## What the #93 (context_recovery) port MUST carry
+- **The limit-run detection** itself (the context-length-exceeded fire) —
+  out of scope here; this spec lands only the condition check
+  (`budgetExhausted`: count > cap from the shared budget store) + the
+  directive construction (`restartText(sid, exhausted)`).
+- **The directive hand-off**: when the forced new session fires from a
+  fully-exhausted budget, the new planner's start prompt must carry the SAME
+  forced-new-session directive (scan the dump of the last session —
+  `dump_session.cjs` — make a clean handover/commit if not present, continue
+  per the NAP) — the auto-side must reuse the `budgetExhausted` +
+  `restartText` logic (mirrored, not duplicated by divergence).
+- Also from the item-10 spec: the auto-side emergency-1 consumption (count ==
+  cap → consume the 1 WITHOUT the arg; count > cap → refuse/defer to the
+  forced-new-session) still rides that port.
 
-## Verification (measured)
-Baseline re-run at start (pre-change): probe `241/241 PASS`, smoke `57/57`,
-pytest `459 passed, 1 warning`, ruff F=0 — all green.
-Post-change (full gate):
-- probe full run: `PROBE handover: 246/246 PASS` (annotation line updated to
-  S13=19, total 246 — matches the self-annotated output).
-- compact_memory smoke: `COMPACT_MEMORY_SMOKE: ALL PASS (65/65)`.
-- pytest: `459 passed, 1 warning`.
-- ruff `--select F`: `All checks passed!`.
+## Deliberately not done
+- No limit-run detection / no context_recovery changes (the #93 port owns it).
+- No budget-file edits (maintainer live); no ctx.log-based exhaustion source
+  (the budget store is the pinned source).
+- No TODO.md change (status lives in the spec + planner bookkeeping, per spec).
 
-## #93 CARRY-OVER NOTE (required by the spec)
-The auto side of the emergency-1 logic is DESIGN ONLY on this build:
-`.opencode/plugin/deactivated/context_recovery.ts` is DEACTIVATED (its frozen
-smoke pins `tests/context_recovery.smoke.mjs` stay untouched, per the spec's
-DO-NOT-touch). When the #93 event-hook port writes the live file, it MUST
-implement the same count logic WITHOUT the arg requirement: on its overflow
-fire — `count < cap` → consume normally; `count === cap` AND the emergency
-available (`emergency_budget >= 1`) → consume the 1 (its blind compaction, keep
-per its own config); `count > cap` → refuse / defer to the forced-new-session
-(item 11 spec). The live plugin's header comment (Part 2 budget section)
-documents this. NOTE: the auto-side consumption would also need the
-`appendCompactLine` ` emergency` suffix (the deactivated file has its own line
-writer — the port must mirror the pinned format).
-
-## Deliberately NOT done
-- `.opencode/plugin/deactivated/context_recovery.ts` + `compact_memory_v1.ts`
-  (DO-NOT-touch — the emergency-1 auto side rides the #93 port, see above).
-- `.opencode/temp/compact_budget.json`, `opencode.jsonc` (maintainer live files —
-  the budget file carries no `emergency_budget` key; the fail-open default 1
-  covers its absence, per spec).
-- `auto_resume.ts` (the item 2+11 / item 3 specs own it), prompt / knowledge
-  files, anything under `.opencode/maintainer/`.
-- No `TODO.md` change (the spec: status lives in the spec + your bookkeeping).
-- Maintainer's uncommitted live files (opencode.jsonc, AGENTS.md,
-  prompt_agent_task.md, agent_feedback.md, loop_log.md, ideas.md) — untouched,
-  not staged, not committed (named-path commit only).
+## Friction
+- The spec's auto_resume smoke baseline (102/102) was stale at launch (live:
+  121/121) — harmless (green), but the launch baselines should be re-measured
+  at spec time, not carried forward.

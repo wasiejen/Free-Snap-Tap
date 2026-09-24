@@ -963,10 +963,105 @@ try {
   chk("UNIT 4 #90 (re-pin): the cap-exhaustion spawn deactivated ses_u4_cap — the real busy arms (cap reset) but the routing skips (skip= deactivated, no attempt re-issue, no send)",
     okCap4 && capRecovery(1) === 1 && capArmReal() === 2 && u4Sends.length === sBeforeCap4,
     `n1=${capRecovery(1)} arm=${capArmReal()} sends=${u4Sends.length}`);
-  chk("UNIT 4 #80: exactly the two injected busies were consumed (arm= ... injected ×2)",
-    capInjected() === 2, `armInjected=${capInjected()}`);
+   chk("UNIT 4 #80: exactly the two injected busies were consumed (arm= ... injected ×2)",
+     capInjected() === 2, `armInjected=${capInjected()}`);
 
-   // ============================================================
+    // ============================================================
+    // ITEM 2 (2026-09-24) — the post-compaction message relay:
+    // compact_memory STORES its `message` arg at queue time (one
+    // per-session file under the temp dir —
+    // .opencode/temp/compact_message_<sid>); the unit-4 CONTINUE relay
+    // delivers the stored message as the FIRST message of the resumed
+    // turn, followed by the one-line post-compaction addendum, and
+    // renames the file .consumed on a successful send.
+    // ITEM 11 (2026-09-24) — the forced-new-session directive: the
+    // restart branch checks the budget store (count > cap = FULLY
+    // exhausted — the emergency 1 consumed) → the RESTART prompt
+    // carries the directive (the limit-run DETECTION is the #93 port —
+    // this pins the condition check + the directive construction).
+    // ============================================================
+    const tmp2 = path.join(proj, ".opencode", "temp");
+    const budget2 = path.join(tmp2, "compact_budget.json");
+    const RELAY_MSG = "resume the gate section from the last green commit (re-read the NAP)";
+    const ADDENDUM = "post-compaction: re-read your head files per .opencode/agent/prompts/agent_readme_post_compaction.md and CONTINUE — never re-plan from scratch";
+
+    // ---- (1) a stored message → relayed as the FIRST CONTINUE message
+    // (+ the one-line addendum); the file is consumed on success.
+    msgScript.set("ses_u4_relay", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Mid-unit, no closing line."]], PLANNER_A));
+    fs.writeFileSync(path.join(tmp2, "compact_message_ses_u4_relay"), RELAY_MSG, "utf-8");
+    await fire(hooksU4, "ses_u4_relay", [statusEv("ses_u4_relay", "busy"), statusEv("ses_u4_relay", "idle")]);
+    const okR1 = await waitUntil(() => readLines().some((l) => l.includes("recovery= sid=ses_u4_relay attempt=1")), 12000);
+    const relaySend = u4Sends.find((c) => c.path?.id === "ses_u4_relay");
+    const relayText = relaySend?.body?.parts?.[0]?.text ?? "";
+    chk("ITEM 2: a stored queued message is RELAYED as the FIRST message of the CONTINUE prompt (+ the one-line post-compaction addendum)",
+      okR1 && relaySend != null && relayText === `${RELAY_MSG}\n${ADDENDUM}`,
+      JSON.stringify(relayText.slice(0, 120)));
+    chk("ITEM 2: the relayed CONTINUE body carries the session's current agent (planner) — same as the plain CONTINUE",
+      okR1 && relaySend?.body?.agent === PLANNER_A, JSON.stringify(relaySend?.body?.agent));
+    chk("ITEM 2: the stored file is CONSUMED on a successful send (renamed .consumed)",
+      okR1 && !fs.existsSync(path.join(tmp2, "compact_message_ses_u4_relay")) && fs.existsSync(path.join(tmp2, "compact_message_ses_u4_relay.consumed")), "");
+    chk("ITEM 2: the relay= line is logged", okR1 && readLines().some((l) => l.includes("relay= sid=ses_u4_relay")), "");
+    // (2) NO stored message → the plain CONTINUE text (no addendum, no
+    // relay= line) — pinned on ses_u4_noline (batch A).
+    const nolineText = (u4Sends.find((c) => c.path?.id === "ses_u4_noline")?.body?.parts?.[0]?.text) ?? "";
+    chk("ITEM 2: NO stored message → the plain CONTINUE text (no addendum, no relay= line)",
+      nolineText.includes("agent_readme_post_compaction.md") && !nolineText.includes("never re-plan from scratch") &&
+        !readLines().some((l) => l.includes("relay= sid=ses_u4_noline")), "");
+
+    // ---- (3) budget FULLY exhausted (count 3 > cap 2 — the emergency 1
+    // consumed) → the RESTART prompt carries the directive.
+    msgScript.set("ses_u4_exh", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done. action: restart"]], PLANNER_A));
+    fs.writeFileSync(budget2, JSON.stringify({
+      version: 2,
+      sessions: { ses_u4_exh: { count: 3, updated: "2026-09-24T00:00:00.000Z", model: "ExhModel" } },
+      model_budget: { ExhModel: 2, default: 1 },
+      emergency_budget: 1,
+    }, null, 2) + "\n", "utf-8");
+    const cBeforeExh = u4Creates.length;
+    await fire(hooksU4, "ses_u4_exh", [statusEv("ses_u4_exh", "busy"), statusEv("ses_u4_exh", "idle")]);
+    const okR3 = await waitUntil(
+      () => u4Creates.length === cBeforeExh + 1 && readLines().some((l) => l.includes("route= restart spawn sid=ses_u4_exh")),
+      12000,
+    );
+    const exhSpawn = u4Sends.find((c) => ((c.body?.parts?.[0]?.text) ?? "").includes("compaction budget exhausted"));
+    chk("ITEM 11: budget FULLY exhausted (count 3 > cap 2) → the RESTART prompt carries the forced-new-session directive (line 1 = the toggle, unchanged)",
+      okR3 && exhSpawn != null &&
+        (exhSpawn.body?.parts?.[0]?.text ?? "").startsWith(MARK) &&
+        (exhSpawn.body?.parts?.[0]?.text ?? "").includes("compaction budget exhausted — scan the dump of ses_u4_exh to gain all relevant knowledge") &&
+        (exhSpawn.body?.parts?.[0]?.text ?? "").includes("dump_session.cjs") &&
+        (exhSpawn.body?.parts?.[0]?.text ?? "").includes("make a clean handover/commit if not present") &&
+        (exhSpawn.body?.parts?.[0]?.text ?? "").includes("continue per the NAP"),
+      JSON.stringify((exhSpawn?.body?.parts?.[0]?.text ?? "").slice(0, 200)));
+    chk("ITEM 11: the budget= exhausted line is logged", okR3 && readLines().some((l) => l.includes("budget= exhausted sid=ses_u4_exh")), "");
+
+    // ---- (4) count == cap (the emergency 1 still available) → NOT
+    // exhausted → the PLAIN restart text (no directive).
+    msgScript.set("ses_u4_emg", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done. action: restart"]], PLANNER_A));
+    fs.writeFileSync(budget2, JSON.stringify({
+      version: 2,
+      sessions: { ses_u4_emg: { count: 2, updated: "2026-09-24T00:00:00.000Z", model: "ExhModel" } },
+      model_budget: { ExhModel: 2, default: 1 },
+      emergency_budget: 1,
+    }, null, 2) + "\n", "utf-8");
+    const cBeforeEmg = u4Creates.length;
+    await fire(hooksU4, "ses_u4_emg", [statusEv("ses_u4_emg", "busy"), statusEv("ses_u4_emg", "idle")]);
+    const okR4 = await waitUntil(
+      () => u4Creates.length === cBeforeEmg + 1 && readLines().some((l) => l.includes("route= restart spawn sid=ses_u4_emg")),
+      12000,
+    );
+    const emgSpawn = u4Sends.filter((c) => {
+      const t = c.body?.parts?.[0]?.text ?? "";
+      return t.startsWith(MARK) && t.includes("auto-resume unit 4 restart branch") && !t.includes("compaction budget exhausted");
+    }).at(-1);
+    chk("ITEM 11: count == cap (the emergency 1 available) → NOT exhausted → the PLAIN restart text (no directive)",
+      okR4 && emgSpawn != null && !(emgSpawn.body?.parts?.[0]?.text ?? "").includes("compaction budget exhausted"),
+      JSON.stringify((emgSpawn?.body?.parts?.[0]?.text ?? "").slice(0, 120)));
+    // leave the sandbox clean (later sections read no budget file —
+    // fail-open defaults)
+    fs.rmSync(budget2, { force: true });
+    fs.rmSync(path.join(tmp2, "compact_message_ses_u4_relay.consumed"), { force: true });
+
+    // ============================================================
     // UNIT 2 #85 part 3 — the nudge's scope gate (the factory is re-
     // invoked with a fresh spying client — promptAsync + messages both
     // spied, messages scripted per sid from the shared msgScript):
@@ -1543,7 +1638,7 @@ try {
   } else if (liveBefore === null && liveSizeNow > 0) {
     appended = fs.readFileSync(LIVE_LOG, "utf-8"); // did not exist before — all new
   }
-  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_wrap", "ses_u4_throw", "ses_u4_spawn", "ses_u4_cap", "ses_u2_agnet", "ses_u2_agnone", "ses_u4_worker", "ses_u4_worker_on", "ses_u4_pb", "ses_u4_lastoff", "ses_u4_mid", "ses_p2_cur", "ses_p2_rs", "ses_p2_fb", "ses_p2_dm", "ses_p2_spawn", "ses_u2_hi98", "ses_u2_two", "ses_u2_direct", "ses_u2_stale", "ses_u2_cfa_low", "ses_u2_cfa_hi", "ses_u2_cfb_edit", "ses_u2_cfb_fire", "ses_u2_cfb_no", "ses_u2_cfc_fire", "ses_u2_cfc_no", "ses_u2_cfd_low", "ses_u2_cfd_hi", "ses_p3_pldirect", "ses_90_worker", "ses_90_spawn", "ses_90_trig", "ses_90_t0", "ses_90_d1", "ses_90_d2", "ses_90_fail", "ses_90_file"];
+  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_wrap", "ses_u4_throw", "ses_u4_spawn", "ses_u4_cap", "ses_u4_relay", "ses_u4_exh", "ses_u4_emg", "ses_u2_agnet", "ses_u2_agnone", "ses_u4_worker", "ses_u4_worker_on", "ses_u4_pb", "ses_u4_lastoff", "ses_u4_mid", "ses_p2_cur", "ses_p2_rs", "ses_p2_fb", "ses_p2_dm", "ses_p2_spawn", "ses_u2_hi98", "ses_u2_two", "ses_u2_direct", "ses_u2_stale", "ses_u2_cfa_low", "ses_u2_cfa_hi", "ses_u2_cfb_edit", "ses_u2_cfb_fire", "ses_u2_cfb_no", "ses_u2_cfc_fire", "ses_u2_cfc_no", "ses_u2_cfd_low", "ses_u2_cfd_hi", "ses_p3_pldirect", "ses_90_worker", "ses_90_spawn", "ses_90_trig", "ses_90_t0", "ses_90_d1", "ses_90_d2", "ses_90_fail", "ses_90_file"];
   chk("LIVE .opencode/temp/auto_resume.log received no smoke line (sandbox got every smoke line)",
     liveBefore === liveSizeNow || !smokeSids.some((s) => appended.includes(s)), `before=${liveBefore} after=${liveSizeNow}`);
   chk("sandbox log path is under the sandbox", sandboxLog.startsWith(base), sandboxLog);

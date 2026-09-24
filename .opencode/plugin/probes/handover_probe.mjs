@@ -2595,20 +2595,20 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
 }
 
 // 97 — the message response shape (cross dispatch, the message arg GIVEN,
-//      unit A): the response is the dispatch line + the queued note (the
-//      message itself is NOT in the response); the queued promptAsync is
-//      COMMENTED OUT (maintainer temp fix 0f192e5, 2026-09-22 — it killed
-//      the SELF-compaction queued-message race): NO prompt is sent (empty
-//      prompt array). RE-PINNED 2026-09-22 per the maintainer's ruling:
-//      pin the current behavior, do NOT deactivate/skip, do NOT restore
-//      the promptAsync (TODO #81)
+//      unit A → item 2, 2026-09-24): the response is the dispatch line +
+//      the queued note (the message itself is NOT in the response); NO
+//      promptAsync at queue time (the maintainer's temp fix 0f192e5 stays
+//      in place) — the message is STORED per-session under
+//      .opencode/temp/ and is delivered at RESUME time by the auto-resume
+//      unit-4 CONTINUE relay (empty prompt array at queue time —
+//      unchanged)
 {
   const { rec, res } = await qcExec({ summarize: true, messages: [{ info: { modelID: "IQ4-x", providerID: "llama-swap" } }], promptAsync: true }, { message: "resume unit-3", sessionID: "ses_qc_msg" });
   await qcTick();
   check(
     "97",
     "S13",
-    "message (unit A): response = dispatch line + the queued note (byte-exact) + NO queued promptAsync (temp fix 0f192e5 — the prompt is not sent)",
+    "message (unit A → item 2): response = dispatch line + the queued note (byte-exact) + NO promptAsync at queue time (the message is STORED — delivered at RESUME time by the auto-resume relay)",
     res === `Compaction dispatched for ses_qc_msg (background, fire-and-forget) — the summarize call was sent (model: IQ4-x); the budget increment + the COMPACT line in .opencode/temp/ctx.log land ONLY on verified success.\nThe message was queued for ses_qc_msg (delivered on its resume).` &&
       rec.prompt.length === 0,
     JSON.stringify({ res: String(res).slice(0, 160), prompt: rec.prompt }),

@@ -140,13 +140,20 @@
 // stop / ask_maintainer → NO send, `route= stop|ask` line; resume or NO
 // recognized line → ONE queued CONTINUE prompt (recoveryCount++, cap 2
 // per idle cycle, reset on a fresh busy), `recovery= attempt=N` line;
+// item 2: a STORED queued message (the compact_memory per-session temp
+// file) is relayed as the CONTINUE prompt's FIRST message + the one-line
+// post-compaction addendum (`relay=` line; the file is renamed .consumed
+// on a successful send);
 // a FAILED CONTINUE send (`send-fail=`) DEAD-MARKS the session for the
 // current idle cycle (#85 part 2): the next routed tick logs
 // `skip= dead` — the remaining recovery retries AND the
 // cap-exhaustion fallback spawn are skipped (no doomed successor);
 // cleared on a fresh busy (the same reset axis as the recovery
 // budget); a dead model never goes busy → the mark persists → no 5s
-// retry loop. restart, or cap exhausted with still no line →
+// retry loop. restart, or cap exhausted with still no line (item 11:
+// the closing session's compaction budget FULLY exhausted — count > cap
+// — → the RESTART prompt carries the forced-new-session directive + a
+// `budget= exhausted` line) →
 // SUCCESSOR CHECK (a
 // DIFFERENT sid tracked in a session.created event since the closed
 // session's lastActivityAt → `skip= successor`) else the
@@ -771,6 +778,40 @@ function continueText(sid: string): string {
   );
 }
 
+// Item 2 (2026-09-24): the queued continuation message the compact_memory
+// tool STORED at queue time (one per-session file under the temp dir —
+// .opencode/temp/compact_message_<sid>; the temp fix 0f192e5's disabled
+// promptAsync stays gone — the relay is the delivery path). Delivered at
+// RESUME time (the unit-4 CONTINUE path — recovery / self-compact resume)
+// as the FIRST message of the resumed turn, followed by the one-line
+// post-compaction addendum below. Absent / empty / unreadable → null (the
+// plain CONTINUE text). Consume-on-success: the file is renamed
+// .consumed ONLY after a successful promptAsync (a failed send keeps it
+// for the next attempt).
+const POST_COMPACTION_ADDENDUM =
+  "post-compaction: re-read your head files per .opencode/agent/prompts/agent_readme_post_compaction.md and CONTINUE — never re-plan from scratch";
+
+function queuedMessagePath(sid: string): string {
+  return join(logDir, `compact_message_${sid}`);
+}
+
+function readQueuedMessage(sid: string): string | null {
+  try {
+    const t = readFileSync(queuedMessagePath(sid), "utf-8");
+    return t.trim() === "" ? null : t;
+  } catch {
+    return null; // absent / unreadable → the plain CONTINUE text
+  }
+}
+
+function consumeQueuedMessage(sid: string): void {
+  try {
+    renameSync(queuedMessagePath(sid), queuedMessagePath(sid) + ".consumed");
+  } catch {
+    // best effort — never throw out of a hook
+  }
+}
+
 // Unit 4: the RESTART start prompt for the spawnPlanner call (the
 // restart branch / cap-exhausted branch): carries the looprunner
 // launch marker + the iteration-counter rule + the rebuild-from-
@@ -787,15 +828,70 @@ function continueText(sid: string): string {
 // state as autorun-scoped: behaviorally identical today (routeScoped-
 // Idle treats "planner" and "autorun" alike), and the loop
 // self-perpetuates (the successor's own restart spawn carries the same
-// text).
-function restartText(): string {
-  return (
+// text). Item 11 (2026-09-24): when the closing session's compaction
+// budget is FULLY exhausted (count > cap — the emergency 1 consumed),
+// the prompt ADDS the forced-new-session directive (the limit-run
+// DETECTION is the #93 context_recovery port — this is the condition
+// check + the directive construction).
+function restartText(sid: string, exhausted: boolean): string {
+  const base =
     `<|autonom|>\n` +
     `Run autonomously. (auto-resume unit 4 restart branch: the previous planner closed with ` +
     "`action: restart`.) Your iteration number = the largest `planner-N` in the current loop folder's `loop_log.md` " +
     "plus one (verify from the log; the counter-mismatch rule applies). Rebuild reality from committed state " +
-    "(git log, NAP, TODO.md) and continue per your planner prompt's autonomous mode."
+    "(git log, NAP, TODO.md) and continue per your planner prompt's autonomous mode.";
+  if (!exhausted) return base;
+  // The directive's session id = the CLOSING session (the budget store
+  // key checked in budgetExhausted — the pinned source).
+  return (
+    base +
+    ` compaction budget exhausted — scan the dump of ${sid} to gain all relevant knowledge ` +
+    `(the auto-dump corpus; ` +
+    "`dump_session.cjs` in .opencode/agent/scripts/db/ for on-demand dumps); " +
+    "make a clean handover/commit if not present; then continue per the NAP."
   );
+}
+
+// Item 11 (2026-09-24): the forced-new-session budget check — the budget
+// store (the SAME compact_budget.json the Unit-2 nudge reads; READ-ONLY,
+// per restart-branch call) shows the closing session's compaction count
+// FULLY EXHAUSTED: count > cap (the post-item-10 exhaustion state — the
+// emergency 1 consumed, count = cap+1; count == cap leaves the emergency
+// available → NOT exhausted). The cap is resolved EXACTLY as
+// compact_memory.ts resolves it (mirror of its resolveCap): the CPU
+// safety invariant (cap 0), the model_budget map's EXACT bare-model-id
+// key (the session entry's `model` = the model id at the last increment),
+// else model_budget.default, else the default 1. Fail-open: file missing
+// / unreadable / malformed / no entry → NOT exhausted (no directive).
+function budgetExhausted(sid: string): boolean {
+  try {
+    const data: unknown = JSON.parse(readFileSync(join(logDir, COMPACT_BUDGET_FILE), "utf-8"));
+    if (typeof data !== "object" || data === null) return false;
+    const rec = data as Record<string, unknown>;
+    const sessions = rec["sessions"];
+    if (sessions == null || typeof sessions !== "object" || Array.isArray(sessions)) return false;
+    const entry = (sessions as Record<string, unknown>)[sid];
+    if (entry == null || typeof entry !== "object") return false;
+    const e = entry as Record<string, unknown>;
+    const count = e["count"];
+    if (typeof count !== "number" || !Number.isFinite(count)) return false;
+    const model = typeof e["model"] === "string" ? (e["model"] as string) : "";
+    const mb = rec["model_budget"];
+    let cap: number;
+    if (/^cpu/i.test(model)) {
+      cap = 0; // the CPU safety invariant (mirror of compact_memory's resolveCap)
+    } else if (mb != null && typeof mb === "object" && !Array.isArray(mb)) {
+      const m = mb as Record<string, unknown>;
+      if (model !== "" && typeof m[model] === "number" && Number.isFinite(m[model])) cap = m[model] as number;
+      else if (typeof m["default"] === "number" && Number.isFinite(m["default"])) cap = m["default"] as number;
+      else cap = 1;
+    } else {
+      cap = 1;
+    }
+    return count > cap;
+  } catch {
+    return false; // missing / unreadable / malformed → fail OPEN (no directive)
+  }
 }
 
 // Unit 4: the SDK list shape of a messages() result —
@@ -1197,11 +1293,19 @@ async function routeScopedIdle(sid: string, w: Watch) {
       // agent → no agent field (the host default applies) + an
       // agent-omit= attribution line.
       const ident = resolveInjectIdentity(msgs);
-      const body: Record<string, unknown> = { parts: [{ type: "text", text: continueText(sid) }] };
+      // Item 2: the stored queued message (the compact_memory temp file)
+      // is the FIRST message of the resumed turn + the one-line
+      // post-compaction addendum; NO stored message → the plain
+      // CONTINUE text.
+      const stored = readQueuedMessage(sid);
+      const text = stored != null ? `${stored}\n${POST_COMPACTION_ADDENDUM}` : continueText(sid);
+      if (stored != null) log(`relay= sid=${sid}`);
+      const body: Record<string, unknown> = { parts: [{ type: "text", text }] };
       if (ident.agent) body.agent = ident.agent;
       else log(`agent-omit= sid=${sid} no current agent+model`);
       if (ident.model) body.model = ident.model;
       await sess.promptAsync({ path: { id: sid }, body });
+      if (stored != null) consumeQueuedMessage(sid); // consume ONLY on a successful send
       // #80 (cap semantics): mark the pending injection — the busy of
       // this injected turn must not reset the recovery cap.
       pendingInject.set(sid, Date.now());
@@ -1231,10 +1335,14 @@ async function routeScopedIdle(sid: string, w: Watch) {
     log(`skip= depth sid=${sid} depth=${depth}`);
     return;
   }
+  // Item 11: the forced-new-session budget check (FULLY exhausted → the
+  // restart prompt carries the directive).
+  const exhausted = budgetExhausted(sid);
+  if (exhausted) log(`budget= exhausted sid=${sid}`);
   log(`route= restart spawn sid=${sid}`);
   // #85 part 2: the SOURCE session's fresh fetch — its current
   // agent+modelID carries over to the successor.
-  const newSid = await spawnPlanner(restartText(), msgs); // Unit 3 helper (never throws outward)
+  const newSid = await spawnPlanner(restartText(sid, exhausted), msgs); // Unit 3 helper (never throws outward)
   // #90 part A+B: a SUCCESSFUL spawn records the successor's lineage
   // depth (trigger depth + 1) and STICKY-deactivates the TRIGGER
   // (part B: the fresh fetch is already in hand — its user-message
