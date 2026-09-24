@@ -245,3 +245,19 @@ fix pending):**
   the session's own model (config-dependent, §1).
 - "Near-limit estimates are 'starting values, calibrate from measured loopruns'" → act on the
   ~10-call / ~6-call thresholds as the calibrated instruction.
+
+## 12. Corrections (2026-09-24 — maintainer clarifications; supersede earlier text)
+- **Emergency-1 semantics (supersedes "first-come-first-served" in §4/§5):** the emergency 1
+  is consumed ONLY after the normal 5 are drained; total 6 per session; usable by EITHER
+  emergency system (self `emergency` param or auto-at-limit), once. The race window is only
+  the post-drain window.
+- **Live values (2026-09-24):** keepTokens = 0 in both stores (opencode.json keep block
+  tokens-off, the override rule commented in-file; compact_budget.json `"keepTokens": 0`);
+  keepMessages = **18** in BOTH stores — the "12 default" in §2/§7 is stale (both stores are
+  now 18); `agent.compaction.model` is COMMENTED OUT → same-model summarizer confirmed.
+- **Active server path on this build:** v1 `client.session.summarize` — keep fields reach the
+  server ONLY via the tool ARGS (no args → the server default, 18); the budget file's keep
+  values currently feed only the COMPACT log line (single-source question: see the change
+  list, the maintainer inbox file).
+- **Budget file live state:** `autoCompact: false`, `saturationThreshold: 0.95`,
+  `outputReserve: 5000`, `emergencyRecovery: true`; no emergency-1 key yet (planned).

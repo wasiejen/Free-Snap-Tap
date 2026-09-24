@@ -49,3 +49,12 @@ files, TODO) and CONTINUE; never re-plan from scratch.
   compact to continue, 95% commit + compact NOW) — not the only compaction moments.
 - A dump is created automatically on self/cross compaction; the last session's dump is the
   recovery source for a forced new session.
+
+## Corrections (2026-09-24; supersede earlier text)
+- Emergency 1: consumed ONLY after the normal 5 are drained (total 6), either system, once —
+  not first-come-first-served.
+- Live defaults: keepTokens = 0 / being removed from both stores; keepMessages = 18 in BOTH
+  stores (the "12" above is stale). `agent.compaction.model` commented out → same-model
+  summarizer.
+- The trusted-system change list (grounded): `maintainer/inbox_planner/
+  compaction_feedback_by_planner.md` (planner-consolidated, 2026-09-24).
