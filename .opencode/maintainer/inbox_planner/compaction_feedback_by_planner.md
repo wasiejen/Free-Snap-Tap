@@ -235,6 +235,15 @@ Discrepancies surfaced (evidence-attached):
   plugin code — the suffix appears after his restart (my ctx_gauge + his ctx
   line show it not yet — the same "only new sessions/processes get new code"
   pattern as AGENTS.md).
+- **Wave task d LANDED** (worker_Q3S_230K_slow — his backend caching test,
+  first worker run on that model): commit `16e0bfb` — dated corrections
+  appended to the two stale knowledge entries (same-model summarizer —
+  `agent.compaction.model` commented out; keepTokens removed + low
+  keepMessages legitimate, floor ~25-30k, 18 the live default in both
+  stores); history preserved (+19/-0). The worker flagged a THIRD stale
+  claim in the same entry (item 4: "server schema has no keep key") —
+  corrected inline by the planner in the follow-up commit (keep.messages is
+  honored via the v1 path, per guide §12).
 - Maintainer confirmation (recorded in the spec 2+11 facts + the knowledge
   inbox): post-compaction planner resume = the AUTO-RESUME PLUGIN (the #90/
   #91 family — the restart spawn carries the real planner agent, the

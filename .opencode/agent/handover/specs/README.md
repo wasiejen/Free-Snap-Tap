@@ -19,9 +19,10 @@ Status (2026-09-24): 01 = LANDED (7f253ea; probe S10/S11 carve-out accepted,
 rides #93); 10 = LANDED (04053e8; auto side design-only → #93 port must carry
 it); 2+11 = LANDED (526e7e1; narrow exception used — queueMessage persists);
 3 = LANDED (9d2e727; suffix via formatGauge — ctx line/peek/ctx_gauge; live
-effect awaits the host restart). Wave = next: task d (knowledge) goes to a
-WORKER first (worker_Q3S_230K_slow — his backend caching test), then the
-text-worker pass for c/e/g/h (prompt files — his prompt_agent_task.md is
-still live-edited/uncommitted).
+effect awaits the host restart). Wave: task d = LANDED (16e0bfb, worker_Q3S_230K_slow); item-4 stale claim
+corrected inline by the planner. Remaining c/e/g/h = the text-worker pass
+(prompt files — his prompt_agent_task.md is still live-edited/uncommitted;
+the text-worker must check git status before editing and skip live-edited
+files, flagging them in the handover).
 What does NOT go here: launched specs' worker summaries (handover folder root),
 NAP, non-compaction specs.

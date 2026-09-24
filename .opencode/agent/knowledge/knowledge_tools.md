@@ -181,7 +181,7 @@ instructions/protocol — facts that save lookups. Format per the README:
   (3) NEVER use keepTokens/keepMessages 0 (usage ruling 2026-09-14: the
   compaction run still costs the full summarize time/energy — a fresh worker
   session gives the same result cheaper); (4) the keep args ARE sent in the
-  body, but this host's server schema has no keep key → the retry-once
+  body, but this host's server schema has no keep key (STALE 2026-09-24, guide section 12: the keep fields DO reach the server and ARE honored via the v1 summarize path - keep.messages only; no args means server default 18; item 1, commit 7f253ea - this clause is superseded, the rest of the sentence still stands) → the retry-once
   drops them; the observed compaction floor is server-side behavior, not the
   keep args; (5) agents NEVER send direct requests (curl/test scripts) to
   the inference server while a session is active — the single slot UNLOADS
