@@ -28,6 +28,9 @@ All paths below are relative to `.opencode/agent/prompts/`.
 - `repo/repo_custom_tools.md` — read when using the host-specific opencode
   tools (block_transfer, ctx_gauge, loop_log, compact_memory) or when one of
   their behaviors surprises you.
+- `repo/repo_opencode.md` — read when you need opencode host specifics:
+  install/log/SDK paths, plugin registration, or opencode behavior not in
+  the knowledge base (index → `knowledge/opencode-plugins/`).
 - `agent_readme_todo.md` — read when appending findings to `todo_inbox.md`.
 - `agent_readme_loop.md` — §Loop log defines the activity-log lines you write at
   session start and task completion (write them via the `loop_log` tool when it

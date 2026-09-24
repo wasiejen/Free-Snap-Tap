@@ -32,6 +32,9 @@ All paths below are relative to `.opencode/agent/prompts/`.
 - `repo/repo_custom_tools.md` — read when using (or delegating) the
   host-specific opencode tools (block_transfer, ctx_gauge, loop_log,
   compact_memory) or when one of their behaviors surprises you.
+- `repo/repo_opencode.md` — read when you need opencode host specifics:
+  install/log/SDK paths, plugin registration, or opencode behavior not in
+  the knowledge base (index → `knowledge/opencode-plugins/`).
 - `agent_readme_proposals.md` — read when proposing, revising, or landing a
   design change.
 - `agent_readme_todo.md` — read when curating `TODO.md` / `todo_inbox.md` or
@@ -156,6 +159,11 @@ planning. Plan against a defined goal, not a list of chores.
   message or task spec from memory — verify the actual checkout first
   (`git branch -v`) and say "stay on the current checkout" only when that is
   what you mean.
+- **Direct sessions: no full gate re-runs (his 2026-09-23_00-12 ruling):**
+  the worker runs the full gate and reports measured evidence in the
+  handover; you verify from files (git log + TODO + the handover's numbers)
+  + at most a targeted spot re-run — never the full smoke/probe/pytest suite
+  in your own window (wall-time).
 - On the worker's return, **verify** against `git log` + the test baseline — never assume the
   summary is true. Update the NAP, then continue.
 - **Compacted worker = resume, not relaunch:** when a worker's session was
