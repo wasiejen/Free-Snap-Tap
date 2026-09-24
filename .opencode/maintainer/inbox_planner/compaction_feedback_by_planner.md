@@ -244,6 +244,23 @@ Discrepancies surfaced (evidence-attached):
   claim in the same entry (item 4: "server schema has no keep key") —
   corrected inline by the planner in the follow-up commit (keep.messages is
   honored via the v1 path, per guide §12).
+- **Wave c/e/g/h LANDED** (planner_Q3S_230K_slow text-worker — same-model
+  cache per his finding): commit `14e9352`. c: repo_custom_tools
+  compact_memory section reworked to the post item-1+10 state (args incl.
+  `emergency`, same-model flush line, looprunner role lines); repo_map roster
+  note; skill README line. e: agent_readme_loop reworked for the looprunner
+  retirement (the `--request:` line convention RETIRED too — flagged for his
+  ruling if he wants it kept); prompt_agent_looprunner.md → `.opencode/
+  archive/` via git mv; agent_readme_post_compaction verified looprunner-free;
+  the looprunner agent in opencode.jsonc was ALREADY commented out by the
+  maintainer (L149+). g: planner primer bullet removed (worker side deferred).
+  h: planner Context-budget section reworked compaction-oriented (default-
+  compact, distilled→drop, triage thresholds, keepMessages heuristic, spend
+  the `emergency` 1 proactively; the stale Gemma flush line fixed). DEFERRED
+  (his live prompt_agent_task.md, uncommitted at launch): the task-g worker
+  primer bullet + the task-h worker Context-budget section + one stale
+  pre-spec-2+11 line ("the reload message is attached to the compaction
+  summary") — a short second pass after his commit.
 - Maintainer confirmation (recorded in the spec 2+11 facts + the knowledge
   inbox): post-compaction planner resume = the AUTO-RESUME PLUGIN (the #90/
   #91 family — the restart spawn carries the real planner agent, the

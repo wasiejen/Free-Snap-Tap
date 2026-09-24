@@ -19,10 +19,11 @@ Status (2026-09-24): 01 = LANDED (7f253ea; probe S10/S11 carve-out accepted,
 rides #93); 10 = LANDED (04053e8; auto side design-only → #93 port must carry
 it); 2+11 = LANDED (526e7e1; narrow exception used — queueMessage persists);
 3 = LANDED (9d2e727; suffix via formatGauge — ctx line/peek/ctx_gauge; live
-effect awaits the host restart). Wave: task d = LANDED (16e0bfb, worker_Q3S_230K_slow); item-4 stale claim
-corrected inline by the planner. Remaining c/e/g/h = the text-worker pass
-(prompt files — his prompt_agent_task.md is still live-edited/uncommitted;
-the text-worker must check git status before editing and skip live-edited
-files, flagging them in the handover).
+effect awaits the host restart). Wave: task d = LANDED (16e0bfb, worker_Q3S_230K_slow; item-4 corrected inline
+by the planner); c/e/g/h = LANDED (14e9352, planner_Q3S_230K_slow text-
+worker). REMAINING: the worker-prompt parts (task g primer bullet + task h
+Context-budget section + 1 stale pre-spec-2+11 line) — deferred, awaiting
+his prompt_agent_task.md commit; f2-cleanup = his 4 looprunner lines in
+AGENTS.md (wave spec lists them).
 What does NOT go here: launched specs' worker summaries (handover folder root),
 NAP, non-compaction specs.
