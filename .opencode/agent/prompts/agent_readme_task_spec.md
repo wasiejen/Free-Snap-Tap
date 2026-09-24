@@ -22,6 +22,16 @@
   green; each spec is written against the just-verified state (fresh
   line numbers / reference sets / baselines) and is COMMITTED BEFORE the
   launch — a spec is never launched uncommitted.
+- **Spec wave (approved 2026-09-24, maintainer ruling — recommended method):**
+  when context allows, pre-write a QUEUE of committed specs as MULTIPLE files
+  (e.g. `handover/specs/` + a README naming each spec + the queue order)
+  instead of one spec at a time. Each spec still follows every rule above
+  (committed before launch, written against the just-verified state); the
+  launching planner (fresh or post-compaction) launches from the committed
+  files. Rationale: generating many specs at once is cheaper than re-deriving
+  them later — adapting a committed spec costs less context than re-deriving
+  it for the next or a compacted planner. Use it after a design session that
+  settles a multi-item build.
 - **Claims in a spec are the planner's verified facts** (measured at spec
   time), not assignments for the worker to re-derive.
 - **Commit hash in the DoD (codified 2026-09-22 after two worker stumbles):**

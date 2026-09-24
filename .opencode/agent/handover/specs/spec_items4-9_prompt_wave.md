@@ -10,22 +10,20 @@ Sources of truth (read first, in one batch):
 §12 corrections), `maintainer/draft/compaction_guide/handout.md`.
 
 ## Tasks (ordered; each small; text-only — NO code, NO config, NO behavior claims)
-- **a. Planner prompt** (`.opencode/agent/prompts/agents/prompt_agent_planner.md`):
-  replace the compaction policy content with the handout model (default-compact
-  until the budget is spent; distilled→drop, mid-unit ok; wall-time/speed
-  rationale; bit-rot; the three paths + the emergency-1 race; keepMessages
-  heuristic — when in doubt keep more; restart exception; stop lines as triage
-  thresholds, not the purpose). Remove: the two "(starting value … calibrate
-  from measured loopruns)" notes (act on ~10/~6 calls as calibrated); the Gemma
-  flush line (~L179); the dump-before-compact protocol lines (dumps are now
-  AUTOMATIC on self/cross compact — `dump_session.cjs` stays for manual/
-  forensics); the looprunner mentions (~L65/84/85/209/265) → the auto-resume
-  plugin. Keep: the Work State dump form, the action-line mechanics, the
-  NAP/TODO contract.
+- **a. Planner prompt** (`.opencode/agent/prompts/agents/prompt_agent_planner.md`)
+  — his ruling 2026-09-24: the shared compaction knowledge MOVES to AGENTS.md
+  (its paste, task f). So: REMOVE the compaction guide content (the
+  handout-equivalent policy passages + the stale passages: the two "(starting
+  value … calibrate from measured loopruns)" notes, the Gemma flush line
+  (~L179), the dump-before-compact protocol lines — dumps are AUTOMATIC now,
+  `dump_session.cjs` stays for manual/forensics, the looprunner mentions
+  ~L65/84/85/209/265). KEEP only the role-specific triage/handover mechanics
+  (near-limit triage, emergency handover form, Work State dump form, stop-line
+  protocol) + one pointer line: "Compaction: see AGENTS.md §Compaction."
 - **b. Worker prompt** (`.opencode/agent/prompts/agents/prompt_agent_task.md`):
-  same stale removals that occur there (dump step in the near-limit protocol,
-  Gemma/keepTokens/looprunner mentions if present — grep first) + the compact
-  keepMessages heuristic.
+  same — REMOVE the compaction guide content (stale removals: dump step in the
+  near-limit protocol, Gemma/keepTokens/looprunner mentions if present — grep
+  first), KEEP role-specific mechanics + the pointer line.
 - **c. Repo docs** (`.opencode/agent/prompts/repo/`): `repo_custom_tools.md` —
   the compact_memory tool section: args now `[sessionID, keepMessages, message,
   emergency]` (post item 1+10), keepTokens gone, the "server ignores keep
@@ -48,9 +46,11 @@ Sources of truth (read first, in one batch):
   note it, do not touch).
 - **f. AGENTS.md paste list (MAINTAINER does the paste — the text-worker only
   produces the exact replacement text in the handover, NEVER edits AGENTS.md):**
-  the `Compaction Guideline` section (the keepMessages line + "(message is
-  currently not working …)" — stale once item 2 lands) and the role table /
-  interaction contract looprunner rows (item 8).
+  (1) the NEW Compaction section = the handout (`draft/compaction_guide/
+  handout.md`, ~950 tokens) — his ruling: test it as-is, shrink later — it
+  REPLACES the old `Compaction Guideline` section (incl. the stale "(message
+  is currently not working …)" line once item 2 lands); (2) the role table /
+  interaction contract looprunner rows (item 8 — CONFIRMED full removal).
 
 ## DoD (per task: grep-clean of the stale strings named above; a read-back of
 each edited file; zero edits outside the named files; zero behavior claims —

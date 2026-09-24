@@ -125,3 +125,16 @@ Discrepancies surfaced (evidence-attached):
   2026-09-24) — 12 is no longer in either store; guide corrected.
 - knowledge_plugins.md / knowledge_tools.md "Gemma is the DEFAULT compaction model
   (agent.compaction.model set)" vs opencode.jsonc L144-145 (commented out) — stale.
+
+## Rulings (maintainer, 2026-09-24 close)
+- **Item 12: RESOLVED — keep args-only** (no cfg-merge; no args → server default;
+  both stores 18 so no drift). No build needed.
+- **Item 8: CONFIRMED — looprunner to be COMPLETELY removed** (the prompt-wave
+  spec's assumption holds; the AGENTS.md rows ride its paste list).
+- **Guide's final home: AGENTS.md** (every agent needs it) — the handout (~950
+  tokens) becomes an AGENTS.md section (his paste — test first, shrink later);
+  the whole compaction-guide content is REMOVED from the planner + worker
+  prompts (they keep only role-specific triage/handover mechanics + a pointer).
+- **Spec wave codified:** pre-writing a committed queue of specs (multiple
+  files) is an allowed + recommended method — landed in
+  agent_readme_task_spec.md (this commit).
