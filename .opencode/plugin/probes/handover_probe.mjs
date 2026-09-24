@@ -285,7 +285,7 @@
 //      (85) hook restore (cf. check 39): the global db path is back where
 //          S12 found it; a global read and an explicit-path read of the
  //          restored path agree byte-exact (no drift left by S12)
-//   S13 compact_memory plugin tool (15) — the approved v2 proposal + the
+//   S13 compact_memory plugin tool (19) — the approved v2 proposal + the
 //      2026-09-14 maintainer adaptation (explicit pair override; SELF sync,
 //      CROSS fire-and-forget dispatch — see the spec's revision note) (the
 //      plugin-registered compact_memory, quant-class budget; supersedes the
@@ -304,7 +304,16 @@
 //          line (cross, NO trailer); (98) cross-session model read (the LAST
 //          entry, pair-less); (100 REMOVED 2026-09-21 unit A — the explicit
 //          pair override is GONE, the S25 section pins the config resolver);
-//          (99) failing RPC (default cap + note, no throw)
+//          (99) failing RPC (default cap + note, no throw);
+//          (222) emergency-1 gate part 1 (item 10: fixture {Gate-M: 2} +
+//          emergency_budget 1 — calls 1-2 dispatched, call 3 no-arg DENIED
+//          naming the `emergency`-arg availability, zero side effects);
+//          (223) call 3 emergency:true DISPATCHES (count → cap+1, the
+//          COMPACT line carries ` emergency`, the normal lines carry NO
+//          suffix); (224) call 4 emergency:true DENIED (fully exhausted) +
+//          the state survives a FRESH module instance (cache-busted
+//          re-import); (225) emergency_budget 0 → DENIED; (226) key ABSENT
+//          → fail-open default 1 (the emergency is consumed)
 //   S14 compact_memory pre-compaction dump hook (7) — TODO #152 (approved
 //      2026-09-15): BEFORE ANY dispatch the hook dumps the target session's
 //      full pre-compaction content into the corpus via the dump script
@@ -652,7 +661,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=14 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 hygiene=6  →  "PROBE handover: 241/241 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=19 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 hygiene=6  →  "PROBE handover: 246/246 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -2377,8 +2386,9 @@ mkdirSync(path.dirname(QC_DUMP_SCRIPT), { recursive: true });
 writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
 
 // 86 — the registration shape: the default factory (the plugin ctx capture)
-//      returns tool.compact_memory — description + the 3 optional args
-//      (sessionID/keepMessages/message) as zod schemas + execute
+//      returns tool.compact_memory — description + the 4 optional args
+//      (sessionID/keepMessages/message/emergency — item 10) as zod schemas
+//      + execute
 {
   const { client } = qcMakeClient({ summarize: true });
   const reg = await qcMod.default({ client });
@@ -2386,9 +2396,9 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   check(
     "86",
     "S13",
-    "registration shape: default factory → tool.compact_memory (description + args [sessionID, keepMessages, message] as zod schemas + execute)",
+    "registration shape: default factory → tool.compact_memory (description + args [sessionID, keepMessages, message, emergency] as zod schemas + execute)",
     t != null && typeof t.description === "string" && typeof t.execute === "function" &&
-      JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "keepMessages", "message"]) &&
+      JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "keepMessages", "message", "emergency"]) &&
       Object.values(t.args).every((s) => s != null && typeof s.safeParse === "function"),
     JSON.stringify({ tools: Object.keys(reg?.tool ?? {}), args: Object.keys(t?.args ?? {}) }),
   );
@@ -2648,6 +2658,133 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
     !threw && /no resolvable model/i.test(res) && /NOT sent/i.test(res) && /model read/.test(res) &&
       rec.summarize.length === 0 && st.sessions.ses_qc_rpc == null,
     String(res).slice(0, 160),
+  );
+}
+
+// 222 — the EMERGENCY-1 gate sequence, part 1 (item 10, 2026-09-24): the
+//      fixture model_budget { "Gate-M": 2 } + emergency_budget 1 — calls
+//      1-2 DISPATCH (count 2 == cap); call 3 (no arg) is DENIED naming
+//      class+cap+count + the `emergency`-arg availability note, with ZERO
+//      side effects (no call, no increment). The cross read of the last
+//      messages-RPC entry resolves the Gate-M model (cap 2).
+{
+  const stEmg = qcStore();
+  stEmg.model_budget = { "Gate-M": 2, default: 1 };
+  stEmg.emergency_budget = 1;
+  writeFileSync(path.join(SANDBOX, ".opencode", "temp", "compact_budget.json"), JSON.stringify(stEmg, null, 2) + "\n", "utf8");
+  const { client, rec } = qcMakeClient({ summarize: true, messages: [{ info: { modelID: "Gate-M", providerID: "llama-swap" } }] });
+  const t = (await qcMod.default({ client })).tool.compact_memory;
+  const run = async (args) => { const r = await t.execute(args, qcCtx({})); await qcTick(); return r; };
+  const r1 = await run({ keepMessages: 2, sessionID: "ses_qc_emg" });
+  const r2 = await run({ keepMessages: 2, sessionID: "ses_qc_emg" });
+  const r3 = await run({ keepMessages: 2, sessionID: "ses_qc_emg" });
+  const st = qcStore();
+  check(
+    "222",
+    "S13",
+    "emergency-1 gate part 1 (fixture {Gate-M: 2}, emergency_budget 1): calls 1-2 dispatched (count 2 == cap); call 3 (no arg) DENIED naming class+cap+count + the `emergency`-arg availability note, zero side effects",
+    /dispatched/i.test(r1) && /dispatched/i.test(r2) && rec.summarize.length === 2 &&
+      /refused/.test(r3) && r3.includes("cap 2") && r3.includes("2/2") && /hand over/i.test(r3) &&
+      r3.includes("`emergency` argument") && st.sessions.ses_qc_emg?.count === 2,
+    JSON.stringify({ r3: String(r3).slice(0, 220) }),
+  );
+}
+
+// 223 — the EMERGENCY-1 gate sequence, part 2: at count == cap the
+//      `emergency` arg DISPATCHES the once-per-session emergency (count →
+//      cap+1 = 3); the COMPACT line carries the ` emergency` suffix; the
+//      earlier NORMAL lines carry NO suffix
+{
+  const { client } = qcMakeClient({ summarize: true, messages: [{ info: { modelID: "Gate-M", providerID: "llama-swap" } }] });
+  const t = (await qcMod.default({ client })).tool.compact_memory;
+  const r3e = await t.execute({ keepMessages: 2, sessionID: "ses_qc_emg", emergency: true }, qcCtx({}));
+  await qcTick();
+  const st = qcStore();
+  const lineEmg = ctxLogLines().find((l) => l.includes("COMPACT ses_qc_emg messages=2 emergency"));
+  const lineNorm = ctxLogLines().filter((l) => l.includes("COMPACT ses_qc_emg messages=2") && !l.includes(" emergency"));
+  check(
+    "223",
+    "S13",
+    "emergency-1: at count == cap the `emergency` arg dispatches the once-per-session emergency (count → cap+1 = 3); the COMPACT line carries ` emergency`; the normal lines carry NO suffix",
+    /dispatched/i.test(r3e) && st.sessions.ses_qc_emg?.count === 3 && lineEmg != null &&
+      new RegExp(`^${DT} Gate-M COMPACT ses_qc_emg messages=2 emergency$`).test(lineEmg) &&
+      lineNorm.length === 2 && lineNorm.every((l) => new RegExp(`^${DT} Gate-M COMPACT ses_qc_emg messages=2$`).test(l)),
+    JSON.stringify({ lineEmg, lineNorm }),
+  );
+}
+
+// 224 — the EMERGENCY-1 gate sequence, part 3: call 4 with the `emergency`
+//      arg is DENIED (count 3 > cap 2 — FULLY exhausted, the item 11
+//      directive state) and the state SURVIVES a fresh module instance
+//      (cache-busted re-import — the count lives on disk, not in module
+//      memory): the re-imported tool still refuses
+{
+  const { client } = qcMakeClient({ summarize: true, messages: [{ info: { modelID: "Gate-M", providerID: "llama-swap" } }] });
+  const t = (await qcMod.default({ client })).tool.compact_memory;
+  const r4 = await t.execute({ keepMessages: 2, sessionID: "ses_qc_emg", emergency: true }, qcCtx({}));
+  await qcTick();
+  const st = qcStore();
+  const freshMod = await import(pathToFileURL(QC_PLUGIN_TS).href + "?qc_emg_reimport=1");
+  const freshT = (await freshMod.default({ client })).tool.compact_memory;
+  const rFresh = await freshT.execute({ keepMessages: 2, sessionID: "ses_qc_emg", emergency: true }, qcCtx({}));
+  check(
+    "224",
+    "S13",
+    "emergency-1: call 4 with `emergency` DENIED (count 3 > cap 2 — fully exhausted); the state survives a FRESH module instance (cache-busted re-import still refuses)",
+    /refused/.test(r4) && r4.includes("cap 2") && r4.includes("3/2") && /fully exhausted/i.test(r4) && st.sessions.ses_qc_emg?.count === 3 &&
+      /refused/.test(rFresh) && /fully exhausted/i.test(rFresh),
+    JSON.stringify({ r4: String(r4).slice(0, 220), rFresh: String(rFresh).slice(0, 220) }),
+  );
+}
+
+// 225 — emergency_budget 0: the emergency is NOT available — at count == cap
+//      the `emergency` arg is DENIED (a fresh session is drained to the cap
+//      first)
+{
+  const stE0 = qcStore();
+  stE0.emergency_budget = 0;
+  writeFileSync(path.join(SANDBOX, ".opencode", "temp", "compact_budget.json"), JSON.stringify(stE0, null, 2) + "\n", "utf8");
+  const { client } = qcMakeClient({ summarize: true, messages: [{ info: { modelID: "Gate-M", providerID: "llama-swap" } }] });
+  const t = (await qcMod.default({ client })).tool.compact_memory;
+  const run = async (args) => { const r = await t.execute(args, qcCtx({})); await qcTick(); return r; };
+  const a1 = await run({ keepMessages: 1, sessionID: "ses_qc_emg0" });
+  const a2 = await run({ keepMessages: 1, sessionID: "ses_qc_emg0" });
+  const r0 = await run({ keepMessages: 1, sessionID: "ses_qc_emg0", emergency: true });
+  const st = qcStore();
+  check(
+    "225",
+    "S13",
+    "emergency_budget 0: at count == cap the `emergency` arg is DENIED (no emergency available — the unavailable/consumed note)",
+    /dispatched/i.test(a1) && /dispatched/i.test(a2) &&
+      /refused/.test(r0) && r0.includes("cap 2") && r0.includes("2/2") && /hand over/i.test(r0) &&
+      /unavailable or already consumed/i.test(r0) && st.sessions.ses_qc_emg0?.count === 2,
+    JSON.stringify({ r0: String(r0).slice(0, 220) }),
+  );
+}
+
+// 226 — the emergency_budget key ABSENT: the fail-open default 1 applies —
+//      at count == cap the `emergency` arg DISPATCHES (a fresh session is
+//      drained to the cap first), count → cap+1, the COMPACT line carries
+//      ` emergency`
+{
+  const stEd = qcStore();
+  delete stEd.emergency_budget;
+  writeFileSync(path.join(SANDBOX, ".opencode", "temp", "compact_budget.json"), JSON.stringify(stEd, null, 2) + "\n", "utf8");
+  const { client } = qcMakeClient({ summarize: true, messages: [{ info: { modelID: "Gate-M", providerID: "llama-swap" } }] });
+  const t = (await qcMod.default({ client })).tool.compact_memory;
+  const run = async (args) => { const r = await t.execute(args, qcCtx({})); await qcTick(); return r; };
+  await run({ keepMessages: 1, sessionID: "ses_qc_emgdf" });
+  await run({ keepMessages: 1, sessionID: "ses_qc_emgdf" });
+  const rD = await run({ keepMessages: 1, sessionID: "ses_qc_emgdf", emergency: true });
+  const st = qcStore();
+  const lineD = ctxLogLines().find((l) => l.includes("COMPACT ses_qc_emgdf messages=1 emergency"));
+  check(
+    "226",
+    "S13",
+    "emergency_budget key ABSENT → fail-open default 1: at count == cap the `emergency` arg dispatches (count → cap+1), the COMPACT line carries ` emergency`",
+    /dispatched/i.test(rD) && st.sessions.ses_qc_emgdf?.count === 3 && lineD != null &&
+      new RegExp(`^${DT} Gate-M COMPACT ses_qc_emgdf messages=1 emergency$`).test(lineD),
+    JSON.stringify({ rD: String(rD).slice(0, 120), lineD }),
   );
 }
 
@@ -5118,14 +5255,14 @@ let n24 = 239;
   );
 }
 
-// ------------------------------------------------------------------ S25 compact_memory unit A (7) — 2026-09-21 (priority.md #1): the 3-key args + the config-resolved summarizer (the exported pure resolver, JSONC-safe) + the DUMP-OK line
+// ------------------------------------------------------------------ S25 compact_memory unit A (7) — 2026-09-21 (priority.md #1): the 4-key args (the 3-key args + the item-10 `emergency` arg) + the config-resolved summarizer (the exported pure resolver, JSONC-safe) + the DUMP-OK line
 //
 // Reuses S13's type-stripped plugin import (qcMod) and the sandbox: the
 // resolver is PURE (driven directly over string fixtures); the DUMP-OK pin
 // drives the exported preCompactionDump with the S14 stub dump script (still
 // in place from check 105); the tool-integration pin writes a SANDBOX
 // opencode.jsonc (removed afterwards) and drives the tool path with the
-// 3-key args.
+// 4-key args.
 {
   check(
     "250",
@@ -5211,7 +5348,7 @@ let n24 = 239;
   check(
     "256",
     "S25",
-    "tool integration: the sandbox opencode.jsonc agent.compaction.model → the summarize body carries the config pair (the 3-key args — no providerID/modelID keys)",
+    "tool integration: the sandbox opencode.jsonc agent.compaction.model → the summarize body carries the config pair (the 4-key args — no providerID/modelID keys)",
     rec.summarize.length === 1 && rec.summarize[0]?.body?.providerID === "llama-swap" &&
       rec.summarize[0]?.body?.modelID === "Gemma4-12B-Q4KXL-MTP-128K" && /dispatched/i.test(res),
     JSON.stringify({ body: rec.summarize[0]?.body, res: String(res).slice(0, 120) }),
@@ -5276,7 +5413,7 @@ let n24 = 239;
   const postLog = POST["plugin.log"] ?? "";
   const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
   const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
-  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non", "ses_qc_self", "ses_qc_retry", "ses_qc_flat", "ses_qc_nocli", "ses_qc_gate", "ses_qc_cpu", "ses_qc_fail", "ses_qc_msg", "ses_qc_cross", "ses_qc_rpc", "ses_qc_pair", "ses_pc_noscript", "ses_pc_ok", "ses_qc_dumpok", "ses_qc_cfgbody"];
+  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non", "ses_qc_self", "ses_qc_retry", "ses_qc_flat", "ses_qc_nocli", "ses_qc_gate", "ses_qc_cpu", "ses_qc_fail", "ses_qc_msg", "ses_qc_cross", "ses_qc_rpc", "ses_qc_pair", "ses_qc_emg", "ses_qc_emg0", "ses_qc_emgdf", "ses_pc_noscript", "ses_pc_ok", "ses_qc_dumpok", "ses_qc_cfgbody"];
   const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`) || l.includes(`"sess":"${fid}"`)));
   check(
     "43",

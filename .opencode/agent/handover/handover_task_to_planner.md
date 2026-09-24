@@ -1,86 +1,113 @@
-# Worker summary — spec 01: remove keepTokens from compact_memory (change-list item 1)
+# Worker summary — spec 10: the emergency-1 compaction budget (change-list item 10)
 
-Status: DONE (LANDED per spec — commit hash recorded by you in the follow-up bookkeeping).
-Commit: `7f253ea` (branch `opencode_test`, named-path commit — exactly the three scoped files).
-Worker session: `ses_f2b47fa1effefej9AVC58Ogj2l` (worker, Qwen3.8-27B-Q3S-170K).
+Status: DONE (LANDED per spec — commit hash recorded by you in the follow-up
+bookkeeping, not by me).
+Commit: this worker commit (branch `opencode_test`, named-path — the three scoped
+files + this summary). Runs AFTER item 1 (7f253ea) — written against the
+post-item-1 state.
+Worker session: `ses_f2b2edff1ffe60GXyVJGzKg17Z` (worker, Qwen3.8-27B-Q3S-170K).
 
 ## What changed
 
 1. `.opencode/plugin/compact_memory.ts`
-   - config section: `keepTokens` dropped from the `CompactionConfig` type,
-     `DEFAULT_KEEP_TOKENS`, and the budget-file parsing — the key is never read /
-     defaulted / sent (the budget file's `"keepTokens": 0` is now inert, left in place
-     per spec).
-   - tool args: `keepTokens` arg removed; keepMessages description re-pinned to
-     "Recent messages to retain (e.g. 18) — working, sent in the request body."
-   - keep construction: `keep.tokens` never set; `keep.messages` from
-     `args.keepMessages` only (args-only behavior kept — item 12 stays out of scope);
-     `keepObj` + the retry-once-without-keep logic unchanged; `tokensToKeep` gone.
-   - `appendCompactLine`: `tokens` param dropped — the COMPACT line is now
-     `COMPACT <sid> [<model>] messages=<m> [(pre-readout)]` (messages reported =
-     `args.keepMessages ?? cfg.keepMessages`, same reporting logic as before).
-   - Only remaining `keepTokens` string in the file: ONE comment line in the config
-     header documenting the removal (allowed by the spec's grep DoD).
+   - config section: new top-level key `emergency_budget` (number >= 0, fail-open
+     default `DEFAULT_EMERGENCY_BUDGET = 1`) in the `CompactionConfig` type, the
+     defaults, and the budget-file parsing — parsed exactly like the other keys
+     (absent file / malformed key → default 1). The header config comment lists it.
+   - gate (`count >= cap` area): four states, per the pinned design —
+     - `count < cap` → dispatch normally (increment).
+     - `count === cap` AND `args.emergency === true` AND `emergency_budget >= 1`
+       → dispatch as EMERGENCY (increment to cap+1; `isEmergency` flag).
+     - `count === cap`, no `emergency` arg (and emergency available) → refuse:
+       existing text + one line "…available via the `emergency` argument."
+     - `count > cap` (or `count === cap` with the emergency unavailable / already
+       consumed) → refuse: existing text + one line "…unavailable or already
+       consumed — the budget is fully exhausted." (the item 11 directive state).
+     - NO store-schema bump: the count tracks it (count > cap = exhausted).
+   - tool schema: new arg `emergency: tool.schema.boolean().optional()` — args are
+     now exactly `[sessionID, keepMessages, message, emergency]`; description
+     string gained the one-sentence emergency budget note.
+   - success callbacks (both the v2 compact and the ACTIVE v1 summarize path):
+     `recordSuccess` unchanged (increment-on-verified-success) +
+     `appendCompactLine(…, isEmergency)`.
+   - `appendCompactLine`: new `emergency = false` param — the COMPACT line appends
+     ` emergency` after `messages=<m>` only when the emergency was consumed
+     (`… COMPACT <sid> messages=<m> emergency [(pre-readout)]`); normal lines are
+     byte-identical to before.
+   - header comment (Part 2 budget section): the emergency-1 design + the
+     auto-side note documented (see the #93 carry-over below).
 
-2. `.opencode/plugin/tests/compact_memory.smoke.mjs` — fully re-pinned, ZERO
-   `keepTokens` hits:
-   - defaults pins → `12/false/{}`; fixture JSON drops the keepTokens key.
-   - schema pin → exactly `[sessionID, keepMessages, message]` ("THREE keys").
-   - body asserts → `keep.messages === N && keep.tokens == null` (L186/L214/L252 area).
-   - all call sites drop the keepTokens arg.
-   - keepcfg test re-pinned to messages-only: configured `messages=9` when the arg is
-     omitted, explicit `messages=2` wins.
+2. `.opencode/plugin/tests/compact_memory.smoke.mjs` — re-pinned (57 → 65 checks):
+   - header comment + registration pin → FOUR keys
+     `[sessionID, keepMessages, message, emergency]`.
+   - NEW gate-sequence section (8 checks, fixture model_budget `{"Gate-M": 2}` +
+     `emergency_budget 1`, cross-read session):
+     - calls 1-2 dispatched (count 2 == cap);
+     - call 3 no-arg REFUSED (cap 2, 2/2, hand-over note + the `emergency`-arg
+       availability line, zero side effects);
+     - call 3 `emergency: true` DISPATCHED (count 3 == cap+1) + the COMPACT line
+       carries ` emergency` (pinned byte-exact `messages=2 emergency$`);
+     - the two normal lines carry NO ` emergency` suffix;
+     - call 4 `emergency: true` REFUSED (count 3 > cap 2 — fully exhausted);
+     - state survives a FRESH module instance (cache-busted re-import still
+       refuses — the count lives on disk);
+     - `emergency_budget 0` → call 3 refused (unavailable);
+     - key ABSENT → fail-open default 1 (the emergency IS consumed).
+     - The fixture (model_budget / emergency_budget) is saved + restored before the
+       later tests (their self-model cap-3 pins survive).
 
-3. `.opencode/plugin/probes/handover_probe.mjs` — S13 (active plugin) + S25 re-pinned:
-   - registration pin (check 86) → 3 keys `[sessionID, keepMessages, message]` +
-     description.
-   - body asserts (checks 88/89) → `keep?.messages === N && keep?.tokens == null`.
-   - COMPACT-line pin (check 96) → `COMPACT ses_qc_self messages=7` (messages-only
-     format), comment + description + regex.
-   - all S13 call sites drop keepTokens (88/89/90/92/94/98/99).
-   - "4-key args" → "3-key args" in the S25 header, check 256 description, and the
-     probe's top annotation block.
-   - **S10 and S11 sections left byte-identical** — see Deviation below.
+3. `.opencode/plugin/probes/handover_probe.mjs` — S13/S25 re-pinned (241 → 246
+   checks; the annotation line + S13 header count updated to match):
+   - registration pin (check 86) → 4 keys `[sessionID, keepMessages, message,
+     emergency]`.
+   - NEW checks 222-226 in S13 (the gate-sequence test, fixture model_budget
+     `{"Gate-M": 2}` + `emergency_budget 1`): 222 calls 1-2 ok + call 3 no-arg
+     denied (availability note); 223 call 3 emergency ok (count cap+1, COMPACT
+     line ` emergency`, normal lines suffix-free); 224 call 4 emergency denied
+     (fully exhausted) + fresh-module-instance persistence (cache-busted
+     re-import, the check-73 pattern); 225 `emergency_budget 0` denied; 226 key
+     absent → default 1 consumed.
+   - FINGERPRINT array: the new synthetic ids (ses_qc_emg / ses_qc_emg0 /
+     ses_qc_emgdf) added (check 43).
+   - S25: "3-key args" → "4-key args" in the section header, the tool-path
+     preamble comment, and check 256's label (its assertion pins the body,
+     unchanged).
+   - **S10/S11 left byte-identical** (they pin the frozen artifacts — the spec-01
+     carve-out).
 
-## Verification (measured, post-change — all identical to the re-run baseline)
-- probe full run: `PROBE handover: 241/241 PASS` (same total as the baseline run).
-- all 10 plugin smokes: exit 0; compact_memory smoke: `COMPACT_MEMORY_SMOKE: ALL PASS (57/57)`.
-- pytest: `459 passed, 1 warning in 1.96s` (exact baseline match).
-- ruff `--select F`: `All checks passed!`
-- `grep -n keepTokens` (the three files): compact_memory.ts = 1 (the removal
-  comment), smoke = 0, probe = 14 — all 14 in the untouched S10/S11 sections.
+## Verification (measured)
+Baseline re-run at start (pre-change): probe `241/241 PASS`, smoke `57/57`,
+pytest `459 passed, 1 warning`, ruff F=0 — all green.
+Post-change (full gate):
+- probe full run: `PROBE handover: 246/246 PASS` (annotation line updated to
+  S13=19, total 246 — matches the self-annotated output).
+- compact_memory smoke: `COMPACT_MEMORY_SMOKE: ALL PASS (65/65)`.
+- pytest: `459 passed, 1 warning`.
+- ruff `--select F`: `All checks passed!`.
 
-## Deviation from the spec (needs your ruling)
-The spec's probe re-pin items — "schema pin L1837 (3 keys → 2)", "COMPACT-line pin
-L2193 (tokens=30_000 messages=12 → messages-only)", "comment L2106" — target the
-**S10 and S11 sections, which pin RETIRED / DO-NOT-TOUCH artifacts**:
-- S10 pins `.opencode/plugin/deactivated/compact_memory_v1.ts` (not in the 3-file
-  scope; it still has the keepTokens arg — its line 172).
-- S11 pins `.opencode/plugin/deactivated/context_recovery.ts` (explicit DO-NOT-touch;
-  its own keepTokens default 30_000/12 + its own `tokens=<t> messages=<m>` line writer
-  at L193-202; its removal rides the #93 event-hook port).
-Re-pinning those sections to 2-key / messages-only would turn probe checks 67–75 /
-78 / 81 RED and break the gate-green DoD. I prioritized the gate-green DoD (the
-measurable definition of done) and left S10/S11 untouched. Consequence: the spec's
-grep DoD ("zero hits, or at most ONE comment line") is not achievable across all
-three files while the gate stays green — 14 literal `keepTokens` occurrences remain
-in the probe (13 S10 pins/call sites + 1 S11 comment).
-Options: (a) accept as-is (the hits pin frozen artifacts, factually correct);
-(b) a follow-up spec that also removes keepTokens from compact_memory_v1.ts and
-re-pins S10 (retired artifact — your call, could ride the #93 port wave alongside the
-context_recovery S11 re-pin).
+## #93 CARRY-OVER NOTE (required by the spec)
+The auto side of the emergency-1 logic is DESIGN ONLY on this build:
+`.opencode/plugin/deactivated/context_recovery.ts` is DEACTIVATED (its frozen
+smoke pins `tests/context_recovery.smoke.mjs` stay untouched, per the spec's
+DO-NOT-touch). When the #93 event-hook port writes the live file, it MUST
+implement the same count logic WITHOUT the arg requirement: on its overflow
+fire — `count < cap` → consume normally; `count === cap` AND the emergency
+available (`emergency_budget >= 1`) → consume the 1 (its blind compaction, keep
+per its own config); `count > cap` → refuse / defer to the forced-new-session
+(item 11 spec). The live plugin's header comment (Part 2 budget section)
+documents this. NOTE: the auto-side consumption would also need the
+`appendCompactLine` ` emergency` suffix (the deactivated file has its own line
+writer — the port must mirror the pinned format).
 
 ## Deliberately NOT done
-- `context_recovery.ts`, `compact_memory_v1.ts`, `opencode.jsonc`,
-  `.opencode/temp/compact_budget.json` (the inert `"keepTokens": 0` key stays),
-  `auto_resume.ts`, prompt/knowledge files, change-list items 10/12, anything under
-  `.opencode/maintainer/` — per scope + DO-NOT-touch.
-- No `TODO.md` change (the spec says status lives in the spec + your bookkeeping).
+- `.opencode/plugin/deactivated/context_recovery.ts` + `compact_memory_v1.ts`
+  (DO-NOT-touch — the emergency-1 auto side rides the #93 port, see above).
+- `.opencode/temp/compact_budget.json`, `opencode.jsonc` (maintainer live files —
+  the budget file carries no `emergency_budget` key; the fail-open default 1
+  covers its absence, per spec).
+- `auto_resume.ts` (the item 2+11 / item 3 specs own it), prompt / knowledge
+  files, anything under `.opencode/maintainer/`.
+- No `TODO.md` change (the spec: status lives in the spec + your bookkeeping).
 - Maintainer's uncommitted live files (opencode.jsonc, AGENTS.md,
-  prompt_agent_task.md, agent_feedback.md, loop_log.md) — untouched, not staged, not
-  committed.
-
-Lessons: the probe's section→artifact mapping (S10 = retired v1 tool,
-S11 = context_recovery, S13 = active plugin, S25 = unit A) is nowhere stated in the
-probe header — a future spec author re-pinning "the keepTokens pins" needs to identify
-which section pins which file first; a one-line map per section would prevent this.
+  prompt_agent_task.md, agent_feedback.md, loop_log.md, ideas.md) — untouched,
+  not staged, not committed (named-path commit only).

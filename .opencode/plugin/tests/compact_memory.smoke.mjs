@@ -9,10 +9,12 @@
 //     on microtasks well before that).
 //   - the retry-keep note + the background failure go to console.log /
 //     console.error — captured, not returned.
-//   - the arg shape is THREE keys (unit A, 2026-09-21: providerID/modelID
+//   - the arg shape is FOUR keys (unit A, 2026-09-21: providerID/modelID
 //     REMOVED — the summarizer resolves from the root config's
 //     agent.compaction.model, falling back to the session model; 2026-09-24:
-//     the tokens keep knob is GONE — keepMessages is the only keep arg).
+//     the tokens keep knob is GONE — keepMessages is the only keep arg;
+//     item 10: the `emergency` arg — the once-per-session emergency
+//     compaction on top of the model cap).
 //   - the sandbox carries a stub dump_session.cjs so the pre-compaction dump hook (4512fe6) succeeds silently (a dump failure would append a WARNING line and break the byte-exact checks) — mirrors the probe S13 preamble.
 // Idempotent re-runs: the sandbox is a FRESH scratchpad subdir each run.
 // Run: node .opencode/plugin/tests/compact_memory.smoke.mjs (plain node, exit 0 iff green).
@@ -166,14 +168,14 @@ const withClient = async (spec = {}) => {
   return { rec, t, exec: (args, extra) => t.execute(args, toolCtx(extra)) };
 };
 
-// ---- registration shape (unit A: THREE args — the override pair is GONE,
-// the tokens keep knob is GONE)
+// ---- registration shape (unit A: FOUR args — the override pair is GONE,
+// the tokens keep knob is GONE, the emergency arg added (item 10))
 {
   const { t } = await withClient({ summarize: true });
   chk("factory returns { tool: { compact_memory } }", t != null);
   chk("reg shape: description string + async execute", typeof t.description === "string" && typeof t.execute === "function" && t.execute.constructor.name === "AsyncFunction");
-  chk("reg args: THREE keys (sessionID, keepMessages, message)",
-    JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "keepMessages", "message"]),
+  chk("reg args: FOUR keys (sessionID, keepMessages, message, emergency)",
+    JSON.stringify(Object.keys(t.args)) === JSON.stringify(["sessionID", "keepMessages", "message", "emergency"]),
     JSON.stringify(Object.keys(t.args)));
   chk("reg args: every value is a zod schema (safeParse)", Object.values(t.args).every((s) => typeof s.safeParse === "function"));
 }
@@ -385,6 +387,99 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
     rec.summarize.length === 3 && /dispatched/i.test(res3) && /refused/i.test(res4) && res4.includes("cap 3") && res4.includes("3/3") && /hand over/i.test(res4),
     res4.slice(0, 160));
   chk("gate: exactly 3 increments", readStore().sessions.ses_sm_gate?.count === 3);
+}
+
+// ---- gate: the EMERGENCY-1 budget (item 10, 2026-09-24): once the normal
+// cap is drained (count == cap), the once-per-session emergency compaction
+// is consumed via the `emergency` arg (count → cap+1); afterwards the
+// budget is FULLY exhausted. Fixture: model_budget { "Gate-M": 2 },
+// emergency_budget 1 (then 0, then absent — the fail-open default 1). The
+// fixture is RESTORED before the later tests (their self-model cap 3 must
+// survive).
+{
+  const st0 = readStore();
+  const savedMb = st0.model_budget;
+  const savedEb = st0.emergency_budget;
+  st0.model_budget = { "Gate-M": 2, default: 1 };
+  st0.emergency_budget = 1;
+  writeFileSync(storePath, JSON.stringify(st0, null, 2) + "\n");
+  const { exec } = await withClient({ summarize: true, messages: [{ info: { modelID: "Gate-M", providerID: "llama-swap" } }] });
+  const r1 = await exec({ keepMessages: 2, sessionID: "ses_sm_emg" });
+  await drain();
+  const r2 = await exec({ keepMessages: 2, sessionID: "ses_sm_emg" });
+  await drain();
+  chk("emg: calls 1-2 dispatched (count 2 == cap)",
+    /dispatched/i.test(r1) && /dispatched/i.test(r2) && readStore().sessions.ses_sm_emg?.count === 2,
+    JSON.stringify({ r1: String(r1).slice(0, 80), r2: String(r2).slice(0, 80) }));
+  const r3 = await exec({ keepMessages: 2, sessionID: "ses_sm_emg" });
+  await drain();
+  chk("emg: call 3 (no arg) refused at count == cap, naming the `emergency`-arg availability",
+    /refused/i.test(r3) && r3.includes("cap 2") && r3.includes("2/2") && /hand over/i.test(r3) &&
+      r3.includes("`emergency` argument") && readStore().sessions.ses_sm_emg?.count === 2,
+    r3.slice(0, 220));
+  const r3e = await exec({ keepMessages: 2, sessionID: "ses_sm_emg", emergency: true });
+  await drain();
+  const lineEmg = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_emg messages=2 emergency"));
+  const lineNorm = readLog().trim().split("\n").filter((l) => l.includes("COMPACT ses_sm_emg messages=2") && !l.includes(" emergency"));
+  chk("emg: call 3 emergency:true dispatched (count 3 == cap+1), the COMPACT line carries ` emergency`",
+    /dispatched/i.test(r3e) && readStore().sessions.ses_sm_emg?.count === 3 && lineEmg != null &&
+      /COMPACT ses_sm_emg messages=2 emergency$/.test(lineEmg),
+    JSON.stringify({ r3e: String(r3e).slice(0, 80), lineEmg }));
+  chk("emg: the normal COMPACT lines carry NO ` emergency` suffix (exactly 2, messages=2)",
+    lineNorm.length === 2 && lineNorm.every((l) => /COMPACT ses_sm_emg messages=2$/.test(l)),
+    JSON.stringify(lineNorm));
+  const r4 = await exec({ keepMessages: 2, sessionID: "ses_sm_emg", emergency: true });
+  await drain();
+  chk("emg: call 4 emergency:true refused (count 3 > cap 2 — fully exhausted)",
+    /refused/i.test(r4) && r4.includes("cap 2") && r4.includes("3/2") && /fully exhausted/i.test(r4) &&
+      readStore().sessions.ses_sm_emg?.count === 3,
+    r4.slice(0, 220));
+  // state survives a FRESH module instance (cache-busted re-import — the
+  // count lives on disk, not in module memory): still refused
+  const { pathToFileURL } = await import("node:url");
+  const freshMod = await import(pathToFileURL(path.join(REPO_ROOT, ".opencode", "plugin", "compact_memory.ts")).href + "?cm_emg_reimport=1");
+  const freshClient = { session: { summarize: () => Promise.resolve(true) } };
+  const freshT = (await freshMod.default({ client: freshClient })).tool.compact_memory;
+  const rFresh = await freshT.execute({ keepMessages: 2, sessionID: "ses_sm_emg", emergency: true },
+    toolCtx({ sessionID: "ses_sm_emg", extra: { model: { id: "Gate-M", providerID: "llama-swap" } } }));
+  chk("emg: state survives a fresh module instance (re-import still refuses — the count is on disk)",
+    /refused/i.test(rFresh) && /fully exhausted/i.test(rFresh),
+    rFresh.slice(0, 220));
+  // emergency_budget 0 → the emergency is NOT available: call 3 refused
+  const stA = readStore();
+  stA.emergency_budget = 0;
+  writeFileSync(storePath, JSON.stringify(stA, null, 2) + "\n");
+  const { exec: exec0 } = await withClient({ summarize: true, messages: [{ info: { modelID: "Gate-M", providerID: "llama-swap" } }] });
+  await exec0({ keepMessages: 1, sessionID: "ses_sm_emg0" });
+  await drain();
+  await exec0({ keepMessages: 1, sessionID: "ses_sm_emg0" });
+  await drain();
+  const r0 = await exec0({ keepMessages: 1, sessionID: "ses_sm_emg0", emergency: true });
+  await drain();
+  chk("emg0: emergency_budget 0 → call 3 emergency:true refused (no emergency available)",
+    /refused/i.test(r0) && r0.includes("cap 2") && r0.includes("2/2") && /unavailable or already consumed/i.test(r0) &&
+      readStore().sessions.ses_sm_emg0?.count === 2,
+    r0.slice(0, 220));
+  // key ABSENT → the fail-open default 1 applies: the emergency IS consumed
+  const stB = readStore();
+  delete stB.emergency_budget;
+  writeFileSync(storePath, JSON.stringify(stB, null, 2) + "\n");
+  const { exec: execD } = await withClient({ summarize: true, messages: [{ info: { modelID: "Gate-M", providerID: "llama-swap" } }] });
+  await execD({ keepMessages: 1, sessionID: "ses_sm_emgdf" });
+  await drain();
+  await execD({ keepMessages: 1, sessionID: "ses_sm_emgdf" });
+  await drain();
+  const rD = await execD({ keepMessages: 1, sessionID: "ses_sm_emgdf", emergency: true });
+  await drain();
+  const lineD = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_emgdf messages=1 emergency"));
+  chk("emg-default: emergency_budget key ABSENT → fail-open default 1 (the emergency is consumed, count → cap+1)",
+    /dispatched/i.test(rD) && readStore().sessions.ses_sm_emgdf?.count === 3 && lineD != null,
+    JSON.stringify({ rD: String(rD).slice(0, 80), lineD }));
+  // restore the fixture for the later tests
+  const stR = readStore();
+  stR.model_budget = savedMb;
+  if (savedEb === undefined) delete stR.emergency_budget; else stR.emergency_budget = savedEb;
+  writeFileSync(storePath, JSON.stringify(stR, null, 2) + "\n");
 }
 
 // ---- keep defaults from the budget file config (consolidation 2026-09-22):
