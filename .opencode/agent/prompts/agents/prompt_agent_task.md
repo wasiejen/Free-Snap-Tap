@@ -37,11 +37,6 @@ All paths below are relative to `.opencode/agent/prompts/`.
   your task's area (e.g. `knowledge_tools.md`, `knowledge_context.md`) before
   starting; append an entry when you gain verified, actionable knowledge
   (format in the folder README).
-- `.opencode/agent/research/fuzzy-numword/primer.md` (repo-root-relative) —
-  the numeral convention's form details (the convention itself is in
-  AGENTS.md, already loaded): read when you pass dense numerals (paths, ids,
-  totals, dates). The `decision-record.md` next to it is LARGE (~10k tokens) —
-  grep it by section, do not read it whole.
 
 ## Work loop
 - Follow existing conventions: read the neighboring code first, mimic style, reuse existing
@@ -71,27 +66,42 @@ All paths below are relative to `.opencode/agent/prompts/`.
   (canonical marker table: planner prompt §maintainer calls/decisions).
 
 ## Context budget (stop line + compaction)
+General compaction model: AGENTS.md §Compaction Guidelines (default-compact
+until the budget is spent — a routine speed/maintenance tool, not an
+emergency valve; compaction is NOT a restart — after it, re-read your head
+files and CONTINUE). Your section = the worker-specific mechanics:
 **Stop line: gauge readout ≈90 %** (the readout lags true usage by ≈2 tool
 calls / ~5k — treat it as optimistic; the gauge-lag note also lives in the
-`ctx_gauge` tool description). AGENTS.md §Context budget carries the same
-line. Canonical rules — near-limit triage at ≥80 %, "compaction is
-NOT a restart", the 90/95 % tiers, the Work State dump form: **planner prompt
-§Context-budget trigger** — they bind you exactly the same way; your
-worker-specific mechanics are below.
-- **Early handover (maintainer protocol, 2026-09-12):** do not wait for the
-  stop line. When the readout reaches ≥70 % — or the current unit clearly
-  cannot finish before the stop line — PAUSE at a clean checkpoint, write the
-  CURRENT state of `handover_task_to_planner.md` (marked IN PROGRESS: what's
-  done, what's left, baselines) and COMMIT it, then continue. A committed
-  partial handover at 70 % beats an emergency one at 90 %.
+`ctx_gauge` tool description). Stop lines are TRIAGE thresholds, not the only
+compaction moments: at ≥80 % estimate the tool calls still needed to finish
+the current unit (estimates near the limit are optimistic — round up); if
+more than ~10 remain, checkpoint (handover current + commit) and compact
+INSTEAD of starting the next unit. At ≥95 %: commit + compact NOW, do not
+deliberate (keepMessages keeps the recent head intact — deliberation burns
+the budget that funds the compaction).
+- **Drop distilled output mid-unit:** once you have read the files and formed
+  the plan, raw tool output is dead weight — compacting it out reclaims
+  speed and extends the window; compaction almost always REDUCES total
+  wall-time.
+- **keepMessages heuristic:** keep what you would have to RE-DERIVE (drafts,
+  plan, rationale, in-flight state); a full committed handover → keep less;
+  when in doubt → keep more.
+- **Early handover (maintainer protocol, 2026-09-12; 80 % per his
+  2026-09-24 test):** do not wait for the stop line. When the readout
+  reaches ≥80 % — or the current unit clearly cannot finish before the stop
+  line — PAUSE at a clean checkpoint, write the CURRENT state of
+  `handover_task_to_planner.md` (marked IN PROGRESS: what's done, what's
+  left, baselines) and COMMIT it, then continue. A committed partial
+  handover at 80 % beats an emergency one at 90 %.
 - **Self-compaction (`compact_memory` is live on this host):** firing it
-  compacts your session and the session ENDS after the compaction — the reload
-  message is attached to the compaction summary. BEFORE firing: commit a
-  handover checkpoint (early-handover rule at full force — after the
-  compaction you resume from files, not memory). ON RESUME (the planner RESUMES
-  the SAME session via task_id): first read `agent_readme_post_compaction.md`
-  and follow it, then continue from the committed state — not from the
-  compaction summary.
+  compacts your session and the session ENDS after the compaction; the
+  `message` you pass is STORED at queue time and delivered as the FIRST
+  message of the resumed session (the post-compaction relay). BEFORE firing:
+  commit a handover checkpoint (early-handover rule at full force — after
+  the compaction you resume from files, not memory). ON RESUME (the planner
+  RESUMES the SAME session via task_id): first read
+  `agent_readme_post_compaction.md` and follow it, then continue from the
+  committed state — not from the compaction summary.
 
 ## Honesty guard (hard rule)
 - Report only what is on disk. If you did not write a file or entry, say so — never claim a
