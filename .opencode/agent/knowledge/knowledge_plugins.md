@@ -137,6 +137,12 @@ Gained, verified knowledge for opencode plugins. Format per the README:
   (2026-09-15, direct session).
 - **Keys:** compact_memory, gemma default, agent.compaction.model,
   providerID, modelID, summarize, COMPACT line, verified working.
+- **Correction (2026-09-24, prompt wave task d):** `agent.compaction.model`
+  is now COMMENTED OUT in `opencode.jsonc` → the default compaction
+  summarizer is the SAME model as the session's model (the "Gemma is the
+  DEFAULT compaction model" claim above is stale; a default cross-compact
+  now runs on the target's own model). Factual source: `maintainer/draft/
+  compaction_guide/full_guide.md` §12 Corrections.
 
 ## Spawning a node script from a plugin: execPath is NOT a node runtime on the live host
 - **Do:** when a plugin `execFileSync`s a node script, resolve the executable

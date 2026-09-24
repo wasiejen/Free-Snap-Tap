@@ -206,6 +206,19 @@ instructions/protocol — facts that save lookups. Format per the README:
   section 2026-09-14 (the 2nd-exchange bullet).
 - **Keys:** flush, delegation, single slot, llama-swap, Gemma, compaction
   model, keep, zero-keep, 131K, sequential swap.
+- **Correction (2026-09-24, prompt wave task d):** the 2026-09-15 claim in
+  item (1) is stale — `agent.compaction.model` is now COMMENTED OUT in
+  `opencode.jsonc` → the compaction summarizer is the SAME model as the
+  session's model (the default cross-compact runs on the target's own model,
+  so the flush-budget rule of item (2) applies again). Factual source:
+  `maintainer/draft/compaction_guide/full_guide.md` §12 Corrections.
+- **Correction (2026-09-24, prompt wave task d):** item (3) — "NEVER use
+  keepTokens/keepMessages 0" — is stale: `keepTokens` has been REMOVED from
+  `compact_memory` (commit 7f253ea); a LOW `keepMessages` is legitimate — the
+  compaction floor is ~25-30k at keepMessages=0 (server-side).
+  `keepMessages` 18 is the live default in BOTH stores (opencode.json keep
+  block + `compact_budget.json`). Factual source: `maintainer/draft/
+  compaction_guide/full_guide.md` §12 Corrections.
 
 ## ctx_gauge / `ctx:` lines lag ~2 tool calls — plan with margin
 - **Do:** treat any gauge readout as a LOWER bound of real usage — plan
