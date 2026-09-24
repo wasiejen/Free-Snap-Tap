@@ -31,7 +31,7 @@ Contract pinning lives in `.opencode/plugin/probes/handover_probe.mjs`.
   tool calls (~5k). Plan with margin; a displayed readout is optimistic.
 
 ## loop_log — append one loop-log line (loop roles only)
-- Roles in the loop (planner / worker / looprunner) write their bookkeeping
+- Roles in the loop (planner / worker) write their bookkeeping
   here instead of hand-formatting `loop_log.md`: it appends the formatted
   line to the current looprun folder and auto-creates the dated folder.
 - `status` is exactly one of the 8-char tokens: `-->START`, `DONE<---`,
@@ -42,12 +42,17 @@ Contract pinning lives in `.opencode/plugin/probes/handover_probe.mjs`.
   `SESSION=` field.
 - Never hand-edit `loop_log.md`; it is the loop's committed record.
 
-## compact_memory — session compaction (fire-and-forget)
-- Fire it to compact your OWN session at the L3 trigger, or cross-session
-  (planner rescuing a worker: `sessionID` + `providerID`/`modelID`).
-  Cross dispatches are fire-and-forget: success is VERIFIED by the
+## compact_memory — session compaction (SELF / CROSS)
+- Fire it to compact your OWN session (SELF) at the L3 trigger, or a named
+  session (CROSS — the planner rescuing a worker before a `task_id` resume).
+  Args: `[sessionID, keepMessages, message, emergency]` (`keepTokens` is
+  gone). CROSS dispatches are fire-and-forget: success is VERIFIED by the
   `COMPACT` line in `.opencode/temp/ctx.log` (or the terminal), not by the
-  response. Budget is per session + quant class (CPU models denied, cap 0).
+  response. Budget is per target session + model (cap from
+  `compact_budget.json` `model_budget`, bare model id → cap; unlisted models
+  get the configured default; CPU models denied, cap 0); the `emergency` arg
+  consumes the one extra compaction AFTER the normal budget is drained (once
+  per session).
 - Pre-compaction dump (TODO #55, landed plan4): before ANY dispatch the
   target session's full content is dumped to
   `.opencode/archive/sessions/compaction_dumps/<sid>_c<count>.md` —
@@ -56,9 +61,10 @@ Contract pinning lives in `.opencode/plugin/probes/handover_probe.mjs`.
 - After a SELF compaction the session ENDS — continuation rides the
   post-compaction reload directive / `task_id` resume (planner prompt
   §Context-budget trigger). A failed dispatch consumes NO budget.
-- Same-model cross compaction → expect ONE flush delegation afterwards
-  (llama-swap single slot); a DIFFERENT compaction model (e.g. Gemma) → no
-  flush (knowledge_tools.md).
+- The summarizer is the target session's OWN model (same-model —
+  `agent.compaction.model` commented out in opencode.jsonc) → expect ONE
+  flush delegation after a CROSS dispatch (llama-swap single slot;
+  knowledge_tools.md).
 
 ## NOT here
 Built-ins (`task`, `skill`, `webfetch`, …) and the probe/gauge scripts

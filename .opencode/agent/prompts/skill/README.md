@@ -6,7 +6,7 @@ follow it. Host quirk: every md under `.opencode/agent/` also auto-registers
 as a launchable agent type (`prompts/skill/skill_*`) — that is a side effect,
 not the intended launch path.
 - `skill_autorun_summary.md` — summarize one autorun run → `_overall_summary.md`
-  in the loop run folder (run at end of loop by the looprunner).
+  in the loop run folder (run at end of loop).
 - `skill_feedback.md` — collect feedback from runs + `agent_feedback.md` +
   handovers → `maintainer/feedback/` (run regularly).
 Does NOT go here: role prompts / repo parts / agent readmes (sibling folders

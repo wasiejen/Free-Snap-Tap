@@ -102,7 +102,7 @@ bigger context, weaker reasoning and stability):
   edit allow-list = `TODO.md` / summary / scratchpad only, no code fixes.
   Weaker on detail — ALWAYS check its work.
 - Raw `agent_*` variants: same models WITHOUT the worker prompt (ad-hoc, no
-  handover protocol). `looprunner_*` / `planner_*` are not workers.
+  handover protocol). `planner_*` are not workers.
 
 ## Phase-scoped work
 Phase plans, the progress log, current baselines, and the rules of the current

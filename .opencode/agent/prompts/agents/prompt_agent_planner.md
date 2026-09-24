@@ -39,8 +39,8 @@ All paths below are relative to `.opencode/agent/prompts/`.
 - `agent_readme_task_spec.md` — MANDATORY: read it BEFORE writing or launching
   any task spec (`handover_task.md`) — it sets the scope/size discipline for specs.
 - `agent_readme_loop.md` — read when driving the loop (autonomous launch):
-  iteration semantics (incl. counter mismatch + `--request:` lines), the loop
-  folder convention, the loop-log protocol, closing + interrupt handling.
+  iteration semantics (incl. counter mismatch), the loop folder
+  convention, the loop-log protocol, closing + interrupt handling.
 - `.opencode/agent/knowledge/` (repo-root-relative, NOT under agent/prompts) —
   the knowledge base (gained findings, not instructions): read the area file
   when entering that area; when searching for a solution, grep the folder FIRST
@@ -49,12 +49,6 @@ All paths below are relative to `.opencode/agent/prompts/`.
   (append-only inbox; the planner cures it into the area files) when the
   placement is unclear, or the area file directly when it is obvious (format in
   the folder README).
-- `.opencode/agent/research/fuzzy-numword/primer.md` (repo-root-relative) —
-  the numeral convention's form details (the convention itself is in
-  AGENTS.md, already loaded): read when you pass dense numerals (paths, ids,
-  totals, dates) or write a task spec whose content carries them. The
-  `decision-record.md` next to it is LARGE (~10k tokens) — grep it by section,
-  do not read it whole.
 
 ## .opencode layout
 - Creating a new sub-folder under `.opencode/` requires its README (≤20 lines:
@@ -174,9 +168,9 @@ planning. Plan against a defined goal, not a list of chores.
   (compact_memory with its sessionID), then resume via task_id. A CROSS
   `compact_memory` dispatch is fire-and-forget: success = the COMPACT line in
   `.opencode/temp/ctx.log` / the terminal; a failure burns NO budget. The
-  host's compaction model (Gemma) differs from the target's model → no flush;
-  a SAME-model cross compaction → budget ONE flush delegation after the
-  dispatch (knowledge_tools.md "llama-swap single slot").
+  summarizer is the target's OWN model (same-model — `agent.compaction.model`
+  commented out in opencode.jsonc) → budget ONE flush delegation after the
+  dispatch (llama-swap single slot; knowledge_tools.md).
 - **Failure-message interpretation:** `Task cancelled` / `the request exceeds
   the available context size` (or similar) = a CONTEXT-LIMIT HIT in a RUNNING
   session — the sub-agent ran normally and died at the window limit; it is NOT
@@ -184,33 +178,49 @@ planning. Plan against a defined goal, not a list of chores.
   failure messages") — follow the resume protocol above.
 
 ## Context-budget trigger (L3) + stop line (maintainer ruling 2026-09-15, priority.md)
+The general compaction model (cost/gain, the budgets, when to use) is the
+AGENTS.md `# Compaction Guidelines` section — this section holds the
+role-specific triage + handover mechanics on top of it.
 **Stop line: gauge readout ≈90 %** (his "95 % true wall" with the gauge's
 lagging value included — the readout LAGS true usage by ≈2 tool calls (~5k),
 so treat a displayed readout as optimistic; plan with margin). AGENTS.md
 §Context budget carries the same 90 % line (2026-09-15 ruling, landed there).
-- **Near-limit triage (maintainer ruling 2026-09-18 — CANONICAL for all
-  roles):** BEFORE starting any unit at a readout ≥ 80 %, estimate the tool
-  calls still needed to finish the current work. Estimates near the limit are
-  optimistic by construction (context rot + gauge lag) — when in doubt, round
-  up. If the estimate exceeds ~10 calls, stop at
-  the last verified checkpoint and fire `compact_memory` INSTEAD of starting
-  the unit. At ≥ 90 %: same estimate — if more than ~6 calls remain, close and
-  compact NOW.
-- **Compaction is NOT a restart (clarity, 2026-09-15):** it reduces OLD
-  history only — the recent messages stay INTACT and a summary of the
-  dropped head is auto-created; on resume you re-read only the head files
-  the post-compaction protocol names. Never treat a compaction as a lost
-  session and never re-plan from scratch.
-- above 90 % → EMERGENCY handover: stop starting new work, bring the NAP
-  current + COMMIT, then self-compact (compaction ENABLES further work, it does not end it); if the
-  tool refuses (budget exhausted) → end clean per the stop line;
-- above 95 % → commit the current status + self-compact, and DO NOT
-  DELIBERATE while budget remains — `keepMessages` keeps the last N messages
-  INTACT, so the recent work survives; deliberation burns the budget that
-  funds the compaction.
-- **Worker hit the context limit :**
-  CROSS `compact_memory` (fire-and-forget) and resume via `task_id` with the
-  post-compaction protocol. 
+- **Default: compact until the budget is spent** — compaction is a routine
+  speed/maintenance tool (it reclaims generation speed + window space), not
+  an emergency valve.
+- **Distilled → drop (mid-unit ok):** once your tool output is distilled
+  (files read, plan formed, the raw output dead weight), compact — mid-unit,
+  no stop line needed.
+- **Stop lines are triage thresholds (maintainer ruling 2026-09-18 —
+  CANONICAL for all roles), not the only compaction moments:**
+  - ≥ 80 % — BEFORE starting any unit, estimate the tool calls still needed
+    to finish the current work. Estimates near the limit are optimistic by
+    construction (context rot + gauge lag) — when in doubt, round up. If the
+    estimate exceeds ~10 calls, stop at the last verified checkpoint and fire
+    `compact_memory` INSTEAD of starting the unit.
+  - ≥ 90 % — same estimate: if more than ~6 calls remain, close and compact
+    NOW; otherwise EMERGENCY handover — stop starting new work, bring the NAP
+    current + COMMIT, then self-compact (compaction ENABLES further work, it
+    does not end it). If the tool refuses (budget exhausted) → end clean per
+    the stop line.
+  - ≥ 95 % — commit the current status + self-compact NOW, and DO NOT
+    DELIBERATE while budget remains — deliberation burns the budget that
+    funds the compaction.
+- **Compaction is NOT a restart (clarity, 2026-09-15):** it trims OLD history
+  only — the last `keepMessages` stay INTACT and a same-model summary of the
+  dropped head is auto-created; on resume you re-read only the head files the
+  post-compaction protocol names. Never treat a compaction as a lost session
+  and never re-plan from scratch.
+- **keepMessages heuristic:** keep what you would have to RE-DERIVE (drafts,
+  plan, rationale, in-flight state); a full committed handover → keep less;
+  when in doubt → keep more. At the stop line / >95 % / mid-handover: spend
+  the `emergency` 1 PROACTIVELY, with the keepMessages you want — the auto
+  one at the limit takes it blindly (18).
+- A dump is created automatically on self/cross compaction (no manual dump
+  before compact); the last session's dump is the recovery source for a
+  forced new session.
+- **Worker hit the context limit:** CROSS `compact_memory` (fire-and-forget)
+  and resume via `task_id` with the post-compaction protocol.
 
 ## Early handover (maintainer protocol, 2026-09-12)
 Do not wait for the stop line to write the handover. When the readout reaches

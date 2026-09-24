@@ -1,6 +1,6 @@
 # agent_readme_loop.md — the loop protocol
 
-Planner-owned static file; the looprunner reads it when driving the loop
+Planner-owned static file; the planner reads it when driving the loop
 (autonomous launch). Iteration state lives in the launch message + the NAP —
 not here.
 
@@ -10,22 +10,18 @@ not here.
 - **Counter mismatch (loop-signals Part 2, approved 2026-09-15):** if the launch
   N is smaller than the last `planner-N` in the loop log, use the BIGGER
   number for the `plan<N>_*` files — never clobber existing ones; the planner
-  notes it in an `--INFO--` loop line and in its summary.
-- **`--request:` lines (loop-signals Part 2):** a `--request:` line in the
-  planner's closing message is addressed to the looprunner; a `--request:`
-  line in the launch message is the looprunner addressing the planner — both
-  carried verbatim, no interpretation.
+   notes it in an `--INFO--` loop line and in its summary.
 
 ## Action line
-- The states (INLINED here — the looprunner does NOT load AGENTS.md; the
-  planner references AGENTS.md §Interaction-contract, same vocabulary):
+- The states (the planner references AGENTS.md §Interaction-contract, same
+  vocabulary):
   - `restart` — fresh planner launch (the default; missing/unclear → restart)
   - `resume` — resume the same sub-agent session via `task_id`
   - `ask_maintainer: <q>` — pause the loop until the maintainer answers
   - `stop` — goal reached / unrecoverable
 - The planner ends each autonomous session with a closing summary
-  (`plan<N>_summary.md`) and exactly one `action:` line; the looprunner reads
-  the LAST one.
+  (`plan<N>_summary.md`) and exactly one `action:` line; the auto-resume
+  plugin reads the LAST one.
 
 ## Loop folder
 - The CURRENT looprun lives in `.opencode/loop/autorun-<YYYY-MM-DD_HH-MM>/` —
@@ -48,9 +44,8 @@ not here.
   the maintainer after the fact.
 - ONE file per looprun, in its loop folder:
   `.opencode/loop/autorun-<YYYY-MM-DD_HH-MM>/loop_log.md` — append only,
-  created on first write. (Distinct from the looprunner's own
-  `.opencode/loop_log.md`, §Looprunner's own file.) Logged: loopruns and
-  direct planner runs; plain interactive chat has no log.
+  created on first write. Logged: loopruns and direct planner runs; plain
+  interactive chat has no log.
 - Tool: when the `loop_log` tool is in your toolset, WRITE your lines via it —
   it resolves the current looprun folder (creating the dated one when absent),
   machine-stamps, and appends exactly one line, returning what it wrote. The
@@ -60,11 +55,12 @@ not here.
   `date_time <STATUS> <role>[-<iteration>] <session_id> <agent_model> <content>`
   - `<STATUS>` is exactly one of these 8-char tokens: `-->START`, `DONE<---`,
     `-RETURN-`, `-WARNING`, `--INFO--`.
-  - `<role>[-<iteration>]` — `looprunner` / `planner-N` / `worker-N` /
-    `explorer-N`; the iteration number when known (it is in the launch
-    message / task spec), role only for direct runs.
+  - `<role>[-<iteration>]` — `planner-N` / `worker-N` / `explorer-N` (the
+    retired `looprunner` token appears in historical lines only); the
+    iteration number when known (it is in the launch message / task spec),
+    role only for direct runs.
   - `<content>` per status:
-    - `-->START` — looprunner, planner, and worker each write one at their own
+    - `-->START` — planner and worker each write one at their own
       session/task start (the WORKER'S is its FIRST action after reading the
       task spec - before planning or heavy tool calls, because an interrupted
       delegation does not return the task_id and the log is the only way to
@@ -74,7 +70,7 @@ not here.
       `<CTX>%/<REM>K` — verbatim from the gauge command, never guessed.
       (The explorer has no loop-folder write access — its completion rides the
       planner's `-RETURN-` line.)
-    - `-RETURN-` — planner and looprunner each write one when a sub-agent
+    - `-RETURN-` — the planner writes one when a sub-agent
       returns; content = the returned agent's `role-N session_id model`.
     - `-WARNING` — the supervising agent writes one when a sub-agent task FAILS
       (e.g. `context_length_exceeded`); content = the failed sub-agent's
@@ -96,6 +92,7 @@ not here.
 - Rebuild from committed state: `git log`, the NAP
   (`.opencode/agent/handover/handover_planner.md`), `TODO.md` — never from memory.
 
-## Looprunner's own file
-- `.opencode/loop_log.md` is the looprunner's bookkeeping; the planner does not
-  edit it.
+## Looprunner's own file (retired)
+- `.opencode/loop_log.md` was the looprunner's bookkeeping. The role is
+  retired (2026-09-24) — the auto-resume plugin covers launch/relay/restart —
+  and the file no longer exists.
