@@ -168,4 +168,17 @@ Discrepancies surfaced (evidence-attached):
   removal.
 - Note: the current planner session still carries the PRE-3c390e7 AGENTS.md +
   planner prompt in its system prompt — the test is observable from the NEXT
-  fresh session.
+  fresh session. (Confirmed with him: only NEW sessions get the new system
+  prompt — compaction does not re-inject it; his "refill" is the fold into
+  AGENTS.md, so nothing is lost for this session.)
+
+## Progress (planner, 2026-09-24 round 2)
+- **f2 DONE by the maintainer** (his uncommitted AGENTS.md edit): the fold-in-
+  complete handout is now the AGENTS.md section; looprunner row removed; the
+  action line's 'read by' = 'auto-resume plugin / planner (for worker end
+  line)'. 4 leftover looprunner references remain for his cleanup (wave f2:
+  L66/L78/L82/L92).
+- **Order-stop / Work State dump form: removal CONFIRMED** (his ruling — in
+  serial execution a stop order is never usable: the worker returns only on
+  close (finish / self-compaction / context limit), none need a pre-ordered
+  stop, and dumps are automatic). Wave task h updated — nothing to restore.

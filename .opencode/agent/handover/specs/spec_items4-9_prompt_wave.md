@@ -60,13 +60,16 @@ they differ):**
   `skill/README.md` ~L9; `repo_map.md` ~L105 roster note. The opencode.jsonc
   agent removal = MAINTAINER domain — verify his live file first, note the
   outcome in the handover, do not touch.
-- **f2. AGENTS.md integration (MAINTAINER pastes — the text-worker only prepares
-  the exact text, NEVER edits AGENTS.md):** repaste the now fold-in-complete
-  handout (`draft/compaction_guide/handout.md` — paste-ready; the 2026-09-24
-  corrections are folded into its body) as the `# Compaction Guidelines`
-  section; remove the leftover looprunner reference in the role table's
-  planner row ("consumed by: workers, looprunner, next planner session" →
-  "consumed by: workers, next planner session").
+- **f2. AGENTS.md integration — DONE by the maintainer (his uncommitted tree
+  edit, verified 2026-09-24):** the fold-in-complete handout is now the
+  AGENTS.md `# Compaction Guidelines` section; the looprunner row removed;
+  the action line's 'read by' = 'auto-resume plugin / planner (for worker
+  end line)'. REMAINING (his cleanup — 4 leftover looprunner references):
+  L66 planner row 'consumed by: workers, looprunner, next planner session' →
+  'workers, next planner session'; L78 NAP row 'planner (next session),
+  looprunner (indirect)' → 'planner (next session)'; L82 '(looprunner and
+  planner both read this)' → '(planner reads this)'; L92 'the looprunner
+  never touches repo files…' — drop the sentence.
 - **g. Bit-drift references (approved by his ruling):** remove the
   fuzzy-numword primer lines from the Instruction index —
   `prompt_agent_planner.md` ~L52, `prompt_agent_task.md` ~L40. The primer file
@@ -76,10 +79,11 @@ they differ):**
   budget is spent, distilled→drop (mid-unit ok), stop lines as triage
   thresholds, the keepMessages heuristic (when in doubt keep more). Worker
   early handover = 80 % (his test — keep); planner early handover = 70 %
-  (unchanged for now). PENDING his ruling: restore the Work State dump
-  CLOSING FORM without the dump-before-compact + looprunner parts (one short
-  paragraph — the form a self-compacted session uses to say what to resume),
-  or confirm the removal.
+  (unchanged for now). ORDER-STOP / WORK STATE DUMP FORM: removal CONFIRMED
+  (his ruling 2026-09-24 — in serial execution a stop order is never usable:
+  the worker returns only on close (finish / self-compaction / context
+  limit), none need a pre-ordered stop, and dumps are automatic). Nothing to
+  restore.
 
 ## DoD (per task: grep-clean of the stale strings named above; a read-back of
 each edited file; zero edits outside the named files; zero behavior claims —
