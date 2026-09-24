@@ -17,6 +17,26 @@ Parts (read when …):
   the input pipeline (no live listeners).
 - `repo_gotchas.md` — read when debugging odd behavior, or before editing code
   in the areas named there.
-- `repo_custom_tools.md` — read when using (or delegating) the host-specific
-  opencode tools (block_transfer, ctx_gauge, loop_log, compact_memory) or
-  when one of their behaviors surprises you.
+- `repo_custom_tools.md` — read when using (or delegating) the
+  host-specific opencode tools (block_transfer, ctx_gauge, loop_log,
+  compact_memory) or when one of their behaviors surprises you.
+
+## Safety limits
+- **Backend inference server** (llama-swap, SINGLE model slot —
+  192.168.178.20:8033 as of 2026-09-24, the address may move): agents
+  NEVER launch requests at it — not for tests or probes, not even
+  enumeration (GET /v1/models). A direct request evicts whatever model
+  the live session is using (measured 2026-09-24: an 80k prefill probe
+  kicked the planner's own model out of the backend mid-session). All
+  model traffic goes through opencode sessions only; the maintainer
+  alone touches the backend (e.g. moving the context limit there —
+  no opencode.jsonc change needed).
+- **Permanent startup load errors (measured 2026-09-24):** every
+  process start logs `failed to load plugin` for `compact_memory.ts`
+  ("The \"paths[0]\" property must be of type string, got object") and
+  `intercept_observer_core.ts` ("Plugin export is not a function") —
+  yet the compact_memory tool WORKS (a self-compact ran under the same
+  failing start) and the observer intercepts live (intercept.log
+  grows). The maintainer confirmed no alternative plugin versions
+  exist — the files load despite the errors. FIX PENDING (separate
+  item; the maintainer flagged it 2026-09-24).
