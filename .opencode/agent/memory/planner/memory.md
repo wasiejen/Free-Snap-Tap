@@ -258,3 +258,38 @@ knowledge / NAP) is re-stated.
   (self-compaction signals — the COMPACT line is the thing ABSENT here).
 - Review when: the dump format changes (step-finish meta / `## msg_` headers),
   or chunked-write guidance proves unnecessary in a later looprun.
+
+## MEM-0108 — NEVER launch requests at the backend inference server (the single llama-swap model slot) — a direct request evicts the live session's own model
+
+- Rule (maintainer ruling 2026-09-24, direct session): agents NEVER
+  launch ANY request at the backend inference server (the
+  OpenAI-compatible llama-swap endpoint — 192.168.178.20:8033 as of
+  2026-09-24; the address may move) — not for speed tests, not for
+  probes, not "small" requests, not even enumeration (GET /v1/models).
+  All model traffic goes through opencode sessions only. The backend is
+  a SINGLE model slot: it swaps in whatever the active session needs —
+  a direct request swaps out whatever is live, INCLUDING the requesting
+  agent's own model (which then must be swapped back in at its next
+  turn). The maintainer alone touches the backend (e.g. moving the
+  context limit there — he can do that without opencode.jsonc changes).
+- Why it matters: a direct 80k-token prefill probe at
+  Qwen3.8-27B-Compaction returned empty (TTFT null, no usage) after
+  ~7 s and kicked the planner's own model (Qwen3.8-27B-Q3S-230K-slow)
+  out of the backend mid-session. The probe was also REDUNDANT — the
+  maintainer had already measured prefill in his fork test (a fork of
+  the planner session driven to the context limit on the Compaction
+  model).
+- Evidence: 2026-09-24 (planner ses_f30493f9effeuQRFc3ijNON166, direct
+  session): my own prefill_test.mjs against the backend
+  /v1/chat/completions; maintainer: "you kicked your own model out of
+  the backend with a command ... NEVER!".
+- Verified: 2026-09-24 (measured incident, maintainer-confirmed).
+- Related: MEM-0105 (single-slot setup); the canonical safety-limits
+  home is repo_overview.md (maintainer-owned — agents do NOT edit it
+  directly; a one-line Safety entry was proposed in the 2026-09-24
+  session; no safety section existed there yet); AGENTS.md "Safety
+  limits" points at repo_overview.md.
+- Review when: the backend gains multi-slot/queueing or a dedicated
+  test endpoint, or the maintainer explicitly authorizes a specific
+  direct request for a measured run (then the rule's scope narrows to
+  "only explicit maintainer-authorized runs").
