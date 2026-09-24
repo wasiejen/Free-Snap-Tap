@@ -1,57 +1,63 @@
-# TASK SPEC — R4: the intercept.log mining scriptlet (staged spec, gate now satisfied)
+# TASK SPEC — remove keepTokens from compact_memory (change-list item 1)
 
-Worker: `worker_Q3S_170K`. Branch: stay on the current checkout (`opencode_test`).
+Origin: `maintainer/inbox_planner/compaction_feedback_by_planner.md` — consolidated
+change list item 1 (his `--maintainer` directive, 2026-09-24: "keepTokens need to be
+set as default 0 and not be accessible via the compact tool: whenever keepToken != 0
+keepMessages will be ignored entirely"). Reference docs:
+`maintainer/draft/compaction_guide/full_guide.md` (+ §12 Corrections).
 
 ## Goal
-Build the staged R4 scriptlet per its own design source
-`.opencode/agent/research/fuzzy-numword/spec_R4_log_mining.md` — READ THAT FILE
-FIRST (it is the full design: the 6 output sections, the home conventions, the
-DoD). One committed
-`node .opencode/agent/scripts/log/summarize_intercept.cjs [logfile]`
-(default `.opencode/temp/intercept.log`) that turns the log into a readable
-evidence summary + a committed fixture test + one pinned check + the
-INVENTORY/README entries. The script must be GENERIC — the log keeps growing,
-never hardcode counts or session ids.
+The `compact_memory` tool never reads, defaults, or sends keepTokens again;
+keepMessages is the only keep knob the agent can pass.
 
-## Verified context (planner-measured 2026-09-23, HEAD d6ddf37 — do not re-derive)
-- The R4 GATE is SATISFIED: `.opencode/temp/intercept.log` = 3076 lines / 139
-  distinct session ids.
-- Log line shape (verify with a BOUNDED read: `head -20` of the log, do not
-  read the whole file): `date_time | session_id | model | tool |
-  args-json | <free-form evidence fields...>` — the final field(s) carry the
-  verdict (e.g. `no-candidate`, `out-of-sandbox`, `pair-resolved`).
-- Home conventions: `.opencode/agent/scripts/log/README.md` (script home + the
-  fixture-under-tests convention) and `.opencode/agent/scripts/INVENTORY.md`
-  (one entry per script — copy an existing entry's format).
-- Standard gate (must stay green): run per
-  `.opencode/agent/prompts/repo/repo_commands.md` — probe 241/241, all
-  `.opencode/plugin/tests/` smokes, pytest 459 passed + 1 warning, ruff F=0.
-
-## DoD
-1. The script runs on the real log without error and prints the 6 sections from
-   the R4 spec (machine-stable lines).
-2. One committed fixture log (a few lines) under the log/ tests home + the
-   fixture test green.
-3. Your ONE pinned check (the fixture test, or a probe section if you judge the
-   probe the right home — pick one, pin it, explain the choice in the
-   handover) + the standard gate green.
-4. `INVENTORY.md` entry + the `log/README.md` pointer.
-5. Status: record `LANDED` in your handover (the commit hash goes in the
-   planner's follow-up bookkeeping — a commit never carries its own hash).
+## Scope (exact — three files)
+1. `.opencode/plugin/compact_memory.ts` (887 lines — work only in these areas):
+   - L72-127 config section: drop `keepTokens` from the `CompactionConfig` type, the
+     fail-open defaults (L87 `DEFAULT_KEEP_TOKENS = 30_000`, L102), and the file
+     parsing (L112). (Default-0 semantics = the key simply no longer exists / is
+     never sent; no tokens value may ever reach the server body.)
+   - L710-717 tool description + args: remove the `keepTokens` arg (L713) and the
+     stale keep-field notes; keepMessages description = working, sent in the request
+     body (e.g. 18). (This is change-list item 4's keep-note fix — folded in.)
+   - L802-807 keep construction: `keep.tokens` never set; `keep.messages` from
+     `args.keepMessages` only (the args-only behavior stays — change-list item 12,
+     the cfg-merge, is OUT of scope, his call).
+   - `appendCompactLine` call sites (L832, L862) + the log-line builder (L236-260
+     area): the COMPACT line reports the kept MESSAGES only — drop the tokens value
+     from the format (re-pin whatever the exact current format is).
+2. `.opencode/plugin/tests/compact_memory.smoke.mjs` — re-pin:
+   - defaults pins L109/L119 (currently `30000/12/...`), fixture L112 (drop
+     keepTokens from the JSON), schema-key pin L173-174 → exactly
+     `[sessionID, keepMessages, message]`, body asserts L186/L214/L252
+     (`body.keep.messages` only, NO `body.keep.tokens`), all call sites passing
+     keepTokens (drop the arg), the log-seed test L389-412 (re-pin to messages).
+3. `.opencode/plugin/probes/handover_probe.mjs` — re-pin: schema pin L1837
+   (3 keys → 2), the COMPACT-line pin L2193 (`tokens=30_000 messages=12` → new
+   messages-only format), registration pin L2389-2391, all call sites passing
+   keepTokens, comment L2106.
 
 ## DO-NOT-touch
-- `.opencode/agent/prompts/**` (no edit access) and the R4 spec file itself
-  (its stale `Worker: worker_Q4_140K` line is corrected by the planner — do not
-  edit it).
-- `.opencode/maintainer/**` (his live files).
-- `.opencode/plugin/**` — this task touches NO plugin code.
-- Uncommitted maintainer changes on disk (`context_recovery.ts` move,
-  `ideas.md`, `my_todos.md`) — never stage them; stage only your named paths,
-  never `git add -A`.
+- `context_recovery.ts` keepTokens (its removal rides the #93 event-hook port —
+  separate spec).
+- `opencode.jsonc`, `.opencode/temp/compact_budget.json` (maintainer live files —
+  the budget file already carries `"keepTokens": 0`; it becomes inert, leave it).
+- `auto_resume.ts`, the prompt files, knowledge files, items 10/12 (other specs).
+- Anything under `.opencode/maintainer/`.
 
-## Commit routine
-One commit: the script + fixture + INVENTORY/README entries +
-`handover_task_to_planner.md`. Commit green, never red. Your handover:
-executive summary, measured verification (the script run on the real log +
-the fixture test + gate output), commit hash, TODO entries (none expected —
-the planner updates #67), what was deliberately not done.
+## Definition of done
+- `grep -n "keepTokens" .opencode/plugin/compact_memory.ts
+  .opencode/plugin/tests/compact_memory.smoke.mjs
+  .opencode/plugin/probes/handover_probe.mjs` → zero hits, or at most ONE
+  comment line documenting the removal.
+- Tool args are exactly `[sessionID, keepMessages, message]` (smoke pin).
+- The v1 summarize body (the ACTIVE path on this build — L845-854, verified at
+  spec time) carries `keep.messages` when given and NO `keep.tokens` key ever.
+- Gate green from the just-verified state: probe full run, compact_memory smoke,
+  pytest 459 passed + 1 warning, ruff F=0 (Standing baselines; re-run at start).
+- Commit: the three files in one commit (imperative subject). Status → `LANDED`
+  (the hash is recorded by the planner in the follow-up bookkeeping commit — not
+  by you). No TODO.md change (status lives in this spec + planner bookkeeping).
+- Worker summary → `handover_task_to_planner.md`.
+
+## Worker
+`worker_Q3S_170K` (verify the live roster in opencode.jsonc before launch).
