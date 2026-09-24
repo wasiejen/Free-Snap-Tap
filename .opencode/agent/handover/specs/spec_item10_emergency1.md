@@ -30,27 +30,31 @@ PREFACE: runs after item 1 (same file) — write against the post-item-1 state
   normal budget is exhausted). Omit = a normal compaction."
 - COMPACT log line: append ` emergency` when the emergency was consumed
   (re-pin the format in smoke/probe).
-- Auto side (context_recovery.ts, live file — the T5 emergency hook): on its
-  overflow fire, same count logic WITHOUT the arg requirement: `count < cap` →
-  consume normally; `count === cap` and emergency available → consume the 1
-  (its blind compaction, keep per its own config); `count > cap` → refuse /
-  defer to the forced-new-session (item 11 spec). NOTE for the handover: the
-  #93 event-hook port MUST carry this logic.
+- Auto side (DESIGN ONLY — the file is DEACTIVATED: `.opencode/plugin/
+  deactivated/context_recovery.ts`; the #93 event-hook port writes the live
+  file): on its overflow fire, same count logic WITHOUT the arg requirement:
+  `count < cap` → consume normally; `count === cap` and emergency available →
+  consume the 1 (its blind compaction, keep per its own config); `count > cap`
+  → refuse / defer to the forced-new-session (item 11 spec). NOTE for the
+  handover: the #93 event-hook port MUST carry this logic.
 
 ## Scope
 1. `.opencode/plugin/compact_memory.ts` — config section (add the key + default),
    the budget gate + refusal texts, the tool args (add `emergency`), the success
    callbacks (emergency increment + the COMPACT line extension).
-2. `.opencode/plugin/context_recovery.ts` — the overflow path per the design
-   above (the worker reads the file — it is small; the #93 port is separate).
-3. `.opencode/plugin/tests/compact_memory.smoke.mjs`,
-   `.opencode/plugin/tests/context_recovery.smoke.mjs`,
-   `.opencode/plugin/probes/handover_probe.mjs` — re-pin: new arg key in the
-   schema pins; the gate SEQUENCE test (fixture model_budget {M: 2},
-   emergency_budget 1: calls 1-2 ok; call 3 no-arg refused; call 3
-   emergency:true ok + COMPACT line carries ` emergency`; call 4 emergency:true
-   refused; state survives a fresh module instance); emergency_budget 0 → call
-   3 refused; key absent → default 1 (fail-open).
+2. `.opencode/plugin/tests/compact_memory.smoke.mjs` +
+   `.opencode/plugin/probes/handover_probe.mjs` — re-pin (the ACTIVE-plugin
+   sections only — S13/S25 area; S10/S11 pin frozen artifacts and stay
+   byte-identical, per the spec-01 carve-out): new arg key in the schema pins;
+   the gate SEQUENCE test (fixture model_budget {M: 2}, emergency_budget 1:
+   calls 1-2 ok; call 3 no-arg refused; call 3 emergency:true ok + COMPACT line
+   carries ` emergency`; call 4 emergency:true refused; state survives a fresh
+   module instance); emergency_budget 0 → call 3 refused; key absent →
+   default 1 (fail-open).
+3. DO-NOT-touch (verified 2026-09-24): `.opencode/plugin/deactivated/
+   context_recovery.ts` (DEACTIVATED — the auto-side emergency-1 logic above
+   lands with the #93 port; its `tests/context_recovery.smoke.mjs` pins are
+   FROZEN) and `.opencode/plugin/deactivated/compact_memory_v1.ts`.
 
 ## DO-NOT-touch
 - `.opencode/temp/compact_budget.json`, `opencode.jsonc` (maintainer live).
