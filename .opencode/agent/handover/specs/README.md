@@ -15,5 +15,7 @@ launch; a new planner (or this one post-compaction) launches them in queue order
   updates, executed by a PLANNER agent in text-worker mode (workers have no edit
   access to `.opencode/agent/prompts/**`). Runs LAST, after the build specs.
 Queue order: 01 → 10 → 2+11 → 3 → prompt wave.
+Status (2026-09-24): 01 = LANDED (7f253ea; probe S10/S11 carve-out accepted,
+rides #93); 10 = current `handover_task.md`, launching next.
 What does NOT go here: launched specs' worker summaries (handover folder root),
 NAP, non-compaction specs.

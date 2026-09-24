@@ -184,7 +184,19 @@ Discrepancies surfaced (evidence-attached):
   stop, and dumps are automatic). Wave task h updated — nothing to restore.
 
 ## Progress (planner, 2026-09-24 round 3)
-- **Spec 01 LAUNCHED** (worker_Q3S_170K) — keepTokens removal, per his "go".
+- **Spec 01 LANDED** (worker_Q3S_170K, verified from files + an independent
+  smoke re-run): commit `7f253ea` (3 scoped files; summary commit `4edd0f0`).
+  keepTokens never read/defaulted/sent from compact_memory.ts (1 removal
+  comment); tool args = [sessionID, keepMessages, message]; v1 body carries
+  `keep.messages` only; COMPACT line = `messages=<m>` only. Gate green
+  (probe 241/241, smoke 57/57, pytest 459+1w, ruff F=0). DEVIATION RULING:
+  option (a) accepted — the probe's S10/S11 sections pin retired
+  (`compact_memory_v1.ts`) / DO-NOT-touch (`context_recovery.ts`) artifacts and
+  stay byte-identical (14 keepTokens occurrences remain there, factually
+  correct); follow-up (b) — de-v1'ing keepTokens + the S10/S11 re-pin — rides
+  the #93 port wave (his call on the v1 removal per the deactivated-alternative
+  rule).
+- **Spec 01 was LAUNCHED** (worker_Q3S_170K) — keepTokens removal, per his "go".
 - Maintainer confirmation (recorded in the spec 2+11 facts + the knowledge
   inbox): post-compaction planner resume = the AUTO-RESUME PLUGIN (the #90/
   #91 family — the restart spawn carries the real planner agent, the
