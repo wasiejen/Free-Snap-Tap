@@ -119,6 +119,14 @@
 //                       pct/REM)
 // - no total / unreadable db: SESSION=<sid|unknown> CTX=notAvailable —
 //   verbatim, never a silent/zero confusion.
+// - the item-3 budget suffix (2026-09-24): when the compaction budget store
+//   resolves, the line ENDS with the distinct ` | N compactions left` field
+//   (singular at 1 — the ` | ` separator flags it as a separate field):
+//   remaining = max(0, cap - count) PLUS 1 iff the once-per-session emergency
+//   compaction is still available (count === cap && effective
+//   emergency_budget >= 1 — see compactionsLeftSuffix). Budget file missing /
+//   unparseable, or the read session unknown (db-error) → NO suffix
+//   (fail-open — the forms above stand verbatim).
 //
 // SESSION-GATING (the #32 cross-session feed root cause): the result carries
 // the id of the session the read came from (sid). The plugin posts its part
@@ -129,7 +137,7 @@
 // =============================================================================
 
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -178,6 +186,22 @@ export function setBackends(list) {
 }
 export function getBackends() {
   return [...backendList];
+}
+
+// Item 3 (2026-09-24): the budget store the "N compactions left" suffix
+// reads (the compact_memory budget store — the SAME file auto_resume.ts
+// reads per nudge-eligible call; READ-ONLY here, read per formatGauge call —
+// small file, a per-call read is fine). Resolved RELATIVE to this file
+// (.opencode/plugin/scripts → ../.. = repo root → .opencode/temp/).
+export const DEFAULT_BUDGET_FILE = join(THIS_DIR, "..", "..", "temp", "compact_budget.json");
+let budgetFile = DEFAULT_BUDGET_FILE;
+// Test hook (the setDbPath pattern — the probe/smokes steer the read at
+// fixture budget files; the production host never calls it).
+export function setBudgetFileForTest(p) {
+  budgetFile = p;
+}
+export function getBudgetFile() {
+  return budgetFile;
 }
 
 // Probe-only test hooks (the production host never calls these):
@@ -242,7 +266,67 @@ export function parseModelId(raw) {
 //   no total   : { ok:false, kind:"no-total",  sid, modelId }            // read ok, no total
 //   unreadable : { ok:false, kind:"db-error",  sid:"unknown", modelId:"", error }
 
+// Item 3 (2026-09-24): the "N compactions left" suffix — the compaction
+// budget remaining for the READ session, appended as a DISTINCT field to the
+// readout line (format ` | N compactions left`, singular at 1; the budget
+// THRESHOLD is deliberately NOT revealed — indirect information only).
+// remaining = max(0, cap - count) PLUS 1 iff the once-per-session emergency
+// compaction is still available: count === cap && the effective
+// emergency_budget >= 1. The key is read LENIENTLY — absent → the fail-open
+// default 1 (matching compact_memory's DEFAULT_EMERGENCY_BUDGET), so the
+// readout matches the ACTUAL gate after item 10: at count === cap the
+// emergency IS still available (count === cap + key absent → 1, NOT 0).
+// The cap is resolved EXACTLY like compact_memory's resolveCap (mirror of
+// the auto_resume budgetExhausted helper): the CPU safety invariant FIRST
+// (cap 0), then the model_budget map's EXACT bare-model-id key, else
+// model_budget.default, else 1. The model is the read's modelId (the
+// session's CURRENT model — the bare id, the map's key form); no-total reads
+// carry none, so the session entry's `model` (the model at the last
+// increment) is the fallback. File missing / unreadable / unparseable /
+// root-not-an-object / sid "unknown" (a db-error read) → NO suffix
+// (fail-open). NEVER throws.
+export function compactionsLeftSuffix(sid, modelId) {
+  if (typeof sid !== "string" || sid === "" || sid === "unknown") return "";
+  let data;
+  try {
+    data = JSON.parse(readFileSync(budgetFile, "utf-8"));
+  } catch {
+    return ""; // missing / unreadable / malformed → no suffix (fail-open)
+  }
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return ""; // scalar root → no store
+  const rec = data;
+  const sessions = rec["sessions"];
+  let entry = null;
+  if (sessions != null && typeof sessions === "object" && !Array.isArray(sessions)) {
+    const e = sessions[sid];
+    if (e != null && typeof e === "object" && !Array.isArray(e)) entry = e;
+  }
+  const count = entry != null && typeof entry["count"] === "number" && Number.isFinite(entry["count"]) ? entry["count"] : 0;
+  const model =
+    typeof modelId === "string" && modelId !== ""
+      ? modelId
+      : entry != null && typeof entry["model"] === "string"
+        ? entry["model"]
+        : "";
+  const mb = rec["model_budget"];
+  let cap;
+  if (/^cpu/i.test(model)) cap = 0; // the CPU safety invariant (mirror of resolveCap)
+  else if (mb != null && typeof mb === "object" && !Array.isArray(mb)) {
+    if (model !== "" && typeof mb[model] === "number" && Number.isFinite(mb[model])) cap = mb[model];
+    else if (typeof mb["default"] === "number" && Number.isFinite(mb["default"])) cap = mb["default"];
+    else cap = 1;
+  } else {
+    cap = 1;
+  }
+  const eb = rec["emergency_budget"];
+  const emergency = typeof eb === "number" && Number.isFinite(eb) && eb >= 0 ? eb : 1; // absent → fail-open default 1
+  const remaining = Math.max(0, cap - count) + (count === cap && emergency >= 1 ? 1 : 0);
+  return ` | ${remaining} compaction${remaining === 1 ? "" : "s"} left`;
+}
+
 // The ONE readout form (see the header). sid missing/undefined -> "unknown".
+// Item 3 (2026-09-24): the line ends with the budget suffix when the store
+// resolves (compactionsLeftSuffix — empty string on fail-open).
 export function formatGauge(r) {
   let out;
   if (r.ok) {
@@ -254,7 +338,7 @@ export function formatGauge(r) {
   } else {
     out = "CTX=notAvailable";
   }
-  return `SESSION=${r.sid ?? "unknown"} ${out}`;
+  return `SESSION=${r.sid ?? "unknown"} ${out}` + compactionsLeftSuffix(r.sid ?? "unknown", r.modelId ?? "");
 }
 
 // The two single-row reads (see the header). json_extract never fetches the

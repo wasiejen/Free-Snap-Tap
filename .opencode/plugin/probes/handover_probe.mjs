@@ -123,6 +123,14 @@
 //      every readout / parseWindow cases (256K, 210K, 1.5M, 120K_MTP, no-match,
 //      non-string) / parseModelId (JSON id / plain / malformed / empty) /
 //      setDbPath+getDbPath global plumbing with explicit-path override
+//   S6b item 3 (2026-09-24): the "N compactions left" budget suffix on the
+//      readout line (6): the 3 states (count < cap → plural ` | N
+//      compactions left` / count === cap + key ABSENT → ` | 1 compaction
+//      left` (the fail-open default-1 emergency — NOT 0) / count > cap →
+//      ` | 0 compactions left`) + the emergency_budget-0 explicit case +
+//      the fail-open no-suffix form (the probe default budget path is a
+//      never-created sandbox file → every pre-existing readout pin stays
+//      byte-identical) + the no-total entry-model fallback
 //   S7 backend chain (11) — the #37 chain IS contract: each backend is
 //      FORCED via setBackends([...]) and verified against the sandbox
 //      fixtures (the list is cleared/restored between sections):
@@ -661,7 +669,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=19 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 hygiene=6  →  "PROBE handover: 246/246 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=19 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 hygiene=6  →  "PROBE handover: 252/252 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -803,8 +811,15 @@ const MISSING_DB = path.join(SANDBOX, "missing_fx.db"); // never created — the
 
 // the core — SAME module instance the plugin imports (same resolved file), so
 // setDbPath below steers the plugin's chat.message read to the fixtures.
-const { readGauge, formatGauge, parseWindow, parseModelId, setDbPath, getDbPath, setBackends, getBackends, DEFAULT_BACKENDS, setImportForTest, clearImportForTest, importAttemptsForTest } =
+const { readGauge, formatGauge, parseWindow, parseModelId, setDbPath, getDbPath, setBackends, getBackends, DEFAULT_BACKENDS, setImportForTest, clearImportForTest, importAttemptsForTest, setBudgetFileForTest, getBudgetFile, compactionsLeftSuffix } =
   await import(new URL("../scripts/gauge.mjs", import.meta.url).href);
+
+// Item 3 (2026-09-24): the "N compactions left" suffix reads the budget
+// store PER formatGauge call — steered to a NEVER-CREATED sandbox path so
+// every pre-existing formatGauge / ctx-line pin stays byte-identical
+// (fail-open → no suffix); the S6b section points it at fixture budget
+// files for its own pins.
+setBudgetFileForTest(path.join(SANDBOX, "missing_budget.json"));
 
 // the plugin, loaded from the REAL repo path (Node 24 strips the TS types)
 const plugin = (await import(pathToFileURL(PLUGIN_TS).href)).default;
@@ -1158,6 +1173,116 @@ check(
     JSON.stringify({ getDbPath: getDbPath(), viaGlobal: viaGlobal.sid, viaOverride: viaOverride.sid }),
   );
 }
+
+// ------------------------------------------------------------------ S6b item 3 (2026-09-24): the "N compactions
+// left" budget suffix on the readout line (6) — the formatGauge extension:
+// remaining = max(0, cap - count) PLUS 1 iff the once-per-session emergency
+// compaction is still available (count === cap && the effective
+// emergency_budget >= 1 — the key read LENIENTLY: absent → the fail-open
+// default 1, matching compact_memory's gate). The cap is resolved EXACTLY
+// like compact_memory's resolveCap (CPU invariant 0, then the model_budget
+// map's exact bare-model-id key, else default, else 1). The budget store is
+// steered at fixture files via setBudgetFileForTest (the setDbPath pattern);
+// the FX_OK fixture read carries sid ses_fx_ok + model probe-model-256K_MTP.
+
+const BUDGET_FX = path.join(SANDBOX, "budget_fx.json");
+const MB_FX = { "probe-model-256K_MTP": 3, default: 1 };
+const setBudgetFx = (count, eb, sid = "ses_fx_ok") => {
+  const rec = { model_budget: MB_FX, sessions: { [sid]: { count, updated: "fx", model: "probe-model-256K_MTP" } } };
+  if (eb !== undefined) rec.emergency_budget = eb;
+  writeFileSync(BUDGET_FX, JSON.stringify(rec), "utf-8");
+  setBudgetFileForTest(BUDGET_FX);
+};
+const FX_OK_LINE = "SESSION=ses_fx_ok CTX=10000 (3%) REM=246000";
+
+// 28.1 — state 1: count 0 < cap 3 → 3 remaining (plural form)
+{
+  setBudgetFx(0);
+  const r = await readGauge(FX_OK);
+  check(
+    "28.1",
+    "S6b",
+    "state 1 (count 0 < cap 3): the known-window line ends ` | 3 compactions left`",
+    formatGauge(r) === `${FX_OK_LINE} | 3 compactions left`,
+    JSON.stringify(formatGauge(r)),
+  );
+}
+
+// 28.2 — state 2: count === cap, the emergency_budget key ABSENT → the
+//      fail-open default 1 IS available → 1 remaining (singular form; the
+//      spec pin: NOT 0)
+{
+  setBudgetFx(3);
+  const r = await readGauge(FX_OK);
+  check(
+    "28.2",
+    "S6b",
+    "state 2 (count === cap, key absent → default 1): the line ends ` | 1 compaction left` (singular)",
+    formatGauge(r) === `${FX_OK_LINE} | 1 compaction left`,
+    JSON.stringify(formatGauge(r)),
+  );
+}
+
+// 28.3 — state 3: count 4 > cap 3 → fully exhausted → 0 remaining
+{
+  setBudgetFx(4);
+  const r = await readGauge(FX_OK);
+  check(
+    "28.3",
+    "S6b",
+    "state 3 (count > cap — fully exhausted): the line ends ` | 0 compactions left`",
+    formatGauge(r) === `${FX_OK_LINE} | 0 compactions left`,
+    JSON.stringify(formatGauge(r)),
+  );
+}
+
+// 28.4 — state 2b: count === cap + emergency_budget 0 EXPLICIT → the
+//      emergency is unavailable → 0 remaining (the lenient read distinguishes
+//      0 from absent)
+{
+  setBudgetFx(3, 0);
+  const r = await readGauge(FX_OK);
+  check(
+    "28.4",
+    "S6b",
+    "state 2b (count === cap, emergency_budget 0 explicit): the line ends ` | 0 compactions left`",
+    formatGauge(r) === `${FX_OK_LINE} | 0 compactions left`,
+    JSON.stringify(formatGauge(r)),
+  );
+}
+
+// 28.5 — fail-open: the budget file MISSING (the never-created sandbox path
+//      the probe default) → NO suffix — the line is byte-identical to the
+//      pre-item-3 form
+{
+  setBudgetFileForTest(path.join(SANDBOX, "missing_budget.json"));
+  const r = await readGauge(FX_OK);
+  check(
+    "28.5",
+    "S6b",
+    "fail-open (budget file missing): NO suffix — the known-window line is byte-identical to the pre-item-3 form",
+    formatGauge(r) === FX_OK_LINE,
+    JSON.stringify(formatGauge(r)),
+  );
+}
+
+// 28.6 — no-total read (no finished step → modelId ""): the cap falls back
+//      to the session entry's `model` (the model at the last increment) —
+//      the suffix still resolves (count 0 < cap 3 → 3)
+{
+  setBudgetFx(0, undefined, "ses_fx_empty");
+  const r = await readGauge(FX_NOTAL);
+  check(
+    "28.6",
+    "S6b",
+    "no-total read (modelId '' → entry-model fallback): `SESSION=ses_fx_empty CTX=notAvailable | 3 compactions left`",
+    formatGauge(r) === "SESSION=ses_fx_empty CTX=notAvailable | 3 compactions left",
+    JSON.stringify(formatGauge(r)),
+  );
+}
+
+// restore the probe-default budget steering for every later section
+setBudgetFileForTest(path.join(SANDBOX, "missing_budget.json"));
 
 // ------------------------------------------------------------------ S7 backend chain (11) — the #37 chain IS contract
 //
