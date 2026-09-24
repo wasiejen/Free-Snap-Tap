@@ -138,3 +138,14 @@ Discrepancies surfaced (evidence-attached):
 - **Spec wave codified:** pre-writing a committed queue of specs (multiple
   files) is an allowed + recommended method — landed in
   agent_readme_task_spec.md (this commit).
+
+## Build progress (planner, 2026-09-24 post-compact)
+- `3c390e7` (maintainer, in the compact gap): wave tasks **a/b/f DONE** — the
+  handout is now the AGENTS.md `# Compaction Guidelines` section; planner/worker
+  prompts shed the guide content (his more aggressive rework — Work State dump
+  protocol, Order-stop, looprunner row, and the bit-drift numerals block all
+  gone). Wave remaining: **c** (repo docs), **d** (knowledge), **e** (looprunner
+  agent-side files), **f2** (AGENTS.md body fix — 2 lines the Corrections
+  override + 1 leftover looprunner row reference; his paste, exact text in the
+  wave spec).
+- Next launch: spec 01 (keepTokens removal, `handover_task.md`).
