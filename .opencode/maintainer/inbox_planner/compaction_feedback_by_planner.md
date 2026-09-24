@@ -197,6 +197,16 @@ Discrepancies surfaced (evidence-attached):
   the #93 port wave (his call on the v1 removal per the deactivated-alternative
   rule).
 - **Spec 01 was LAUNCHED** (worker_Q3S_170K) — keepTokens removal, per his "go".
+- **Spec 10 LANDED** (worker_Q3S_170K, verified from files + independent smoke
+  re-run): commit `04053e8`. `emergency_budget` config key (fail-open default
+  1, live budget file untouched); the gate's four states exactly as pinned
+  (no store-schema bump — count=cap+1 tracks the consumed emergency); tool
+  args = [sessionID, keepMessages, message, emergency]; the COMPACT line
+  carries ` emergency` only on consumption. Auto side = DESIGN ONLY
+  (deactivated context_recovery — the #93 port MUST carry the same count
+  logic without the arg requirement + the line-writer mirror). Gate green
+  (probe 246/246, smoke 65/65, pytest 459+1w, ruff F=0); S10/S11 frozen pins
+  byte-identical. No deviations.
 - Maintainer confirmation (recorded in the spec 2+11 facts + the knowledge
   inbox): post-compaction planner resume = the AUTO-RESUME PLUGIN (the #90/
   #91 family — the restart spawn carries the real planner agent, the
