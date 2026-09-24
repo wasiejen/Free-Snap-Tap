@@ -20,6 +20,11 @@ to make a clean handover/commit if not present".
   (verified working, plan11).
 - The post-compaction protocol: `.opencode/agent/prompts/
   agent_readme_post_compaction.md` (its steps are the "short instructions").
+- Post-compaction planner RESUME = the auto-resume plugin (the #90/#91 family
+  — the restart spawn carries the real planner agent; #91: the compaction
+  summary is skipped in spawn identity/routing). The `action:` line is read
+  by the plugin even in Direct sessions, where ACTING on it is deactivated
+  (maintainer confirmation 2026-09-24).
 
 ## Scope
 1. `.opencode/plugin/auto_resume.ts` (the worker reads the file first — bounded:

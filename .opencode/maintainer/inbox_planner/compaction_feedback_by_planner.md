@@ -182,3 +182,12 @@ Discrepancies surfaced (evidence-attached):
   serial execution a stop order is never usable: the worker returns only on
   close (finish / self-compaction / context limit), none need a pre-ordered
   stop, and dumps are automatic). Wave task h updated — nothing to restore.
+
+## Progress (planner, 2026-09-24 round 3)
+- **Spec 01 LAUNCHED** (worker_Q3S_170K) — keepTokens removal, per his "go".
+- Maintainer confirmation (recorded in the spec 2+11 facts + the knowledge
+  inbox): post-compaction planner resume = the AUTO-RESUME PLUGIN (the #90/
+  #91 family — the restart spawn carries the real planner agent, the
+  compaction summary is skipped); spawning a new planner on the `action:`
+  line already works well; the action line is read by the plugin even in
+  Direct sessions, where acting on it is deactivated.
