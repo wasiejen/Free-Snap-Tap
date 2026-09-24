@@ -1,85 +1,86 @@
-# HANDOVER worker-13 → planner — R4: intercept.log mining scriptlet (LANDED)
+# Worker summary — spec 01: remove keepTokens from compact_memory (change-list item 1)
 
-Status: **LANDED** (one commit on `opencode_test` — hash recorded by planner
-per DoD-5; it is the commit whose subject starts with
-`add summarize_intercept.cjs`).
+Status: DONE (LANDED per spec — commit hash recorded by you in the follow-up bookkeeping).
+Commit: `7f253ea` (branch `opencode_test`, named-path commit — exactly the three scoped files).
+Worker session: `ses_f2b47fa1effefej9AVC58Ogj2l` (worker, Qwen3.8-27B-Q3S-170K).
 
 ## What changed
-- **`.opencode/agent/scripts/log/summarize_intercept.cjs`** (new) — read-only
-  scriptlet: `node …/summarize_intercept.cjs [logfile]` (default
-  `.opencode/temp/intercept.log`). Prints the 6 spec'd sections with
-  machine-stable lines: (1) verdict counts — the 9 frozen VERDICTS in
-  byte-stable order, zero-included, NEW verdicts after; (2) fuzzy-rejected
-  per-event `d`/`gap` + best-cand census (threshold-tuning input);
-  (3) redundancy-mismatch lines verbatim (380-char cap, logctx convention);
-  (4) adder-form usage in pair args (`pair-events` / `adder-left`, decision-record
-  §2.5 incident-density metric); (5) out-of-sandbox count by path prefix
-  (normalized first 3 segments; short/junk values kept raw so noise sources
-  stay visible); (6) per-session_id line counts.
-  Generic: no hardcoded counts/session ids; the only constant is the frozen
-  VERDICTS mirror (documented as a mirror of
-  `.opencode/plugin/intercept_observer_core.ts` `VERDICTS`). Parsed
-  right-anchored (verdict/scope/evidence = last 3 fields) so an args-json
-  containing ` | ` cannot shift the evidence fields; `<8`-field lines are
-  counted `malformed`.
-- **`.opencode/agent/scripts/log/tests/`** (new) — `intercept_fixture.log`
-  (13 synthetic lines covering every frozen verdict, one NEW verdict, one
-  adder-left pair, one malformed line, 3 out-of-sandbox prefix buckets),
-  `expected_summary.txt` (byte-exact pin), `summarize_intercept.smoke.cjs`
-  (6 checks: in-process byte-exact, CLI exit 0 + byte-exact stdout,
-  missing-file exit 1 / empty stdout / stderr names the file).
-- **`.opencode/agent/scripts/log/README.md`** — table row + usage + tests/
-  pointer. **`.opencode/agent/scripts/INVENTORY.md`** — promoted-table row.
 
-## Pinned-check choice (DoD-3)
-Pinned as the **fixture test** (not a probe section). Reason: both probe
-homes (`.opencode/plugin/probes/handover_probe.mjs`, `.opencode/plugin/tests/`)
-live under `.opencode/plugin/**`, which the task spec lists in DO-NOT-touch;
-a self-contained smoke under the scripts `log/` home pins the same output in
-the established smoke style (chk/finish, exit 0 iff green) without touching
-plugin territory. The standard gate was then verified separately.
+1. `.opencode/plugin/compact_memory.ts`
+   - config section: `keepTokens` dropped from the `CompactionConfig` type,
+     `DEFAULT_KEEP_TOKENS`, and the budget-file parsing — the key is never read /
+     defaulted / sent (the budget file's `"keepTokens": 0` is now inert, left in place
+     per spec).
+   - tool args: `keepTokens` arg removed; keepMessages description re-pinned to
+     "Recent messages to retain (e.g. 18) — working, sent in the request body."
+   - keep construction: `keep.tokens` never set; `keep.messages` from
+     `args.keepMessages` only (args-only behavior kept — item 12 stays out of scope);
+     `keepObj` + the retry-once-without-keep logic unchanged; `tokensToKeep` gone.
+   - `appendCompactLine`: `tokens` param dropped — the COMPACT line is now
+     `COMPACT <sid> [<model>] messages=<m> [(pre-readout)]` (messages reported =
+     `args.keepMessages ?? cfg.keepMessages`, same reporting logic as before).
+   - Only remaining `keepTokens` string in the file: ONE comment line in the config
+     header documenting the removal (allowed by the spec's grep DoD).
 
-## Measured verification (all run from repo root, plain node / venv)
-- Fixture smoke: `node .opencode/agent/scripts/log/tests/summarize_intercept.smoke.cjs`
-  → **6/6 PASS**, exit 0.
-- Real log: `node .opencode/agent/scripts/log/summarize_intercept.cjs` → exit 0,
-  all 6 sections. At run time: 3130 lines, 86 sessions, 0 malformed;
-  `ambiguous 0` (the frozen zero-included case); pair-events 107, adder-left 2;
-  out-of-sandbox 722, top buckets `398 (empty)`, `61 C:/Users/Wasiejen`,
-  `30 c/Users/Wasiejen`. (Counts move — the log grows live; the run output is
-  reproducible at any moment.)
-- Standard gate, measured at commit time:
-  - pytest: **459 passed, 1 warning** (matches baseline) ✓
-  - ruff `--select F .`: **All checks passed** (F=0) ✓
-  - plugin smokes: **9/10 PASS** — `context_recovery.smoke.mjs` FAILs with
-    `ERR_MODULE_NOT_FOUND .opencode/plugin/deactivated/context_recovery.ts`
-  - `handover_probe.mjs`: **FAILS with the same** `ERR_MODULE_NOT_FOUND`
-  - Both failures are the maintainer's UNCOMMITTED `context_recovery.ts` move
-    (git: `D .opencode/plugin/deactivated/context_recovery.ts`,
-    `?? .opencode/plugin/context_recovery.ts`) — a pre-existing environment
-    state named in the task spec's DO-NOT-touch list, NOT caused by this task
-    (no `.opencode/plugin/**` file was modified). Gate is otherwise green and
-    was green before this task's change; it should read fully green once the
-    maintainer commits the move.
+2. `.opencode/plugin/tests/compact_memory.smoke.mjs` — fully re-pinned, ZERO
+   `keepTokens` hits:
+   - defaults pins → `12/false/{}`; fixture JSON drops the keepTokens key.
+   - schema pin → exactly `[sessionID, keepMessages, message]` ("THREE keys").
+   - body asserts → `keep.messages === N && keep.tokens == null` (L186/L214/L252 area).
+   - all call sites drop the keepTokens arg.
+   - keepcfg test re-pinned to messages-only: configured `messages=9` when the arg is
+     omitted, explicit `messages=2` wins.
 
-## Findings (for #67 / curation — loose todo entries appended via submit)
-1. Session-count basis differs from the spec's measured value: the spec says
-   "139 distinct session ids" (planner-measured 2026-09-23); the script's
-   field-2 census reads **86** distinct session_id values at 3130 lines, and
-   a substring census of `ses_*` anywhere in lines reads 120. The script
-   counts the session_id FIELD (the per-session metric R4 needs); the spec's
-   139 likely used a different measure. Worth a one-line basis note in #67.
-2. The `context_recovery.ts` move leaves probe + one smoke red until
-   committed (evidence above) — gate baseline is blocked by maintainer state.
+3. `.opencode/plugin/probes/handover_probe.mjs` — S13 (active plugin) + S25 re-pinned:
+   - registration pin (check 86) → 3 keys `[sessionID, keepMessages, message]` +
+     description.
+   - body asserts (checks 88/89) → `keep?.messages === N && keep?.tokens == null`.
+   - COMPACT-line pin (check 96) → `COMPACT ses_qc_self messages=7` (messages-only
+     format), comment + description + regex.
+   - all S13 call sites drop keepTokens (88/89/90/92/94/98/99).
+   - "4-key args" → "3-key args" in the S25 header, check 256 description, and the
+     probe's top annotation block.
+   - **S10 and S11 sections left byte-identical** — see Deviation below.
 
-## TODO entries
-None appended to `TODO.md` directly (planner updates #67); the two findings
-above were sent to `todo_inbox.md` via `submit`.
+## Verification (measured, post-change — all identical to the re-run baseline)
+- probe full run: `PROBE handover: 241/241 PASS` (same total as the baseline run).
+- all 10 plugin smokes: exit 0; compact_memory smoke: `COMPACT_MEMORY_SMOKE: ALL PASS (57/57)`.
+- pytest: `459 passed, 1 warning in 1.96s` (exact baseline match).
+- ruff `--select F`: `All checks passed!`
+- `grep -n keepTokens` (the three files): compact_memory.ts = 1 (the removal
+  comment), smoke = 0, probe = 14 — all 14 in the untouched S10/S11 sections.
 
-## Deliberately not done
-- No probe section / no new file under `.opencode/plugin/**` (DO-NOT-touch;
-  see pinned-check choice).
-- No edit of the R4 spec's stale `Worker: worker_Q4_140K` line (planner's).
-- No staging of the maintainer's live changes (`context_recovery.ts` move,
-  `ideas.md`, `my_todos.md`, loop_log.md) — only the five named paths above
-  were staged.
+## Deviation from the spec (needs your ruling)
+The spec's probe re-pin items — "schema pin L1837 (3 keys → 2)", "COMPACT-line pin
+L2193 (tokens=30_000 messages=12 → messages-only)", "comment L2106" — target the
+**S10 and S11 sections, which pin RETIRED / DO-NOT-TOUCH artifacts**:
+- S10 pins `.opencode/plugin/deactivated/compact_memory_v1.ts` (not in the 3-file
+  scope; it still has the keepTokens arg — its line 172).
+- S11 pins `.opencode/plugin/deactivated/context_recovery.ts` (explicit DO-NOT-touch;
+  its own keepTokens default 30_000/12 + its own `tokens=<t> messages=<m>` line writer
+  at L193-202; its removal rides the #93 event-hook port).
+Re-pinning those sections to 2-key / messages-only would turn probe checks 67–75 /
+78 / 81 RED and break the gate-green DoD. I prioritized the gate-green DoD (the
+measurable definition of done) and left S10/S11 untouched. Consequence: the spec's
+grep DoD ("zero hits, or at most ONE comment line") is not achievable across all
+three files while the gate stays green — 14 literal `keepTokens` occurrences remain
+in the probe (13 S10 pins/call sites + 1 S11 comment).
+Options: (a) accept as-is (the hits pin frozen artifacts, factually correct);
+(b) a follow-up spec that also removes keepTokens from compact_memory_v1.ts and
+re-pins S10 (retired artifact — your call, could ride the #93 port wave alongside the
+context_recovery S11 re-pin).
+
+## Deliberately NOT done
+- `context_recovery.ts`, `compact_memory_v1.ts`, `opencode.jsonc`,
+  `.opencode/temp/compact_budget.json` (the inert `"keepTokens": 0` key stays),
+  `auto_resume.ts`, prompt/knowledge files, change-list items 10/12, anything under
+  `.opencode/maintainer/` — per scope + DO-NOT-touch.
+- No `TODO.md` change (the spec says status lives in the spec + your bookkeeping).
+- Maintainer's uncommitted live files (opencode.jsonc, AGENTS.md,
+  prompt_agent_task.md, agent_feedback.md, loop_log.md) — untouched, not staged, not
+  committed.
+
+Lessons: the probe's section→artifact mapping (S10 = retired v1 tool,
+S11 = context_recovery, S13 = active plugin, S25 = unit A) is nowhere stated in the
+probe header — a future spec author re-pinning "the keepTokens pins" needs to identify
+which section pins which file first; a one-line map per section would prevent this.
