@@ -18,7 +18,10 @@ Queue order: 01 → 10 → 2+11 → 3 → prompt wave.
 Status (2026-09-24): 01 = LANDED (7f253ea; probe S10/S11 carve-out accepted,
 rides #93); 10 = LANDED (04053e8; auto side design-only → #93 port must carry
 it); 2+11 = LANDED (526e7e1; narrow exception used — queueMessage persists);
-3 = current `handover_task.md`, launching next (pre-launch fix: emergency
-"absent → default 1", not 0).
+3 = LANDED (9d2e727; suffix via formatGauge — ctx line/peek/ctx_gauge; live
+effect awaits the host restart). Wave = next: task d (knowledge) goes to a
+WORKER first (worker_Q3S_230K_slow — his backend caching test), then the
+text-worker pass for c/e/g/h (prompt files — his prompt_agent_task.md is
+still live-edited/uncommitted).
 What does NOT go here: launched specs' worker summaries (handover folder root),
 NAP, non-compaction specs.

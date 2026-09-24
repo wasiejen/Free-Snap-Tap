@@ -221,6 +221,20 @@ Discrepancies surfaced (evidence-attached):
   PROCESS NOTE: the spec's 102/102 auto_resume baseline was stale at launch
   (live 121/121 — worker re-ran correctly); friction logged: re-measure
   baselines at spec/launch time.
+- **Spec 3 LANDED** (worker_Q3S_170K, verified from files + independent
+  gauge-smoke re-run): commit `9d2e727`. The ` | N compactions left` suffix is
+  implemented ONCE in `formatGauge` (gauge.mjs) → the injected ctx: line (via
+  ctx_watchdog), the peek.mjs self-gauge, and the ctx_gauge tool; fail-open
+  (absent/unparseable store → no suffix); the emergency read matches the
+  item-10 gate (key absent → default 1). Gates green (probe 252/252, all
+  smokes, pytest 459+1w, ruff F=0). DEVIATIONS (accepted, worker logged the
+  friction): the ctx-line home is actually `ctx_watchdog.ts` (the spec's
+  verified-facts mislocated it in auto_resume.ts — that file is untouched);
+  the pins live in gauge_core.smoke + probe S6b (6 checks), not
+  auto_resume.smoke. NOTE: the live host process still runs the PRE-9d2e727
+  plugin code — the suffix appears after his restart (my ctx_gauge + his ctx
+  line show it not yet — the same "only new sessions/processes get new code"
+  pattern as AGENTS.md).
 - Maintainer confirmation (recorded in the spec 2+11 facts + the knowledge
   inbox): post-compaction planner resume = the AUTO-RESUME PLUGIN (the #90/
   #91 family — the restart spawn carries the real planner agent, the
