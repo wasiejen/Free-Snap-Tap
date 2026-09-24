@@ -207,6 +207,20 @@ Discrepancies surfaced (evidence-attached):
   logic without the arg requirement + the line-writer mirror). Gate green
   (probe 246/246, smoke 65/65, pytest 459+1w, ruff F=0); S10/S11 frozen pins
   byte-identical. No deviations.
+- **Spec 2+11 LANDED** (worker_Q3S_170K, verified from files): commit `526e7e1`.
+  Item 2 — compact_memory stores the message per-session at queue time
+  (`.opencode/temp/compact_message_<sid>`, the narrow exception used; no
+  promptAsync at queue time — the temp fix's disabled delivery REPLACED by the
+  relay); the unit-4 CONTINUE path delivers it FIRST + the post-compaction
+  addendum; `.consumed` rename only after a successful send. Item 11 —
+  `restartText(sid, exhausted)` + `budgetExhausted(sid)` (count > cap from the
+  shared budget store; cap resolved like compact_memory's `resolveCap`;
+  fail-open). Gates green (auto_resume smoke 129/129, compact 66/66, probe
+  246/246, pytest 459+1w, ruff F=0). #93 carry-over documented (limit-run
+  detection + directive hand-off + the item-10 auto-side consumption).
+  PROCESS NOTE: the spec's 102/102 auto_resume baseline was stale at launch
+  (live 121/121 — worker re-ran correctly); friction logged: re-measure
+  baselines at spec/launch time.
 - Maintainer confirmation (recorded in the spec 2+11 facts + the knowledge
   inbox): post-compaction planner resume = the AUTO-RESUME PLUGIN (the #90/
   #91 family — the restart spawn carries the real planner agent, the

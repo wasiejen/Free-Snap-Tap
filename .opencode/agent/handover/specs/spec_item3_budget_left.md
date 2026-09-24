@@ -21,11 +21,15 @@ the info)".
    - remaining N = `max(0, cap - count)` for the session's model (cap from
      `model_budget[session model]`, else `model_budget.default`, else 1)
      PLUS 1 if the emergency compaction is still available
-     (`count === cap` and `emergency_budget >= 1` — read the key LENIENTLY;
-     absent → 0, so this spec works before AND after the item 10 spec).
+     (`count === cap` and the effective `emergency_budget >= 1` — read the
+     key LENIENTLY; absent → default 1, matching compact_memory's fail-open
+     DEFAULT_EMERGENCY_BUDGET — so the readout matches the ACTUAL gate after
+     the item 10 spec: at count === cap the emergency IS still available).
    - Format (pinned): ` | 3 compactions left` / ` | 1 compaction left` /
      ` | 0 compactions left` (singular at 1; the ` | ` separator flags it as a
      distinct field). File absent / unparseable → no suffix (fail-open).
+     Pin also: count === cap + key ABSENT → 1 remaining (the default-1
+     emergency is available), NOT 0.
 2. **Secondary home — the self-gauge readout (peek.mjs/gauge.mjs):** the SAME
    suffix on the `CTX=… REM=…` line (worker identifies which script prints the
    readout; same fail-open rule).

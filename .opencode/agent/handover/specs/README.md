@@ -17,6 +17,8 @@ launch; a new planner (or this one post-compaction) launches them in queue order
 Queue order: 01 → 10 → 2+11 → 3 → prompt wave.
 Status (2026-09-24): 01 = LANDED (7f253ea; probe S10/S11 carve-out accepted,
 rides #93); 10 = LANDED (04053e8; auto side design-only → #93 port must carry
-it); 2+11 = current `handover_task.md`, launching next.
+it); 2+11 = LANDED (526e7e1; narrow exception used — queueMessage persists);
+3 = current `handover_task.md`, launching next (pre-launch fix: emergency
+"absent → default 1", not 0).
 What does NOT go here: launched specs' worker summaries (handover folder root),
 NAP, non-compaction specs.
