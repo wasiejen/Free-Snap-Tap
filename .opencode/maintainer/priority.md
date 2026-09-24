@@ -46,6 +46,13 @@
 - you are intelligent - you will find something to do
   - go through my ideas for new research on functions. create a folder in research for each if you find something worthwhile
 
+# 2026-09-24_22-47:
+workers are always thinking:
+- "Context is getting tight (87%) — I'll push through the planned edits efficiently. Now auto_resume.ts: the relay helpers + the new restartText."
+  - and most often than ran into context limit while doing handover or similar things
+- part is the instruction to deliver everything in one commit
+  - loosen the  requirements to make it easier to create a checkpoint with a commit and compact without violating the one commit requirement
+
 # 2026-09-23_14-25 spawned new session by the auto-resume plugin should be tracked also and not set to "none"
 - they should inherit the settings/state from the session that triggered the new session via action: restart
   - so in the next session the same Autorun / Direct setting will be transmitted

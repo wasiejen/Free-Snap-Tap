@@ -5,6 +5,18 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
+2026-09-24_22-47:
+workers are always thinking:
+- "Context is getting tight (87%) — I'll push through the planned edits efficiently. Now auto_resume.ts: the relay helpers + the new restartText."
+- part is the instruction to deliver everything in one commit
+  - loosen the  requirements to make it easier to create a checkpoint with a commit and compact without violating the one commit requirement
+
+2026-09-24_21-13:
+- include infos about auto-resume in the compaction handout and system prompt
+  - e.g. what unit 2 and 4 actually do, how the restart of the planner after compaction works, how a new planner is started
+  - move it to knowledge folder together
+  - and include changes of handout into agents.md
+
 2026-09-23_19-42:
 - have an agent map out all the available functions of context.session in plugin scope. 
   - via the local node modules path: .opencode\node_modules\@opencode-ai\sdk\dist\gen\

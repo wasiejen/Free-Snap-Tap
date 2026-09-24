@@ -63,7 +63,7 @@ shared protocol; it does not replace it. Read these sections once and reference 
 
 | role | verb | produces | consumed by |
 |---|---|---|---|
-| planner | plan, delegate, verify, own goal + plan state | task spec, NAP (plan state), closing summary + action line | workers, looprunner, next planner session |
+| planner | plan, delegate, verify, own goal + plan state | task spec, NAP (plan state), closing summary + action line | workers, next planner session |
 | worker | implement one task, edit → verify → green | a green commit + `handover_task_to_planner.md` | planner |
 | explorer | audit + map, classify gaps | prioritized `TODO.md` entries + `handover_task_to_planner.md` | planner |
 
@@ -75,22 +75,20 @@ shared protocol; it does not replace it. Read these sections once and reference 
 |---|---|---|---|---|
 | task spec | `.opencode/agent/handover/handover_task.md` | planner | worker | committed |
 | worker summary | `.opencode/agent/handover/handover_task_to_planner.md` | worker | planner | committed (the Task-tool result may clobber it post-commit — the committed copy wins) |
-| plan state / NAP | `.opencode/agent/handover/handover_planner.md` | planner | planner (next session), looprunner (indirect) | committed |
-| action line | last `action:` line of planner's closing message | planner | looprunner | last one in the message |
-| iteration N | top of looprunner's launch message | looprunner | planner | the launch message |
+| plan state / NAP | `.opencode/agent/handover/handover_planner.md` | planner | planner (next session) | committed |
+| action line | last `action:` line of planner's closing message | planner | auto-resume plugin / planner (for worker end line) | last one in the message |
 | maintainer → role | `.opencode/maintainer/inbox_<role>/` | maintainer | named role | moved to `maintainer/done/` after handling |
 
-**Action-line state machine** (looprunner and planner both read this):
+**Action-line state machine** (planner read this):
 - `action: restart` — fresh planner session (default; missing/unclear → restart)
 - `action: resume` — resume the last sub-agent session via `task_id` (no task re-injection)
-- `action: ask_maintainer: <q>` — pause the loop until the maintainer answers
+- `action: ask_maintainer` — pause the loop until the maintainer answers
 - `action: stop` — goal reached / unrecoverable
 
 **Surface rules:**
 - The summary *file* is the single summary channel; an agent's final message is a short
   pointer (path), never a re-dump of the summary.
-- A worker never touches the NAP; a planner never does a worker's implementation; the
-  looprunner never touches repo files except its own `loop_log.md` / prompt file.
+- A worker never touches the NAP; a planner never does a worker's implementation
 - Committed state is the resume contract: a fresh session rebuilds reality from files +
   `git log`, never from memory.
 
@@ -121,9 +119,7 @@ agent can resume from a committed state without re-exploring. Two-party split:
 
 ## Context budget (stop line)
 - Check between logical chunks and after every commit (step 4): run the context gauge
-  (command + path in `repo_overview.md`, read-only) → `CTX=n (p%) REM=m`. The injected `ctx:`
-  nudge from the gauge plugin is the same number from your last finished message — treat it
-  as a reminder; the self-gauge is source of truth.
+  (command + path in `repo_overview.md`, read-only) → `CTX=n (p%) REM=m N Compactions left`. The injected `ctx:`  nudge from the gauge plugin is the same number from your last finished message — treat it as a reminder; the self-gauge is source of truth but laggs 2 tool calls behind.
 - **Stop line:** stop starting new work when `REM ≤ 15k` or usage `≥ 90%`, whichever comes
   first. Writing the handover/summary needs ~10–15k more.
 - At the line (or when the next task won't fit): make the handover current, finish the commit
@@ -145,7 +141,7 @@ delegating. Closed entries live in `todo_records.md`.
 - **FIX** small, local, confident bugs you hit *inside* the task's scope: fix them in your own
   commit and add a one-line `TODO.md` close note.
 - **APPEND** what you found but cannot confidently fix (or that is out of scope) to
-  `todo_inbox.md` (loose, unnumbered, dated + role-tagged) — the planner curates it into
+  `todo_inbox.md` via the submit.todo tool — the planner curates it into
   `TODO.md` and assigns the stable ID at curation time.
 - **LEAVE OPEN** in `TODO.md` only: maintainer calls, blocked/deferred work, and things you
   must not touch.
@@ -192,7 +188,7 @@ delegating. Closed entries live in `todo_records.md`.
 
 Full reference: `.opencode/maintainer/draft/compaction_guide/full_guide.md`.
 Numbers below are current for the planner model (170k window) on this host; mechanics apply to
-every agent, numbers are per model.
+every agent, numbers are per model. Budget might vary based on current model. Check your ctx: inline message to see `#n compactions left`.
 
 ## What it is
 Compaction trims OLD history: the last `keepMessages` messages stay INTACT (tool calls + outputs),
@@ -209,10 +205,9 @@ files, TODO) and CONTINUE; never re-plan from scratch.
 - Floor: ~25-30k at keepMessages=0. keepMessages is the dial.
 
 ## Budgets (per model, per session — check your own, don't hardcode)
-- `normal`: 5 self-triggered compactions (keepMessages-capable, default 12).
-- `emergency`: 1 — SHARED between your self-triggered emergency (planned `emergency` param) and
-  the AUTO one at the limit (blind, 18-msg default, you cannot trigger it). First-come-first-
-  served.
+- `normal`: 5 self-triggered compactions (keepMessages-capable — live default 18).
+- `emergency`: 1 — consumed ONLY after the 5 are drained (total 6); usable by either system
+  (self via the `emergency` arg, or the auto one at the limit), once.
 - **Why the cap exists: BIT-ROT** — the unknown behavior shift of N-times-chained summaries.
   A safety measure against an unknown; may be raised once stability is proven.
 - Both exhausted → the next limit hit forces a clean NEW session (new planner + directive to
@@ -239,12 +234,3 @@ files, TODO) and CONTINUE; never re-plan from scratch.
   compact to continue, 95% commit + compact NOW) — not the only compaction moments.
 - A dump is created automatically on self/cross compaction; the last session's dump is the
   recovery source for a forced new session.
-
-## Corrections (2026-09-24; supersede earlier text)
-- Emergency 1: consumed ONLY after the normal 5 are drained (total 6), either system, once —
-  not first-come-first-served.
-- Live defaults: keepTokens = 0 / being removed from both stores; keepMessages = 18 in BOTH
-  stores (the "12" above is stale). `agent.compaction.model` commented out → same-model
-  summarizer.
-- The trusted-system change list (grounded): `maintainer/inbox_planner/
-  compaction_feedback_by_planner.md` (planner-consolidated, 2026-09-24).

@@ -17,7 +17,7 @@
         "system": true,
       // whenever tokens is set to a non zero value, keep Messages will be ignored entirely!!!/
         "tokens": 0,
-        "messages": 18
+        "messages": 22
     },
     "buffer": 2000
   },
@@ -186,7 +186,7 @@
     //   }
     // },
     "planner_Q3S_170K": {
-      "description": "plans tasks and delegates to sub-agents: very high intelligence, speedrating 60, 170k context, high precision, highest general knowledge: best for very complex coding and code review work",
+      "description": "plans tasks and delegates to sub-agents: very high intelligence, speedrating 60, 170k context, high precision, highest general knowledge",
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-Q3S-170K",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_planner.md}\n{file:.opencode/agent/memory/planner/destilled_mem.md}",
@@ -280,6 +280,25 @@
           "AGENTS.md": "deny",
           ".opencode/agent/prompts/**": "deny",
           ".opencode/agent/handover/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
+    },
+    "planner_Q3S_230K_slow": {
+      "description": "plans tasks and delegates to sub-agents: very high intelligence, speedrating 45, 230k context, high precision, highest general knowledge",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-Q3S-230K-slow",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_planner.md}\n{file:.opencode/agent/memory/planner/destilled_mem.md}",
+      // "prompt": "{file:./prompts/base.txt}\n{file:./prompts/rules.txt}\n{file:./prompts/examples.txt}"
+      "temperature": 1.0,
+      "permission": {
+        "task": "allow",
+        "edit": {
+          "*": "allow",
           ".git/**": "deny",
           ".github/**": "deny"
         },
