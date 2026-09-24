@@ -5,7 +5,10 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
-
+2026-09-23_19-42:
+- have an agent map out all the available functions of context.session in plugin scope. 
+  - via the local node modules path: .opencode\node_modules\@opencode-ai\sdk\dist\gen\
+  - create an overview over the available functions and what each does with a reference where to find more information
 
 2026-09-23_05-19:
 try to be more creative and experiment a bit with different appoaches to problems - to use context this was is never a waste - when you learn something from it save it in memories.
@@ -32,7 +35,8 @@ try to be more creative and experiment a bit with different appoaches to problem
 2026-09-22_17-53
 - might be a good idea to create seperate README.md files for each plugin we have written 
   - general explanation what is does and how it is implemented
-  - might contain gotchas encountered - lessons learned not to do
+  - might contain gotchas encountered - lessons learned and what not to do with reasoning
+    - this might be better in another gotchas file specific to plugins
 
 2026-09-22_17-41
 - we should move ctx gauge max value not gained from the modelID but from the opencode.jsonc or if their is a field in ctx object to gain the limit directly over it.

@@ -2,16 +2,23 @@
 // need a place to collect the items when analysing an autorun to not keep trach
 --wip
 
+2026-09-23_19-32:
+- for compactions use a high throughput variant of qwen3.8-27b 
+  - so no kvarn kv cache settings
+  - can still be beellama based to simplify config
+    - batch and ubatch as high as possible 4096/1024? or even 4096/4096 -> huge vram block
+    - needs around 120k token for 200k compaction with lots of thinking
+      - 140 to be save?
+      - so Q4XS as a speedup nonkvarn version? Q5/Q4 combi?
+        - but this all saves ony 20-30 seconds per compaction on huge context limits
+          - unload and reload for another model around 2x10 seonds ...
+            - is no worth it ... just stay with the same model
+  - BUT i could save RAM - no checkpoints for this model would save the ram the compaction blocks and never needs
+    - this has value!
 
-- increase real context to 150k? possible but with a bit slower prefill think 1300 drop to 1200t/s?
-  - this is the maximum with this model
-    - 5000 buffer in gauge seemed to work fine to motivate handover
-    - caching on planner worker switch fails repeatedly - or semi repeatedly
-      - check number of contextpoint for the new context size
-        - RAM seem ok so far - ok ram overflow or ram freeing action triggers missing cache
-  - increaset o 150k not possible - not enough vram. ubatch already at minimum
-    
 
+2026-09-23_17-23:
+kwargs setting correct - is medium active or not? might be xhigh still - check online
 
 - need to move or rename the agent folder in .opencode
   - it is picked up as a general agents folder and every md file in it is added as a system prompt for aseperate agent to start

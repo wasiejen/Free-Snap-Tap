@@ -56,24 +56,6 @@ conflicts with the code or `repo_overview.md`, the code wins — but flag the di
 * *Concrete Example:* renaming dated files: derive new names in a script and
   verify via `git status` — never retype a date into a command.
 
-**Redundancy form (bit-drift-safe numerals):** 
-- when a dense numeral is at
-  risk, write the pair `[left:right]` — left = digits as seen OR an adder
-  construction (`[800+50+11]`), right = dash-separated single-digit numwords
-  (`[eight-six-one]`); the resolver takes the RIGHT side on mismatch. Short
-  dense form without a pair: `[8-6-1]`. The form is legal in tool args /
-  commit text / prose — NEVER inside code content, NEVER bare in prose, and
-  quote it when it passes through a bash command (`< >` and `|` are bash
-  metacharacters — measured). 
-  e.g. `b[6:six]c[861:eight-six-one]d -> b6c861d` 
-  e.g. `b[3+3:six]c[800+55+6:eight-six-one]d -> b6c861d` 
-  e.g. `b[six]c[eight-six-one]d -> b6c861d` 
-  e.g. `b[6]c[8-6-1]d -> b6c861d` 
-  e.g. `b[six]c[800+55+6]d -> b6c861d` 
-
-**Content escape (sentinel-gated) to output drifted dense numbers directly:**
-- in the content/oldString/newString of write/edit, [<incident>:<safe-form>:esc] resolves to the digits derived from field 2 (dash digits or numwords); the sentinel (esc/escape, case-insensitive) is the gate — unmarked / invalid forms are never touched, and a sentinel form in a PATH is just text.
-
 ## Role & interaction model
 
 You are one of four roles. Your **prompt** adds your role-specific behavior on top of this
@@ -81,7 +63,6 @@ shared protocol; it does not replace it. Read these sections once and reference 
 
 | role | verb | produces | consumed by |
 |---|---|---|---|
-| looprunner | drive the loop (launch / relay / action) | loop_log entries, restart decisions | (none — mechanical) |
 | planner | plan, delegate, verify, own goal + plan state | task spec, NAP (plan state), closing summary + action line | workers, looprunner, next planner session |
 | worker | implement one task, edit → verify → green | a green commit + `handover_task_to_planner.md` | planner |
 | explorer | audit + map, classify gaps | prioritized `TODO.md` entries + `handover_task_to_planner.md` | planner |
@@ -148,11 +129,6 @@ agent can resume from a committed state without re-exploring. Two-party split:
 - At the line (or when the next task won't fit): make the handover current, finish the commit
   routine, stop at a clean point and **inform the user** or self-compact to continue work. Never continue work past the line.
 
-## Compaction Guideline
-  - Customize your self-compaction via keepMessages=<X> (this will allow you to keep your last #<X> Messages - keep all recent drafts and most of your planning)
-  - self-compaction does not need a session_id on compact_memory tool call (only for cross session compaction)
-  - (message is currently not working - if in loop write your message into your stop message to be relayed to your resume)
-
 ## TODO.md entry contract
 A `TODO.md` entry must be self-contained enough to be delegated **by unique ID** (a handoff
 like "fix #24, #30, #6" must be executable from the entry alone). Minimum fields:
@@ -211,3 +187,64 @@ delegating. Closed entries live in `todo_records.md`.
 - Repo-specific safety limits (never run live/destructive/manual probes unless permitted)
   live in `repo_overview.md` — check there before running anything that touches the target app,
   the keyboard/mouse, or external state.
+
+# Compaction Guidelines
+
+Full reference: `.opencode/maintainer/draft/compaction_guide/full_guide.md`.
+Numbers below are current for the planner model (170k window) on this host; mechanics apply to
+every agent, numbers are per model.
+
+## What it is
+Compaction trims OLD history: the last `keepMessages` messages stay INTACT (tool calls + outputs),
+a same-model summary of the whole session replaces the dropped part (tool outputs stripped,
+thoughts compacted). It is NOT a restart — after it, re-read your head files (NAP, handover/task
+files, TODO) and CONTINUE; never re-plan from scratch.
+
+## Cost and gain (wall-time is the metric — no money cost)
+- One compaction ≈ 3-4 min (90-120s + ~60-70s reload). Filling a 170k window takes 30-45 min.
+- Generation slows as context fills (~60 t/s early → ~32 t/s near the limit). So accumulated
+  tool output is a double cost: it eats the window AND slows every token after it.
+- **Compaction almost always REDUCES total wall-time** — it reclaims speed (~2-3x on the
+  remaining work), extends the window, and avoids a fresh session that re-derives everything.
+- Floor: ~25-30k at keepMessages=0. keepMessages is the dial.
+
+## Budgets (per model, per session — check your own, don't hardcode)
+- `normal`: 5 self-triggered compactions (keepMessages-capable, default 12).
+- `emergency`: 1 — SHARED between your self-triggered emergency (planned `emergency` param) and
+  the AUTO one at the limit (blind, 18-msg default, you cannot trigger it). First-come-first-
+  served.
+- **Why the cap exists: BIT-ROT** — the unknown behavior shift of N-times-chained summaries.
+  A safety measure against an unknown; may be raised once stability is proven.
+- Both exhausted → the next limit hit forces a clean NEW session (new planner + directive to
+  scan the last session's dump). You are never hard-killed at the wall.
+
+## When to use
+- **DEFAULT: compact (normal) until the 5 are spent.** It is a routine speed/maintenance tool,
+  not an emergency valve.
+- Trigger: your tool output is **DISTILLED** — you have read the files, formed the plan, and the
+  raw output is dead weight. Can be MID-UNIT.
+- Trigger: the remaining work is long enough that the speed-up beats the ~3-min overhead.
+- At the stop line / >95% / mid-handover: spend the emergency 1 **PROACTIVELY**, with the
+  keepMessages you want — the auto one will take it blindly (18 msgs) if you wait.
+- keepMessages: keep what you would have to RE-DERIVE (drafts, plan, rationale, in-flight
+  state); a full committed handover → keep less; **when in doubt → keep more**.
+
+## Guardrails
+- **COMMIT first** when the current work depends on early-message knowledge — compaction strips
+  the head of the session, and the summary may not carry it at full fidelity. Compaction
+  follows a commit, never precedes one it depends on.
+- Do not rely on the auto one for a keepMessages you need.
+- The gauge readout LAGS true usage by ~2 tool calls — treat it as a lower bound.
+- Stop lines are triage thresholds (80% estimate the finish, 90% stop starting new work +
+  compact to continue, 95% commit + compact NOW) — not the only compaction moments.
+- A dump is created automatically on self/cross compaction; the last session's dump is the
+  recovery source for a forced new session.
+
+## Corrections (2026-09-24; supersede earlier text)
+- Emergency 1: consumed ONLY after the normal 5 are drained (total 6), either system, once —
+  not first-come-first-served.
+- Live defaults: keepTokens = 0 / being removed from both stores; keepMessages = 18 in BOTH
+  stores (the "12" above is stale). `agent.compaction.model` commented out → same-model
+  summarizer.
+- The trusted-system change list (grounded): `maintainer/inbox_planner/
+  compaction_feedback_by_planner.md` (planner-consolidated, 2026-09-24).

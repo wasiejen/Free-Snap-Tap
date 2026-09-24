@@ -94,3 +94,6 @@ post-compaction state was never re-routed — unit 4 never saw it.
 2. **Part B second** — the hardening that makes the protocol's resume
    promise deterministic.
 3. Part C optional (cheap, defense-in-depth).
+
+--comment
+approved A, B and C

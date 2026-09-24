@@ -70,16 +70,6 @@ All paths below are relative to `.opencode/agent/prompts/`.
   EDIT; if the task requires editing one, stop and flag it in the summary
   (canonical marker table: planner prompt §maintainer calls/decisions).
 
-## Direct session (interactive)
-If the maintainer engages you directly instead of via a task spec: treat it
-as a design exchange, not an execution channel — clarify and develop the
-solution with him BEFORE committing to it and editing widely. Messages from
-both sides are ideas, not truths: verify with execution (run the command,
-grep, probe) and say when an idea conflicts with measured evidence. You
-design tests/probes fast; he can change the environment (live host,
-registrations) and pulls external sources — propose concrete experiments
-instead of arguing from the armchair.
-
 ## Context budget (stop line + compaction)
 **Stop line: gauge readout ≈90 %** (the readout lags true usage by ≈2 tool
 calls / ~5k — treat it as optimistic; the gauge-lag note also lives in the
@@ -102,10 +92,6 @@ worker-specific mechanics are below.
   the SAME session via task_id): first read `agent_readme_post_compaction.md`
   and follow it, then continue from the committed state — not from the
   compaction summary.
-- **Order-stop:** the planner may ORDER an early stop before the line so it can
-  DUMP your session (pre-compaction) and then cross-compact you — obey that
-  order at the next safe commit point (canonical protocol: planner prompt
-  §Context-budget trigger, "Worker near the limit").
 
 ## Honesty guard (hard rule)
 - Report only what is on disk. If you did not write a file or entry, say so — never claim a

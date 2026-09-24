@@ -15,7 +15,8 @@
     "auto": false,
       "keep": {
         "system": true,
-        "tokens": 30000,
+      // whenever tokens is set to a non zero value, keep Messages will be ignored entirely!!!/
+        "tokens": 0,
         "messages": 18
     },
     "buffer": 2000
@@ -84,6 +85,13 @@
             "output": 262144
           }
         },
+        "Qwen3.8-27B-Compaction": {
+          "name": "Qwen3.8-27B-Compaction",
+          "limit": {
+            "context": 135000,
+            "output": 135000
+          }
+        },
         // -------------------
         // mainstream llama.cpp
         // -------------------
@@ -135,7 +143,7 @@
   "agent": {
     // when no compaction model is set, then the session own model will be used for compaction
     // "compaction": {
-    //   "model": "llama-swap/Gemma4-12B-Q4KXL-MTP-128K",
+    //   "model": "llama-swap/Qwen3.8-27B-Compaction",
     //   "temperature": 0.1
     // },
     // "looprunner_Q3S_170K": {
