@@ -1,51 +1,56 @@
-# Task spec — R6: edit-scope hint channel + payload journal (TODO #95, sub-item 1)
+# Task spec — TODO #96: auto_resume.log write-volume reduction (SSD wear)
 
-GOAL: build R6 exactly as the staged spec directs — read it FIRST, it is
-the contract: `.opencode/agent/research/fuzzy-numword/spec_R6_edit_hint_journal.md`
-(the design rationale: `decision-record.md` §8 in the same folder — read
-that section only).
+## Goal
+`.opencode/temp/auto_resume.log` = 239.6MB / 2,813,277 lines at ~4 days uptime.
+**97.4% of the bytes = `event=message.part.delta` lines** (2,718,066 lines /
+231.0MB) — the event hook `onEvent` logs ONE line per event, incl. every
+streamed token delta (~100MB/day of small appends). Stop the per-token growth,
+bound long-term growth with a size guard, and auto-trim the existing file on
+the next host restart (no manual step).
 
-VERIFIED FACTS (measured at spec time, 2026-09-25 — do not re-derive):
-- HEAD `c82f788`; stay on the current checkout (verify `git branch -v`,
-  never trust a branch name from memory).
-- The staged spec's gate (R1 green + planner-verified) is CLEARED —
-  R1/R2 live.
-- Probe total = the probe's self-annotated header total (machine-read,
-  never retype; post-#94 state = 259).
-- Smoke baselines: intercept_observer 39/39, block_transfer 30/30 +
-  53/53, auto_resume 129/129, compact_memory 66/66, context_recovery
-  15/15; pytest 459 passed + 1 warning; ruff F=0.
-- Loader contract: plugin `grep -c ^export` = 1 (per the staged spec).
-- The content-locator principle = the existing path matcher's shape
-  (anchor/candidate + d/gap rule, fail-closed) — build on THAT shape,
-  do not re-derive the distance math.
-- `tool.execute.after` result mutability = UNVERIFIED (staged spec
-  fact #2): check the installed host bundle types at build time; if
-  the failed result cannot be enriched → the hint is LOG-ONLY (the
-  staged spec's fallback — still green) — record WHICH path landed in
-  the handover.
+## Design (pinned — from TODO #96; verify line refs against current source)
+1. **`onEvent` NEVER logs `message.part.delta`.** All other event types
+   unchanged. The Unit-2 saturation INPUT is `message.updated` ONLY (the arm
+   path is unaffected) — confirm `onEvent` (auto_resume.ts ~L1468-1480) skips
+   `message.part.delta`; the `message.updated` handling (~L1447-1464) stays.
+2. **Size guard at init, BEFORE `restoreLineageFromLog`** (auto_resume.ts
+   ~L1508-1544 — today it reads the whole 233MB): if log size > 20MB, keep the
+   byte TAIL (last 2MB) and append ONE `log-trim= old=<bytes> new=<bytes>` line.
+   Caps are FACTORY OPTIONS (defaults 20MB/2MB; the smoke passes small values —
+   the `tickMs` factory-option pattern at ~L1573-1574). absent/unreadable file
+   → no-op. `log()` is a per-line `appendFileSync` (~L352-359) → the file is
+   never held open → a synchronous init-trim is safe.
+   - Documented accepted consequence: the #90 lineage restore then sees only
+     the surviving tail — an older `route=`/`spawn=` pair cut by the trim
+     resets depth to 0 (best-effort by design).
+3. **Smoke re-pins** (baseline 129/129):
+   - a synthetic `message.part.delta` event → ZERO log lines for it (a paired
+     `message.updated` in the same batch still logs);
+   - a seeded oversized log → trimmed to the tail + the `log-trim=` line
+     present;
+   - the lineage restore still works on a trimmed tail.
 
-CONTEXT DISCIPLINE: the target areas are named in the staged spec's
-scope list — the content-locator primitive lands in the core file
-(`intercept_observer_core.ts`, next to the existing path matcher), the
-journal + hint wiring in `intercept_observer.ts`. First greps bounded
-(`| head -30`); locate probe/smoke sections by name (S-section, check
-number) — do not read whole probe files.
+## Definition of done
+- zero `message.part.delta` lines appended after a live restart (maintainer's
+  live check);
+- the existing 233MB file trimmed to ~2MB on the next restart with the
+  `log-trim=` line;
+- smoke green (re-pinned) + standard gate green (probe, pytest, ruff).
 
-SCOPE + DoD + approval boundary: per the staged spec (probe pins per
-surface, journal line shapes, hint verdicts, the recovery-protocol
-doc, the controlled failed-edit machine check). Checkpoint commits per
-verified unit; TODO + handover ride the FINAL commit (hashes recorded
-in the planner's bookkeeping commit — never self-referenced).
+## Approval boundary
+- PRE-APPROVED (maintainer launch directive, his item 3, 2026-09-25): the log
+  reduction. No observable tool behavior change (plugin-internal logging
+  only).
+- DO-NOT-TOUCH: `ctx_watchdog.ts`, `AGENTS.md`, `.opencode/maintainer/`,
+  `opencode.jsonc`, the other plugins, and every file outside the scope below.
+  The live 233MB file is trimmed at the next host restart, NOT by this commit
+  (the code lands; the trim fires on restart).
 
-DO-NOT-TOUCH (staged spec + host rules): oldString/newString mutation,
-auto-retry, the R2 write-scope surfaces, `ctx_watchdog.ts`, AGENTS.md,
-`.opencode/maintainer/`; the temp journal files stay git-ignored.
-`.opencode/agent/prompts/**` = edit-deny for workers — if prompt/doc
-text seems needed, do NOT circumvent; note the block in the handover
-(no-circumvent rule). The recovery-protocol doc (staged scope #4) goes
-into the plugin README + the decision record — not into prompt files.
+## Scope
+- `.opencode/plugin/auto_resume.ts` (`onEvent`, the init trim guard, the
+  factory-option caps, the `log-trim=` line).
+- `.opencode/plugin/tests/auto_resume.smoke.mjs` (re-pins per (3); the smoke's
+  small-value factory options).
 
-WORKER: worker_Q3S_170K. (The staged spec's `worker_Q4_140K` line is a
-stale roster entry — that agent no longer exists in the live
-opencode.jsonc.)
+## Worker
+`worker_Q3S_170K`.

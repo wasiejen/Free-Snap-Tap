@@ -58,11 +58,17 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   the R8 section is labeled `# TODO #97` → RENOUMBERED: R8 = #97
   (filed, full entry), unit4-compaction-resume = #98 (renumbered).
   He also removed the done "revocery hook" heading.
-- NEXT (this session continues): **R6 COMMITTED (this commit)** →
-  **#96 LAUNCH** (auto_resume.log reduction — spec from the TODO #96
-  entry, worker_Q3S_170K) → after #96: write the **(2) edit-fuzzy spec**
+- **#96 LANDED (22c36e4 code / 70399ea smoke / 57f773f bookkeeping,
+  worker_Q3S_170K, planner re-verified 2026-09-25):** `onEvent` skips
+  `message.part.delta`; the init size guard (20MB → 2MB byte tail + a
+  `log-trim=` line, factory caps); smoke 133/133 (baseline 129 + 4
+  re-pins); probe 279/279 (unchanged); pytest 459+1w; ruff F=0. The live
+  ~268MB file trims at the NEXT host restart (maintainer live check —
+  zero delta lines). The worker's `repo_opencode.md` reference-URL
+  addition was left uncommitted (a likely maintainer live edit, as found).
+- NEXT (this session continues): write the **(2) edit-fuzzy spec**
   (normalize-then-compare + the two directives from the #95 entry) →
-  R3 → #97 (R8 sandbox redirect) / escape return-info. **#98**
+  launch → R3 → #97 (R8 sandbox redirect) / escape return-info. **#98**
   (unit4-compaction-resume A+B+C, approved) queued after #96 (same
   file). R6 live acceptance (the after-hook enrichment) = next host
   restart.
