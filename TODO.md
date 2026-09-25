@@ -582,6 +582,22 @@ All those IDs stay reserved — see the numbering rule in the header.
    pytest 459+1w, ruff F=0. Docs: the plugin README recovery protocol +
    decision-record §8.1 addendum. Next: sub-item (2) the edit-fuzzy spec
    (normalize-then-compare).
+   2026-09-25 (worker ses_f27bb616dffe8yue93zR3sEwHs, worker_Q3S_170K,
+   resumed post-compaction): sub-item (2) the MUTATING edit-fuzzy
+   oldString (normalize-then-compare) LANDED: `runEditFuzzy` supersedes
+   the R6 hint path for the 0-raw-occurrence case — exactly-one
+   candidate at d=0/d≤1 → oldString MUTATED to the file's exact unique
+   bytes + the `fuzzy-edit` line (VERDICTS = 12; NO after-hook hint);
+   else FAIL-CLOSED (the R6 verdict carrying the best-candidate d —
+   directive a; the after-hook hint stored). Directive b: the feedback
+   line truncated (first 40 + ...), the journal's edit `old` = the
+   ORIGINAL pre-mutation oldString. Code commit 15761d8; the probe/docs
+   commit hash is in the worker handover (the planner records it in the
+   follow-up — no self-reference). Gates: probe 287/287 (baseline 279 +
+   S27's 8; the S26 re-pins 271/275/276), intercept_observer smoke 55/55
+   (from 48/48), pytest 459+1w, ruff F=0. Docs:
+   spec_sub2_edit_fuzzy_oldstring.md + decision-record §8.2 addendum.
+   Next: sub-item (3) R3 (gate cleared — absorbs the anchor-drift fix).
 
 ## #94. (LANDED 2026-09-25, planner direct; his approval 2026-09-25) block_transfer REPLACE mode — line-anchored span replacement from a buffer (edit-like, no exact oldString)
 - **Problem / evidence:** edit oldString exact-match is a very regular failure (his priority.md "fuzzy matching of edit oldstring"; ideas.md L153-158: "what would be needed to make block_transfer as versatile as edit but less prone to oldstring mismatch?"); block_transfer PASTE is insert-only (append after targetMarker / EOF) — a slot/region replacement needs a MOVE+DELETE composition (two calls, intermediate state); the 2026-09-24 slot-clobber incident (agent_feedback) showed PASTE-as-slot-replacement is a trap.

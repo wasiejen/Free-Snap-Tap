@@ -704,19 +704,46 @@
 //      (269) journal block_transfer: one line in journal_edit.log (the tool
 //          field disambiguates; the anchors payload);
 //      (270) the journal paths are git-ignored (check-ignore, both files);
-//      (271) hint d=1: absent oldString, single candidate → edit-hint
-//          (byte-exact line+d+gap+snippet evidence);
+//      (271) ((2) re-pin) absent oldString, single candidate d=1 → now
+//          MUTATES: fuzzy-edit line (byte-exact) + oldString mutated to the
+//          file's exact bytes (no after-hook hint);
 //      (272) hint multiple exact: two occurrences → edit-ambiguous
-//          'hint lines=1,3';
+//          'hint lines=1,3' (UNCHANGED by (2));
 //      (273) hint no candidate: anchor absent → no-candidate
-//          'hint reason=no-anchor-line';
+//          'hint reason=no-anchor-line' (UNCHANGED by (2) — no candidate →
+//          no best-d);
 //      (274) hint fuzzy ambiguous: two candidates, same d → edit-ambiguous
-//          'hint cands=1 1,2 1';
-//      (275) after-hook enrichment: the failed edit's output.output gains
-//          the hint line (consumed once; hint-less / non-edit untouched);
-//      (276) DoD machine check: the failed edit's hint line + journal
-//          payload; the write payload cp'd in place reproduces the intended
-//          file state.
+//          'hint cands=1 1,2 1' (UNCHANGED by (2) — not exactly-one);
+//      (275) after-hook enrichment ((2) re-pin): c271 now a mutation (no
+//          hint stored) → re-point at the fail-closed c273 (no-candidate
+//          hint, consumed once; mutation / hint-less / non-edit untouched);
+//      (276) DoD machine check ((2) re-pin): the fail-closed c273's no-
+//          candidate line + journal payload (the journal's edit `old` = the
+//          ORIGINAL pre-mutation oldString); the write payload cp check
+//          stays.
+//   S27 (2) the MUTATING edit-fuzzy oldString (8) — 2026-09-25 (TODO #95
+//      sub-item 2; design source: research/fuzzy-numword/decision-record.md
+//      §8.2 + spec_sub2_edit_fuzzy_oldstring.md): the 0-raw-occurrence case
+//      resolves WITHOUT agent action (normalize-then-compare; d = the MAX
+//      Levenshtein over the scored line-pairs) — exactly-one candidate at
+//      d=0/d≤1 → oldString MUTATED to the file's exact unique bytes (the
+//      fuzzy-edit line; NO after-hook hint); else FAIL-CLOSED (the R6 hint
+//      verdict carrying the best-candidate d — directive a — the after-
+//      hook hint is stored); directive b: the feedback line is truncated
+//      (first 40 chars + ...), the journal carries the FULL original
+//      oldString:
+//      (277) CRLF-drift: 0 raw → d=0 → MUTATE (line + exact-unique
+//          substring);
+//      (278) trailing-ws drift: 0 raw → d=0 → MUTATE;
+//      (279) single typo: exactly one candidate d=1 → MUTATE;
+//      (280) fail-closed near-miss: best d=3 → NOT mutated (the fail line
+//          carries 'best-d=3' — directive a);
+//      (281) ambiguous: two candidates d<=1 → NOT mutated (edit-ambiguous);
+//      (282) directive (b): long oldString → the line is TRUNCATED (no full
+//          oldString), the journal carries the FULL original;
+//      (283) after-hook: mutate → no enrichment; fail → enrichment
+//          consumed once;
+//      (284) the fuzzy-edit line shape byte-exact (8 fields).
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -729,7 +756,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=11 S12=4 S13=19 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 S26=20 hygiene=6  →  "PROBE handover: 279/279 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=11 S12=4 S13=19 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 S26=20 S27=8 hygiene=6  →  "PROBE handover: 287/287 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -4136,11 +4163,11 @@ n18++;
   check(
     String(n18),
     "S18",
-    "export fix: plugin module = default factory ONLY (every Object.values entry a function); named core in the core module (VERDICTS = 6 + 2 fuzzy + pair-resolved + the two R6 edit-hint tokens)",
+    "export fix: plugin module = default factory ONLY (every Object.values entry a function); named core in the core module (VERDICTS = 6 + 2 fuzzy + pair-resolved + the two R6 edit-hint tokens + the (2) fuzzy-edit mutation token)",
     ioVals.length === 1 && ioVals.every((v) => typeof v === "function") &&
       typeof ioMod.default === "function" &&
       typeof ioCore.resolveReadPath === "function" && typeof ioCore.buildCorpus === "function" &&
-      typeof ioCore.observeArg === "function" && Array.isArray(ioCore.VERDICTS) && ioCore.VERDICTS.length === 11,
+      typeof ioCore.observeArg === "function" && Array.isArray(ioCore.VERDICTS) && ioCore.VERDICTS.length === 12,
     JSON.stringify({ pluginKeys: Object.keys(ioMod), verdicts: ioCore.VERDICTS.length }),
   );
   n18++;
@@ -5727,6 +5754,7 @@ writeFileSync(ioHintFiles.he, "zzz qqq www\n", "utf8");
 let n26 = 257;
 let ioJwBefore = -1;
 let ioJeBeforeE = -1;
+let ioJeC273 = -1; // ((2) re-pin) the journal line index of the FAIL-closed c273 call (276 uses it)
 
 // 257 — locateContent: single-line exact → {kind:exact, lines:[N]}
 {
@@ -5960,9 +5988,10 @@ let ioJeBeforeE = -1;
   n26++;
 }
 
-// 271 — hint d=1: oldString ABSENT (raw), a single fuzzy candidate →
-//      edit-hint (8 fields; byte-exact evidence: line + d + gap + snippet;
-//      context `edit oldString`)
+// 271 — ((2) re-pin, 2026-09-25, #95 sub-item 2): oldString ABSENT (raw), a
+//      single fuzzy candidate d=1 → now MUTATES: the fuzzy-edit LAST line
+//      (byte-exact) + oldString MUTATED to the file's exact bytes (the edit
+//      will now succeed — NO after-hook hint)
 {
   const h1 = { filePath: ioHintFiles.hb, oldString: "alpha 20260915 betaa", newString: "z" };
   ioJeBeforeE = ioJRead(ioJEditLog).length;
@@ -5972,9 +6001,10 @@ let ioJeBeforeE = -1;
   check(
     String(n26),
     "S26",
-    "hint d=1: absent oldString, single candidate → edit-hint LAST line (byte-exact; context 'edit oldString') — the dense date also fires an observation line",
-    f4.length === 8 && f4[3] === "edit" && f4[7] === "edit-hint" &&
-      f4[5] === "hint line=1 d=1 gap=inf snippet=alpha 20260915 beta" && f4[6] === "edit oldString",
+    "(2) re-pin: absent oldString, single candidate d=1 → now MUTATES — fuzzy-edit LAST line (byte-exact; context 'edit oldString') + h1.oldString mutated to the file's exact bytes — the dense date also fires an observation line",
+    f4.length === 8 && f4[3] === "edit" && f4[7] === "fuzzy-edit" &&
+      f4[5] === "fuzzy-edit orig=alpha 20260915 betaa len=20 d=1 value=alpha 20260915 beta" && f4[6] === "edit oldString" &&
+      h1.oldString === "alpha 20260915 beta",
     JSON.stringify(f4),
   );
   n26++;
@@ -5999,9 +6029,11 @@ let ioJeBeforeE = -1;
 }
 
 // 273 — hint no candidate: the anchor is in no file line → fail-closed
-//      no-candidate
+//      no-candidate (UNCHANGED by (2) — no candidate → no best-d; the
+//      ((2) re-pin) journal-line marker for 276 is captured here)
 {
   const h3 = { filePath: ioHintFiles.he, oldString: "alpha 20260915 beta", newString: "z" };
+  ioJeC273 = ioJRead(ioJEditLog).length;
   await ioBefore({ tool: "edit", sessionID: "ses_fx_io3", callID: "c273" }, { args: h3 });
   const l6 = ioReadLines();
   const f6 = l6[l6.length - 1].split(" | ");
@@ -6034,15 +6066,19 @@ let ioJeBeforeE = -1;
   n26++;
 }
 
-// 275 — the AFTER-HOOK enrichment (live acceptance restart-gated): the
-//      failed edit's output.output gains the hint line — consumed once
-//      (a second call is a no-op); a hint-less edit and a non-edit call are
+// 275 — the AFTER-HOOK enrichment (live acceptance restart-gated) —
+//      ((2) re-pin): c271 is now a MUTATION (no hint stored) → re-point at
+//      the FAIL-closed c273 (no-candidate): the failed edit's output.output
+//      gains the no-candidate hint line — consumed once (a second call is a
+//      no-op); a mutation, a hint-less edit, and a non-edit call are
 //      untouched
 {
+  const outM = { title: "edit", output: "ok", metadata: {} };
+  await ioAfter({ tool: "edit", sessionID: "ses_fx_io3", callID: "c271" }, outM); // mutate → NO hint stored → untouched
   const outR = { title: "edit", output: "Error: oldString not found", metadata: {} };
-  await ioAfter({ tool: "edit", sessionID: "ses_fx_io3", callID: "c271" }, outR);
+  await ioAfter({ tool: "edit", sessionID: "ses_fx_io3", callID: "c273" }, outR); // fail-closed → the hint IS stored
   const enriched = outR.output;
-  await ioAfter({ tool: "edit", sessionID: "ses_fx_io3", callID: "c271" }, outR); // consumed once
+  await ioAfter({ tool: "edit", sessionID: "ses_fx_io3", callID: "c273" }, outR); // consumed once
   const outS = { title: "edit", output: "ok", metadata: {} };
   await ioAfter({ tool: "edit", sessionID: "ses_fx_io3", callID: "c268" }, outS); // exact-1 silent → nothing cached
   const outN = { title: "bash", output: "ls", metadata: {} };
@@ -6050,20 +6086,23 @@ let ioJeBeforeE = -1;
   check(
     String(n26),
     "S26",
-    "after-hook enrichment: the failed edit's output.output gains the hint line (consumed once; a hint-less edit + a non-edit call are untouched)",
-    enriched === "Error: oldString not found\nhint line=1 d=1 gap=inf snippet=alpha 20260915 beta" &&
+    "after-hook enrichment ((2) re-pin): mutate (c271) → UNTOUCHED (no hint stored); fail-closed (c273 no-candidate) → gains the hint line (consumed once); a hint-less edit + a non-edit call are untouched",
+    outM.output === "ok" &&
+      enriched === "Error: oldString not found\nhint reason=no-anchor-line" &&
       outR.output === enriched && outS.output === "ok" && outN.output === "ls",
-    JSON.stringify({ e: outR.output, s: outS.output, n: outN.output }),
+    JSON.stringify({ m: outM.output, e: outR.output, s: outS.output, n: outN.output }),
   );
   n26++;
 }
 
-// 276 — the DoD machine check: the controlled FAILED EDIT (271) produced the
-//      hint line AND a journal line whose payload names the exact intended
-//      edit; the journal WRITE payload (267) cp'd in place reproduces the
-//      intended file state (byte-identical)
+// 276 — the DoD machine check — ((2) re-pin): the controlled FAILED EDIT is
+//      now the FAIL-closed c273 (no-candidate; c271 mutates): the fail line
+//      AND the journal line (the journal's edit `old` = the ORIGINAL
+//      pre-mutation oldString) name the exact intended edit; the journal
+//      WRITE payload (267) cp'd in place reproduces the intended file state
+//      (byte-identical)
 {
-  const doDLine = ioJRead(ioJEditLog)[ioJeBeforeE];
+  const doDLine = ioJRead(ioJEditLog)[ioJeC273];
   const doDJ = doDLine ? JSON.parse(ioJPayload(doDLine)) : null;
   const jwPayload = JSON.parse(ioJPayload(ioJRead(ioJWriteLog)[ioJwBefore]));
   const wTarget = ioHintDir + "\\jw.txt";
@@ -6072,13 +6111,221 @@ let ioJeBeforeE = -1;
   check(
     String(n26),
     "S26",
-    "DoD machine check: the failed edit's hint line + journal payload {filePath, old, new} name the exact intended edit; the write journal payload cp'd in place reproduces the intended file state (byte-identical)",
-    doDJ !== null && doDJ.filePath === ioHintFiles.hb && doDJ.old === "alpha 20260915 betaa" && doDJ.new === "z" &&
-      ioReadLines().some((l) => l.endsWith("edit oldString | edit-hint") && l.includes("hint line=1 d=1 gap=inf snippet=")) &&
+    "DoD machine check ((2) re-pin): the fail-closed c273's no-candidate line + journal payload {filePath, old, new} name the exact intended edit (journal `old` = the ORIGINAL oldString); the write journal payload cp'd in place reproduces the intended file state (byte-identical)",
+    doDJ !== null && doDJ.filePath === ioHintFiles.he && doDJ.old === "alpha 20260915 beta" && doDJ.new === "z" &&
+      ioReadLines().some((l) => l.endsWith("edit oldString | no-candidate") && l.includes("hint reason=no-anchor-line")) &&
       cpBack === "part A | part B\npart C",
     JSON.stringify({ doDJ, cpBack }),
   );
   n26++;
+}
+
+// ------------------------------------------------------------------ S27 (2) the MUTATING edit-fuzzy oldString (8) — 2026-09-25 (TODO #95 sub-item 2; design source: research/fuzzy-numword/decision-record.md §8.2 + spec_sub2_edit_fuzzy_oldstring.md)
+//
+// The (2) MUTATING unit (normalize-then-compare): the 0-raw-occurrence case
+// resolves WITHOUT agent action — normalize BOTH sides (CRLF/LF + per-line
+// trailing whitespace), d = the MAX Levenshtein over the scored line-pairs;
+// exactly-one candidate at d=0 or d≤1 → oldString MUTATED to the file's
+// exact unique bytes (the fuzzy-edit line; NO after-hook hint — the edit
+// succeeds); else FAIL-CLOSED (the R6 hint verdict carrying the best-
+// candidate d — directive a; the after-hook hint is stored). Directive b:
+// the feedback line is truncated (first 40 chars + ...), the journal
+// carries the FULL original oldString.
+
+const ioF2Dir = path.join(ioSandboxProj, "f2");
+mkdirSync(ioF2Dir, { recursive: true });
+const ioF2 = {
+  cf: path.join(ioF2Dir, "cf.txt"), // CRLF file (the LF query: 0 raw)
+  tw: path.join(ioF2Dir, "tw.txt"), // LF file (trailing-ws drift)
+  am: path.join(ioF2Dir, "am.txt"), // two d<=1 candidates (ambiguous)
+  nm: path.join(ioF2Dir, "nm.txt"), // d=1 typo + d=3 near-miss candidates
+  lg: path.join(ioF2Dir, "lg.txt"), // the long oldString (directive b)
+};
+writeFileSync(ioF2.cf, "alpha one\r\nbeta two\r\ngamma three\r\n", "utf8");
+writeFileSync(ioF2.tw, "alpha one\nbeta two\ndelta four\n", "utf8");
+writeFileSync(ioF2.am, "alpha 20260915 beta\nalpha 20260915 betz\n", "utf8");
+writeFileSync(ioF2.nm, "alpha 20260915 beta\ngamma 20260916 delta\n", "utf8");
+const ioLgLine = "the quick brown fox 20260915 jumps over the lazy dog and the cat slept";
+writeFileSync(ioF2.lg, ioLgLine + "\n", "utf8");
+const ioMutCount = (hay, needle) => {
+  let n = 0,
+    p = 0;
+  while (p + needle.length <= hay.length) {
+    const i = hay.indexOf(needle, p);
+    if (i === -1) break;
+    n++;
+    p = i + 1;
+  }
+  return n;
+};
+let n27 = 277;
+let ioF77 = null; // the c277 fuzzy-edit line (284 checks its byte-exact shape)
+
+// 277 — (2) CRLF-drift: oldString LF, file CRLF (same content, 0 raw) →
+//      d=0 → MUTATE to the file's CRLF bytes (an exact UNIQUE file
+//      substring) + the fuzzy-edit LAST line (byte-exact)
+{
+  const h77 = { filePath: ioF2.cf, oldString: "alpha one\nbeta two\ngamma three", newString: "z" };
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io3", callID: "c277" }, { args: h77 });
+  const l77 = ioReadLines();
+  ioF77 = l77[l77.length - 1].split(" | ");
+  check(
+    String(n27),
+    "S27",
+    "(2) CRLF-drift: 0 raw → d=0 → MUTATED oldString to the file's CRLF bytes (exact UNIQUE substring) + fuzzy-edit LAST line (byte-exact)",
+    h77.oldString === "alpha one\r\nbeta two\r\ngamma three" &&
+      ioMutCount(readFileSync(ioF2.cf, "utf8"), h77.oldString) === 1 &&
+      ioF77.length === 8 && ioF77[3] === "edit" && ioF77[7] === "fuzzy-edit" &&
+      ioF77[5] === "fuzzy-edit orig=alpha one beta two gamma three len=30 d=0 value=alpha one beta two gamma three" && ioF77[6] === "edit oldString",
+    JSON.stringify(ioF77),
+  );
+  n27++;
+}
+
+// 278 — (2) trailing-whitespace drift: oldString line has trailing ws, the
+//      file line does not → d=0 → MUTATE to the file's exact bytes
+{
+  const h78 = { filePath: ioF2.tw, oldString: "beta two   ", newString: "z" };
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io3", callID: "c278" }, { args: h78 });
+  const l78 = ioReadLines();
+  const f78 = l78[l78.length - 1].split(" | ");
+  check(
+    String(n27),
+    "S27",
+    "(2) trailing-ws drift: 0 raw → d=0 → MUTATED oldString to the file's exact bytes (exact UNIQUE substring) + fuzzy-edit LAST line (byte-exact)",
+    h78.oldString === "beta two" &&
+      ioMutCount(readFileSync(ioF2.tw, "utf8"), h78.oldString) === 1 &&
+      f78.length === 8 && f78[7] === "fuzzy-edit" &&
+      f78[5] === "fuzzy-edit orig=beta two    len=11 d=0 value=beta two" && f78[6] === "edit oldString",
+    JSON.stringify(f78),
+  );
+  n27++;
+}
+
+// 279 — (2) single typo (outside the anchor — the line carries a dense
+//      span): exactly one candidate at d=1 → MUTATE
+{
+  const h79 = { filePath: ioF2.nm, oldString: "alpha 20260915 betaa", newString: "z" };
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io3", callID: "c279" }, { args: h79 });
+  const l79 = ioReadLines();
+  const f79 = l79[l79.length - 1].split(" | ");
+  check(
+    String(n27),
+    "S27",
+    "(2) single typo d=1: exactly one candidate → MUTATED oldString to the file's exact bytes (exact UNIQUE substring) + fuzzy-edit LAST line (byte-exact) — the dense date also fires an observation line",
+    h79.oldString === "alpha 20260915 beta" &&
+      ioMutCount(readFileSync(ioF2.nm, "utf8"), h79.oldString) === 1 &&
+      f79.length === 8 && f79[7] === "fuzzy-edit" &&
+      f79[5] === "fuzzy-edit orig=alpha 20260915 betaa len=20 d=1 value=alpha 20260915 beta" && f79[6] === "edit oldString",
+    JSON.stringify(f79),
+  );
+  n27++;
+}
+
+// 280 — (2) fail-closed near-miss: a single candidate at d=3 → NOT mutated
+//      (byte-identical); the no-candidate fail line CARRIES the best-
+//      candidate d (directive a: every attempt is logged with the best-d)
+{
+  const h80 = { filePath: ioF2.nm, oldString: "alpha 20260915 zeet", newString: "z" };
+  const h80Before = JSON.stringify(h80);
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io3", callID: "c280" }, { args: h80 });
+  const l80 = ioReadLines();
+  const f80 = l80[l80.length - 1].split(" | ");
+  check(
+    String(n27),
+    "S27",
+    "(2) fail-closed near-miss: best d=3 → NOT mutated (byte-identical) + no-candidate LAST line carries 'best-d=3' (directive a) — the dense date also fires an observation line",
+    JSON.stringify(h80) === h80Before && f80.length === 8 && f80[7] === "no-candidate" &&
+      f80[5] === "hint reason=d-too-high best-d=3" && f80[6] === "edit oldString",
+    JSON.stringify(f80),
+  );
+  n27++;
+}
+
+// 281 — (2) ambiguous: two candidates at d<=1 → NOT mutated (byte-
+//      identical) → edit-ambiguous (the R6 verdict as today; the after-
+//      hook hint is stored)
+{
+  const h81 = { filePath: ioF2.am, oldString: "alpha 20260915 bety", newString: "z" };
+  const h81Before = JSON.stringify(h81);
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io3", callID: "c281" }, { args: h81 });
+  const l81 = ioReadLines();
+  const f81 = l81[l81.length - 1].split(" | ");
+  check(
+    String(n27),
+    "S27",
+    "(2) ambiguous: two candidates at d<=1 → NOT mutated (byte-identical) + edit-ambiguous LAST line 'hint cands=1 1,2 1' — the dense date also fires an observation line",
+    JSON.stringify(h81) === h81Before && f81.length === 8 && f81[7] === "edit-ambiguous" &&
+      f81[5] === "hint cands=1 1,2 1" && f81[6] === "edit oldString",
+    JSON.stringify(f81),
+  );
+  n27++;
+}
+
+// 282 — (2) directive (b): a LONG oldString (> 40 chars) → the feedback
+//      line is TRUNCATED (first 40 chars + ... + len + d + the truncated
+//      target — the line does NOT carry the full oldString) while the
+//      journal carries the FULL original oldString (edit `old`); the
+//      mutated oldString is an exact UNIQUE file substring
+{
+  const ioLgQuery = "the quick brovn fox 20260915 jumps over the lazy dog and the cat slept";
+  const h82 = { filePath: ioF2.lg, oldString: ioLgQuery, newString: "z" };
+  const je82Before = ioJRead(ioJEditLog).length;
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io3", callID: "c282" }, { args: h82 });
+  const l82 = ioReadLines();
+  const f82 = l82[l82.length - 1].split(" | ");
+  const j82 = ioJRead(ioJEditLog)[je82Before];
+  const j82P = j82 ? JSON.parse(ioJPayload(j82)) : null;
+  check(
+    String(n27),
+    "S27",
+    "(2) directive (b): long oldString → the fuzzy-edit line is TRUNCATED (no full oldString in the line) + the journal's edit `old` = the FULL original oldString + the mutated oldString is an exact UNIQUE file substring",
+    h82.oldString === ioLgLine && ioMutCount(readFileSync(ioF2.lg, "utf8"), h82.oldString) === 1 &&
+      f82.length === 8 && f82[7] === "fuzzy-edit" &&
+      f82[5] === "fuzzy-edit orig=the quick brovn fox 20260915 jumps over ... len=70 d=1 value=the quick brown fox 20260915 jumps over ..." &&
+      !f82[5].includes("the lazy dog") &&
+      j82P !== null && j82P.old === ioLgQuery && j82P.new === "z" && j82P.filePath === ioF2.lg,
+    JSON.stringify({ f82, j82P, mutated: h82.oldString }),
+  );
+  n27++;
+}
+
+// 283 — (2) the AFTER-HOOK: a mutate call → NO enrichment (no hint
+//      stored); a fail-closed call → enrichment (the fail line's hint,
+//      consumed once)
+{
+  const outM = { title: "edit", output: "ok", metadata: {} };
+  await ioAfter({ tool: "edit", sessionID: "ses_fx_io3", callID: "c277" }, outM); // mutate → NO hint stored → untouched
+  const outR = { title: "edit", output: "Error: oldString not found", metadata: {} };
+  await ioAfter({ tool: "edit", sessionID: "ses_fx_io3", callID: "c280" }, outR); // fail-closed → the hint IS stored
+  const enriched = outR.output;
+  await ioAfter({ tool: "edit", sessionID: "ses_fx_io3", callID: "c280" }, outR); // consumed once
+  check(
+    String(n27),
+    "S27",
+    "(2) after-hook: mutate (c277) → UNTOUCHED (no hint stored); fail-closed (c280 near-miss) → gains the best-d hint line (consumed once)",
+    outM.output === "ok" &&
+      enriched === "Error: oldString not found\nhint reason=d-too-high best-d=3" && outR.output === enriched,
+    JSON.stringify({ m: outM.output, e: outR.output }),
+  );
+  n27++;
+}
+
+// 284 — (2) the mandatory fuzzy-edit line SHAPE, byte-exact on the c277
+//      mutate call (8 fields: stamp|session|model|edit|args|evidence|
+//      'edit oldString'|'fuzzy-edit')
+{
+  check(
+    String(n27),
+    "S27",
+    "(2) fuzzy-edit line shape byte-exact (8 fields; the c277 mutate call)",
+    ioF77 !== null && ioF77.length === 8 && ioStampRe.test(ioF77[0]) && ioF77[1] === "ses_fx_io3" &&
+      ioF77[3] === "edit" &&
+      ioF77[5] === "fuzzy-edit orig=alpha one beta two gamma three len=30 d=0 value=alpha one beta two gamma three" &&
+      ioF77[6] === "edit oldString" && ioF77[7] === "fuzzy-edit",
+    JSON.stringify(ioF77),
+  );
+  n27++;
 }
 
 // ------------------------------------------------------------------ S5 hygiene (6)

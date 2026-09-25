@@ -434,3 +434,49 @@ close-out died silently — the state was committed from the working tree).
 - **Gates (measured 2026-09-25):** probe 279/279 (baseline 259 + S26's 20);
   intercept_observer smoke 48/48; pytest 459 + 1w; ruff F=0.
 - The §4 recovery protocol (doc, not code) is documented in the plugin README.
+
+### 8.2 LANDED addendum (2026-09-25, worker-14)
+The (2) MUTATING edit-fuzzy oldString (normalize-then-compare) is
+IMPLEMENTED + verified (his GO 2026-09-25 — normalize-then-compare
+CONFIRMED over the proportional d: the CRLF/LF + trailing-whitespace
+drift class is unbounded in length, so a proportional distance bar was
+REJECTED; normalization removes it exactly).
+- **The (2) matcher** (`intercept_observer_core.ts`: `normEditBytes`,
+  `resolveEditOldString` + the `EditResolution` type,
+  `EDIT_FUZZY_MAX_D = 1`): reuses the R6 content-locator candidate-start
+  generation (`prepContentQuery` / `contentCandidateStarts` factored out
+  of `locateContent` — its behavior unchanged, the S26 locator pins
+  green); normalizes BOTH sides (CRLF/LF + per-line trailing
+  whitespace); d = the MAX Levenshtein over the scored line-pairs (the
+  same scored-line rule as `locateContent`).
+- **Mutation bar (hierarchical — the #72/M1 strict discipline, NO
+  auto-retry):** exactly ONE candidate at d=0 → MUTATE; else exactly ONE
+  at d≤1 (i.e. d=1) → MUTATE; else FAIL-CLOSED (no mutation — the R6 hint
+  verdict fires as today, the `no-candidate` line gains `best-d=<n>` when
+  candidates exist — directive a; the after-hook hint is stored). The
+  mutated `oldString` is an exact, UNIQUE substring of the file (the
+  edit tool's raw `indexOf` then succeeds). A SINGLE mutation — no
+  retry; the R6 journal stays the recovery fallback.
+- **The `fuzzy-edit` verdict** (NEW — `VERDICTS` = 12): evidence
+  `fuzzy-edit orig=<first 40 chars> len=<n> d=<0|1> value=<first 40 chars
+  of the target>` (the `truncEdit40` feedback truncation — directive b),
+  context `edit oldString`; NO after-hook hint (the edit succeeds).
+- **The journal's edit `old` field** = the ORIGINAL, pre-mutation
+  `oldString` (captured in `onToolBefore` before the channel — the
+  recovery fallback captures what the model asked for, not what the
+  interceptor mutated to).
+- **The S26 re-pins (probe):** 271 (absent `oldString`, single candidate
+  d=1 → now MUTATES), 275 (after-hook re-pointed at the FAIL-closed c273
+  no-candidate — c271 stores no hint), 276 (DoD machine check re-pointed
+  at c273; the journal `old` = the ORIGINAL `oldString`; the write-
+  payload `cp` check stays). 272 / 273 / 274 UNCHANGED (no mutation —
+  not exactly-one / no candidate).
+- **Probe S27** (8 checks, 277-284): CRLF-drift d=0, trailing-ws d=0,
+  single-typo d=1 (all MUTATE to the exact unique file bytes), fail-
+  closed near-miss (best d=3 — the fail line carries `best-d=3`),
+  ambiguous (two d≤1 — no mutation), directive (b) (truncated feedback
+  line + the FULL original in the journal), the after-hook mutate-vs-
+  fail, the mandatory line shape (byte-exact).
+- **Gates (measured 2026-09-25):** probe 287/287 (baseline 279 + S27's
+  8); intercept_observer smoke 55/55 (from 48/48); pytest 459 + 1w; ruff
+  F=0.
