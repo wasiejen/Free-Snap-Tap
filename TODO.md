@@ -750,3 +750,43 @@ All those IDs stay reserved — see the numbering rule in the header.
   completely DROPPED and REPLACED by the summary → no bit-rot from a
   compaction chain, only from an N-summarized summary (the budget cap's
   rationale — his review).
+
+## #100. (open, 2026-09-25, direct session; maintainer GO 2026-09-25 — the next autorun build) remove the numword escape channel — bit-drift solved backend-side, the escape's use-case is gone
+- **Problem / evidence:** the escape sentinel (`[<incident>:<safe-form>:esc]` in
+  write/edit content → the digits, the `kind=escape` channel) existed to
+  protect dense values from model bit-drift. Bit-drift no longer occurs
+  (maintainer, direct session 2026-09-25: "the bitdrift problematic is
+  solved as of now"). It fulfills no usage right now and makes fuzzy-channel
+  development more cumbersome (every write/edit change must respect the
+  escape path).
+- **Desired outcome:** the escape channel is gone (code + pins) while the
+  fuzzy track's positive parts stay fully intact: the pair channel
+  (R1/R2 — right-side numwords → digits), the shared numword map
+  (`.opencode/agent/scripts/numword/numwords.json`), the dense/numword
+  observation logging, the R6/R7/R8 channels. The Unit-2 (#97) noteCache /
+  after-hook note delivery STAYS (the R8 redirect notes ride it).
+- **Scope (agreed, direct session 2026-09-25):**
+  - core: `ESCAPE_RE`, `EscapeHit`, `resolveEscapeSafe`, `resolveEscapes`
+    (`intercept_observer_core.ts` ~L445-506)
+  - plugin: `runEscapeContent` + the `onToolBefore` wiring + the
+    `pre-escape=` journal extension (`appendJournal`'s escapeForms param)
+    + the `kind=escape` log lines
+  - tests: the escape pins (intercept smoke: ~24 escape grep hits incl.
+    13a-13d; probe: ~45 grep hits) — removed; one 13-style note-delivery
+    pin repurposed to the R8 redirect note (the note mechanism stays)
+  - knowledge: the primer `.opencode/agent/research/fuzzy-numword/primer.md`
+    → new `.opencode/agent/knowledge/fuzzy-numword/primer.md` (escape
+    section annotated removed 2026-09-25) + the subfolder README (≤20
+    lines) in the SAME commit; NOT into AGENTS.md (his ruling)
+  - DO-NOT-touch: the pair channel, the map, R1/R2/R6/R7/R8,
+    auto_resume / compact_memory / context_recovery / block_transfer
+    plugins, FST code, `.opencode/maintainer/**`
+- **Acceptance criteria:** standard gate green; zero escape code paths
+  (grep-clean for `ESCAPE_RE` / `runEscapeContent` / `kind=escape`); the
+  pair/fuzzy pins unchanged; the note mechanism still delivers the R8
+  redirect notes (smoke pin); the primer present in knowledge/ with its
+  README; `numwords.json` untouched.
+- **Interaction:** #95 sub-item (3) R3 is UNAFFECTED (still blocked on his
+  GO — a separate unit).
+- **Status:** GO (maintainer, direct session 2026-09-25) — the next
+  autorun build.

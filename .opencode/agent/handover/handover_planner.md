@@ -54,7 +54,13 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   compaction + my CROSS compaction #3 (both keep=18; the COMPACT line
   verified in ctx.log) → resume SUCCESS (units green, DONE line written).
 - **Direct exchange (mid-session, 2026-09-25 — his reply to my 3 open
-  questions; awaiting his rulings on all three):**
+  questions; 2nd round answered):**
+  (0) **HIS RULINGS (2nd round):** #1 GO → **TODO #100** (escape-channel
+  removal, scope agreed, the NEXT AUTORUN BUILD); #2 confirm still pending
+  (loop_log-v2 as the build after #100 — no objection raised); #3 the
+  design conversation continues (his questions: the default `last_write`
+  buffer, the unified input schema, the feedback design — my answers in
+  the 2nd-round message; the dedicated design session still ahead).
   (1) **bit-drift solved backend-side** → he leans to remove the
   numword/escape part. My recommendation (pending GO): remove ONLY the
   escape channel (core `ESCAPE_RE`/`resolveEscapes`, plugin
