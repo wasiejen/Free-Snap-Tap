@@ -170,6 +170,35 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   then worker model; parallel slots only if slot-wait is measured.
   (d) memory/knowledge/maintenance gap = CADENCE → proposed a standing
   maintenance unit every N iterations (his GO pending).
+  (11) **System-design exchange (2026-09-25, his long message):**
+  (a) **Memory separation** — his design intent: worker failure-mode
+  knowledge = PLANNER PROMPT baseline section ("Worker failure-mode
+  recognition"), one line per entry + pointer to the grounded memory.md
+  entry (evidence/reasoning); general-planning MEMs stay in the distill
+  block. Concrete design given; PENDING his GO (prompt edit, mine).
+  (b) **Research/map** — agreed (his strongest point): per-task
+  re-derivation is the cost structure. Proposal: (1) explorer builds the
+  OPENCODE HOST MAP (SDK surface, hooks, DB schema, permission,
+  compaction path) → knowledge file, dated refresh; (2) delegated
+  upstream research via the explorer (webfetch; cost in its context,
+  finding → knowledge base; planner reads installed types for
+  verification only); (3) scope rule: standard problems → upstream
+  first, OUR core (loop/compaction protocol) stays ours.
+  (c) **Consolidation** — no ground-up rewrite now; EVIDENCE-TRIGGERED:
+  a change touching 3+ plugin files on a bad boundary / repeated
+  cross-plugin debugging / a feature unbuildable without restructuring.
+  Until then: boundary discipline + repo_overview.md as the coherence
+  instrument (tangles in the map = the signal).
+  (d) **Maintenance unit** — design given: trigger = ITERATION COUNTER
+  (every 5th, at session top before task selection — not idle, not the
+  priority list); planner-run inline, bounded ~10 calls; scope:
+  knowledge_inbox curation, NAP compression, TODO curation with a
+  14-day RETIREMENT target, baselines, stale proposals/drafts
+  (flag-to-maintainer, never auto-delete). + BEHAVIOR RULE (his
+  self-observation, accepted): unmarked observation → NAP ONLY, no
+  action; action needs a marker / inbox / explicit instruction.
+  (e) **Standing duties** — net-zero rule: a new standing duty is added
+  only when an existing one is retired or automated.
 - **Pending live observations (maintainer / natural):** #99 fork test (his,
   post-restart), #98 live acceptance (the next self-compact→idle cycle —
   the #98 build is live in this process), #93 live overflow (his fork
