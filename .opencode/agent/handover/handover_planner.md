@@ -4,50 +4,61 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 
-## Current session — autorun, 2026-09-25 (ses_f2761efb2ffeUhMTEM4hgSLKKK, planner-16, Qwen3.8-27B-Q3S-170K)
-- Launch (unit-4 restart branch after planner-15's `action: restart`; the
-  interrupted-startup session was re-entered as Planner — the Build-agent
-  prefix in the launch was overridden; recorded as a minor anomaly).
-- **Rebuilt from committed state:** git log + NAP + TODO + loop_log
-  (planner-16 = this iteration) + priority.md (his live uncommitted edit)
-  + proposals. Inbox empty.
-- **Triage (per priority.md + TODO):** R3 (fuzzy #95 sub-item 3) build is
-  BLOCKED on a maintainer GO — #67 says the plugin-scope extension "awaits
-  maintainer approval" (an observable behavior change), so it is NOT
-  pre-approved — recorded here as an open question, deferred (non-blocking).
-  **Task #98** (unit-4 resume-after-compaction, approved A+B+C by his
-  2026-09-23 --comment) is the next clear approved build — verified NOT
-  implemented (ACTION_RE unanchored at L269; no ctx.log COMPACT tail-read
-  in the tick).
-- **#98 spec written** (handover_task.md; Parts A+B for the worker, Part C
-  = not-applicable — the Work State dump form was removed in the 2026-09-24
-  rework, so no live prompt quotes a literal `action: restart` in prose;
-  Part A is the primary defense). Baseline re-measured: auto_resume smoke
-  **133/133**; standard gate probe 291/291, pytest 459+1w, ruff F=0.
-- **#98 LANDED + planner-verified (2026-09-25):** worker-16 (session
-  ses_f2741890affeDWi2GqkunKqIeX) — Part A (`4f90218`) line-anchored
-  ACTION_RE (non-capturing anchor, `m[1]` = action word; 17 mid-line
-  scripted closing texts re-pinned to own-line, intent unchanged) + Part B
-  (`cf7e6f5`) tick tail-reads ctx.log for NEW `COMPACT <sid>` lines and
-  re-arms watched sids (`idlePending=true`, `recoveryCount=0`) before the
-  routing loop. Part C = not-applicable (Work State dump form removed in
-  the 2026-09-24 rework). **Gates (planner spot-re-verified):**
-  auto_resume smoke **139/139** (133 + 6 new pins A-rechk/A1/A2/B1/B2/B3),
-  pytest 459+1w, ruff F=0, probe 291/291 (no probe pin broke). LIVE
-  acceptance (a next self-compact routes from the real close) PENDING live
-  observation. Commits: `4f90218`/`cf7e6f5`/`80797e4` (+ my spec commit
-  `eda314e`).
-- **Next (next iteration):** per priority.md, **#97 (R8 sandbox redirect)**
-  is the next clear approved build (needs a spec; R3-gate per #95 sub-item
-  order). R3 (fuzzy #95 sub-item 3) remains BLOCKED on a maintainer GO
-  (observable behavior change). The next planner session re-triages from
-  priority.md. Close `action: restart`.
-- Working tree: his live files uncommitted (priority.md, opencode.jsonc,
-  repo_opencode.md, agent_feedback.md, ideas.md) — never stage (standing
-  rule); feedback entries ride the bookkeeping commit.
+## Current session — autorun, 2026-09-25 (ses_f27282d2dfferl9gScrfLt2AxV, planner-17, Qwen3.8-27B-Q3S-170K)
+- Launch (unit-4 restart branch; his message: "opencode restarted. continue planner-17.").
+- **Rebuilt from committed state:** git log + NAP + TODO + loop_log (max
+  planner-16 → this = planner-17, the bounded-grep rule) + priority.md (his
+  live uncommitted edit: the loop.log read-cost question = top # item,
+  "# TODO #97", the log-tool-v2 "not yet implemented" note, the
+  block_transfer upgrade draft, the fuzzy return-info + AGENTS-example
+  notes) + proposals (the loop_log-v2 is back in `approved/`). Inbox empty.
+- **His live items triaged:** (1) the loop.log question — ANSWERED with
+  live evidence: my own session title = `autorun-2026-09-21_15-33
+  planner-17` (the #89 spawn ident — the title carries loop folder +
+  iteration, so a spawned session needs no loop-log read) → codified in
+  `agent_readme_loop.md` §Loop folder (the title + the bounded-grep rule);
+  the "iteration in the unit-4 start message" idea = his "(later maybe)" —
+  deferred. (2) "# TODO #97" = the next build → spec written + worker
+  launched (this session, see below). (3) loop_log-v2 (back in
+  `approved/`): per his 26-09-18 `--info` it is NOT fully implemented
+  (only the session autofill landed — model autofill, the Part B readback
+  confirmation, the Part C lenient status, the Part D `correct` are
+  missing from the live tool schema) → QUEUED next (after #97 lands;
+  needs a spec). (4) the block_transfer upgrade draft
+  (`2026-09-25_15-23-upgrade.md`) = discussion basis ("direct session") →
+  noted, NO build (design exchange is the direct-session channel).
+  (5) the fuzzy return-info note → folded into the #97 spec (Unit 2); his
+  AGENTS.md escape-example note (examples with different left/right sides
+  + "single digit/numwords are safe") — grep-clean: the escape convention
+  is NOT in AGENTS.md / knowledge / prompts (only the proposal + the
+  plugin code) → open question in the summary (a paste-proposal candidate).
+- **#96 CLOSED (live-verified this session, post-restart):**
+  `auto_resume.log` shows `log-trim= old=293026007 new=2097152`
+  (12:50:57Z — the 293MB file trimmed to 2MB at init) + zero
+  `message.part.delta` lines appended after the trim (last delta line
+  24391 < trim line 24434; the new build's ~2.7k lines are delta-free) —
+  acceptance met; TODO one-liner + full text in todo_records.md.
+- **#97 spec committed + worker launched:** `worker_Q3S_170K` — Unit 1 =
+  the R8 out-of-sandbox 1:1 redirect (typed path fields of
+  read/write/edit/block_transfer; allowed roots from opencode.jsonc
+  `permission.external_directory` + `references` + workspace; sibling/
+  exact-root mapping; fail-closed otherwise; `kind=redirect` line) +
+  Unit 2 = the escape return-info (the after-hook feedback note on
+  `kind=escape` mutations, truncated first form, full payload in the
+  journal). Baseline at spec time: probe 291/291, smokes all green,
+  pytest 459+1w, ruff F=0.
+- **Pending live observations (maintainer / natural):** #99 fork test (his,
+  post-restart), #98 live acceptance (the next self-compact→idle cycle —
+  the #98 build is live in this process), #93 live overflow (his fork
+  test), #95 sub-item (3) R3 (still BLOCKED on his GO), #92 (his call),
+  #83 (his call).
+- Working tree: his live files uncommitted (priority.md, ideas.md, the
+  new draft `block_transfer_tool/2026-09-25_15-23-upgrade.md`) — never
+  stage (standing rule); named-path commits only.
 
 
 ## Compressed archive (one line each
+- 2026-09-25 autorun (ses_f2761efb2ffeUhMTEM4hgSLKKK, planner-16, Qwen3.8-27B-Q3S-170K) — #98 LANDED + planner-verified (Part A: line-anchored ACTION_RE `4f90218`; Part B: the 5s tick re-arms watched sids on NEW ctx.log COMPACT lines `cf7e6f5`; Part C not-applicable — smoke 139/139, probe 291/291, pytest 459+1w, ruff F=0; live acceptance pending the next self-compact→idle cycle) + #98 spec `eda314e` + friction entry (block_transfer marker-matching CRLF/semantics) `fa6fb38` — details: loop folder plan16_summary.md + git eda314e/4f90218/cf7e6f5/80797e4
 - 2026-09-25 autorun (ses_f27a7d75affeqsh0h1c4LZS3CY, planner-15, Qwen3.8-27B-Q3S-170K) — TODO #99 LANDED + planner-verified (probe 291/291, compact 74/74, context_recovery 17/17, pytest 459+1w, ruff F=0; spec staged keepTokens computed-primary) + live fork test PENDING (maintainer, post-restart; computed ~27k -> ~52k proves body keep.tokens honored) — details: loop folder plan15_summary.md + git ebf59b2/c5859c7/abb0915 + 282a583
 - 2026-09-25 autorun (ses_f29afbb66ffeRM1EHgBIpTwTg5, planner-14, Qwen3.8-27B-Q3S-170K) — his 3 items triaged (normalize-then-compare CONFIRMED + 2 directives; R-unit question answered; #96 filed 233MB log) + R6 LANDED (acb6323 — worker close-out died SILENTLY, planner verified from files: probe 279/279, smoke 48/48) + (2) edit-fuzzy LANDED (15761d8 code + 78b68e7 probe S27/docs, probe 287/287, smoke 55/55; worker saga: launch 1 died zero-work, launch 2 clean checkpoint, task_id resume NO-OP, launch 3 fresh finished) + #96 LANDED (22c36e4/70399ea/57f773f, live check pending next restart) + his live priority.md edit RENOUMBERED (R8 = #97 filed, unit4-resume = #98 filed) + R3 gate CLEARED (bitdrift retired; absorbs the anchor-drift fix) — details: git 305ce1b..099fea8 + TODO #95/#96/#97/#98
 - 2026-09-25 direct (ses_f2a436b57ffe8go608Z63jwNG6, planner, Qwen3.8-27B-Q3S-170K) — his reply triaged: #93 live acceptance VERIFIED from files (Gemma overflow 34649>30208 → recovery → session continued; the NORMAL slot consumed, emergency-1 unspent — his design call on slot preference) + f2-cleanup verified + one-commit loosening LANDED f4dbc31 + #94 LANDED 528f66b (worker_Q3S_170K; the anchor-drift finding → #95) + the fuzzy track grounded → TODO #95 parent + close rulings LANDED c82f788 (normalize-then-compare confirmed over the proportional d; R4 RETIRED → R3 gate cleared; the anchor-drift folded into R3; #83 threshold INERT while autoCompact false) — details: nap_direct.md (2026-09-25 excess append) + git 305ce1b..c82f788 + TODO #94/#95
@@ -139,7 +150,8 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 ## Standing
 - Baselines (re-verified 2026-09-25 by the planner, post-#99):
   probe **291** [two-ninety-one]; smokes **all green**
-  (context_recovery 17/17, compact_memory 74/74, auto_resume 133/133,
+   (context_recovery 17/17, compact_memory 74/74, auto_resume 139/139
+   (post-#98),
   intercept_observer 55/55, block_transfer 30/30 + 53/53, submit 20/20;
   the per-suite counts are in each smoke's own readout — no total kept
   here); pytest **459 passed + 1 warning (the known #10 coroutine

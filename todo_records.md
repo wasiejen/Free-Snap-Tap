@@ -1595,3 +1595,50 @@ smokes, pytest 459+1w, ruff F=0).
    **Live acceptance (2026-09-23, planner-12 direct ses_f3144d9d6…, post-restart):** the live build v=ef8c6149 IS the #90 build (sha256 prefix of the on-disk auto_resume.ts = the surface= v= line; process starts 16:32:37Z + 16:37:45Z, both after c4b244d 15:53:06Z). PART A verified by A/B contrast on the SAME successor session — the old build (d2b9d510) judged it scope=none (14:46:16Z, the spawn exclusion) vs the new build scope=autorun (16:37:07Z) + recovery= attempt=1 (the #87 stall case INVERTED: the successor is tracked + recoverable; the cap held at attempt=1). PART B/C verified — the new process's init log-restore (the old route= + spawn= pair) → zero re-routing/spawn against the trigger (planner-11) after the restart + zero spawn= lines in the new process (no unbounded loop; the trigger's own final close was correctly route= stop at 15:59:27Z under the old process). NOT YET exercised live by the new build: its own restart spawn (the deactivate= line on success, the new restartText line-1 exact-own-line marker as the successor's first message, the depth-cap skip=) — awaits the next autorun action:restart close. ADJACENT LIVE FINDING → TODO #91 (the compaction summary leaked into the spawn identity + routing during the 14:46Z episode — STILL LATENT in the live build).
    **Spawn-tail live acceptance (2026-09-23, planner-13 autorun, build v=7d2e6207 = the sha256 prefix of the on-disk auto_resume.ts at HEAD d6ddf37, process start 19:13:25Z):** the maintainer's own-line `<|autonom|>` toggle + the `action: restart` close led to `scope= autorun` (19:20:54Z) then `route= restart spawn sid=ses_f3144d9d6...` (19:20:55Z) then `spawn= sid=ses_f30493f9... agent=planner_Q3S_170K model=llama-swap/Qwen3.8-27B-Q3S-170K ident=autorun-2026-09-21_15-33 planner-13` + `deactivate= sid=ses_f3144d9d6...` (19:20:55Z). ALL THREE previously unexercised items verified live: (1) the `deactivate=` line on success + the trigger idle-untouched afterwards (zero scope=/route=/recovery= for its sid post-spawn); (2) the new restartText line-1 exact own-line `<|autonom|>` as the successor's first user message (line 1 of the queued text; line 2 of the received message after the gauge's passive `ctx:` prefix per #85 part 3); (3) zero `skip=` depth-cap lines. The successor was armed (arm= lines from 19:20:55Z); its own `scope= autorun` line appears in the log at its first idle evaluation (after that session's close).
 - **Closed:** 2026-09-23 (planner-13) — the spawn-tail live acceptance is complete (see the paragraph above); subsumes #87 (closed) — full text to todo_records.md.
+## #96. (open, 2026-09-25, planner-14; his launch directive — auto_resume.log hardware wear) auto_resume.log write-volume reduction
+- **Problem / evidence:** `.opencode/temp/auto_resume.log` = 239.6MB /
+  2,813,277 lines at ~4 days process uptime (measured 2026-09-25):
+  **97.4% of the bytes = `event=message.part.delta` lines** (2,718,066
+  lines / 231.0MB) — the event hook `onEvent` (auto_resume.ts
+  L1468-1480) logs ONE line per event, incl. every streamed token
+  delta; the current process (v=c57de2cc) wrote ≈18.7k delta lines in
+  ~20 min ≈ 1.25M lines/day ≈ ~100MB/day of small appends (his SSD-
+  wear concern). The remaining lines grow ≈1MB/day. The old-build
+  lines `skip= autoCompact-off` / `saturation=` are NOT emitted by the
+  current source (grep-clean) — no work needed there.
+- **Desired outcome:** the log stops growing per-token; a size guard
+  bounds long-term growth; the existing 233MB file is trimmed
+  AUTOMATICALLY on the next host restart (no manual step).
+- **Design (planner, 2026-09-25 — the spec at launch is built from this
+  entry):** (1) `onEvent` NEVER logs `message.part.delta` (the arm path
+  is unaffected — the Unit-2 saturation input is `message.updated`
+  only, L1447-1464); all other event types unchanged. (2) Size guard
+  at init, BEFORE `restoreLineageFromLog` (L1508-1544 — today it reads
+  the whole 233MB): log size > 20MB → keep the byte TAIL (last 2MB),
+  ONE `log-trim= old=<bytes> new=<bytes>` line; caps as factory options
+  (defaults 20MB/2MB; small values in the smoke — the `tickMs` factory-
+  option pattern L1573-1574); absent/unreadable → no-op. `log()` is a
+  per-line appendFileSync (L352-359) → the file is never held open → a
+  synchronous init-trim is safe. Documented accepted consequence: the
+  #90 lineage restore sees only the surviving tail (an older
+  route=/spawn= pair cut by the trim → depth resets to 0 — best-effort
+  by design). (3) Smoke re-pins (baseline 129/129): a synthetic
+  `message.part.delta` event → zero log lines for it (a paired
+  `message.updated` in the same batch still logs); a seeded oversized
+  log → trim + tail preserved + the `log-trim=` line; the lineage
+  restore still works on a trimmed tail.
+- **Acceptance:** zero `message.part.delta` lines appended after a
+  live restart (his live check); the 233MB file trimmed to ~2MB on the
+  next restart with the `log-trim=` line; smoke + standard gate green.
+- **Suggested scope:** `.opencode/plugin/auto_resume.ts` (`onEvent`,
+  init, the trim guard), `.opencode/plugin/tests/auto_resume.smoke.mjs`.
+- **Status:** CODE LANDED (worker-Q3S-170K, 2026-09-25, commits
+  22c36e4 + 70399ea): the delta exclusion + the init size guard
+  (defaults 20MB/2MB, factory options `maxLogBytes`/`logTailBytes`) +
+  the smoke re-pins (133/133; standard gate green: probe 279/279,
+  pytest 459 passed + 1 warning, ruff F=0). PENDING his live check at
+  the next host restart: zero `message.part.delta` lines appended from
+  the new build + the existing file (239.6MB at measure, ~100MB/day
+  growth — 264.4MB at worker run) trimmed to ~2MB with the `log-trim=`
+  line — then close.
+- **Closed:** 2026-09-25 (planner-17) — live-verified post-restart this session: the init trim fired (`log-trim= old=293026007 new=2097152`, 12:50:57Z — 293MB → 2MB) and zero `message.part.delta` lines were appended after the trim (last delta line 24391 < trim line 24434; the new build's ~2.7k lines are delta-free) — acceptance met, closed.

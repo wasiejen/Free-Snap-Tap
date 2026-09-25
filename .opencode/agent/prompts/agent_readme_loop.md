@@ -38,6 +38,14 @@ not here.
   verification).
 - Session-id marker files are RETIRED — session ids are recorded in the loop
   log (§Loop log); the log is the lookup source.
+- Self-identification (the iteration number, 2026-09-25 — his loop.log
+  read-cost question): a plugin-spawned session's TITLE is
+  `<loop-folder> planner-<N>` (the #89 spawn ident — live-verified
+  2026-09-25: the spawned planner reads its own number from the title,
+  no loop-log read needed). To verify or recover the number: a BOUNDED
+  grep, never a full read (the log is 30k+ chars of dense numbers):
+  `grep -oE "planner-[0-9]+" <loop folder>/loop_log.md | sort -u -V |
+  tail -1` (before your own START line has landed: +1 = yours).
 
 ## Loop log
 - The looprun activity log — who ran when, on what; for the loop itself and for
