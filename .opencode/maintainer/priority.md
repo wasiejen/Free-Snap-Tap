@@ -37,15 +37,40 @@
 - you are intelligent - you will find something to do
   - go through my ideas for new research on functions. create a folder in research for each if you find something worthwhile
 
+# keepMessages does not work -> only keepToken is respected by summarize()/compaction
+- bases on observations and research i did online in the current version of opencode keepMessages is entirely ignored. the compaction is based entirely on keepToken. And since we set keepToken to 0 to enable keepMessages (which is ignored) the agents essentially get lobotomized and keep as good as nothing from the prior uncompacted session.
+- settings for keepToken as fallback from compact_budged.json
+- can we caluculate the actual keepToken based on the dump and then supply the correct keepToken to exactly keep these messages?
+
+- based on observations 
+  - that independent of set keepMessages the compactied sessions starts at around 25k token.
+  - a freshly compacted planner read 4 turns before the compaction a specific smoke_r6.txt. when supplied after the compaction with the same file the planner behaved as if this was an unknown file -> thus the message was not kept.
+  - current specification for V2 opencode confirm that only keepToken is the only keep value left and uses summeries instead of tail_turn in V1
+    - but i thought we were on V1 - but the bahavior and summery existence point to V2 ...
+
+- also as info, the history is completely dropped and REPLACED by the summery. so there seems not to be a danger of bit-rot from a compacted history, but only from a N summerized summery.
+
+- default value set to 30k now in both compact_budged.json and opencode.json
+  - checked in compact_memory.ts the keepToken is not passed to summerize() and thus fallback to default (in this case opencode.json 30000 keepToken)
+  
+This is my error as maintainer, to not have checked prior on live session or forks.
+
+- source of current compaction.ts of opencode
+  - https://github.com/anomalyco/opencode/blob/dev/packages%2Fopencode%2Fsrc%2Fsession%2Fcompaction.ts
+  - https://github.com/anomalyco/opencode/tree/dev/packages/opencode/src/session
+
 # fuzzy matching of edit oldstring 
 - a very regular problem that an edit fails
   - see # fuzzy_numword fuzzy extension on edit
 - could also be solved by a WRITE function of block_transfer
 
+# TODO #97
 
-# revocery hook event rework according to TODO
-
-
+# fuzzy_numword R8
+- R8 (to minimze loop disruptions)
+  - repeated accesses outside of sandbox stop everything until I intervene
+    - e.g. access to C:\Users\Wasiejen\AppData\Local\Temp instead of the designated C:\Users\Wasiejen\AppData\Local\Temp\opencode 
+    - basis for resolution are the "permission.external_directory" and "references" sections of opencode.jsonc
 
 
 

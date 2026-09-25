@@ -1,23 +1,58 @@
 {
-  "$schema": "https://opencode.ai/config.json",
+  // config.json is for desktop app, tui.json for TUI ^^
+  // https://opencode.ai/docs/config/
+  "$schema": "https://opencode.ai/tui.json",
+  "autoupdate": false,
+  "formatter": true,
+  "scroll_speed": 3,
+  "scroll_acceleration": {
+    "enabled": true
+  },
+  "diff_style": "auto",
+  "cursor": {
+    "style": "block",
+    "blinking": false
+  },
+  "mouse": true,
+  "attention": {
+    "enabled": true,
+    "notifications": true,
+    "sound": true,
+    "volume": 0.5
+  },
   "permission": {
-    "external_directory": { // as basis for sandboxing, so the base paths that are possible to correct to are known
+    // as basis for sandboxing, so the base paths that are possible to correct to are known
+    "external_directory": {
       "C:/Users/Wasiejen/Projects/OpenCodeProjects/Free-Snap-Tap/Free-Snap-Tap": "allow",
       "C:/Users/Wasiejen/AppData/Local/Temp/opencode": "allow",
       "C:/Users/Wasiejen/.local/share/opencode/log": "allow",
       "C:/Users/Wasiejen/AppData/Roaming/npm": "allow",
-      "C:/Users/Wasiejen/AppData/Roaming/npm/*": "allow",
-      "C:/Users/Wasiejen/AppData/Roaming/npm/node_modules/opencode-ai/*": "allow"
+      "C:/Users/Wasiejen/AppData/Roaming/npm/**": "allow",
+      "C:/Users/Wasiejen/AppData/Roaming/npm/node_modules/opencode-ai/**": "allow"
+      // db path still to add or better in watcher ignore?
     }
   },
+  "references": {
+    "scratchpad": {
+      "path": "C:/Users/Wasiejen/AppData/Local/Temp/opencode",
+      "description": "Local windows temporary directory for intermediate agent outputs"
+    }
+  },
+  // test to see if this is still triggering a rejection
+  "watcher": {
+    "ignore": ["C:/Users/Wasiejen/AppData/Local/Temp/**", "C:/Users/Wasiejen/AppData/Local/Temp/"]
+  },
+  // automatic revert of git changes on revert in session via TUI -> caused a lot of origin mismatches
   "snapshots": false,
   "compaction": {
     "auto": false,
-      "keep": {
-        "system": true,
-      // whenever tokens is set to a non zero value, keep Messages will be ignored entirely!!!/
-        "tokens": 0,
-        "messages": 22
+    //"prune": false,
+    //"reserved": 10000,
+    "keep": {
+      "system": true,
+    // 2026-09-25_14-05: messages are ignored by V2 summerize -> only keepToken is respected
+      "tokens": 30000,
+      "messages": 22
     },
     "buffer": 2000
   },
@@ -133,13 +168,8 @@
       }
     }
   },
-  "references": {
-    "scratchpad": {
-      "path": "C:/Users/Wasiejen/AppData/Local/Temp/opencode",
-      "description": "Local windows temporary directory for intermediate agent outputs"
-    }
-  },
   "subagent_depth": 2,
+  "default_agent": "planner_Q3S_170K",
   "agent": {
     // when no compaction model is set, then the session own model will be used for compaction
     // "compaction": {
@@ -209,6 +239,28 @@
       "mode": "all",
       "model": "llama-swap/Qwen3.8-27B-Q3S-170K",
       "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}",
+      "temperature": 1.0,
+      "permission": {
+        "task": "allow",
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          "AGENTS.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
+    },
+    "explorer_Q3S_170K": {
+      "description": "very high intelligence, speedrating 60, 170k context, high precision, highest general knowledge: best for very complex coding and code review work",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-Q3S-170K",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_explorer.md}",
       "temperature": 1.0,
       "permission": {
         "task": "allow",

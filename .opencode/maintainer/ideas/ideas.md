@@ -12,6 +12,15 @@ question for block transfer in a session:
 so you are a fork of your original session. i have some questions: you used the block_transfer tool a bit and discovered that Paste does an append. what functionality would you like to see in this tool? change of current function? added more functions to make it more usable? multiple sets of lines to delete or copy from? write function to write into the selected area to replace the area? i have some ideas scattered in priority.md and ideas.md - but never collected them in one place
 
 
+2026-09-25_14-46 
+- planner-15 session was switched to Build agent on start of the new session?
+  - lets see if this repeats
+  - tried to the agent to planner but it reverted to build without prompt from me to apply the change i guess
+
+2026-09-25_14-33:
+- explorer prompt needs to be updated ? mh do i even need the explorer? same model to prevent
+  - compaction protokol, file references, worker
+
 2026-09-24_21-13:
 - include infos about auto-resume in the compaction handout and system prompt
   - e.g. what unit 2 and 4 actually do, how the restart of the planner after compaction works, how a new planner is started

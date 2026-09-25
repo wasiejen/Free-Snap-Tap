@@ -33,3 +33,6 @@ files) — read those on need-to-know.
   #75/#85/#90/#91 + `knowledge/opencode-plugins/auto-resume-*`.
 - The single backend slot: NEVER launch raw inference-server requests — all
   model traffic via opencode sessions (`knowledge_tools.md`).
+
+## Onlione Source Code of Opencode (as reference - may be not the same version as host install)
+- `https://github.com/anomalyco/opencode/tree/dev/packages/opencode/src/session`
