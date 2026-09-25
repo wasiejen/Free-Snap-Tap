@@ -506,3 +506,6 @@ block_transfer PASTE (no targetMarker) APPENDS to EOF — I assumed overwrite an
 ### 2026-09-24_23-48 worker_Q3S_230K_slow ses_f2aa0f8e3ffemOXY00icMeKWW3
 Wave task d: spec DoD "one commit (the two files only)" conflicts with the AGENTS.md commit routine (worker commits handover files in the same commit) — the launch env-note resolved it (handover stays uncommitted for the planner follow-up), but the spec DoD line itself could state it to avoid the ambiguity.
 
+### 2026-09-25_02-49 planner_Q3S_170K ses_f2a436b57ffe8go608Z63jwNG6
+NAP splice via inline `node -e` one-liner in bash failed on JSON/quote escaping (unterminated string) — multi-line file transforms should go through a .cjs script written to the temp dir (write tool) and executed with node, never inline heredocs/one-liners with nested quotes.
+
