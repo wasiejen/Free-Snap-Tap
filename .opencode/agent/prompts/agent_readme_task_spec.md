@@ -42,3 +42,13 @@
   its own bookkeeping commit (the #80 precedent: 1fd3726 recorded 4098253).
   Never write "LANDED (commit hash)" as a same-commit requirement — it is
   unsatisfiable by construction.
+- **Checkpoint commits (approved 2026-09-25 — the one-commit loosening, his
+  #2026-09-24_22-47):** the worker commits ONE green checkpoint per verified
+  unit (code only — the commit routine's append-discrepancies rule still
+  applies to each), so an interrupted session loses at most one unit;
+  `TODO.md` + the handover file ride the FINAL commit (carrying the code
+  commits' hashes, never their own). Spec DoDs state "checkpoint commits per
+  verified unit; TODO + handover in the final commit" — never "ONE commit"
+  for the whole task. AGENTS.md §Commit-routine step 1 carries the same rule
+  (maintainer paste pending — this bullet + the spec DoD line govern until
+  it lands).

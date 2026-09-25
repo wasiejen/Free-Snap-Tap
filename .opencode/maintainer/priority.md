@@ -37,16 +37,13 @@
 - you are intelligent - you will find something to do
   - go through my ideas for new research on functions. create a folder in research for each if you find something worthwhile
 
+# fuzzy matching of edit oldstring 
+- a very regular problem that an edit fails
+  - see # fuzzy_numword fuzzy extension on edit
+- could also be solved by a WRITE function of block_transfer
 
 
 # revocery hook event rework according to TODO
-
-# 2026-09-24_22-47:
-workers are always thinking:
-- "Context is getting tight (87%) — I'll push through the planned edits efficiently. Now auto_resume.ts: the relay helpers + the new restartText."
-  - and most often than ran into context limit while doing handover or similar things
-- part is the instruction to deliver everything in one commit
-  - loosen the  requirements to make it easier to create a checkpoint with a commit and compact without violating the one commit requirement
 
 
 
