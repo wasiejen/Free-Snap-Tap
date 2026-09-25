@@ -760,8 +760,12 @@ All those IDs stay reserved — see the numbering rule in the header.
   `.opencode/plugin/tests/context_recovery.smoke.mjs`,
   `.opencode/plugin/probes/handover_probe.mjs`,
   `knowledge/opencode-plugins/` (dated note).
-- **Status:** OPEN — spec written (handover_task.md, 2026-09-25
-  planner-15), worker launch next. Design call (planner, veto-able):
+- **Status:** IMPLEMENTED (worker-15, 2026-09-25, commit c5859c7 +
+  ebf59b2) — plugins + smokes + probe all green (291/291, 74/74, 17/17,
+  459+1w, F=0). The LIVE fork test (acceptance item: self-compact with
+  computed keep.tokens ~27k → post-compaction ≈ 52k, proving the body
+  `keep.tokens` is honored) is PENDING the maintainer's post-restart
+  fork test — that part stays OPEN. Design call (planner, veto-able):
   computed PRIMARY, budget `keepTokens` the fallback (his question (b)
   is the fix; the budget 30k stays the safety value when the DB read
   fails). SIDE NOTE (his observation, recorded): the history is
