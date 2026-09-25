@@ -241,7 +241,7 @@
  //          and does NOT consume the budget (the next call compacts)
  //      (75) the success return carries the re-application file pointer;
   //          the refusal return carries the hand-over note
-  //   S11 emergency recovery plugin (11) — TODO #93: the 2026-09-25
+  //   S11 emergency recovery plugin (13) — TODO #93: the 2026-09-25
   //      event-hook port of the T5 prototype (re-pin): the plugin file
   //      .opencode/plugin/context_recovery.ts is imported DIRECT from the
   //      repo path (type-stripped, the same way the plugin loads) and
@@ -264,10 +264,10 @@
   //          event → no summarize, no promptAsync, no budget entry
   //      (78) flag ON + overflow event + fresh budget (cap 1) → the
   //          summarize body carries the messages-resolved pair + keep
-  //          { messages: 12 } (NO tokens key), the directive byte-matches
-  //          the ported constant (the spec-2+11 relay wording), budget
-  //          count==1 ON DISK, the COMPACT line `<dt> smoke-model
-  //          COMPACT ses_rc_ok messages=12`
+  //          { messages: 12 } (tokens UNRESOLVED → tok=- none), the
+  //          directive byte-matches the ported constant (the spec-2+11
+  //          relay wording), budget count==1 ON DISK, the COMPACT line
+  //          `<dt> smoke-model COMPACT ses_rc_ok keep=12m tok=- none`
   //      (79) the once-per-overflow guard: 3 more burst events for the
   //          same overflow → no-ops (exactly ONE compact), budget
   //          unchanged
@@ -280,15 +280,22 @@
   //      (257) flag ON + NON-overflow error → no-op
   //      (258) flag value `false` → OFF
   //      (259) keep override: keepMessages 7 in the budget file → body
-  //          keep { messages: 7 } (NO tokens key) + the line
-  //          `messages=7`
+  //          keep { messages: 7 } (tokens UNRESOLVED → tok=- none) + the
+  //          line `keep=7m tok=- none`
   //      (260) config pair override: the sandbox opencode.jsonc
   //          agent.compaction.model → the summarize body carries the
   //          CONFIG pair + the line's model field (file removed
   //          afterwards)
   //      (261) unresolvable model pair (no session.messages) → the
   //          request is NOT sent (CLEAN FAIL)
-//   S12 ctx_gauge tool (4) — the loop-tool-batch part 2 approved design
+  //      (285) keepTokens computed: messages return token data (wrapper
+  //          shape, last 12 = all 2) → body keep.tokens 4500 (computed)
+  //          + the line `keep=12m tok=4500 computed`
+  //      (286) keepTokens budget fallback: messages read FAILS + budget
+  //          store keepTokens 42000 + sandbox config pair (deviation 1)
+  //          → body keep.tokens 42000 (budget) + the line
+  //          `keep=12m tok=42000 budget`
+  //   S12 ctx_gauge tool (4) — the loop-tool-batch part 2 approved design
 //      (the peek readout as a directly-fired tool): the tool file
 //      .opencode/tools/ctx_gauge.ts is imported DIRECT from the repo path
 //      (type-stripped, the same way the probe loads compact_memory.ts — the
@@ -311,7 +318,7 @@
 //      (85) hook restore (cf. check 39): the global db path is back where
 //          S12 found it; a global read and an explicit-path read of the
  //          restored path agree byte-exact (no drift left by S12)
-//   S13 compact_memory plugin tool (19) — the approved v2 proposal + the
+//   S13 compact_memory plugin tool (21) — the approved v2 proposal + the
 //      2026-09-14 maintainer adaptation (explicit pair override; SELF sync,
 //      CROSS fire-and-forget dispatch — see the spec's revision note) (the
 //      plugin-registered compact_memory, quant-class budget; supersedes the
@@ -339,7 +346,13 @@
 //          suffix); (224) call 4 emergency:true DENIED (fully exhausted) +
 //          the state survives a FRESH module instance (cache-busted
 //          re-import); (225) emergency_budget 0 → DENIED; (226) key ABSENT
-//          → fail-open default 1 (the emergency is consumed)
+//          → fail-open default 1 (the emergency is consumed);
+//          (287) keepTokens computed (tool path): messages return token
+//          data (wrapper shape, last 2) → body keep.tokens 4500
+//          (computed) + the line `keep=2m tok=4500 computed`;
+//          (288) keepTokens budget fallback (tool path): messages read
+//          FAILS + store keepTokens 30000 + model_budget cap 3 → body
+//          keep.tokens 30000 (budget) + the line `keep=4m tok=30000 budget`
 //   S14 compact_memory pre-compaction dump hook (7) — TODO #152 (approved
 //      2026-09-15): BEFORE ANY dispatch the hook dumps the target session's
 //      full pre-compaction content into the corpus via the dump script
@@ -756,7 +769,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=11 S12=4 S13=19 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 S26=20 S27=8 hygiene=6  →  "PROBE handover: 287/287 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=13 S12=4 S13=21 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 S26=20 S27=8 hygiene=6  →  "PROBE handover: 291/291 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -2262,6 +2275,8 @@ const rcReadBudget = () => {
   }
 };
 const rcCalls = { summarize: [], prompt: [] };
+let rcMessages = [{ info: { modelID: "smoke-model", providerID: "smoke-provider" } }];
+let rcMessagesError = null;
 const rcClient = {
   session: {
     summarize: (options) => {
@@ -2273,7 +2288,8 @@ const rcClient = {
       return Promise.resolve({ ok: true });
     },
     messages: (options) => {
-      return Promise.resolve([{ info: { modelID: "smoke-model", providerID: "smoke-provider" } }]);
+      if (rcMessagesError != null) return Promise.reject(rcMessagesError);
+      return Promise.resolve(rcMessages);
     },
   },
 };
@@ -2326,10 +2342,10 @@ const rcOVF = (text) => ({ name: "MessageAbortedError", data: { message: text } 
 //      default 1 — "smoke-model" UNLISTED) → success: the summarize body
 //      carries the MESSAGES-RESOLVED fallback pair (no sandbox
 //      opencode.jsonc) + keep { messages: 12 } (the fail-open default —
-//      no keep keys in the fixture; NO tokens key — spec 01), the
+//      no keep keys in the fixture; tokens UNRESOLVED → `tok=- none`), the
 //      directive BYTE-MATCHES the ported constant (synthetic text part),
 //      the budget file carries count==1 ON DISK (model recorded), and the
-//      COMPACT line `<stamp> smoke-model COMPACT ses_rc_ok messages=12`
+//      COMPACT line `<stamp> smoke-model COMPACT ses_rc_ok keep=12m tok=- none`
 {
   rcSetStore((store) => { store.emergencyRecovery = true; store.model_budget = { default: 1 }; });
   const before = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
@@ -2341,14 +2357,14 @@ const rcOVF = (text) => ({ name: "MessageAbortedError", data: { message: text } 
   check(
     "78",
     "S11",
-    "flag ON + overflow event + fresh budget (cap 1, default): the summarize body carries the messages-resolved pair + keep { messages: 12 } (NO tokens key), the directive byte-exact (the ported constant), budget count==1 on disk (model recorded), the COMPACT line `<dt> smoke-model COMPACT ses_rc_ok messages=12`",
+    "flag ON + overflow event + fresh budget (cap 1, default): the summarize body carries the messages-resolved pair + keep { messages: 12 } (tokens UNRESOLVED → tok=- none), the directive byte-exact (the ported constant), budget count==1 on disk (model recorded), the COMPACT line `<dt> smoke-model COMPACT ses_rc_ok keep=12m tok=- none`",
     rcCalls.summarize.length === before.s + 1 && sc?.path?.id === "ses_rc_ok" &&
       sc?.body?.providerID === "smoke-provider" && sc?.body?.modelID === "smoke-model" &&
-      sc?.body?.keep?.messages === 12 && sc?.body?.keep?.tokens === undefined &&
+      sc?.body?.keep?.messages === 12 && sc?.body?.keep?.tokens == null &&
       rcCalls.prompt.length === before.p + 1 && pc?.path?.id === "ses_rc_ok" && pc?.body?.parts?.length === 1 &&
       pc?.body?.parts?.[0]?.type === "text" && pc?.body?.parts?.[0]?.synthetic === true && pc?.body?.parts?.[0]?.text === RC_DIRECTIVE &&
       budget?.sessions?.ses_rc_ok?.count === 1 && budget?.sessions?.ses_rc_ok?.model === "smoke-model" &&
-      okLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_rc_ok messages=12$`).test(okLine),
+      okLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_rc_ok keep=12m tok=- none$`).test(okLine),
     JSON.stringify({ sc, p0text: pc?.body?.parts?.[0]?.text?.slice(0, 60), budget: budget?.sessions?.ses_rc_ok, line: okLine }),
   );
 }
@@ -2386,7 +2402,7 @@ const rcOVF = (text) => ({ name: "MessageAbortedError", data: { message: text } 
     "EventSessionIdle clears the guard: the next overflow fires again — the EMERGENCY slot (count 1 == cap 1): count → 2, the line carries the ` emergency` suffix",
     rcCalls.summarize.length === before.s + 1 && rcCalls.prompt.length === before.p + 1 &&
       budget?.sessions?.ses_rc_ok?.count === 2 &&
-      emgLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_rc_ok messages=12 emergency$`).test(emgLine),
+      emgLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_rc_ok keep=12m tok=- none emergency$`).test(emgLine),
     JSON.stringify({ ds: rcCalls.summarize.length - before.s, count: budget?.sessions?.ses_rc_ok?.count, line: emgLine }),
   );
 }
@@ -2444,8 +2460,8 @@ const rcOVF = (text) => ({ name: "MessageAbortedError", data: { message: text } 
 
 // 259 — the keep override: keepMessages 7 in the budget file (keepTokens
 //       REMOVED — spec 01: never read, never defaulted, never sent) → the
-//       summarize body keep { messages: 7 } (NO tokens key) + the COMPACT
-//       line `messages=7`
+//       summarize body keep { messages: 7 } (tokens UNRESOLVED → tok=- none)
+//       + the COMPACT line `keep=7m tok=- none`
 {
   rcSetStore((store) => { store.emergencyRecovery = true; store.keepMessages = 7; store.model_budget = { default: 1 }; });
   const before = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
@@ -2456,10 +2472,10 @@ const rcOVF = (text) => ({ name: "MessageAbortedError", data: { message: text } 
   check(
     "259",
     "S11",
-    "keep override: keepMessages 7 in the budget file → summarize body keep { messages: 7 } (NO tokens key — spec 01) + the COMPACT line `messages=7`",
-    sc259?.path?.id === "ses_rc_keep" && sc259?.body?.keep?.messages === 7 && sc259?.body?.keep?.tokens === undefined &&
+    "keep override: keepMessages 7 in the budget file → summarize body keep { messages: 7 } (tokens UNRESOLVED → tok=- none) + the COMPACT line `keep=7m tok=- none`",
+    sc259?.path?.id === "ses_rc_keep" && sc259?.body?.keep?.messages === 7 && sc259?.body?.keep?.tokens == null &&
       budget259?.sessions?.ses_rc_keep?.count === 1 &&
-      keepLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_rc_keep messages=7$`).test(keepLine),
+      keepLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_rc_keep keep=7m tok=- none$`).test(keepLine),
     JSON.stringify({ keep: sc259?.body?.keep, line: keepLine }),
   );
 }
@@ -2485,7 +2501,7 @@ const rcOVF = (text) => ({ name: "MessageAbortedError", data: { message: text } 
     rcCalls.summarize.length === before.s + 1 && sc260?.path?.id === "ses_rc_cfg" &&
       sc260?.body?.providerID === "cfgprov" && sc260?.body?.modelID === "cfgmodel" &&
       budget260?.sessions?.ses_rc_cfg?.count === 1 && budget260?.sessions?.ses_rc_cfg?.model === "cfgmodel" &&
-      cfgLine != null && new RegExp(`^${DT} cfgmodel COMPACT ses_rc_cfg messages=12$`).test(cfgLine),
+      cfgLine != null && new RegExp(`^${DT} cfgmodel COMPACT ses_rc_cfg keep=12m tok=- none$`).test(cfgLine),
     JSON.stringify({ body: sc260?.body, line: cfgLine }),
   );
 }
@@ -2514,6 +2530,61 @@ const rcOVF = (text) => ({ name: "MessageAbortedError", data: { message: text } 
       (budget261 == null || budget261.sessions?.ses_rc_nomodel == null) && !ctxLogLines().some((l) => l.includes("COMPACT ses_rc_nomodel")),
     JSON.stringify({ ds: rcCalls.summarize.length - before.s, dp: rcCalls.prompt.length - before.p }),
   );
+}
+
+// 285 — keepTokens computed: the fake client's messages return token data
+//       (wrapper shape, last 12 = all 2) → the summarize body carries
+//       keep.tokens 4500 (computed) + the COMPACT line
+//       `keep=12m tok=4500 computed`
+{
+  rcMessages = { data: [
+    { info: { role: "user", tokens: { input: 1200 } } },
+    { info: { modelID: "smoke-model", providerID: "smoke-provider", role: "assistant", tokens: { output: 2500, reasoning: 800 } } },
+  ] };
+  rcSetStore((store) => { store.emergencyRecovery = true; store.model_budget = { default: 1 }; delete store.keepMessages; delete store.keepTokens; });
+  const before285 = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+  await rcFireError("ses_rc_tokcomp", rcOVF("context length exceeded"));
+  const sc285 = rcCalls.summarize.at(-1);
+  const tokLine = ctxLogLines().find((l) => l.includes("COMPACT ses_rc_tokcomp"));
+  check(
+    "285",
+    "S11",
+    "keepTokens computed: messages return token data (wrapper shape, last 12 = all 2) → body keep.tokens 4500 (computed) + the COMPACT line `keep=12m tok=4500 computed`",
+    sc285?.path?.id === "ses_rc_tokcomp" && sc285?.body?.keep?.messages === 12 && sc285?.body?.keep?.tokens === 4500 &&
+      tokLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_rc_tokcomp keep=12m tok=4500 computed$`).test(tokLine),
+    JSON.stringify({ keep: sc285?.body?.keep, line: tokLine }),
+  );
+  rcMessages = [{ info: { modelID: "smoke-model", providerID: "smoke-provider" } }];
+}
+
+// 286 — keepTokens budget fallback: the messages read FAILS (rcMessagesError)
+//       + the budget store carries keepTokens 42000 + the sandbox
+//       opencode.jsonc pair (deviation 1: the model pair comes from the
+//       SAME messages read — a failed read leaves no pair → CLEAN FAIL
+//       before the keep resolution; the config pair lets the budget path
+//       execute) → the body carries keep.tokens 42000 (budget) + the
+//       COMPACT line `keep=12m tok=42000 budget`
+{
+  rcMessagesError = new Error("boom-rc-msgs");
+  const CFGP286 = path.join(SANDBOX, "opencode.jsonc");
+  rcSetStore((store) => { store.emergencyRecovery = true; store.model_budget = { default: 1 }; store.keepTokens = 42000; delete store.keepMessages; });
+  writeFileSync(CFGP286, `{\n  "agent": { "compaction": { "model": "cfgprov/cfgmodel" } }\n}`, "utf8");
+  const before286 = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+  await rcFireError("ses_rc_tokbud", rcOVF("context length exceeded"));
+  rmSync(CFGP286, { force: true });
+  const sc286 = rcCalls.summarize.at(-1);
+  const budLine = ctxLogLines().find((l) => l.includes("COMPACT ses_rc_tokbud"));
+  check(
+    "286",
+    "S11",
+    "keepTokens budget fallback: messages read FAILS + budget store keepTokens 42000 + sandbox config pair → body keep.tokens 42000 (budget) + the COMPACT line `keep=12m tok=42000 budget`",
+    sc286?.path?.id === "ses_rc_tokbud" && sc286?.body?.keep?.messages === 12 && sc286?.body?.keep?.tokens === 42000 &&
+      sc286?.body?.providerID === "cfgprov" && sc286?.body?.modelID === "cfgmodel" &&
+      budLine != null && new RegExp(`^${DT} cfgmodel COMPACT ses_rc_tokbud keep=12m tok=42000 budget$`).test(budLine),
+    JSON.stringify({ keep: sc286?.body?.keep, line: budLine }),
+  );
+  rcMessagesError = null;
+  rcSetStore((store) => { delete store.keepTokens; });
 }
 
 // ------------------------------------------------------------------ S12 ctx_gauge tool (4) — the loop-tool-batch part 2 (the approved design)
@@ -2893,14 +2964,14 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
 }
 
 // 96 — the COMPACT line WITH the model field POPULATED (the sandbox ctx.log):
-//      `<dt> Qwen3.8-27B-IQ4KT-120K COMPACT ses_qc_self messages=7`
+//      `<dt> Qwen3.8-27B-IQ4KT-120K COMPACT ses_qc_self keep=7m tok=- none`
 {
   const line = ctxLogLines().find((l) => l.includes("COMPACT ses_qc_self"));
   check(
     "96",
     "S13",
-    "COMPACT line WITH the model field populated (sandbox ctx.log): `<dt> Qwen3.8-27B-IQ4KT-120K COMPACT ses_qc_self messages=7`",
-    line != null && new RegExp(`^${DT} Qwen3\\.8-27B-IQ4KT-120K COMPACT ses_qc_self messages=7$`).test(line),
+    "COMPACT line WITH the model field populated (sandbox ctx.log): `<dt> Qwen3.8-27B-IQ4KT-120K COMPACT ses_qc_self keep=7m tok=- none`",
+    line != null && new RegExp(`^${DT} Qwen3\\.8-27B-IQ4KT-120K COMPACT ses_qc_self keep=7m tok=- none$`).test(line),
     JSON.stringify(line),
   );
 }
@@ -3011,15 +3082,15 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   const r3e = await t.execute({ keepMessages: 2, sessionID: "ses_qc_emg", emergency: true }, qcCtx({}));
   await qcTick();
   const st = qcStore();
-  const lineEmg = ctxLogLines().find((l) => l.includes("COMPACT ses_qc_emg messages=2 emergency"));
-  const lineNorm = ctxLogLines().filter((l) => l.includes("COMPACT ses_qc_emg messages=2") && !l.includes(" emergency"));
+  const lineEmg = ctxLogLines().find((l) => l.includes("COMPACT ses_qc_emg keep=2m tok=- none emergency"));
+  const lineNorm = ctxLogLines().filter((l) => l.includes("COMPACT ses_qc_emg keep=2m tok=- none") && !l.includes(" emergency"));
   check(
     "223",
     "S13",
     "emergency-1: at count == cap the `emergency` arg dispatches the once-per-session emergency (count → cap+1 = 3); the COMPACT line carries ` emergency`; the normal lines carry NO suffix",
     /dispatched/i.test(r3e) && st.sessions.ses_qc_emg?.count === 3 && lineEmg != null &&
-      new RegExp(`^${DT} Gate-M COMPACT ses_qc_emg messages=2 emergency$`).test(lineEmg) &&
-      lineNorm.length === 2 && lineNorm.every((l) => new RegExp(`^${DT} Gate-M COMPACT ses_qc_emg messages=2$`).test(l)),
+      new RegExp(`^${DT} Gate-M COMPACT ses_qc_emg keep=2m tok=- none emergency$`).test(lineEmg) &&
+      lineNorm.length === 2 && lineNorm.every((l) => new RegExp(`^${DT} Gate-M COMPACT ses_qc_emg keep=2m tok=- none$`).test(l)),
     JSON.stringify({ lineEmg, lineNorm }),
   );
 }
@@ -3088,15 +3159,73 @@ writeFileSync(QC_DUMP_SCRIPT, QC_FAKE_DUMP, "utf8");
   await run({ keepMessages: 1, sessionID: "ses_qc_emgdf" });
   const rD = await run({ keepMessages: 1, sessionID: "ses_qc_emgdf", emergency: true });
   const st = qcStore();
-  const lineD = ctxLogLines().find((l) => l.includes("COMPACT ses_qc_emgdf messages=1 emergency"));
+  const lineD = ctxLogLines().find((l) => l.includes("COMPACT ses_qc_emgdf keep=1m tok=- none emergency"));
   check(
     "226",
     "S13",
     "emergency_budget key ABSENT → fail-open default 1: at count == cap the `emergency` arg dispatches (count → cap+1), the COMPACT line carries ` emergency`",
     /dispatched/i.test(rD) && st.sessions.ses_qc_emgdf?.count === 3 && lineD != null &&
-      new RegExp(`^${DT} Gate-M COMPACT ses_qc_emgdf messages=1 emergency$`).test(lineD),
+      new RegExp(`^${DT} Gate-M COMPACT ses_qc_emgdf keep=1m tok=- none emergency$`).test(lineD),
     JSON.stringify({ rD: String(rD).slice(0, 120), lineD }),
   );
+}
+
+// 287 — keepTokens computed (S13 tool path): the fake client's messages
+//       return token data (wrapper shape, last 2) → the summarize body
+//       carries keep.tokens 4500 (computed) + the COMPACT line
+//       `keep=2m tok=4500 computed` (model field `QC-TokModel` — unlisted,
+//       cap 1, fresh session)
+{
+  const { rec, res } = await qcExec(
+    { summarize: true, messages: { data: [
+      { info: { role: "user", tokens: { input: 1200 } } },
+      { info: { modelID: "QC-TokModel", providerID: "llama-swap", role: "assistant", tokens: { output: 2500, reasoning: 800 } } },
+    ] } },
+    { keepMessages: 2, sessionID: "ses_qc_tokcomp" },
+  );
+  await qcTick();
+  const st287 = qcStore();
+  const tokLine287 = ctxLogLines().find((l) => l.includes("COMPACT ses_qc_tokcomp"));
+  check(
+    "287",
+    "S13",
+    "keepTokens computed (tool path): messages return token data (wrapper shape, last 2) → body keep.tokens 4500 (computed) + the COMPACT line `keep=2m tok=4500 computed`",
+    rec.summarize.length === 1 && rec.summarize[0]?.body?.keep?.messages === 2 && rec.summarize[0]?.body?.keep?.tokens === 4500 &&
+      rec.summarize[0]?.body?.modelID === "QC-TokModel" &&
+      st287.sessions.ses_qc_tokcomp?.count === 1 &&
+      tokLine287 != null && new RegExp(`^${DT} QC-TokModel COMPACT ses_qc_tokcomp keep=2m tok=4500 computed$`).test(tokLine287),
+    JSON.stringify({ keep: rec.summarize[0]?.body?.keep, line: tokLine287 }),
+  );
+}
+
+// 288 — keepTokens budget fallback (S13 tool path): the messages read
+//       FAILS + the budget store carries keepTokens 30000 + the model_budget
+//       map is restored to { Qwen3.8-27B-IQ4KT-120K: 3, default: 1 } (cap 3
+//       — after checks 222-226 the live model is UNLISTED cap 1 and
+//       ses_qc_self already has count 1 → a SELF compaction would be DENIED
+//       at cap 1) → the body carries keep.tokens 30000 (budget) + the
+//       COMPACT line `keep=4m tok=30000 budget` (model field
+//       `Qwen3.8-27B-IQ4KT-120K`)
+{
+  const st288 = qcStore();
+  st288.keepTokens = 30000;
+  st288.model_budget = { "Qwen3.8-27B-IQ4KT-120K": 3, default: 1 };
+  writeFileSync(path.join(SANDBOX, ".opencode", "temp", "compact_budget.json"), JSON.stringify(st288, null, 2) + "\n", "utf8");
+  const { rec, res } = await qcExec({ summarize: true, messagesError: new Error("boom-qc-msgs") }, { keepMessages: 4 });
+  await qcTick();
+  const st288b = qcStore();
+  const budLine288 = ctxLogLines().find((l) => l.includes("COMPACT ses_qc_self") && l.includes("keep=4m tok=30000 budget"));
+  check(
+    "288",
+    "S13",
+    "keepTokens budget fallback (tool path): messages read FAILS + store keepTokens 30000 + model_budget cap 3 → body keep.tokens 30000 (budget) + the COMPACT line `keep=4m tok=30000 budget`",
+    rec.summarize.length === 1 && rec.summarize[0]?.body?.keep?.messages === 4 && rec.summarize[0]?.body?.keep?.tokens === 30000 &&
+      st288b.sessions.ses_qc_self?.count === 2 &&
+      budLine288 != null && new RegExp(`^${DT} Qwen3\\.8-27B-IQ4KT-120K COMPACT ses_qc_self keep=4m tok=30000 budget$`).test(budLine288),
+    JSON.stringify({ keep: rec.summarize[0]?.body?.keep, line: budLine288 }),
+  );
+  delete st288b.keepTokens;
+  writeFileSync(path.join(SANDBOX, ".opencode", "temp", "compact_budget.json"), JSON.stringify(st288b, null, 2) + "\n", "utf8");
 }
 
 // ------------------------------------------------------------------ S14 compact_memory pre-compaction dump hook (7) — TODO #152 (approved 2026-09-15): the no-overwrite corpus dump before ANY dispatch
@@ -6386,7 +6515,7 @@ let ioF77 = null; // the c277 fuzzy-edit line (284 checks its byte-exact shape)
   const postLog = POST["plugin.log"] ?? "";
   const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
   const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
-  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non", "ses_rc_keep", "ses_rc_cfg", "ses_rc_nomodel", "ses_qc_self", "ses_qc_retry", "ses_qc_flat", "ses_qc_nocli", "ses_qc_gate", "ses_qc_cpu", "ses_qc_fail", "ses_qc_msg", "ses_qc_cross", "ses_qc_rpc", "ses_qc_pair", "ses_qc_emg", "ses_qc_emg0", "ses_qc_emgdf", "ses_pc_noscript", "ses_pc_ok", "ses_qc_dumpok", "ses_qc_cfgbody"];
+  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non", "ses_rc_keep", "ses_rc_cfg", "ses_rc_nomodel", "ses_qc_self", "ses_qc_retry", "ses_qc_flat", "ses_qc_nocli", "ses_qc_gate", "ses_qc_cpu", "ses_qc_fail", "ses_qc_msg", "ses_qc_cross", "ses_qc_rpc", "ses_qc_pair", "ses_qc_emg", "ses_qc_emg0", "ses_qc_emgdf", "ses_pc_noscript", "ses_pc_ok", "ses_qc_dumpok", "ses_qc_cfgbody", "ses_rc_tokcomp", "ses_rc_tokbud", "ses_qc_tokcomp"];
   const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`) || l.includes(`"sess":"${fid}"`)));
   check(
     "43",
