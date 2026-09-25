@@ -282,6 +282,11 @@ let projectDir = "";
 // read, null = read but no usable agents map / parse failure, object =
 // the agents map) — read only when the fallback fires (never per tick).
 let jsoncAgentsCache: Record<string, unknown> | null | undefined;
+// #98 part B: the ctx.log TAIL CURSOR (module-level — the file is
+// append-only; the cursor always sits on a line boundary (a newline
+// is a single UTF-8 byte), so a byte offset is a character boundary;
+// a size REGRESSION (rotation/trim) resets it to 0).
+let ctxLogOffset = 0;
 
 // Unit 2 module-level state (all state at module level — the file's
 // Unit 1 shape): per-session watches, the re-entrancy latch, the
@@ -1362,10 +1367,73 @@ async function routeScopedIdle(sid: string, w: Watch) {
   }
 }
 
+// #98 part B: the COMPACT-line sid extractor (the measured ctx.log
+// line format: `<YYYY-MM-DD_HH-MM> <model> COMPACT <sid>
+// [tok=<n> <source>] messages=<n>`).
+const COMPACT_SID_RE = /\bCOMPACT\s+(ses_[A-Za-z0-9_]+)/;
+
+// #98 part B: the RE-ARM tail-read — on EVERY tick, read only the NEW
+// content of `.opencode/temp/ctx.log` since the last tick (the
+// `ctxLogOffset` cursor); for each NEW `COMPACT <sid>` line whose sid
+// is currently WATCHED: set `idlePending` + reset `recoveryCount` to 0
+// (a FRESH recovery budget — the context situation changed after the
+// compaction). The silent-compaction gap: a compaction that neither
+// emits a fresh busy nor an idle would otherwise leave the watch
+// UNARMED (no pending decision, no recovery, no restart — the
+// session stalls silently). The existing routing loop (the SAME tick)
+// then routes the newly-armed sid. A partial trailing line (no newline
+// yet — the writer is mid-write) is held back for the next tick
+// (processing it now would lose it forever). Never throws (the tick's
+// never-throw contract); only watched sids are armed; a fresh busy
+// already clears `idlePending` (the arm path) so no double send.
+function tailCompactRearm(): void {
+  const ctxLogPath = join(logDir, "ctx.log");
+  let size: number;
+  try {
+    size = statSync(ctxLogPath).size;
+  } catch {
+    return; // no ctx.log yet / unreadable → no-op
+  }
+  if (size < ctxLogOffset) ctxLogOffset = 0; // shrank (rotation/trim) → re-read from the start
+  if (size === ctxLogOffset) return; // no new content
+  const buf = Buffer.alloc(size - ctxLogOffset);
+  let n = 0;
+  try {
+    const fd = openSync(ctxLogPath, "r");
+    try {
+      n = readSync(fd, buf, 0, size - ctxLogOffset, ctxLogOffset);
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return; // unreadable → no-op (the cursor is unchanged)
+  }
+  const chunk = buf.subarray(0, n).toString("utf-8");
+  let complete: string;
+  if (chunk.length > 0 && chunk.charCodeAt(chunk.length - 1) === 10) {
+    ctxLogOffset += n; // every line in the chunk is fully written
+    complete = chunk;
+  } else {
+    const nl = chunk.lastIndexOf("\n");
+    ctxLogOffset += nl + 1; // nl === -1 → advance 0 (hold the whole chunk back)
+    complete = nl >= 0 ? chunk.slice(0, nl) : "";
+  }
+  for (const line of complete.split("\n")) {
+    const m = line.match(COMPACT_SID_RE);
+    if (!m) continue;
+    const w = watches.get(m[1]);
+    if (!w) continue; // only watched sids
+    w.idlePending = true;
+    w.recoveryCount = 0; // a FRESH recovery budget (the context changed)
+    log(`rearm= compact sid=${m[1]}`);
+  }
+}
+
 // Unit 3+4: the ONE tick (5000ms default, per-factory tickMs option) —
 // the only decision+send funnel. Unit 3's
 // trigger check runs first (the spawn is a high-priority action), then
-// Unit 4 routes every scoped session with a pending idle decision.
+// #98 part B re-arms the watched sids on a NEW ctx.log COMPACT line,
+// then Unit 4 routes every scoped session with a pending idle decision.
 // (#85 part 3: Unit 2 has no tick leg anymore — the nudge is a passive
 // ctx-line suffix on the tool-call return, gated per tool result in
 // onToolAfterNudge.) Never throws out (an unhandled rejection from the
@@ -1373,6 +1441,11 @@ async function routeScopedIdle(sid: string, w: Watch) {
 async function tick() {
   try {
     await checkSpawnTrigger(); // Unit 3 — the trigger check first
+  } catch {
+    // swallow — the timer callback must never reject
+  }
+  try {
+    tailCompactRearm(); // #98 part B — BEFORE the routing loop: arm on a NEW ctx.log COMPACT line
   } catch {
     // swallow — the timer callback must never reject
   }

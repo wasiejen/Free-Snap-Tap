@@ -1837,6 +1837,44 @@ try {
         (p98SpawnSend?.body?.parts?.[0]?.text ?? "").includes("auto-resume unit 4 restart branch"),
       `create=${p98Creates.length} send=${!!p98SpawnSend}`);
 
+    // (B) the ctx.log COMPACT tail-read (part B): a NEW `COMPACT <sid>`
+    // line for a WATCHED sid re-arms the watch on the next tick
+    // (idlePending set + recoveryCount reset to 0 — a FRESH recovery
+    // budget) → routing proceeds WITHOUT a fresh busy/idle event (the
+    // silent-compaction gap). The synthetic ctx.log lands in the
+    // sandbox's .opencode/temp/ (NEVER the live one).
+    p98Script.set("ses_p98_compact", [
+      { info: { role: "user", agent: PLANNER_A }, parts: [{ type: "text", text: MARK + " iteration 1" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "Mid-unit, no closing line." }] },
+    ]);
+    // step 1: one normal idle cycle → recovery attempt 1 (the budget is now 1).
+    await fire(hooksP98, "ses_p98_compact", [statusEv("ses_p98_compact", "busy"), statusEv("ses_p98_compact", "idle")]);
+    const okP98B1 = await waitUntil(() => readLines().some((l) => l.includes("recovery= sid=ses_p98_compact attempt=1")), 12000);
+    // step 2: the synthetic ctx.log — a COMPACT line for the WATCHED sid
+    // + one for an UNWATCHED sid (the guard: only watched sids arm).
+    const ctxLogPath = path.join(proj, ".opencode", "temp", "ctx.log");
+    fs.writeFileSync(ctxLogPath,
+      "2026-09-25_14-36 Qwen3.8-27B-Q3S-170K COMPACT ses_p98_compact messages=10\n" +
+      "2026-09-25_14-37 Qwen3.8-27B-Q3S-170K COMPACT ses_p98_unwatched messages=8\n", "utf-8");
+    // step 3: the NEXT tick tail-reads the NEW lines, re-arms (budget 1 → 0)
+    // and routes on the SAME tick → a SECOND attempt=1 (not attempt=2 —
+    // the budget reset is the discriminator).
+    const p98Rearm = () => readLines().filter((l) => l.includes("rearm= compact sid=ses_p98_compact")).length;
+    const p98Cont1 = () => readLines().filter((l) => l.includes("recovery= sid=ses_p98_compact attempt=1")).length;
+    const p98Cont2 = () => readLines().filter((l) => l.includes("recovery= sid=ses_p98_compact attempt=2")).length;
+    const okP98B = okP98B1 && (await waitUntil(() => p98Rearm() >= 1 && p98Cont1() >= 2, 12000));
+    await tickWait(); // at least one full tick period — the no-attempt-2 absence must be settled
+    chk("#98 (B1): a NEW ctx.log `COMPACT <sid>` line for a watched sid re-arms the watch on the next tick (rearm= line; NO fresh busy/idle event — the silent-compaction gap closed)",
+      okP98B && p98Rearm() === 1 && p98Cont1() >= 2, `rearm=${p98Rearm()} cont1=${p98Cont1()}`);
+    chk("#98 (B2): the re-arm RESETS the recovery budget (a SECOND attempt=1, NO attempt=2 — without the reset the re-armed cycle would be attempt 2) → routing proceeds (a second queued CONTINUE, no restart spawn)",
+      okP98B && p98Cont1() === 2 && p98Cont2() === 0 &&
+        p98Sends.filter((c) => c.path?.id === "ses_p98_compact").length === 2 &&
+        !readLines().some((l) => l.includes("route= restart spawn sid=ses_p98_compact")) && p98Creates.length === 1,
+      `cont1=${p98Cont1()} cont2=${p98Cont2()} sends=${p98Sends.filter((c) => c.path?.id === "ses_p98_compact").length}`);
+    chk("#98 (B3): the UNWATCHED sid in the same ctx.log batch is NOT armed (no rearm= line, no scope/route/recovery line for it)",
+      okP98B && !readLines().some((l) => l.includes("rearm= compact sid=ses_p98_unwatched")) &&
+        !readLines().some((l) => l.includes("sid=ses_p98_unwatched") && (l.includes("route=") || l.includes("recovery=") || l.includes("scope="))), "");
+
     // ---- the live log received NO smoke line. The LIVE plugin instance
   // (this host) keeps appending ITS OWN live-session lines in real time
   // while the smoke runs, so the live size may legitimately grow — the
