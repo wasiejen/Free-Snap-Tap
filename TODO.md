@@ -626,8 +626,15 @@ All those IDs stay reserved — see the numbering rule in the header.
   next restart with the `log-trim=` line; smoke + standard gate green.
 - **Suggested scope:** `.opencode/plugin/auto_resume.ts` (`onEvent`,
   init, the trim guard), `.opencode/plugin/tests/auto_resume.smoke.mjs`.
-- **Status:** OPEN — spec at launch (queued after R6; his launch item
-  3, 2026-09-25).
+- **Status:** CODE LANDED (worker-Q3S-170K, 2026-09-25, commits
+  22c36e4 + 70399ea): the delta exclusion + the init size guard
+  (defaults 20MB/2MB, factory options `maxLogBytes`/`logTailBytes`) +
+  the smoke re-pins (133/133; standard gate green: probe 279/279,
+  pytest 459 passed + 1 warning, ruff F=0). PENDING his live check at
+  the next host restart: zero `message.part.delta` lines appended from
+  the new build + the existing file (239.6MB at measure, ~100MB/day
+  growth — 264.4MB at worker run) trimmed to ~2MB with the `log-trim=`
+  line — then close.
 
 ## #97. (open, 2026-09-25, his live priority.md edit labeled "TODO #97"; planner-14 filed) R8 sandbox redirect: out-of-sandbox path args redirected INTO the sandbox (repeated out-of-sandbox accesses stop the session until he intervenes)
 - **Problem / evidence:** his priority.md live section 2026-09-25 ("# fuzzy_numword
