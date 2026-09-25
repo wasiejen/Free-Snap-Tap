@@ -5,17 +5,34 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
+2026-09-25_18-01:
 
+  ctx: SESSION=ses_f27282d2dfferl9gScrfLt2AxV CTX=84677 (49%) REM=85323 | 4 compactions left
+  <|Direct|>
+  stop.
+  first time the worker self compacted.
+  after resume the worker stopped on the context limit - without triggering it it seems. 
+  that was not voluntary by the worker.
+  your second resume then triggered the context limit violation and the auto-resume plugin startet the emergency compaction.
+  after compaction you were again active and fired another compaction (the third for the worker) as cross compaction on the worker. 
+  both compaction ran with keepMessages= 18 so it might be ok.
+  
+  What was the result of the second stop without context limit violation? just an emptry result?
+  
+  + Thought: 52.3s
+  Yes — just an empty result, no other signal. Precise timeline of what I observed:
+  1. First resume (after my self-compaction): the worker ran, committed Unit 1 (07bdd56), staged the full Unit 2 code + pins in the tree — then the Task tool returned state: completed with a completely empty task_result (no text, no error, no Work State summary, no DONE line in the loop log). It stopped silently at the limit without triggering its own compaction — nothing surfaced to me. I rebuilt the state purely from files (git log + git status + the in-progress handover + the diff), per the limit-death discipline.
+  2. My second resume attempt: that one failed immediately with request (170869 tokens) exceeds the available context size (170240 tokens) — the session was already past the window, so even injecting my resume message was hard-rejected (MEM-0109 signature). No work ran on that attempt.
+  3. Then the auto-resume emergency compaction + my CROSS compaction (third for the worker) both landed, keepMessages=18 each.
+  So the "second stop" left no result channel at all — only the committed + staged state. Now that both compactions are in, the session should be below the wall. Verifying, then retrying the resume:
 
-
-question for block transfer in a session:
-so you are a fork of your original session. i have some questions: you used the block_transfer tool a bit and discovered that Paste does an append. what functionality would you like to see in this tool? change of current function? added more functions to make it more usable? multiple sets of lines to delete or copy from? write function to write into the selected area to replace the area? i have some ideas scattered in priority.md and ideas.md - but never collected them in one place
-
-
+  submit [feedback=A worker session that stops at the context wall WITHOUT triggering a self-compaction returns only an EMPTY Task result (no error, no Work State, no loop-log line) — recovery required full file forensics (git log + status + in-progress handover). A signal in the result channel (stop reason) or a plugin-side detection + `-WARNING` loop-log line for silent limit-stops would make the resume decision instant instead of forensic.]
+  
 2026-09-25_14-46 
 - planner-15 session was switched to Build agent on start of the new session?
   - lets see if this repeats
-  - tried to the agent to planner but it reverted to build without prompt from me to apply the change i guess
+    - set default agent to planner in opencode.json
+  - tried to change the agent to planner but it reverted to build without prompt from me to apply the change i guess
 
 2026-09-25_14-33:
 - explorer prompt needs to be updated ? mh do i even need the explorer? same model to prevent
@@ -76,8 +93,8 @@ try to be more creative and experiment a bit with different appoaches to problem
 2026-09-22_12-03:
 - commit has inclusion instruction lets every worker stumble on how to do it
   - needs clear instruction or has to be part of the spec
-    - maybe a spec template to be filled out? with handles all the not changing parts of the process
-      - could be created with an edit marker for easier filling out 
+- maybe a spec template to be filled out? with handles all the not changing parts of the process
+  - could be created with an edit marker for easier filling out 
 
 - overhead of small changes are big atm - loosem the 15 diff line convention
   - 2026-09-22_12-41 done - first change to planner prompt
@@ -148,23 +165,6 @@ try to be more creative and experiment a bit with different appoaches to problem
   - this needs to be checked
     - apparently its the way the opencode TUI does this
 
-
-# 8 write to buffer option?
-- so no direct writes can fail
-- if intercepts can not resolve a filepath it is buffered instead - but how to retrieve? special marker in write command? or just dump it into a file and inform agent?
-Refer to R6 in fuzzy_numword as sketch for a cheap dump file for every edit and write tool call, 
-- to prevent rewrite cost (rewrites take time and stay in context - copy with block_tansfer from the editlog or writelog is way cheaper and faster)
-  - .opencode/temp/journal_write.log
-  - .opencode/temp/journal_edit.log
-- but also to use anchor points to scan for low density parts of oldstring in the destination file to identify candidates and then fuzzy check these only and if one match is found replace oldstring with it to have no failed edit action
-  - path correction for edit should be in R1 already
-
-## what would be needed to make block_transfer as versatile as edit but less prone to oldstring mismatch?
-  - write option to write into the selected block?
-  - multiple writes per tool call
-  - stability by providing markers/text anchors that can resolve in the line not only at the start? - might be too much work for small gain. but might be useful for long lines?
-    - markers not only for line but for specific text (best combined with a line reference for closet search) + fuzzy matching in this area
-    - applied from highest line number to lowest to not shift lines
 
 ## tool description list/prompt that explains the available costum tools to each agent
 - session_info

@@ -37,27 +37,12 @@
 - you are intelligent - you will find something to do
   - go through my ideas for new research on functions. create a folder in research for each if you find something worthwhile
 
-# keepMessages does not work -> only keepToken is respected by summarize()/compaction
-- bases on observations and research i did online in the current version of opencode keepMessages is entirely ignored. the compaction is based entirely on keepToken. And since we set keepToken to 0 to enable keepMessages (which is ignored) the agents essentially get lobotomized and keep as good as nothing from the prior uncompacted session.
-- settings for keepToken as fallback from compact_budged.json
-- can we caluculate the actual keepToken based on the dump and then supply the correct keepToken to exactly keep these messages?
-
-- based on observations 
-  - that independent of set keepMessages the compactied sessions starts at around 25k token.
-  - a freshly compacted planner read 4 turns before the compaction a specific smoke_r6.txt. when supplied after the compaction with the same file the planner behaved as if this was an unknown file -> thus the message was not kept.
-  - current specification for V2 opencode confirm that only keepToken is the only keep value left and uses summeries instead of tail_turn in V1
-    - but i thought we were on V1 - but the bahavior and summery existence point to V2 ...
-
-- also as info, the history is completely dropped and REPLACED by the summery. so there seems not to be a danger of bit-rot from a compacted history, but only from a N summerized summery.
-
-- default value set to 30k now in both compact_budged.json and opencode.json
-  - checked in compact_memory.ts the keepToken is not passed to summerize() and thus fallback to default (in this case opencode.json 30000 keepToken)
-  
-This is my error as maintainer, to not have checked prior on live session or forks.
-
-- source of current compaction.ts of opencode
-  - https://github.com/anomalyco/opencode/blob/dev/packages%2Fopencode%2Fsrc%2Fsession%2Fcompaction.ts
-  - https://github.com/anomalyco/opencode/tree/dev/packages/opencode/src/session
+# include loop.log in your files that are only read sparingly with limit (e.g. to determine current loop number)
+  - currently 30000 chars ... around 16k token (lots of numbers and dense strings)
+  - easiest was to determine is to just get your session title before trying to read the loop.log?
+    - what is the easiest method for the agent? title of session or loop.log careful grep?
+    - -> do we need to codify this somewhere? 
+    - or include the current iteration number in the starting unit 4 message of a new session? (later maybe)
 
 # fuzzy matching of edit oldstring 
 - a very regular problem that an edit fails
@@ -73,54 +58,11 @@ This is my error as maintainer, to not have checked prior on live session or for
     - basis for resolution are the "permission.external_directory" and "references" sections of opencode.jsonc
 
 
-
-
-
-
-
-
-
-
-# 1 compact_memory additions/fix messages (your todo ##70 likely needs an update)
-- autocompact on context limit option, toggable via parameter in the budget file
-- (1)add a fallback to fetch the providerID and modelID as fallback for cross-session compaction (so only session_id needs to be set) 
-  - source is in line 119 of opencode.json defines as agent compaction. (a planner used the wrong modelID for self-compaction)
-  - on self-compaction the model should also be resolved from the opencode.json if in doubt. only explicit overwrite of the model will change the compaction model.
-    - cross-compaction -> only needs session id of to be compacted session
-    - self-compaction -> needs not parameters at all (parameter desciptions in compact_memory are likely descriped badly by me -> needs to reword this so it is clearer)
-  - 26-09-21_03-17: both providerID and modelID should just be removed from the parameter list exposed to the agents
-    - looks up settings in opencode.json for the compaction agent
-    - if not compaction agent it used the default providerID and modelID of the session that does the compaction. (normally a worker, planner have the same anyway)
-      - the same model of the session to compact the session should result in better results even - even if it takes a whole lot longer than gemma.
-    - 
-26-09-16_21-02: 
-- message value from compact_memory do not arrive in the compacted sesssion. not as part of the summery or later
-  - change to direct prompt messges for message content. async should not hurt - no await (i guess?) - message should be queued and when resumed delivered
-    - we have done something similar in the past with out nudges and the message arrived. but interferred with execution. but on compaction not execution thus no risk of interception.
-    - keepMessage is extremely useful for customizing compaction
-      - testing a bit more
-  - idea: use of a collect function in buffer (proposed in .opencode\maintainer\feedback\FB_2026-09-16_block_transfer_status.md) to collect different parts of files and put them into a buffer to send with the message for the next compacted agent. he gets an instand dump of all relevant sections and does not need to reread everything.
-    - further costumization of compact to get the new one faster and targeted up and running
-    - feedback for that pleasy and for buffer_transfer - up and downs - what is problematic and why, what would be alternatives. so a small research on each.
-      - we need a research spec ...
-        - too many ideas .. idle hands and so ...
-
-26-09-17_00-11:
-  - observed multiple failed dump messages in ctx.log
-  - Line 4741: 2026-09-16_21-48 DUMP-FAIL ses_f54677188ffeVjBr0O8pXp5cXT spawnSync node ETIMEDOUT
-    - not present in compaction_dumps folder
-  - Line 4881: 2026-09-16_23-59 DUMP-FAIL ses_f5409e7a5ffeHFuZxFFuWovscO spawnSync node ETIMEDOUT
-    - this was the second compaction, but there was no ses..._c1.md created in compaction_dumps only ..._c0.md exists
-
-  - rework of compact_memory parameter count of remove providerID and modelID from parameter list avaialble -> get them from opencode.json - see # # compact_memory tool dump function
-
-  # log tool v2 proposal implementation:
-    - found it in implemented and moved back to approved because it is not yes implemented
-
+# log tool v2 proposal implementation:
+  - found it in implemented and moved back to approved because it is not yet implemented
 
 # block_transfer extension:
-  - look at ideas.md points::
-    - # 8 write to buffer option?
+  - collection as discussion base: .opencode\maintainer\draft\block_transfer_tool\2026-09-25_15-23-upgrade.md
     - ## what would be needed to make block_transfer as versatile as edit but less prone to oldstring mismatch?
 
 # fuzzy_numword  
@@ -152,8 +94,6 @@ This is my error as maintainer, to not have checked prior on live session or for
     - I would create a copy of the FST repo in github and clone it into this new folder and move the old FST into C:\Users\Wasiejen\Projects\Repos\Free-Snap-Tap (might defer move to not to have to update all the references at once?)
 
 
-
-
 # prompt additions/edits/rewrites:
 ## safe knowledge when you gained it! 
 - motivation: when you e.g. researched how an object is resolved and it is needed for solving a problem, this needs to be documented somewhere -> knowledge base
@@ -161,21 +101,6 @@ This is my error as maintainer, to not have checked prior on live session or for
   - when looking for solutions one of the first things should be to grep the knowledge in the folder for relevant hits (remember to limit outputted lines for first grep call or similar)
     - knowledge folder may need to get keywords? or would a tool with e.g. increasing resolution and window of needle search be useful?
 
-## prompt addition to planner:
-- basis is this experience of a planner who tried to solve all at the same time and wasted his would context window without finishing anything. and also in a direct session - ignoring possible input or clarification i could give.
-- TRIAGE RULE FOR PLANNER (not verbatim but in the best interpretation and implemented in a way that might work)
- - try not to solve everything in one go. pick on and defer the rest. you have a large context window but you waste it on solving everything and risk finishing nothing. set priorities and focus on one. then answer or do and clarify. finish one with answering or commit etc then move on to the next. and ASK if I might clarify some things - the worst that can happen is that i say i do not know. direct session is for interaction - not for you do waste your whole context window and needing to have an eye on you because you did not follow stop line protokol. triage your own task even if they are coming from me. defer what can wait
- - e.g. create yourself an session_open_todo.md where you can not down everything that is deferred and arrived e.g. via maintainer
- - priorities answering first and then doing what needs a commit to conclude
- - do not work on unclear premised in a direct session until they are adressed by direct interaction
-  - your job is to ask me if something is not clear or seems unlogical
-    - nothing wastes more time than trying to answer questions i could give you instantly
-      - we could even add to ask question a timeout - thus when i am not available then the "autorun" will at least resume after e.g. 5 minutes
-
-  # 7 small knowledge / use addition - or more likely do-not addition? 
-- do we need explicit coding guidelines?
-- The edit tool chokes on non-ASCII chars in oldString (planner working on code failed multiple times to use the code due to this an neede to write a script to replace a textstring - tool block_transfer would be a solution for this case)
-  - so do not use non-ASCII chars if possible
 
 --defer # 3 3 destillation worker runs for now - to much work right now. 
 # 3 3
