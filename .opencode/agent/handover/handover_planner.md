@@ -88,13 +88,22 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   My answers: COPY keeps REPLACE semantics (current, verified); new
   APPEND mode (named mode, no flag) for stepwise assembly, accepts refs
   or `text`, creates-if-absent; exactly ONE newline between list sections
-  (default, no param); new SHOW mode (buffer line count + bounded first
-  lines — the handout's truncation-steering); WRITE-list overlap check in
+  (default, no param);   buffer-preview mode (renamed PEEK in the 4th round — see there);
+  WRITE-list overlap check in
   the error taxonomy; the `last_write` auto-buffer stays automatic
   (no param — poka-yoke); build DoD per the handout's "Verify before
   done": multi-step held-out task (COPY-list assembly + WRITE-list) +
   transcript read + description rework per the handout's ordering.
   No fundamental sketch changes.
+  (5) **4th round (2026-09-25):** his: SHOW is context-heavy risk +
+  "more like a PEEK". Ruling (agreed, my take confirmed his): the mode
+  is **PEEK** — bounded preview, NEVER the full buffer: default = line
+  count + 3 head + 3 tail lines (each capped ~40 chars; blank lines
+  SKIPPED when picking the echoed lines — his "2 lines if a blank starts
+  the end" refinement); optional `from` + `count` (capped, e.g. 25)
+  bounded window; the all-lines-truncated-to-10-chars variant REJECTED
+  (scales with buffer size = the handout's "never return all"); full
+  content = PASTE to a file + read (the explicit boundary).
 - **Pending live observations (maintainer / natural):** #99 fork test (his,
   post-restart), #98 live acceptance (the next self-compact→idle cycle —
   the #98 build is live in this process), #93 live overflow (his fork
