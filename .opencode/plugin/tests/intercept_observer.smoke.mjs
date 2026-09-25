@@ -30,7 +30,7 @@
 // exit 0 iff green).
 import fs from "node:fs";
 import path from "node:path";
-import { REPO_ROOT, loadRepo, freshSandbox, makeChecker } from "./_smoke_base.mjs";
+import { REPO_ROOT, SCRATCHPAD, loadRepo, freshSandbox, makeChecker } from "./_smoke_base.mjs";
 
 const base = freshSandbox("intercept_observer");
 const { chk, finish } = makeChecker("INTERCEPT_OBSERVER_SMOKE");
@@ -45,6 +45,12 @@ const proj = path.join(base, "proj");
 fs.mkdirSync(proj, { recursive: true });
 const sandboxLog = path.join(proj, ".opencode", "temp", "intercept.log");
 const STAMP_RE = /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2}$/;
+// R8 (#97): the config-root fixture dir — a SIBLING of the scratchpad (so
+// paths under it are out-of-sandbox for the note) + cleaned in finally.
+const tdir = path.join(path.dirname(SCRATCHPAD), "io_r8_smoke_" + process.pid);
+fs.rmSync(tdir, { recursive: true, force: true });
+fs.mkdirSync(path.join(tdir, "sub"), { recursive: true });
+fs.mkdirSync(path.join(tdir, "sub2"), { recursive: true });
 
 const mod = await loadRepo(".opencode/plugin/intercept_observer.ts");
 const core = await loadRepo(".opencode/plugin/intercept_observer_core.ts");

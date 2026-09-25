@@ -1,130 +1,50 @@
-# Worker summary — TODO #98 (unit-4 resume-after-compaction, Parts A+B) — FINAL
+# Worker handover — TODO #97 (R8 redirect + escape return-info) — worker-17
 
-worker-16, session ses_f2741890affeDWi2GqkunKqIeX, model Qwen3.8-27B-Q3S-170K,
-loop autorun-2026-09-21_15-33. 2026-09-25.
+**STATE: IN PROGRESS (Unit 1 code done + verified; pins pending; Unit 2 pending).**
+Session ses_f271155b4ffeIWwbQEekkRQRA6 compacted at budget — resume via task_id.
+Branch: `opencode_test` (verified at start; never switched).
 
-## State: DONE + GREEN — Parts A+B implemented, all gates green, Part C = not-applicable
+## Done (Unit 1 code — committed in the checkpoint commit below)
+- `intercept_observer_core.ts`: exported `normSandboxPath` (extracted from `underRoot`, behavior identical) + pure `resolveRedirect(span, roots)` — case (i) span==root → root as configured; case (ii) direct sibling → root + "/" + basename (case preserved); 0 or >=2 matches after root dedupe → null (fail-closed).
+- `intercept_observer.ts`: `resolveAllowedRoots()` (from opencode.jsonc: `permission.external_directory` "allow" keys with `/**` stripped, `references.*.path`, + workspace root; deduped via normSandboxPath; unreadable → fallback [dir, SCRATCHPAD_ROOT]; never throws; reuses `stripJsoncComments` from compact_memory.ts); `REDIRECT_PATH_FIELDS` (read/write/edit filePath + block_transfer srcFile/dstFile — separate table, WRITE_PATH_FIELDS untouched); `runRedirect` (after fuzzy channels; mutates arg; `pair-resolved` verdict REUSED with evidence `kind=redirect tool=<t> arg=<field> orig=<full> value=<full>`; out-of-sandbox NOTE recomputed on effective args when fired; note stored per callID); `noteCache`/`storeNote` (storeHint pattern, multiple notes per callID); factory resolves roots ONCE at init.
+- Smoke: `SCRATCHPAD` import + `tdir` fixture scaffold added (config-root dir, sibling of scratchpad, cleaned in finally).
 
-### Done (verified, committed)
+## Measured gate (before adding new pins)
+- smoke 55/55 (existing pins unchanged), probe 291/291, ruff `check --select F .` → All checks passed, smoke re-run after the SCRATCHPAD import fix was green.
 
-**Part A — line-anchored action regex** (commit `4f90218`):
-- `.opencode/plugin/auto_resume.ts` L269→L274: `ACTION_RE` is now
-  `/(?:^|\n)\s*action:\s*(restart|resume|stop|ask_maintainer)/g` —
-  `action:` matches ONLY at line start (after any leading whitespace).
-  The anchor group is **NON-capturing** `(?:^|\n)`, so the existing
-  `found = m[1]` (the scan in `lastAssistantAction`) still reads the
-  ACTION WORD, not the anchor. `lastAssistantAction` itself is
-  otherwise UNCHANGED (last line-start match still wins).
-- `.opencode/plugin/tests/auto_resume.smoke.mjs`: the spec's "all
-  existing 133 pins stay green" required RE-PINNING, not zero changes —
-  17 scripted closing messages carried a MID-LINE `action: …` (e.g.
-  `"Done. action: restart"`) whose routing assertion depends on the
-  match; each was moved to an OWN-LINE action line
-  (`"Done.\naction: restart"`), pin intent unchanged (stop → route= stop,
-  restart → spawn, etc.). Left as-is (irrelevant to their assertions):
-  ses_u4_plain / ses_u2_agnet / ses_u2_agnone (scope=none — no route
-  line either way), TRIG re-set L1535 + child msgA (skip= deactivated
-  fires before the action scan).
-- New pins (section `#98 (A)`, fresh spying client):
-  - **A1**: last assistant message QUOTES `action: restart` MID-LINE
-    (no own line) → NOT an action line → CONTINUE attempt 1, NO restart
-    spawn (the `lastAssistantAction` null path).
-  - **A2**: standalone `action: restart` on its OWN line → still the
-    action word (non-capturing anchor) → restart spawn (ONE create,
-    restart body).
+## REMAINING (resume checklist — in order)
+1. **Unit 1 pins — smoke** (insert before the `(9) live log` section; design already worked out):
+   - (12a) pure: dedupe 3 root forms → one match `C:/x/rootA/other.txt`; sibling of TWO distinct roots → null; no mapping → null.
+   - (12b) READ sibling of workspace root (fallback): span `base\io-r8-read-sib.txt` → mutated `proj + "/io-r8-read-sib.txt"`; kind=redirect line byte-exact (find via `.includes("kind=redirect")` — a fuzzy-rejected line may follow); NO out-of-sandbox line.
+   - (12c) WRITE sibling: span `base\io-r8-write-sib.txt` → exactly ONE new line (M1: no fuzzy for write), byte-exact evidence.
+   - (12d) span == SCRATCHPAD root case variant (`C:\USERS\wasiejen\APPDATA\local\TEMP\opencode`) → mutated to `C:/Users/Wasiejen/AppData/Local/Temp/opencode`.
+   - (12e) nested non-sibling (`proj\deep\io-r8-file.txt`) → no mutation, no kind=redirect line.
+   - then SECOND factory instance: `proj2 = base/proj2` + crafted `opencode.jsonc` (JSONC comment inside; roots `tdir/rootA`, `tdir/rootB`, `tdir/rootA/**` (twin), `tdir/sub/rootC`, references `tdir/sub2/refroot`) → use its hooks ONLY afterwards (module state `dir` flips to proj2):
+   - (12g) span `tdir/both.txt` (sibling of rA AND rB) → NO mutation + out-of-sandbox note fires (read2 = `proj2/.opencode/temp/intercept.log`).
+   - (12h) span `tdir/sub/only-c.txt` (sibling of rC only) → mutated `rC + "/only-c.txt"` + byte-exact line.
+   - (12i) span `rA.toUpperCase()` → root as configured; span `tdir/sub2/ref-sib.txt` → `rRef + "/ref-sib.txt"` (references root).
+   - finally-block: also `fs.rmSync(tdir, {recursive, force})`.
+2. **Unit 1 pins — probe** (NEW section `S28` inserted AFTER S27 (ends ~L6458) BEFORE S5 hygiene (~L6460); counter `let n28 = 285`; 12 checks 285-296):
+   - 285-291 PURE: case (i) w/ 2-root list; case (ii) `MY-FILE.txt` case preserved; no mapping null; two-distinct-roots null; dedupe 3 forms → first configured form; child + 2-levels-down sibling null; empty span / empty roots null.
+   - 292 e2e READ sibling of ioSandboxProj: span `SANDBOX + "\\r8-read-sib.txt"` → `ioSandboxProj + "/r8-read-sib.txt"`, byte-exact line, no out-of-sandbox (find via includes; fuzzy-rejected may follow).
+   - 293 e2e WRITE sibling: `SANDBOX + "\\r8-write-sib.txt"` → exactly ONE new line byte-exact.
+   - 294 e2e span == root: `ioSandboxProj.toUpperCase()` → ioSandboxProj, one line.
+   - 295 e2e no mapping: `C:/Windows/System32/cmd.exe` → byte-identical + exactly one out-of-sandbox line.
+   - 296 e2e nested non-sibling: `ioSandboxProj + "\\deep\\r8-file.txt"` → no mutation, no kind=redirect line.
+   - HEADER updates: (a) EXTENDED line at top (after the R1 line ~L43); (b) S28 description in the section list (after S27 ~L759, before S5 hygiene ~L760); (c) EXPECTED OUTPUT line (~L772): `S27=8 S28=12 hygiene=6  →  "PROBE handover: 303/303 PASS"` (291+12).
+3. Run full gate (smoke 63/63, probe 303/303, pytest, ruff) → **Unit 1 checkpoint commit** (code + smoke + probe).
+4. **Unit 2** (spec §Unit 2):
+   - `runEscapeContent(output, tool, callID)`: on a hit, `storeNote(callID, ...)` — text drafted: `escape-resolved: <n> escape form(s) in <field> (first: <raw40 truncated + ... > len=<L> -> <value>); full pre-mutation forms: .opencode/temp/intercept.log (kind=escape) + .opencode/temp/journal_<write|edit>.log` (one note per mutated field; content/oldString/newString order).
+   - journal: capture pre-escape content fields before `runEscapeContent` in onToolBefore; after, compute per-field raw hit forms (`resolveEscapes(pre, map).hits.map(h => h.raw)` for fields whose value changed); extend `appendJournal(..., escapeForms?)` → append trailing ` | pre-escape=<JSON field→forms map>` ONLY when non-empty (existing payload pins byte-identical).
+   - `onToolAfter`: keep the edit-hint logic UNCHANGED, then deliver `noteCache` notes for ANY tool (also on success), hint first then notes joined "\n", consumed once, best-effort.
+   - smoke pins: escape write → after-hook note (byte-exact) + journal `pre-escape` field; escape edit (old+new) → notes; no-escape call → no note; hint+note combined on a failing edit (both, hint first); consumed once.
+   - gate → **Unit 2 checkpoint commit**.
+5. Final: standard gate green, TODO.md #97 note (status LANDED is planner bookkeeping), final handover (exec summary, per-unit changes, measured gate totals, commit hashes, TODO entries, not-done list), friction via submit, DONE loop-log line.
 
-**Part B — re-arm on a NEW ctx.log COMPACT line** (commit `cf7e6f5`):
-- `.opencode/plugin/auto_resume.ts`:
-  - module-level `ctxLogOffset` tail cursor (near the other module
-    state; always on a line boundary — newline is one UTF-8 byte — so a
-    byte offset is a character boundary; a size REGRESSION resets it to
-    0).
-  - `COMPACT_SID_RE = /\bCOMPACT\s+(ses_[A-Za-z0-9_]+)/` (measured line
-    format `<ts> <model> COMPACT <sid> [tok=…] messages=…`).
-  - `tailCompactRearm()` (directly above `tick()`): stat the sandbox-
-    scoped `.opencode/temp/ctx.log`, read ONLY the new bytes since the
-    cursor (`openSync`/`readSync` from the offset, the
-    `trimLogIfNeeded` style), hold back a partial trailing line (no
-    newline yet) for the next tick, and for each NEW `COMPACT <sid>`
-    line whose sid is in `watches`: `idlePending = true` +
-    `recoveryCount = 0` (a FRESH recovery budget) + a `rearm= compact
-    sid=…` log line. Never throws (every fs call guarded; the tick
-    wraps the call in its own try/catch too).
-  - `tick()` calls it BEFORE the existing
-    `for (const [sid, w] of watches)` idlePending routing loop → the
-    newly-armed sid routes on the same tick (a fresh busy still clears
-    `idlePending` — the existing arm path — so no double send).
-- New pins (section `#98 (A)`, after A2): a synthetic sandbox
-  ctx.log (NEVER the live one) with a `COMPACT <sid>` line:
-  - **B1**: a watched sid's NEW COMPACT line re-arms on the next tick
-    (`rearm=` line; NO fresh busy/idle event — the silent-compaction
-    gap closed).
-  - **B2**: the re-arm RESETS the budget — a SECOND `recovery= attempt=1`
-    (NOT attempt 2 — the reset is the discriminator) → a second queued
-    CONTINUE, no restart spawn.
-  - **B3**: an UNWATCHED sid in the same ctx.log batch is NOT armed
-    (no rearm/scope/route/recovery line for it).
+## Deliberately not done / decisions to confirm
+- Probe section label: spec said "S18-adjacent section (established pattern)" — I placed it as `S28` AFTER S27 / before S5 hygiene (the established append pattern of S26/S27 — inserting physically next to S18 would shift S19-S27's check-number counters). Flagging in case planner meant a literal S18-adjacent block.
+- Redirect line verdict: reuses `pair-resolved` (the `kind=escape`/`kind=dedup` precedent — the 12-token VERDICTS vocabulary is pinned by smoke/probe, so no new token).
+- Redirect feedback note text = the `kind=redirect` evidence string (unpinned by spec; paths kept in full — not a dense payload).
 
-### Measured verification (2026-09-25)
-
-- auto_resume smoke: **139/139 ALL PASS** (baseline 133/133 measured at
-  launch + 6 new pins: A re-factory chk, A1, A2, B1, B2, B3).
-- pytest: **459 passed, 1 warning** (baseline held).
-- ruff (`--select F`): **All checks passed** (F=0).
-- handover probe: **291/291 PASS** (baseline held — NO probe pin
-  broke; the existing probe pins use standalone `action:` lines, as the
-  spec predicted).
-
-### Commits
-
-- `4f90218` — #98 part A: line-anchor ACTION_RE (line-start only) +
-  smoke re-pins (code only).
-- `cf7e6f5` — #98 part B: re-arm unit-4 routing on a NEW ctx.log COMPACT
-  line (code only).
-- This summary + the TODO.md #98 status update ride the FINAL commit
-  (this file never carries its own hash).
-
-### TODO entries
-
-- #98 header → LANDED (worker-16, both commit hashes) + Status field
-  rewritten with the gate numbers, the LIVE-acceptance-pending note,
-  and the Part C not-applicable ruling. No other TODO.md entries
-  touched; nothing appended to todo_inbox.md (no out-of-scope findings).
-
-### Deliberately NOT done
-
-- **Part C** (planner-owned; spec marks it not-applicable): the Work
-  State dump form that Part C's premise references was removed in the
-  2026-09-24 rework (the maintainer's ruling "Order-stop / Work State
-  dump form: removal CONFIRMED"); no live prompt quotes a literal
-  `action: restart` in dump prose, and Part A is the primary defense
-  (makes C moot). The worker has no prompt edit access anyway. The
-  planner records Part C = not-applicable in the handover/NAP.
-- DO-NOT-touch list respected: `.opencode/maintainer/**`,
-  `.opencode/agent/prompts/**`, `opencode.jsonc`,
-  `.opencode/temp/compact_budget.json` (read-only reference), the other
-  plugin files, the NAP. Stayed on `opencode_test` (no branch switch).
-- LIVE acceptance (the next self-compact routes from the real close; a
-  `recovery=`/`route=` line follows the `COMPACT` line without a user
-  message in between) is PENDING live observation — out of a worker
-  session's reach.
-
-### Notes / procedure deviations
-
-- The spec's smoke-pin clause "the new A + B pins plus ALL existing 133
-  pins" was executed as RE-PINNING (the 17 mid-line scripted texts
-  above) — without it the batch-A/#85/#90 pins would have gone red (a
-  mid-line `action:` is no longer a match, by design). No pin was
-  removed or weakened; every routing assertion kept its intent.
-- `COMPACT_SID_RE` character class includes `_` (not just
-  `[A-Za-z0-9]`): measured mid-implementation — a sid like
-  `ses_p98_compact` truncated at the first underscore and the re-arm
-  silently no-op'd (caught by a throwaway standalone probe, deleted
-  after; the smoke B-pins are the permanent cover).
-- Temporary debug instrumentation in `auto_resume.ts` was fully reverted
-  (restored from a byte-copy; the committed file contains no DBG lines).
-
-Lessons: smoke specs that pin routing behavior via scripted assistant
-texts should state the text FORMAT contract (own-line vs mid-line)
-explicitly — the regex's anchor change silently invalidates mid-line
-fixtures (17 re-pins needed here).
+## NOT done at all (per DO-NOT-touch)
+opencode.jsonc, compact_memory.ts (only imported), auto_resume/compact_memory/context_recovery/block_transfer/loop_log, FST code, maintainer files (left dirty as found).

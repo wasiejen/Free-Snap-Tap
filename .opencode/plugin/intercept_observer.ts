@@ -220,14 +220,19 @@ import {
   matchNearPathSegments,
   nearestExistingDir,
   normPathForm,
+  normSandboxPath,
   observeArg,
+  observeSandbox,
   relForm,
   resolveEditOldString,
   resolveEscapes,
   resolveReadPath,
+  resolveRedirect,
   resolveWritePath,
+  SCRATCHPAD_ROOT,
 } from "./intercept_observer_core.ts";
 import type { NumwordMap, Observation, PairCheck } from "./intercept_observer_core.ts";
+import { stripJsoncComments } from "./compact_memory.ts";
 import { readGauge } from "./scripts/gauge.mjs";
 
 const THIS_DIR = dirname(fileURLToPath(import.meta.url));
@@ -248,6 +253,9 @@ function localStamp(): string {
 
 let dir = "";
 let map: NumwordMap | null = null;
+// R8 (#97, 2026-09-25): the allowed redirect roots — resolved ONCE at the
+// factory/init call (never per call).
+let allowedRoots: string[] = [];
 // Per-session model-id cache (bounded: TTL expiry; the read itself is the
 // gauge's bounded chain — never spawns unbounded).
 const modelCache = new Map<string, { at: number; model: string }>();
@@ -279,6 +287,52 @@ async function getModel(sid: string): Promise<string> {
   } catch {
     return "unknown";
   }
+}
+
+// R8 (#97, 2026-09-25): the allowed-root basis for the out-of-sandbox path
+// redirect — resolved ONCE at plugin init from opencode.jsonc: the
+// `permission.external_directory` keys with value "allow" (the `/**` suffix
+// stripped — a dir key and its `/**` twin dedupe to ONE root), the
+// `references.*.path` values, + the workspace root (the hook's `directory`).
+// Config unreadable / malformed → the fallback roots [workspace root,
+// SCRATCHPAD_ROOT] (today's note-only roots) — never throw (fail-open, the
+// established pattern). The JSONC parse reuses the shared string-state
+// comment stripper (compact_memory.ts — the URL-safe parse).
+function resolveAllowedRoots(): string[] {
+  const roots: string[] = [];
+  try {
+    const cfg = JSON.parse(stripJsoncComments(readFileSync(join(dir, "opencode.jsonc"), "utf8")));
+    const top = cfg && typeof cfg === "object" ? (cfg as Record<string, unknown>) : null;
+    const ed = top && top.permission && typeof top.permission === "object" ? (top.permission as Record<string, unknown>) : null;
+    const ext = ed && ed.external_directory && typeof ed.external_directory === "object" ? (ed.external_directory as Record<string, unknown>) : null;
+    if (ext !== null) {
+      for (const [key, val] of Object.entries(ext)) {
+        if (val !== "allow" || key === "") continue;
+        roots.push(key.endsWith("/**") ? key.slice(0, -3) : key);
+      }
+    }
+    const refs = top && top.references && typeof top.references === "object" ? (top.references as Record<string, unknown>) : null;
+    if (refs !== null) {
+      for (const ref of Object.values(refs)) {
+        if (ref && typeof ref === "object" && typeof (ref as Record<string, unknown>).path === "string" && (ref as Record<string, unknown>).path !== "") {
+          roots.push((ref as Record<string, string>).path);
+        }
+      }
+    }
+  } catch {
+    // config unreadable / malformed → the fallback roots (fail-open)
+  }
+  roots.push(dir);
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const r of roots) {
+    const n = normSandboxPath(r);
+    if (n === "" || seen.has(n)) continue;
+    seen.add(n);
+    out.push(r);
+  }
+  if (out.length === 0) return [dir, SCRATCHPAD_ROOT].filter((r) => normSandboxPath(r) !== "");
+  return out;
 }
 
 function logPath(): string {
@@ -448,6 +502,56 @@ const WRITE_PATH_FIELDS: Record<string, string[]> = {
 
 function writePathFields(tool: string): string[] {
   return WRITE_PATH_FIELDS[tool] ?? [];
+}
+
+// R8 (#97, 2026-09-25): the TYPED path fields of the out-of-sandbox path
+// redirect — the 1:1 allowed-root redirect (core `resolveRedirect`). A
+// SEPARATE table from WRITE_PATH_FIELDS (which drives the write-owned
+// pair/escape/fuzzy channels — adding `read` there would break ownership).
+// Applies to: read/write/edit `filePath` + block_transfer `srcFile`/
+// `dstFile`. Bash command strings are OUT OF SCOPE (opaque — the
+// fail-closed out-of-sandbox note stays for them). Runs AFTER the R1/R2
+// fuzzy channels (a path fuzzy-resolved in-sandbox is never redirected).
+// On a redirect: the field is MUTATED to the target, the channel line
+// `kind=redirect tool=<t> arg=<field> orig=<full> value=<full>` is logged
+// (the `pair-resolved` verdict is REUSED — the `kind=escape`/`kind=dedup`
+// precedent; the twelve VERDICTS stay byte-identical), the out-of-sandbox
+// NOTE is recomputed on the EFFECTIVE args (the redirected field no longer
+// fires it — see onToolBefore), and a feedback note is stored for the
+// after hook (the Unit 2 delivery). FAIL-CLOSED: no 1:1 mapping → no
+// mutation (the permission gate + the note behave exactly as today).
+// M1 note: the write redirect targets ALREADY-ALLOWED paths — no new
+// overwrite hazard class (a file there was always directly writable by
+// the agent). Never throws.
+const REDIRECT_PATH_FIELDS: Record<string, string[]> = {
+  read: ["filePath"],
+  write: ["filePath"],
+  edit: ["filePath"],
+  block_transfer: ["srcFile", "dstFile"],
+};
+
+function runRedirect(output: { args?: unknown }, tool: string): { lines: Observation[]; fired: boolean } {
+  const args = output?.args;
+  if (args == null || typeof args !== "object") return { lines: [], fired: false };
+  const fields = REDIRECT_PATH_FIELDS[tool] ?? [];
+  if (fields.length === 0) return { lines: [], fired: false };
+  const lines: Observation[] = [];
+  let fired = false;
+  for (const field of fields) {
+    const raw = (args as Record<string, unknown>)[field];
+    if (typeof raw !== "string" || raw.trim() === "") continue;
+    const abs = isAbsolute(raw) ? raw : join(dir || ".", raw);
+    const target = resolveRedirect(abs, allowedRoots);
+    if (target === null || target === raw) continue; // fail-closed / no-op
+    (args as Record<string, string>)[field] = target;
+    fired = true;
+    lines.push({
+      verdict: "pair-resolved",
+      evidence: `kind=redirect tool=${tool} arg=${field} orig=${raw} value=${target}`,
+      context: classifyContext(raw),
+    });
+  }
+  return { lines, fired };
 }
 
 // The no-candidate pair line (shared by every channel — byte-identical to
@@ -765,6 +869,30 @@ function storeHint(callID: string, text: string): void {
   hintCache.set(callID, { at: now, text });
 }
 
+// (6b) the per-callID FEEDBACK NOTE cache (#97, 2026-09-25) — the
+// after-hook enrichment source for the CHANNEL notes (the storeHint
+// pattern: TTL 10 min, cap 100, FIFO evict — one callID may carry SEVERAL
+// notes, delivered joined). Unit 1 stores the R8 redirect note; Unit 2
+// stores the escape note and extends onToolAfter to DELIVER both (also on
+// SUCCESS — today only the failed-edit hint is delivered).
+const noteCache = new Map<string, { at: number; notes: string[] }>();
+
+function storeNote(callID: string, text: string): void {
+  if (callID === "") return;
+  const now = Date.now();
+  for (const [k, v] of noteCache) if (now - v.at > HINT_TTL_MS) noteCache.delete(k);
+  const hit = noteCache.get(callID);
+  if (hit !== undefined) {
+    hit.notes.push(text);
+    return;
+  }
+  if (noteCache.size >= HINT_MAX_ENTRIES) {
+    const first = noteCache.keys().next().value;
+    if (first !== undefined) noteCache.delete(first);
+  }
+  noteCache.set(callID, { at: now, notes: [text] });
+}
+
 // (4) the payload journal — ONE line per write / edit / block_transfer
 // call (best-effort; the house rule: never fail the tool call). The
 // effective (post-mutation) args are journaled — what the host would
@@ -958,7 +1086,7 @@ async function onToolBefore(
     if (pairOwned) channel = runPairRead(output);
     else if (writeOwned) channel = runPairWrite(output, tool);
     else if (bashOwned) channel = runGitRefBash(output);
-    const obs = argStr === "" ? [] : observeArg(argStr, map, dir || null, skipPairs);
+    let obs = argStr === "" ? [] : observeArg(argStr, map, dir || null, skipPairs);
     if (pairOwned) {
       const f = runFuzzyRead(output); // read-scope ONLY
       if (f !== null) fuzzy = [f];
@@ -968,6 +1096,22 @@ async function onToolBefore(
       // never hijack the target (edit/block_transfer keep the channel;
       // the pair channel above is unaffected for all three tools)
       fuzzy = runFuzzyWrite(output, tool); // write-scope ONLY
+    }
+    // R8 (#97, 2026-09-25): the 1:1 allowed-root redirect over the TYPED
+    // path fields — AFTER the R1/R2 fuzzy channels (a path fuzzy-resolved
+    // in-sandbox is never redirected); FAIL-CLOSED when no 1:1 mapping
+    // (no mutation; the out-of-sandbox note behaves exactly as today).
+    // When a redirect fires, the out-of-sandbox NOTE (observation e) is
+    // recomputed on the EFFECTIVE args — the redirected field no longer
+    // fires it (an unredirected span still does; the cap holds: ≤1 drop,
+    // ≤1 re-add). The feedback note is stored for the after hook (the
+    // Unit 2 delivery mechanism).
+    const rd = runRedirect(output, tool);
+    const redirect = rd.lines;
+    if (rd.fired) {
+      obs = obs.filter((o) => o.verdict !== "out-of-sandbox");
+      obs.push(...observeSandbox(argsToString(output?.args), dir || null));
+      storeNote(str(input?.callID), redirect.map((o) => o.evidence).join("; "));
     }
     // R6 (2026-09-25) + (2) (2026-09-25, #95 sub-item 2): the edit channel
     // (edit only — sees the effective, post-escape/pair/fuzzy args; the
@@ -988,10 +1132,11 @@ async function onToolBefore(
       if (hint !== null && hint.verdict !== "fuzzy-edit") storeHint(str(input?.callID), hint.evidence);
     }
     if (writeOwned) appendJournal(tool, sid, output.args as Record<string, unknown>, editOldOriginal);
-    if (escape.length === 0 && obs.length === 0 && channel.length === 0 && fuzzy.length === 0 && hint === null) return; // nothing to log
+    if (escape.length === 0 && obs.length === 0 && channel.length === 0 && redirect.length === 0 && fuzzy.length === 0 && hint === null) return; // nothing to log
     model = await getModel(sid);
     for (const o of escape) appendObservation(sid, model, tool, argStr, o);
     for (const o of channel) appendObservation(sid, model, tool, argStr, o);
+    for (const o of redirect) appendObservation(sid, model, tool, argStr, o); // channel lines before observation lines
     for (const o of obs) appendObservation(sid, model, tool, argStr, o);
     for (const o of fuzzy) appendObservation(sid, model, tool, argStr, o);
     if (hint !== null) appendObservation(sid, model, tool, argStr, hint);
@@ -1009,6 +1154,7 @@ async function onToolBefore(
 export default (async (input: PluginInput) => {
   dir = str(input?.directory);
   map = loadNumwordMap(MAP_PATH); // ONE shared map; null → numword checks silently off
+  allowedRoots = resolveAllowedRoots(); // R8 (#97): resolved ONCE at init
   return {
     "tool.execute.before": onToolBefore,
     "tool.execute.after": onToolAfter, // R6 (2026-09-25): the failed-edit hint enrichment

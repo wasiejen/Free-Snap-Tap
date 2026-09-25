@@ -557,13 +557,18 @@ const UNC_PATH_RE = /(^|[\s"'=({])(\\\\[^\s|]+)/g;
 // note-only sandbox check.
 export const SCRATCHPAD_ROOT = "C:/Users/Wasiejen/AppData/Local/Temp/opencode";
 
+// The shared root/span normalization (R8, #97, 2026-09-25 — extracted from
+// underRoot so the redirect resolver reuses it exactly): backslashes →
+// slashes, collapse separator runs (a JSON-escaped `\\` in a stringified
+// arg reads as `//`), lowercase, trim trailing `/`.
+export function normSandboxPath(p: string): string {
+  return String(p ?? "").replace(/\\/g, "/").replace(/\/{2,}/g, "/").toLowerCase().replace(/\/+$/, "");
+}
+
 export function underRoot(span: string, root: string): boolean {
-  // normalize: backslashes → slashes, collapse separator runs (a JSON-
-  // escaped `\\` in a stringified arg reads as `//`), lowercase, trim
-  const n = (p: string) => p.replace(/\\/g, "/").replace(/\/{2,}/g, "/").toLowerCase().replace(/\/+$/, "");
-  const r = n(root);
+  const r = normSandboxPath(root);
   if (r === "") return false;
-  const s = n(span);
+  const s = normSandboxPath(span);
   return s === r || s.startsWith(r + "/");
 }
 
@@ -583,6 +588,49 @@ export function observeSandbox(arg: string, workspaceRoot: string | null): Obser
   const outside = spans.filter((p) => !underRoot(p, workspaceRoot) && !underRoot(p, SCRATCHPAD_ROOT)).slice(0, 2);
   if (outside.length === 0) return [];
   return [{ verdict: "out-of-sandbox", evidence: `path=${outside[0]} root=${workspaceRoot}`, context: ctx }];
+}
+
+// ------------------------------------------------------------------ R8 out-of-sandbox path redirect (#97, 2026-09-25)
+//
+// The 1:1 allowed-root resolver: an out-of-sandbox TYPED path span that
+// maps EXACTLY ONCE to an allowed root (after root dedupe) is redirected
+// (mutated) before the call runs — 0 or >=2 mappings → null (FAIL-CLOSED:
+// no mutation; the permission gate + the out-of-sandbox note behave
+// exactly as today). Redirect only, never allow-widening: the target is
+// an ALREADY-ALLOWED root path (M1 note: the write redirect targets
+// already-allowed paths — no new overwrite hazard class; a file there was
+// always directly writable by the agent).
+//   case (i):  span == root (normalized) → target = root AS CONFIGURED
+//   case (ii): dirname(span) == dirname(root), span != root (a direct
+//              SIBLING) → target = root AS CONFIGURED + separator + the
+//              span's basename (case preserved)
+// Pure over ONE normalized absolute path span + the root list (the plugin
+// resolves the roots ONCE at init from opencode.jsonc). Never throws.
+export function resolveRedirect(span: string, roots: string[]): string | null {
+  const s = normSandboxPath(span);
+  if (s === "" || !s.includes("/")) return null;
+  const base = String(span ?? "").split(/[\\/]+/).filter((seg) => seg !== "").pop();
+  if (base === undefined || base === "") return null;
+  const seen = new Set<string>();
+  const hits: string[] = [];
+  for (const rawRoot of roots) {
+    const root = String(rawRoot ?? "");
+    const r = normSandboxPath(root);
+    if (r === "" || !r.includes("/") || seen.has(r)) continue;
+    seen.add(r);
+    if (s === r) {
+      hits.push(root); // case (i): the span IS the root
+      continue;
+    }
+    // case (ii): the span and the root share a parent dir (direct sibling)
+    const parent = (p: string) => p.slice(0, p.lastIndexOf("/"));
+    if (parent(s) === parent(r) && parent(s) !== "") hits.push(root);
+  }
+  if (hits.length !== 1) return null; // 0 or >=2 → FAIL-CLOSED (no mutation)
+  const root = hits[0];
+  if (s === normSandboxPath(root)) return root; // case (i): the root as configured
+  // case (ii): the root as configured + separator + the span's basename
+  return root.endsWith("/") ? root + base : root + "/" + base;
 }
 
 // ------------------------------------------------------------------ compose + cap
