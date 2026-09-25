@@ -662,10 +662,19 @@ function runPairWrite(output: { args?: unknown }, tool: string): Observation[] {
 // `kind=escape scope=content orig=<form> value=<digits> hits=<n>` (n =
 // the hits in that field; the nine-verdict vocabulary is unchanged, the
 // #73 `kind=dedup` precedent). Never throws.
-function runEscapeContent(output: { args?: unknown }, tool: string): Observation[] {
+// Unit 2 (#97, 2026-09-25): on a hit, a FEEDBACK NOTE is stored for the
+// after hook (the storeNote pattern) — the mutation the agent cannot
+// perceive gets mandatory return-info: the resolved count + the FIRST
+// orig→value TRUNCATED (first 40 chars + its length — the context-saving
+// ruling), pointing at intercept.log (the kind=escape lines) + the R6
+// journal (the FULL pre-mutation forms — its trailing `pre-escape` field,
+// appended by appendJournal). One note per mutated field (the
+// content/oldString/newString loop order). Never throws.
+function runEscapeContent(output: { args?: unknown }, tool: string, callID: string): Observation[] {
   const args = output?.args;
   if (args == null || typeof args !== "object" || map === null) return [];
   if (!writePathFields(tool).length) return [];
+  const journal = tool === "write" ? "journal_write.log" : "journal_edit.log";
   const lines: Observation[] = [];
   for (const field of ["content", "oldString", "newString"]) {
     const raw = (args as Record<string, unknown>)[field];
@@ -673,6 +682,9 @@ function runEscapeContent(output: { args?: unknown }, tool: string): Observation
     const res = resolveEscapes(raw, map);
     if (res.hits.length === 0) continue;
     (args as Record<string, string>)[field] = res.text;
+    const first = res.hits[0];
+    storeNote(callID,
+      `escape-resolved: ${res.hits.length} escape form(s) in ${field} (first: ${truncEdit40(first.raw)} len=${first.raw.length} -> ${first.value}); full pre-mutation forms: .opencode/temp/intercept.log (kind=escape) + .opencode/temp/${journal}`);
     for (const h of res.hits) {
       lines.push({
         verdict: "pair-resolved",
@@ -902,7 +914,14 @@ function storeNote(callID: string, text: string): void {
 // pre-(2)-mutation oldString (directive b, 2026-09-25 — the recovery
 // fallback captures what the model asked for, NOT what the (2) channel
 // mutated it to).
-function appendJournal(tool: string, sid: string, args: Record<string, unknown>, editOldOriginal?: string): void {
+// Unit 2 (#97, 2026-09-25): the optional `escapeForms` — the FULL
+// pre-mutation escape forms (field → the raw sentinel forms, in hit
+// order) ride the journal line as a trailing ` | pre-escape=<JSON>` field,
+// appended ONLY when non-empty (a call without escape forms stays
+// byte-identical — the existing payload pins hold). The journal is the
+// full-payload home for the silent escape mutation (the after-hook note
+// is the truncated pointer to it).
+function appendJournal(tool: string, sid: string, args: Record<string, unknown>, editOldOriginal?: string, escapeForms?: Record<string, string[]>): void {
   try {
     const a = args as Record<string, unknown>;
     const s = (k: string): string => (typeof a[k] === "string" ? (a[k] as string) : "");
@@ -923,9 +942,13 @@ function appendJournal(tool: string, sid: string, args: Record<string, unknown>,
       }
       payload = JSON.stringify(o);
     }
+    let suffix = "";
+    if (escapeForms !== undefined && Object.keys(escapeForms).length > 0) {
+      suffix = ` | pre-escape=${JSON.stringify(escapeForms)}`;
+    }
     const p = join(dir, ".opencode", "temp", tool === "write" ? "journal_write.log" : "journal_edit.log");
     mkdirSync(dirname(p), { recursive: true });
-    appendFileSync(p, `${localStamp()} | ${sid || "unknown"} | ${tool} | ${target} | ${payload}\n`, "utf8");
+    appendFileSync(p, `${localStamp()} | ${sid || "unknown"} | ${tool} | ${target} | ${payload}${suffix}\n`, "utf8");
   } catch {
     // best-effort — never break a tool call
   }
@@ -1024,20 +1047,35 @@ function runEditFuzzy(output: { args?: unknown }): Observation | null {
   return { verdict: "no-candidate", evidence: `hint reason=${lc.reason}${bd}`, context: "edit oldString" };
 }
 
-// (6) the after hook — enrich the failed edit result with the stored hint
-// (consumed once; best-effort, never throw).
+// (6) the after hook — enrich the tool result: the stored edit hint
+// (failed edit — behavior UNCHANGED) + the Unit 2 (#97, 2026-09-25)
+// channel FEEDBACK NOTES (the silent escape resolution + the R8
+// redirects) — delivered for ANY tool, also on SUCCESS (today only the
+// failed-edit hint is delivered). Hint first, then the notes (joined
+// "\n"); consumed once; best-effort, never throw.
 function onToolAfter(
   input: { tool?: string; sessionID?: string; callID?: string },
   output: { title?: string; output?: string; metadata?: unknown },
 ): void {
   try {
-    if (str(input?.tool) !== "edit") return;
+    const tool = str(input?.tool);
     const callID = str(input?.callID);
-    const hit = hintCache.get(callID);
-    if (hit === undefined) return;
-    hintCache.delete(callID); // consumed once (the TTL bounds the stragglers)
+    let extra = "";
+    if (tool === "edit") {
+      const hit = hintCache.get(callID);
+      if (hit !== undefined) {
+        hintCache.delete(callID); // consumed once (the TTL bounds the stragglers)
+        extra = hit.text;
+      }
+    }
+    const notes = noteCache.get(callID);
+    if (notes !== undefined) {
+      noteCache.delete(callID); // consumed once (the TTL bounds the stragglers)
+      if (notes.notes.length > 0) extra = extra === "" ? notes.notes.join("\n") : `${extra}\n${notes.notes.join("\n")}`;
+    }
+    if (extra === "") return;
     if (output != null && typeof output === "object") {
-      output.output = `${str(output.output)}\n${hit.text}`;
+      output.output = `${str(output.output)}\n${extra}`;
     }
   } catch {
     // best-effort — never throw out of a hook
@@ -1082,7 +1120,31 @@ async function onToolBefore(
     // log BEFORE the observation lines (the pair-before-dense order the
     // smoke/probe pins).
     let escape: Observation[] = [];
-    if (writeOwned) escape = runEscapeContent(output, tool);
+    // Unit 2 (#97): capture the pre-escape CONTENT fields BEFORE the
+    // channel mutates them (the journal's trailing `pre-escape` field
+    // carries the FULL pre-mutation forms)
+    let escapePre: Record<string, string> | null = null;
+    if (writeOwned) {
+      const pre: Record<string, string> = {};
+      const args0 = output?.args;
+      if (args0 != null && typeof args0 === "object") {
+        for (const field of ["content", "oldString", "newString"]) {
+          const v = (args0 as Record<string, unknown>)[field];
+          if (typeof v === "string" && v !== "") pre[field] = v;
+        }
+      }
+      escapePre = pre;
+    }
+    if (writeOwned) escape = runEscapeContent(output, tool, str(input?.callID));
+    let escapeForms: Record<string, string[]> | undefined;
+    if (escapePre !== null && Object.keys(escapePre).length > 0 && map !== null) {
+      const forms: Record<string, string[]> = {};
+      for (const [field, pre] of Object.entries(escapePre)) {
+        const res = resolveEscapes(pre, map);
+        if (res.hits.length > 0) forms[field] = res.hits.map((h) => h.raw);
+      }
+      if (Object.keys(forms).length > 0) escapeForms = forms;
+    }
     let channel: Observation[] = [];
     let fuzzy: Observation[] = [];
     if (pairOwned) channel = runPairRead(output);
@@ -1137,7 +1199,7 @@ async function onToolBefore(
       // (fuzzy-edit) stores NO hint (the edit succeeds, no enrichment)
       if (hint !== null && hint.verdict !== "fuzzy-edit") storeHint(str(input?.callID), hint.evidence);
     }
-    if (writeOwned) appendJournal(tool, sid, output.args as Record<string, unknown>, editOldOriginal);
+    if (writeOwned) appendJournal(tool, sid, output.args as Record<string, unknown>, editOldOriginal, escapeForms);
     if (escape.length === 0 && obs.length === 0 && channel.length === 0 && redirect.length === 0 && fuzzy.length === 0 && hint === null) return; // nothing to log
     model = await getModel(sid);
     for (const o of escape) appendObservation(sid, model, tool, argStr, o);

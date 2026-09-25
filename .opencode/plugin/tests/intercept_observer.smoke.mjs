@@ -696,6 +696,85 @@ try {
       JSON.stringify({ args: a, n: nl.length }));
   }
 
+  // ---- (13) Unit 2 (#97, 2026-09-25): the escape RETURN-INFO — the
+  //      silent escape mutation gets a FEEDBACK NOTE in the tool result
+  //      (the after hook — also on success) + the FULL pre-mutation forms
+  //      in the R6 journal (the trailing `pre-escape` field). Uses the
+  //      FIRST factory's hooks (dir = proj — the (12f) second factory
+  //      below flips the module state).
+  const eu2 = path.join(proj, "eu2");
+  fs.mkdirSync(eu2, { recursive: true });
+  const eu2File = path.join(eu2, "f.txt");
+  fs.writeFileSync(eu2File, "alpha line one\nbeta line two\n", "utf-8");
+  const formNum = "[405:four-two-five:esc]"; // -> 425 (the (8h) proven form)
+  const formDash = "[405:4-2-5:esc]"; // -> 425 (the (8h) proven form)
+
+  // (13a) escape WRITE → content resolved (args mutated) + the after-hook
+  //        FEEDBACK note (byte-exact, the truncated first form) + the
+  //        journal line carries the trailing pre-escape field (the full
+  //        pre-mutation forms)
+  {
+    const content = `x ${formNum} y`;
+    const a = { filePath: eu2File, content };
+    const je0 = jRead(journalWriteLog).length;
+    await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13a" }, { args: a });
+    const out = { title: "write", output: "ok", metadata: {} };
+    await after({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13a" }, out);
+    const note = `escape-resolved: 1 escape form(s) in content (first: ${formNum} len=${formNum.length} -> 425); full pre-mutation forms: .opencode/temp/intercept.log (kind=escape) + .opencode/temp/journal_write.log`;
+    const jl = jRead(journalWriteLog)[je0];
+    chk("Unit2 escape write → content resolved (args mutated) + the after-hook FEEDBACK note (byte-exact, the truncated first form) + the journal line carries the trailing pre-escape field (full pre-mutation forms)",
+      a.content === "x 425 y" && out.output === `ok\n${note}` &&
+        jl !== undefined && jl.endsWith(` | pre-escape=${JSON.stringify({ content: [formNum] })}`) &&
+        JSON.parse(jl.split(" | ")[4]) === a.content,
+      JSON.stringify({ content: a.content, out: out.output, jl }));
+  }
+
+  // (13b) escape EDIT (oldString + newString) → BOTH resolved → 2 notes +
+  //        the failed-edit HINT — the hint FIRST, then the notes (the
+  //        oldString/newString field order); the hint behavior is
+  //        unchanged
+  {
+    const je0 = jRead(journalEditLog).length;
+    const a = { filePath: eu2File, oldString: `n ${formDash}`, newString: `m ${formNum}` };
+    await before({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c13b" }, { args: a });
+    const out = { title: "edit", output: "Error: oldString not found", metadata: {} };
+    await after({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c13b" }, out);
+    const noteOld = `escape-resolved: 1 escape form(s) in oldString (first: ${formDash} len=${formDash.length} -> 425); full pre-mutation forms: .opencode/temp/intercept.log (kind=escape) + .opencode/temp/journal_edit.log`;
+    const noteNew = `escape-resolved: 1 escape form(s) in newString (first: ${formNum} len=${formNum.length} -> 425); full pre-mutation forms: .opencode/temp/intercept.log (kind=escape) + .opencode/temp/journal_edit.log`;
+    const jle = jRead(journalEditLog)[je0];
+    chk("Unit2 escape edit (old+new) → BOTH resolved (args mutated) + the failed-edit HINT fires FIRST, then the two notes (oldString, newString); hint behavior unchanged; journal pre-escape field carries both forms",
+      a.oldString === "n 425" && a.newString === "m 425" &&
+        out.output === `Error: oldString not found\nhint reason=d-too-high best-d=11\n${noteOld}\n${noteNew}` &&
+        jle !== undefined && jle.endsWith(` | pre-escape=${JSON.stringify({ oldString: [formDash], newString: [formNum] })}`),
+      JSON.stringify({ old: a.oldString, nw: a.newString, out: out.output, jle }));
+  }
+
+  // (13c) a call with no escape forms → NO note (the after hook leaves the
+  //        output byte-identical)
+  {
+    const a = { filePath: path.join(eu2, "plain.txt"), content: "hello" };
+    await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13c" }, { args: a });
+    const out = { title: "write", output: "ok", metadata: {} };
+    await after({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13c" }, out);
+    chk("Unit2 no-escape call → NO note (the after hook leaves the output byte-identical)",
+      out.output === "ok",
+      JSON.stringify(out.output));
+  }
+
+  // (13d) the note is consumed ONCE (a second after call with the same
+  //        callID → untouched)
+  {
+    const a = { filePath: path.join(eu2, "once.txt"), content: `y ${formDash}` };
+    await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13d" }, { args: a });
+    const out = { title: "write", output: "ok", metadata: {} };
+    await after({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13d" }, out);
+    const first = out.output;
+    await after({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13d" }, out);
+    chk("Unit2 note consumed once: the second after call leaves the output unchanged (one note line only)",
+      first !== "ok" && first.startsWith("ok\nescape-resolved: 1 escape form(s) in content") && out.output === first,
+      JSON.stringify(out.output));
+  }
+
   // (12f) the CONFIG-READ path: a SECOND factory instance with a crafted
   //        opencode.jsonc under proj2 — the roots come from the config
   //        (permission "allow" keys + the `/**` twin deduped + the
