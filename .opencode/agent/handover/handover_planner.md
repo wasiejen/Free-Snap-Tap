@@ -53,6 +53,29 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   hard-rejected (`request 170869 > 170240`) → the auto-resume emergency
   compaction + my CROSS compaction #3 (both keep=18; the COMPACT line
   verified in ctx.log) → resume SUCCESS (units green, DONE line written).
+- **Direct exchange (mid-session, 2026-09-25 — his reply to my 3 open
+  questions; awaiting his rulings on all three):**
+  (1) **bit-drift solved backend-side** → he leans to remove the
+  numword/escape part. My recommendation (pending GO): remove ONLY the
+  escape channel (core `ESCAPE_RE`/`resolveEscapes`, plugin
+  `runEscapeContent`, its pins, the Unit-2 `pre-escape=` journal
+  extension) — KEEP the numword map + pair channel (R1/R2, his "positive
+  part") + the dense/numword observation logging; the noteCache/
+  after-hook delivery stays (R8 redirect notes ride it); primer → new
+  `knowledge/fuzzy-numword/` (README in the same commit, escape section
+  annotated as removed); NOT into AGENTS.md (his ruling).
+  (2) **loop_log**: no new tool-level items from this session — the
+  approved loop_log-v2 proposal (model autofill, Part B readback, Part C
+  lenient status, Part D `correct`) stands as the NEXT build (confirm
+  pending).
+  (3) **block_transfer** dedicated session — my concrete additions
+  sketched (1: unify+document anchor semantics — measured this session:
+  COPY matched mid-line/substring, REPLACE needed the exact prefix — +
+  line-number references; 2: SET/APPEND buffer modes (direct text→buffer,
+  unlocks his COLLECT idea); 3: line-number refs; 4: WRITE mode
+  (bufferless region replace); 5: in-line fuzzy anchors — DEFER;
+  6: journal-as-source + #8 failed-write buffering — DEFER/backlog).
+  Proposed order: 1+2 → 3+4 → 5/6 separate decisions.
 - **Pending live observations (maintainer / natural):** #99 fork test (his,
   post-restart), #98 live acceptance (the next self-compact→idle cycle —
   the #98 build is live in this process), #93 live overflow (his fork
