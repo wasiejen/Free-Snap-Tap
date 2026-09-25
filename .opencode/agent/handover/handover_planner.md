@@ -66,12 +66,25 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   ~268MB file trims at the NEXT host restart (maintainer live check —
   zero delta lines). The worker's `repo_opencode.md` reference-URL
   addition was left uncommitted (a likely maintainer live edit, as found).
-- NEXT (this session continues): write the **(2) edit-fuzzy spec**
-  (normalize-then-compare + the two directives from the #95 entry) →
-  launch → R3 → #97 (R8 sandbox redirect) / escape return-info. **#98**
-  (unit4-compaction-resume A+B+C, approved) queued after #96 (same
-  file). R6 live acceptance (the after-hook enrichment) = next host
-  restart.
+- **(2) edit-fuzzy spec WRITTEN + worker LAUNCHED (this session,
+  2026-09-25 post-compaction):** the mutating edit-fuzzy oldString
+  (normalize-then-compare + the two directives) — spec committed to
+  `handover_task.md`, `worker_Q3S_170K` launched (loop-log START line).
+  Design: 0-raw-occurrence miss → reuse the R6 content-locator candidate
+  generation → normalize BOTH sides (`\r\n`→`\n` + strip per-line trailing
+  ws) → exactly-one candidate at d=0 OR d≤1 → mutate `oldString` to the
+  file's exact bytes (hierarchical: d=0 first, then d=1; else fail-closed
+  → the R6 hint line carrying the best-d); new verdict `fuzzy-edit`;
+  mandatory `fuzzy-edit orig=<trunc> len= d= value=<trunc>` line; directive
+  (a) every attempt logged with best-d, (b) feedback truncated (first ~40
+  chars + len + d + target) / full original `oldString` in the journal
+  (the journal edit `old` = pre-mutation). Re-pins S26 271/275/276 + new
+  S27 section.
+- NEXT (after the worker lands): verify the gate + commit the bookkeeping →
+  R3 (gate CLEARED; absorbs the anchor-drift fix) → #97 (R8 sandbox
+  redirect + escape return-info). **#98** (unit4-compaction-resume A+B+C,
+  approved) queued after #96 (same file). R6 live acceptance (the
+  after-hook enrichment) = next host restart.
 
 
 ## Compressed archive (one line each

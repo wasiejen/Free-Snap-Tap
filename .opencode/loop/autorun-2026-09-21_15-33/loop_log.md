@@ -100,3 +100,4 @@
 2026-09-25_11-26 DONE<--- planner-14 ses_f29afbb66ffeRM1EHgBIpTwTg5 Qwen3.8-27B-Q3S-170K R6 edit-hint+journal LANDED acb6323 (probe 279/279, smoke 48/48, pytest 459+1w, ruff F=0; worker close-out had died — planner verified from files) CTX=141838 (83%)
 2026-09-25_11-28 -->START worker-10 ses_f281bdf31ffevhZbHouvrZ3Q1d Qwen3.8-27B-Q3S-170K TODO #96: auto_resume.log write-volume reduction (onEvent delta skip + init size guard + smoke re-pin)
 2026-09-25_11-48 DONE<--- worker-10 ses_f281bdf31ffevhZbHouvrZ3Q1d Qwen3.8-27B-Q3S-170K SESSION=ses_f281bdf31ffevhZbHouvrZ3Q1d CTX=106244 (62%) REM=63756 | 5 compactions left
+2026-09-25_12-09 -->START planner-14 ses_f29afbb66ffeRM1EHgBIpTwTg5 Qwen3.8-27B-Q3S-170K plan14 (continued): TODO #95 sub-item (2) the MUTATING edit-fuzzy oldString (normalize-then-compare + the two directives) — spec written to handover_task.md, worker_Q3S_170K launched
