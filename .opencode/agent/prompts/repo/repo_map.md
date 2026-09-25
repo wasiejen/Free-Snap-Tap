@@ -92,8 +92,8 @@ The delegate targets live in `opencode.jsonc` (mode `all`) — the maintainer ed
 that file live, so **verify the roster there, never trust this section or
 memory**. Model notes for choosing (Q3 = 3bit, higher precision; Q2 = 2bit,
 bigger context, weaker reasoning and stability):
-- **Default** `*_Q3S_170K` very high intelligence, speedrating 60, 160k context, very high precision, highest general knowledge: best for very complex coding and code review work 
-- `*_Q3S_230K_slow` same as `*_Q3S_170K` but slower speedrating of 45 with bigger 230k context: for big work tasks with high complexity
+- `*_Q3S_170K` very high intelligence, speedrating 60, 160k context, very high precision, highest general knowledge: best for very complex coding and code review work 
+- **Default** `*_Q3S_245K_slow` same as `*_Q3S_170K` but slower speedrating of 45 with bigger 245k context: for big work tasks with high complexity
 - `*_Q3S_140K_HQKV` same as `*_Q3S_170K` but higher precision -> more stable, less distracted, less errors - context 140K and speedrating 57
 - `*_Q3XS_262K` high intelligence, speedrating 62, 262k context, medium-high precision, medium-high general knowledge: for very long exploration and research runs
 - `*_gemma_Q4_262K` moderately intelligent, speedrating 160-200, 256k context, lower pecision, lower to medium general knowledge: needs explicit step by step guidance, should do no coding
