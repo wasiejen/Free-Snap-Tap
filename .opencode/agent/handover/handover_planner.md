@@ -27,15 +27,27 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   (`preserve_recent_tokens ?? clamp(0.25*usable, 2k..15k)` + optional
   `tail_turns`) — no message-count knob. The budget file already carries
   `keepTokens: 30000` + `keepMessages: 18` (his live edit).
-- **TODO #99 FILED + spec written** (handover_task.md) — resolution at
-  dispatch: computed (last `keepMessages` messages' tokens from the DB —
-  user: `tokens.input`, assistant: `tokens.output + tokens.reasoning`)
-  PRIMARY → budget `keepTokens` fallback → omit (host default); body
-  gains `keep.tokens` (+ `keep.messages` kept); COMPACT line gains the
-  resolved value + source; context_recovery.ts same; LIVE fork test
-  (maintainer) proves the body field is honored (~52k expected, not
-  55k/25k) or his fallback ruling. Worker `worker_Q3S_170K` launched
-  (roster-verified opencode.jsonc L207).
+- **TODO #99 FILED + spec written** (handover_task.md) + **LANDED
+  (worker-15, planner re-verified 2026-09-25)** — resolution at dispatch:
+  computed (last `keepMessages` messages' tokens from the DB — user:
+  `tokens.input`, assistant: `tokens.output + tokens.reasoning`) PRIMARY
+  → budget `keepTokens` fallback → omit (host default); body gains
+  `keep.tokens` (+ `keep.messages` kept); COMPACT line gains
+  `tok=<n> <source>` (`computed|budget|none`); context_recovery.ts same.
+  Commits: `ebf59b2` (plugins + smokes) + `c5859c7` (probe S11/S13 re-pins
+  + checks 285-288 + FINGERPRINT + header → 291) + `abb0915` (knowledge
+  note + TODO #99 status + final handover). **Gates (planner, own runs):**
+  probe **291/291**, compact_memory smoke **74/74**, context_recovery
+  smoke **17/17**, pytest **459+1w**, ruff **F=0**. Worker saga: 2×
+  self-compact mid-wave + 2× task_id resume (both resumes PROCEEDED —
+  unlike the no-op checkpoint-resume case in the (2) saga). Deviations
+  flagged: the recovery budget pin needs the sandbox config pair (failed
+  messages read → no pair → CLEAN FAIL before keep resolution); `keepRes`
+  name collision. **PENDING (maintainer, post-restart):** the LIVE fork
+  test (computed ~27k → ≈52k proves the body `keep.tokens` is honored;
+  if ignored → his fallback ruling — the config knob is his file).
+  Baseline moved: probe 291 [two-ninety-one]; smokes compact_memory
+  74/74, context_recovery 17/17 (others unchanged).
 - Side note (his observation, recorded in #99): the history is completely
   DROPPED and REPLACED by the summary → no bit-rot from a compaction
   chain, only from an N-summarized summary (the budget cap's rationale —
@@ -135,10 +147,9 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Standing
-- Baselines (re-verified 2026-09-25 by the planner, post-edit-fuzzy
-  (2) 78b68e7):
-  probe **287** [two-eighty-seven]; smokes **all green**
-  (context_recovery 15/15, compact_memory 66/66, auto_resume 133/133,
+- Baselines (re-verified 2026-09-25 by the planner, post-#99):
+  probe **291** [two-ninety-one]; smokes **all green**
+  (context_recovery 17/17, compact_memory 74/74, auto_resume 133/133,
   intercept_observer 55/55, block_transfer 30/30 + 53/53, submit 20/20;
   the per-suite counts are in each smoke's own readout — no total kept
   here); pytest **459 passed + 1 warning (the known #10 coroutine
