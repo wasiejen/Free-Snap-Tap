@@ -104,6 +104,16 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   bounded window; the all-lines-truncated-to-10-chars variant REJECTED
   (scales with buffer size = the handout's "never return all"); full
   content = PASTE to a file + read (the explicit boundary).
+  (6) **5th round (2026-09-25):** his: the unbounded preview could also
+  echo heading-like lines (#/##) between head and tail. Agreed design:
+  a SEPARATE mode **MAP** (PEEK stays single-shape): line count + head 3
+  + tail 3 + the heading skeleton (max ~10 headings, `+N more`) with line
+  numbers. Detection rule narrow + documented: `^#{1,6} ` at column 0
+  (markdown H1-H6; indented # excluded); echoed lines VERBATIM with line
+  numbers, so a `#` comment in a code buffer is self-evident to the
+  agent (his comment-collision concern is mitigated by the verbatim
+  echo + a one-line description caveat — NO file-type sniffing, that's
+  the unpredictable part). Build priority: 2nd wave (purely additive).
 - **Pending live observations (maintainer / natural):** #99 fork test (his,
   post-restart), #98 live acceptance (the next self-compact→idle cycle —
   the #98 build is live in this process), #93 live overflow (his fork
