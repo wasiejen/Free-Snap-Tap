@@ -4,61 +4,37 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 
-## Current session — autorun, 2026-09-25 (ses_f27a7d75affeqsh0h1c4LZS3CY, planner-15, Qwen3.8-27B-Q3S-170K)
-- Launch (unit-4 restart branch after planner-14's `action: restart`).
-- **Triage: priority.md NEW top item (his live edit 2026-09-25) — the
-  compaction keep semantics:** his live measurements (his words):
-  "keepToken was worken. with 30000 keepToken the newly compacted session
-  was around 55k token. with the keepToken 0 and keepMessages X it was
-  always around 25K token after compaction. so the 30k keeptoken were a
-  direct retention that added 25k +30k to the observed 55k" →
-  `keep.tokens` = DIRECT retention on a constant ~25k base; the
-  `keep.messages` count does NOT control the retention. His asks:
-  (a) "settings for keepToken as fallback from compact_budged.json",
-  (b) "can we caluculate the actual keepToken based on the dump and then
-  supply the correct keepToken to exactly keep these messages?".
-- **Verified from files today:** the installed SDK summarize body schema
-  (`.opencode/node_modules/@opencode-ai/sdk/dist/gen/types.gen.d.ts`
-  `SessionSummarizeData`) = `{ providerID, modelID }` ONLY — no documented
-  `keep` field in the BODY (our current body `keep.messages` is untyped,
-  effect unverified — the live retention tracked the CONFIG
-  `compaction.keep` in opencode.jsonc). Dev-branch host source
-  (his link, `session/compaction.ts`): V2 token-budget tail
-  (`preserve_recent_tokens ?? clamp(0.25*usable, 2k..15k)` + optional
-  `tail_turns`) — no message-count knob. The budget file already carries
-  `keepTokens: 30000` + `keepMessages: 18` (his live edit).
-- **TODO #99 FILED + spec written** (handover_task.md) + **LANDED
-  (worker-15, planner re-verified 2026-09-25)** — resolution at dispatch:
-  computed (last `keepMessages` messages' tokens from the DB — user:
-  `tokens.input`, assistant: `tokens.output + tokens.reasoning`) PRIMARY
-  → budget `keepTokens` fallback → omit (host default); body gains
-  `keep.tokens` (+ `keep.messages` kept); COMPACT line gains
-  `tok=<n> <source>` (`computed|budget|none`); context_recovery.ts same.
-  Commits: `ebf59b2` (plugins + smokes) + `c5859c7` (probe S11/S13 re-pins
-  + checks 285-288 + FINGERPRINT + header → 291) + `abb0915` (knowledge
-  note + TODO #99 status + final handover). **Gates (planner, own runs):**
-  probe **291/291**, compact_memory smoke **74/74**, context_recovery
-  smoke **17/17**, pytest **459+1w**, ruff **F=0**. Worker saga: 2×
-  self-compact mid-wave + 2× task_id resume (both resumes PROCEEDED —
-  unlike the no-op checkpoint-resume case in the (2) saga). Deviations
-  flagged: the recovery budget pin needs the sandbox config pair (failed
-  messages read → no pair → CLEAN FAIL before keep resolution); `keepRes`
-  name collision. **PENDING (maintainer, post-restart):** the LIVE fork
-  test (computed ~27k → ≈52k proves the body `keep.tokens` is honored;
-  if ignored → his fallback ruling — the config knob is his file).
-  Baseline moved: probe 291 [two-ninety-one]; smokes compact_memory
-  74/74, context_recovery 17/17 (others unchanged).
-- Side note (his observation, recorded in #99): the history is completely
-  DROPPED and REPLACED by the summary → no bit-rot from a compaction
-  chain, only from an N-summarized summary (the budget cap's rationale —
-  his review).
-- Working tree: his live files uncommitted (priority.md +31 incl. the new
-  top item, opencode.jsonc `tokens: 0`→`30000`, repo_opencode.md ref-URL)
-  — never stage (standing rule); agent_feedback.md +6 legit entries ride
-  the bookkeeping commit.
+## Current session — autorun, 2026-09-25 (ses_f2761efb2ffeUhMTEM4hgSLKKK, planner-16, Qwen3.8-27B-Q3S-170K)
+- Launch (unit-4 restart branch after planner-15's `action: restart`; the
+  interrupted-startup session was re-entered as Planner — the Build-agent
+  prefix in the launch was overridden; recorded as a minor anomaly).
+- **Rebuilt from committed state:** git log + NAP + TODO + loop_log
+  (planner-16 = this iteration) + priority.md (his live uncommitted edit)
+  + proposals. Inbox empty.
+- **Triage (per priority.md + TODO):** R3 (fuzzy #95 sub-item 3) build is
+  BLOCKED on a maintainer GO — #67 says the plugin-scope extension "awaits
+  maintainer approval" (an observable behavior change), so it is NOT
+  pre-approved — recorded here as an open question, deferred (non-blocking).
+  **Task #98** (unit-4 resume-after-compaction, approved A+B+C by his
+  2026-09-23 --comment) is the next clear approved build — verified NOT
+  implemented (ACTION_RE unanchored at L269; no ctx.log COMPACT tail-read
+  in the tick).
+- **#98 spec written** (handover_task.md; Parts A+B for the worker, Part C
+  = not-applicable — the Work State dump form was removed in the 2026-09-24
+  rework, so no live prompt quotes a literal `action: restart` in prose;
+  Part A is the primary defense). Baseline re-measured: auto_resume smoke
+  **133/133**; standard gate probe 291/291, pytest 459+1w, ruff F=0.
+- **Next:** cp spec -> plan16_ho_task.md; commit spec + plan16_ho_task + NAP;
+  launch worker_Q3S_170K for #98 Parts A+B; on return verify from files
+  (git log + one spot auto_resume smoke), write handover + loop copy,
+  bookkeeping commit, close `action: restart`.
+- Working tree: his live files uncommitted (priority.md, opencode.jsonc,
+  repo_opencode.md, agent_feedback.md, ideas.md) — never stage (standing
+  rule); feedback entries ride the bookkeeping commit.
 
 
 ## Compressed archive (one line each
+- 2026-09-25 autorun (ses_f27a7d75affeqsh0h1c4LZS3CY, planner-15, Qwen3.8-27B-Q3S-170K) — TODO #99 LANDED + planner-verified (probe 291/291, compact 74/74, context_recovery 17/17, pytest 459+1w, ruff F=0; spec staged keepTokens computed-primary) + live fork test PENDING (maintainer, post-restart; computed ~27k -> ~52k proves body keep.tokens honored) — details: loop folder plan15_summary.md + git ebf59b2/c5859c7/abb0915 + 282a583
 - 2026-09-25 autorun (ses_f29afbb66ffeRM1EHgBIpTwTg5, planner-14, Qwen3.8-27B-Q3S-170K) — his 3 items triaged (normalize-then-compare CONFIRMED + 2 directives; R-unit question answered; #96 filed 233MB log) + R6 LANDED (acb6323 — worker close-out died SILENTLY, planner verified from files: probe 279/279, smoke 48/48) + (2) edit-fuzzy LANDED (15761d8 code + 78b68e7 probe S27/docs, probe 287/287, smoke 55/55; worker saga: launch 1 died zero-work, launch 2 clean checkpoint, task_id resume NO-OP, launch 3 fresh finished) + #96 LANDED (22c36e4/70399ea/57f773f, live check pending next restart) + his live priority.md edit RENOUMBERED (R8 = #97 filed, unit4-resume = #98 filed) + R3 gate CLEARED (bitdrift retired; absorbs the anchor-drift fix) — details: git 305ce1b..099fea8 + TODO #95/#96/#97/#98
 - 2026-09-25 direct (ses_f2a436b57ffe8go608Z63jwNG6, planner, Qwen3.8-27B-Q3S-170K) — his reply triaged: #93 live acceptance VERIFIED from files (Gemma overflow 34649>30208 → recovery → session continued; the NORMAL slot consumed, emergency-1 unspent — his design call on slot preference) + f2-cleanup verified + one-commit loosening LANDED f4dbc31 + #94 LANDED 528f66b (worker_Q3S_170K; the anchor-drift finding → #95) + the fuzzy track grounded → TODO #95 parent + close rulings LANDED c82f788 (normalize-then-compare confirmed over the proportional d; R4 RETIRED → R3 gate cleared; the anchor-drift folded into R3; #83 threshold INERT while autoCompact false) — details: nap_direct.md (2026-09-25 excess append) + git 305ce1b..c82f788 + TODO #94/#95
 - 2026-09-24 direct (ses_f2c4fb315ffeM2SaIyahfFSrrx, planner, Qwen3.8-27B-Q3S-170K) — compaction design chat + trusted-compaction-system spec wave COMPLETE: builds 01/10/2+11/3 + wave d/c/e/g/h + worker-prompt parts all LANDED; guide/handout delivered; remaining: his f2-cleanup (4 AGENTS.md looprunner lines) — details: git 7f253ea..8b7e8df + compaction_feedback_by_planner.md + specs/README
