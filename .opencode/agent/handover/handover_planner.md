@@ -126,6 +126,17 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   plugin's — R8 redirect before the call; the tool guard stays
   defense-in-depth only), (c) Parts D + H confirmed (`last_write`) →
   replies appended, file back at the proposals/ root for his decision.
+  (8) **Off-topic Q (2026-09-25):** his draft
+  `maintainer/draft/programming_guidelines/software_quality_handout.md`
+  as mandatory worker read for programming tasks. My verdict (no
+  sugarcoating): too generic to mandate — half overlaps existing
+  conventions (spec DoD, gate discipline, AGENTS.md protocols), half is
+  what capable workers already do by default; ~1.3k tokens/launch cost.
+  Binding parts: rules 5/6/7 (deterministic core, trust-boundary
+  validation, intentional errors) + the completion checklist.
+  My recommendation: DISTILL ~8-10 lines into the worker prompt, full
+  file stays reference; alternatives (reference-only / mandatory for a
+  task class) offered. Awaiting his ruling (advisory only — his file).
 - **Pending live observations (maintainer / natural):** #99 fork test (his,
   post-restart), #98 live acceptance (the next self-compact→idle cycle —
   the #98 build is live in this process), #93 live overflow (his fork
