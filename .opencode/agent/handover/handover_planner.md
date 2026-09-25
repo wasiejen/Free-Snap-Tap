@@ -66,25 +66,25 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   ~268MB file trims at the NEXT host restart (maintainer live check —
   zero delta lines). The worker's `repo_opencode.md` reference-URL
   addition was left uncommitted (a likely maintainer live edit, as found).
-- **(2) edit-fuzzy spec WRITTEN + worker LAUNCHED (this session,
-  2026-09-25 post-compaction):** the mutating edit-fuzzy oldString
-  (normalize-then-compare + the two directives) — spec committed to
-  `handover_task.md`, `worker_Q3S_170K` launched (loop-log START line).
-  Design: 0-raw-occurrence miss → reuse the R6 content-locator candidate
-  generation → normalize BOTH sides (`\r\n`→`\n` + strip per-line trailing
-  ws) → exactly-one candidate at d=0 OR d≤1 → mutate `oldString` to the
-  file's exact bytes (hierarchical: d=0 first, then d=1; else fail-closed
-  → the R6 hint line carrying the best-d); new verdict `fuzzy-edit`;
-  mandatory `fuzzy-edit orig=<trunc> len= d= value=<trunc>` line; directive
-  (a) every attempt logged with best-d, (b) feedback truncated (first ~40
-  chars + len + d + target) / full original `oldString` in the journal
-  (the journal edit `old` = pre-mutation). Re-pins S26 271/275/276 + new
-  S27 section.
-- NEXT (after the worker lands): verify the gate + commit the bookkeeping →
-  R3 (gate CLEARED; absorbs the anchor-drift fix) → #97 (R8 sandbox
-  redirect + escape return-info). **#98** (unit4-compaction-resume A+B+C,
-  approved) queued after #96 (same file). R6 live acceptance (the
-  after-hook enrichment) = next host restart.
+- **(2) edit-fuzzy LANDED (this session, 2026-09-25 post-compaction;
+  planner re-verified the gate):** the mutating edit-fuzzy oldString
+  (normalize-then-compare + the two directives). Commits: `15761d8` (code:
+  core `normEditBytes`/`resolveEditOldString`/`EditResolution`/`fuzzy-edit`
+  verdict → VERDICTS 12 / `EDIT_FUZZY_MAX_D=1` + plugin `runEditFuzzy`
+  supersedes `runEditHint` / journal edit `old` = original) + `78b68e7`
+  (probe S27 8 checks + S26 re-pins 271/275/276 + check 171 VERDICTS 12 +
+  header 287 + docs `spec_sub2_edit_fuzzy_oldstring.md` + decision-record
+  §8.2 + TODO #95 status + final handover). Gates (measured by the
+  planner): probe **287/287**, intercept_observer smoke **55/55**, pytest
+  **459+1w**, ruff **F=0**. Worker saga: 1st launch (ses_f27f41e1) died
+  zero-work; 2nd (ses_f27e4e53) did code+smoke then stopped at a clean
+  checkpoint; task_id resume was a no-op; 3rd fresh (ses_f27bb616)
+  finished the probe+docs+gate. NEXT: R3 (gate CLEARED; absorbs the
+  anchor-drift fix: existing block_transfer modes `includes` + no
+  unique-check → startsWith+unique per #94) → #97 (R8 sandbox redirect +
+  escape return-info). **#98** (unit4-compaction-resume A+B+C, approved)
+  queued after #96 (same file). R6 live acceptance (the after-hook
+  enrichment) = next host restart.
 
 
 ## Compressed archive (one line each
