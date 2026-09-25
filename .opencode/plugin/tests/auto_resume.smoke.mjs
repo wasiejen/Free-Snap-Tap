@@ -42,7 +42,9 @@
 // SUCCESSFUL spawn STICKY-deactivates the TRIGGER (`skip=
 // deactivated` — cleared only by a NEW user message with an own-line
 // ON toggle); the in-memory state is restored at init from the plugin's
-// own log (part C, once per process).
+// own log (part C, once per process). #98 (A): the action: line is
+// OWN-LINE (line-start) — a prose-quoted MID-LINE mention no longer
+// matches (the scripted closing texts are own-line accordingly).
 // The plugin factory is called with a SCRATCHPAD sandbox `directory` —
 // auto_resume.log lands in the sandbox (.opencode/temp/auto_resume.log
 // under the sandbox project), NEVER the live .opencode/temp/. Run:
@@ -400,7 +402,7 @@ try {
    // nudge CANNOT reach it: an idle session emits no tool results → no
    // nudge, and NO promptAsync (no resume). The old tick design would
    // have fired within 5s — wait one full tick period to pin it.
-   u2Script.set("ses_u2_stale", u2Pairs([["user", TOG], ["assistant", "Done. action: stop"]]));
+    u2Script.set("ses_u2_stale", u2Pairs([["user", TOG], ["assistant", "Done.\naction: stop"]])); // #98 A: own-line (line-start) action line
    // re-factor with the v2 spy client (the fail-safety section above
    // re-factored with the throwing v3Session — restore the spy)
    const hooksU2b = await factory({ directory: proj, client: { session: v2Session, provider: { list: providerList }, app: { log: () => "log" } } });
@@ -786,15 +788,18 @@ try {
    // FIRST user message's `agent` — the scope rule (a)); the old
    // launch-marker text is NO LONGER a scope source (it is not an
    // own-line toggle — #82).
-   msgScript.set("ses_u4_stop", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Unit closed. action: stop"]], PLANNER_A));
-   msgScript.set("ses_u4_ask", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Blocked. action: ask_maintainer: which branch?"]], PLANNER_A));
-   msgScript.set("ses_u4_restart", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done. action: restart"]], PLANNER_A));
-   msgScript.set("ses_u4_sux", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done. action: restart"]], PLANNER_A));
+    // #98 A: the action: line is OWN-LINE (line-start) in every scripted
+    // closing message (a prose-quoted mid-line mention no longer
+    // matches — the re-pin of the batch-A texts).
+    msgScript.set("ses_u4_stop", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Unit closed.\naction: stop"]], PLANNER_A));
+    msgScript.set("ses_u4_ask", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Blocked.\naction: ask_maintainer: which branch?"]], PLANNER_A));
+    msgScript.set("ses_u4_restart", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done.\naction: restart"]], PLANNER_A));
+    msgScript.set("ses_u4_sux", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done.\naction: restart"]], PLANNER_A));
    msgScript.set("ses_u4_noline", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Mid-unit, no closing line."]], PLANNER_A));
    msgScript.set("ses_u4_plain", mkPairs([["user", "plain direct session, no marker"], ["assistant", "Done. action: stop"]]));
    // wrapper shape (the in-process client's RequestResult { data: [...] }):
    // the plugin must unwrap it — without the unwrap, scope=none, no route line
-   msgScript.set("ses_u4_wrap", { data: mkPairs([["user", MARK + " iteration 1"], ["assistant", "Unit closed. action: stop"]], PLANNER_A) });
+    msgScript.set("ses_u4_wrap", { data: mkPairs([["user", MARK + " iteration 1"], ["assistant", "Unit closed.\naction: stop"]], PLANNER_A) }); // #98 A: own-line action line
     // A real spawned session's first user message is the spawn start
     // prompt (agent = the source session's current agent) — faithful
     // script; #90: the old self-spawned exclusion is GONE — the
@@ -1024,7 +1029,7 @@ try {
 
     // ---- (3) budget FULLY exhausted (count 3 > cap 2 — the emergency 1
     // consumed) → the RESTART prompt carries the directive.
-    msgScript.set("ses_u4_exh", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done. action: restart"]], PLANNER_A));
+    msgScript.set("ses_u4_exh", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done.\naction: restart"]], PLANNER_A)); // #98 A: own-line action line
     fs.writeFileSync(budget2, JSON.stringify({
       version: 2,
       sessions: { ses_u4_exh: { count: 3, updated: "2026-09-24T00:00:00.000Z", model: "ExhModel" } },
@@ -1050,7 +1055,7 @@ try {
 
     // ---- (4) count == cap (the emergency 1 still available) → NOT
     // exhausted → the PLAIN restart text (no directive).
-    msgScript.set("ses_u4_emg", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done. action: restart"]], PLANNER_A));
+    msgScript.set("ses_u4_emg", mkPairs([["user", MARK + " iteration 1"], ["assistant", "Done.\naction: restart"]], PLANNER_A)); // #98 A: own-line action line
     fs.writeFileSync(budget2, JSON.stringify({
       version: 2,
       sessions: { ses_u4_emg: { count: 2, updated: "2026-09-24T00:00:00.000Z", model: "ExhModel" } },
@@ -1093,7 +1098,7 @@ try {
    // no body): the equivalent pin is the verdict gate on the fresh
    // fetch.
    // ============================================================
-   msgScript.set("ses_u3_new", mkPairs([["user", "plain direct"], ["assistant", "Done. action: stop"]], PLANNER_A));
+    msgScript.set("ses_u3_new", mkPairs([["user", "plain direct"], ["assistant", "Done.\naction: stop"]], PLANNER_A)); // #98 A: own-line action line
    msgScript.set("ses_u2_agnet", [
      { info: { role: "user", agent: "worker_Q3S_160K" }, parts: [{ type: "text", text: "plain" }] },
      { info: { role: "assistant" }, parts: [{ type: "text", text: "Done. action: stop" }] },
@@ -1290,10 +1295,10 @@ try {
    ]);
    // (a2) SPAWN: planner-scoped, action: restart, the last assistant
    // carries the switched agent+model — the successor keeps them.
-   msgScript.set("ses_p2_rs", [
-     { info: { role: "user", agent: PLANNER_A }, parts: [{ type: "text", text: MARK + " iteration 1" }] },
-     { info: { role: "assistant", agent: WORKER_A, model: MODEL }, parts: [{ type: "text", text: "Done. action: restart" }] },
-   ]);
+    msgScript.set("ses_p2_rs", [
+      { info: { role: "user", agent: PLANNER_A }, parts: [{ type: "text", text: MARK + " iteration 1" }] },
+      { info: { role: "assistant", agent: WORKER_A, model: MODEL }, parts: [{ type: "text", text: "Done.\naction: restart" }] }, // #98 A: own-line action line
+    ]);
    // (a3) JSONC fallback: the last assistant carries NO agent+model →
    // the working agent (first user) + its CONFIGURED model from the
    // sandbox opencode.jsonc (the parser: comments + trailing commas).
@@ -1323,7 +1328,7 @@ try {
     // agent.
     msgScript.set("ses_p2_cmp2", [
       { info: { role: "user", agent: PLANNER_A }, parts: [{ type: "text", text: MARK + " iteration 1" }] },
-      { info: { role: "assistant", agent: WORKER_A, model: MODEL }, parts: [{ type: "text", text: "Done. action: restart" }] },
+      { info: { role: "assistant", agent: WORKER_A, model: MODEL }, parts: [{ type: "text", text: "Done.\naction: restart" }] }, // #98 A: own-line action line
       { info: { role: "assistant", agent: "compaction", model: { providerID: "prov_c", modelID: "model_c" } }, parts: [{ type: "text", text: "Compaction summary: previous work recap, no closing line." }] },
     ]);
 
@@ -1472,7 +1477,7 @@ try {
     // from that message ALONE (restart-safe — no in-memory state) and
     // is RECOVERED after an idle without an action line (the #87 stall
     // case, inverted).
-    msgScript.set("ses_90_worker", mkPairs([["user", MARK + "\nworker task, iteration 1"], ["assistant", "Done. action: restart"]], WORKER_A));
+    msgScript.set("ses_90_worker", mkPairs([["user", MARK + "\nworker task, iteration 1"], ["assistant", "Done.\naction: restart"]], WORKER_A)); // #98 A: own-line action line
     await fire(hooks90, "ses_90_worker", [statusEv("ses_90_worker", "busy"), statusEv("ses_90_worker", "idle")]);
     const ok90a = await waitUntil(
       () => readLines().some((l) => l.includes("route= restart spawn sid=ses_90_worker")) &&
@@ -1511,7 +1516,7 @@ try {
     // toggle clears it → routed again → the successor check yields
     // skip= successor (no duplicate spawn).
     const TRIG = "ses_90_trig";
-    msgScript.set(TRIG, mkPairs([["user", MARK + "\niteration 1"], ["assistant", "Done. action: restart"]], PLANNER_A));
+    msgScript.set(TRIG, mkPairs([["user", MARK + "\niteration 1"], ["assistant", "Done.\naction: restart"]], PLANNER_A)); // #98 A: own-line action line
     await fire(hooks90, TRIG, [statusEv(TRIG, "busy"), msgUpdated(TRIG, "assistant", { total: 100 }), statusEv(TRIG, "idle")]);
     const ok90c = await waitUntil(() => readLines().some((l) => l.includes("deactivate= sid=" + TRIG)), 12000);
     const trigRoutes = () => readLines().filter((l) => l.includes("sid=" + TRIG) && l.includes("route=")).length;
@@ -1539,7 +1544,7 @@ try {
       ok90c3 && trigSkip() === 2 && c90Sends.length === 3, `skip=${trigSkip()}`);
     // a ping WITH an own-line ON toggle → the flag clears → routed
     // again → the successor check yields skip= successor.
-    msgScript.set(TRIG, mkPairs([["user", MARK + "\niteration 1"], ["assistant", "Done. action: restart"], ["user", "plain ping, no toggle"], ["user", MARK]], PLANNER_A));
+    msgScript.set(TRIG, mkPairs([["user", MARK + "\niteration 1"], ["assistant", "Done.\naction: restart"], ["user", "plain ping, no toggle"], ["user", MARK]], PLANNER_A)); // #98 A: own-line action line
     await fire(hooks90, TRIG, [statusEv(TRIG, "busy"), statusEv(TRIG, "idle")]);
     const ok90c4 = await waitUntil(() => readLines().some((l) => l.includes("skip= successor sid=ses_90_spawn")), 12000);
     chk("#90 (iii): a ping WITH an own-line ON toggle clears the flag → routed again → the successor check yields skip= successor (no duplicate spawn)",
@@ -1596,7 +1601,7 @@ try {
     // the trigger — the trigger is still routed normally on the next
     // idle (its last assistant flips to action: stop → route= stop).
     const FAIL = "ses_90_fail";
-    msgScript.set(FAIL, mkPairs([["user", MARK + "\nfail task"], ["assistant", "Done. action: restart"]], PLANNER_A));
+    msgScript.set(FAIL, mkPairs([["user", MARK + "\nfail task"], ["assistant", "Done.\naction: restart"]], PLANNER_A)); // #98 A: own-line action line
     c90CreateShouldThrow = true;
     await fire(hooks90, FAIL, [statusEv(FAIL, "busy"), statusEv(FAIL, "idle")]);
     const ok90e = await waitUntil(
@@ -1608,7 +1613,7 @@ try {
       ok90e && c90Creates.length === 4 && !readLines().some((l) => l.includes("deactivate= sid=" + FAIL)),
       `create=${c90Creates.length}`);
     c90CreateShouldThrow = false;
-    msgScript.set(FAIL, mkPairs([["user", MARK + "\nfail task"], ["assistant", "Done. action: stop"]], PLANNER_A));
+    msgScript.set(FAIL, mkPairs([["user", MARK + "\nfail task"], ["assistant", "Done.\naction: stop"]], PLANNER_A)); // #98 A: own-line action line
     await fire(hooks90, FAIL, [statusEv(FAIL, "busy"), statusEv(FAIL, "idle")]);
     const ok90e2 = await waitUntil(() => readLines().some((l) => l.includes("route= stop sid=" + FAIL)), 12000);
     chk("#90 (v): the non-deactivated trigger routes normally on the next idle (route= stop — the failed spawn changed nothing)",
@@ -1721,10 +1726,10 @@ try {
       '  { info: { role: "user" }, parts: [{ type: "text", text: "plain ping, no toggle" }] },',
       '  { info: { role: "assistant" }, parts: [{ type: "text", text: "Done. action: restart" }] },',
       "];",
-      "const msgC = [",
+    "const msgC = [",
       '  { info: { role: "user", agent: PLANNER }, parts: [{ type: "text", text: "iteration 1, no toggle" }] },',
-      '  { info: { role: "assistant" }, parts: [{ type: "text", text: "Done. action: restart" }] },',
-      "];",
+      '  { info: { role: "assistant" }, parts: [{ type: "text", text: "Done.\\naction: restart" }] },', // #98 A: own-line action line (child-process pin)
+    "];",
       "const scripted = { trim_a: msgA, trim_c: msgC };",
       "const client = {",
       "  session: {",
@@ -1767,6 +1772,71 @@ try {
         childLines.some((l) => l.includes("skip= depth sid=trim_c depth=2")),
       `status=${childRes.status} ${childRes.stdout ? childRes.stdout.trim().split("\n").pop() : ""}`);
 
+    // ============================================================
+    // #98 (A) — the LINE-ANCHORED action-line regex: `action:` matches
+    // ONLY at line start (after any leading whitespace); a PROSE-QUOTED
+    // MID-LINE mention no longer matches (the 2026-09-23 20:14Z
+    // mis-route cause). Fresh spying client (the module state — watches,
+    // the single tick — is shared across re-factories; the tick period
+    // is the first factory's 300ms).
+    const p98Sends = [];
+    const p98Creates = [];
+    const p98Script = new Map();
+    const p98Session = {
+      prompt: function () {},
+      promptAsync: async (args) => { p98Sends.push(args); return { data: { id: "queued" } }; },
+      abort: function () {},
+      list: function () {},
+      get: function () {},
+      message: function () {},
+      messages: async (args) => p98Script.get(args?.path?.id) ?? [],
+      todo: function () {},
+      command: function () {},
+      summarize: function () {},
+      create: async () => { p98Creates.push({}); return { data: { id: "ses_p98_spawn" } }; },
+    };
+    const hooksP98 = await factory({ directory: proj, client: { session: p98Session, provider: { list: providerList }, app: { log: () => "log" } } });
+    chk("#98 (A): re-factory with the spying client returns the event hook", typeof hooksP98?.event === "function");
+
+    // (A1) PROSE-QUOTED MID-LINE: the last assistant message QUOTES
+    // `action: restart` in the middle of a sentence (no own line) —
+    // the anchor must NOT match → NO action line → CONTINUE attempt 1
+    // (no restart spawn).
+    p98Script.set("ses_p98_prose", [
+      { info: { role: "user", agent: PLANNER_A }, parts: [{ type: "text", text: MARK + " iteration 1" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "Close with exactly one action: restart line — that is the closing convention, nothing more." }] },
+    ]);
+    await fire(hooksP98, "ses_p98_prose", [statusEv("ses_p98_prose", "busy"), statusEv("ses_p98_prose", "idle")]);
+    const okP98A1 = await waitUntil(
+      () => readLines().some((l) => l.includes("recovery= sid=ses_p98_prose attempt=1")) &&
+             readLines().some((l) => l.includes("scope= planner sid=ses_p98_prose")),
+      12000,
+    );
+    chk("#98 (A1): a PROSE-QUOTED MID-LINE `action: restart` (no own line) is NOT an action line → CONTINUE attempt 1, NO restart spawn (the lastAssistantAction null path)",
+      okP98A1 && p98Creates.length === 0 &&
+        !readLines().some((l) => l.includes("route= restart spawn sid=ses_p98_prose")) &&
+        p98Sends.some((c) => c.path?.id === "ses_p98_prose" && ((c.body?.parts?.[0]?.text) ?? "").includes("agent_readme_post_compaction.md")),
+      `create=${p98Creates.length}`);
+
+    // (A2) OWN-LINE: a standalone `action: restart` on its OWN line →
+    // still recognized (the anchor group is NON-capturing — group 1 is
+    // still the action word) → restart spawn.
+    p98Script.set("ses_p98_own", [
+      { info: { role: "user", agent: PLANNER_A }, parts: [{ type: "text", text: MARK + " iteration 1" }] },
+      { info: { role: "assistant" }, parts: [{ type: "text", text: "Done.\naction: restart" }] },
+    ]);
+    await fire(hooksP98, "ses_p98_own", [statusEv("ses_p98_own", "busy"), statusEv("ses_p98_own", "idle")]);
+    const okP98A2 = await waitUntil(
+      () => readLines().some((l) => l.includes("route= restart spawn sid=ses_p98_own")) && p98Creates.length === 1,
+      12000,
+    );
+    const p98SpawnSend = p98Sends.find((c) => ((c.body?.parts?.[0]?.text) ?? "").startsWith(MARK));
+    chk("#98 (A2): a standalone `action: restart` on its OWN line is still the action line (non-capturing anchor — group 1 = the action word) → restart spawn (ONE create, restart body)",
+      okP98A2 && p98Creates.length === 1 &&
+        !!p98SpawnSend && p98SpawnSend?.path?.id === "ses_p98_spawn" &&
+        (p98SpawnSend?.body?.parts?.[0]?.text ?? "").includes("auto-resume unit 4 restart branch"),
+      `create=${p98Creates.length} send=${!!p98SpawnSend}`);
+
     // ---- the live log received NO smoke line. The LIVE plugin instance
   // (this host) keeps appending ITS OWN live-session lines in real time
   // while the smoke runs, so the live size may legitimately grow — the
@@ -1782,7 +1852,7 @@ try {
   } else if (liveBefore === null && liveSizeNow > 0) {
     appended = fs.readFileSync(LIVE_LOG, "utf-8"); // did not exist before — all new
   }
-  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_wrap", "ses_u4_throw", "ses_u4_spawn", "ses_u4_cap", "ses_u4_relay", "ses_u4_exh", "ses_u4_emg", "ses_u2_agnet", "ses_u2_agnone", "ses_u4_worker", "ses_u4_worker_on", "ses_u4_pb", "ses_u4_lastoff", "ses_u4_mid", "ses_p2_cur", "ses_p2_rs", "ses_p2_fb", "ses_p2_dm", "ses_p2_spawn", "ses_u2_hi98", "ses_u2_two", "ses_u2_direct", "ses_u2_stale", "ses_u2_cfa_low", "ses_u2_cfa_hi", "ses_u2_cfb_edit", "ses_u2_cfb_fire", "ses_u2_cfb_no", "ses_u2_cfc_fire", "ses_u2_cfc_no", "ses_u2_cfd_low", "ses_u2_cfd_hi", "ses_p3_pldirect", "ses_90_worker", "ses_90_spawn", "ses_90_trig", "ses_90_t0", "ses_90_d1", "ses_90_d2", "ses_90_fail", "ses_90_file"];
+  const smokeSids = ["ses_smoke_ar1", "ses_throwing", "ses_u2_sat", "ses_u2_low", "ses_u2_over", "ses_u2_nomodel", "ses_u2_noprov",     "ses_u2_sendfail", "ses_u2_noprov2", "ses_u2_str", "ses_u2_tgnof", "ses_u2_tgoff", "ses_u2_tgon", "ses_u2_tgmal", "ses_u3_new", "ses_u3_chk2", "ses_u4_stop", "ses_u4_ask", "ses_u4_restart", "ses_u4_sux", "ses_u4_succ", "ses_u4_noline", "ses_u4_plain", "ses_u4_wrap", "ses_u4_throw", "ses_u4_spawn", "ses_u4_cap", "ses_u4_relay", "ses_u4_exh", "ses_u4_emg", "ses_u2_agnet", "ses_u2_agnone", "ses_u4_worker", "ses_u4_worker_on", "ses_u4_pb", "ses_u4_lastoff", "ses_u4_mid", "ses_p2_cur", "ses_p2_rs", "ses_p2_fb", "ses_p2_dm", "ses_p2_spawn", "ses_u2_hi98", "ses_u2_two", "ses_u2_direct", "ses_u2_stale", "ses_u2_cfa_low", "ses_u2_cfa_hi", "ses_u2_cfb_edit", "ses_u2_cfb_fire", "ses_u2_cfb_no", "ses_u2_cfc_fire", "ses_u2_cfc_no", "ses_u2_cfd_low", "ses_u2_cfd_hi", "ses_p3_pldirect", "ses_90_worker", "ses_90_spawn", "ses_90_trig", "ses_90_t0", "ses_90_d1", "ses_90_d2", "ses_90_fail", "ses_90_file", "ses_p98_prose", "ses_p98_own", "ses_p98_spawn", "ses_p98_compact", "ses_p98_unwatched"];
   chk("LIVE .opencode/temp/auto_resume.log received no smoke line (sandbox got every smoke line)",
     liveBefore === liveSizeNow || !smokeSids.some((s) => appended.includes(s)), `before=${liveBefore} after=${liveSizeNow}`);
   chk("sandbox log path is under the sandbox", sandboxLog.startsWith(base), sandboxLog);

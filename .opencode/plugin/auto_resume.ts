@@ -266,7 +266,11 @@ const MAX_RECOVERY_ATTEMPTS = 2;
 // plugin-spawned (a user session, a file-trigger spawn) is absent from
 // the `spawned` map → depth 0.
 const LINEAGE_MAX_DEPTH = 2;
-const ACTION_RE = /action:\s*(restart|resume|stop|ask_maintainer)/g;
+// #98 part A: LINE-ANCHORED — `action:` matches ONLY at line start
+// (after any leading whitespace), never as a PROSE-QUOTED MID-LINE
+// mention (the 2026-09-23 20:14Z mis-route cause). The anchor group is
+// NON-capturing so group 1 is still the ACTION WORD (`found = m[1]`).
+const ACTION_RE = /(?:^|\n)\s*action:\s*(restart|resume|stop|ask_maintainer)/g;
 
 let logDir = "";
 let logPath = "";
