@@ -482,3 +482,27 @@ dump_session.cjs's output location is not in its usage text: it writes to .openc
 ### 2026-09-24_15-50 planner_Q3S_170K ses_f30493f9effeuQRFc3ijNON166
 The self-compact→resume protocol (Work State dump form, "looprunner resumes the session") was trusted on paper but its live plugin path had never been exercised: my dump's prose-quoted `action: restart` was mis-parsed by the unanchored ACTION_RE AND no idle event followed the compaction, so the loop stalled until manual re-engagement. What would help: when a protocol promises an automated continuation, the resume path itself gets one live acceptance before the protocol is relied on in production (the unit-4 proposal + TODO #93 diagnostics now cover the two root causes).
 
+### 2026-09-24_18-13 planner_Q3S_170K ses_f2c4fb315ffeM2SaIyahfFSrrx
+Stale compaction passages cost correction rounds in the 2026-09-24 chat: the compact_memory tool description (keep fields "ignored"), the dump-before-compact protocol, the Gemma-summarizer note, and the "starting values" wording all contradicted the live system — each had to be corrected by the maintainer before the compaction model could be trusted; the stale passages are now catalogued in draft/compaction_guide/full_guide.md §11 for the fix pass.
+
+### 2026-09-24_21-02 worker_Q3S_170K ses_f2b47fa1effefej9AVC58Ogj2l
+Spec 01's probe re-pin items (L1837/L2193/L2106) point at the S10/S11 sections, which pin out-of-scope retired artifacts (compact_memory_v1.ts, context_recovery.ts) — the spec's grep DoD and the gate-green DoD are mutually unsatisfiable; a section→artifact map in the probe header (or the spec) would have prevented the collision.
+
+### 2026-09-24_21-36 worker_Q3S_170K ses_f2b2edff1ffe60GXyVJGzKg17Z
+Probe check-ID numbering is not centralized: free IDs (222-230) are gaps between sections while S13's own IDs end at 99 and S14 starts at 101 — the spec author has to run the probe and extract used IDs to pick safe ones for new checks; also the per-section header counts (S13 said "(15)") drift from the authoritative annotation sum line (S13=14).
+
+### 2026-09-24_22-53 worker_Q3S_170K ses_f2ae69d1cffeFqogBIbH2xyh0F
+Spec 2+11 launch baselines stale: auto_resume smoke was 121/121 live, not the 102/102 stated (harmless — green — but launch baselines should be re-measured at spec time).
+
+### 2026-09-24_22-58 planner_Q3S_170K ses_f2c4fb315ffeM2SaIyahfFSrrx
+Spec-wave launch baselines were carried forward from Standing instead of re-measured at launch (spec 2+11: "auto_resume 102/102" was actually 121/121 live; worker adapted correctly via the re-run-at-start rule) — spec/launch baselines should be re-measured at spec time / launch time, or stated as "re-run at start, do not trust the number".
+
+### 2026-09-24_23-32 worker_Q3S_170K ses_f2ac76fd3ffeh13lUv8xcxy0AL
+Spec item 3's verified facts mislocated the primary home: the injected ctx: line is built by ctx_watchdog.ts (formatGauge), not auto_resume.ts's unit-2 nudge — the stale-anchor warning covered line numbers but not the file; locating the real builder took extra reads and forced pin-home deviations (gauge_core.smoke + probe S6b instead of auto_resume.smoke.mjs).
+
+### 2026-09-24_23-42 planner_Q3S_170K ses_f2c4fb315ffeM2SaIyahfFSrrx
+block_transfer PASTE (no targetMarker) APPENDS to EOF — I assumed overwrite and pasted specs 10/2+11/3 onto handover_task.md which still held the previous spec, so the launch file was a 4-spec concatenation. Workers navigated it correctly (launch prompts named the spec; results verified per-scope), but for a "launch slot" file use write (overwrite) or clear-then-paste; PASTE is for insertion, not slot replacement.
+
+### 2026-09-24_23-48 worker_Q3S_230K_slow ses_f2aa0f8e3ffemOXY00icMeKWW3
+Wave task d: spec DoD "one commit (the two files only)" conflicts with the AGENTS.md commit routine (worker commits handover files in the same commit) — the launch env-note resolved it (handover stays uncommitted for the planner follow-up), but the spec DoD line itself could state it to avoid the ambiguity.
+

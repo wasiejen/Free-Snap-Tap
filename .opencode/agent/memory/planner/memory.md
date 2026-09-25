@@ -293,3 +293,34 @@ knowledge / NAP) is re-stated.
   test endpoint, or the maintainer explicitly authorizes a specific
   direct request for a measured run (then the rule's scope narrows to
   "only explicit maintainer-authorized runs").
+
+## MEM-0109 — Task-tool limit signature `request (N tokens) exceeds the available context size (M tokens)` = a limit hit on a TOOL-OUTPUT insertion (a normal limit death, not a launch rejection)
+
+- Ruling (maintainer, 2026-09-25, direct session): in that signature
+  "prefill" means the context-limit hit happened while a tool output was
+  inserted into the context — the SAME as a normal context limit, only the
+  final push was a tool output instead of the thinking/generation part.
+  Consequence: do NOT read the Task-tool failure message as a failed start
+  (a fresh-session prefill rejection) — the sub-agent ran, and its last
+  in-flight request (the accumulated context + the new tool output) was
+  hard-rejected by the server because it exceeded the window.
+- Evidence: 2026-09-25 (planner `ses_f2a436b57ffe8go608Z63jwNG6`, direct):
+  `worker_Q3S_170K` on TODO #93 — the Task result was `request (170372
+  tokens) exceeds the available context size (170240 tokens), try
+  increasing it`; the session dump
+  (`ses_f2a2ebcafffeVW1j4oXA7K3ioa`) read messages=61 parts=280 — a full
+  run; the working tree had ALL six task files staged (`git add` done), the
+  handover written, the gate evidence recorded (probe 257/257,
+  context_recovery smoke 15/15, compact_memory 66/66, auto_resume 129/129,
+  pytest 459+1w, ruff F=0); the planner verified from files (git status +
+  handover + a targeted 15/15 spot re-run of the changed smoke) and landed
+  the commit `5f823e4` — no resume needed.
+- Verified: 2026-09-25 (measured incident + the maintainer's confirmed
+  interpretation).
+- Related: MEM-0104 (a `context_length_exceeded`-class Task failure ALWAYS
+  means the sub-agent RAN — rebuild from files first), MEM-0107 (limit-death
+  forensics via the dump's last step-finish meta + per-message sizes).
+- Review when: a GENUINE launch failure is observed (a fresh session whose
+  prefill alone exceeds the window) — then distinguish the two signatures by
+  file state (the dump's message count: ~2 for a failed start vs. many for a
+  ran-and-died session), never by the message alone.
