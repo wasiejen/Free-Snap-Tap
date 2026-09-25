@@ -4,90 +4,50 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 
-## Current session — autorun, 2026-09-25 (ses_f29afbb66ffeRM1EHgBIpTwTg5, planner-14, Qwen3.8-27B-Q3S-170K)
-- Launch (his 3 items): (A) **normalize-then-compare CONFIRMED** for the
-  edit-fuzzy oldstring (his words: better than his proportional
-  distance rule; "go ahead with it") + two directives: (a) resolutions
-  AND failed resolutions logged (near-miss d<10 / in general — every
-  attempt, best-candidate d in the line, no d bar on logging), (b)
-  feedback context-saving: the return feedback does NOT carry the full
-  oldstring (truncated identifier — first ~40 chars + length + d +
-  target; the full payload stays in the R6 journal). (B) his question:
-  which R unit carries the resolution feedback? (answered at close:
-  R6's edit-hint channel; the mutating-channel "return info" = #95
-  sub-item 4, not yet staged; his (b) idea adopted into the (2) spec).
-  (C) **auto_resume.log = 233MB and growing** (small-write SSD wear) →
-  reduce the logged data → TODO #96 filed with measured root cause
-  (97.4% of bytes = `message.part.delta` lines ≈ 100MB/day).
-- Inbox: `compaction_feedback_by_planner.md` handled → `done/` (all
-  content already landed/recorded in the wave; the unit4-compaction-
-  resume A+B+C approval filed as TODO #97 — verified NOT implemented
-  from files today: `ACTION_RE` L267 unanchored, no ctx.log COMPACT
-  tail-read in the tick).
-- TODO: #95 status updated (his go + the two directives), #96 filed
-  (log reduction, full design in the entry), #97 filed (unit4-
-  compaction-resume A+B+C); header numbering → #97.
-- **R6 LAUNCHED → worker DIED mid-close (silent)**: worker-14
-  `worker_Q3S_170K` ses_f299d233effezQzd4la8UBVxki — self-compacted
-  ONCE (COMPACT line landed; the Task result WAS the compaction
-  summary), resumed via task_id → did major work → silent death (no
-  2nd COMPACT line, empty Task result, no commit/handover/DONE line).
-  State ON DISK (now committed — this commit): core +161 (locator
-  primitive, VERDICTS=11), plugin +189 (journal + hint + onToolAfter
-  registered in the factory), probe +468 (S26 section, 23 mentions;
-  re-pins 171/203/241/245 applied), smoke +151 (R6 checks).
-- **R6 LANDED + verified (this session, post-compaction; the worker's
-  close-out had died silently):** smoke 39/48 → **48/48**; probe S26
-  8-fail → **green (279/279)**. The 9 smoke + 8 probe fails were ALL
-  CHECK-side (the code was correct): (a) journal checks asserted
-  whole-file line counts instead of per-scenario DELTAS (the sandbox
-  journal accumulates across the run); (b) the hint checks asserted a
-  total line-count `nL+1` when a dense date / numword in `oldString`
-  fires an EXTRA observation line → changed to assert the hint-specific
-  LAST line (context `edit oldString`); (c) `JSON.parse(...) === {object}`
-  (JS reference identity, always false) → string compare
-  `jPayload(line) === JSON.stringify({...})`. Probe 267's write fixture
-  also had numword content (`line one | two`) firing an observation line
-  → dense/numword-free `part A | part B\npart C` (276 DoD string updated).
-  Wiring confirmed GOOD: block_transfer journal FIRES (probe delta=1);
-  the exact-1 hint IS silent. **Gates (measured):** probe 279/279, smoke
-  48/48, pytest 459+1w, ruff F=0. **DOCS done** (README recovery protocol
-  + decision-record §8.1); **handover** written by the planner from file
-  evidence.
-- His live priority.md edit (uncommitted, his file — left untouched):
-  the R8 section is labeled `# TODO #97` → RENOUMBERED: R8 = #97
-  (filed, full entry), unit4-compaction-resume = #98 (renumbered).
-  He also removed the done "revocery hook" heading.
-- **#96 LANDED (22c36e4 code / 70399ea smoke / 57f773f bookkeeping,
-  worker_Q3S_170K, planner re-verified 2026-09-25):** `onEvent` skips
-  `message.part.delta`; the init size guard (20MB → 2MB byte tail + a
-  `log-trim=` line, factory caps); smoke 133/133 (baseline 129 + 4
-  re-pins); probe 279/279 (unchanged); pytest 459+1w; ruff F=0. The live
-  ~268MB file trims at the NEXT host restart (maintainer live check —
-  zero delta lines). The worker's `repo_opencode.md` reference-URL
-  addition was left uncommitted (a likely maintainer live edit, as found).
-- **(2) edit-fuzzy LANDED (this session, 2026-09-25 post-compaction;
-  planner re-verified the gate):** the mutating edit-fuzzy oldString
-  (normalize-then-compare + the two directives). Commits: `15761d8` (code:
-  core `normEditBytes`/`resolveEditOldString`/`EditResolution`/`fuzzy-edit`
-  verdict → VERDICTS 12 / `EDIT_FUZZY_MAX_D=1` + plugin `runEditFuzzy`
-  supersedes `runEditHint` / journal edit `old` = original) + `78b68e7`
-  (probe S27 8 checks + S26 re-pins 271/275/276 + check 171 VERDICTS 12 +
-  header 287 + docs `spec_sub2_edit_fuzzy_oldstring.md` + decision-record
-  §8.2 + TODO #95 status + final handover). Gates (measured by the
-  planner): probe **287/287**, intercept_observer smoke **55/55**, pytest
-  **459+1w**, ruff **F=0**. Worker saga: 1st launch (ses_f27f41e1) died
-  zero-work; 2nd (ses_f27e4e53) did code+smoke then stopped at a clean
-  checkpoint; task_id resume was a no-op; 3rd fresh (ses_f27bb616)
-  finished the probe+docs+gate. NEXT: R3 (gate CLEARED; absorbs the
-  anchor-drift fix: existing block_transfer modes `includes` + no
-  unique-check → startsWith+unique per #94) → #97 (R8 sandbox redirect +
-  escape return-info). **#98** (unit4-compaction-resume A+B+C, approved)
-  queued after #96 (same file). R6 live acceptance (the after-hook
-  enrichment) = next host restart.
+## Current session — autorun, 2026-09-25 (ses_f27a7d75affeqsh0h1c4LZS3CY, planner-15, Qwen3.8-27B-Q3S-170K)
+- Launch (unit-4 restart branch after planner-14's `action: restart`).
+- **Triage: priority.md NEW top item (his live edit 2026-09-25) — the
+  compaction keep semantics:** his live measurements (his words):
+  "keepToken was worken. with 30000 keepToken the newly compacted session
+  was around 55k token. with the keepToken 0 and keepMessages X it was
+  always around 25K token after compaction. so the 30k keeptoken were a
+  direct retention that added 25k +30k to the observed 55k" →
+  `keep.tokens` = DIRECT retention on a constant ~25k base; the
+  `keep.messages` count does NOT control the retention. His asks:
+  (a) "settings for keepToken as fallback from compact_budged.json",
+  (b) "can we caluculate the actual keepToken based on the dump and then
+  supply the correct keepToken to exactly keep these messages?".
+- **Verified from files today:** the installed SDK summarize body schema
+  (`.opencode/node_modules/@opencode-ai/sdk/dist/gen/types.gen.d.ts`
+  `SessionSummarizeData`) = `{ providerID, modelID }` ONLY — no documented
+  `keep` field in the BODY (our current body `keep.messages` is untyped,
+  effect unverified — the live retention tracked the CONFIG
+  `compaction.keep` in opencode.jsonc). Dev-branch host source
+  (his link, `session/compaction.ts`): V2 token-budget tail
+  (`preserve_recent_tokens ?? clamp(0.25*usable, 2k..15k)` + optional
+  `tail_turns`) — no message-count knob. The budget file already carries
+  `keepTokens: 30000` + `keepMessages: 18` (his live edit).
+- **TODO #99 FILED + spec written** (handover_task.md) — resolution at
+  dispatch: computed (last `keepMessages` messages' tokens from the DB —
+  user: `tokens.input`, assistant: `tokens.output + tokens.reasoning`)
+  PRIMARY → budget `keepTokens` fallback → omit (host default); body
+  gains `keep.tokens` (+ `keep.messages` kept); COMPACT line gains the
+  resolved value + source; context_recovery.ts same; LIVE fork test
+  (maintainer) proves the body field is honored (~52k expected, not
+  55k/25k) or his fallback ruling. Worker `worker_Q3S_170K` launched
+  (roster-verified opencode.jsonc L207).
+- Side note (his observation, recorded in #99): the history is completely
+  DROPPED and REPLACED by the summary → no bit-rot from a compaction
+  chain, only from an N-summarized summary (the budget cap's rationale —
+  his review).
+- Working tree: his live files uncommitted (priority.md +31 incl. the new
+  top item, opencode.jsonc `tokens: 0`→`30000`, repo_opencode.md ref-URL)
+  — never stage (standing rule); agent_feedback.md +6 legit entries ride
+  the bookkeeping commit.
 
 
 ## Compressed archive (one line each
+- 2026-09-25 autorun (ses_f29afbb66ffeRM1EHgBIpTwTg5, planner-14, Qwen3.8-27B-Q3S-170K) — his 3 items triaged (normalize-then-compare CONFIRMED + 2 directives; R-unit question answered; #96 filed 233MB log) + R6 LANDED (acb6323 — worker close-out died SILENTLY, planner verified from files: probe 279/279, smoke 48/48) + (2) edit-fuzzy LANDED (15761d8 code + 78b68e7 probe S27/docs, probe 287/287, smoke 55/55; worker saga: launch 1 died zero-work, launch 2 clean checkpoint, task_id resume NO-OP, launch 3 fresh finished) + #96 LANDED (22c36e4/70399ea/57f773f, live check pending next restart) + his live priority.md edit RENOUMBERED (R8 = #97 filed, unit4-resume = #98 filed) + R3 gate CLEARED (bitdrift retired; absorbs the anchor-drift fix) — details: git 305ce1b..099fea8 + TODO #95/#96/#97/#98
 - 2026-09-25 direct (ses_f2a436b57ffe8go608Z63jwNG6, planner, Qwen3.8-27B-Q3S-170K) — his reply triaged: #93 live acceptance VERIFIED from files (Gemma overflow 34649>30208 → recovery → session continued; the NORMAL slot consumed, emergency-1 unspent — his design call on slot preference) + f2-cleanup verified + one-commit loosening LANDED f4dbc31 + #94 LANDED 528f66b (worker_Q3S_170K; the anchor-drift finding → #95) + the fuzzy track grounded → TODO #95 parent + close rulings LANDED c82f788 (normalize-then-compare confirmed over the proportional d; R4 RETIRED → R3 gate cleared; the anchor-drift folded into R3; #83 threshold INERT while autoCompact false) — details: nap_direct.md (2026-09-25 excess append) + git 305ce1b..c82f788 + TODO #94/#95
 - 2026-09-24 direct (ses_f2c4fb315ffeM2SaIyahfFSrrx, planner, Qwen3.8-27B-Q3S-170K) — compaction design chat + trusted-compaction-system spec wave COMPLETE: builds 01/10/2+11/3 + wave d/c/e/g/h + worker-prompt parts all LANDED; guide/handout delivered; remaining: his f2-cleanup (4 AGENTS.md looprunner lines) — details: git 7f253ea..8b7e8df + compaction_feedback_by_planner.md + specs/README
 - 2026-09-23/24 (ses_f30493f9effeuQRFc3ijNON166, planner-13, Qwen3.8-27B-Q3S-170K) — spawn-tail live acceptances verified (#90 + #82 CLOSED with live evidence, #91 updated) + R4 LANDED (dde74b9, R3 unblocked) + unit-4 no-resume-after-self-compact live finding (A: action-line regex unanchored, B: compaction landing silent) → proposal filed, maintainer moved it to `proposals/approved/` (uncommitted) + 2026-09-24 direct rulings: planner may edit prompt files (he reviews/adopts), NEXT = #93 (context_recovery port to the `event` hook — prestep to the compact_memory merge), host auto-compaction stays off, keep values 12 (our plugins) vs 18 (host block) each own store, load errors fix pending — details: git 0484bf6/805f4d7/bea117f/7663d04/ef3daca + TODO.md + todo_records.md
@@ -175,13 +135,14 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Standing
-- Baselines (re-verified 2026-09-25 by the planner, post-#94):
-  probe **259** [two-fifty-nine]; smokes **all green** (context_recovery
-  15/15, compact_memory 66/66, auto_resume 129/129, intercept_observer
-  39/39, block_transfer 30/30 + 53/53, submit 20/20; the per-suite
-  counts are in each smoke's own readout — no total kept here); pytest
-  **459 passed + 1 warning (the known #10 coroutine warning)**; ruff
-  **F=0**.
+- Baselines (re-verified 2026-09-25 by the planner, post-edit-fuzzy
+  (2) 78b68e7):
+  probe **287** [two-eighty-seven]; smokes **all green**
+  (context_recovery 15/15, compact_memory 66/66, auto_resume 133/133,
+  intercept_observer 55/55, block_transfer 30/30 + 53/53, submit 20/20;
+  the per-suite counts are in each smoke's own readout — no total kept
+  here); pytest **459 passed + 1 warning (the known #10 coroutine
+  warning)**; ruff **F=0**.
 - Cross-compaction (measured 2026-09-18 plan2; re-verified live 2026-09-22):
   `compact_memory` with a foreign sessionID — no model args in the tool
   schema; the summarizer model resolves per `agent.compaction.model` (set in

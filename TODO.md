@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #98, new
-entries start at #99 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #99, new
+entries start at #100 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -712,3 +712,59 @@ All those IDs stay reserved — see the numbering rule in the header.
   prompt text (planner, not the worker).
 - **Status:** OPEN — already approved (no new approval needed); queued
   after #96 (same file — serial slot).
+
+## #99. (open, 2026-09-25, planner-15; his priority.md top item 2026-09-25) compaction keep: the plugin must pass keepTokens (computed primary, budget-file fallback) — keepMessages alone does not control the retention
+- **Problem / evidence:** maintainer live measurements 2026-09-25
+  (priority.md top item, his words): "keepToken was worken [worked]. with
+  30000 keepToken the newly compacted session was around 55k token. with
+  the keepToken 0 and keepMessages X it was always around 25K token after
+  compaction. so the 30k keeptoken were a direct retention that added
+  25k +30k to the observed 55k" — `keep.tokens` = direct retention on a
+  CONSTANT ~25k base (system + summary + minimal tail); the
+  `keep.messages` count does NOT control the retention (always ~25k
+  regardless of X). Our compact_memory sends only `keep.messages` in the
+  summarize body (keepTokens removed 2026-09-24 spec 01 as "never
+  respected" — superseded: the respected knob is `keep.tokens`). The
+  installed SDK's summarize body schema is `{ providerID, modelID }`
+  ONLY (no documented `keep` field — the body field's effect is
+  UNVERIFIED; the live retention tracked the CONFIG
+  `compaction.keep` in opencode.jsonc). Dev-branch host source
+  (maintainer link, `session/compaction.ts`): token-budget tail
+  (`preserve_recent_tokens ?? clamp(0.25*usable, 2k..15k)` + optional
+  `tail_turns`) — no message-count knob. His ask: "settings for keepToken
+  as fallback from compact_budged.json" + "can we caluculate the actual
+  keepToken based on the dump and then supply the correct keepToken to
+  exactly keep these messages?" — the budget file already carries
+  `keepTokens: 30000` + `keepMessages: 18` (his live edit).
+- **Desired outcome:** at dispatch the plugin RESOLVES keepTokens and
+  passes `keep.tokens` in the summarize body: (1) primary = COMPUTED
+  (token size of the last `keepMessages` messages from the DB — user:
+  `tokens.input`, assistant: `tokens.output + tokens.reasoning`;
+  dual-shape unwrap per #79 — the DB is the clean source of "the dump"),
+  (2) fallback = `keepTokens` from the budget file (30000) when the read
+  fails / sum 0, (3) else omit (host config default). Body keeps
+  `keep.messages` too (his config comment: non-zero tokens wins). The
+  resolution source is logged in the COMPACT line. Tool schema unchanged
+  (keepMessages stays the agent-facing knob — it drives the
+  computation). context_recovery.ts gets the same resolution.
+- **Acceptance:** computed / budget / none paths each smoke-pinned;
+  COMPACT line carries the resolved tokens + source; standard gate
+  green; LIVE (maintainer fork test post-restart): a self-compact with
+  a computed keep.tokens (~27k) → post-compaction ≈ 25k base + 27k ≈
+  52k (NOT 55k, NOT 25k) proves the body `keep.tokens` is honored; if
+  ignored (result tracks the config) → his fallback ruling (config-level
+  knob is his file; the plugin's value stays logged as advisory).
+- **Suggested scope:** `.opencode/plugin/compact_memory.ts`,
+  `.opencode/plugin/context_recovery.ts`,
+  `.opencode/plugin/tests/compact_memory.smoke.mjs`,
+  `.opencode/plugin/tests/context_recovery.smoke.mjs`,
+  `.opencode/plugin/probes/handover_probe.mjs`,
+  `knowledge/opencode-plugins/` (dated note).
+- **Status:** OPEN — spec written (handover_task.md, 2026-09-25
+  planner-15), worker launch next. Design call (planner, veto-able):
+  computed PRIMARY, budget `keepTokens` the fallback (his question (b)
+  is the fix; the budget 30k stays the safety value when the DB read
+  fails). SIDE NOTE (his observation, recorded): the history is
+  completely DROPPED and REPLACED by the summary → no bit-rot from a
+  compaction chain, only from an N-summarized summary (the budget cap's
+  rationale — his review).

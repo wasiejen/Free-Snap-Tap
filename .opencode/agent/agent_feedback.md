@@ -518,3 +518,9 @@ Stale-ID trap: TODO #67 was carried in the NAP + referenced by a worker's todo_i
 ### 2026-09-25_03-40 planner_Q3S_170K ses_f2a436b57ffe8go608Z63jwNG6
 The glob tool skips hidden directories (.opencode) — two wasted calls before falling back to bash ls/grep; use bash listing/greps for anything under .opencode from the start.
 
+### 2026-09-25_13-29 worker_Q3S_170K ses_f27bb616dffe8yue93zR3sEwHs
+(2) edit-fuzzy close-out: the 276 re-pin instruction didn't state that the S26 journal marker ioJeBeforeE captures c271's journal line (now the MUTATING call) — a fresh marker for the fail-closed c273 call was needed (added ioJeC273); the checkpoint should name which call a marker's journal line points at when re-pins swap the "controlled failed edit".
+
+### 2026-09-25_13-32 build ses_f29afbb66ffeRM1EHgBIpTwTg5
+(2) edit-fuzzy worker saga (planner-14, 2026-09-25): launch #1 (ses_f27f41e1) died with ZERO work (empty Task result, no dump/ctx.log line — host-side, #74 family); launch #2 (ses_f27e4e53) did code+smoke (green) then stopped at a clean checkpoint handover; a `task_id` resume of that session returned the IDENTICAL checkpoint (a no-op — the session did not progress on resume, even with the precise resume point in hand); only a 3rd FRESH launch (ses_f27bb616) finished the probe+docs+gate. FRICTION: the task_id resume of a checkpoint-stopped worker was a no-op — fresh re-launch was required. Worth knowing for the worker-death recovery path (fresh launch > task_id resume when the session already returned a checkpoint).
+
