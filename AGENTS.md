@@ -103,8 +103,9 @@ shared protocol; it does not replace it. Read these sections once and reference 
 ## Commit routine (before every commit, no exceptions)
 Plan/handover state and `TODO.md` updates happen **before** committing, so an interrupted
 agent can resume from a committed state without re-exploring. Two-party split:
-1. **Worker** commits its code + `TODO.md` + the task's handover files in one commit.
-   `git log` + `TODO.md` is the durable record of what happened.
+1. **Worker** commits code in checkpoint commits — one per verified unit — so an interrupted
+   session loses at most one unit; `TODO.md` + the task's handover files ride the FINAL commit
+   (the commit routine above still applies to each: plan state before committing, append discrepancies).
 2. **Planner** updates the plan-state file (what's done, next, baselines, what's about to be
    committed) and commits it with its bookkeeping. A single agent doing both roles commits
    everything in one commit.

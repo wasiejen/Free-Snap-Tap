@@ -5,11 +5,12 @@
 //   - e.g. research: you (the planner) can go trough feedback, maintainer folder files, archive log and identify problems/opportunities/things-to-optimise and research them
 // this is no priority sorting ... ideas are loosely grouped in topics but might contain crossrelevant snippets
 
-2026-09-24_22-47:
-workers are always thinking:
-- "Context is getting tight (87%) — I'll push through the planned edits efficiently. Now auto_resume.ts: the relay helpers + the new restartText."
-- part is the instruction to deliver everything in one commit
-  - loosen the  requirements to make it easier to create a checkpoint with a commit and compact without violating the one commit requirement
+
+
+
+question for block transfer in a session:
+so you are a fork of your original session. i have some questions: you used the block_transfer tool a bit and discovered that Paste does an append. what functionality would you like to see in this tool? change of current function? added more functions to make it more usable? multiple sets of lines to delete or copy from? write function to write into the selected area to replace the area? i have some ideas scattered in priority.md and ideas.md - but never collected them in one place
+
 
 2026-09-24_21-13:
 - include infos about auto-resume in the compaction handout and system prompt
