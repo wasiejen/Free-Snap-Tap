@@ -536,3 +536,6 @@ block_transfer marker matching was unclear this session: COPY failed twice (a li
 ### 2026-09-25_17-58 worker_Q3S_170K ses_f271155b4ffeIWwbQEekkRQRA6
 worker-17 (Q3S-170K): Pattern-3 token loop on the bracketed sentinel form "[405:four-two-five:esc]" — kept re-emitting the resolved digits "425" where the form belonged (3 failed edit attempts, incl. one near-corrupting a const line); a node-script built the string from parts as workaround.
 
+### 2026-09-25_18-02 planner_Q3S_170K ses_f27282d2dfferl9gScrfLt2AxV
+A worker session that stops at the context wall WITHOUT triggering a self-compaction returns only an EMPTY Task result (no error, no Work State, no loop-log line) — recovery required full file forensics (git log + status + in-progress handover). A signal in the result channel (stop reason) or a plugin-side detection + `-WARNING` loop-log line for silent limit-stops would make the resume decision instant instead of forensic.
+
