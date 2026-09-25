@@ -572,7 +572,13 @@ export function underRoot(span: string, root: string): boolean {
   return s === r || s.startsWith(r + "/");
 }
 
-export function observeSandbox(arg: string, workspaceRoot: string | null): Observation[] {
+// R8 (#97, 2026-09-25): the optional `extraRoots` — the allowed redirect
+// roots join the note check (additive: two-arg calls behave exactly as
+// today). Used when an R8 redirect fires and the note is recomputed on
+// the EFFECTIVE args — a redirected field lands under an allowed root
+// and no longer fires the note (an UNredirected out-of-sandbox span still
+// does).
+export function observeSandbox(arg: string, workspaceRoot: string | null, extraRoots: string[] = []): Observation[] {
   if (workspaceRoot === null || workspaceRoot === "") return [];
   const s = String(arg ?? "");
   const ctx = classifyContext(s);
@@ -585,7 +591,9 @@ export function observeSandbox(arg: string, workspaceRoot: string | null): Obser
     }
     if (spans.length >= 4) break;
   }
-  const outside = spans.filter((p) => !underRoot(p, workspaceRoot) && !underRoot(p, SCRATCHPAD_ROOT)).slice(0, 2);
+  const outside = spans
+    .filter((p) => !underRoot(p, workspaceRoot) && !underRoot(p, SCRATCHPAD_ROOT) && !extraRoots.some((r) => underRoot(p, r)))
+    .slice(0, 2);
   if (outside.length === 0) return [];
   return [{ verdict: "out-of-sandbox", evidence: `path=${outside[0]} root=${workspaceRoot}`, context: ctx }];
 }

@@ -609,12 +609,178 @@ try {
        jF6P !== null && jF6P.old === lgQuery && jF6P.new === "z" && jF6P.filePath === lg,
      JSON.stringify({ fF6, jF6P, mutated: argsF6.oldString }));
 
+  // ---- (12) R8 out-of-sandbox path redirect (#97, 2026-09-25): the 1:1
+  //      allowed-root redirect over the TYPED path fields. The factory
+  //      found NO opencode.jsonc under the sandbox proj → the FALLBACK
+  //      roots [workspace root (proj), SCRATCHPAD_ROOT] apply (the
+  //      config-unreadable DoD case — they still redirect). Roots are
+  //      resolved ONCE at init; the config-read path is pinned below via
+  //      a SECOND factory instance with a crafted config.
+  const r8Scratch = "C:/Users/Wasiejen/AppData/Local/Temp/opencode";
+
+  // (12a) pure resolver: 3 forms of ONE root dedupe to one match → the
+  //        target; a sibling of TWO distinct roots (same parent) → null
+  //        (fail-closed); no mapping → null
+  chk("R8 pure resolver: deduped root (3 forms of rootA) → one match → 'C:/x/rootA/other.txt'; sibling of TWO distinct roots → null; no mapping → null",
+    core.resolveRedirect("C:/x/other.txt", ["C:/x/rootA", "C:\\X\\ROOTA", "C:/x/rootA/"]) === "C:/x/rootA/other.txt" &&
+      core.resolveRedirect("C:/x/both.txt", ["C:/x/rootA", "C:/x/rootB"]) === null &&
+      core.resolveRedirect("C:/Windows/System32/cmd.exe", ["C:/x/rootA"]) === null,
+    JSON.stringify({
+      one: core.resolveRedirect("C:/x/other.txt", ["C:/x/rootA", "C:\\X\\ROOTA", "C:/x/rootA/"]),
+      two: core.resolveRedirect("C:/x/both.txt", ["C:/x/rootA", "C:/x/rootB"]),
+      none: core.resolveRedirect("C:/Windows/System32/cmd.exe", ["C:/x/rootA"]),
+    }));
+
+  // (12b) READ sibling of the workspace root (fallback) → filePath
+  //        MUTATED to root+basename + the kind=redirect line FIRST (a
+  //        fuzzy-rejected line may follow) + NO out-of-sandbox line (the
+  //        note is recomputed on the effective args)
+  {
+    const a = { filePath: base + "\\io-r8-read-sib.txt" };
+    const aBefore = JSON.stringify(a);
+    const c0 = readLines().length;
+    await before({ tool: "read", sessionID: "ses_smoke_io1", callID: "c12b" }, { args: a });
+    const nl = readLines().slice(c0);
+    const f = split8(nl[0] ?? "");
+    chk("R8 read-sibling (fallback root) → filePath MUTATED to root+basename + kind=redirect FIRST line (8 fields, byte-exact evidence, the log field cap-flattened) + NO out-of-sandbox line",
+      a.filePath === proj + "/io-r8-read-sib.txt" && JSON.stringify(a) !== aBefore && f.length === 8 && f[3] === "read" && f[7] === "pair-resolved" &&
+        f[5] === core.flattenField(`kind=redirect tool=read arg=filePath orig=${base}\\io-r8-read-sib.txt value=${proj}/io-r8-read-sib.txt`) &&
+        !nl.some((x) => split8(x)[7] === "out-of-sandbox"),
+      JSON.stringify({ after: a.filePath, nl }));
+  }
+
+  // (12c) WRITE sibling of the workspace root (fallback) → exactly ONE
+  //        new line (M1: write has no fuzzy channel — the redirect line
+  //        only) + args mutated
+  {
+    const a = { filePath: base + "\\io-r8-write-sib.txt", content: "R8-WRITE" };
+    const aBefore = JSON.stringify(a);
+    const c0 = readLines().length;
+    await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c12c" }, { args: a });
+    const nl = readLines().slice(c0);
+    const f = split8(nl[0] ?? "");
+    chk("R8 write-sibling (fallback root) → filePath MUTATED + EXACTLY ONE new line: kind=redirect (byte-exact, the log field cap-flattened) — no out-of-sandbox note",
+      a.filePath === proj + "/io-r8-write-sib.txt" && JSON.stringify(a) !== aBefore && nl.length === 1 && f.length === 8 && f[3] === "write" && f[7] === "pair-resolved" &&
+        f[5] === core.flattenField(`kind=redirect tool=write arg=filePath orig=${base}\\io-r8-write-sib.txt value=${proj}/io-r8-write-sib.txt`),
+      JSON.stringify({ after: a.filePath, nl }));
+  }
+
+  // (12d) span == root (the fallback SCRATCHPAD root — case/separator
+  //        variant) → MUTATED to the root AS CONFIGURED (existsSync
+  //        passes case-insensitively → the fuzzy channel is silent)
+  {
+    const a = { filePath: "C:\\USERS\\wasiejen\\APPDATA\\local\\TEMP\\opencode" };
+    const aBefore = JSON.stringify(a);
+    const c0 = readLines().length;
+    await before({ tool: "read", sessionID: "ses_smoke_io1", callID: "c12d" }, { args: a });
+    const nl = readLines().slice(c0);
+    const f = split8(nl[0] ?? "");
+    chk("R8 span == root (fallback SCRATCHPAD root, case/separator variant) → MUTATED to the root AS CONFIGURED + kind=redirect line (byte-exact, the log field cap-flattened)",
+      a.filePath === r8Scratch && JSON.stringify(a) !== aBefore && nl.length === 1 && f.length === 8 && f[7] === "pair-resolved" &&
+        f[5] === core.flattenField(`kind=redirect tool=read arg=filePath orig=C:\\USERS\\wasiejen\\APPDATA\\local\\TEMP\\opencode value=${r8Scratch}`),
+      JSON.stringify({ after: a.filePath, nl }));
+  }
+
+  // (12e) nested non-sibling (under the workspace root, two levels down)
+  //        → NO mutation, NO kind=redirect line (fail-closed), no
+  //        out-of-sandbox (it is under the root)
+  {
+    const a = { filePath: proj + "\\deep\\io-r8-file.txt" };
+    const aBefore = JSON.stringify(a);
+    const c0 = readLines().length;
+    await before({ tool: "read", sessionID: "ses_smoke_io1", callID: "c12e" }, { args: a });
+    const nl = readLines().slice(c0);
+    chk("R8 nested non-sibling (under the workspace root) → NOT mutated + NO kind=redirect line + no out-of-sandbox",
+      JSON.stringify(a) === aBefore && !nl.some((x) => x.includes("kind=redirect")) &&
+        !nl.some((x) => split8(x)[7] === "out-of-sandbox"),
+      JSON.stringify({ args: a, n: nl.length }));
+  }
+
+  // (12f) the CONFIG-READ path: a SECOND factory instance with a crafted
+  //        opencode.jsonc under proj2 — the roots come from the config
+  //        (permission "allow" keys + the `/**` twin deduped + the
+  //        references path + the workspace root). Module state flips to
+  //        proj2 → only `before2` may be used from here on.
+  const proj2 = path.join(base, "proj2");
+  fs.mkdirSync(proj2, { recursive: true });
+  const rA = path.join(tdir, "rootA");
+  const rB = path.join(tdir, "rootB");
+  const rC = path.join(tdir, "sub", "rootC");
+  const rRef = path.join(tdir, "sub2", "refroot");
+  fs.writeFileSync(path.join(proj2, "opencode.jsonc"),
+    JSON.stringify({
+      permission: { external_directory: { [rA]: "allow", [rB]: "allow", [rA + "/**"]: "allow", [rC]: "allow" } },
+      references: { ref1: { path: rRef } },
+    }) + "\n// trailing JSONC comment — must survive the shared parse\n", "utf-8");
+  const hooks2 = await factory({ directory: proj2 });
+  const before2 = hooks2["tool.execute.before"];
+  const log2 = path.join(proj2, ".opencode", "temp", "intercept.log");
+  const read2 = () => (fs.existsSync(log2) ? fs.readFileSync(log2, "utf-8").split(/\r?\n/).filter((l) => l.length > 0) : []);
+
+  // (12g) sibling of TWO distinct config roots (rA + rB, same parent) →
+  //        NO mutation (fail-closed) + the out-of-sandbox NOTE fires
+  //        (tdir is outside the sandbox)
+  {
+    const a = { filePath: path.join(tdir, "both.txt") };
+    const aBefore = JSON.stringify(a);
+    const c0 = read2().length;
+    await before2({ tool: "read", sessionID: "ses_smoke_io1", callID: "c12g" }, { args: a });
+    const nl = read2().slice(c0);
+    chk("R8 config: sibling of TWO distinct config roots → NOT mutated (fail-closed) + the out-of-sandbox NOTE fires + no kind=redirect line",
+      JSON.stringify(a) === aBefore && !nl.some((x) => x.includes("kind=redirect")) &&
+        nl.some((x) => split8(x)[7] === "out-of-sandbox"),
+      JSON.stringify({ args: a, nl }));
+  }
+
+  // (12h) sibling of exactly ONE config root (rC — its parent dir is not
+  //        shared by any other root) → MUTATED to root+basename
+  {
+    const a = { filePath: path.join(tdir, "sub", "only-c.txt") };
+    const aBefore = JSON.stringify(a);
+    const c0 = read2().length;
+    await before2({ tool: "read", sessionID: "ses_smoke_io1", callID: "c12h" }, { args: a });
+    const nl = read2().slice(c0);
+    const f = split8(nl[0] ?? "");
+    chk("R8 config: sibling of exactly ONE config root → filePath MUTATED to root+basename + kind=redirect FIRST line (byte-exact, the log field cap-flattened) + no out-of-sandbox",
+      a.filePath === rC + "/only-c.txt" && JSON.stringify(a) !== aBefore && f.length === 8 && f[3] === "read" && f[7] === "pair-resolved" &&
+        f[5] === core.flattenField(`kind=redirect tool=read arg=filePath orig=${path.join(tdir, "sub", "only-c.txt")} value=${rC}/only-c.txt`) &&
+        !nl.some((x) => split8(x)[7] === "out-of-sandbox"),
+      JSON.stringify({ after: a.filePath, nl }));
+  }
+
+  // (12i) case (i) span == root (rC, uppercased — rC's parent dir is NOT
+  //        shared by any other root, so the span matches exactly ONE root;
+  //        an rA span would ALSO be a sibling of rB → 2 matches →
+  //        fail-closed, pinned in (12g)) → the root AS CONFIGURED; a
+  //        sibling of the references root (rRef) → root+basename
+  {
+    const a = { filePath: rC.toUpperCase() };
+    const aBefore = JSON.stringify(a);
+    const c0 = read2().length;
+    await before2({ tool: "read", sessionID: "ses_smoke_io1", callID: "c12i" }, { args: a });
+    const nl = read2().slice(c0);
+    const f = split8(nl[0] ?? "");
+    const b = { filePath: path.join(tdir, "sub2", "ref-sib.txt") };
+    const bBefore = JSON.stringify(b);
+    const c1 = read2().length;
+    await before2({ tool: "read", sessionID: "ses_smoke_io1", callID: "c12j" }, { args: b });
+    const nl2 = read2().slice(c1);
+    const fb = split8(nl2[0] ?? "");
+    chk("R8 config: span == root (case variant) → the root AS CONFIGURED; a sibling of the references root → root+basename (kind=redirect FIRST line, byte-exact, the log field cap-flattened)",
+      a.filePath === rC && JSON.stringify(a) !== aBefore && f.length === 8 && f[7] === "pair-resolved" &&
+        f[5] === core.flattenField(`kind=redirect tool=read arg=filePath orig=${rC.toUpperCase()} value=${rC}`) &&
+        b.filePath === rRef + "/ref-sib.txt" && JSON.stringify(b) !== bBefore && fb.length === 8 && fb[7] === "pair-resolved" &&
+        fb[5] === core.flattenField(`kind=redirect tool=read arg=filePath orig=${path.join(tdir, "sub2", "ref-sib.txt")} value=${rRef}/ref-sib.txt`),
+      JSON.stringify({ a: a.filePath, b: b.filePath }));
+  }
+
   // ---- (9) the LIVE log is untouched by this smoke
   const liveAfter = fs.existsSync(LIVE_LOG) ? fs.statSync(LIVE_LOG).size : null;
   chk("live .opencode/temp/intercept.log untouched (sandbox-only writes)",
     liveBefore === null ? !fs.existsSync(LIVE_LOG) : liveAfter === liveBefore, `before=${liveBefore} after=${liveAfter}`);
 } finally {
   fs.rmSync(base, { recursive: true, force: true });
+  fs.rmSync(tdir, { recursive: true, force: true });
 }
 
 finish();

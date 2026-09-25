@@ -300,6 +300,7 @@ async function getModel(sid: string): Promise<string> {
 // comment stripper (compact_memory.ts — the URL-safe parse).
 function resolveAllowedRoots(): string[] {
   const roots: string[] = [];
+  let ok = false;
   try {
     const cfg = JSON.parse(stripJsoncComments(readFileSync(join(dir, "opencode.jsonc"), "utf8")));
     const top = cfg && typeof cfg === "object" ? (cfg as Record<string, unknown>) : null;
@@ -319,10 +320,12 @@ function resolveAllowedRoots(): string[] {
         }
       }
     }
+    ok = true;
   } catch {
     // config unreadable / malformed → the fallback roots (fail-open)
   }
   roots.push(dir);
+  if (!ok) roots.push(SCRATCHPAD_ROOT); // spec fallback: [workspace root, SCRATCHPAD_ROOT]
   const seen = new Set<string>();
   const out: string[] = [];
   for (const r of roots) {
@@ -331,7 +334,6 @@ function resolveAllowedRoots(): string[] {
     seen.add(n);
     out.push(r);
   }
-  if (out.length === 0) return [dir, SCRATCHPAD_ROOT].filter((r) => normSandboxPath(r) !== "");
   return out;
 }
 
@@ -1110,7 +1112,11 @@ async function onToolBefore(
     const redirect = rd.lines;
     if (rd.fired) {
       obs = obs.filter((o) => o.verdict !== "out-of-sandbox");
-      obs.push(...observeSandbox(argsToString(output?.args), dir || null));
+      // the allowed roots join the note check — a redirected field lands
+      // under an allowed root and no longer fires the note (an
+      // UNredirected out-of-sandbox span still does; the cap holds: ≤1
+      // drop, ≤1 re-add)
+      obs.push(...observeSandbox(argsToString(output?.args), dir || null, allowedRoots));
       storeNote(str(input?.callID), redirect.map((o) => o.evidence).join("; "));
     }
     // R6 (2026-09-25) + (2) (2026-09-25, #95 sub-item 2): the edit channel

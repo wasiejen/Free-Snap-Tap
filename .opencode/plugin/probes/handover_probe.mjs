@@ -40,7 +40,13 @@
 // fail-closed none-exist / fail-closed both-exist / right-wins mutation),
 // the non-read log-only rule, the SCRATCHPAD_ROOT sandbox allowance; S18's
 // pair pins 157-160/165/167 were switched to the new form and its VERDICTS
-// pin grew to 9): the pre-rebuild
+// pin grew to 9) + EXTENDED 2026-09-25 (R8, #97: the out-of-sandbox path
+// redirect — the new S28 section, checks 285-296: the pure 1:1 resolver
+// (case (i) span == root / case (ii) direct sibling / 0 or >=2 fail-closed
+// / root dedupe / degenerate inputs) + the hook e2e over the FALLBACK roots
+// [workspace root, SCRATCHPAD_ROOT] (read/write sibling, span == root,
+// no-mapping note, nested non-sibling); the config-read path is smoke-
+// pinned): the pre-rebuild
 // probe
 // (v2.2.1 era) targeted the DELETED handover.ts, the retired
 // experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
@@ -757,6 +763,40 @@
 //      (283) after-hook: mutate → no enrichment; fail → enrichment
 //          consumed once;
 //      (284) the fuzzy-edit line shape byte-exact (8 fields).
+//   S28 R8 the out-of-sandbox path redirect (12) — 2026-09-25 (TODO #97
+//      unit 1): an out-of-sandbox TYPED path span that maps EXACTLY ONCE to
+//      an allowed root (after root dedupe) is REDIRECTED (mutated) before
+//      the call runs; 0 or >=2 → fail-closed (no mutation). The pure 1:1
+//      resolver (case (i) span == root → the root as configured; case (ii)
+//      direct sibling → root + separator + basename; the root dedupe; the
+//      degenerate inputs) is pinned PURE; the hook-level e2e pins run over
+//      the FALLBACK roots [workspace root (ioSandboxProj), SCRATCHPAD_ROOT]
+//      (the probe's sandbox proj has no opencode.jsonc — the config-read
+//      path is smoke-pinned via a second factory instance with a crafted
+//      config):
+//      (285) case (i): span == root (case/separator variant) → the root as
+//          configured (exactly one match);
+//      (286) case (ii): a direct sibling → root + '/' + the span's basename
+//          (case preserved);
+//      (287) no mapping (0 matches) → null (fail-closed);
+//      (288) a sibling of TWO distinct roots (same parent) → null
+//          (fail-closed — never picks one);
+//      (289) root dedupe: 3 forms of ONE root → ONE match (the first
+//          configured form wins);
+//      (290) a child of the root and a two-levels-down sibling → null (not
+//          a 1:1 mapping);
+//      (291) degenerate inputs (empty span / empty root list) → null
+//          (never throws);
+//      (292) hook e2e READ sibling of the workspace root → MUTATED + the
+//          kind=redirect line (byte-exact, cap-flattened) + NO out-of-
+//          sandbox line (the note recomputes on the effective args);
+//      (293) hook e2e WRITE sibling → MUTATED + EXACTLY ONE new line
+//          (M1: write has no fuzzy channel);
+//      (294) hook e2e span == root (case variant) → the root as configured;
+//      (295) hook e2e no mapping (an existing out-of-sandbox path) → NOT
+//          mutated + the out-of-sandbox NOTE fires (as today);
+//      (296) hook e2e nested non-sibling (under the root) → NOT mutated +
+//          NO kind=redirect line + no out-of-sandbox.
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -769,7 +809,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=13 S12=4 S13=21 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 S26=20 S27=8 hygiene=6  →  "PROBE handover: 291/291 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=13 S12=4 S13=21 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 S26=20 S27=8 S28=12 hygiene=6  →  "PROBE handover: 303/303 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -6455,6 +6495,188 @@ let ioF77 = null; // the c277 fuzzy-edit line (284 checks its byte-exact shape)
     JSON.stringify(ioF77),
   );
   n27++;
+}
+
+// ------------------------------------------------------------------ S28 R8 out-of-sandbox path redirect (#97, 2026-09-25)
+//
+// The 1:1 allowed-root redirect over the TYPED path fields: the pure
+// resolver is pinned over the SPLIT core; the hook e2e pins use the S18
+// factory — the probe's sandbox proj has NO opencode.jsonc → the FALLBACK
+// roots [workspace root (ioSandboxProj), SCRATCHPAD_ROOT] apply (the
+// config-read path is smoke-pinned via a second factory instance with a
+// crafted config). The log field is cap-flattened (MAX_FIELD_CHARS) — the
+// expected evidence goes through the SAME flattenField.
+let n28 = 285;
+
+// 285 — case (i): span == root (normalized — case/separator variant) →
+//      the root AS CONFIGURED (exactly one match; the other root unrelated)
+check(
+  String(n28),
+  "S28",
+  "resolveRedirect case (i): span == root (case/variant) → the root as configured (one match wins)",
+  ioCore.resolveRedirect("C:\\Users\\Wasiejen\\AppData\\local\\TEMP\\opencode", ["C:/Users/Wasiejen/AppData/Local/Temp/opencode", "C:/other/root"]) === "C:/Users/Wasiejen/AppData/Local/Temp/opencode",
+);
+n28++;
+
+// 286 — case (ii): a direct sibling → root + separator + the span's
+//      basename (case preserved)
+check(
+  String(n28),
+  "S28",
+  "resolveRedirect case (ii): direct sibling → root + '/' + basename (case preserved)",
+  ioCore.resolveRedirect("C:/Users/Wasiejen/AppData/Local/Temp/MY-FILE.txt", ["C:/Users/Wasiejen/AppData/Local/Temp/opencode"]) === "C:/Users/Wasiejen/AppData/Local/Temp/opencode/MY-FILE.txt",
+);
+n28++;
+
+// 287 — no mapping (0 matches) → null (fail-closed)
+check(
+  String(n28),
+  "S28",
+  "resolveRedirect: no mapping (0 matches) → null (fail-closed)",
+  ioCore.resolveRedirect("C:/Windows/System32/cmd.exe", ["C:/Users/Wasiejen/AppData/Local/Temp/opencode", "C:/repo"]) === null,
+);
+n28++;
+
+// 288 — >=2 matches: a sibling of TWO distinct roots (same parent) → null
+check(
+  String(n28),
+  "S28",
+  "resolveRedirect: a sibling of TWO distinct roots (same parent) → null (fail-closed — never picks one)",
+  ioCore.resolveRedirect("C:/x/other.txt", ["C:/x/rootA", "C:/x/rootB"]) === null,
+);
+n28++;
+
+// 289 — root dedupe: 3 forms of ONE root → ONE match → the first configured
+//      form wins
+check(
+  String(n28),
+  "S28",
+  "resolveRedirect root dedupe: 3 forms of one root → ONE match → 'C:/x/rootA/other.txt' (the first configured form)",
+  ioCore.resolveRedirect("C:/x/other.txt", ["C:/x/rootA", "C:\\X\\ROOTA", "C:/x/rootA/"]) === "C:/x/rootA/other.txt",
+);
+n28++;
+
+// 290 — a child of the root and a two-levels-down sibling → null (not a
+//      1:1 mapping)
+check(
+  String(n28),
+  "S28",
+  "resolveRedirect: a child of the root and a two-levels-down sibling → null (not a 1:1 mapping)",
+  ioCore.resolveRedirect("C:/Users/Wasiejen/AppData/Local/Temp/opencode/deep/f.txt", ["C:/Users/Wasiejen/AppData/Local/Temp/opencode"]) === null &&
+    ioCore.resolveRedirect("C:/Users/Wasiejen/AppData/Local/Temp/other/dir/f.txt", ["C:/Users/Wasiejen/AppData/Local/Temp/opencode"]) === null,
+);
+n28++;
+
+// 291 — degenerate inputs (empty span / empty root list) → null (never
+//      throws)
+check(
+  String(n28),
+  "S28",
+  "resolveRedirect: empty span or empty root list → null (never throws)",
+  ioCore.resolveRedirect("", ["C:/x/rootA"]) === null && ioCore.resolveRedirect("C:/x/y.txt", []) === null,
+);
+n28++;
+
+// 292 — e2e READ sibling of the workspace root (the fallback root) →
+//      MUTATED to root+basename + the kind=redirect line FIRST (a fuzzy-
+//      rejected line may follow) + NO out-of-sandbox line
+{
+  const a = { filePath: SANDBOX + "\\r8-read-sib.txt" };
+  const aBefore = JSON.stringify(a);
+  const n0 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io3", callID: "c292" }, { args: a });
+  const nl = ioReadLines().slice(n0);
+  const f = nl[0] ? nl[0].split(" | ") : [];
+  check(
+    String(n28),
+    "S28",
+    "hook R8 read-sibling (fallback root) → MUTATED to root+basename + kind=redirect FIRST line (byte-exact, cap-flattened) + NO out-of-sandbox line",
+    a.filePath === ioSandboxProj + "/r8-read-sib.txt" && JSON.stringify(a) !== aBefore && f.length === 8 &&
+      f[1] === "ses_fx_io3" && f[3] === "read" && f[7] === "pair-resolved" &&
+      f[5] === ioCore.flattenField(`kind=redirect tool=read arg=filePath orig=${SANDBOX}\\r8-read-sib.txt value=${ioSandboxProj}/r8-read-sib.txt`) &&
+      !nl.some((x) => x.split(" | ")[7] === "out-of-sandbox"),
+    JSON.stringify({ after: a.filePath, nl }),
+  );
+  n28++;
+}
+
+// 293 — e2e WRITE sibling → exactly ONE new line (M1: write has no fuzzy
+//      channel — the redirect line only) + args mutated
+{
+  const a = { filePath: SANDBOX + "\\r8-write-sib.txt", content: "R8" };
+  const aBefore = JSON.stringify(a);
+  const n0 = ioReadLines().length;
+  await ioBefore({ tool: "write", sessionID: "ses_fx_io3", callID: "c293" }, { args: a });
+  const nl = ioReadLines().slice(n0);
+  const f = nl[0] ? nl[0].split(" | ") : [];
+  check(
+    String(n28),
+    "S28",
+    "hook R8 write-sibling (fallback root) → MUTATED + EXACTLY ONE new line: kind=redirect (byte-exact, cap-flattened) — no out-of-sandbox note",
+    a.filePath === ioSandboxProj + "/r8-write-sib.txt" && JSON.stringify(a) !== aBefore && nl.length === 1 && f.length === 8 &&
+      f[3] === "write" && f[7] === "pair-resolved" &&
+      f[5] === ioCore.flattenField(`kind=redirect tool=write arg=filePath orig=${SANDBOX}\\r8-write-sib.txt value=${ioSandboxProj}/r8-write-sib.txt`),
+    JSON.stringify({ after: a.filePath, nl }),
+  );
+  n28++;
+}
+
+// 294 — e2e span == root (the fallback workspace root, case variant) →
+//      the root AS CONFIGURED (existsSync passes case-insensitively → the
+//      fuzzy channel is silent → exactly one line)
+{
+  const a = { filePath: ioSandboxProj.toUpperCase() };
+  const aBefore = JSON.stringify(a);
+  const n0 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io3", callID: "c294" }, { args: a });
+  const nl = ioReadLines().slice(n0);
+  const f = nl[0] ? nl[0].split(" | ") : [];
+  check(
+    String(n28),
+    "S28",
+    "hook R8 span == root (case variant) → MUTATED to the root AS CONFIGURED + kind=redirect line (byte-exact, cap-flattened)",
+    a.filePath === ioSandboxProj && JSON.stringify(a) !== aBefore && nl.length === 1 && f.length === 8 && f[7] === "pair-resolved" &&
+      f[5] === ioCore.flattenField(`kind=redirect tool=read arg=filePath orig=${ioSandboxProj.toUpperCase()} value=${ioSandboxProj}`),
+    JSON.stringify({ after: a.filePath, nl }),
+  );
+  n28++;
+}
+
+// 295 — e2e no mapping (an existing out-of-sandbox path) → NOT mutated
+//      (byte-identical) + the out-of-sandbox NOTE fires (exactly one line,
+//      as today)
+{
+  const a = { filePath: "C:/Windows/System32/cmd.exe" };
+  const aBefore = JSON.stringify(a);
+  const n0 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io3", callID: "c295" }, { args: a });
+  const nl = ioReadLines().slice(n0);
+  check(
+    String(n28),
+    "S28",
+    "hook R8 no mapping → NOT mutated (byte-identical) + the out-of-sandbox NOTE fires (exactly one line, as today)",
+    JSON.stringify(a) === aBefore && nl.length === 1 && nl[0].split(" | ")[7] === "out-of-sandbox" && !nl.some((x) => x.includes("kind=redirect")),
+    JSON.stringify(nl),
+  );
+  n28++;
+}
+
+// 296 — e2e nested non-sibling (under the workspace root, two levels
+//      down) → NOT mutated + NO kind=redirect line + no out-of-sandbox
+{
+  const a = { filePath: ioSandboxProj + "\\deep\\r8-file.txt" };
+  const aBefore = JSON.stringify(a);
+  const n0 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io3", callID: "c296" }, { args: a });
+  const nl = ioReadLines().slice(n0);
+  check(
+    String(n28),
+    "S28",
+    "hook R8 nested non-sibling (under the workspace root) → NOT mutated + NO kind=redirect line + no out-of-sandbox",
+    JSON.stringify(a) === aBefore && !nl.some((x) => x.includes("kind=redirect")) && !nl.some((x) => x.split(" | ")[7] === "out-of-sandbox"),
+    JSON.stringify({ args: a, n: nl.length }),
+  );
+  n28++;
 }
 
 // ------------------------------------------------------------------ S5 hygiene (6)
