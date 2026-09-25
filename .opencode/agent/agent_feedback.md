@@ -512,3 +512,9 @@ NAP splice via inline `node -e` one-liner in bash failed on JSON/quote escaping 
 ### 2026-09-25_03-33 worker_Q3S_170K ses_f29d9a56bffeqeXGlv6vWUJhjj
 Git-Bash redirect gotcha: `> C:\Windows\path\file.txt` in a bash command did NOT redirect to the Windows path — it created a junk file at the repo root named `C:`+U+FE00+path-with-backslashes-stripped (backslashes mangled by MSYS). Shell redirects need unix-form paths (/c/Users/...); file-tool paths with backslashes are fine.
 
+### 2026-09-25_03-40 planner_Q3S_170K ses_f2a436b57ffe8go608Z63jwNG6
+Stale-ID trap: TODO #67 was carried in the NAP + referenced by a worker's todo_inbox entry, but it never existed in the committed TODO.md (git log -S empty) — track/ID references should be grep-verified against committed TODO.md before being carried across sessions or specs.
+
+### 2026-09-25_03-40 planner_Q3S_170K ses_f2a436b57ffe8go608Z63jwNG6
+The glob tool skips hidden directories (.opencode) — two wasted calls before falling back to bash ls/grep; use bash listing/greps for anything under .opencode from the start.
+
