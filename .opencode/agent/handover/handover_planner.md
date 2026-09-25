@@ -38,7 +38,10 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   `message.part.delta` lines appended after the trim (last delta line
   24391 < trim line 24434; the new build's ~2.7k lines are delta-free) —
   acceptance met; TODO one-liner + full text in todo_records.md.
-- **#97 spec committed + worker launched:** `worker_Q3S_170K` — Unit 1 =
+- **#97 spec committed + worker launched:** `worker_Q3S_170K`
+  (session `ses_f271155b4ffeIWwbQEekkRQRA6` — it self-compacted at the
+  planning stage (Work State summary, no code yet, full plan in its
+  summary) → RESUMED via task_id (post-compaction protocol). Unit 1 =
   the R8 out-of-sandbox 1:1 redirect (typed path fields of
   read/write/edit/block_transfer; allowed roots from opencode.jsonc
   `permission.external_directory` + `references` + workspace; sibling/
