@@ -617,7 +617,37 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Status:** OPEN — spec at launch (queued after R6; his launch item
   3, 2026-09-25).
 
-## #97. (open, 2026-09-25, planner-14; APPROVED proposal, NOT implemented — verified from files today) unit-4 resume-after-compaction: line-anchor the action regex (A) + re-arm on COMPACT (B) + prompt note (C)
+## #97. (open, 2026-09-25, his live priority.md edit labeled "TODO #97"; planner-14 filed) R8 sandbox redirect: out-of-sandbox path args redirected INTO the sandbox (repeated out-of-sandbox accesses stop the session until he intervenes)
+- **Problem / evidence:** his priority.md live section 2026-09-25 ("# fuzzy_numword
+  R8"): repeated accesses outside the sandbox stop everything until he
+  intervenes — e.g. an access to `C:\Users\Wasiejen\AppData\Local\Temp`
+  instead of the designated `C:\Users\Wasiejen\AppData\Local\Temp\opencode`;
+  the earlier priority.md fuzzy_numword item gives the shape (redirect
+  calls like `C:\Users\Asiejen\AppData\Local\Temp\opencode\brtest.mjs`
+  into the sandbox). His named basis for the allowed paths: the
+  `permission.external_directory` + `references` sections of
+  opencode.jsonc (both). This is #95 sub-item (4) first half — the
+  escape return-info is the second half (rides the same launch).
+- **Desired outcome:** an out-of-sandbox path argument that maps 1:1 into
+  a sandbox/allowed path is REDIRECTED (mutated) by the intercept before
+  the call runs, with the mandatory log line (kind + orig= + value= per
+  his return-info ruling) — the "repeated accesses stop everything"
+  loop ends; NO new out-of-sandbox access is ever granted (redirect
+  only, never an allow-widening).
+- **Acceptance:** a controlled out-of-sandbox path (the Temp-without-
+  opencode-suffix case) is redirected + logged; a path with no 1:1
+  mapping fails closed (no mutation); probe pins per the established
+  pattern; standard gate green.
+- **Suggested scope:** `.opencode/plugin/intercept_observer.ts` (+ core —
+  the allowed-path resolution from opencode.jsonc
+  `permission.external_directory` + `references`),
+  `.opencode/plugin/probes/handover_probe.mjs`, the tests.
+- **Status:** OPEN — queued per the #95 order (after the edit-fuzzy (2)
+  + R3); the return-info/feedback half is specced with it (his context-
+  saving ruling: truncated orig in the feedback, full payload in the
+  journal — #95 status).
+
+## #98. (open, 2026-09-25, planner-14; APPROVED proposal, NOT implemented — verified from files today) unit-4 resume-after-compaction: line-anchor the action regex (A) + re-arm on COMPACT (B) + prompt note (C)
 - **Problem / evidence:** `proposals/approved/2026-09-23_unit4-
   compaction-resume.md` (his `--comment` "approved A, B and C") —
   verified NOT implemented 2026-09-25: `ACTION_RE` (auto_resume.ts

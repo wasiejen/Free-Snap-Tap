@@ -27,11 +27,47 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 - TODO: #95 status updated (his go + the two directives), #96 filed
   (log reduction, full design in the entry), #97 filed (unit4-
   compaction-resume A+B+C); header numbering → #97.
-- **R6 LANCHED** (sub-item 1, pre-approved): spec = `handover_task.md`
-  (copy `plan14_ho_task.md`), worker_Q3S_170K.
-- Next: after R6 lands → #96 (spec from the TODO entry, same worker
-  model) → the (2) edit-fuzzy spec from #95's pinned design + his two
-  directives → R3 → R8/escape-info. #97 queued after #96 (same file).
+- **R6 LAUNCHED → worker DIED mid-close (silent)**: worker-14
+  `worker_Q3S_170K` ses_f299d233effezQzd4la8UBVxki — self-compacted
+  ONCE (COMPACT line landed; the Task result WAS the compaction
+  summary), resumed via task_id → did major work → silent death (no
+  2nd COMPACT line, empty Task result, no commit/handover/DONE line).
+  State ON DISK (uncommitted, `git status`): core +161 (locator
+  primitive, VERDICTS=11), plugin +189 (journal + hint + onToolAfter
+  registered in the factory), probe +468 (S26 section, 23 mentions;
+  re-pins 171/203/241/245 applied), smoke +151 (R6 checks).
+- **Planner-verified state (measured, this session): smoke 39/48 — 9
+  R6 checks FAIL.** Analysis (from the smoke output):
+  - DOMINANT PATTERN = the smoke checks assert against the ACCUMULATED
+    sandbox log state (whole-file line count / first line) instead of
+    the per-scenario delta / LAST line — journal_write (5 accumulated
+    lines vs expected 1), journal_edit (4 vs 1), the hint checks
+    (lines present but the check's comparison mis-frames them), the
+    DoD cp check (read back the sentinel content "R2-WRITE" instead of
+    a byte compare).
+  - 2 POSSIBLE WIRING GAPS: block_transfer journal never fired (the
+    check's evidence = the OLD edit line from a prior scenario), and
+    the exact-1 hint FIRED (n=1) where it must be silent (occurrence
+    counting — CRLF/normalization suspect).
+  - Check 37 (escape positive) evidence LOOKS CORRECT (2 escape +
+    numword + hint last) → a comparison/ordering mismatch in the check.
+  - AFTER-HOOK ENRICHMENT WORKS (check 46 PASS: the failed edit's
+    output gains the hint line) — so the hint surface is live, not
+    log-only (live acceptance still restart-gated).
+  - PROBE S26 NOT YET RUN; DOCS missing (plugin README recovery
+    protocol + decision-record §8 addendum); handover missing.
+- His live priority.md edit (uncommitted, his file — left untouched):
+  the R8 section is labeled `# TODO #97` → RENOUMBERED: R8 = #97
+  (filed, full entry), unit4-compaction-resume = #98 (renumbered).
+  He also removed the done "revocery hook" heading.
+- NEXT (this session continues post-compact): fix the 9 smoke checks
+  (check-logic first, then the 2 wiring gaps if real) → run probe S26
+  (expect total 279) → docs (README + decision-record addendum) →
+  commit (code + probe + smoke + docs; handover WRITTEN BY THE PLANNER
+  from file evidence — the worker's close-out died) → TODO #95 status
+  → #96 launch (spec from the TODO entry) → the (2) edit-fuzzy spec.
+  #98 queued after #96 (same file). #97 (R8) per the #95 order (after
+  (2) + R3).
 
 
 ## Compressed archive (one line each
