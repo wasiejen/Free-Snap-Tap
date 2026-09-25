@@ -1,94 +1,72 @@
-# HANDOVER — worker: TODO #96 auto_resume.log write-volume reduction (2026-09-25, worker_Q3S_170K, ses_f281bdf31ffevhZbHouvrZ3Q1d)
+# Worker summary — TODO #95 sub-item (2): the mutating edit-fuzzy oldString (IN PROGRESS — compact checkpoint)
 
-## Executive summary
-Per the pinned spec: (1) `onEvent` NEVER logs `message.part.delta`
-(~97% of the old log volume — 2,718,066 lines / 231MB at measure);
-(2) a size guard at init, BEFORE `restoreLineageFromLog`, trims an
-oversized log to its byte TAIL + ONE `log-trim= old=<bytes> new=<bytes>`
-line (caps as factory options, defaults 20MB/2MB); (3) the smoke re-pins
-129/129 → 133/133 covering all three spec cases. The live 239.6MB file
-(264.4MB at my run, ~100MB/day growth) is trimmed by the code at the NEXT
-host restart — not by this commit.
+## What's done (committed 15761d8)
+- `intercept_observer_core.ts`: `normEditBytes`, `resolveEditOldString` (+ `EditResolution`),
+  `EDIT_FUZZY_MAX_D = 1`, the `fuzzy-edit` verdict (VERDICTS = 12), shared
+  `prepContentQuery` / `contentCandidateStarts` factored out of `locateContent`
+  (locateContent behavior unchanged — verified by the S26 locator pins).
+- `intercept_observer.ts`: `runEditFuzzy` supersedes `runEditHint` (1-raw silent + >1
+  edit-ambiguous unchanged; 0-raw → the (2) matcher: exactly-one d=0 or d≤1 →
+  MUTATE `output.args.oldString` to the file's exact unique bytes + the
+  `fuzzy-edit orig=<40> len=<n> d=<0|1> value=<40>` line, NO after-hook hint;
+  else fail-closed → the R6 hint verdict as today, the no-candidate line gains
+  ` best-d=<n>` when candidates exist). The journal's edit `old` = the ORIGINAL
+  pre-mutation oldString (captured in `onToolBefore` before the channel, passed
+  to `appendJournal(tool, sid, args, editOldOriginal)`).
+- `intercept_observer.smoke.mjs`: VERDICTS 12 + core-surface pin, (10e) re-pinned
+  (d=1 → mutation), (10h) re-pinned (mutate → no enrichment; c10g fail-closed →
+  enrichment), (10i) re-pinned (journal `old` = original), new (11) section
+  (11a CRLF d=0, 11b trailing-ws d=0, 11c typo d=1, 11d near-miss best-d=3,
+  11e ambiguous two-d≤1, 11f directive-b long truncation + full journal).
+  **Smoke green 55/55** (was 48/48).
 
-## What changed
-- `.opencode/plugin/auto_resume.ts` (commit 22c36e4):
-  - `onEvent`: early return on `message.part.delta` before the log call.
-    `armEvent` is a no-op for the type (no matching branch — the Unit-2
-    saturation input is `message.updated` only), so the early return
-    changes nothing but the missing log line; every other event type is
-    byte-identical in behavior.
-  - `trimLogIfNeeded(maxBytes, tailBytes)` (new, right before
-    `restoreLineageFromLog`): statSync → absent/unreadable = no-op;
-    `size <= maxBytes` = no-op; else keep = min(size, tailBytes), read
-    the byte TAIL via openSync/readSync (never reads the whole file —
-    the old `readFileSync` of the 233MB log in the #90 restore is now
-    bounded by the trim), writeFileSync the tail, then `log()` ONE
-    `log-trim= old=<pre-trim size> new=<kept tail size>` line. A
-    degenerate-cap guard (tail >= size → no-op) prevents growth;
-    best-effort, never throws out of init.
-  - factory: `maxLogBytes` / `logTailBytes` options (tickMs pattern:
-    number, finite, > 0, else the 20MB/2MB defaults — the live host
-    passes nothing → live behavior: trim only when the log outgrew 20MB);
-    `trimLogIfNeeded(...)` called BEFORE `restoreLineageFromLog()`.
-  - UNIT-1 header doc: the delta exclusion noted.
-- `.opencode/plugin/tests/auto_resume.smoke.mjs` (commit 70399ea):
-  - (a) two synthetic `message.part.delta` events → ZERO lines; the
-    paired `message.updated` in the same batch still logs (+1 chk).
-  - (b) seeded oversized log (the smoke's own accumulated log + an end
-    marker; small caps 4096/2048 via the factory options) → ONE
-    `log-trim=` line with `old=<pre-trim bytes>` and `new=2048`, the
-    file ends ~TAIL, the tail carries the seed end marker (+2 chk).
-  - (c) lineage restore on a trimmed tail — a FRESH child node process
-    (the #90 restore is once-per-process, so the trim-then-restore
-    ORDER can only be proven out-of-process): the child seeds an
-    oversized log whose TAIL carries two route=/spawn= pairs
-    (a→b, b→c: c at depth 2), factories with small caps, then fires
-    busy+idle on both restored sessions: `skip= deactivated sid=trim_a`
-    (restored STICKY flag) + `skip= depth sid=trim_c depth=2`
-    (restored depth — a non-restored c would SPAWN; the discriminator)
-    (+1 chk, spawnSync, exit-code + child-log asserted).
-  - total 129 → 133.
+## What's left (resume from here)
+1. **Probe** `.opencode/plugin/probes/handover_probe.mjs`:
+   - S26 re-pins: 271 (now `fuzzy-edit` line byte-exact
+     `fuzzy-edit orig=alpha 20260915 betaa len=20 d=1 value=alpha 20260915 beta` +
+     `h1.oldString` mutated to `alpha 20260915 beta`), 275 (re-point the
+     after-hook at a FAIL-closed call — c273 no-candidate: enrichment
+     `Error: oldString not found\nhint reason=no-anchor-line`), 276 (re-point at
+     c273: journal `old` = `alpha 20260915 beta` original, `new` = `z`, filePath
+     = he.txt; the line check becomes the no-candidate one; the write-payload cp
+     check stays).
+   - NEW S27 section (8 checks, numbered 277-284, `let n27 = 277`), inserted
+     after check 276 / before the S5 hygiene section; reuse the S26 io* vars
+     (ioBefore/ioAfter/ioReadLines/ioCore/ioJEditLog/ioJPayload/ioStampRe,
+     sandbox ioSandboxProj/ioHintDir). Suggested checks: 277 CRLF-drift d=0
+     mutate (line + mutation + exact-unique substring), 278 trailing-ws d=0,
+     279 single-typo d=1, 280 fail-closed near-miss `best-d=3` (not mutated),
+     281 ambiguous two-d≤1 (`hint cands=1 1,2 1`, not mutated), 282 directive (b)
+     long oldString truncated line + journal full original, 283 after-hook
+     (mutate call → no enrichment; fail call → enrichment consumed once),
+     284 the fuzzy-edit line shape byte-exact (a dedicated check on one of the
+     mutate calls). ALL fixture strings were MACHINE-VERIFIED in
+     `$TMP/opencode/f2_verify.mjs` + `f2_verify2.mjs` (scratchpad) — the exact
+     evidence strings are in the smoke (11) section, copy from there.
+   - Header: add the S27 TOC block (after the S26 TOC, lines ~684-719) + update
+     the EXPECTED OUTPUT line (`S26=20 S27=8 hygiene=6`) — MACHINE-COMPUTE the
+     section sum (node one-liner), do not retype. New total 287.
+   - Note: S26 275/276 re-points change no hygiene tally (observer hooks don't
+     write the watchdog plugin.log).
+2. **Docs** (part of this commit track): copy the design into
+   `.opencode/agent/research/fuzzy-numword/spec_sub2_edit_fuzzy_oldstring.md`
+   (from `.opencode/agent/handover/handover_task.md`) + a decision-record
+   `§8.2 LANDED addendum` (mirror the §8.1 style; gates: probe total, smoke
+   55/55, pytest + ruff).
+3. **Final gate**: `./.venv/Scripts/python.exe -m pytest -q` (459+1w),
+   `./.venv/Scripts/ruff.exe check --select F .` (F=0), the probe (new total).
+4. **TODO.md** #95 status: sub-item (2) LANDED (commit hash in the FINAL
+   handover — the planner records it; note the 15761d8 code commit here).
+5. Final `handover_task_to_planner.md` rewrite (executive summary, measured
+   gate, commits, TODO entries, what was NOT done: no auto-retry, R2/R8/R3
+   untouched, journal git-ignored, maintainer files never staged).
+6. Friction check via `submit(feedback=...)` before the handoff.
 
-## Measured verification (re-run at start AND after the change)
-- Baseline (before edits): smoke 129/129, probe 279/279, pytest 459
-  passed + 1 warning, ruff F=0 — all green, as expected.
-- After: `node .opencode/plugin/tests/auto_resume.smoke.mjs` →
-  **ALL PASS (133/133)**, exit 0.
-- After: `node .opencode/plugin/probes/handover_probe.mjs` →
-  **PROBE handover: 279/279 PASS** — UNCHANGED total (the probe has no
-  message.part.delta / auto_resume-log-volume dependency), so the
-  header annotation did NOT move.
-- After: `./.venv/Scripts/python.exe -m pytest -q` → **459 passed,
-  1 warning** (the known #10 coroutine warning).
-- After: `./.venv/Scripts/ruff.exe check --select F .` → **F=0**
-  ("All checks passed!").
-
-## Commits
-- 22c36e4 — auto_resume.ts (code only).
-- 70399ea — auto_resume.smoke.mjs (re-pins only).
-- This bookkeeping commit — TODO.md #96 status + this file.
-Staged ONLY the two scoped files (+ bookkeeping here). Pre-existing
-working-tree changes (`handover_task.md`, `repo_opencode.md`,
-`.opencode/maintainer/priority.md`, `opencode.jsonc`, the loop log)
-left untouched / unstaged.
-
-## TODO entries
-- #96 status updated: CODE LANDED (commits + gate results); PENDING his
-  live check at the next host restart (zero delta lines from the new
-  build + the existing file trimmed to ~2MB with the `log-trim=` line)
-  — then close.
-- No `todo_inbox.md` findings this unit.
-
-## Deliberately NOT done (with reason)
-- The live 239.6MB/264.4MB file is NOT trimmed by this commit — per the
-  spec the trim fires at the next host restart (the code lands now).
-- No change to `ctx_watchdog.ts`, `opencode.jsonc`, `AGENTS.md`,
-  `.opencode/maintainer/`, or any other plugin — DO-NOT-TOUCH list.
-- No `todo_inbox.md` / `TODO.md` NEW entries: nothing found beyond the
-  task scope (the probe total needed no move; no doc/code mismatch).
-
-## Lessons
-Embedding a JS child script from a smoke: write it as an array of
-lines + `join("\n")` — a template literal would corrupt the child's
-`\n` string escapes and regex escapes (they'd be resolved in the
-PARENT's literal, not the written file).
+## Baselines (measured 2026-09-25)
+- Smoke 55/55 (green). Probe 279/279 (pre-S27; grows to 287 with S27).
+  pytest 459 passed + 1 warning, ruff F=0 (pre-change — re-verify at the gate).
+- NEVER stage: `.opencode/maintainer/priority.md`, `opencode.jsonc`,
+  `.opencode/agent/prompts/repo/repo_opencode.md`, the loop_log files.
+- Task spec: `.opencode/agent/handover/handover_task.md` (the pinned design).
+- Design source: `research/fuzzy-numword/decision-record.md` §8 + §8.1 (the
+  LANDED addendum style to mirror).
