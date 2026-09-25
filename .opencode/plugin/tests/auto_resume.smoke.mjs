@@ -50,6 +50,7 @@
 // iff green).
 import fs from "node:fs";
 import path from "node:path";
+import { spawnSync } from "node:child_process";
 import { REPO_ROOT, loadRepo, freshSandbox, makeChecker } from "./_smoke_base.mjs";
 
 const base = freshSandbox("auto_resume");
@@ -145,6 +146,19 @@ try {
   const l2 = readLines();
   const ev2 = l2.find((l) => l.includes("event=message.updated"));
   chk("message.updated event → line with sid + tokens", l2.length === n2 + 1 && !!ev2 && ev2.includes("sid=ses_smoke_ar1") && ev2.includes('tokens={"input":10,"output":2}'), ev2 ?? `n=${l2.length}`);
+
+  // #96: message.part.delta is NEVER logged (the per-token stream delta
+  // was ~97% of the old log volume) — two synthetic deltas → ZERO lines;
+  // the paired message.updated in the SAME batch still logs.
+  const nDelta = readLines().length;
+  await hooks.event({ event: { type: "message.part.delta", properties: { sessionID: "ses_smoke_ar1" } } });
+  await hooks.event({ event: { type: "message.part.delta", properties: { sessionID: "ses_smoke_ar1", delta: "tok" } } });
+  await hooks.event({ event: { type: "message.updated", properties: { sessionID: "ses_smoke_ar1", message: { tokens: { input: 20, output: 4 } } } } });
+  const lDelta = readLines();
+  chk("#96: a synthetic message.part.delta → ZERO log lines (the paired message.updated in the same batch still logs)",
+    lDelta.length === nDelta + 1 && lDelta.every((l) => !l.includes("event=message.part.delta")) &&
+      lDelta.some((l) => l.includes("event=message.updated") && l.includes('tokens={"input":20,"output":4}')),
+    `n=${lDelta.length}`);
 
   // ---- robustness: degenerate event inputs never throw (swallow
   // discipline) and log nothing bogus
@@ -1620,8 +1634,138 @@ try {
       12000,
     );
     chk("#90 (vii): the file-trigger path is unchanged — no lineage parent (depth 0), the content ON toggle is respected (scope= autorun + CONTINUE)",
-      ok90f && c90Sends.some((c) => c.path?.id === FILE && ((c.body?.parts?.[0]?.text ?? "")).includes("agent_readme_post_compaction.md")),
-      `sends=${c90Sends.length}`);
+    ok90f && c90Sends.some((c) => c.path?.id === FILE && ((c.body?.parts?.[0]?.text ?? "")).includes("agent_readme_post_compaction.md")),
+    `sends=${c90Sends.length}`);
+
+    // ---- #96 (b): the INIT SIZE GUARD — a seeded oversized log is
+    // trimmed to the byte TAIL + ONE log-trim= line (the guard runs at
+    // factory init, before the #90 restore; the live defaults stay
+    // 20MB/2MB — small factory options here, the tickMs pattern). The
+    // seed = the smoke's own accumulated log (already well over the
+    // small cap) + an end marker line (must survive in the tail).
+    const MAXL = 4096; // small max cap for the smoke
+    const TAIL = 2048; // small tail cap for the smoke
+    let seedGuard = 0;
+    while (fs.statSync(sandboxLog).size <= MAXL + TAIL && seedGuard++ < 10000) {
+      fs.appendFileSync(sandboxLog, "filler line " + seedGuard + " (#96 trim seed)\n");
+    }
+    const SEED_END = "trim-tail-end #96";
+    fs.appendFileSync(sandboxLog, SEED_END + "\n");
+    const preTrim = fs.statSync(sandboxLog).size;
+    const trimCountBefore = readLines().filter((l) => l.includes("log-trim=")).length;
+    const hooksTrim = await factory({ directory: proj, client: { session: c90Session, provider: { list: providerList }, app: { log: () => "log" } }, maxLogBytes: MAXL, logTailBytes: TAIL });
+    const lTrim = readLines();
+    const trimLine = lTrim.find((l) => l.includes("log-trim="));
+    const postTrim = fs.statSync(sandboxLog).size;
+    chk("#96 (b): the seeded oversized log → trimmed to the byte tail (ONE log-trim= line, old=<pre-trim> new=<TAIL>) and the file is now ~TAIL",
+      !!hooksTrim?.event && !!trimLine && lTrim.filter((l) => l.includes("log-trim=")).length === trimCountBefore + 1 &&
+        trimLine.includes(`old=${preTrim}`) && trimLine.includes(`new=${TAIL}`) &&
+        postTrim > TAIL && postTrim <= TAIL + 4096,
+      `pre=${preTrim} post=${postTrim}`);
+    chk("#96 (b): the surviving byte tail carries the seed end marker (the last pre-trim line is intact)",
+      lTrim.some((l) => l.includes(SEED_END)), "");
+
+    // ---- #96 (c): LINEAGE RESTORE on a TRIMMED TAIL — a FRESH node
+    // process (the #90 restore is ONCE per process: this smoke process
+    // already ran it on its FIRST factory call, with an empty log — so
+    // the trim-then-restore ORDER is proven in a child process): the
+    // child seeds an oversized log whose TAIL carries two route=/spawn=
+    // pairs (trim_a→trim_b, trim_b→trim_c → c at depth 2), factories
+    // with small caps (trim BEFORE restore), and the restored state
+    // must be observable — trim_a (restored STICKY-deactivated) →
+    // skip= deactivated; trim_c (restored depth 2) → skip= depth
+    // depth=2 (a non-restored c would SPAWN — the restored depth is
+    // the discriminator).
+    const childProj = path.join(base, "trim_child", "proj");
+    const childScript = path.join(base, "trim_restore_child.mjs");
+    fs.mkdirSync(childProj, { recursive: true });
+    const childSrc = [
+      "// #96 (c) child — a FRESH node process: the plugin init order (the",
+      "// #96 trim BEFORE the #90 restore) runs on the first factory call",
+      "// of this process. The child seeds its own oversized log (a",
+      "// filler HEAD cut by the trim + the two route=/spawn= PAIRS at",
+      "// the TAIL: a→b, b→c → c at depth 2), factories with small caps,",
+      "// and proves the RESTORED state: trim_a (restored",
+      "// STICKY-deactivated) → skip= deactivated; trim_c (restored",
+      "// depth 2) → skip= depth depth=2 (a non-restored c would SPAWN —",
+      "// the restored depth is the discriminator).",
+      "",
+      'import fs from "node:fs";',
+      'import path from "node:path";',
+      'import { pathToFileURL } from "node:url";',
+      "",
+      "const NL = String.fromCharCode(10);",
+      "const REPO = process.argv[2];",
+      "const proj = process.argv[3];",
+      'const logPath = path.join(proj, ".opencode", "temp", "auto_resume.log");',
+      "const sleep = (ms) => new Promise((r) => setTimeout(r, ms));",
+      "const waitUntil = async (cond, ms = 8000) => {",
+      "  const t0 = Date.now();",
+      "  while (Date.now() - t0 < ms) {",
+      "    if (cond()) return true;",
+      "    await sleep(200);",
+      "  }",
+      "  return !!cond();",
+      "};",
+      'const head = Array.from({ length: 200 }, (_, i) => "2026-01-01T00:00:00.000Z filler-" + i + " (cut by the trim)" + NL).join("");',
+      "const pairs =",
+      '  "2026-01-01T00:00:00.000Z route= restart spawn sid=trim_a" + NL +',
+      '  "2026-01-01T00:00:00.000Z spawn= sid=trim_b" + NL +',
+      '  "2026-01-01T00:00:00.000Z route= restart spawn sid=trim_b" + NL +',
+      '  "2026-01-01T00:00:00.000Z spawn= sid=trim_c" + NL;',
+      "fs.mkdirSync(path.dirname(logPath), { recursive: true });",
+      "fs.writeFileSync(logPath, head + pairs);",
+      'const mod = await import(pathToFileURL(path.join(REPO, ".opencode/plugin/auto_resume.ts")).href);',
+      'const PLANNER = "planner_Q3S_160K";',
+      "const msgA = [",
+      '  { info: { role: "user" }, parts: [{ type: "text", text: "plain ping, no toggle" }] },',
+      '  { info: { role: "assistant" }, parts: [{ type: "text", text: "Done. action: restart" }] },',
+      "];",
+      "const msgC = [",
+      '  { info: { role: "user", agent: PLANNER }, parts: [{ type: "text", text: "iteration 1, no toggle" }] },',
+      '  { info: { role: "assistant" }, parts: [{ type: "text", text: "Done. action: restart" }] },',
+      "];",
+      "const scripted = { trim_a: msgA, trim_c: msgC };",
+      "const client = {",
+      "  session: {",
+      "    prompt: function () {},",
+      '    promptAsync: async () => { throw new Error("no sends expected in the child"); },',
+      "    abort: function () {},",
+      "    list: function () {},",
+      "    get: function () {},",
+      "    message: function () {},",
+      "    messages: async (args) => scripted[args?.path?.id] ?? [],",
+      "    todo: function () {},",
+      "    command: function () {},",
+      "    summarize: function () {},",
+      "    create: function () {},",
+      "  },",
+      "  app: {},",
+      "};",
+      "const hooks = await mod.default({ directory: proj, tickMs: 300, maxLogBytes: 1024, logTailBytes: 512, client });",
+      'const lines = () => fs.readFileSync(logPath, "utf-8").split(NL).filter((l) => l.length > 0);',
+      "const fire = async (sid) => {",
+      '  await hooks.event({ event: { type: "session.status", properties: { sessionID: sid, status: "busy" } } });',
+      '  await hooks.event({ event: { type: "session.status", properties: { sessionID: sid, status: "idle" } } });',
+      "};",
+      'await fire("trim_a");',
+      'const okA = await waitUntil(() => lines().some((l) => l.includes("skip= deactivated sid=trim_a")), 12000);',
+      'await fire("trim_c");',
+      'const okC = await waitUntil(() => lines().some((l) => l.includes("skip= depth sid=trim_c depth=2")), 12000);',
+      'const okTrim = lines().some((l) => l.includes("log-trim=")) && lines().some((l) => l.includes("spawn= sid=trim_c"));',
+      "const ok = okA && okC && okTrim;",
+      'console.log("TRIM_RESTORE " + (ok ? "OK" : "FAIL a=" + okA + " c=" + okC + " trim=" + okTrim));',
+      "process.exit(ok ? 0 : 1);",
+    ];
+    fs.writeFileSync(childScript, childSrc.join("\n"));
+    const childRes = spawnSync(process.execPath, [childScript, REPO_ROOT, childProj], { encoding: "utf-8", timeout: 90000 });
+    const childLog = path.join(childProj, ".opencode", "temp", "auto_resume.log");
+    const childLines = fs.existsSync(childLog) ? fs.readFileSync(childLog, "utf-8").split(/\r?\n/).filter((l) => l.length > 0) : [];
+    chk("#96 (c): a fresh-process init (trim BEFORE the #90 restore) still pairs the route=/spawn= lines surviving in the trimmed tail (trim_a skip= deactivated, trim_c skip= depth depth=2)",
+      childRes.status === 0 && childLines.some((l) => l.includes("log-trim=")) &&
+        childLines.some((l) => l.includes("skip= deactivated sid=trim_a")) &&
+        childLines.some((l) => l.includes("skip= depth sid=trim_c depth=2")),
+      `status=${childRes.status} ${childRes.stdout ? childRes.stdout.trim().split("\n").pop() : ""}`);
 
     // ---- the live log received NO smoke line. The LIVE plugin instance
   // (this host) keeps appending ITS OWN live-session lines in real time
