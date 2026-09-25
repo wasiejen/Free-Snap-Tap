@@ -4,20 +4,38 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 
-## Current session — direct, 2026-09-25 (ses_f2a436b57ffe8go608Z63jwNG6, planner, Qwen3.8-27B-Q3S-170K)
-- Triage: his uncommitted maintainer-file additions handled — priority.md curation (his explicit request: 15 handled items → `_past_priorities.md` with replies, `e879811`); the unit-4 question answered (TODO #85 part 1 + #90 — LANDED + live-accepted); `repo_opencode.md` seeded (his `--comment` request) + indexed into both role prompts; the no-smoke-in-direct rule codified in the planner prompt (his 2026-09-23_00-12).
-- TODO #93 LANDED: spec `f45fda4` (verified facts pinned: the `EventSessionError` SDK shape, the v1 `summarize` path, the v2 budget gate, the once-per-overflow guard) → `worker_Q3S_170K` RAN TO THE CONTEXT WALL (the Task result `request (170372 tokens) exceeds the available context size (170240 tokens)` — per MEM-0109: a tool-output insertion pushed the running session over the wall, not a launch rejection; the session ran 61 messages / 280 parts) → the work was COMPLETE (6 files staged, handover written, gate evidence in the handover) → the planner verified from files (git status + handover + a targeted 15/15 spot re-run of the changed smoke) and LANDED the commit `5f823e4`. Gate: probe 257/257, context_recovery smoke 15/15, compact_memory 66/66, auto_resume 129/129, pytest 459+1w, ruff F=0.
-- MAINTAINER DOMAIN (named verbatim in the handover): (1) the host restart (plugin activation — the `deactivated/` → `plugin/` move IS the activation; opencode.jsonc has no `plugin` key), (2) the live overflow acceptance on a driven/forked session as the 2026-09-23 fork test (the flag `emergencyRecovery: true` is already live in `compact_budget.json` — no flag work needed). FOLLOW-UP candidate: the context_recovery + compact_memory ONE-plugin integration.
-- Memory: MEM-0109 added (his interpretation: the "prefill" signature = a limit hit on a tool-output insertion, a normal limit death — its final push was a tool result, not the thinking part).
-- OPEN for his ruling (raised at close, not acted on): (1) his #2026-09-24_22-47 one-commit loosening (recommendation: allow a checkpoint commit per verified unit; TODO + handover ride the final commit); (2) the block_transfer extension (recommendation: add a REPLACE region mode; keep PASTE = insert; defer multi-block).
-- Next: the #93 live-acceptance tail (his restart + the fork overflow test) → then the #83 threshold raise toward ~0.98 is unblocked; queued: #92 (his call — the md+json double dump, my recommendation: YES), #67 R3 (unblocked, needs his approval), his f2-cleanup (4 AGENTS.md looprunner lines).
-- Note: hit the context wall mid-close (the NAP splice via script) — the maintainer compacted the session (~97 % → ~49 %); resumed from the committed checkpoint and finished the splice here.
-- His reply (2026-09-25) triaged: **(A)** #93 live acceptance VERIFIED from files — the Gemma session `ses_f29efd56affeofecSaf0g2QhHH` overflowed (34649 > 30208) at 00:56:31Z → the `[compaction]` trigger 143 ms later → summary → budget count 0→1 + COMPACT line (messages=18) → the session CONTINUED (post-compact turns, cache read 16399) → his manual abort. Nuance flagged: NO ` emergency` marker — the recovery consumed the NORMAL slot (cap 1 was free; the emergency 1 unspent — his design call on whether recovery should prefer the emergency slot); the ` | 1 compaction left` spec-3 suffix live-verified in that session ctx line. f2 cleanup VERIFIED (0 looprunner hits in AGENTS.md); the plugin is active (`context_recovery.ts` in `.opencode/plugin/`). **(B)** one-commit loosening LANDED `f4dbc31` (task-spec bullet + priority.md move; the AGENTS.md step-1 paste text goes in the close message — his file). **(C)** #94 block_transfer REPLACE spec written + committed (fresh baselines: smokes 22/22 + 52/52, probe S15=10, total 257) — launching `worker_Q3S_170K`. **(D)** the fuzzy_numword oldstring track (his priority.md section + ideas.md L143-158 read): design pending his ruling — planner reply at close (fuzzy oldString resolution via the existing hook architecture + the edit/write journal dump per his R6 sketch).
-- Post-close continuation (same session): **(C) #94 LANDED `528f66b`** (worker_Q3S_170K ses_f29d9a56bffeqeXGlv6vWUJhjj; planner-verified from files + 30/30 spot re-run) — REPLACE mode live in code (activation at the next restart); the worker's todo_inbox finding (anchor-semantics drift: existing modes `includes` + no unique-check vs REPLACE startsWith+unique) queued into the fuzzy track. **(D grounded, reply at close):** the track state = R1/R2 live, R4/R7 landed, **R6 STAGED with gate cleared** (observation-only: content-locator + the `journal_edit.log`/`journal_write.log` payload dump + edit hints — exactly his "dump newstring to a file" ask), **R3 STAGED** (gate: R4 volume data; covers glob/grep/anchor/bash/block_transfer anchors), R8 + the escape return-info NOT yet staged. Proposed build order: R6 → the MUTATING edit-fuzzy oldString resolution (his core ask; needs his approval — recommendation: d<=1 exactly-one per the #72 precedent + the mandatory log line per his return-info ruling) → R3 (absorbing the anchor-drift fix) → R8 + escape-info. DISCREPANCY: **#67 does not exist in the committed TODO.md nor its history** (referenced by worker-13's todo_inbox 2026-09-23 + an old NAP line) — the track's parent entry needs re-anchoring (candidates #65/#66, further up the list) before the work starts. He pasted the AGENTS.md one-commit loosening himself (live file — verified, left untouched).
-- His 2026-09-25 close rulings LANDED (TODO #95 = the track parent, replacing the stale #67 refs; R3 spec gate updated): (1) fuzzy threshold — proportional d (1-in-100) REJECTED in favor of **normalize-then-compare** (`\r\n`→`\n` + strip per-line trailing whitespace), then d=0 / d≤1 normalized strict (the CRLF class is unbounded in length — normalization removes it exactly); (2) **R4 RETIRED** (bitdrift gone → no correction data) → the R3 gate is cleared by ruling; (3) the anchor-drift fix folded into R3. THRESHOLD CLARIFICATION (his question): `saturationThreshold` 0.95 belongs to auto_resume Unit 2 (the PRE-EMPTIVE saturation path, currently OFF via `autoCompact: false` in the budget file) — it is NOT the recovery trigger; #93 fires on the ContextOverflowError event (proven live in his test — the threshold never fired); #83 (raise toward ~0.98) is INERT while autoCompact is false (it only tunes the pre-emptive path if he re-enables it). NEXT: launch R6 (STAGED, gate cleared — pre-approved) → the edit-fuzzy spec from #95's pinned design → R3 → R8/escape-info.
+## Current session — autorun, 2026-09-25 (ses_f29afbb66ffeRM1EHgBIpTwTg5, planner-14, Qwen3.8-27B-Q3S-170K)
+- Launch (his 3 items): (A) **normalize-then-compare CONFIRMED** for the
+  edit-fuzzy oldstring (his words: better than his proportional
+  distance rule; "go ahead with it") + two directives: (a) resolutions
+  AND failed resolutions logged (near-miss d<10 / in general — every
+  attempt, best-candidate d in the line, no d bar on logging), (b)
+  feedback context-saving: the return feedback does NOT carry the full
+  oldstring (truncated identifier — first ~40 chars + length + d +
+  target; the full payload stays in the R6 journal). (B) his question:
+  which R unit carries the resolution feedback? (answered at close:
+  R6's edit-hint channel; the mutating-channel "return info" = #95
+  sub-item 4, not yet staged; his (b) idea adopted into the (2) spec).
+  (C) **auto_resume.log = 233MB and growing** (small-write SSD wear) →
+  reduce the logged data → TODO #96 filed with measured root cause
+  (97.4% of bytes = `message.part.delta` lines ≈ 100MB/day).
+- Inbox: `compaction_feedback_by_planner.md` handled → `done/` (all
+  content already landed/recorded in the wave; the unit4-compaction-
+  resume A+B+C approval filed as TODO #97 — verified NOT implemented
+  from files today: `ACTION_RE` L267 unanchored, no ctx.log COMPACT
+  tail-read in the tick).
+- TODO: #95 status updated (his go + the two directives), #96 filed
+  (log reduction, full design in the entry), #97 filed (unit4-
+  compaction-resume A+B+C); header numbering → #97.
+- **R6 LANCHED** (sub-item 1, pre-approved): spec = `handover_task.md`
+  (copy `plan14_ho_task.md`), worker_Q3S_170K.
+- Next: after R6 lands → #96 (spec from the TODO entry, same worker
+  model) → the (2) edit-fuzzy spec from #95's pinned design + his two
+  directives → R3 → R8/escape-info. #97 queued after #96 (same file).
 
 
 ## Compressed archive (one line each
+- 2026-09-25 direct (ses_f2a436b57ffe8go608Z63jwNG6, planner, Qwen3.8-27B-Q3S-170K) — his reply triaged: #93 live acceptance VERIFIED from files (Gemma overflow 34649>30208 → recovery → session continued; the NORMAL slot consumed, emergency-1 unspent — his design call on slot preference) + f2-cleanup verified + one-commit loosening LANDED f4dbc31 + #94 LANDED 528f66b (worker_Q3S_170K; the anchor-drift finding → #95) + the fuzzy track grounded → TODO #95 parent + close rulings LANDED c82f788 (normalize-then-compare confirmed over the proportional d; R4 RETIRED → R3 gate cleared; the anchor-drift folded into R3; #83 threshold INERT while autoCompact false) — details: nap_direct.md (2026-09-25 excess append) + git 305ce1b..c82f788 + TODO #94/#95
 - 2026-09-24 direct (ses_f2c4fb315ffeM2SaIyahfFSrrx, planner, Qwen3.8-27B-Q3S-170K) — compaction design chat + trusted-compaction-system spec wave COMPLETE: builds 01/10/2+11/3 + wave d/c/e/g/h + worker-prompt parts all LANDED; guide/handout delivered; remaining: his f2-cleanup (4 AGENTS.md looprunner lines) — details: git 7f253ea..8b7e8df + compaction_feedback_by_planner.md + specs/README
 - 2026-09-23/24 (ses_f30493f9effeuQRFc3ijNON166, planner-13, Qwen3.8-27B-Q3S-170K) — spawn-tail live acceptances verified (#90 + #82 CLOSED with live evidence, #91 updated) + R4 LANDED (dde74b9, R3 unblocked) + unit-4 no-resume-after-self-compact live finding (A: action-line regex unanchored, B: compaction landing silent) → proposal filed, maintainer moved it to `proposals/approved/` (uncommitted) + 2026-09-24 direct rulings: planner may edit prompt files (he reviews/adopts), NEXT = #93 (context_recovery port to the `event` hook — prestep to the compact_memory merge), host auto-compaction stays off, keep values 12 (our plugins) vs 18 (host block) each own store, load errors fix pending — details: git 0484bf6/805f4d7/bea117f/7663d04/ef3daca + TODO.md + todo_records.md
 - 2026-09-23 direct (ses_f3144d9d6ffe8HbOlnQsKD2tq9, planner-12, Qwen3.8-27B-Q3S-170K — the re-engaged #91 ghost session) — #91 LANDED inline (2fa4bb6: the two agent=compaction guards + 3 smoke pins, gate green) + #80/#81 CLOSED (records first) + #82 unit-2 suppression ruling (Direct suppresses Unit 2 = the already-landed #85 part 3 behavior, no code change) + #78 LANDED (6b33907, delegated + planner-verified) + #92 FILED (his go-ahead pending) + the LIVE TEST armed (his own-line toggle, close action: restart) — the successor (planner-13) verified the spawn tail and curated (#90/#82 closed with live evidence) — details: git d6ddf37/2fa4bb6/6b33907 + the TODO.md one-liners + todo_records.md full texts
@@ -104,12 +122,13 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Standing
-- Baselines (re-verified 2026-09-25 by the planner, post-#93):
-  probe **257** [two-fifty-seven]; smokes **all green** (context_recovery
-  15/15 post-#93, compact_memory 66/66, auto_resume 129/129,
-  intercept_observer 39/39, submit 20/20; the per-suite counts are in
-  each smoke's own readout — no total kept here); pytest **459 passed
-  + 1 warning (the known #10 coroutine warning)**; ruff **F=0**.
+- Baselines (re-verified 2026-09-25 by the planner, post-#94):
+  probe **259** [two-fifty-nine]; smokes **all green** (context_recovery
+  15/15, compact_memory 66/66, auto_resume 129/129, intercept_observer
+  39/39, block_transfer 30/30 + 53/53, submit 20/20; the per-suite
+  counts are in each smoke's own readout — no total kept here); pytest
+  **459 passed + 1 warning (the known #10 coroutine warning)**; ruff
+  **F=0**.
 - Cross-compaction (measured 2026-09-18 plan2; re-verified live 2026-09-22):
   `compact_memory` with a foreign sessionID — no model args in the tool
   schema; the summarizer model resolves per `agent.compaction.model` (set in

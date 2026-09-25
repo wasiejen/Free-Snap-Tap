@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #92, new
-entries start at #93 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #97, new
+entries start at #98 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -560,6 +560,16 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Acceptance:** per sub-item (each spec at launch); overall: a controlled CRLF-drift edit and a single-typo edit both resolve without agent action (log evidence), gate green at each landing.
 - **Suggested scope:** `.opencode/plugin/intercept_observer.ts` (+ core), `.opencode/plugin/tests/`, `.opencode/plugin/probes/handover_probe.mjs`, the `research/fuzzy-numword/` specs.
 - **Status:** OPEN — specs written at launch from this entry.
+  2026-09-25 (autorun, ses_f29afbb66ffeRM1EHgBIpTwTg5, planner-14): his
+  GO for sub-item (2) — the normalize-then-compare design is CONFIRMED
+  (his words: better than the proportional distance rule; go ahead) +
+  two directives folded into the (2) spec: (a) resolutions AND failed
+  resolutions are LOGGED — every attempt, the line carries the best-
+  candidate d (a near-miss d<10 is visible; no d bar on logging),
+  (b) the return feedback does NOT carry the full oldstring (context
+  saving — a truncated identifier: first ~40 chars + length + d +
+  target; the full payload stays in the R6 journal). R6 (sub-item 1)
+  LANCHED (worker_Q3S_170K, spec plan14_ho_task.md).
 
 ## #94. (LANDED 2026-09-25, planner direct; his approval 2026-09-25) block_transfer REPLACE mode — line-anchored span replacement from a buffer (edit-like, no exact oldString)
 - **Problem / evidence:** edit oldString exact-match is a very regular failure (his priority.md "fuzzy matching of edit oldstring"; ideas.md L153-158: "what would be needed to make block_transfer as versatile as edit but less prone to oldstring mismatch?"); block_transfer PASTE is insert-only (append after targetMarker / EOF) — a slot/region replacement needs a MOVE+DELETE composition (two calls, intermediate state); the 2026-09-24 slot-clobber incident (agent_feedback) showed PASTE-as-slot-replacement is a trap.
@@ -567,3 +577,73 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Acceptance criteria:** smokes 30/30 + 53/53 (from 22/52); probe S15 = 12 checks, total 259; standard gate green; the tool description documents REPLACE; a knowledge note appended.
 - **Suggested scope:** `.opencode/tools/block_transfer.ts`, `.opencode/plugin/tests/block_transfer*.smoke.mjs`, `.opencode/plugin/probes/handover_probe.mjs` (S15), `.opencode/agent/knowledge/plugin_tools/`.
 - **Status:** LANDED 2026-09-25 (worker, `worker_Q3S_170K`): `REPLACE` mode in `.opencode/tools/block_transfer.ts` (enum + the dispatch branch next to PASTE + the description MODES/ANCHORS/BUFFERS/EDGE text) — the line-anchored span (short UNIQUE line prefixes, `startsWith`, non-unique → an error naming the cause, start..end INCLUSIVE, start ≤ end) of an EXISTING dstFile is replaced atomically by the named buffer (REPLACE never creates a file; the buffer is preserved, PASTE semantics; all checks before any fs write; the return reports the 1-based line span + counts); smokes re-pinned 30/30 (+8) + 53/53 (+1); probe S15 = 12 checks (+262/263), probe total 259/259 (header totals machine-updated); gate green (pytest 459 passed + 1 warning, ruff F=0); knowledge note appended at `.opencode/agent/knowledge/plugin_tools/2026-09-25_block_transfer.replace_mode.md`. (Commit hash recorded in the planner's follow-up bookkeeping commit — no self-reference.) The broader fuzzy-oldstring track (anchor-based fuzzy oldString resolution + the edit/write journal dump per his ideas.md L146-150 + the priority.md fuzzy_numword items) is a SEPARATE track awaiting design ruling.
+## #96. (open, 2026-09-25, planner-14; his launch directive — auto_resume.log hardware wear) auto_resume.log write-volume reduction
+- **Problem / evidence:** `.opencode/temp/auto_resume.log` = 239.6MB /
+  2,813,277 lines at ~4 days process uptime (measured 2026-09-25):
+  **97.4% of the bytes = `event=message.part.delta` lines** (2,718,066
+  lines / 231.0MB) — the event hook `onEvent` (auto_resume.ts
+  L1468-1480) logs ONE line per event, incl. every streamed token
+  delta; the current process (v=c57de2cc) wrote ≈18.7k delta lines in
+  ~20 min ≈ 1.25M lines/day ≈ ~100MB/day of small appends (his SSD-
+  wear concern). The remaining lines grow ≈1MB/day. The old-build
+  lines `skip= autoCompact-off` / `saturation=` are NOT emitted by the
+  current source (grep-clean) — no work needed there.
+- **Desired outcome:** the log stops growing per-token; a size guard
+  bounds long-term growth; the existing 233MB file is trimmed
+  AUTOMATICALLY on the next host restart (no manual step).
+- **Design (planner, 2026-09-25 — the spec at launch is built from this
+  entry):** (1) `onEvent` NEVER logs `message.part.delta` (the arm path
+  is unaffected — the Unit-2 saturation input is `message.updated`
+  only, L1447-1464); all other event types unchanged. (2) Size guard
+  at init, BEFORE `restoreLineageFromLog` (L1508-1544 — today it reads
+  the whole 233MB): log size > 20MB → keep the byte TAIL (last 2MB),
+  ONE `log-trim= old=<bytes> new=<bytes>` line; caps as factory options
+  (defaults 20MB/2MB; small values in the smoke — the `tickMs` factory-
+  option pattern L1573-1574); absent/unreadable → no-op. `log()` is a
+  per-line appendFileSync (L352-359) → the file is never held open → a
+  synchronous init-trim is safe. Documented accepted consequence: the
+  #90 lineage restore sees only the surviving tail (an older
+  route=/spawn= pair cut by the trim → depth resets to 0 — best-effort
+  by design). (3) Smoke re-pins (baseline 129/129): a synthetic
+  `message.part.delta` event → zero log lines for it (a paired
+  `message.updated` in the same batch still logs); a seeded oversized
+  log → trim + tail preserved + the `log-trim=` line; the lineage
+  restore still works on a trimmed tail.
+- **Acceptance:** zero `message.part.delta` lines appended after a
+  live restart (his live check); the 233MB file trimmed to ~2MB on the
+  next restart with the `log-trim=` line; smoke + standard gate green.
+- **Suggested scope:** `.opencode/plugin/auto_resume.ts` (`onEvent`,
+  init, the trim guard), `.opencode/plugin/tests/auto_resume.smoke.mjs`.
+- **Status:** OPEN — spec at launch (queued after R6; his launch item
+  3, 2026-09-25).
+
+## #97. (open, 2026-09-25, planner-14; APPROVED proposal, NOT implemented — verified from files today) unit-4 resume-after-compaction: line-anchor the action regex (A) + re-arm on COMPACT (B) + prompt note (C)
+- **Problem / evidence:** `proposals/approved/2026-09-23_unit4-
+  compaction-resume.md` (his `--comment` "approved A, B and C") —
+  verified NOT implemented 2026-09-25: `ACTION_RE` (auto_resume.ts
+  L267) is still the unanchored `/action:\s*(restart|resume|stop|
+  ask_maintainer)/g` (a prose-quoted action line still drives routing —
+  the live-verified 2026-09-23 20:14Z mis-route) and there is NO
+  ctx.log `COMPACT` tail-read in the tick (a landing compaction is
+  silent → the unit-4 recovery-continue promise is non-deterministic).
+- **Desired outcome:** per the proposal — Part A: `action:` matches only
+  at line start (`/(^|\n)\s*action:\s*(…)/g`, last match still wins);
+  Part B: on the 5s tick, tail-read `.opencode/temp/ctx.log` for NEW
+  `COMPACT <sid>` lines → `idlePending = true` + `recoveryCount = 0`
+  (fresh budget — the context situation changed); Part C: the Work
+  State dump form should not quote a literal `action: restart` in
+  prose (prompt-text note — planner-as-text-worker, workers have no
+  prompt edit access).
+- **Acceptance:** per the proposal: smoke pin A (a last assistant
+  message with a PROSE-quoted mid-line `action: restart` →
+  `lastAssistantAction` null; a standalone line → "restart"), smoke
+  pin B (a synthetic ctx.log `COMPACT` line for a watched sid → re-armed
+  on the next tick), standard gate green; LIVE: the next self-compact
+  → idle cycle routes from the real close (no mis-spawn from a quoted
+  line) + a `recovery=`/`route=` line follows the `COMPACT` line
+  WITHOUT a user message in between.
+- **Suggested scope:** `.opencode/plugin/auto_resume.ts` (L267, the
+  tick), `.opencode/plugin/tests/auto_resume.smoke.mjs`; Part C =
+  prompt text (planner, not the worker).
+- **Status:** OPEN — already approved (no new approval needed); queued
+  after #96 (same file — serial slot).

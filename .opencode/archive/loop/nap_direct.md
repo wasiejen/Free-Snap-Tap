@@ -1283,3 +1283,37 @@
   agent prompt; reality-rebuild tool; pathfinder-mentality prompt part;
   looprunner-retirement decision; feedback integration on planner close-up;
   worker git-hash closing confusion (ideas.md).
+# Excess append — 2026-09-25 direct session (ses_f2a436b57ffe8go608Z63jwNG6, planner, Qwen3.8-27B-Q3S-170K)
+
+Appended by planner-14 (2026-09-25) when compressing that session's NAP
+section into the Compressed archive (details beyond what git + TODO hold):
+
+- His reply triage (2026-09-25): (A) #93 live acceptance VERIFIED from
+  files — the Gemma session ses_f29efd56affeofecSaf0g2QhHH overflowed
+  (34649 > 30208) at 00:56:31Z → the [compaction] trigger 143 ms later
+  → summary → budget count 0→1 + COMPACT line (messages=18) → the
+  session CONTINUED (post-compact turns, cache read 16399) → his manual
+  abort. Nuance flagged: NO ` emergency` marker — the recovery consumed
+  the NORMAL slot (cap 1 was free; the emergency-1 unspent — his design
+  call on whether recovery should prefer the emergency slot).
+  f2-cleanup VERIFIED (0 looprunner hits in AGENTS.md); the plugin is
+  active (context_recovery.ts in .opencode/plugin/).
+  (B) one-commit loosening LANDED f4dbc31 (task-spec bullet +
+  priority.md move; the AGENTS.md step-1 paste text = his file).
+  (C) #94 spec 39ff312 → worker → LANDED 528f66b. (D) the fuzzy track
+  grounded → TODO #95 parent entry + the close rulings LANDED c82f788:
+  (1) fuzzy threshold — proportional d REJECTED in favor of
+  normalize-then-compare, (2) R4 RETIRED (bitdrift gone) → the R3 gate
+  cleared by ruling, (3) the anchor-drift fix folded into R3.
+  THRESHOLD CLARIFICATION: saturationThreshold 0.95 belongs to
+  auto_resume Unit 2 (the pre-emptive path, OFF via autoCompact: false)
+  — NOT the recovery trigger; #83's raise toward ~0.98 is INERT while
+  autoCompact is false.
+- #94 worker: worker_Q3S_170K ses_f29d9a56bffeqeXGlv6vWUJhjj (planner-
+  verified from files + 30/30 spot re-run). Its todo_inbox finding
+  (anchor-semantics drift: existing block_transfer modes `includes` +
+  no unique-check vs the #94 REPLACE startsWith+unique) queued into
+  #95 → folded into R3 per his ruling.
+- Context note: hit the context wall mid-close (NAP splice via
+  script); the maintainer compacted the session (~97% → ~49%); resumed
+  from the committed checkpoint and finished the splice.
