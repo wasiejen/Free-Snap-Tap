@@ -82,6 +82,19 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   (bufferless region replace); 5: in-line fuzzy anchors — DEFER;
   6: journal-as-source + #8 failed-write buffering — DEFER/backlog).
   Proposed order: 1+2 → 3+4 → 5/6 separate decisions.
+  (4) **3rd round (2026-09-25):** his questions: append-vs-replace on
+  COPY, section separators, + the interface handout
+  (`knowledge/plugin_tools/2026-09-18_tool-plugin-design-handout.md`).
+  My answers: COPY keeps REPLACE semantics (current, verified); new
+  APPEND mode (named mode, no flag) for stepwise assembly, accepts refs
+  or `text`, creates-if-absent; exactly ONE newline between list sections
+  (default, no param); new SHOW mode (buffer line count + bounded first
+  lines — the handout's truncation-steering); WRITE-list overlap check in
+  the error taxonomy; the `last_write` auto-buffer stays automatic
+  (no param — poka-yoke); build DoD per the handout's "Verify before
+  done": multi-step held-out task (COPY-list assembly + WRITE-list) +
+  transcript read + description rework per the handout's ordering.
+  No fundamental sketch changes.
 - **Pending live observations (maintainer / natural):** #99 fork test (his,
   post-restart), #98 live acceptance (the next self-compact→idle cycle —
   the #98 build is live in this process), #93 live overflow (his fork
