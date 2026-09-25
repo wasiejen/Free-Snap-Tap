@@ -22,26 +22,26 @@ function sandboxCheck(cwd: string, givenPath: string): string | null {
 }
 
 export default tool({
-  description: `Move, copy, cut, paste, delete, or clear multi-line blocks in files using short unique line-prefix anchors and named clipboard buffers.
+   description: `Move, copy, cut, paste, delete, or clear multi-line blocks in files using short unique line-prefix anchors and named clipboard buffers.
 
-MODES — MOVE: immediate cut-and-paste, extracts a block from srcFile and inserts it into dstFile in one call. COPY: extract a block from srcFile into a buffer, leaving the source untouched. CUT: extract into a buffer AND delete from the source. PASTE: write a buffer into dstFile. DELETE: extract a block and discard it (purge without outputting). CLEAR: empty a buffer. Use MOVE for a single direct transfer; use COPY/CUT + PASTE for multi-buffer work across files (one buffer can be pasted several times).
+MODES — MOVE: immediate cut-and-paste, extracts a block from srcFile and inserts it into dstFile in one call. COPY: extract a block from srcFile into a buffer, leaving the source untouched. CUT: extract into a buffer AND delete from the source. PASTE: write a buffer into dstFile. REPLACE: replace the line-anchored span (startMarker..endMarker inclusive) of dstFile with the contents of a named buffer — edit-like region replacement WITHOUT an exact oldString match (REPLACE never creates a file). DELETE: extract a block and discard it (purge without outputting). CLEAR: empty a buffer. Use MOVE for a single direct transfer; use COPY/CUT + PASTE for multi-buffer work across files (one buffer can be pasted several times); use REPLACE to swap a region in place (PASTE inserts, it does not replace).
 
-ANCHORS — startMarker and endMarker are short UNIQUE line prefixes; the block spans the start line through the end line INCLUSIVE. For MOVE/PASTE, an optional targetMarker (a unique line prefix in dstFile) sets the insertion point right after that line; omit it to append at EOF.
+ANCHORS — startMarker and endMarker are short UNIQUE line prefixes; the block spans the start line through the end line INCLUSIVE. For MOVE/PASTE, an optional targetMarker (a unique line prefix in dstFile) sets the insertion point right after that line; omit it to append at EOF. For REPLACE, startMarker/endMarker are the span in dstFile itself (no targetMarker).
 
-BUFFERS — bufferName selects a named clipboard buffer (default 'default'); multiple buffers can coexist in one session; CLEAR empties one.
+BUFFERS — bufferName selects a named clipboard buffer (default 'default'); multiple buffers can coexist in one session; CLEAR empties one. For REPLACE the buffer supplies the replacement content (and is preserved afterwards, like PASTE).
 
 SANDBOX — all file access (reads AND writes) is confined to the working directory and the Windows temp directory; any path outside is rejected with an error.
 
-EDGE — a non-unique anchor, a missing required path, an empty PASTE buffer, or an out-of-sandbox path each return an error naming the cause — read the error, fix the input, re-issue (a non-unique anchor: widen the prefix, do not guess).
+EDGE — a non-unique anchor, a missing required path, an empty PASTE or REPLACE buffer, or an out-of-sandbox path each return an error naming the cause — read the error, fix the input, re-issue (a non-unique anchor: widen the prefix, do not guess).
 
 EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TODO.md into BACKLOG.md, right after its "# Backlog" header line:
   { "mode": "MOVE", "srcFile": "TODO.md", "dstFile": "BACKLOG.md", "startMarker": "## TODO", "endMarker": "## Notes", "targetMarker": "# Backlog" }`,
   args: {
-    mode: tool.schema.enum(["MOVE", "COPY", "CUT", "PASTE", "DELETE", "CLEAR"]).describe("Operation mode: MOVE (immediate cut-and-paste), COPY (yank to buffer), CUT (yank to buffer and delete from source), PASTE (write buffer to target), DELETE (cut to null), CLEAR (empty buffer)."),
+    mode: tool.schema.enum(["MOVE", "COPY", "CUT", "PASTE", "REPLACE", "DELETE", "CLEAR"]).describe("Operation mode: MOVE (immediate cut-and-paste), COPY (yank to buffer), CUT (yank to buffer and delete from source), PASTE (write buffer to target), REPLACE (replace the line-anchored span of dstFile with a named buffer), DELETE (cut to null), CLEAR (empty buffer)."),
     srcFile: tool.schema.string().optional().describe("Source file path. Required for MOVE, COPY, CUT, and DELETE."),
-    dstFile: tool.schema.string().optional().describe("Destination file path. Required for MOVE or PASTE."),
-    startMarker: tool.schema.string().optional().describe("Unique line anchor marking the beginning of the block (MOVE, COPY, CUT, DELETE)."),
-    endMarker: tool.schema.string().optional().describe("Unique line anchor marking the end of the block (MOVE, COPY, CUT, DELETE)."),
+    dstFile: tool.schema.string().optional().describe("Destination file path. Required for MOVE, PASTE, or REPLACE. For REPLACE the file must exist (REPLACE never creates a file)."),
+    startMarker: tool.schema.string().optional().describe("Unique line anchor marking the beginning of the block (MOVE, COPY, CUT, DELETE; for REPLACE: the span start in dstFile)."),
+    endMarker: tool.schema.string().optional().describe("Unique line anchor marking the end of the block (MOVE, COPY, CUT, DELETE; for REPLACE: the span end in dstFile)."),
     targetMarker: tool.schema.string().optional().describe("Unique line anchor in dstFile where the block should be inserted. If omitted in MOVE or PASTE, appends to EOF."),
     bufferName: tool.schema.string().optional().describe("Name of the clipboard buffer (defaults to 'default'). Allows managing multiple clipboards.")
   },
@@ -86,6 +86,49 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
         fs.writeFileSync(dstPath, dstLines.join("\n"), "utf-8");
 
         return `Pasted ${buffer.length} lines from buffer '${bufferKey}' into '${args.dstFile}'.`;
+      }
+
+      // 2b. REPLACE SPAN IN DST — the line-anchored span (start..end inclusive) of
+      // an EXISTING dstFile is replaced by the named buffer's content. PASTE-like
+      // buffer semantics: the buffer is PRESERVED (not consumed). All checks run
+      // BEFORE any fs write — no partial writes on rejection.
+      if (mode === "REPLACE") {
+        if (!args.dstFile) return "Error: 'dstFile' is required for REPLACE mode.";
+        if (!args.startMarker) return "Error: 'startMarker' is required for REPLACE mode.";
+        if (!args.endMarker) return "Error: 'endMarker' is required for REPLACE mode.";
+
+        const dstPath = path.resolve(cwd, args.dstFile);
+        const dstViolation = sandboxCheck(cwd, args.dstFile);
+        if (dstViolation) return dstViolation;
+        // REPLACE never creates a file — there is no span to replace in a nonexistent file.
+        if (!fs.existsSync(dstPath)) return `Error: File '${args.dstFile}' not found.`;
+
+        const buffer = clipboardBuffers[bufferKey];
+        if (!buffer || buffer.length === 0) {
+          return `Error: Clipboard buffer '${bufferKey}' is empty. Perform a COPY or CUT first.`;
+        }
+
+        const dstLines = fs.readFileSync(dstPath, "utf-8").split(/\r?\n/);
+        const startIdx = dstLines.findIndex(line => line.startsWith(args.startMarker));
+        if (startIdx === -1) return `Error: Start marker '${args.startMarker}' not found in ${args.dstFile}.`;
+        if (dstLines.filter(line => line.startsWith(args.startMarker)).length > 1) {
+          return `Error: Start marker '${args.startMarker}' is not unique in ${args.dstFile}.`;
+        }
+        const endIdx = dstLines.findIndex(line => line.startsWith(args.endMarker));
+        if (endIdx === -1) return `Error: End marker '${args.endMarker}' not found in ${args.dstFile}.`;
+        if (dstLines.filter(line => line.startsWith(args.endMarker)).length > 1) {
+          return `Error: End marker '${args.endMarker}' is not unique in ${args.dstFile}.`;
+        }
+        if (startIdx > endIdx) {
+          return `Error: Start marker '${args.startMarker}' is after end marker '${args.endMarker}' in ${args.dstFile}.`;
+        }
+
+        const replacedCount = endIdx - startIdx + 1;
+        dstLines.splice(startIdx, replacedCount, ...buffer);
+        fs.writeFileSync(dstPath, dstLines.join("\n"), "utf-8");
+
+        const lineWord = (n: number) => `${n} line${n === 1 ? "" : "s"}`;
+        return `REPLACED lines ${startIdx + 1}..${endIdx + 1} (${lineWord(replacedCount)}) in '${args.dstFile}' with buffer '${bufferKey}' (${lineWord(buffer.length)}).`;
       }
 
       // 3. ANCHOR EXTRACTION (MOVE, COPY, CUT, DELETE)

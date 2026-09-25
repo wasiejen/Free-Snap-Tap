@@ -360,7 +360,7 @@
 //      (106) hook call #2 (same count) → the base name EXISTS now → the
 //          STAMPED name (<sid>_c0_<YYYYMMDDTHHmmss>.md) is created instead;
 //      (107) no-overwrite proof: file #1 is BYTE-IDENTICAL after call #2
-//   S15 block_transfer tool (10) — the #60 probe pin (part 1 of 2): the
+//   S15 block_transfer tool (12) — the #60 probe pin (part 1 of 2): the
 //      named-clipboard block mover (.opencode/tools/block_transfer.ts,
 //      post-#57) imported DIRECT (type-stripped, the S12/S13 load pattern);
 //      ONE loaded instance drives the whole section (the in-memory
@@ -390,7 +390,13 @@
 //          PASTE of the cleared buffer → the byte-exact empty-buffer error
 //          (no file written);
 //      (10.17) MOVE success: byte-exact `Moved` return + the source cut to
-//          its byte-exact remainder + the dst carrying the inclusive block
+//          its byte-exact remainder + the dst carrying the inclusive block;
+//      (262) TODO #94: REPLACE happy path: the anchored span of the existing
+//          dst replaced IN PLACE by the buffer — byte-exact dst + byte-exact
+//          `REPLACED` report + the buffer preserved (a later PASTE still
+//          reports its 2 lines);
+//      (263) TODO #94: REPLACE non-unique start anchor → the byte-exact
+//          non-unique error + the dst byte-identical (no write)
 //   S16 loop_log tool (6) — the #60 probe pin (part 2 of 2): the looprun
 //      activity log as a directly-fired tool (.opencode/tools/loop_log.ts,
 //      T3 loop-tool-batch part 3) imported DIRECT (type-stripped); driven
@@ -687,7 +693,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=11 S12=4 S13=19 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 hygiene=6  →  "PROBE handover: 257/257 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=11 S12=4 S13=19 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 hygiene=6  →  "PROBE handover: 259/259 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -3148,7 +3154,7 @@ let s14Body1 = null;
   );
 }
 
-// ------------------------------------------------------------------ S15 block_transfer tool (10) — the #60 probe pin (part 1 of 2): the named-clipboard block mover
+// ------------------------------------------------------------------ S15 block_transfer tool (12) — the #60 probe pin (part 1 of 2): the named-clipboard block mover
 //
 // The custom tool at .opencode/tools/block_transfer.ts (post-#57: the MOVE
 // dstFile requirement is hoisted PRE-WRITE): imported DIRECT from the repo
@@ -3372,6 +3378,54 @@ let btTool;
     res === "Moved 3 lines from 'bt/bt-move.txt' to 'bt/bt-move-dst.txt'." &&
       srcBody === "m1\nm3" && dstBody === "BTMV-START block\nm2\nBTMV-END block",
     JSON.stringify({ res, srcBody, dstBody }),
+  );
+}
+
+// 262 — TODO #94: REPLACE (the happy path): the line-anchored span of an
+//      EXISTING dst is replaced IN PLACE by the named buffer's content —
+//      byte-exact dst + byte-exact `REPLACED` report + the buffer PRESERVED
+//      (a later PASTE of the same buffer still reports its 2 lines). Fresh
+//      buffer `bt-rep` — the `bt1` buffer was CLEARED at check 116.
+{
+  const dst = btWrite("bt-rep.txt", "head\nREP-A old one\nREP-B old two\ntail");
+  btWrite("bt-rep-src.txt", "RS-A new one\nRS-B new two");
+  await btTool.execute(
+    { mode: "COPY", srcFile: "bt/bt-rep-src.txt", startMarker: "RS-A", endMarker: "RS-B", bufferName: "bt-rep" },
+    BT_CTX,
+  );
+  const res = await btTool.execute(
+    { mode: "REPLACE", dstFile: "bt/bt-rep.txt", startMarker: "REP-A", endMarker: "REP-B", bufferName: "bt-rep" },
+    BT_CTX,
+  );
+  const body = readFileSync(dst, "utf8");
+  const rPreserve = await btTool.execute({ mode: "PASTE", dstFile: "bt/bt-rep-preserve.txt", bufferName: "bt-rep" }, BT_CTX);
+  check(
+    "262",
+    "S15",
+    "REPLACE happy path: the span (REP-A..REP-B inclusive) of the existing dst is replaced by the buffer — byte-exact dst + byte-exact `REPLACED lines 2..3 (2 lines) in 'bt/bt-rep.txt' with buffer 'bt-rep' (2 lines).` + the buffer PRESERVED (the later PASTE reports its 2 lines)",
+    res === "REPLACED lines 2..3 (2 lines) in 'bt/bt-rep.txt' with buffer 'bt-rep' (2 lines)." &&
+      body === "head\nRS-A new one\nRS-B new two\ntail" &&
+      rPreserve === "Pasted 2 lines from buffer 'bt-rep' into 'bt/bt-rep-preserve.txt'.",
+    JSON.stringify({ res, body, rPreserve }),
+  );
+}
+
+// 263 — TODO #94: REPLACE (the non-unique anchor): the startMarker matches
+//      MORE THAN ONE line → the byte-exact non-unique error + the dst
+//      byte-identical (no write)
+{
+  const dst = btWrite("bt-rep-nq.txt", "head\nDUP-A line one\nDUP-B line two\ntail");
+  const before = readFileSync(dst, "utf8");
+  const res = await btTool.execute(
+    { mode: "REPLACE", dstFile: "bt/bt-rep-nq.txt", startMarker: "DUP", endMarker: "DUP-B", bufferName: "bt-rep" },
+    BT_CTX,
+  );
+  check(
+    "263",
+    "S15",
+    "REPLACE non-unique start anchor: 'DUP' matches 2 lines → byte-exact `Error: Start marker 'DUP' is not unique in bt/bt-rep-nq.txt.` + the dst byte-identical (no write)",
+    res === "Error: Start marker 'DUP' is not unique in bt/bt-rep-nq.txt." && readFileSync(dst, "utf8") === before,
+    JSON.stringify({ res, changed: readFileSync(dst, "utf8") !== before }),
   );
 }
 

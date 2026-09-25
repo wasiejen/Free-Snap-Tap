@@ -18,12 +18,13 @@ const outsideDir = path.dirname(REPO_ROOT); // parent of the repo root (outside 
 const outsideDst1 = path.join(outsideDir, "smoke_outside_paste.txt");
 const outsideDst2 = path.join(outsideDir, "smoke_outside_move.txt");
 const outsideDstRel = path.join(outsideDir, "smoke_outside_rel.txt");
+const outsideDstRep = path.join(outsideDir, "smoke_outside_replace.txt");
 const outsideAbs = "C:\\Windows\\System32\\drivers\\etc\\hosts"; // existing file OUTSIDE both allowed roots (reject fixture)
 
 const { chk, finish } = makeChecker("BT-SANDBOX-SMOKE");
 
 // ---- setup: clean slate
-for (const p of [tempFile, tempFile2, path.join(tempRoot, "bt_sandbox_tmpsub"), outsideDst1, outsideDst2, outsideDstRel]) {
+for (const p of [tempFile, tempFile2, path.join(tempRoot, "bt_sandbox_tmpsub"), outsideDst1, outsideDst2, outsideDstRel, outsideDstRep]) {
   try { fs.rmSync(p, { recursive: true, force: true }); } catch {}
 }
 fs.mkdirSync(path.join(workDir, "sub"), { recursive: true });
@@ -150,9 +151,14 @@ try {
   chk("REJECT MOVE: dst outside (no partial cut: src unchanged, dst not created)", REJ.test(r) && fs.readFileSync(tempFile, "utf-8") === moveSrcBefore && !fs.existsSync(outsideDst2));
   r = await t.execute({ mode: "DELETE", srcFile: outsideAbs, startMarker: "AAA", endMarker: "ZZZ" }, ctxRepo);
   chk("REJECT DELETE: src outside", REJ.test(r));
+  // TODO #94: REPLACE into an outside dst — the guard fires BEFORE any fs access
+  // (no read, no write, no file created); the buffer stays untouched for later use.
+  const repRoots = [REPO_ROOT, process.env.TEMP ?? process.env.TMP].filter((rr) => typeof rr === "string" && rr.length > 0);
+  r = await t.execute({ mode: "REPLACE", dstFile: outsideDstRep, startMarker: "AAA", endMarker: "ZZZ", bufferName: "rej_buf" }, ctxRepo);
+  chk("REJECT dst: REPLACE into outside (byte-exact error form, no write)", r === `Error: '${outsideDstRep}' is outside the sandbox (allowed: ${repRoots.join(", ")})` && !fs.existsSync(outsideDstRep));
   chk("reject error form: Error: '<path>' is outside the sandbox (allowed: <roots>)", /^Error: '.*' is outside the sandbox \(allowed: [^)]+\)$/.test(r));
 } finally {
-  for (const p of [workDir, tempFile, tempFile2, path.join(tempRoot, "bt_sandbox_tmpsub"), outsideDst1, outsideDst2, outsideDstRel]) {
+  for (const p of [workDir, tempFile, tempFile2, path.join(tempRoot, "bt_sandbox_tmpsub"), outsideDst1, outsideDst2, outsideDstRel, outsideDstRep]) {
     try { fs.rmSync(p, { recursive: true, force: true }); } catch {}
   }
 }
