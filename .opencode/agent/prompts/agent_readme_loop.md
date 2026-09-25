@@ -104,3 +104,27 @@ not here.
 - `.opencode/loop_log.md` was the looprunner's bookkeeping. The role is
   retired (2026-09-24) — the auto-resume plugin covers launch/relay/restart —
   and the file no longer exists.
+
+## Maintenance unit (counter-triggered, planner-run — GO 2026-09-25)
+- Trigger: every 5th iteration (iteration N of the current looprun, N % 5 ==
+  0), run at session START — after the state rebuild (git log / NAP / TODO)
+  and BEFORE task selection. Never idle-triggered (idle detection is the
+  ghost/unit-4 pathology zone) and not via the priority list (that channel
+  is for urgent items).
+- Scope (bounded, ~10 tool calls total):
+  1. `knowledge_inbox.md` → curate into the area files (shrink the inbox);
+  2. NAP archive compression check (closed sessions keep only their
+     compressed one-liner);
+  3. TODO.md curation with a RETIREMENT target: entries untouched 14 days →
+     re-verify — stale → condense into `todo_records.md` (one-liner +
+     pointer), live → status refresh;
+  4. baselines in Standing: current against the last measured gate;
+  5. stale proposals/drafts: `proposals/` root items or maintainer drafts
+     untouched 14+ days → FLAG to the maintainer (summary/NAP) — NEVER
+     auto-delete.
+- Precedence: a pending maintainer call wins — the pass defers to the next
+  trigger; if the session starts above ~70% context, defer (record in the
+  NAP).
+- Run inline by the planner (the surfaces it touches — NAP/TODO/knowledge —
+  are the planner's lane; no delegation). Close it with ONE `--INFO--` loop
+  line: what was curated, what was flagged.

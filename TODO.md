@@ -790,3 +790,10 @@ All those IDs stay reserved — see the numbering rule in the header.
   GO — a separate unit).
 - **Status:** GO (maintainer, direct session 2026-09-25) — the next
   autorun build.
+
+## #101. (open, 2026-09-25, direct session; GO 2026-09-25 — after #100) opencode host map — one-time explorer task: map the installed host internals so planner/worker LOOK UP instead of re-deriving
+- **Problem / evidence:** every task re-pays the derivation cost of opencode host facts (SDK v1/v2 shape, plugin hook surface, session/message/part DB schema, permission system, the compaction/summarize path) — knowledge is gathered per task, not accumulated as a map (maintainer observation 2026-09-25: "we derive the same knowledge often again and again").
+- **Desired outcome:** a durable, dated host map in the knowledge base of the relevant installed opencode internals (with file/line locators); upstream (web) research delegated to the explorer (cost in its context, finding → knowledge base); the planner reads installed types for VERIFICATION only.
+- **Scope (suggested):** explorer task → new `.opencode/agent/knowledge/opencode-plugins/host-map.md`: SDK surface (v1/v2 endpoints from the installed .d.ts), plugin hook registration + ordering, session/message/part DB schema, permission / external_directory mechanics, the compaction/summarize path, tool registration; every entry dated + locator.
+- **Acceptance criteria:** the map covers the areas above with locators verified against the installed build; the knowledge folder/README rules are followed; planner spot-check: one host question answered from the map alone.
+- **Status:** GO (maintainer, direct session 2026-09-25) — after #100.

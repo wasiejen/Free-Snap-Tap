@@ -187,7 +187,8 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   upstream research via the explorer (webfetch; cost in its context,
   finding → knowledge base; planner reads installed types for
   verification only); (3) scope rule: standard problems → upstream
-  first, OUR core (loop/compaction protocol) stays ours.
+  first, OUR core (loop/compaction protocol) stays ours. → FILED as
+  **TODO #101** (explorer task, GO after #100).
   (c) **Consolidation** — no ground-up rewrite now; EVIDENCE-TRIGGERED:
   a change touching 3+ plugin files on a bad boundary / repeated
   cross-plugin debugging / a feature unbuildable without restructuring.
@@ -199,8 +200,18 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   knowledge_inbox curation, NAP compression, TODO curation with a
   14-day RETIREMENT target, baselines, stale proposals/drafts
   (flag-to-maintainer, never auto-delete). + BEHAVIOR RULE (his
-  self-observation, accepted): unmarked observation → NAP ONLY, no
+  self-observation, accepted):   unmarked observation → NAP ONLY, no
   action; action needs a marker / inbox / explicit instruction.
+  **GO RECEIVED + LANDED** (this session): maintenance section appended to
+  `agent_readme_loop.md`; the observation-triage rule added to
+  `prompt_agent_planner.md` (after the Inbox cadence bullet); first trigger
+  at iteration 20 (N % 5 == 0).
+  (12) **Observation (2026-09-25, unmarked — recorded ONLY, per the new
+  observation-triage rule):** knowledge curation + a real "find anything"
+  (knowledge search/retrieval) system is an open area in HIS words. No
+  action now (no marker/inbox/instruction); it will surface via the
+  maintenance unit's knowledge-curation passes and the #101 host map; a
+  marker or inbox item makes it a task.
   (e) **Standing duties** — net-zero rule: a new standing duty is added
   only when an existing one is retired or automated.
 - **Pending live observations (maintainer / natural):** #99 fork test (his,

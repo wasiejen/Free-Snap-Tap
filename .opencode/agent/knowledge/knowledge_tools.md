@@ -232,8 +232,11 @@ instructions/protocol — facts that save lookups. Format per the README:
 - **After a compaction:** the FIRST gauge readout reflects the COMPACTING
   model's own context fill, not the compacted session's new fill
   (measured 2026-09-22: readout 57570/35% right after a compaction of a
-  144944-token session). Budget decisions must wait ~2 tool calls for the
-  settled readout.
+  144944-token session; re-confirmed 2026-09-25, ses_f27282d2: the resume
+  `ctx:` line read 62%/142769 while the settled readout was 24% — it was
+  the COMPACTING model's own gauge, per the maintainer's explanation).
+  NEVER trust the first readout after a compaction — budget decisions
+  start from the 2nd readout or later.
 - **Ref:** priority.md # 9 (2026-09-15); the same session's stop-line
    incident (real wall ≈ 90% gauge reading, see NAP Standing).
 - **Keys:** ctx_gauge, gauge, lag, context window, stop line, 90%,

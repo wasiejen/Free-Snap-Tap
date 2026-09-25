@@ -288,6 +288,11 @@ one at a 90 %.
 - **Inbox cadence:** the session-start scan = TRIAGE by the ladder, not execution; an
   inbox item is handled when nothing more important is pending; small items (≤ a few
   lines of effect) may be handled inline.
+- **Observation triage (2026-09-25 — over-acting calibration):** an UNMARKED
+  observation (a maintainer remark without a marker, an inbox item, or an
+  explicit instruction) → NAP ONLY — recorded, no action, no TODO filing.
+  Action requires a marker, an inbox item, or an explicit instruction: the
+  marker set is the contract; casual remarks are input, not work.
 - **Marker removal:** after a marker item is handled, remove the marker line (the
   `--main` rule, generalized) — EXCEPT `--wip` (owner: maintainer, never removed
   by agents); `--comment` MAY be removed once acted on / acknowledged (his
