@@ -87,11 +87,12 @@
 // VERDICT VOCABULARY (the original six, byte-identical and in order, plus
 // the two read-scope fuzzy tokens appended — addendum C6: conservative,
 // BOTH outcomes logged — plus `pair-resolved`, the R1 read-scope pair
-// mutation token, plus the two R6 edit-hint tokens appended last,
-// 2026-09-25):
+// mutation token, plus the two R6 edit-hint tokens appended, 2026-09-25,
+// plus `fuzzy-edit`, the (2) mutating edit-fuzzy token appended last,
+// 2026-09-25 — twelve total):
 //   observed-redundancy-ok | redundancy-mismatch | no-candidate | ambiguous |
 //   out-of-sandbox | path-anomaly | fuzzy-resolved | fuzzy-rejected |
-//   pair-resolved | edit-hint | edit-ambiguous
+//   pair-resolved | edit-hint | edit-ambiguous | fuzzy-edit
 // Fuzzy evidence forms (field 6):
 //   resolved: `fuzzy orig=<arg> -> <resolved-rel> d=<n> gap=<g|inf>`
 //   rejected: `fuzzy orig=<arg> cands=<p1 d1,p2 d2,p3 d3> reason=<r>`
@@ -152,6 +153,12 @@ export const WRITE_FUZZY_MAX_D = 1;
 // levenshtein <= 1); a char-far substitution is non-substitutable (the DP
 // routes around it at insert+delete cost 2 — fails closed).
 export const SEG_MAX_D = 1;
+// (2) (2026-09-25, #95 sub-item 2): the MUTATING edit-fuzzy accept bar —
+// d<=1 on the normalize-then-compare distance (the typo tolerance, the
+// #72/M1 strict bar). NO proportional bar: the CRLF/LF + trailing-ws
+// drift class is unbounded in length (a 40-line CRLF drift = 39 chars —
+// beyond any proportional cap); normalization removes it exactly.
+export const EDIT_FUZZY_MAX_D = 1;
 
 export const VERDICTS = Object.freeze([
   "observed-redundancy-ok",
@@ -165,6 +172,7 @@ export const VERDICTS = Object.freeze([
   "pair-resolved", // R1 (2026-09-16): the read-scope pair mutation verdict
   "edit-hint", // R6 (2026-09-25): the edit-hint channel (locator resolved)
   "edit-ambiguous", // R6 (2026-09-25): multiple candidate lines (exact or fuzzy)
+  "fuzzy-edit", // (2) (2026-09-25, #95): the MUTATING edit-fuzzy oldString verdict
 ]) as readonly string[];
 
 // Priority for the per-call line cap (index = rank; ties keep input order —
@@ -183,6 +191,7 @@ const VERDICT_RANK: Record<string, number> = {
   "pair-resolved": 8, // documentary (the read channel logs it separately)
   "edit-hint": 9, // documentary (the R6 hint channel logs it separately)
   "edit-ambiguous": 10, // documentary (same)
+  "fuzzy-edit": 11, // documentary (the (2) edit-fuzzy channel logs it separately)
 };
 
 // ------------------------------------------------------------------ core types
@@ -962,33 +971,47 @@ export type ContentResolution =
   | { kind: "ambiguous"; cands: Array<[number, number]> }
   | { kind: "rejected"; reason: string };
 
-export function locateContent(query: string, fileText: string, cap: number = LOCATOR_MAX_FILE_CHARS): ContentResolution {
+// The shared content-locator query prep (R6 locateContent + the (2)
+// edit-fuzzy channel, 2026-09-25 — the spec's candidate-generation reuse):
+// the dense/non-dense anchor set — multi-line → first + last; an
+// empty/wordless line contributes no anchor; all-dense → a bounded
+// whole-file scan under the cap.
+export interface ContentQuery {
+  qRaw: string;
+  qLines: string[];
+  qNorm: string[];
+  k: number; // qLines.length - 1
+  anchors: Array<{ idx: number; anchor: string }>;
+  scoreIdx: number[]; // the scored lines (anchored lines; all-dense → first+last or [0])
+}
+
+export function prepContentQuery(query: string): ContentQuery {
   const qRaw = String(query ?? "");
   const qLines = qRaw.split(/\r?\n/);
   const qNorm = qLines.map(normContent);
-  if (qNorm.every((s) => s === "")) return { kind: "rejected", reason: "empty-arg" };
   const k = qNorm.length - 1;
-  // anchor set: single line → [0]; multi-line → first + last (the spec's
-  // anchor rule); an empty/wordless line contributes no anchor
   const anchorIdx = k === 0 ? [0] : [0, k];
   const anchors: Array<{ idx: number; anchor: string }> = [];
   for (const i of anchorIdx) {
     const a = longestNonDenseRun(qLines[i]);
     if (a !== "") anchors.push({ idx: i, anchor: a });
   }
-  // scored lines: the anchored lines; all-dense → first + last (or [0])
   const scoreIdx: number[] = anchors.length > 0 ? anchors.map((a) => a.idx) : k === 0 ? [0] : [0, k];
-  const fileLines = String(fileText ?? "").slice(0, cap).split(/\r?\n/);
-  // candidate block starts (1-based)
+  return { qRaw, qLines, qNorm, k, anchors, scoreIdx };
+}
+
+// The shared candidate block starts (1-based, first in file order, capped
+// at LOCATOR_MAX_CANDIDATES).
+export function contentCandidateStarts(q: ContentQuery, fileLines: string[]): number[] {
   const candStarts: number[] = [];
-  for (let i = 1; i + k <= fileLines.length; i++) {
+  for (let i = 1; i + q.k <= fileLines.length; i++) {
     if (candStarts.length >= LOCATOR_MAX_CANDIDATES) break;
-    if (anchors.length === 0) {
+    if (q.anchors.length === 0) {
       candStarts.push(i);
       continue;
     }
     let ok = true;
-    for (const { idx, anchor } of anchors) {
+    for (const { idx, anchor } of q.anchors) {
       if (!normContent(fileLines[i + idx - 1]).includes(anchor)) {
         ok = false;
         break;
@@ -996,15 +1019,23 @@ export function locateContent(query: string, fileText: string, cap: number = LOC
     }
     if (ok) candStarts.push(i);
   }
+  return candStarts;
+}
+
+export function locateContent(query: string, fileText: string, cap: number = LOCATOR_MAX_FILE_CHARS): ContentResolution {
+  const q = prepContentQuery(query);
+  if (q.qNorm.every((s) => s === "")) return { kind: "rejected", reason: "empty-arg" };
+  const fileLines = String(fileText ?? "").slice(0, cap).split(/\r?\n/);
+  const candStarts = contentCandidateStarts(q, fileLines);
   if (candStarts.length === 0) {
-    return { kind: "rejected", reason: anchors.length === 0 ? "d-too-high" : "no-anchor-line" };
+    return { kind: "rejected", reason: q.anchors.length === 0 ? "d-too-high" : "no-anchor-line" };
   }
   // exact first: every scored query line normalized-equal
   const exactLines: number[] = [];
   for (const i of candStarts) {
     let ok = true;
-    for (const idx of scoreIdx) {
-      if (normContent(fileLines[i + idx - 1]) !== qNorm[idx]) {
+    for (const idx of q.scoreIdx) {
+      if (normContent(fileLines[i + idx - 1]) !== q.qNorm[idx]) {
         ok = false;
         break;
       }
@@ -1016,8 +1047,8 @@ export function locateContent(query: string, fileText: string, cap: number = LOC
   const scored: Array<{ line: number; d: number }> = [];
   for (const i of candStarts) {
     let d = 0;
-    for (const idx of scoreIdx) {
-      d = Math.max(d, levenshtein(qNorm[idx], normContent(fileLines[i + idx - 1])));
+    for (const idx of q.scoreIdx) {
+      d = Math.max(d, levenshtein(q.qNorm[idx], normContent(fileLines[i + idx - 1])));
     }
     scored.push({ line: i, d });
   }
@@ -1029,4 +1060,137 @@ export function locateContent(query: string, fileText: string, cap: number = LOC
     return { kind: "resolved", line: best.line, d: best.d, gap: second === Infinity ? Infinity : second - best.d };
   }
   return { kind: "ambiguous", cands: scored.slice(0, 3).map((e) => [e.line, e.d] as [number, number]) };
+}
+
+// ------------------------------------------------------------------ (2) the
+// edit-fuzzy oldString channel (2026-09-25, #95 sub-item 2 — the MUTATING
+// normalize-then-compare; decision-record §8.2)
+//
+// The oldString exact-match failure is a very regular problem, and the
+// dominant drift class (CRLF/LF + trailing-whitespace) is unbounded in
+// length (a 40-line CRLF drift = 39 chars — beyond any proportional cap);
+// normalization removes it EXACTLY, so a proportional distance bar is
+// REJECTED. d = 0 or d<=1 (EDIT_FUZZY_MAX_D — the typo tolerance, the
+// #72/M1 strict bar), on exactly-one candidate; the caller applies a
+// SINGLE mutation (no auto-retry — the §8 recovery discipline; the R6
+// journal stays the recovery fallback).
+
+const stripTrailingWs = (l: string): string => String(l ?? "").replace(/\s+$/, "");
+
+// The (2) normalization (per line): \r\n→\n (via the split) + strip
+// trailing whitespace. NO case / internal-whitespace normalization (those
+// would blur the typo signal — this removes exactly the CRLF/LF +
+// trailing-ws drift class, and nothing else).
+export function normEditBytes(s: string): string {
+  return String(s ?? "").split(/\r?\n/).map(stripTrailingWs).join("\n");
+}
+
+// The (2) resolution result (the EditResolution type — decision-record
+// §8.2, the hierarchical mutation bar):
+//   exactly-one candidate at d=0        → mutate (the exact file bytes)
+//   else exactly-one candidate at d<=1  → mutate (the typo tolerance)
+//   else                                → fail (no mutation — the caller
+//                                         fires the R6 hint verdict)
+// bestD = the MIN d over the candidates (directive a: every attempt is
+// logged with the best-candidate d); -1 when no candidate exists.
+export interface EditResolution {
+  kind: "mutate" | "fail";
+  bestD: number;
+  mutated?: string; // mutate: the exact file bytes of the candidate block
+  line?: number; // mutate: the 1-based block start
+  d?: number; // mutate: the accepted candidate d (0 | 1)
+}
+
+// The candidate block's EXACT file bytes (1-based block start): the block's
+// lines with the file's own internal line terminators; the LAST line's
+// trailing terminator is NOT included (the replacement keeps the file's
+// line structure). null when the block is empty / out of range — the
+// caller fail-closes.
+function editBlockBytes(text: string, fileLines: string[], q: ContentQuery, line: number): string | null {
+  // per-line content offsets (terminator-aware: \r\n or \n; a bare \r is
+  // NOT a terminator — matches the split(/\r?\n/) the rest of the code uses)
+  const starts: number[] = [0];
+  const ends: number[] = [];
+  let i = 0;
+  while (i < text.length) {
+    const c = text.charCodeAt(i);
+    if (c === 10) {
+      ends.push(i);
+      starts.push(i + 1);
+      i += 1;
+    } else if (c === 13 && i + 1 < text.length && text.charCodeAt(i + 1) === 10) {
+      ends.push(i);
+      starts.push(i + 2);
+      i += 2;
+    } else {
+      i += 1;
+    }
+  }
+  ends.push(text.length); // the last (unterminated) line
+  const li = line - 1; // 0-based block start
+  const last = li + q.k; // 0-based last block line
+  if (li < 0 || last >= fileLines.length) return null;
+  const bytes = text.slice(starts[li], ends[last]);
+  return bytes.length > 0 ? bytes : null;
+}
+
+// The raw (overlapping-inclusive) occurrence count of a non-empty needle.
+// Overlaps COUNT (conservative: an over-count fail-closes the mutation).
+function countOccurrences(haystack: string, needle: string): number {
+  if (needle === "") return 0;
+  let n = 0;
+  let pos = 0;
+  while (pos + needle.length <= haystack.length) {
+    const idx = haystack.indexOf(needle, pos);
+    if (idx === -1) break;
+    n += 1;
+    pos = idx + 1;
+  }
+  return n;
+}
+
+// The (2) matcher — normalize-then-compare (the spec's pinned design):
+// candidate block starts REUSE the R6 content-locator candidate generation
+// (anchors = the oldString's distinctive / longest non-dense lines;
+// multi-line anchor = first + last; all-dense → bounded whole-file scan
+// under the cap). For each candidate block, normalize BOTH sides — the
+// query's lines and the file's lines — with normEditBytes; d = the MAX
+// Levenshtein over the scored line-pairs (the same scored-line rule as
+// locateContent).
+export function resolveEditOldString(query: string, fileText: string, cap: number = LOCATOR_MAX_FILE_CHARS): EditResolution {
+  const q = prepContentQuery(query);
+  if (q.qNorm.every((s) => s === "")) return { kind: "fail", bestD: -1 };
+  const full = String(fileText ?? "");
+  const text = full.slice(0, cap);
+  const fileLines = text.split(/\r?\n/);
+  const candStarts = contentCandidateStarts(q, fileLines);
+  if (candStarts.length === 0) return { kind: "fail", bestD: -1 };
+  // normalize-then-compare: d per candidate = the MAX levenshtein over the
+  // scored line-pairs (normEditBytes both sides)
+  const qEdit = q.qLines.map(stripTrailingWs);
+  const scored: Array<{ line: number; d: number }> = [];
+  for (const i of candStarts) {
+    let d = 0;
+    for (const idx of q.scoreIdx) {
+      d = Math.max(d, levenshtein(qEdit[idx], stripTrailingWs(fileLines[i + idx - 1])));
+    }
+    scored.push({ line: i, d });
+  }
+  scored.sort((a, b) => a.d - b.d || a.line - b.line);
+  const bestD = scored[0].d;
+  // the hierarchical mutation bar (exactly-one discipline; the mutated
+  // bytes must be an exact UNIQUE substring of the FULL file — the edit
+  // tool's raw indexOf then succeeds)
+  for (const bar of [0, EDIT_FUZZY_MAX_D]) {
+    const at = scored.filter((s) => s.d <= bar);
+    if (at.length === 1) {
+      const mutated = editBlockBytes(text, fileLines, q, at[0].line);
+      if (mutated !== null && countOccurrences(full, mutated) === 1) {
+        return { kind: "mutate", mutated, line: at[0].line, d: at[0].d, bestD: at[0].d };
+      }
+      // the exact block bytes are not a unique substring — fail-closed
+      return { kind: "fail", bestD: at[0].d };
+    }
+  }
+  return { kind: "fail", bestD };
 }

@@ -91,20 +91,38 @@
 //   bufferName?}` (the string fields present). The journal is a SEPARATE
 //   file from intercept.log — journal-only calls add NO intercept line.
 //
-// (5) R6 EDIT HINT CHANNEL (2026-09-25, observation-only — `edit` only,
-//   the EFFECTIVE post-escape/pair/fuzzy args): oldString occurring
-//   EXACTLY ONCE in the target file → SILENT (the edit will succeed);
-//   >1 raw occurrences → `edit-ambiguous` line
-//   `hint lines=<n1>,<n2>,…`; 0 occurrences → the core CONTENT locator
-//   (locateContent — the anchor/candidate + d<=2 gap>=2 shape,
-//   fail-closed): exact-single → `edit-hint` `hint line=<n> d=0 gap=inf
-//   snippet=<file line>`; resolved → `edit-hint` `hint line=<n> d=<d>
-//   gap=<g|inf> snippet=<file line>`; ambiguous → `edit-ambiguous`
+// (5) THE EDIT CHANNEL (R6 2026-09-25 + the (2) MUTATING edit-fuzzy,
+//   2026-09-25, #95 sub-item 2 — `edit` only, the EFFECTIVE
+//   post-escape/pair/fuzzy args): oldString occurring EXACTLY ONCE in
+//   the target file → SILENT (no line, no mutation, no after-hook hint —
+//   the edit will succeed); >1 raw occurrences → `edit-ambiguous` line
+//   `hint lines=<n1>,<n2>,…` (the edit tool will reject; the after-hook
+//   hint is stored); 0 occurrences → the (2) MUTATING edit-fuzzy matcher
+//   (core `resolveEditOldString` — normalize-then-compare: candidate
+//   starts REUSE the R6 content-locator generation, both sides
+//   normalized per-line \r\n→\n + strip trailing ws, d = the MAX
+//   Levenshtein over the scored line-pairs): exactly-one candidate at
+//   d=0 → MUTATE `output.args.oldString` to the file's EXACT bytes for
+//   that block (an exact UNIQUE file substring) + the `fuzzy-edit` line
+//   `fuzzy-edit orig=<first ~40 chars> len=<n> d=<0|1> value=<first ~40
+//   chars of the target>` (directive b: the feedback is truncated — the
+//   FULL payload stays in the R6 journal, whose edit `old` field is the
+//   ORIGINAL pre-mutation oldString) + NO after-hook hint (the edit
+//   succeeds); else exactly-one candidate at d<=1 → the same mutation;
+//   else FAIL-CLOSED (no mutation): the R6 hint verdict fires as today —
+//   the core CONTENT locator (locateContent — the anchor/candidate +
+//   d<=2 gap>=2 shape): exact-single → `edit-hint` `hint line=<n> d=0
+//   gap=inf snippet=<file line>`; resolved → `edit-hint` `hint line=<n>
+//   d=<d> gap=<g|inf> snippet=<file line>`; ambiguous → `edit-ambiguous`
 //   `hint cands=<n1 d1,n2 d2,n3 d3>`; fail-closed → `no-candidate`
-//   `hint reason=<no-anchor-line|d-too-high|empty-arg>`. Field 7 =
-//   `edit oldString`. The two new verdicts (`edit-hint` /
-//   `edit-ambiguous`) are appended to the core VERDICTS (11 total).
-//   NEVER mutates oldString/newString; NEVER auto-retries.
+//   `hint reason=<no-anchor-line|d-too-high|empty-arg>` — the
+//   no-candidate line GAINS the best-candidate d when candidates exist
+//   (directive a: every attempt is logged with the best-candidate d) —
+//   and the after-hook hint is stored (the edit fails as today). Field 7
+//   = `edit oldString`. The three new verdicts (`edit-hint` /
+//   `edit-ambiguous` / `fuzzy-edit`) are appended to the core VERDICTS
+//   (12 total). A SINGLE mutation — NO auto-retry (the §8 recovery
+//   discipline; the R6 journal stays the recovery fallback).
 //
 // (6) R6 AFTER-HOOK ENRICHMENT (2026-09-25, LIVE-ACCEPTANCE RESTART-
 //   GATED): a hint's evidence is cached per callID (TTL 10 min, cap 100,
@@ -204,6 +222,7 @@ import {
   normPathForm,
   observeArg,
   relForm,
+  resolveEditOldString,
   resolveEscapes,
   resolveReadPath,
   resolveWritePath,
@@ -749,8 +768,11 @@ function storeHint(callID: string, text: string): void {
 // (4) the payload journal — ONE line per write / edit / block_transfer
 // call (best-effort; the house rule: never fail the tool call). The
 // effective (post-mutation) args are journaled — what the host would
-// actually act on.
-function appendJournal(tool: string, sid: string, args: Record<string, unknown>): void {
+// actually act on — EXCEPT the edit `old` field: it is the ORIGINAL,
+// pre-(2)-mutation oldString (directive b, 2026-09-25 — the recovery
+// fallback captures what the model asked for, NOT what the (2) channel
+// mutated it to).
+function appendJournal(tool: string, sid: string, args: Record<string, unknown>, editOldOriginal?: string): void {
   try {
     const a = args as Record<string, unknown>;
     const s = (k: string): string => (typeof a[k] === "string" ? (a[k] as string) : "");
@@ -761,7 +783,8 @@ function appendJournal(tool: string, sid: string, args: Record<string, unknown>)
       payload = JSON.stringify(s("content"));
     } else if (tool === "edit") {
       target = s("filePath");
-      payload = JSON.stringify({ filePath: s("filePath"), old: s("oldString"), new: s("newString") });
+      const old = editOldOriginal !== undefined ? editOldOriginal : s("oldString");
+      payload = JSON.stringify({ filePath: s("filePath"), old, new: s("newString") });
     } else { // block_transfer
       target = s("dstFile");
       const o: Record<string, string> = {};
@@ -778,11 +801,25 @@ function appendJournal(tool: string, sid: string, args: Record<string, unknown>)
   }
 }
 
-// (5) the edit hint channel (`edit` only, effective args). Runs AFTER the
+// The (2) feedback truncation (directive b, 2026-09-25): first 40 chars,
+// a `...` marker when cut — the return feedback (the log line) is a
+// context-saving identifier, NOT the full payload (the FULL payload stays
+// in the R6 journal — its edit `old` field is the ORIGINAL, pre-mutation
+// oldString).
+const truncEdit40 = (s: string): string => (s.length > 40 ? s.slice(0, 40) + "..." : s);
+
+// (5) the edit channel (`edit` only, effective args). Runs AFTER the
 // escape/pair/fuzzy channels (it sees their result). Raw occurrence count
-// of oldString in the target file: 1 → silent; >1 → edit-ambiguous with ALL
-// occurrence start lines; 0 → the core content locator (fail-closed).
-function runEditHint(output: { args?: unknown }): Observation | null {
+// of oldString in the target file: 1 → SILENT (no line, no mutation, no
+// after-hook hint); >1 → edit-ambiguous with ALL occurrence start lines
+// (unchanged from R6); 0 → the (2) MUTATING edit-fuzzy channel
+// (2026-09-25, #95 sub-item 2 — normalize-then-compare): d=0/d≤1
+// exactly-one candidate → oldString is MUTATED to the file's EXACT bytes
+// (the fuzzy-edit line; NO after-hook hint — the edit succeeds); else
+// FAIL-CLOSED → the R6 hint verdict fires as today, CARRYING the
+// best-candidate d (directive a) + the after-hook hint is stored. A
+// SINGLE mutation — no auto-retry (the §8 recovery discipline).
+function runEditFuzzy(output: { args?: unknown }): Observation | null {
   const args = output?.args;
   if (args == null || typeof args !== "object") return null;
   const a = args as { filePath?: unknown; oldString?: unknown };
@@ -794,7 +831,7 @@ function runEditHint(output: { args?: unknown }): Observation | null {
   try {
     fileText = readFileSync(abs, "utf8");
   } catch {
-    fileText = ""; // missing file — the locator fail-closes (no-candidate)
+    fileText = ""; // missing file — the matcher fail-closes (no-candidate)
   }
   const fileLines = fileText.split(/\r?\n/);
   // raw occurrence start lines (1-based, first line of each block)
@@ -815,30 +852,46 @@ function runEditHint(output: { args?: unknown }): Observation | null {
       from = idx + 1;
     }
   }
-  if (starts.length === 1) return null; // exactly one — the edit will succeed
+  if (starts.length === 1) return null; // exactly one — the edit will succeed (silent)
   if (starts.length > 1) {
     return { verdict: "edit-ambiguous", evidence: `hint lines=${starts.join(",")}`, context: "edit oldString" };
   }
-  const res = locateContent(oldString, fileText);
-  if (res.kind === "exact") {
-    if (res.lines.length === 1) {
-      const lineText = fileLines[res.lines[0] - 1] ?? "";
-      return { verdict: "edit-hint", evidence: `hint line=${res.lines[0]} d=0 gap=inf snippet=${lineText}`, context: "edit oldString" };
-    }
-    return { verdict: "edit-ambiguous", evidence: `hint lines=${res.lines.join(",")}`, context: "edit oldString" };
-  }
-  if (res.kind === "resolved") {
-    const lineText = fileLines[res.line - 1] ?? "";
+  // 0 raw occurrences → the (2) mutating channel
+  const res = resolveEditOldString(oldString, fileText);
+  if (res.kind === "mutate") {
+    (a as { oldString: string }).oldString = res.mutated!; // THE single mutation (no auto-retry)
+    const mutated = res.mutated!;
     return {
-      verdict: "edit-hint",
-      evidence: `hint line=${res.line} d=${res.d} gap=${res.gap === Infinity ? "inf" : res.gap} snippet=${lineText}`,
+      verdict: "fuzzy-edit",
+      evidence: `fuzzy-edit orig=${truncEdit40(oldString)} len=${oldString.length} d=${res.d} value=${truncEdit40(mutated)}`,
       context: "edit oldString",
     };
   }
-  if (res.kind === "ambiguous") {
-    return { verdict: "edit-ambiguous", evidence: `hint cands=${res.cands.map(([n, d]) => `${n} ${d}`).join(",")}`, context: "edit oldString" };
+  // fail-closed → the R6 hint verdict fires as today, carrying the
+  // best-candidate d (directive a: the no-candidate line gains the best-d
+  // when candidates exist); the after-hook hint is stored (the edit fails
+  // as today)
+  const lc = locateContent(oldString, fileText);
+  if (lc.kind === "exact") {
+    if (lc.lines.length === 1) {
+      const lineText = fileLines[lc.lines[0] - 1] ?? "";
+      return { verdict: "edit-hint", evidence: `hint line=${lc.lines[0]} d=0 gap=inf snippet=${lineText}`, context: "edit oldString" };
+    }
+    return { verdict: "edit-ambiguous", evidence: `hint lines=${lc.lines.join(",")}`, context: "edit oldString" };
   }
-  return { verdict: "no-candidate", evidence: `hint reason=${res.reason}`, context: "edit oldString" };
+  if (lc.kind === "resolved") {
+    const lineText = fileLines[lc.line - 1] ?? "";
+    return {
+      verdict: "edit-hint",
+      evidence: `hint line=${lc.line} d=${lc.d} gap=${lc.gap === Infinity ? "inf" : lc.gap} snippet=${lineText}`,
+      context: "edit oldString",
+    };
+  }
+  if (lc.kind === "ambiguous") {
+    return { verdict: "edit-ambiguous", evidence: `hint cands=${lc.cands.map(([n, d]) => `${n} ${d}`).join(",")}`, context: "edit oldString" };
+  }
+  const bd = res.bestD >= 0 ? ` best-d=${res.bestD}` : "";
+  return { verdict: "no-candidate", evidence: `hint reason=${lc.reason}${bd}`, context: "edit oldString" };
 }
 
 // (6) the after hook — enrich the failed edit result with the stored hint
@@ -916,16 +969,25 @@ async function onToolBefore(
       // the pair channel above is unaffected for all three tools)
       fuzzy = runFuzzyWrite(output, tool); // write-scope ONLY
     }
-    // R6 (2026-09-25): the edit hint channel (edit only — sees the
-    // effective, post-escape/pair/fuzzy args) + the payload journal
-    // (EVERY write/edit/block_transfer call — the effective args; the
-    // journal is a separate file and runs even when nothing is logged)
+    // R6 (2026-09-25) + (2) (2026-09-25, #95 sub-item 2): the edit channel
+    // (edit only — sees the effective, post-escape/pair/fuzzy args; the
+    // 0-occurrence case is now the MUTATING edit-fuzzy resolve-then-mutate
+    // channel) + the payload journal (EVERY write/edit/block_transfer call
+    // — the effective args; the journal is a separate file and runs even
+    // when nothing is logged). The journal's edit `old` = the ORIGINAL
+    // (pre-(2)-mutation) oldString — captured BEFORE the channel runs
+    // (directive b: the recovery fallback captures what the model asked
+    // for, not what the interceptor mutated to).
     let hint: Observation | null = null;
+    let editOldOriginal: string | undefined;
     if (tool === "edit") {
-      hint = runEditHint(output);
-      if (hint !== null) storeHint(str(input?.callID), hint.evidence); // (6) the after-hook source
+      editOldOriginal = str((output.args as { oldString?: unknown }).oldString);
+      hint = runEditFuzzy(output);
+      // the after-hook source: the FAIL-CLOSED hint only — a mutation
+      // (fuzzy-edit) stores NO hint (the edit succeeds, no enrichment)
+      if (hint !== null && hint.verdict !== "fuzzy-edit") storeHint(str(input?.callID), hint.evidence);
     }
-    if (writeOwned) appendJournal(tool, sid, output.args as Record<string, unknown>);
+    if (writeOwned) appendJournal(tool, sid, output.args as Record<string, unknown>, editOldOriginal);
     if (escape.length === 0 && obs.length === 0 && channel.length === 0 && fuzzy.length === 0 && hint === null) return; // nothing to log
     model = await getModel(sid);
     for (const o of escape) appendObservation(sid, model, tool, argStr, o);
