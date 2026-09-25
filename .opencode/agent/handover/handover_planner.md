@@ -152,6 +152,24 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   process/context failures, not code-quality ones of the handout's
   kind — so "mandatory" is not yet earned for the current mix. No
   ruling requested.
+  (10) **Programmer role + PS (2026-09-25, his direction):** he wants
+  the floor adapted for future new projects + a programmer role
+  (worker + programming additions), and a PS: I am too accommodating —
+  more pushback + clear answers (ACCEPTED as standing instruction).
+  Adapted draft written: `prompts/agents/prompt_programmer_additions.md`
+  (quality floor ~200 tokens incl. the new-project first-commits line +
+  the greenfield design block + verification hierarchy). My pushbacks
+  (stated in-session): (a) the roster entry (his live opencode.jsonc)
+  only at the FIRST programming-centric task / new project — no measured
+  code-quality failures in our corpus, the spec is the ceiling, the role
+  is the floor; (b) explorer/internet: local-first is right for this
+  repo — the real gap is UPSTREAM freshness (opencode SDK/host moves
+  fast) → explicit upstream-research remit + date-stamped knowledge
+  facts, not more explorer launches; (c) serial stays (controllability
+  is the design); upgrade leverage: faster/bigger PLANNER model first,
+  then worker model; parallel slots only if slot-wait is measured.
+  (d) memory/knowledge/maintenance gap = CADENCE → proposed a standing
+  maintenance unit every N iterations (his GO pending).
 - **Pending live observations (maintainer / natural):** #99 fork test (his,
   post-restart), #98 live acceptance (the next self-compact→idle cycle —
   the #98 build is live in this process), #93 live overflow (his fork
