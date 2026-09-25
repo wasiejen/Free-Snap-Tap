@@ -1,8 +1,12 @@
 # R3 spec (STAGED) — arg-scope extension beyond `read`
 
-GATE (launch blocked until ALL hold): R2 green + verified, AND R4 log data
-shows volume justifying the surface (pair/fuzzy activity on tools other than
-read — without the data this is speculative scope).
+GATE: **CLEARED 2026-09-25 by maintainer ruling** (bitdrift retired → no
+correction data → R4 mining retired as meaningless; no R4 data needed). R2
+is green + verified (live). R3 also ABSORBS the anchor-semantics drift fix
+(todo_inbox 2026-09-25, found in #94): the existing block_transfer modes
+MOVE/COPY/CUT/DELETE match `includes` + no unique-check → migrate to
+startsWith + unique (the #94 REPLACE semantics) — approved 2026-09-25
+(folded into R3 per his ruling; observable behavior change, pinned).
 Design source: `decision-record.md` §2 + research doc §2.6/§3.5.
 
 ## Scope (line numbers refreshed at launch)
