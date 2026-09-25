@@ -509,3 +509,6 @@ Wave task d: spec DoD "one commit (the two files only)" conflicts with the AGENT
 ### 2026-09-25_02-49 planner_Q3S_170K ses_f2a436b57ffe8go608Z63jwNG6
 NAP splice via inline `node -e` one-liner in bash failed on JSON/quote escaping (unterminated string) — multi-line file transforms should go through a .cjs script written to the temp dir (write tool) and executed with node, never inline heredocs/one-liners with nested quotes.
 
+### 2026-09-25_03-33 worker_Q3S_170K ses_f29d9a56bffeqeXGlv6vWUJhjj
+Git-Bash redirect gotcha: `> C:\Windows\path\file.txt` in a bash command did NOT redirect to the Windows path — it created a junk file at the repo root named `C:`+U+FE00+path-with-backslashes-stripped (backslashes mangled by MSYS). Shell redirects need unix-form paths (/c/Users/...); file-tool paths with backslashes are fine.
+
