@@ -119,6 +119,13 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   details (anchor rule, WRITE file-creation, the `last_write` name),
   handout "Verify before done" DoD; deferred: in-line fuzzy anchors,
   journal-COLLECT, #8 failed-write buffering.
+  **REV 1 (2026-09-25):** his 3 comments — (a) "prefix" now precisely
+  defined in Part A + the matching rule specced as ONE exported pure
+  function (`resolveAnchor`, easily swappable), (b) `out-of-sandbox`
+  REMOVED from the tool's taxonomy (that layer is the intercept
+  plugin's — R8 redirect before the call; the tool guard stays
+  defense-in-depth only), (c) Parts D + H confirmed (`last_write`) →
+  replies appended, file back at the proposals/ root for his decision.
 - **Pending live observations (maintainer / natural):** #99 fork test (his,
   post-restart), #98 live acceptance (the next self-compact→idle cycle —
   the #98 build is live in this process), #93 live overflow (his fork
