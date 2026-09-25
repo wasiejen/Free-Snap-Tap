@@ -682,7 +682,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   saving ruling: truncated orig in the feedback, full payload in the
   journal — #95 status).
 
-## #98. (open, 2026-09-25, planner-14; APPROVED proposal, NOT implemented — verified from files today) unit-4 resume-after-compaction: line-anchor the action regex (A) + re-arm on COMPACT (B) + prompt note (C)
+## #98. (LANDED, 2026-09-25, worker-16; Parts A+B implemented + smoke re-pinned, Part C not-applicable per the planner ruling) unit-4 resume-after-compaction: line-anchor the action regex (A) + re-arm on COMPACT (B) + prompt note (C)
 - **Problem / evidence:** `proposals/approved/2026-09-23_unit4-
   compaction-resume.md` (his `--comment` "approved A, B and C") —
   verified NOT implemented 2026-09-25: `ACTION_RE` (auto_resume.ts
@@ -710,8 +710,24 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Suggested scope:** `.opencode/plugin/auto_resume.ts` (L267, the
   tick), `.opencode/plugin/tests/auto_resume.smoke.mjs`; Part C =
   prompt text (planner, not the worker).
-- **Status:** OPEN — already approved (no new approval needed); queued
-  after #96 (same file — serial slot).
+- **Status:** LANDED (worker-16, 2026-09-25, commit 4f90218 Part A +
+  cf7e6f5 Part B) — Part A: `ACTION_RE` line-anchored (NON-capturing
+  `(?:^|\n)` — group 1 stays the action word); Part B: the 5s tick
+  tail-reads `.opencode/temp/ctx.log` for NEW `COMPACT <sid>` lines
+  (module-level `ctxLogOffset` cursor, partial-line hold-back,
+  never-throw) → for a WATCHED sid: `idlePending=true` +
+  `recoveryCount=0` BEFORE the routing loop (the silent-compaction gap
+  closed). Smoke 139/139 (133 baseline + 6 new: A1/A2/B1/B2/B3 + the
+  section re-factory chk; 17 scripted closing texts re-pinned to
+  own-line action lines — the pins' routing assertions unchanged).
+  Standard gate green: pytest 459 passed + 1 warning, ruff F=0, probe
+  291/291 (no probe pin breakage — the existing probe pins use
+  standalone `action:` lines). LIVE acceptance (the next self-compact
+  routes from the real close; a `recovery=`/`route=` line follows the
+  `COMPACT` line WITHOUT a user message in between) = PENDING live
+  observation. Part C: not-applicable (the Work State dump form was
+  removed in the 2026-09-24 rework — the planner records it in the
+  handover).
 
 ## #99. (open, 2026-09-25, planner-15; his priority.md top item 2026-09-25) compaction keep: the plugin must pass keepTokens (computed primary, budget-file fallback) — keepMessages alone does not control the retention
 - **Problem / evidence:** maintainer live measurements 2026-09-25
