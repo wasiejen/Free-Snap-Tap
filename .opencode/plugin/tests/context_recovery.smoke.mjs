@@ -29,11 +29,20 @@ const m = await loadRepo(".opencode/plugin/context_recovery.ts");
 const factory = m.default;
 if (typeof factory !== "function") throw new Error("no default factory");
 const clientCalls = { summarize: [], prompt: [] };
+// The mutable messages state for the keepTokens resolution cases (#99) —
+// the default entry has NO token info (sum 0 → none/budget path). The
+// { data: [...] } wrapper is the in-process client's RequestResult shape
+// (the dual-shape unwrap handles both).
+let rcMessages = [{ info: { modelID: "smoke-model", providerID: "smoke-provider" } }];
+let rcMessagesError = null;
 const fakeClient = {
   session: {
     summarize: (o) => { clientCalls.summarize.push(o); return Promise.resolve(true); },
     promptAsync: (o) => { clientCalls.prompt.push(o); return Promise.resolve({ ok: true }); },
-    messages: (o) => Promise.resolve([{ info: { modelID: "smoke-model", providerID: "smoke-provider" } }]),
+    messages: (o) =>
+      rcMessagesError != null
+        ? Promise.reject(rcMessagesError)
+        : Promise.resolve({ data: rcMessages }),
   },
 };
 const hooks = await factory({ directory: SANDBOX, client: fakeClient });
@@ -77,10 +86,11 @@ chk(
 // 4) flag ON + overflow + fresh budget → success: the summarize body
 //    carries the MESSAGES-RESOLVED fallback pair (no sandbox
 //    opencode.jsonc) + keep { messages: 12 } (the fail-open default — no
-//    keep key in the fixture; NO tokens key — spec 01), the directive
-//    BYTE-MATCHES the ported constant (synthetic text part), the budget
-//    carries count==1 ON DISK (model recorded), and the COMPACT line
-//    `<stamp> smoke-model COMPACT ses_smoke_ok messages=12`
+//    keep key in the fixture; NO tokens key — #99: the fake messages have
+//    no token info and the fixture has no keepTokens → the none path), the
+//    directive BYTE-MATCHES the ported constant (synthetic text part), the
+//    budget carries count==1 ON DISK (model recorded), and the COMPACT line
+//    `<stamp> smoke-model COMPACT ses_smoke_ok keep=12m tok=- none`
 {
   writeBudget({ version: 2, emergencyRecovery: true, sessions: {} });
   const before = { s: clientCalls.summarize.length, p: clientCalls.prompt.length };
@@ -110,8 +120,8 @@ chk(
     JSON.stringify(budget.sessions.ses_smoke_ok),
   );
   chk(
-    "COMPACT line `<dt> smoke-model COMPACT ses_smoke_ok messages=12`",
-    okLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_smoke_ok messages=12$`).test(okLine),
+    "COMPACT line `<dt> smoke-model COMPACT ses_smoke_ok keep=12m tok=- none`",
+    okLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_smoke_ok keep=12m tok=- none$`).test(okLine),
     JSON.stringify(okLine),
   );
 }
@@ -144,7 +154,7 @@ chk(
     "idle clears the guard (the emergency slot: count 1 == cap 1)",
     clientCalls.summarize.length === before.s + 1 && clientCalls.prompt.length === before.p + 1 &&
       budget.sessions.ses_smoke_ok?.count === 2 &&
-      emgLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_smoke_ok messages=12 emergency$`).test(emgLine),
+      emgLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_smoke_ok keep=12m tok=- none emergency$`).test(emgLine),
     JSON.stringify({ ds: clientCalls.summarize.length - before.s, count: budget.sessions.ses_smoke_ok?.count, line: emgLine }),
   );
 }
@@ -196,10 +206,10 @@ chk(
   );
 }
 
-// 10) the keep override: keepMessages 7 in the budget file (keepTokens
-//     REMOVED — spec 01: never read, never defaulted, never sent) → the
-//     summarize body keep { messages: 7 } (NO tokens key) + the COMPACT
-//     line `messages=7`
+// 10) the keep override: keepMessages 7 in the budget file → the
+//     summarize body keep { messages: 7 } (NO tokens key — #99: the fake
+//     messages have no token info and the fixture has no keepTokens → the
+//     none path) + the COMPACT line `keep=7m tok=- none`
 {
   writeBudget({ version: 2, emergencyRecovery: true, keepMessages: 7, sessions: {} });
   const before = { s: clientCalls.summarize.length, p: clientCalls.prompt.length };
@@ -211,7 +221,7 @@ chk(
     clientCalls.summarize.at(-1)?.path?.id === "ses_smoke_keep" &&
       clientCalls.summarize.at(-1)?.body?.keep?.messages === 7 && clientCalls.summarize.at(-1)?.body?.keep?.tokens === undefined &&
       budget.sessions.ses_smoke_keep?.count === 1 &&
-      keepLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_smoke_keep messages=7$`).test(keepLine),
+      keepLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_smoke_keep keep=7m tok=- none$`).test(keepLine),
     JSON.stringify({ keep: clientCalls.summarize.at(-1)?.body?.keep, line: keepLine }),
   );
 }
@@ -235,7 +245,7 @@ chk(
       clientCalls.summarize.at(-1)?.path?.id === "ses_smoke_cfg" &&
       clientCalls.summarize.at(-1)?.body?.providerID === "cfgprov" && clientCalls.summarize.at(-1)?.body?.modelID === "cfgmodel" &&
       budget.sessions.ses_smoke_cfg?.count === 1 && budget.sessions.ses_smoke_cfg?.model === "cfgmodel" &&
-      cfgLine != null && new RegExp(`^${DT} cfgmodel COMPACT ses_smoke_cfg messages=12$`).test(cfgLine),
+      cfgLine != null && new RegExp(`^${DT} cfgmodel COMPACT ses_smoke_cfg keep=12m tok=- none$`).test(cfgLine),
     JSON.stringify({ body: clientCalls.summarize.at(-1)?.body, line: cfgLine }),
   );
 }
@@ -261,6 +271,57 @@ chk(
     clientCalls.summarize.length === before.s && clientCalls.prompt.length === before.p &&
       budget.sessions.ses_smoke_nomodel == null && !ctxLines().some((l) => l.includes("COMPACT ses_smoke_nomodel")),
     JSON.stringify({ ds: clientCalls.summarize.length - before.s, dp: clientCalls.prompt.length - before.p }),
+  );
+}
+
+// 13) #99 keepTokens COMPUTED: the fake messages carry role + token info
+//     (user 1200 input + assistant 2500 output + 800 reasoning = 4500 —
+//     last 12 → all 2) → body keep { messages: 12, tokens: 4500 } + the
+//     COMPACT line `keep=12m tok=4500 computed`
+{
+  writeBudget({ version: 2, emergencyRecovery: true, sessions: {} });
+  rcMessages = [
+    { info: { role: "user", modelID: "smoke-model", providerID: "smoke-provider", tokens: { input: 1200 } } },
+    { info: { role: "assistant", modelID: "smoke-model", providerID: "smoke-provider", tokens: { input: 1, output: 2500, reasoning: 800 } } },
+  ];
+  const before = { s: clientCalls.summarize.length, p: clientCalls.prompt.length };
+  await fireError("ses_smoke_tokcomp", OVF("context length exceeded"));
+  const compLine = ctxLines().find((l) => l.includes("COMPACT ses_smoke_tokcomp"));
+  chk(
+    "keepTokens computed: body keep { messages: 12, tokens: 4500 } + line `keep=12m tok=4500 computed`",
+    clientCalls.summarize.length === before.s + 1 &&
+      clientCalls.summarize.at(-1)?.path?.id === "ses_smoke_tokcomp" &&
+      clientCalls.summarize.at(-1)?.body?.keep?.messages === 12 && clientCalls.summarize.at(-1)?.body?.keep?.tokens === 4500 &&
+      compLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_smoke_tokcomp keep=12m tok=4500 computed$`).test(compLine),
+    JSON.stringify({ keep: clientCalls.summarize.at(-1)?.body?.keep, line: compLine }),
+  );
+  // restore the default messages state for the re-run
+  rcMessages = [{ info: { modelID: "smoke-model", providerID: "smoke-provider" } }];
+}
+
+// 14) #99 keepTokens BUDGET fallback: the messages read FAILS — the model
+//     pair then comes from the sandbox opencode.jsonc (the recovery's pair
+//     resolution is the SAME read — without the config the hook would
+//     clean-fail before the keep resolution), and the fixture's keepTokens
+//     42000 wins (the computed path is dead) → body keep { messages: 12,
+//     tokens: 42000 } + the COMPACT line `keep=12m tok=42000 budget`
+{
+  const CFGP = path.join(SANDBOX, "opencode.jsonc");
+  writeBudget({ version: 2, emergencyRecovery: true, keepTokens: 42000, sessions: {} });
+  writeFileSync(CFGP, `{\n  "agent": { "compaction": { "model": "budprov/budmodel" } }\n}`, "utf8");
+  rcMessagesError = new Error("boom-rpc-rc");
+  const before = { s: clientCalls.summarize.length, p: clientCalls.prompt.length };
+  await fireError("ses_smoke_tokbud", OVF("context length exceeded"));
+  rcMessagesError = null;
+  rmSync(CFGP, { force: true });
+  const budLine = ctxLines().find((l) => l.includes("COMPACT ses_smoke_tokbud"));
+  chk(
+    "keepTokens budget: read fails → body keep.tokens 42000 + line `keep=12m tok=42000 budget` (the pair from the config)",
+    clientCalls.summarize.length === before.s + 1 &&
+      clientCalls.summarize.at(-1)?.path?.id === "ses_smoke_tokbud" &&
+      clientCalls.summarize.at(-1)?.body?.keep?.messages === 12 && clientCalls.summarize.at(-1)?.body?.keep?.tokens === 42000 &&
+      budLine != null && new RegExp(`^${DT} budmodel COMPACT ses_smoke_tokbud keep=12m tok=42000 budget$`).test(budLine),
+    JSON.stringify({ keep: clientCalls.summarize.at(-1)?.body?.keep, line: budLine }),
   );
 }
 

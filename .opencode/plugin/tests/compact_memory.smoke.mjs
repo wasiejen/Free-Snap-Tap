@@ -11,10 +11,13 @@
 //     console.error — captured, not returned.
 //   - the arg shape is FOUR keys (unit A, 2026-09-21: providerID/modelID
 //     REMOVED — the summarizer resolves from the root config's
-//     agent.compaction.model, falling back to the session model; 2026-09-24:
-//     the tokens keep knob is GONE — keepMessages is the only keep arg;
-//     item 10: the `emergency` arg — the once-per-session emergency
-//     compaction on top of the model cap).
+//     agent.compaction.model, falling back to the session model; 2026-09-25
+//     #99: keepTokens RETURNS — the dispatch-time resolution (computed
+//     primary from the last keepMessages messages' tokens, budget-file
+//     keepTokens fallback, else omitted) is sent as keep.tokens in the
+//     body + logged on the COMPACT line; keepMessages still drives the
+//     computation; item 10: the `emergency` arg — the once-per-session
+//     emergency compaction on top of the model cap).
 //   - the sandbox carries a stub dump_session.cjs so the pre-compaction dump hook (4512fe6) succeeds silently (a dump failure would append a WARNING line and break the byte-exact checks) — mirrors the probe S13 preamble.
 // Idempotent re-runs: the sandbox is a FRESH scratchpad subdir each run.
 // Run: node .opencode/plugin/tests/compact_memory.smoke.mjs (plain node, exit 0 iff green).
@@ -194,7 +197,7 @@ const withClient = async (spec = {}) => {
   const st = readStore();
   chk("budget increment-on-verified-success (count 1 after drain)", st.sessions.ses_sm_self?.count === 1, JSON.stringify(st.sessions.ses_sm_self));
   const line = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_self"));
-  chk("COMPACT line written with model field + keep args (messages only)", line != null && / COMPACT ses_sm_self messages=7$/.test(line) && line.includes("Qwen3.8-27B-IQ4KT-120K"), JSON.stringify(line));
+  chk("COMPACT line written with model field + keep args (#99: resolved keepTokens + source — none here)", line != null && / COMPACT ses_sm_self keep=7m tok=- none$/.test(line) && line.includes("Qwen3.8-27B-IQ4KT-120K"), JSON.stringify(line));
   const dumpFile = path.join(SANDBOX, ".opencode", "archive", "sessions", "compaction_dumps", "ses_sm_self_c0.md");
   chk("dump hook fired on the tool path: compaction_dumps/ses_sm_self_c0.md exists (the stub dump, no WARNING appended)", existsSync(dumpFile), dumpFile);
   const DT = "\\d{4}-\\d{2}-\\d{2}_\\d{2}-\\d{2}";
@@ -313,8 +316,8 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
   const res = await exec({ keepMessages: 1, sessionID: "ses_sm_cross" });
   await drain();
   const st = readStore();
-  chk("cross model read: last entry, IQ3 cap 1, one increment",
-    rec.messages.length === 1 && rec.messages[0].path.id === "ses_sm_cross" &&
+  chk("cross model read: last entry, IQ3 cap 1, one increment (#99: TWO messages reads — the model pair + the keepTokens resolution)",
+    rec.messages.length === 2 && rec.messages[0].path.id === "ses_sm_cross" &&
     st.sessions.ses_sm_cross?.model === "Qwen3.8-27B-IQ3KT-210K" && st.sessions.ses_sm_cross?.count === 1 && /dispatched/i.test(res) && !/compacted/i.test(res),
     JSON.stringify(st.sessions.ses_sm_cross));
 }
@@ -327,8 +330,8 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
   const res = await exec({ keepMessages: 1, sessionID: "ses_sm_crosswrap" });
   await drain();
   const st = readStore();
-  chk("cross model read ({ data } wrapper): same resolution — model + providerID, empty note, IQ3 cap 1, one increment",
-    rec.messages.length === 1 && rec.messages[0].path.id === "ses_sm_crosswrap" &&
+  chk("cross model read ({ data } wrapper): same resolution — model + providerID, empty note, IQ3 cap 1, one increment (#99: TWO messages reads)",
+    rec.messages.length === 2 && rec.messages[0].path.id === "ses_sm_crosswrap" &&
     st.sessions.ses_sm_crosswrap?.model === "Qwen3.8-27B-IQ3KT-210K" && st.sessions.ses_sm_crosswrap?.count === 1 &&
     /dispatched/i.test(res) && !/compacted/i.test(res) && !/model read/i.test(res),
     JSON.stringify(st.sessions.ses_sm_crosswrap));
@@ -429,14 +432,14 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
     r3.slice(0, 220));
   const r3e = await exec({ keepMessages: 2, sessionID: "ses_sm_emg", emergency: true });
   await drain();
-  const lineEmg = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_emg messages=2 emergency"));
-  const lineNorm = readLog().trim().split("\n").filter((l) => l.includes("COMPACT ses_sm_emg messages=2") && !l.includes(" emergency"));
+  const lineEmg = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_emg keep=2m tok=- none emergency"));
+  const lineNorm = readLog().trim().split("\n").filter((l) => l.includes("COMPACT ses_sm_emg keep=2m tok=- none") && !l.includes(" emergency"));
   chk("emg: call 3 emergency:true dispatched (count 3 == cap+1), the COMPACT line carries ` emergency`",
     /dispatched/i.test(r3e) && readStore().sessions.ses_sm_emg?.count === 3 && lineEmg != null &&
-      /COMPACT ses_sm_emg messages=2 emergency$/.test(lineEmg),
+      /COMPACT ses_sm_emg keep=2m tok=- none emergency$/.test(lineEmg),
     JSON.stringify({ r3e: String(r3e).slice(0, 80), lineEmg }));
-  chk("emg: the normal COMPACT lines carry NO ` emergency` suffix (exactly 2, messages=2)",
-    lineNorm.length === 2 && lineNorm.every((l) => /COMPACT ses_sm_emg messages=2$/.test(l)),
+  chk("emg: the normal COMPACT lines carry NO ` emergency` suffix (exactly 2, keep=2m tok=- none)",
+    lineNorm.length === 2 && lineNorm.every((l) => /COMPACT ses_sm_emg keep=2m tok=- none$/.test(l)),
     JSON.stringify(lineNorm));
   const r4 = await exec({ keepMessages: 2, sessionID: "ses_sm_emg", emergency: true });
   await drain();
@@ -481,7 +484,7 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
   await drain();
   const rD = await execD({ keepMessages: 1, sessionID: "ses_sm_emgdf", emergency: true });
   await drain();
-  const lineD = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_emgdf messages=1 emergency"));
+  const lineD = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_emgdf keep=1m tok=- none emergency"));
   chk("emg-default: emergency_budget key ABSENT → fail-open default 1 (the emergency is consumed, count → cap+1)",
     /dispatched/i.test(rD) && readStore().sessions.ses_sm_emgdf?.count === 3 && lineD != null,
     JSON.stringify({ rD: String(rD).slice(0, 80), lineD }));
@@ -504,14 +507,14 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
   await exec({ sessionID: "ses_sm_keepcfg" });
   await drain();
   const line = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_keepcfg"));
-  chk("config keep: COMPACT line reports the configured messages=9 when the arg is omitted",
-    line != null && /COMPACT ses_sm_keepcfg messages=9$/.test(line),
+  chk("config keep: COMPACT line reports the configured keep=9m when the arg is omitted (#99: tok=- none — the seed store has no keepTokens)",
+    line != null && /COMPACT ses_sm_keepcfg keep=9m tok=- none$/.test(line),
     JSON.stringify(line));
   await exec({ keepMessages: 2, sessionID: "ses_sm_keepargs" });
   await drain();
   const line2 = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_keepargs"));
-  chk("config keep: explicit keep arg still wins over the file config",
-    line2 != null && /COMPACT ses_sm_keepargs messages=2$/.test(line2),
+  chk("config keep: explicit keep arg still wins over the file config (#99: keep=2m tok=- none)",
+    line2 != null && /COMPACT ses_sm_keepargs keep=2m tok=- none$/.test(line2),
     JSON.stringify(line2));
   const st2 = readStore();
   delete st2.keepMessages;
@@ -568,6 +571,91 @@ const CFG_PATH = path.join(SANDBOX, "opencode.jsonc");
   chk("dump spawn: stdio 'pipe' (stderr capture for the DUMP-FAIL detail)",
     spawnIdx >= 0 && /stdio:\s*"pipe"/.test(spawn),
     spawn);
+}
+
+// ---- #99 (2026-09-25): the dispatch-time keepTokens resolution — the
+// token size of the last keepMessages messages is the PRIMARY (sent as
+// keep.tokens in the body + logged on the COMPACT line), the budget file's
+// keepTokens is the FALLBACK when the read fails or the sum is 0, else
+// NONE (keep.tokens omitted — the host config default applies). The seed
+// store has no keepTokens — any seeded key is RESTORED after the case.
+{
+  // COMPUTED: the wrapper-shape { data: [...] } fake with role + tokens
+  // info — the last 2 of 3: (assistant 2000 out + 500 reasoning) +
+  // (assistant 3000 out + 700 reasoning) = 6200
+  const { rec, exec } = await withClient({
+    summarize: true,
+    messages: { data: [
+      { info: { role: "user", modelID: "m", providerID: "llama-swap", tokens: { input: 1000 } } },
+      { info: { role: "assistant", modelID: "m", providerID: "llama-swap", tokens: { input: 1, output: 2000, reasoning: 500 } } },
+      { info: { role: "assistant", modelID: "m", providerID: "llama-swap", tokens: { input: 2, output: 3000, reasoning: 700 } } },
+    ] },
+  });
+  await exec({ keepMessages: 2, sessionID: "ses_sm_toks" });
+  await drain();
+  chk("keepTokens computed: body keep.tokens = the exact sum of the last 2 messages' tokens (user → input; assistant → output + reasoning)",
+    rec.summarize.length === 1 && rec.summarize[0].body.keep.tokens === 6200 && rec.summarize[0].body.keep.messages === 2,
+    JSON.stringify(rec.summarize[0]));
+  const lineToks = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_toks"));
+  chk("keepTokens computed: COMPACT line `keep=2m tok=6200 computed`",
+    lineToks != null && /COMPACT ses_sm_toks keep=2m tok=6200 computed$/.test(lineToks),
+    JSON.stringify(lineToks));
+}
+{
+  // BUDGET FALLBACK: the messages read FAILS — the budget file's keepTokens
+  // wins (SELF exec: the model pair comes from extra.model, so the failed
+  // read only kills the computed path)
+  const st = readStore();
+  st.keepTokens = 30000;
+  writeFileSync(storePath, JSON.stringify(st, null, 2) + "\n");
+  const { rec, exec } = await withClient({ summarize: true, messagesError: new Error("boom-rpc-keep") });
+  await exec({ keepMessages: 4 });
+  await drain();
+  chk("keepTokens budget: read fails → body keep.tokens = the budget file's keepTokens",
+    rec.summarize.length === 1 && rec.summarize[0].body.keep.tokens === 30000 && rec.summarize[0].body.keep.messages === 4,
+    JSON.stringify(rec.summarize[0]));
+  const selfLines = readLog().trim().split("\n").filter((l) => l.includes("COMPACT ses_sm_self"));
+  const lastSelf = selfLines.length > 0 ? selfLines[selfLines.length - 1] : null;
+  chk("keepTokens budget: COMPACT line `keep=4m tok=30000 budget`",
+    lastSelf != null && /COMPACT ses_sm_self keep=4m tok=30000 budget$/.test(lastSelf),
+    JSON.stringify(lastSelf));
+  const st2 = readStore();
+  delete st2.keepTokens;
+  writeFileSync(storePath, JSON.stringify(st2, null, 2) + "\n");
+}
+{
+  // COMPUTED SUM 0 → BUDGET: messages present but WITHOUT token info — the
+  // sum is 0, so the budget file's keepTokens wins
+  const st = readStore();
+  st.keepTokens = 12345;
+  writeFileSync(storePath, JSON.stringify(st, null, 2) + "\n");
+  const { rec, exec } = await withClient({ summarize: true, messages: [{ info: { role: "user", modelID: "m", providerID: "llama-swap" } }] });
+  await exec({ keepMessages: 3, sessionID: "ses_sm_tokzero" });
+  await drain();
+  chk("keepTokens sum-0: body keep.tokens = the budget file's keepTokens (the computed sum was 0)",
+    rec.summarize.length === 1 && rec.summarize[0].body.keep.tokens === 12345,
+    JSON.stringify(rec.summarize[0]));
+  const lineZero = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_tokzero"));
+  chk("keepTokens sum-0: COMPACT line `tok=12345 budget`",
+    lineZero != null && /COMPACT ses_sm_tokzero keep=3m tok=12345 budget$/.test(lineZero),
+    JSON.stringify(lineZero));
+  const st2 = readStore();
+  delete st2.keepTokens;
+  writeFileSync(storePath, JSON.stringify(st2, null, 2) + "\n");
+}
+{
+  // NONE: no messages on the client, no keepTokens in the seed store —
+  // keep.tokens is OMITTED (the host config default applies)
+  const { rec, exec } = await withClient({ summarize: true });
+  await exec({ keepMessages: 5, sessionID: "ses_sm_toknone" });
+  await drain();
+  chk("keepTokens none: body keep.tokens omitted (the host config default applies)",
+    rec.summarize.length === 1 && rec.summarize[0].body.keep.tokens == null && rec.summarize[0].body.keep.messages === 5,
+    JSON.stringify(rec.summarize[0]));
+  const lineNone = readLog().trim().split("\n").find((l) => l.includes("COMPACT ses_sm_toknone"));
+  chk("keepTokens none: COMPACT line `keep=5m tok=- none`",
+    lineNone != null && /COMPACT ses_sm_toknone keep=5m tok=- none$/.test(lineNone),
+    JSON.stringify(lineNone));
 }
 
 finish();

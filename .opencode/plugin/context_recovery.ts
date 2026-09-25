@@ -14,15 +14,19 @@
 //   2. compacts via the v1-generation client call `session.summarize`
 //      (session.compact is undefined on this host) with the
 //      config-resolved summarizer pair (the root opencode.jsonc
-//      agent.compaction.model "provider/model", falling back to the
-//      session's own model read via session.messages) + keep
-//      { messages } (keepMessages from the budget file — keepTokens was
-//      REMOVED, spec 01: never read, never defaulted, never sent),
+ //      agent.compaction.model "provider/model", falling back to the
+ //      session's own model read via session.messages) + keep
+ //      { messages, tokens? } (keepMessages from the budget file + the
+ //      dispatch-time keepTokens resolution (#99, 2026-09-25 — a local
+ //      duplicate of the tool's): the token size of the last keepMessages
+ //      messages is the primary, the budget file's keepTokens the
+ //      fallback when the read fails or the sum is 0, else omitted),
 //   3. on VERIFIED success only: increments the shared v2 budget store
 //      (re-read-then-write, NO await between the read and the write) and
-//      appends the COMPACT line to .opencode/temp/ctx.log (the current
-//      tool's writer shape: `<stamp>[ <model>] COMPACT <sid>
-//      messages=<m>[ emergency]` — messages-only, no tokens= field),
+ //      appends the COMPACT line to .opencode/temp/ctx.log (the current
+ //      tool's writer shape (#99, 2026-09-25): `<stamp>[ <model>] COMPACT
+ //      <sid> keep=<m>m tok=<t> <source>[ emergency]` — the resolved
+ //      keepTokens + its source: computed / budget / none (tok=-)),
 //   4. injects the post-compaction directive as a synthetic text part via
 //      promptAsync — the directive IS the retry vehicle (a lost directive
 //      degrades to a plain retry — evidence only, never a throw).
@@ -106,10 +110,12 @@ function budgetPath(root: string): string {
 //
 // Top-level keys of <root>/.opencode/temp/compact_budget.json (all
 // optional):
-//   emergencyRecovery: strictly `true`   (default false — OFF)
-//   keepMessages: number >= 0            (default 12 — keepTokens was
-//                                         REMOVED, spec 01: never read,
-//                                         never defaulted, never sent)
+ //   emergencyRecovery: strictly `true`   (default false — OFF)
+ //   keepMessages: number >= 0            (default 12)
+ //   keepTokens: number >= 0              (default undefined — the
+ //                                         FALLBACK value for the
+ //                                         dispatch-time keepTokens
+ //                                         resolution (#99, 2026-09-25))
 //   emergency_budget: number >= 0        (default 1 — the once-per-
 //                                         session emergency compaction on
 //                                         top of the model cap)
@@ -124,6 +130,7 @@ const DEFAULT_MODEL_BUDGET = 1;
 type RecoveryConfig = {
   enabled: boolean;
   keepMessages: number;
+  keepTokens: number | undefined;
   emergency_budget: number;
   model_budget: Record<string, number>;
 };
@@ -132,6 +139,7 @@ function readRecoveryConfig(root: string): RecoveryConfig {
   const cfg: RecoveryConfig = {
     enabled: false,
     keepMessages: DEFAULT_KEEP_MESSAGES,
+    keepTokens: undefined,
     emergency_budget: DEFAULT_EMERGENCY_BUDGET,
     model_budget: {},
   };
@@ -142,6 +150,10 @@ function readRecoveryConfig(root: string): RecoveryConfig {
     if (parsed != null && typeof parsed === "object") {
       if (parsed.emergencyRecovery === true) cfg.enabled = true;
       if (typeof parsed.keepMessages === "number" && Number.isFinite(parsed.keepMessages) && parsed.keepMessages >= 0) cfg.keepMessages = parsed.keepMessages;
+      // keepTokens: the FALLBACK value (#99) — absent / non-finite /
+      // negative → undefined (never a default — the none path omits
+      // keep.tokens)
+      if (typeof parsed.keepTokens === "number" && Number.isFinite(parsed.keepTokens) && parsed.keepTokens >= 0) cfg.keepTokens = parsed.keepTokens;
       if (typeof parsed.emergency_budget === "number" && Number.isFinite(parsed.emergency_budget) && parsed.emergency_budget >= 0) cfg.emergency_budget = parsed.emergency_budget;
       const mb = parsed.model_budget;
       if (mb != null && typeof mb === "object" && !Array.isArray(mb)) {
@@ -228,32 +240,86 @@ function resolveCap(cfg: RecoveryConfig, modelName: string): { cap: number; labe
   return { cap: def, label: "model_budget default" };
 }
 
+// ------------------------------------------------------------------ the keepTokens resolution (#99, 2026-09-25)
+//
+// A LOCAL DUPLICATE of compact_memory.ts's exported computeKeepTokens (the
+// self-contained-by-design constraint — no runtime import; the tool's file
+// is the source of truth, keep them in step): the token size of the LAST
+// `keepMessages` messages (fewer → all of them; keepMessages <= 0 → no sum)
+// with the DUAL SHAPE unwrap (the bare array, or the in-process client's
+// RequestResult wrapper { data: [...] } — anything else → no sum).
+// Per-message size: role "user" → info.tokens.input, role "assistant" →
+// info.tokens.output + info.tokens.reasoning, other roles → 0 (non-finite /
+// negative / absent token values count 0 — fail-open). sum > 0 → computed;
+// else the budget file's keepTokens (finite, > 0) → budget; else none (the
+// host config default applies — keep.tokens is omitted from the body).
+function computeKeepTokens(
+  raw: unknown,
+  keepMessages: number,
+  budgetTokens: number | undefined,
+): { tokens: number | undefined; source: "computed" | "budget" | "none" } {
+  const msgs = Array.isArray(raw)
+    ? raw
+    : raw != null && typeof raw === "object" && Array.isArray(raw.data)
+      ? raw.data
+      : null;
+  let sum = 0;
+  if (msgs != null && keepMessages > 0) {
+    const last = msgs.slice(Math.max(0, msgs.length - keepMessages));
+    for (const entry of last) {
+      const info = entry?.info;
+      if (info == null) continue;
+      const tokens = info.tokens;
+      const role = typeof info.role === "string" ? info.role : "";
+      // fail-open numeric guard: non-finite / negative / absent → 0
+      const take = (n: unknown): number => (typeof n === "number" && Number.isFinite(n) && n > 0 ? n : 0);
+      if (role === "user") sum += take(tokens?.input);
+      else if (role === "assistant") sum += take(tokens?.output) + take(tokens?.reasoning);
+    }
+  }
+  if (sum > 0) return { tokens: sum, source: "computed" };
+  if (typeof budgetTokens === "number" && Number.isFinite(budgetTokens) && budgetTokens > 0) {
+    return { tokens: budgetTokens, source: "budget" };
+  }
+  return { tokens: undefined, source: "none" };
+}
+
 // ------------------------------------------------------------------ the COMPACT line
 //
 // Appends the plugin's own COMPACT line to .opencode/temp/ctx.log after a
 // successful recovery compaction (in-process file append, never throws).
-// Shape = the current tool's writer (compact_memory.ts appendCompactLine):
-// `<stamp>[ <model>] COMPACT <sid> messages=<m>[ emergency]` —
-// messages-only (no tokens= field since spec 01) + the optional
-// ` emergency` suffix (the once-per-session emergency compaction was
-// consumed). The model field is POPULATED from the RESOLVED model id
-// (the event hook carries no hook context — no pre-readout field,
-// omitted).
+// Shape = the current tool's writer (compact_memory.ts appendCompactLine,
+// #99, 2026-09-25): `<stamp>[ <model>] COMPACT <sid> keep=<m>m tok=<t>
+// <source>[ emergency]` — the resolved keepTokens + its source
+// (computed / budget / none — tok=-) + the optional ` emergency` suffix
+// (the once-per-session emergency compaction was consumed). The model
+// field is POPULATED from the RESOLVED model id (the event hook carries
+// no hook context — no pre-readout field, omitted).
 function localStamp(): string {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`;
 }
 
-function appendCompactLine(root: string, sessionID: string, model: string, messages: number, emergency: boolean): void {
+function appendCompactLine(
+  root: string,
+  sessionID: string,
+  model: string,
+  messages: number,
+  resolved: { tokens: number | undefined; source: "computed" | "budget" | "none" },
+  emergency: boolean,
+): void {
   try {
     const dir = tempDir(root);
     mkdirSync(dir, { recursive: true });
     const p = path.join(dir, "ctx.log");
     const modelField = typeof model === "string" ? model : "";
+    const tok = resolved?.tokens != null ? String(resolved.tokens) : "-";
+    const source =
+      resolved?.source === "computed" || resolved?.source === "budget" ? resolved.source : "none";
     const line =
       `${localStamp()}${modelField !== "" ? ` ${modelField}` : ""} ` +
-      `COMPACT ${sessionID} messages=${messages}` +
+      `COMPACT ${sessionID} keep=${messages}m tok=${tok} ${source}` +
       (emergency ? " emergency" : "");
     appendFileSync(p, line + "\n", "utf8");
   } catch {
@@ -395,8 +461,9 @@ async function resolveSessionModel(client: any, sessionID: string): { model: str
 // The live client is v1-generation: `session.summarize` (session.compact
 // is undefined on this host). The body ALWAYS carries providerID +
 // modelID (REQUIRED by the server payload schema — an unresolvable pair
-// is refused BEFORE any call, by the hook); the keep fields (messages
-// only — spec 01) go in the body WHEN GIVEN; on a 404/missing-key/
+ // is refused BEFORE any call, by the hook); the keep fields (messages
+ // + the resolved tokens — #99) go in the body WHEN GIVEN; on a
+ // 404/missing-key/
 // unexpected-field rejection the call is retried ONCE without the keep
 // fields. A resolved promise is NOT success: success is the handler's
 // boolean true (this host's client does NOT throw on a 404 — it resolves
@@ -478,13 +545,13 @@ async function callSummarize(
   client: RecoveryClient,
   sessionID: string,
   ref: { providerID: string; modelID: string },
-  keepMessages: number,
+  keep: { messages: number; tokens?: number },
 ): Promise<{ note: string; error: string }> {
   const base: Record<string, unknown> = {};
   if (ref.providerID !== "") base.providerID = ref.providerID;
   if (ref.modelID !== "") base.modelID = ref.modelID;
   const attempt = (withKeep: boolean): Promise<any> =>
-    client.session.summarize({ path: { id: sessionID }, body: withKeep ? { ...base, keep: { messages: keepMessages } } : base });
+    client.session.summarize({ path: { id: sessionID }, body: withKeep ? { ...base, keep } : base });
   const NOTE = "keep not accepted by this build (retried without the keep fields)";
   try {
     let error = compactionFailure(await attempt(true));
@@ -607,9 +674,22 @@ export default (async (input: PluginInput) => {
       } else {
         return;
       }
-      // The keep: keepMessages ONLY (spec 01: keepTokens never read,
-      // never defaulted, never sent).
-      const keepMessages = cfg.keepMessages;
+      // #99 (2026-09-25): the dispatch-time keepTokens resolution (a local
+      // duplicate of the tool's): the token size of the last keepMessages
+      // messages is the PRIMARY; the budget file's keepTokens is the
+      // FALLBACK when the read fails or the sum is 0; else NONE (keep.
+      // tokens omitted — the host config default applies). Never throws.
+      let rawMsgs: unknown = null;
+      if (typeof client.session.messages === "function") {
+        try {
+          rawMsgs = await client.session.messages({ path: { id: sessionID } });
+        } catch {
+          rawMsgs = null; // RPC failure → the budget/none path (fail-open)
+        }
+      }
+      const resolved = computeKeepTokens(rawMsgs, cfg.keepMessages, cfg.keepTokens);
+      const keep: { messages: number; tokens?: number } = { messages: cfg.keepMessages };
+      if (resolved.tokens != null) keep.tokens = resolved.tokens;
       // The compaction call — AWAITED (unlike the tool's fire-and-forget
       // execute: the event hook is a server-side listener — NO turn
       // awaits it, and the overflowing turn is already ABORTED (the
@@ -617,14 +697,14 @@ export default (async (input: PluginInput) => {
       // form here). Verified success only: increment + COMPACT line +
       // directive (a failed compact consumes NO budget and changes
       // nothing — the session error propagates).
-      const { note, error } = await callSummarize(client, sessionID, { providerID, modelID: model }, keepMessages);
+      const { note, error } = await callSummarize(client, sessionID, { providerID, modelID: model }, keep);
       if (error !== "") {
         console.error("Emergency compaction failed:", error);
         return;
       }
       if (note !== "") console.log(`context_recovery (${sessionID}): ${note}`);
       recordSuccess(root, sessionID, model);
-      appendCompactLine(root, sessionID, model, keepMessages, isEmergency);
+      appendCompactLine(root, sessionID, model, keep.messages, resolved, isEmergency);
       // The directive — the retry vehicle (a lost directive degrades to
       // a plain retry — evidence only, never a throw).
       try {
