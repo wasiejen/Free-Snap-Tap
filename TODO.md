@@ -632,10 +632,17 @@ All those IDs stay reserved — see the numbering rule in the header.
   the allowed-path resolution from opencode.jsonc
   `permission.external_directory` + `references`),
   `.opencode/plugin/probes/handover_probe.mjs`, the tests.
-- **Status:** OPEN — queued per the #95 order (after the edit-fuzzy (2)
-  + R3); the return-info/feedback half is specced with it (his context-
-  saving ruling: truncated orig in the feedback, full payload in the
-  journal — #95 status).
+- **Status:** LANDED (worker-17, 2026-09-25 — commits `07bdd56` (Unit 1
+  R8 redirect) + `0d9b8e6` (Unit 2 escape return-info) + `6684991`
+  (handover); planner-17 spot-verified: intercept smoke re-run 67/67
+  green, probe 303/303, pytest 459 passed + 1 warning, ruff F=0 per the
+  handover). The return-info/feedback half landed as Unit 2 (his
+  context-saving ruling honored: truncated first form in the feedback,
+  full pre-mutation payload in the journal `pre-escape` field).
+  Sign-offs (handover §deliberately-not-done): S28 probe section
+  placement, `pair-resolved` verdict reuse (the 12-token vocabulary is
+  pinned), the redirect note text, the 13b hint token — all accepted by
+  planner-17.
 
 ## #98. (LANDED, 2026-09-25, worker-16; Parts A+B implemented + smoke re-pinned, Part C not-applicable per the planner ruling) unit-4 resume-after-compaction: line-anchor the action regex (A) + re-arm on COMPACT (B) + prompt note (C)
 - **Problem / evidence:** `proposals/approved/2026-09-23_unit4-

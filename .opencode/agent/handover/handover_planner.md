@@ -38,18 +38,21 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   `message.part.delta` lines appended after the trim (last delta line
   24391 < trim line 24434; the new build's ~2.7k lines are delta-free) —
   acceptance met; TODO one-liner + full text in todo_records.md.
-- **#97 spec committed + worker launched:** `worker_Q3S_170K`
-  (session `ses_f271155b4ffeIWwbQEekkRQRA6` — it self-compacted at the
-  planning stage (Work State summary, no code yet, full plan in its
-  summary) → RESUMED via task_id (post-compaction protocol). Unit 1 =
-  the R8 out-of-sandbox 1:1 redirect (typed path fields of
-  read/write/edit/block_transfer; allowed roots from opencode.jsonc
-  `permission.external_directory` + `references` + workspace; sibling/
-  exact-root mapping; fail-closed otherwise; `kind=redirect` line) +
-  Unit 2 = the escape return-info (the after-hook feedback note on
-  `kind=escape` mutations, truncated first form, full payload in the
-  journal). Baseline at spec time: probe 291/291, smokes all green,
-  pytest 459+1w, ruff F=0.
+- **#97 LANDED + verified (this session):** `worker_Q3S_170K` (session
+  `ses_f271155b4ffeIWwbQEekkRQRA6`) — Unit 1 `07bdd56` (R8 redirect: core
+  resolver + plugin wiring + smoke 12a–12i + probe S28) + Unit 2 `0d9b8e6`
+  (escape return-info: after-hook feedback note + journal `pre-escape`
+  field + smoke 13a–13d) + final handover `6684991`; planner-17
+  spot-verified: intercept smoke re-run 67/67, handover numbers (probe
+  303/303, pytest 459+1w, ruff F=0); TODO #97 → LANDED; the 4 sign-off
+  decisions (S28 label, `pair-resolved` verdict reuse, the note text, the
+  13b hint token) accepted. **Worker context-limit saga:** self-compact
+  #1 (Work State at the planning stage) → resume ran + committed Unit 1,
+  then STOPPED SILENTLY at the wall (empty Task result, no compaction
+  triggered — maintainer-confirmed involuntary) → my 2nd resume
+  hard-rejected (`request 170869 > 170240`) → the auto-resume emergency
+  compaction + my CROSS compaction #3 (both keep=18; the COMPACT line
+  verified in ctx.log) → resume SUCCESS (units green, DONE line written).
 - **Pending live observations (maintainer / natural):** #99 fork test (his,
   post-restart), #98 live acceptance (the next self-compact→idle cycle —
   the #98 build is live in this process), #93 live overflow (his fork
@@ -152,10 +155,11 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 ## Standing
 - Baselines (re-verified 2026-09-25 by the planner, post-#99):
-  probe **291** [two-ninety-one]; smokes **all green**
+  probe **303** [three-oh-three]; smokes **all green**
    (context_recovery 17/17, compact_memory 74/74, auto_resume 139/139
    (post-#98),
-  intercept_observer 55/55, block_transfer 30/30 + 53/53, submit 20/20;
+  intercept_observer 67/67 (post-#97), block_transfer 30/30 + 53/53,
+  submit 20/20;
   the per-suite counts are in each smoke's own readout — no total kept
   here); pytest **459 passed + 1 warning (the known #10 coroutine
   warning)**; ruff **F=0**.
