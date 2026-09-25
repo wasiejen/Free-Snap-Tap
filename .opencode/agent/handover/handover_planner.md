@@ -137,6 +137,21 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   My recommendation: DISTILL ~8-10 lines into the worker prompt, full
   file stays reference; alternatives (reference-only / mandatory for a
   task class) offered. Awaiting his ruling (advisory only — his file).
+  (9) **2nd round (2026-09-25):** he shared another AI's reply on my
+  verdict (`maintainer/draft/programming_guidelines/feedback.md` — NOT
+  his ruling, advisory comparison only). My take: good reply — its
+  "existing code is not a normative spec" rebuttal is fair (my
+  default-based argument can't cover greenfield), and its "New
+  component design" block (interface/ownership/boundary-failure/
+  test-plan as spec add-on artifacts) is the best new mechanism. I
+  converged on the distill (his ~190-token floor ≈ my rules 5/6/7 +
+  checklist) and would accept it for the worker prompt as cheap
+  insurance for the future FST-product/greenfield task mix; my
+  tempering: applying its OWN failure-mode test to our measured corpus
+  (friction log + TODO + worker history) shows our failures are
+  process/context failures, not code-quality ones of the handout's
+  kind — so "mandatory" is not yet earned for the current mix. No
+  ruling requested.
 - **Pending live observations (maintainer / natural):** #99 fork test (his,
   post-restart), #98 live acceptance (the next self-compact→idle cycle —
   the #98 build is live in this process), #93 live overflow (his fork
