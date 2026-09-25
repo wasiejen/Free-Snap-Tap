@@ -681,6 +681,42 @@
 //          style, the numeric ms field);
 //      (256) tool integration: the sandbox opencode.jsonc config model →
 //          the summarize body carries the config pair (3-key args).
+//   S26 R6 edit hint channel + payload journal (20) — 2026-09-25 (TODO #95
+//      sub-item 1; design source: research/fuzzy-numword/decision-record.md
+//      §8): the CONTENT locator primitive (core — anchor/candidate +
+//      d<=2 gap>=2 over file lines, fail-closed), the payload journal
+//      (journal_write.log / journal_edit.log — a separate file, never an
+//      intercept line), the edit hint channel (edit-hint / edit-ambiguous /
+//      no-candidate), the after-hook enrichment:
+//      (257-258) the locator: single-line exact; multi-line exact (anchor =
+//          first + last line);
+//      (259-260) the locator fuzzy bar: d=1 (gap inf); d=2 (gap 4);
+//      (261) the locator ambiguous (two candidates, gap 0 < 2);
+//      (262-264) the locator fail-closed: no-anchor-line / d-too-high /
+//          empty-arg;
+//      (265) the all-dense query: present dense line → exact; absent →
+//          rejected d-too-high;
+//      (266) the file-size cap: within → found; beyond → rejected;
+//      (267) journal write: one line (JSON payload round-trips) + zero
+//          intercept lines;
+//      (268) journal edit: one line ({filePath, old, new}) + the exact-1
+//          hint is silent;
+//      (269) journal block_transfer: one line in journal_edit.log (the tool
+//          field disambiguates; the anchors payload);
+//      (270) the journal paths are git-ignored (check-ignore, both files);
+//      (271) hint d=1: absent oldString, single candidate → edit-hint
+//          (byte-exact line+d+gap+snippet evidence);
+//      (272) hint multiple exact: two occurrences → edit-ambiguous
+//          'hint lines=1,3';
+//      (273) hint no candidate: anchor absent → no-candidate
+//          'hint reason=no-anchor-line';
+//      (274) hint fuzzy ambiguous: two candidates, same d → edit-ambiguous
+//          'hint cands=1 1,2 1';
+//      (275) after-hook enrichment: the failed edit's output.output gains
+//          the hint line (consumed once; hint-less / non-edit untouched);
+//      (276) DoD machine check: the failed edit's hint line + journal
+//          payload; the write payload cp'd in place reproduces the intended
+//          file state.
 //   S5 hygiene (6): every sandbox plugin.log line is JSON.parse-able; <=2000
 //      chars with an ISO ts + a string kind; exact kind tallies (warn==2,
 //      tool.before==6, tool.after==24, chatmsg==8, gauge==3, event==0,
@@ -693,7 +729,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=11 S12=4 S13=19 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 hygiene=6  →  "PROBE handover: 259/259 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=11 S12=4 S13=19 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 S26=20 hygiene=6  →  "PROBE handover: 279/279 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -4100,11 +4136,11 @@ n18++;
   check(
     String(n18),
     "S18",
-    "export fix: plugin module = default factory ONLY (every Object.values entry a function); named core in the core module (VERDICTS = 6 + 2 fuzzy + pair-resolved)",
+    "export fix: plugin module = default factory ONLY (every Object.values entry a function); named core in the core module (VERDICTS = 6 + 2 fuzzy + pair-resolved + the two R6 edit-hint tokens)",
     ioVals.length === 1 && ioVals.every((v) => typeof v === "function") &&
       typeof ioMod.default === "function" &&
       typeof ioCore.resolveReadPath === "function" && typeof ioCore.buildCorpus === "function" &&
-      typeof ioCore.observeArg === "function" && Array.isArray(ioCore.VERDICTS) && ioCore.VERDICTS.length === 9,
+      typeof ioCore.observeArg === "function" && Array.isArray(ioCore.VERDICTS) && ioCore.VERDICTS.length === 11,
     JSON.stringify({ pluginKeys: Object.keys(ioMod), verdicts: ioCore.VERDICTS.length }),
   );
   n18++;
@@ -4737,14 +4773,16 @@ let n20 = 195;
   const nL9 = ioReadLines().length;
   await ioBefore({ tool: "edit", sessionID: "ses_fx_io2", callID: "c203" }, { args: c2 });
   const c2Lines = ioReadLines();
-  const c2f = c2Lines[c2Lines.length - 1].split(" | ");
+  const c2f = c2Lines[c2Lines.length - 2].split(" | ");
+  const c2h = c2Lines[c2Lines.length - 1].split(" | ");
   check(
     String(n20),
     "S20",
-    "content-scope guard (edit): pair in oldString → log line ONLY, args byte-identical",
-    JSON.stringify(c2) === c2Before && c2Lines.length === nL9 + 1 &&
-      c2f[7] === "observed-redundancy-ok" && c2f[5] === "pair=[2:two] canon=2 dist=0",
-    JSON.stringify({ argsAfter: JSON.stringify(c2), n: c2Lines.length - nL9, f: c2f }),
+    "content-scope guard (edit): pair in oldString → log line ONLY, args byte-identical (+ the R6 hint line LAST — oldString absent from the file → fail-closed no-candidate)",
+    JSON.stringify(c2) === c2Before && c2Lines.length === nL9 + 2 &&
+      c2f[7] === "observed-redundancy-ok" && c2f[5] === "pair=[2:two] canon=2 dist=0" &&
+      c2h[7] === "no-candidate" && c2h[5] === "hint reason=no-anchor-line" && c2h[6] === "edit oldString",
+    JSON.stringify({ argsAfter: JSON.stringify(c2), n: c2Lines.length - nL9, f: c2f, h: c2h }),
   );
   n20++;
 }
@@ -5444,18 +5482,20 @@ let n24 = 239;
   const nL2 = ioReadLines().length;
   await ioBefore({ tool: "edit", sessionID: "ses_fx_io2", callID: "c241" }, { args: a2 });
   const a2Lines = ioReadLines();
-  const a2fa = a2Lines[a2Lines.length - 3].split(" | ");
-  const a2fb = a2Lines[a2Lines.length - 2].split(" | ");
-  const a2fc = a2Lines[a2Lines.length - 1].split(" | ");
+  const a2fa = a2Lines[a2Lines.length - 4].split(" | ");
+  const a2fb = a2Lines[a2Lines.length - 3].split(" | ");
+  const a2fc = a2Lines[a2Lines.length - 2].split(" | ");
+  const a2fd = a2Lines[a2Lines.length - 1].split(" | ");
   check(
     String(++n24),
     "S24",
-    "edit oldString+newString numword-form escape → both resolved (2 kind=escape lines) + the numword observation on the original arg",
-    a2.oldString === "n 425" && a2.newString === "m 524" && a2Lines.length === nL2 + 3 &&
+    "edit oldString+newString numword-form escape → both resolved (2 kind=escape lines) + the numword observation on the original arg + the R6 hint line LAST (oldString absent → fail-closed no-candidate)",
+    a2.oldString === "n 425" && a2.newString === "m 524" && a2Lines.length === nL2 + 4 &&
       a2fa[7] === "pair-resolved" && a2fa[5] === "kind=escape scope=content orig=[405:four-two-five:esc] value=425 hits=1" &&
       a2fb[7] === "pair-resolved" && a2fb[5] === "kind=escape scope=content orig=[405:five-two-four:esc] value=524 hits=1" &&
-      a2fc[7] === "no-candidate" && a2fc[5] === "numword four-two-five→425 five-two-four→524",
-    JSON.stringify({ o: a2.oldString, w: a2.newString, n: a2Lines.length - nL2, fc: a2fc }),
+      a2fc[7] === "no-candidate" && a2fc[5] === "numword four-two-five→425 five-two-four→524" &&
+      a2fd[7] === "no-candidate" && a2fd[5] === "hint reason=no-anchor-line" && a2fd[6] === "edit oldString",
+    JSON.stringify({ o: a2.oldString, w: a2.newString, n: a2Lines.length - nL2, fd: a2fd }),
   );
 }
 
@@ -5536,18 +5576,20 @@ let n24 = 239;
   const nL6 = ioReadLines().length;
   await ioBefore({ tool: "edit", sessionID: "ses_fx_io2", callID: "c245" }, { args: f1 });
   const f1Lines = ioReadLines();
-  const f1fa = f1Lines[f1Lines.length - 3].split(" | ");
-  const f1fb = f1Lines[f1Lines.length - 2].split(" | ");
-  const f1fc = f1Lines[f1Lines.length - 1].split(" | ");
+  const f1fa = f1Lines[f1Lines.length - 4].split(" | ");
+  const f1fb = f1Lines[f1Lines.length - 3].split(" | ");
+  const f1fc = f1Lines[f1Lines.length - 2].split(" | ");
+  const f1fd = f1Lines[f1Lines.length - 1].split(" | ");
   check(
     String(++n24),
     "S24",
-    "case variants ESC/Escape/escape → all resolved (one field, 3 kind=escape lines, hits=3 per field)",
-    f1.oldString === "a 320 b 320 c 320 d" && f1Lines.length === nL6 + 3 &&
+    "case variants ESC/Escape/escape → all resolved (one field, 3 kind=escape lines, hits=3 per field) + the R6 hint line LAST (oldString absent → fail-closed no-candidate)",
+    f1.oldString === "a 320 b 320 c 320 d" && f1Lines.length === nL6 + 4 &&
       f1fa[7] === "pair-resolved" && f1fa[5] === "kind=escape scope=content orig=[316:3-2-0:ESC] value=320 hits=3" &&
       f1fb[7] === "pair-resolved" && f1fb[5] === "kind=escape scope=content orig=[317:3-2-0:Escape] value=320 hits=3" &&
-      f1fc[7] === "pair-resolved" && f1fc[5] === "kind=escape scope=content orig=[318:3-2-0:escape] value=320 hits=3",
-    JSON.stringify({ o: f1.oldString, n: f1Lines.length - nL6, fa: f1fa, fb: f1fb, fc: f1fc }),
+      f1fc[7] === "pair-resolved" && f1fc[5] === "kind=escape scope=content orig=[318:3-2-0:escape] value=320 hits=3" &&
+      f1fd[7] === "no-candidate" && f1fd[5] === "hint reason=no-anchor-line" && f1fd[6] === "edit oldString",
+    JSON.stringify({ o: f1.oldString, n: f1Lines.length - nL6, fd: f1fd }),
   );
 }
 
@@ -5649,6 +5691,394 @@ let n24 = 239;
       rec.summarize[0]?.body?.modelID === "Gemma4-12B-Q4KXL-MTP-128K" && /dispatched/i.test(res),
     JSON.stringify({ body: rec.summarize[0]?.body, res: String(res).slice(0, 120) }),
   );
+}
+
+// ------------------------------------------------------------------ S26 R6 edit hint channel + payload journal (20) — 2026-09-25 (TODO #95 sub-item 1; design source: research/fuzzy-numword/decision-record.md §8 + spec_R6_edit_hint_journal.md)
+//
+// The R6 observation-only unit: (a) the CONTENT locator primitive
+// (ioCore.locateContent — the anchor/candidate + d<=2 gap>=2 shape over FILE
+// LINES, fail-closed — the unifying primitive for the edit hints, the R3
+// section-anchor resolver, and the block_transfer section recovery); (b)
+// the PAYLOAD JOURNAL (every write/edit/block_transfer call appends one line
+// to journal_write.log / journal_edit.log — a SEPARATE file, never an
+// intercept line); (c) the EDIT HINT channel (edit only: exact-1 silent, >1
+// ambiguous with ALL lines, 0 → the locator — edit-hint / edit-ambiguous /
+// no-candidate verdicts); (d) the AFTER-HOOK enrichment (the hint is cached
+// per callID and appended to the failed result's output.output — consumed
+// once; live acceptance is restart-gated).
+
+const ioAfter = ioHooks["tool.execute.after"];
+const ioHintDir = path.join(ioSandboxProj, "hfx");
+mkdirSync(ioHintDir, { recursive: true });
+const ioJWriteLog = path.join(ioSandboxProj, ".opencode", "temp", "journal_write.log");
+const ioJEditLog = path.join(ioSandboxProj, ".opencode", "temp", "journal_edit.log");
+const ioJRead = (p) => (existsSync(p) ? readFileSync(p, "utf8").split(/\r?\n/).filter((l) => l.length > 0) : []);
+const ioJPayload = (line) => line.split(" | ").slice(4).join(" | ");
+const ioHintFiles = {
+  hb: path.join(ioHintDir, "hb.txt"), // single-candidate d=1 fixture
+  hc: path.join(ioHintDir, "hc.txt"), // two identical candidates (ambiguous)
+  hd: path.join(ioHintDir, "hd.txt"), // two raw occurrences (multiple-exact)
+  he: path.join(ioHintDir, "he.txt"), // no-anchor fixture
+};
+writeFileSync(ioHintFiles.hb, "alpha 20260915 beta\nomega 20260916 psi\n", "utf8");
+writeFileSync(ioHintFiles.hc, "alpha 20260915 beta\nalpha 20260915 beta\n", "utf8");
+writeFileSync(ioHintFiles.hd, "alpha 20260915 beta\ngamma 20260915 delta\nalpha 20260915 beta\n", "utf8");
+writeFileSync(ioHintFiles.he, "zzz qqq www\n", "utf8");
+let n26 = 257;
+let ioJwBefore = -1;
+let ioJeBeforeE = -1;
+
+// 257 — locateContent: single-line exact → {kind:exact, lines:[N]}
+{
+  const r = ioCore.locateContent("four five six", "one two three\nfour five six\n");
+  check(
+    String(n26),
+    "S26",
+    "locateContent: single-line exact → {kind:exact, lines:[2]}",
+    JSON.stringify(r) === '{"kind":"exact","lines":[2]}',
+    JSON.stringify(r),
+  );
+  n26++;
+}
+
+// 258 — locateContent: multi-line query (anchor = first + last line) → the
+//      EXACT block start
+{
+  const r = ioCore.locateContent("aaa 111 bbb\nccc 222 ddd", "aaa 111 bbb\nccc 222 ddd\neee 333 fff\n");
+  check(
+    String(n26),
+    "S26",
+    "locateContent: multi-line exact → the block start {kind:exact, lines:[1]}",
+    JSON.stringify(r) === '{"kind":"exact","lines":[1]}',
+    JSON.stringify(r),
+  );
+  n26++;
+}
+
+// 259 — locateContent fuzzy: d=1, single candidate → resolved (gap infinite)
+{
+  const r = ioCore.locateContent("alpha 20260915 betaa", "alpha 20260915 beta\n");
+  check(
+    String(n26),
+    "S26",
+    "locateContent fuzzy d=1 (single candidate) → {kind:resolved, line:1, d:1, gap:Infinity}",
+    r.kind === "resolved" && r.line === 1 && r.d === 1 && r.gap === Infinity,
+    JSON.stringify(r),
+  );
+  n26++;
+}
+
+// 260 — locateContent fuzzy bar: d=2 accepted when the gap to the second-
+//      best >= 2 (d 2 vs 3… measured gap 4)
+{
+  const r = ioCore.locateContent("alpha 20260915 bex", "alpha 20260915 beta\nalpha 20260915 qqqqqq\n");
+  check(
+    String(n26),
+    "S26",
+    "locateContent fuzzy d=2 (gap >= 2) → {kind:resolved, line:1, d:2, gap:4}",
+    r.kind === "resolved" && r.line === 1 && r.d === 2 && r.gap === 4,
+    JSON.stringify(r),
+  );
+  n26++;
+}
+
+// 261 — locateContent ambiguous: two candidates at the same d (gap 0 < 2)
+//      → top-3 [line, d]
+{
+  const r = ioCore.locateContent("alpha 20260915 betx", "alpha 20260915 beta\nalpha 20260915 beta\n");
+  check(
+    String(n26),
+    "S26",
+    "locateContent ambiguous (gap 0 < 2) → {kind:ambiguous, cands:[[1,1],[2,1]]}",
+    r.kind === "ambiguous" && JSON.stringify(r.cands) === "[[1,1],[2,1]]",
+    JSON.stringify(r),
+  );
+  n26++;
+}
+
+// 262 — locateContent fail-closed: the anchor is in no file line
+{
+  const r = ioCore.locateContent("alpha 20260915 beta", "zzz qqq www\n");
+  check(
+    String(n26),
+    "S26",
+    "locateContent fail-closed: anchor absent → {kind:rejected, reason:no-anchor-line}",
+    r.kind === "rejected" && r.reason === "no-anchor-line",
+    JSON.stringify(r),
+  );
+  n26++;
+}
+
+// 263 — locateContent fail-closed: candidates exist but the best d > 2
+{
+  const r = ioCore.locateContent("alpha 20260915 zzzz", "alpha 20260915 beta\n");
+  check(
+    String(n26),
+    "S26",
+    "locateContent fail-closed: best d > 2 → {kind:rejected, reason:d-too-high}",
+    r.kind === "rejected" && r.reason === "d-too-high",
+    JSON.stringify(r),
+  );
+  n26++;
+}
+
+// 264 — locateContent fail-closed: empty / whitespace-only query
+{
+  const r1 = ioCore.locateContent("", "x\n");
+  const r2 = ioCore.locateContent("   \n  ", "x\n");
+  check(
+    String(n26),
+    "S26",
+    "locateContent fail-closed: empty / whitespace-only query → {kind:rejected, reason:empty-arg}",
+    r1.kind === "rejected" && r1.reason === "empty-arg" && r2.kind === "rejected" && r2.reason === "empty-arg",
+    JSON.stringify([r1, r2]),
+  );
+  n26++;
+}
+
+// 265 — locateContent all-dense query (no word span → bounded whole-file
+//      scan): an exact dense line → {exact}; absent → rejected d-too-high
+{
+  const r1 = ioCore.locateContent("20260915 12345678", "20260915 12345678\nother\n");
+  const r2 = ioCore.locateContent("20260915 99999999", "20260915 12345678\nother\n");
+  check(
+    String(n26),
+    "S26",
+    "locateContent all-dense: present dense line → {kind:exact, lines:[1]}; absent → rejected d-too-high",
+    r1.kind === "exact" && JSON.stringify(r1.lines) === "[1]" && r2.kind === "rejected" && r2.reason === "d-too-high",
+    JSON.stringify([r1, r2]),
+  );
+  n26++;
+}
+
+// 266 — locateContent file-size cap (LOCATOR_MAX_FILE_CHARS): the target
+//      within the cap → found; beyond the cap → rejected (a truncated scan
+//      can only MISS a candidate, never invent one)
+{
+  const big = "alpha 20260915 beta\n" + "x".repeat(262144 + 500);
+  const big2 = "x".repeat(262144 + 500) + "\nalpha 20260915 beta";
+  const r1 = ioCore.locateContent("alpha 20260915 beta", big);
+  const r2 = ioCore.locateContent("alpha 20260915 beta", big2);
+  check(
+    String(n26),
+    "S26",
+    "locateContent cap: within the 256 KiB cap → {kind:exact, lines:[1]}; beyond → rejected no-anchor-line",
+    r1.kind === "exact" && JSON.stringify(r1.lines) === "[1]" && r2.kind === "rejected" && r2.reason === "no-anchor-line",
+    JSON.stringify([r1, r2]),
+  );
+  n26++;
+}
+
+// 267 — journal WRITE: ONE line in journal_write.log (5 logical fields —
+//      stamp|session|tool|target|payload; the JSON payload is
+//      self-delimiting and may contain " | " + newlines) + ZERO intercept
+//      lines (the journal is a separate file)
+{
+  const w1 = { filePath: ioHintDir + "\\jw.txt", content: "part A | part B\npart C" };
+  const nL1 = ioReadLines().length;
+  ioJwBefore = ioJRead(ioJWriteLog).length;
+  await ioBefore({ tool: "write", sessionID: "ses_fx_io3", callID: "c267" }, { args: w1 });
+  const j1 = ioJRead(ioJWriteLog);
+  const f1 = j1[ioJwBefore].split(" | ");
+  check(
+    String(n26),
+    "S26",
+    "journal write: ONE new line in journal_write.log (JSON payload round-trips, may contain ' | ' + newline) + ZERO intercept lines",
+    j1.length === ioJwBefore + 1 && ioStampRe.test(f1[0]) && f1[1] === "ses_fx_io3" && f1[2] === "write" &&
+      f1[3] === ioHintDir + "\\jw.txt" && JSON.parse(ioJPayload(j1[ioJwBefore])) === w1.content &&
+      ioReadLines().length === nL1,
+    JSON.stringify({ j1: f1, n: ioReadLines().length - nL1 }),
+  );
+  n26++;
+}
+
+// 268 — journal EDIT: ONE line in journal_edit.log (target = filePath;
+//      payload = JSON {filePath, old, new} — the effective args) + the
+//      EXACT-1 hint is silent (zero intercept lines)
+{
+  const e1 = { filePath: ioHintFiles.hb, oldString: "alpha 20260915 beta", newString: "z" };
+  const nL2 = ioReadLines().length;
+  const jeBefore = ioJRead(ioJEditLog).length;
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io3", callID: "c268" }, { args: e1 });
+  const j2 = ioJRead(ioJEditLog);
+  const jeLine = j2[jeBefore];
+  const f2 = jeLine.split(" | ");
+  const lNew2 = ioReadLines().slice(nL2);
+  check(
+    String(n26),
+    "S26",
+    "journal edit: ONE new line in journal_edit.log (payload {filePath, old, new}) + exact-1 hint SILENT (no 'edit oldString' line)",
+    j2.length === jeBefore + 1 && f2[1] === "ses_fx_io3" && f2[2] === "edit" && f2[3] === ioHintFiles.hb &&
+      ioJPayload(jeLine) === JSON.stringify({ filePath: ioHintFiles.hb, old: "alpha 20260915 beta", new: "z" }) &&
+      !lNew2.some((l) => l.split(" | ")[6] === "edit oldString"),
+    JSON.stringify({ jeLine: f2, n: lNew2.length }),
+  );
+  n26++;
+}
+
+// 269 — journal BLOCK_TRANSFER: ONE line in journal_edit.log (the shared
+//      edit-class file — the spec names two files for three tools; the tool
+//      field disambiguates); target = dstFile; payload = the anchor fields +
+//      ZERO intercept lines (both paths exist → the fuzzy channel fast-paths)
+{
+  const a1 = path.join(ioHintDir, "a.txt");
+  const b1 = path.join(ioHintDir, "b.txt");
+  writeFileSync(a1, "x", "utf8");
+  writeFileSync(b1, "x", "utf8");
+  const bt1 = { srcFile: a1, dstFile: b1, mode: "MOVE", startMarker: "## S", endMarker: "## E", targetMarker: "## T" };
+  const nL3 = ioReadLines().length;
+  const jbBefore = ioJRead(ioJEditLog).length;
+  await ioBefore({ tool: "block_transfer", sessionID: "ses_fx_io3", callID: "c269" }, { args: bt1 });
+  const j3 = ioJRead(ioJEditLog);
+  const jbLine = j3[jbBefore];
+  const f3 = jbLine.split(" | ");
+  check(
+    String(n26),
+    "S26",
+    "journal block_transfer: ONE new line in journal_edit.log (target = dstFile; payload = the anchor fields) + ZERO intercept lines",
+    j3.length === jbBefore + 1 && f3[1] === "ses_fx_io3" && f3[2] === "block_transfer" && f3[3] === b1 &&
+      ioJPayload(jbLine) === JSON.stringify({ srcFile: a1, dstFile: b1, mode: "MOVE", startMarker: "## S", endMarker: "## E", targetMarker: "## T" }) &&
+      ioReadLines().length === nL3,
+    JSON.stringify({ jbLine: f3, n: ioReadLines().length - nL3 }),
+  );
+  n26++;
+}
+
+// 270 — the journal paths are git-ignored (the `temp` entry covers both
+//      files; check-ignore tests the rule, not the file)
+{
+  let ok1 = true, ok2 = true;
+  try { execFileSync("git", ["check-ignore", "-q", ".opencode/temp/journal_write.log"], { cwd: REPO_ROOT }); } catch { ok1 = false; }
+  try { execFileSync("git", ["check-ignore", "-q", ".opencode/temp/journal_edit.log"], { cwd: REPO_ROOT }); } catch { ok2 = false; }
+  check(
+    String(n26),
+    "S26",
+    "the journal paths are git-ignored (git check-ignore -q, both files)",
+    ok1 && ok2,
+    `write=${ok1} edit=${ok2}`,
+  );
+  n26++;
+}
+
+// 271 — hint d=1: oldString ABSENT (raw), a single fuzzy candidate →
+//      edit-hint (8 fields; byte-exact evidence: line + d + gap + snippet;
+//      context `edit oldString`)
+{
+  const h1 = { filePath: ioHintFiles.hb, oldString: "alpha 20260915 betaa", newString: "z" };
+  ioJeBeforeE = ioJRead(ioJEditLog).length;
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io3", callID: "c271" }, { args: h1 });
+  const l4 = ioReadLines();
+  const f4 = l4[l4.length - 1].split(" | ");
+  check(
+    String(n26),
+    "S26",
+    "hint d=1: absent oldString, single candidate → edit-hint LAST line (byte-exact; context 'edit oldString') — the dense date also fires an observation line",
+    f4.length === 8 && f4[3] === "edit" && f4[7] === "edit-hint" &&
+      f4[5] === "hint line=1 d=1 gap=inf snippet=alpha 20260915 beta" && f4[6] === "edit oldString",
+    JSON.stringify(f4),
+  );
+  n26++;
+}
+
+// 272 — hint multiple exact: two raw occurrences → edit-ambiguous with ALL
+//      occurrence start lines
+{
+  const h2 = { filePath: ioHintFiles.hd, oldString: "alpha 20260915 beta", newString: "z" };
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io3", callID: "c272" }, { args: h2 });
+  const l5 = ioReadLines();
+  const f5 = l5[l5.length - 1].split(" | ");
+  check(
+    String(n26),
+    "S26",
+    "hint multiple exact: two occurrences → edit-ambiguous LAST line 'hint lines=1,3'",
+    f5.length === 8 && f5[7] === "edit-ambiguous" &&
+      f5[5] === "hint lines=1,3" && f5[6] === "edit oldString",
+    JSON.stringify(f5),
+  );
+  n26++;
+}
+
+// 273 — hint no candidate: the anchor is in no file line → fail-closed
+//      no-candidate
+{
+  const h3 = { filePath: ioHintFiles.he, oldString: "alpha 20260915 beta", newString: "z" };
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io3", callID: "c273" }, { args: h3 });
+  const l6 = ioReadLines();
+  const f6 = l6[l6.length - 1].split(" | ");
+  check(
+    String(n26),
+    "S26",
+    "hint no candidate: anchor absent → no-candidate LAST line 'hint reason=no-anchor-line' (fail-closed)",
+    f6.length === 8 && f6[7] === "no-candidate" &&
+      f6[5] === "hint reason=no-anchor-line" && f6[6] === "edit oldString",
+    JSON.stringify(f6),
+  );
+  n26++;
+}
+
+// 274 — hint fuzzy ambiguous: two candidates at the same d (gap 0 < 2) →
+//      edit-ambiguous with the top-3 [line, d]
+{
+  const h4 = { filePath: ioHintFiles.hc, oldString: "alpha 20260915 betx", newString: "z" };
+  await ioBefore({ tool: "edit", sessionID: "ses_fx_io3", callID: "c274" }, { args: h4 });
+  const l7 = ioReadLines();
+  const f7 = l7[l7.length - 1].split(" | ");
+  check(
+    String(n26),
+    "S26",
+    "hint fuzzy ambiguous: two candidates, same d → edit-ambiguous LAST line 'hint cands=1 1,2 1'",
+    f7.length === 8 && f7[7] === "edit-ambiguous" &&
+      f7[5] === "hint cands=1 1,2 1" && f7[6] === "edit oldString",
+    JSON.stringify(f7),
+  );
+  n26++;
+}
+
+// 275 — the AFTER-HOOK enrichment (live acceptance restart-gated): the
+//      failed edit's output.output gains the hint line — consumed once
+//      (a second call is a no-op); a hint-less edit and a non-edit call are
+//      untouched
+{
+  const outR = { title: "edit", output: "Error: oldString not found", metadata: {} };
+  await ioAfter({ tool: "edit", sessionID: "ses_fx_io3", callID: "c271" }, outR);
+  const enriched = outR.output;
+  await ioAfter({ tool: "edit", sessionID: "ses_fx_io3", callID: "c271" }, outR); // consumed once
+  const outS = { title: "edit", output: "ok", metadata: {} };
+  await ioAfter({ tool: "edit", sessionID: "ses_fx_io3", callID: "c268" }, outS); // exact-1 silent → nothing cached
+  const outN = { title: "bash", output: "ls", metadata: {} };
+  await ioAfter({ tool: "bash", sessionID: "ses_fx_io3", callID: "c267" }, outN); // not an edit → no-op
+  check(
+    String(n26),
+    "S26",
+    "after-hook enrichment: the failed edit's output.output gains the hint line (consumed once; a hint-less edit + a non-edit call are untouched)",
+    enriched === "Error: oldString not found\nhint line=1 d=1 gap=inf snippet=alpha 20260915 beta" &&
+      outR.output === enriched && outS.output === "ok" && outN.output === "ls",
+    JSON.stringify({ e: outR.output, s: outS.output, n: outN.output }),
+  );
+  n26++;
+}
+
+// 276 — the DoD machine check: the controlled FAILED EDIT (271) produced the
+//      hint line AND a journal line whose payload names the exact intended
+//      edit; the journal WRITE payload (267) cp'd in place reproduces the
+//      intended file state (byte-identical)
+{
+  const doDLine = ioJRead(ioJEditLog)[ioJeBeforeE];
+  const doDJ = doDLine ? JSON.parse(ioJPayload(doDLine)) : null;
+  const jwPayload = JSON.parse(ioJPayload(ioJRead(ioJWriteLog)[ioJwBefore]));
+  const wTarget = ioHintDir + "\\jw.txt";
+  writeFileSync(wTarget, jwPayload, "utf8");
+  const cpBack = readFileSync(wTarget, "utf8");
+  check(
+    String(n26),
+    "S26",
+    "DoD machine check: the failed edit's hint line + journal payload {filePath, old, new} name the exact intended edit; the write journal payload cp'd in place reproduces the intended file state (byte-identical)",
+    doDJ !== null && doDJ.filePath === ioHintFiles.hb && doDJ.old === "alpha 20260915 betaa" && doDJ.new === "z" &&
+      ioReadLines().some((l) => l.endsWith("edit oldString | edit-hint") && l.includes("hint line=1 d=1 gap=inf snippet=")) &&
+      cpBack === "part A | part B\npart C",
+    JSON.stringify({ doDJ, cpBack }),
+  );
+  n26++;
 }
 
 // ------------------------------------------------------------------ S5 hygiene (6)

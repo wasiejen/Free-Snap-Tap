@@ -406,5 +406,31 @@ Decisions + reasoning from the exchange:
   observation-only throughout (journal + hints, no mutation, no auto-retry)
   → **gates on R1 green, NOT R2**. R2 (write-scope mutation) unchanged.
   After-hook result-enrichment (hint inside the error text) = spec-time
-  type check against the installed host bundle; log-only is the fallback
-  (the after-hook result surface is UNVERIFIED as of this writing).
+   type check against the installed host bundle; log-only is the fallback
+   (the after-hook result surface is UNVERIFIED as of this writing).
+
+### 8.1 LANDED addendum (2026-09-25, planner-14)
+R6 is IMPLEMENTED + verified (planner-verified from file evidence; the worker's
+close-out died silently — the state was committed from the working tree).
+- **Content locator** (`intercept_observer_core.ts`: `locateContent`):
+  anchor/candidate + d<=2 gap>=2 over FILE LINES, fail-closed (exact-then-
+  fuzzy; all-dense → bounded whole-file fuzzy under a 256 KiB cap). The
+  unifying primitive for (a) R6 edit hints, (b) R3 section-anchor resolver,
+  (c) block_transfer section recovery. Probe 257-266.
+- **Payload journal**: `journal_write.log` (write = full content) /
+  `journal_edit.log` (edit = `{filePath, old, new}`; block_transfer =
+  src/dst+anchors — the shared edit-class file, the tool field disambiguates).
+  Git-ignored. Probe 267-270.
+- **Edit hint channel** (before hook, edit only): exact-1 silent; absent →
+  `edit-hint` / `edit-ambiguous` / `no-candidate` (8-field line, context
+  `edit oldString`). A dense date / numword in `oldString` ALSO fires an
+  observation line (context != `edit oldString`) — the hint is the LAST line.
+  Probe 271-274.
+- **After-hook enrichment**: the failed edit's `output.output` gains the hint
+  line, consumed once. Live acceptance restart-gated. Probe 275.
+- **DoD machine check** (probe 276): a controlled failed edit produces the
+  hint line + a journal payload naming the exact intended edit; the write
+  payload `cp`'d in place reproduces the intended file state byte-identical.
+- **Gates (measured 2026-09-25):** probe 279/279 (baseline 259 + S26's 20);
+  intercept_observer smoke 48/48; pytest 459 + 1w; ruff F=0.
+- The §4 recovery protocol (doc, not code) is documented in the plugin README.

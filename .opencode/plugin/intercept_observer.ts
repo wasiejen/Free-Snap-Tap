@@ -77,6 +77,44 @@
 //   Channel lines log BEFORE the observation lines (pair-before-dense
 //   order); the nine VERDICTS stay byte-identical (core VERDICTS).
 //
+// (4) R6 PAYLOAD JOURNAL (2026-09-25, observation-only — decision-record
+//   §8): EVERY `write` / `edit` / `block_transfer` call appends ONE line to
+//   `.opencode/temp/journal_write.log` (write) or `journal_edit.log`
+//   (edit + block_transfer — the spec names two files for three tools; the
+//   line's tool field disambiguates). Best-effort, NEVER fails the call.
+//   Line: `<stamp> | <session> | <tool> | <target> | <payload>` — 5 logical
+//   fields; the payload is JSON (self-delimiting, may itself contain
+//   " | "). target = the EFFECTIVE (post-mutation) path: write/edit
+//   `filePath`, block_transfer `dstFile`. payload: write = JSON
+//   `content`; edit = JSON `{filePath, old, new}`; block_transfer = JSON
+//   `{srcFile, dstFile, mode?, startMarker?, endMarker?, targetMarker?,
+//   bufferName?}` (the string fields present). The journal is a SEPARATE
+//   file from intercept.log — journal-only calls add NO intercept line.
+//
+// (5) R6 EDIT HINT CHANNEL (2026-09-25, observation-only — `edit` only,
+//   the EFFECTIVE post-escape/pair/fuzzy args): oldString occurring
+//   EXACTLY ONCE in the target file → SILENT (the edit will succeed);
+//   >1 raw occurrences → `edit-ambiguous` line
+//   `hint lines=<n1>,<n2>,…`; 0 occurrences → the core CONTENT locator
+//   (locateContent — the anchor/candidate + d<=2 gap>=2 shape,
+//   fail-closed): exact-single → `edit-hint` `hint line=<n> d=0 gap=inf
+//   snippet=<file line>`; resolved → `edit-hint` `hint line=<n> d=<d>
+//   gap=<g|inf> snippet=<file line>`; ambiguous → `edit-ambiguous`
+//   `hint cands=<n1 d1,n2 d2,n3 d3>`; fail-closed → `no-candidate`
+//   `hint reason=<no-anchor-line|d-too-high|empty-arg>`. Field 7 =
+//   `edit oldString`. The two new verdicts (`edit-hint` /
+//   `edit-ambiguous`) are appended to the core VERDICTS (11 total).
+//   NEVER mutates oldString/newString; NEVER auto-retries.
+//
+// (6) R6 AFTER-HOOK ENRICHMENT (2026-09-25, LIVE-ACCEPTANCE RESTART-
+//   GATED): a hint's evidence is cached per callID (TTL 10 min, cap 100,
+//   FIFO) and `tool.execute.after` APPENDS it to the failed result's
+//   `output.output` (the installed host reads `output.output` back from
+//   the same reference — verified in the installed bundle types + binary;
+//   if a host version could not enrich, the log-only fallback still
+//   stands — the hint line is always logged). The cache entry is consumed
+//   once.
+//
 // EXPORT CONTRACT (the 2026-09-16 export fix — verified in the installed
 // binary's minified source): the plugin loader normalizes a plugin module
 // via `Object.values(module)` and EVERY value must be a function (or an
@@ -147,7 +185,7 @@
 
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -160,6 +198,7 @@ import {
   collapseAdjacentDup,
   flattenField,
   loadNumwordMap,
+  locateContent,
   matchNearPathSegments,
   nearestExistingDir,
   normPathForm,
@@ -688,6 +727,140 @@ function runGitRefBash(output: { args?: unknown }): Observation[] {
   );
 }
 
+// ------------------------------------------------------------------ R6 payload journal + edit hint (2026-09-25)
+
+// (6) the per-callID hint cache (the after-hook enrichment source): TTL
+// 10 min, cap 100 entries (FIFO evict — Map iteration is insertion order).
+const HINT_TTL_MS = 600_000;
+const HINT_MAX_ENTRIES = 100;
+const hintCache = new Map<string, { at: number; text: string }>();
+
+function storeHint(callID: string, text: string): void {
+  if (callID === "") return;
+  const now = Date.now();
+  for (const [k, v] of hintCache) if (now - v.at > HINT_TTL_MS) hintCache.delete(k);
+  if (hintCache.size >= HINT_MAX_ENTRIES) {
+    const first = hintCache.keys().next().value;
+    if (first !== undefined) hintCache.delete(first);
+  }
+  hintCache.set(callID, { at: now, text });
+}
+
+// (4) the payload journal — ONE line per write / edit / block_transfer
+// call (best-effort; the house rule: never fail the tool call). The
+// effective (post-mutation) args are journaled — what the host would
+// actually act on.
+function appendJournal(tool: string, sid: string, args: Record<string, unknown>): void {
+  try {
+    const a = args as Record<string, unknown>;
+    const s = (k: string): string => (typeof a[k] === "string" ? (a[k] as string) : "");
+    let target = "";
+    let payload = "";
+    if (tool === "write") {
+      target = s("filePath");
+      payload = JSON.stringify(s("content"));
+    } else if (tool === "edit") {
+      target = s("filePath");
+      payload = JSON.stringify({ filePath: s("filePath"), old: s("oldString"), new: s("newString") });
+    } else { // block_transfer
+      target = s("dstFile");
+      const o: Record<string, string> = {};
+      for (const key of ["srcFile", "dstFile", "mode", "startMarker", "endMarker", "targetMarker", "bufferName"] as const) {
+        if (typeof a[key] === "string") o[key] = a[key] as string;
+      }
+      payload = JSON.stringify(o);
+    }
+    const p = join(dir, ".opencode", "temp", tool === "write" ? "journal_write.log" : "journal_edit.log");
+    mkdirSync(dirname(p), { recursive: true });
+    appendFileSync(p, `${localStamp()} | ${sid || "unknown"} | ${tool} | ${target} | ${payload}\n`, "utf8");
+  } catch {
+    // best-effort — never break a tool call
+  }
+}
+
+// (5) the edit hint channel (`edit` only, effective args). Runs AFTER the
+// escape/pair/fuzzy channels (it sees their result). Raw occurrence count
+// of oldString in the target file: 1 → silent; >1 → edit-ambiguous with ALL
+// occurrence start lines; 0 → the core content locator (fail-closed).
+function runEditHint(output: { args?: unknown }): Observation | null {
+  const args = output?.args;
+  if (args == null || typeof args !== "object") return null;
+  const a = args as { filePath?: unknown; oldString?: unknown };
+  const filePath = str(a.filePath);
+  const oldString = str(a.oldString);
+  if (filePath.trim() === "" || oldString === "") return null; // empty-arg → silent
+  const abs = isAbsolute(filePath) ? filePath : join(dir, filePath);
+  let fileText = "";
+  try {
+    fileText = readFileSync(abs, "utf8");
+  } catch {
+    fileText = ""; // missing file — the locator fail-closes (no-candidate)
+  }
+  const fileLines = fileText.split(/\r?\n/);
+  // raw occurrence start lines (1-based, first line of each block)
+  const starts: number[] = [];
+  {
+    const lineStarts: number[] = [0];
+    for (let i = 0; i < fileText.length; i++) if (fileText.charCodeAt(i) === 10) lineStarts.push(i + 1);
+    let from = 0;
+    while (from + oldString.length <= fileText.length) {
+      const idx = fileText.indexOf(oldString, from);
+      if (idx === -1) break;
+      let lo = 0, hi = lineStarts.length - 1, ln = 1;
+      while (lo <= hi) {
+        const mid = (lo + hi) >> 1;
+        if (lineStarts[mid] <= idx) { ln = mid + 1; lo = mid + 1; } else hi = mid - 1;
+      }
+      starts.push(ln);
+      from = idx + 1;
+    }
+  }
+  if (starts.length === 1) return null; // exactly one — the edit will succeed
+  if (starts.length > 1) {
+    return { verdict: "edit-ambiguous", evidence: `hint lines=${starts.join(",")}`, context: "edit oldString" };
+  }
+  const res = locateContent(oldString, fileText);
+  if (res.kind === "exact") {
+    if (res.lines.length === 1) {
+      const lineText = fileLines[res.lines[0] - 1] ?? "";
+      return { verdict: "edit-hint", evidence: `hint line=${res.lines[0]} d=0 gap=inf snippet=${lineText}`, context: "edit oldString" };
+    }
+    return { verdict: "edit-ambiguous", evidence: `hint lines=${res.lines.join(",")}`, context: "edit oldString" };
+  }
+  if (res.kind === "resolved") {
+    const lineText = fileLines[res.line - 1] ?? "";
+    return {
+      verdict: "edit-hint",
+      evidence: `hint line=${res.line} d=${res.d} gap=${res.gap === Infinity ? "inf" : res.gap} snippet=${lineText}`,
+      context: "edit oldString",
+    };
+  }
+  if (res.kind === "ambiguous") {
+    return { verdict: "edit-ambiguous", evidence: `hint cands=${res.cands.map(([n, d]) => `${n} ${d}`).join(",")}`, context: "edit oldString" };
+  }
+  return { verdict: "no-candidate", evidence: `hint reason=${res.reason}`, context: "edit oldString" };
+}
+
+// (6) the after hook — enrich the failed edit result with the stored hint
+// (consumed once; best-effort, never throw).
+function onToolAfter(
+  input: { tool?: string; sessionID?: string; callID?: string },
+  output: { title?: string; output?: string; metadata?: unknown },
+): void {
+  try {
+    if (str(input?.tool) !== "edit") return;
+    const callID = str(input?.callID);
+    const hit = hintCache.get(callID);
+    if (hit === undefined) return;
+    hintCache.delete(callID); // consumed once (the TTL bounds the stragglers)
+    if (output != null && typeof output === "object") {
+      output.output = `${str(output.output)}\n${hit.text}`;
+    }
+  } catch {
+    // best-effort — never throw out of a hook
+  }
+}
+
 // ------------------------------------------------------------------ the hook
 
 async function onToolBefore(
@@ -743,12 +916,23 @@ async function onToolBefore(
       // the pair channel above is unaffected for all three tools)
       fuzzy = runFuzzyWrite(output, tool); // write-scope ONLY
     }
-    if (escape.length === 0 && obs.length === 0 && channel.length === 0 && fuzzy.length === 0) return; // nothing to log
+    // R6 (2026-09-25): the edit hint channel (edit only — sees the
+    // effective, post-escape/pair/fuzzy args) + the payload journal
+    // (EVERY write/edit/block_transfer call — the effective args; the
+    // journal is a separate file and runs even when nothing is logged)
+    let hint: Observation | null = null;
+    if (tool === "edit") {
+      hint = runEditHint(output);
+      if (hint !== null) storeHint(str(input?.callID), hint.evidence); // (6) the after-hook source
+    }
+    if (writeOwned) appendJournal(tool, sid, output.args as Record<string, unknown>);
+    if (escape.length === 0 && obs.length === 0 && channel.length === 0 && fuzzy.length === 0 && hint === null) return; // nothing to log
     model = await getModel(sid);
     for (const o of escape) appendObservation(sid, model, tool, argStr, o);
     for (const o of channel) appendObservation(sid, model, tool, argStr, o);
     for (const o of obs) appendObservation(sid, model, tool, argStr, o);
     for (const o of fuzzy) appendObservation(sid, model, tool, argStr, o);
+    if (hint !== null) appendObservation(sid, model, tool, argStr, hint);
   } catch (e) {
     // at most ONE intercept-error line; the hook returns silently (the model
     // read may itself have failed — `unknown` then, never a throw)
@@ -765,5 +949,6 @@ export default (async (input: PluginInput) => {
   map = loadNumwordMap(MAP_PATH); // ONE shared map; null → numword checks silently off
   return {
     "tool.execute.before": onToolBefore,
+    "tool.execute.after": onToolAfter, // R6 (2026-09-25): the failed-edit hint enrichment
   };
 }) satisfies Plugin;

@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #97, new
-entries start at #98 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #98, new
+entries start at #99 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -568,8 +568,20 @@ All those IDs stay reserved — see the numbering rule in the header.
   candidate d (a near-miss d<10 is visible; no d bar on logging),
   (b) the return feedback does NOT carry the full oldstring (context
   saving — a truncated identifier: first ~40 chars + length + d +
-  target; the full payload stays in the R6 journal). R6 (sub-item 1)
-  LANCHED (worker_Q3S_170K, spec plan14_ho_task.md).
+   target; the full payload stays in the R6 journal). R6 (sub-item 1)
+   LANCHED (worker_Q3S_170K, spec plan14_ho_task.md).
+   2026-09-25 (autorun, ses_f29afbb66ffeRM1EHgBIpTwTg5, planner-14,
+   post-compaction): sub-item (1) R6 LANDED + planner-verified from file
+   evidence (the worker's close-out died silently — the state was
+   committed from the working tree): content-locator `locateContent`
+   (VERDICTS 11) + the payload journal (journal_write.log /
+   journal_edit.log) + the edit-hint channel (edit-hint /
+   edit-ambiguous / no-candidate) + the after-hook enrichment (live
+   acceptance restart-gated) + the DoD machine check. Gates: probe
+   279/279 (baseline 259 + S26's 20), intercept_observer smoke 48/48,
+   pytest 459+1w, ruff F=0. Docs: the plugin README recovery protocol +
+   decision-record §8.1 addendum. Next: sub-item (2) the edit-fuzzy spec
+   (normalize-then-compare).
 
 ## #94. (LANDED 2026-09-25, planner direct; his approval 2026-09-25) block_transfer REPLACE mode — line-anchored span replacement from a buffer (edit-like, no exact oldString)
 - **Problem / evidence:** edit oldString exact-match is a very regular failure (his priority.md "fuzzy matching of edit oldstring"; ideas.md L153-158: "what would be needed to make block_transfer as versatile as edit but less prone to oldstring mismatch?"); block_transfer PASTE is insert-only (append after targetMarker / EOF) — a slot/region replacement needs a MOVE+DELETE composition (two calls, intermediate state); the 2026-09-24 slot-clobber incident (agent_feedback) showed PASTE-as-slot-replacement is a trap.

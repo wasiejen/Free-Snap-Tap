@@ -5,7 +5,11 @@
 // channel EXCLUDED — "new file" is a legal write intent, the d=1 near-miss
 // must not hijack; edit keeps the channel; R7 2026-09-17: the SEGMENT-level
 // channel — a path is a sequence of folder units, the doubled folder is one
-// insertion (seg-d 1), the kind=seg evidence flag)
+// insertion (seg-d 1), the kind=seg evidence flag; R6 2026-09-25: the
+// payload journal (journal_write.log / journal_edit.log — a separate file,
+// never an intercept line) + the edit hint channel (edit-hint /
+// edit-ambiguous / no-candidate) + the after-hook enrichment (consumed
+// once; live acceptance restart-gated))
 // (.opencode/plugin/intercept_observer.ts
 // + _core.ts). The plugin factory is called with a SCRATCHPAD sandbox
 // `directory` — the intercept.log lands in the sandbox
@@ -55,18 +59,21 @@ try {
       typeof core.flattenField === "function" && typeof core.resolveReadPath === "function" &&
       typeof core.matchNearPathSegments === "function" && typeof core.buildCorpus === "function" &&
       Array.isArray(core.VERDICTS));
-  chk("VERDICTS vocabulary (exactly the nine: the six observation + the two fuzzy + pair-resolved)",
+  chk("VERDICTS vocabulary (exactly the eleven: the six observation + the two fuzzy + pair-resolved + the two R6 edit-hint)",
     JSON.stringify([...core.VERDICTS]) === JSON.stringify([
       "observed-redundancy-ok", "redundancy-mismatch", "no-candidate",
       "ambiguous", "out-of-sandbox", "path-anomaly",
       "fuzzy-resolved", "fuzzy-rejected", "pair-resolved",
+      "edit-hint", "edit-ambiguous",
     ]));
 
   // ---- factory registration shape
   const hooks = await factory({ directory: proj });
-  chk("factory returns the tool.execute.before hook only (log-only, one hook)",
-    typeof hooks === "object" && Object.keys(hooks).length === 1 && typeof hooks["tool.execute.before"] === "function");
+  chk("factory returns the tool.execute.before + tool.execute.after hooks (R6: the hint enrichment after hook)",
+    typeof hooks === "object" && Object.keys(hooks).length === 2 &&
+      typeof hooks["tool.execute.before"] === "function" && typeof hooks["tool.execute.after"] === "function");
   const before = hooks["tool.execute.before"];
+  const after = hooks["tool.execute.after"];
 
   // ---- (1) suspicious arg → lines in the SANDBOX log, args NOT mutated
   // (filePath stays UNDER the sandbox workspace root → no out-of-sandbox line)
@@ -319,14 +326,16 @@ try {
   const fE1a = split8(lE1[countE1]);
   const fE1b = split8(lE1[countE1 + 1]);
   const fE1c = split8(lE1[countE1 + 2]);
-  chk("escape positive (edit oldString+newString) → both resolved (numword + dash-digit forms) + 2 pair-resolved kind=escape lines + the numword observation on the original arg",
-    argsE1.oldString === "n 425" && argsE1.newString === "m 425" && lE1.length === countE1 + 3 &&
+  const fE1d = split8(lE1[countE1 + 3]);
+  chk("escape positive (edit oldString+newString) → both resolved (numword + dash-digit forms) + 2 pair-resolved kind=escape lines + the numword observation on the original arg + the R6 hint (oldString absent → fail-closed no-candidate, LAST line)",
+    argsE1.oldString === "n 425" && argsE1.newString === "m 425" && lE1.length === countE1 + 4 &&
       fE1a[7] === "pair-resolved" && fE1a[5] === "kind=escape scope=content orig=[405:four-two-five:esc] value=425 hits=1" &&
       fE1b[7] === "pair-resolved" && fE1b[5] === "kind=escape scope=content orig=[405:4-2-5:esc] value=425 hits=1" &&
       // the log FIELD is cap-truncated (MAX_FIELD_CHARS) — expected via the
       // SAME flattenField the hook's log path uses
-      fE1a[4] === core.flattenField(argsE1Before) && fE1c[7] === "no-candidate" && fE1c[5] === "numword four-two-five→425",
-    JSON.stringify([fE1a, fE1b, fE1c]));
+      fE1a[4] === core.flattenField(argsE1Before) && fE1c[7] === "no-candidate" && fE1c[5] === "numword four-two-five→425" &&
+      fE1d[7] === "no-candidate" && fE1d[5] === "hint reason=no-anchor-line" && fE1d[6] === "edit oldString",
+    JSON.stringify([fE1a, fE1b, fE1c, fE1d]));
 
   const argsE2 = { filePath: proj + "\\wfx\\file-4.txt", content: "x = args[1:one] + y; [316:foo-bar:esc]" };
   const argsE2Before = JSON.stringify(argsE2);
@@ -338,6 +347,135 @@ try {
     JSON.stringify(argsE2) === argsE2Before && lE2.length === countE2 + 1 && fE2[7] === "observed-redundancy-ok" &&
       fE2[5] === "pair=[1:one] canon=1 dist=0" &&
       !lE2.slice(countE2).some((l) => l.includes("kind=escape")), JSON.stringify([argsE2, lE2.slice(countE2)]));
+
+  // ---- (10) the R6 payload journal + edit hint channel (2026-09-25;
+  //      observation-only): the journal is a SEPARATE file (journal-only
+  //      calls add NO intercept.log line); the hint runs on the effective
+  //      edit args (exact-1 silent / >1 ambiguous / 0 → the content
+  //      locator) + the after-hook enrichment (consumed once) + the DoD
+  //      machine check (the write payload cp'd in place reproduces the
+  //      intended file state; the failed edit's payload names the exact
+  //      intended edit)
+  const jdir = path.join(proj, "jf");
+  fs.mkdirSync(jdir, { recursive: true });
+  const journalWriteLog = path.join(proj, ".opencode", "temp", "journal_write.log");
+  const journalEditLog = path.join(proj, ".opencode", "temp", "journal_edit.log");
+  const jRead = (p) => (fs.existsSync(p) ? fs.readFileSync(p, "utf-8").split(/\r?\n/).filter((l) => l.length > 0) : []);
+  const jPayload = (line) => line.split(" | ").slice(4).join(" | ");
+
+  // (10a) journal WRITE: the content is DENSE/NUMWORD-FREE so the write fires
+  //        NO observation line (the journal is the only effect); the payload is
+  //        self-delimiting JSON (may contain " | " + newline)
+  const argsJW = { filePath: jdir + "\\w.txt", content: "part A | part B\npart C" };
+  const countJW = readLines().length;
+  const jwBefore = jRead(journalWriteLog).length;
+  await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c10a" }, { args: argsJW });
+  const jw = jRead(journalWriteLog);
+  const jwLine = jw[jwBefore];
+  chk("journal write: ONE new line in journal_write.log (5 logical fields; the JSON payload round-trips, may contain ' | ' + newline) + ZERO intercept lines (content dense/numword-free)",
+    jw.length === jwBefore + 1 && jwLine.split(" | ").length >= 5 && jwLine.split(" | ")[1] === "ses_smoke_io1" && jwLine.split(" | ")[2] === "write" &&
+      jwLine.split(" | ")[3] === jdir + "\\w.txt" && JSON.parse(jPayload(jwLine)) === argsJW.content &&
+      readLines().length === countJW, JSON.stringify({ jwLine, n: readLines().length - countJW }));
+
+  // (10b) journal EDIT: one line; payload = JSON {filePath, old, new}; the
+  //        EXACT-1 hint is silent (zero intercept lines)
+  fs.writeFileSync(path.join(jdir, "e.txt"), "abc", "utf-8");
+  const argsJE = { filePath: jdir + "\\e.txt", oldString: "abc", newString: "def" };
+  const countJE = readLines().length;
+  const jeBefore = jRead(journalEditLog).length;
+  await before({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c10b" }, { args: argsJE });
+  const je = jRead(journalEditLog);
+  const jeLine = je[jeBefore];
+  chk("journal edit: ONE new line in journal_edit.log (payload {filePath, old, new}) + exact-1 hint SILENT (zero intercept lines)",
+    je.length === jeBefore + 1 && jeLine.split(" | ")[2] === "edit" && jeLine.split(" | ")[3] === jdir + "\\e.txt" &&
+      jPayload(jeLine) === JSON.stringify({ filePath: jdir + "\\e.txt", old: "abc", new: "def" }) &&
+      readLines().length === countJE, JSON.stringify({ jeLine, n: readLines().length - countJE }));
+
+  // (10c) journal BLOCK_TRANSFER: one line in journal_edit.log (the shared
+  //        edit-class file — the tool field disambiguates); target = dstFile
+  fs.writeFileSync(path.join(jdir, "a.txt"), "x", "utf-8");
+  fs.writeFileSync(path.join(jdir, "b.txt"), "x", "utf-8");
+  const argsJB = { srcFile: jdir + "\\a.txt", dstFile: jdir + "\\b.txt", mode: "MOVE", startMarker: "## S", endMarker: "## E", targetMarker: "## T" };
+  const jbBefore = jRead(journalEditLog).length;
+  await before({ tool: "block_transfer", sessionID: "ses_smoke_io1", callID: "c10c" }, { args: argsJB });
+  const jb = jRead(journalEditLog);
+  const jbLine = jb[jbBefore];
+  chk("journal block_transfer: ONE new line in journal_edit.log (target = dstFile; payload = the anchor fields)",
+    jb.length === jbBefore + 1 && jbLine.split(" | ")[2] === "block_transfer" && jbLine.split(" | ")[3] === jdir + "\\b.txt" &&
+      jPayload(jbLine) === JSON.stringify({ srcFile: jdir + "\\a.txt", dstFile: jdir + "\\b.txt", mode: "MOVE", startMarker: "## S", endMarker: "## E", targetMarker: "## T" }),
+    JSON.stringify(jbLine));
+
+  // (10d) hint EXACT-1 → silent (no HINT line — the edit will succeed). The dense
+  //        date in oldString fires an OBSERVATION line (context != 'edit oldString');
+  //        the hint channel itself produces nothing (exact-1).
+  const htxt = jdir + "\\h.txt";
+  fs.writeFileSync(htxt, "alpha 20260915 beta\ngamma 20260916 delta\n", "utf-8");
+  const argsHX = { filePath: htxt, oldString: "alpha 20260915 beta", newString: "z" };
+  const countHX = readLines().length;
+  await before({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c10d" }, { args: argsHX });
+  const lHX = readLines();
+  chk("hint exact-1 → SILENT (no 'edit oldString' line; the edit will succeed)",
+    !lHX.slice(countHX).some((l) => l.split(" | ")[6] === "edit oldString"), `n=${readLines().length - countHX}`);
+
+  // (10e) hint d=1: oldString absent, a single fuzzy candidate → edit-hint
+  //        (byte-exact evidence: line + d + gap + snippet; context
+  //        'edit oldString')
+  const argsHF = { filePath: htxt, oldString: "alpha 20260915 betaa", newString: "z" };
+  const jeBeforeE = jRead(journalEditLog).length;
+  await before({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c10e" }, { args: argsHF });
+  const lHF = readLines();
+  const fHF = split8(lHF[lHF.length - 1]);
+  chk("hint d=1 → edit-hint LAST line (8 fields; byte-exact evidence; context 'edit oldString') — the dense date in oldString also fires an observation line",
+    fHF.length === 8 && fHF[3] === "edit" && fHF[7] === "edit-hint" &&
+      fHF[5] === "hint line=1 d=1 gap=inf snippet=alpha 20260915 beta" && fHF[6] === "edit oldString",
+    JSON.stringify(fHF));
+
+  // (10f) hint multiple exact → edit-ambiguous with ALL occurrence start lines
+  const h2 = jdir + "\\h2.txt";
+  fs.writeFileSync(h2, "one 20260915 x\ntwo 20260916 y\none 20260915 x\n", "utf-8");
+  const argsHM = { filePath: h2, oldString: "one 20260915 x", newString: "z" };
+  await before({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c10f" }, { args: argsHM });
+  const lHM = readLines();
+  const fHM = split8(lHM[lHM.length - 1]);
+  chk("hint multiple exact → edit-ambiguous LAST line 'hint lines=1,3' — the dense date + numword 'one' also fire observation lines",
+    fHM.length === 8 && fHM[7] === "edit-ambiguous" && fHM[5] === "hint lines=1,3" && fHM[6] === "edit oldString",
+    JSON.stringify(fHM));
+
+  // (10g) hint no candidate → fail-closed no-candidate
+  const argsHN = { filePath: htxt, oldString: "zeta 20260917 eta", newString: "z" };
+  await before({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c10g" }, { args: argsHN });
+  const lHN = readLines();
+  const fHN = split8(lHN[lHN.length - 1]);
+  chk("hint no candidate → no-candidate LAST line 'hint reason=no-anchor-line' (fail-closed) — the dense date in oldString also fires an observation line",
+    fHN.length === 8 && fHN[7] === "no-candidate" && fHN[5] === "hint reason=no-anchor-line" && fHN[6] === "edit oldString",
+    JSON.stringify(fHN));
+
+  // (10h) the AFTER-HOOK enrichment: the failed edit's output.output gains
+  //        the hint line — consumed once (a second call is a no-op); a
+  //        hint-less edit is untouched
+  const outR = { title: "edit", output: "Error: oldString not found", metadata: {} };
+  await after({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c10e" }, outR);
+  const enriched = outR.output;
+  await after({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c10e" }, outR); // consumed once
+  const outS = { title: "edit", output: "ok", metadata: {} };
+  await after({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c10d" }, outS); // exact-1 silent → nothing cached
+  chk("after-hook enrichment: the failed edit's output gains the hint line (consumed once; a hint-less edit is untouched)",
+    enriched === "Error: oldString not found\nhint line=1 d=1 gap=inf snippet=alpha 20260915 beta" && outR.output === enriched && outS.output === "ok",
+    JSON.stringify({ e: outR.output, s: outS.output }));
+
+  // (10i) the DoD machine check: the controlled FAILED EDIT (10e) produced
+  //        the hint line AND a journal line whose payload names the exact
+  //        intended edit; the journal WRITE payload (10a) cp'd in place
+  //        reproduces the intended file state (byte-identical)
+  const doDJ = jRead(journalEditLog)[jeBeforeE];
+  const doDP = doDJ ? JSON.parse(jPayload(doDJ)) : null;
+  const jwPayload = JSON.parse(jPayload(jRead(journalWriteLog)[jwBefore]));
+  const wTarget = jdir + "\\w.txt";
+  fs.writeFileSync(wTarget, jwPayload, "utf-8");
+  chk("DoD machine check: the failed edit's journal payload {filePath, old, new} names the exact intended edit + the write payload cp'd in place reproduces the intended file state (byte-identical)",
+    doDP !== null && doDP.filePath === htxt && doDP.old === "alpha 20260915 betaa" && doDP.new === "z" &&
+      fs.readFileSync(wTarget, "utf-8") === argsJW.content,
+    JSON.stringify({ doDP, cp: fs.readFileSync(wTarget, "utf-8") }));
 
   // ---- (9) the LIVE log is untouched by this smoke
   const liveAfter = fs.existsSync(LIVE_LOG) ? fs.statSync(LIVE_LOG).size : null;

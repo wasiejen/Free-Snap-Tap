@@ -87,10 +87,11 @@
 // VERDICT VOCABULARY (the original six, byte-identical and in order, plus
 // the two read-scope fuzzy tokens appended — addendum C6: conservative,
 // BOTH outcomes logged — plus `pair-resolved`, the R1 read-scope pair
-// mutation token appended last):
+// mutation token, plus the two R6 edit-hint tokens appended last,
+// 2026-09-25):
 //   observed-redundancy-ok | redundancy-mismatch | no-candidate | ambiguous |
 //   out-of-sandbox | path-anomaly | fuzzy-resolved | fuzzy-rejected |
-//   pair-resolved
+//   pair-resolved | edit-hint | edit-ambiguous
 // Fuzzy evidence forms (field 6):
 //   resolved: `fuzzy orig=<arg> -> <resolved-rel> d=<n> gap=<g|inf>`
 //   rejected: `fuzzy orig=<arg> cands=<p1 d1,p2 d2,p3 d3> reason=<r>`
@@ -133,6 +134,12 @@ export const CORPUS_TTL_MS = 60_000;
 export const CORPUS_MAX_ENTRIES = 20_000;
 export const FUZZY_MAX_D = 2;
 export const FUZZY_MIN_GAP = 2;
+// R6 (2026-09-25): the CONTENT-locator caps (decision-record §8) — the
+// all-dense bounded whole-file scan cap (first 256 KiB) and the candidate
+// cap (first in file order). The d/gap accept bar reuses FUZZY_MAX_D /
+// FUZZY_MIN_GAP — the SAME thresholds as path matching.
+export const LOCATOR_MAX_FILE_CHARS = 262_144;
+export const LOCATOR_MAX_CANDIDATES = 500;
 // R2 (2026-09-16): the WRITE-scope fuzzy accept bar — d<=1 (tighter than
 // read's d<=2: the hazard class is different, research §2.3 — a wrong write
 // is not self-correcting). Same gap rule, same strict existence gate (the
@@ -156,6 +163,8 @@ export const VERDICTS = Object.freeze([
   "fuzzy-resolved",
   "fuzzy-rejected",
   "pair-resolved", // R1 (2026-09-16): the read-scope pair mutation verdict
+  "edit-hint", // R6 (2026-09-25): the edit-hint channel (locator resolved)
+  "edit-ambiguous", // R6 (2026-09-25): multiple candidate lines (exact or fuzzy)
 ]) as readonly string[];
 
 // Priority for the per-call line cap (index = rank; ties keep input order —
@@ -172,6 +181,8 @@ const VERDICT_RANK: Record<string, number> = {
   "fuzzy-resolved": 6,
   "fuzzy-rejected": 7,
   "pair-resolved": 8, // documentary (the read channel logs it separately)
+  "edit-hint": 9, // documentary (the R6 hint channel logs it separately)
+  "edit-ambiguous": 10, // documentary (same)
 };
 
 // ------------------------------------------------------------------ core types
@@ -872,4 +883,150 @@ export function collapseAdjacentDup(absPath: string): string | null {
     }
   }
   return null;
+}
+
+// ------------------------------------------------------------------ R6 content locator (2026-09-25)
+//
+// The anchor-first CONTENT locator (design source: research/fuzzy-numword/
+// decision-record.md §8 — the unifying primitive for (a) the R6 edit
+// hints, (b) the R3 section-anchor resolver, (c) the block_transfer section
+// recovery). Built on the EXISTING path-matcher shape: anchor/candidate +
+// the d/gap accept bar (FUZZY_MAX_D / FUZZY_MIN_GAP — the SAME thresholds as
+// path matching; `levenshtein` is reused as-is — no re-derived distance
+// math), fail-closed.
+//
+// DENSE / NON-DENSE SPLIT: a line is scanned for DENSE spans — digit-
+// starting runs over [0-9\-_/.] (dates like 2026-09-15, dense ids, bare
+// digit runs — a single digit is dense too; it just shortens the word span
+// around it) and the `ses_…` session-id shape; the NON-DENSE spans are the
+// word runs in between. ANCHOR = the longest non-dense run (normalized);
+// "" when a line has no word run (all-dense). Multi-line queries: the
+// anchor set is the FIRST + LAST line only (their longest non-dense runs,
+// line offsets 0 and k).
+//
+// CANDIDATES: block start i (1-based) where every anchored query line's
+// anchor is a normalized substring of file line i+offset (the whole k+1
+// block must fit in the file). All-dense query (no anchor anywhere) →
+// BOUNDED whole-file scan (the cap below — a truncated scan can only MISS
+// a candidate, never invent one — the safe direction); every block start
+// is a candidate. At most LOCATOR_MAX_CANDIDATES candidates (first in file
+// order).
+//
+// EXACT-THEN-FUZZY within candidates: exact = every scored query line
+// normalized-equal to the candidate's line (scored lines = the anchored
+// lines; all-dense = first + last); then d = the MAX levenshtein over the
+// scored query lines; accept iff d <= FUZZY_MAX_D AND the gap to the
+// second-best >= FUZZY_MIN_GAP; else FAIL-CLOSED: gap<2 → ambiguous
+// (top-3 [line, d]); d too high / no candidate line / empty query →
+// rejected (the caller fail-closes to `no-candidate`).
+
+const DENSE_SPAN_RE = /\d[\d\-_/.]*|ses_[0-9a-zA-Z]{8,}/g;
+
+// Content normalization for comparisons (the normPathForm analogue for
+// line content): trim, collapse whitespace runs, lowercase.
+export function normContent(s: string): string {
+  return String(s ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
+// The longest NON-DENSE run of a line (normalized); "" when the line has
+// no word span (all-dense).
+export function longestNonDenseRun(line: string): string {
+  const s = String(line ?? "");
+  const gaps: string[] = [];
+  let last = 0;
+  for (const m of s.matchAll(DENSE_SPAN_RE)) {
+    gaps.push(s.slice(last, m.index!));
+    last = m.index! + m[0].length;
+  }
+  gaps.push(s.slice(last));
+  let best = "";
+  for (const g of gaps) {
+    const n = normContent(g);
+    if (n.length > best.length) best = n;
+  }
+  return best;
+}
+
+// The R6 content-locator result (the ReadResolution analogue over FILE
+// LINES instead of paths; line numbers are 1-based block starts):
+//   exact     — every scored query line normalized-equal to the candidate
+//               line(s) (the hook: one line → edit-hint d=0; many →
+//               edit-ambiguous with all line numbers)
+//   resolved  — d <= FUZZY_MAX_D AND gap >= FUZZY_MIN_GAP (edit-hint)
+//   ambiguous — gap < FUZZY_MIN_GAP: top-3 [line, d] (edit-ambiguous)
+//   rejected  — fail-closed: empty-arg | no-anchor-line | d-too-high
+//               (the caller logs `no-candidate`)
+export type ContentResolution =
+  | { kind: "exact"; lines: number[] }
+  | { kind: "resolved"; line: number; d: number; gap: number }
+  | { kind: "ambiguous"; cands: Array<[number, number]> }
+  | { kind: "rejected"; reason: string };
+
+export function locateContent(query: string, fileText: string, cap: number = LOCATOR_MAX_FILE_CHARS): ContentResolution {
+  const qRaw = String(query ?? "");
+  const qLines = qRaw.split(/\r?\n/);
+  const qNorm = qLines.map(normContent);
+  if (qNorm.every((s) => s === "")) return { kind: "rejected", reason: "empty-arg" };
+  const k = qNorm.length - 1;
+  // anchor set: single line → [0]; multi-line → first + last (the spec's
+  // anchor rule); an empty/wordless line contributes no anchor
+  const anchorIdx = k === 0 ? [0] : [0, k];
+  const anchors: Array<{ idx: number; anchor: string }> = [];
+  for (const i of anchorIdx) {
+    const a = longestNonDenseRun(qLines[i]);
+    if (a !== "") anchors.push({ idx: i, anchor: a });
+  }
+  // scored lines: the anchored lines; all-dense → first + last (or [0])
+  const scoreIdx: number[] = anchors.length > 0 ? anchors.map((a) => a.idx) : k === 0 ? [0] : [0, k];
+  const fileLines = String(fileText ?? "").slice(0, cap).split(/\r?\n/);
+  // candidate block starts (1-based)
+  const candStarts: number[] = [];
+  for (let i = 1; i + k <= fileLines.length; i++) {
+    if (candStarts.length >= LOCATOR_MAX_CANDIDATES) break;
+    if (anchors.length === 0) {
+      candStarts.push(i);
+      continue;
+    }
+    let ok = true;
+    for (const { idx, anchor } of anchors) {
+      if (!normContent(fileLines[i + idx - 1]).includes(anchor)) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) candStarts.push(i);
+  }
+  if (candStarts.length === 0) {
+    return { kind: "rejected", reason: anchors.length === 0 ? "d-too-high" : "no-anchor-line" };
+  }
+  // exact first: every scored query line normalized-equal
+  const exactLines: number[] = [];
+  for (const i of candStarts) {
+    let ok = true;
+    for (const idx of scoreIdx) {
+      if (normContent(fileLines[i + idx - 1]) !== qNorm[idx]) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) exactLines.push(i);
+  }
+  if (exactLines.length > 0) return { kind: "exact", lines: exactLines };
+  // fuzzy: d per candidate = the MAX levenshtein over the scored lines
+  const scored: Array<{ line: number; d: number }> = [];
+  for (const i of candStarts) {
+    let d = 0;
+    for (const idx of scoreIdx) {
+      d = Math.max(d, levenshtein(qNorm[idx], normContent(fileLines[i + idx - 1])));
+    }
+    scored.push({ line: i, d });
+  }
+  scored.sort((a, b) => a.d - b.d || a.line - b.line);
+  const best = scored[0];
+  const second = scored.length > 1 ? scored[1].d : Infinity;
+  if (best.d > FUZZY_MAX_D) return { kind: "rejected", reason: "d-too-high" };
+  if (second - best.d >= FUZZY_MIN_GAP) {
+    return { kind: "resolved", line: best.line, d: best.d, gap: second === Infinity ? Infinity : second - best.d };
+  }
+  return { kind: "ambiguous", cands: scored.slice(0, 3).map((e) => [e.line, e.d] as [number, number]) };
 }

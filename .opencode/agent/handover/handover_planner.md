@@ -32,42 +32,40 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   ONCE (COMPACT line landed; the Task result WAS the compaction
   summary), resumed via task_id → did major work → silent death (no
   2nd COMPACT line, empty Task result, no commit/handover/DONE line).
-  State ON DISK (uncommitted, `git status`): core +161 (locator
+  State ON DISK (now committed — this commit): core +161 (locator
   primitive, VERDICTS=11), plugin +189 (journal + hint + onToolAfter
   registered in the factory), probe +468 (S26 section, 23 mentions;
   re-pins 171/203/241/245 applied), smoke +151 (R6 checks).
-- **Planner-verified state (measured, this session): smoke 39/48 — 9
-  R6 checks FAIL.** Analysis (from the smoke output):
-  - DOMINANT PATTERN = the smoke checks assert against the ACCUMULATED
-    sandbox log state (whole-file line count / first line) instead of
-    the per-scenario delta / LAST line — journal_write (5 accumulated
-    lines vs expected 1), journal_edit (4 vs 1), the hint checks
-    (lines present but the check's comparison mis-frames them), the
-    DoD cp check (read back the sentinel content "R2-WRITE" instead of
-    a byte compare).
-  - 2 POSSIBLE WIRING GAPS: block_transfer journal never fired (the
-    check's evidence = the OLD edit line from a prior scenario), and
-    the exact-1 hint FIRED (n=1) where it must be silent (occurrence
-    counting — CRLF/normalization suspect).
-  - Check 37 (escape positive) evidence LOOKS CORRECT (2 escape +
-    numword + hint last) → a comparison/ordering mismatch in the check.
-  - AFTER-HOOK ENRICHMENT WORKS (check 46 PASS: the failed edit's
-    output gains the hint line) — so the hint surface is live, not
-    log-only (live acceptance still restart-gated).
-  - PROBE S26 NOT YET RUN; DOCS missing (plugin README recovery
-    protocol + decision-record §8 addendum); handover missing.
+- **R6 LANDED + verified (this session, post-compaction; the worker's
+  close-out had died silently):** smoke 39/48 → **48/48**; probe S26
+  8-fail → **green (279/279)**. The 9 smoke + 8 probe fails were ALL
+  CHECK-side (the code was correct): (a) journal checks asserted
+  whole-file line counts instead of per-scenario DELTAS (the sandbox
+  journal accumulates across the run); (b) the hint checks asserted a
+  total line-count `nL+1` when a dense date / numword in `oldString`
+  fires an EXTRA observation line → changed to assert the hint-specific
+  LAST line (context `edit oldString`); (c) `JSON.parse(...) === {object}`
+  (JS reference identity, always false) → string compare
+  `jPayload(line) === JSON.stringify({...})`. Probe 267's write fixture
+  also had numword content (`line one | two`) firing an observation line
+  → dense/numword-free `part A | part B\npart C` (276 DoD string updated).
+  Wiring confirmed GOOD: block_transfer journal FIRES (probe delta=1);
+  the exact-1 hint IS silent. **Gates (measured):** probe 279/279, smoke
+  48/48, pytest 459+1w, ruff F=0. **DOCS done** (README recovery protocol
+  + decision-record §8.1); **handover** written by the planner from file
+  evidence.
 - His live priority.md edit (uncommitted, his file — left untouched):
   the R8 section is labeled `# TODO #97` → RENOUMBERED: R8 = #97
   (filed, full entry), unit4-compaction-resume = #98 (renumbered).
   He also removed the done "revocery hook" heading.
-- NEXT (this session continues post-compact): fix the 9 smoke checks
-  (check-logic first, then the 2 wiring gaps if real) → run probe S26
-  (expect total 279) → docs (README + decision-record addendum) →
-  commit (code + probe + smoke + docs; handover WRITTEN BY THE PLANNER
-  from file evidence — the worker's close-out died) → TODO #95 status
-  → #96 launch (spec from the TODO entry) → the (2) edit-fuzzy spec.
-  #98 queued after #96 (same file). #97 (R8) per the #95 order (after
-  (2) + R3).
+- NEXT (this session continues): **R6 COMMITTED (this commit)** →
+  **#96 LAUNCH** (auto_resume.log reduction — spec from the TODO #96
+  entry, worker_Q3S_170K) → after #96: write the **(2) edit-fuzzy spec**
+  (normalize-then-compare + the two directives from the #95 entry) →
+  R3 → #97 (R8 sandbox redirect) / escape return-info. **#98**
+  (unit4-compaction-resume A+B+C, approved) queued after #96 (same
+  file). R6 live acceptance (the after-hook enrichment) = next host
+  restart.
 
 
 ## Compressed archive (one line each
