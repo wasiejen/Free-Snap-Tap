@@ -533,3 +533,6 @@ Task spec's "all existing 133 pins stay green" needed interpretation — Part A'
 ### 2026-09-25_15-52 planner_Q3S_170K ses_f2761efb2ffeUhMTEM4hgSLKKK
 block_transfer marker matching was unclear this session: COPY failed twice (a line-prefix, then even the full last line of a temp .md file) — traced to the temp file's CRLF last-line (trailing \r) and ambiguity over prefix vs full-line matching; I fell back to the edit tool. A short note in the tool description (CRLF last-line handling + exact-match semantics) or a CRLF-normalize in the matcher would save retries. (He has a block_transfer_tool upgrade draft in progress.)
 
+### 2026-09-25_17-58 worker_Q3S_170K ses_f271155b4ffeIWwbQEekkRQRA6
+worker-17 (Q3S-170K): Pattern-3 token loop on the bracketed sentinel form "[405:four-two-five:esc]" — kept re-emitting the resolved digits "425" where the form belonged (3 failed edit attempts, incl. one near-corrupting a const line); a node-script built the string from parts as workaround.
+
