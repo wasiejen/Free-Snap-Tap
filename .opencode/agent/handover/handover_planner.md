@@ -175,7 +175,11 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   knowledge = PLANNER PROMPT baseline section ("Worker failure-mode
   recognition"), one line per entry + pointer to the grounded memory.md
   entry (evidence/reasoning); general-planning MEMs stay in the distill
-  block. Concrete design given; PENDING his GO (prompt edit, mine).
+  block. **GO RECEIVED + LANDED** (this session): `destilled_mem.md` —
+  the 4 failure-mode MEMs (0104/0106/0107/0109) moved into a named
+  "Worker failure-mode recognition (baseline — fires on EVERY worker
+  return)" section; the general MEMs (0101/0102/0103/0105/0108) stay in
+  the flat list; file stays 22 lines (<40 policy).
   (b) **Research/map** — agreed (his strongest point): per-task
   re-derivation is the cost structure. Proposal: (1) explorer builds the
   OPENCODE HOST MAP (SDK surface, hooks, DB schema, permission,
