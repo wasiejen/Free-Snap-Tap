@@ -114,6 +114,11 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   agent (his comment-collision concern is mitigated by the verbatim
   echo + a one-line description caveat — NO file-type sniffing, that's
   the unpredictable part). Build priority: 2nd wave (purely additive).
+  (7) **Proposal FILED** `proposals/2026-09-25_block_transfer-v2.md`
+  (2026-09-25, awaiting his approval): Parts A–I, Wave 1/2, 3 flagged
+  details (anchor rule, WRITE file-creation, the `last_write` name),
+  handout "Verify before done" DoD; deferred: in-line fuzzy anchors,
+  journal-COLLECT, #8 failed-write buffering.
 - **Pending live observations (maintainer / natural):** #99 fork test (his,
   post-restart), #98 live acceptance (the next self-compact→idle cycle —
   the #98 build is live in this process), #93 live overflow (his fork
