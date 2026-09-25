@@ -241,35 +241,53 @@
  //          and does NOT consume the budget (the next call compacts)
  //      (75) the success return carries the re-application file pointer;
   //          the refusal return carries the hand-over note
-  //   S11 emergency recovery plugin (6) — the T5 L4 + L5 approved design
-  //      (the compaction-lifecycle proposal): the plugin file
-  //      .opencode/plugin/deactivated/context_recovery.ts is imported DIRECT
-  //      from the repo path (type-stripped, the same way the plugin loads) and
-  //      driven with a FAKE client (records every session.compact /
-  //      session.promptAsync call) + a sandbox root (directory=SANDBOX
+  //   S11 emergency recovery plugin (11) — TODO #93: the 2026-09-25
+  //      event-hook port of the T5 prototype (re-pin): the plugin file
+  //      .opencode/plugin/context_recovery.ts is imported DIRECT from the
+  //      repo path (type-stripped, the same way the plugin loads) and
+  //      driven with a FAKE client (records every session.summarize /
+  //      session.promptAsync / session.messages call) + FAKE SDK events
+  //      (the current host's delivery shape: { type: "session.error",
+  //      properties: { sessionID, error } } / { type: "session.idle",
+  //      properties: { sessionID } }) + a sandbox root (directory=SANDBOX
   //      steers the flag read, the budget store, and the COMPACT ctx.log
-  //      line into the sandbox); the activation flag (L5) is the SANDBOX
-  //      opencode.jsonc, read PER FIRE (absent → OFF, check 77; the JSONC
-  //      fixture with real // + /* */ comments AND a // inside a string
-  //      literal → ON); the budget is the SAME compact_budget.json the
-  //      S10 tool uses, pre-seeded for the exhaustion case:
+  //      line into the sandbox); the activation flag is the top-level
+  //      `emergencyRecovery` key in the SHARED compact_budget.json (the
+  //      SAME file the S10/S13 tools use); the v2 budget gate (the
+  //      model_budget map — default cap 1, the messages-resolved
+  //      "smoke-model" UNLISTED):
   //      (76) the file imports and exposes a default factory whose
-  //          returned hooks object carries "session.error"
-  //      (77) flag OFF (no opencode.jsonc) + overflow → unhandled
-  //          (undefined), no compact, no promptAsync
-  //      (78) flag ON (JSONC fixture) + overflow + fresh budget → compact
-  //          with EXACTLY keep {30_000, 12}, the promptAsync directive
-  //          byte-matches the plugin's constant (the tool's 2-line directive
-  //          + the looprunner continuation line — re-aligned 2026-09-12 at
-  //          the T5 re-verify), the budget file carries count==1 ON DISK,
-  //          and the hook returns {handled:true, action:"retry"}
-  //      (79) flag ON + overflow + pre-seeded exhausted budget
-  //          (count==2) → unhandled, no compact, no promptAsync, budget
+  //          returned hooks object carries the `event` hook (NO
+  //          "session.error" key — that hook does not exist in the
+  //          current SDK)
+  //      (77) flag OFF (no emergencyRecovery: true key) + overflow
+  //          event → no summarize, no promptAsync, no budget entry
+  //      (78) flag ON + overflow event + fresh budget (cap 1) → the
+  //          summarize body carries the messages-resolved pair + keep
+  //          { messages: 12 } (NO tokens key), the directive byte-matches
+  //          the ported constant (the spec-2+11 relay wording), budget
+  //          count==1 ON DISK, the COMPACT line `<dt> smoke-model
+  //          COMPACT ses_rc_ok messages=12`
+  //      (79) the once-per-overflow guard: 3 more burst events for the
+  //          same overflow → no-ops (exactly ONE compact), budget
   //          unchanged
-  //      (80) flag ON + NON-overflow error → no-op
-  //      (81) the COMPACT line is in the sandbox ctx.log after the
-  //          success (`<dt> COMPACT ses_rc_ok tokens=30_000 messages=12`)
-  //          and ABSENT after the refusal (ses_rc_exh)
+  //      (80) EventSessionIdle clears the guard: the next overflow → the
+  //          emergency slot (count 1 == cap 1): count → 2, the line
+  //          carries the ` emergency` suffix
+  //      (81) budget exhausted (count 2 > cap 1) → CLEAN FAIL: no
+  //          summarize, no promptAsync, no new COMPACT line, budget
+  //          unchanged
+  //      (257) flag ON + NON-overflow error → no-op
+  //      (258) flag value `false` → OFF
+  //      (259) keep override: keepMessages 7 in the budget file → body
+  //          keep { messages: 7 } (NO tokens key) + the line
+  //          `messages=7`
+  //      (260) config pair override: the sandbox opencode.jsonc
+  //          agent.compaction.model → the summarize body carries the
+  //          CONFIG pair + the line's model field (file removed
+  //          afterwards)
+  //      (261) unresolvable model pair (no session.messages) → the
+  //          request is NOT sent (CLEAN FAIL)
 //   S12 ctx_gauge tool (4) — the loop-tool-batch part 2 approved design
 //      (the peek readout as a directly-fired tool): the tool file
 //      .opencode/tools/ctx_gauge.ts is imported DIRECT from the repo path
@@ -669,7 +687,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=6 S12=4 S13=19 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 hygiene=6  →  "PROBE handover: 252/252 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=11 S12=4 S13=19 S14=7 S15=10 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 hygiene=6  →  "PROBE handover: 257/257 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -2119,41 +2137,40 @@ const cmExec = (args, extra) => cmTool.execute(args, cmCtx(extra));
   );
 }
 
-// ------------------------------------------------------------------ S11 emergency recovery plugin (6) — T5 L4 + L5 (the approved design)
+// ------------------------------------------------------------------ S11 emergency recovery plugin (11) — TODO #93: the 2026-09-25 event-hook port of the T5 prototype
 //
-// The plugin at .opencode/plugin/deactivated/context_recovery.ts (T5, the
-// compaction-lifecycle proposal L4 + L5): imported DIRECT from the repo path
-// (type-
-// stripped, the same way the plugin loads — the file MUST load that way)
-// and driven with a FAKE client (records every session.compact /
-// session.promptAsync call) + a sandbox root (directory=SANDBOX steers the
-// flag read, the budget store, and the COMPACT ctx.log line into the
-// sandbox). The activation flag (L5, consolidated 2026-09-22) is the
-// top-level `emergencyRecovery` key in the SHARED compact_budget.json —
-// the SAME file the S10 tool uses (moved out of the sandbox opencode.jsonc):
-// key absent / not `true` → OFF (check 77); the flag setter (checks 78-81)
-// MERGES (the S10 session entries survive). The pre-seeded exhausted store
-// (check 79) proves the gate reads from disk, not from module memory.
-// REPOINTED 2026-09-12: the maintainer's cleanup (commit 4b44d8c) moved the
-// plugin to plugin/deactivated/ — the probe keeps pinning the frozen
-// artifact from its new home (same pattern as the v1 compact_memory
-// re-point in 44df939); the file contents are unchanged.
-const RC_TS = path.join(REPO_ROOT, ".opencode", "plugin", "deactivated", "context_recovery.ts");
-// Byte-identical copy of the RECOVERY PLUGIN's directive constant
-// (context_recovery.ts lines 35-39, the T5-escaped form — the runtime value
-// carries the SINGLE backslashes in the path pointer): the tool's 2-line
-// directive + the looprunner continuation line. NOTE (T5 re-verify
-// 2026-09-12): the WIP probe assumed byte-identity with the TOOL's directive;
-// the committed plugin's constant carries the extra looprunner line (the
-// plugin's own "byte-identical to the tool" header comment is stale — see
-// todo_inbox.md).
+// The plugin at .opencode/plugin/context_recovery.ts (TODO #93 — the
+// event-hook port; the deactivated copy is REMOVED): imported DIRECT from
+// the repo path (type-stripped, the same way the plugin loads — the file
+// MUST load that way) and driven with a FAKE client (records every
+// session.summarize / session.promptAsync / session.messages call) +
+// FAKE SDK events (the current host's delivery shape — { type:
+// "session.error", properties: { sessionID, error } } / { type:
+// "session.idle", properties: { sessionID } }; the "session.error" hook
+// does NOT exist in the current SDK — the hooks object carries `event`
+// only) + a sandbox root (directory=SANDBOX steers the flag read, the
+// budget store, and the COMPACT ctx.log line into the sandbox). The
+// activation flag is the top-level `emergencyRecovery` key in the SHARED
+// compact_budget.json (the SAME file the S10/S13 tools use): key absent /
+// not `true` → OFF (checks 77/258); the store setter MERGES (the S10
+// session entries survive). The v2 budget gate (checks 78/80/81): the cap
+// is the sandbox model_budget map (default 1 — the messages-resolved
+// "smoke-model" is UNLISTED); count < cap → normal (count+1); count ==
+// cap → the emergency 1 (count → cap+1, the ` emergency` line suffix);
+// count > cap → CLEAN FAIL. The once-per-overflow guard (check 79): the
+// host emits FOUR session.error events for ONE overflow (its internal
+// tail-strip retries — measured 2026-09-23) — exactly ONE compact;
+// EventSessionIdle (check 80) clears the guard.
+const RC_TS = path.join(REPO_ROOT, ".opencode", "plugin", "context_recovery.ts");
+// The ported plugin's directive constant (the current post-compaction
+// wording — the spec-2+11 relay addendum; the old T5 looprunner
+// directive is RETIRED per TODO #93 fact 8).
 const RC_DIRECTIVE =
-  "[SYSTEM CONTEXT DIRECTIVE]\nContext was compacted. Read .opencode\\agent\\prompts\\agent_readme_post_compaction.md and re-read any required task-specific files using read_file before continuing.\nIf your role is Looprunner continue the last restart/resume close message of a Planner you have received.";
+  "post-compaction: re-read your head files per .opencode/agent/prompts/agent_readme_post_compaction.md and CONTINUE — never re-plan from scratch";
 const RC_BUDGET = path.join(SANDBOX, ".opencode", "temp", "compact_budget.json");
-// The activation flag (consolidation 2026-09-22) is the top-level
-// `emergencyRecovery` key in the SHARED budget store — the setter MERGES
-// (the S10 session entries + any previously seeded top-level keys survive).
-const rcSetFlag = (enabled) => {
+// The store setter MERGES (the S10 session entries + any previously
+// seeded top-level keys survive).
+const rcSetStore = (mutate) => {
   let store = null;
   try {
     store = JSON.parse(readFileSync(RC_BUDGET, "utf8"));
@@ -2161,172 +2178,272 @@ const rcSetFlag = (enabled) => {
     store = null;
   }
   if (store == null || typeof store !== "object" || store.sessions == null || typeof store.sessions !== "object") {
-    store = { version: 1, maxPerSession: 2, sessions: {} };
+    store = { version: 2, sessions: {} };
   }
-  store.emergencyRecovery = enabled;
+  mutate(store);
   mkdirSync(path.dirname(RC_BUDGET), { recursive: true });
   writeFileSync(RC_BUDGET, JSON.stringify(store, null, 2) + "\n", "utf8");
 };
-const rcCalls = { compact: [], prompt: [] };
+const rcSetFlag = (enabled) => rcSetStore((store) => { store.emergencyRecovery = enabled; });
+const rcReadBudget = () => {
+  try {
+    return JSON.parse(readFileSync(RC_BUDGET, "utf8"));
+  } catch {
+    return null;
+  }
+};
+const rcCalls = { summarize: [], prompt: [] };
 const rcClient = {
   session: {
-    compact: (options) => {
-      rcCalls.compact.push(options);
-      return Promise.resolve({ ok: true });
+    summarize: (options) => {
+      rcCalls.summarize.push(options);
+      return Promise.resolve(true);
     },
     promptAsync: (options) => {
       rcCalls.prompt.push(options);
       return Promise.resolve({ ok: true });
     },
+    messages: (options) => {
+      return Promise.resolve([{ info: { modelID: "smoke-model", providerID: "smoke-provider" } }]);
+    },
   },
-};
-// Pre-seed the SHARED budget store (merging with the S10 entries) — the
-// exhaustion case (check 79) needs count==2 on disk BEFORE its first fire.
-const rcSeedBudget = (sid, count) => {
-  let store = null;
-  try {
-    store = JSON.parse(readFileSync(RC_BUDGET, "utf8"));
-  } catch {
-    store = null;
-  }
-  if (store == null || typeof store !== "object" || store.sessions == null || typeof store.sessions !== "object") {
-    store = { version: 1, maxPerSession: 2, sessions: {} };
-  }
-  store.sessions[sid] = { count, updated: new Date().toISOString() };
-  mkdirSync(path.dirname(RC_BUDGET), { recursive: true });
-  writeFileSync(RC_BUDGET, JSON.stringify(store, null, 2) + "\n", "utf8");
 };
 const rcMod = await import(pathToFileURL(RC_TS).href);
 const rcFactory = rcMod.default;
 const rcHooks = typeof rcFactory === "function" ? await rcFactory({ directory: SANDBOX, client: rcClient }) : null;
-const rcFire = (error, sessionId) =>
-  (rcHooks?.["session.error"] ?? (async () => undefined))(error, { sessionId, client: rcClient });
+// The SDK Event shape (the current host's delivery form — capital-D
+// sessionID; the live overflow error is a MessageAbortedError whose text
+// lives in data.message).
+const rcFireError = (sessionId, error) =>
+  (rcHooks?.event ?? (async () => undefined))({ event: { type: "session.error", properties: { sessionID: sessionId, error } } });
+const rcFireIdle = (sessionId) =>
+  (rcHooks?.event ?? (async () => undefined))({ event: { type: "session.idle", properties: { sessionID: sessionId } } });
+const rcOVF = (text) => ({ name: "MessageAbortedError", data: { message: text } });
 
 // 76 — the plugin file imports (type-stripped, direct) and exposes a
-//      DEFAULT FACTORY whose returned hooks object carries "session.error"
+//      DEFAULT FACTORY whose returned hooks object carries the `event`
+//      hook (NO "session.error" key — that hook does not exist in the
+//      current SDK)
 {
   check(
     "76",
     "S11",
-    'plugin file imports (type-stripped, direct) and exposes a default factory whose hooks object carries "session.error"',
-    rcHooks != null && typeof rcHooks["session.error"] === "function",
+    'plugin file imports (type-stripped, direct) and exposes a default factory whose hooks object carries the `event` hook (no "session.error" key)',
+    rcHooks != null && typeof rcHooks.event === "function" && !("session.error" in (rcHooks ?? {})),
     JSON.stringify({ factory: typeof rcFactory, keys: rcHooks == null ? null : Object.keys(rcHooks) }),
   );
 }
 
 // 77 — flag OFF (no `emergencyRecovery: true` key in the shared budget
-//      file) + overflow → the hook does NOTHING: unhandled (undefined), no
-//      compact, no promptAsync
+//      file) + an overflow event → the hook does NOTHING: no summarize, no
+//      promptAsync, no budget entry (the session error propagates — the
+//      visible hard stop)
 {
-  let store77 = null;
-  try {
-    store77 = JSON.parse(readFileSync(RC_BUDGET, "utf8"));
-  } catch {
-    store77 = null;
-  }
-  const before = { c: rcCalls.compact.length, p: rcCalls.prompt.length };
-  const res = await rcFire({ message: "context length exceeded" }, "ses_rc_off");
+  const store77 = rcReadBudget();
+  const before = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+  await rcFireError("ses_rc_off", rcOVF("context length exceeded"));
+  const after77 = rcReadBudget();
   check(
     "77",
     "S11",
-    "flag OFF (no emergencyRecovery: true key in the shared budget file) + overflow: unhandled (undefined), no compact, no promptAsync",
-    (store77 == null || store77.emergencyRecovery !== true) && res === undefined && rcCalls.compact.length === before.c && rcCalls.prompt.length === before.p,
-    JSON.stringify({ flag: store77?.emergencyRecovery, res, dc: rcCalls.compact.length - before.c, dp: rcCalls.prompt.length - before.p }),
+    "flag OFF (no emergencyRecovery: true key in the shared budget file) + overflow event: no summarize, no promptAsync, no budget entry",
+    (store77 == null || store77.emergencyRecovery !== true) && rcCalls.summarize.length === before.s && rcCalls.prompt.length === before.p && (after77 == null || after77.sessions?.ses_rc_off == null),
+    JSON.stringify({ flag: store77?.emergencyRecovery, ds: rcCalls.summarize.length - before.s, dp: rcCalls.prompt.length - before.p }),
   );
 }
 
 // 78 — flag ON (top-level `emergencyRecovery: true` in the shared budget
-//      file) + overflow + fresh budget → compact with EXACTLY keep
-//      {30_000, 12} (the measured-profile defaults — no keepTokens /
-//      keepMessages keys in the file), the promptAsync directive
-//      BYTE-MATCHES the plugin's constant (the tool's 2-line directive +
-//      the looprunner continuation line — synthetic text part), the budget
-//      file carries count==1 ON DISK, and the hook returns
-//      {handled:true, action:"retry"}
+//      file) + an overflow event + fresh budget (cap = model_budget
+//      default 1 — "smoke-model" UNLISTED) → success: the summarize body
+//      carries the MESSAGES-RESOLVED fallback pair (no sandbox
+//      opencode.jsonc) + keep { messages: 12 } (the fail-open default —
+//      no keep keys in the fixture; NO tokens key — spec 01), the
+//      directive BYTE-MATCHES the ported constant (synthetic text part),
+//      the budget file carries count==1 ON DISK (model recorded), and the
+//      COMPACT line `<stamp> smoke-model COMPACT ses_rc_ok messages=12`
 {
-  rcSetFlag(true);
-  const before = { c: rcCalls.compact.length, p: rcCalls.prompt.length };
-  const res = await rcFire({ message: "exceeds the available context size" }, "ses_rc_ok");
-  const cc = rcCalls.compact.slice(before.c);
-  const pc = rcCalls.prompt.slice(before.p);
-  let budget = null;
-  try {
-    budget = JSON.parse(readFileSync(RC_BUDGET, "utf8"));
-  } catch {
-    budget = null;
-  }
-  const p0 = pc[0]?.body?.parts?.[0];
+  rcSetStore((store) => { store.emergencyRecovery = true; store.model_budget = { default: 1 }; });
+  const before = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+  await rcFireError("ses_rc_ok", rcOVF("request (148149 tokens) exceeds the available context size (131072 tokens)"));
+  const sc = rcCalls.summarize.at(-1);
+  const pc = rcCalls.prompt.at(-1);
+  const budget = rcReadBudget();
+  const okLine = ctxLogLines().find((l) => l.includes("COMPACT ses_rc_ok"));
   check(
     "78",
     "S11",
-    "flag ON (emergencyRecovery: true in the shared budget file) + overflow + fresh budget: compact keep {30_000,12} (the defaults — no keep keys in the file), directive byte-exact (the plugin constant: tool directive + looprunner line), budget count==1 on disk, {handled:true,action:\"retry\"}",
-    cc.length === 1 && cc[0]?.path?.id === "ses_rc_ok" && cc[0]?.body?.keep?.tokens === 30_000 && cc[0]?.body?.keep?.messages === 12 &&
-      pc.length === 1 && pc[0]?.path?.id === "ses_rc_ok" && pc[0]?.body?.parts?.length === 1 && p0?.type === "text" && p0?.synthetic === true && p0?.text === RC_DIRECTIVE &&
-      budget?.sessions?.ses_rc_ok?.count === 1 &&
-      res?.handled === true && res?.action === "retry",
-    JSON.stringify({ cc, p0text: p0?.text?.slice(0, 60), budget: budget?.sessions?.ses_rc_ok, res }),
+    "flag ON + overflow event + fresh budget (cap 1, default): the summarize body carries the messages-resolved pair + keep { messages: 12 } (NO tokens key), the directive byte-exact (the ported constant), budget count==1 on disk (model recorded), the COMPACT line `<dt> smoke-model COMPACT ses_rc_ok messages=12`",
+    rcCalls.summarize.length === before.s + 1 && sc?.path?.id === "ses_rc_ok" &&
+      sc?.body?.providerID === "smoke-provider" && sc?.body?.modelID === "smoke-model" &&
+      sc?.body?.keep?.messages === 12 && sc?.body?.keep?.tokens === undefined &&
+      rcCalls.prompt.length === before.p + 1 && pc?.path?.id === "ses_rc_ok" && pc?.body?.parts?.length === 1 &&
+      pc?.body?.parts?.[0]?.type === "text" && pc?.body?.parts?.[0]?.synthetic === true && pc?.body?.parts?.[0]?.text === RC_DIRECTIVE &&
+      budget?.sessions?.ses_rc_ok?.count === 1 && budget?.sessions?.ses_rc_ok?.model === "smoke-model" &&
+      okLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_rc_ok messages=12$`).test(okLine),
+    JSON.stringify({ sc, p0text: pc?.body?.parts?.[0]?.text?.slice(0, 60), budget: budget?.sessions?.ses_rc_ok, line: okLine }),
   );
 }
 
-// 79 — flag ON + overflow + PRE-SEEDED exhausted budget (count==2 on disk)
-//      → CLEAN FAIL: unhandled (undefined), no compact, no promptAsync,
-//      budget UNCHANGED (the looping agent is stopped by the budget, not
-//      healed — the -WARNING is the protocol's job)
+// 79 — the once-per-overflow guard: the host's 4-event burst (its internal
+//      tail-strip retries — measured 2026-09-23) → exactly ONE compact
+//      (the first fire); the 3 follow-up events are no-ops, the budget
+//      UNCHANGED (count==1)
 {
-  rcSeedBudget("ses_rc_exh", 2);
-  const before = { c: rcCalls.compact.length, p: rcCalls.prompt.length };
-  const res = await rcFire({ message: "prompt is too long" }, "ses_rc_exh");
-  let count = null;
-  try {
-    count = JSON.parse(readFileSync(RC_BUDGET, "utf8"))?.sessions?.ses_rc_exh?.count;
-  } catch {
-    count = null;
-  }
+  const before = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+  for (let i = 0; i < 3; i++) await rcFireError("ses_rc_ok", rcOVF("exceeds the available context size"));
+  const count = rcReadBudget()?.sessions?.ses_rc_ok?.count;
   check(
     "79",
     "S11",
-    "flag ON + overflow + pre-seeded exhausted budget (count==2): unhandled, no compact, no promptAsync, budget unchanged",
-    res === undefined && rcCalls.compact.length === before.c && rcCalls.prompt.length === before.p && count === 2,
-    JSON.stringify({ res, dc: rcCalls.compact.length - before.c, dp: rcCalls.prompt.length - before.p, count }),
+    "once-per-overflow guard: 3 more burst events for the same overflow → no-ops (exactly ONE compact total), budget unchanged (count==1)",
+    rcCalls.summarize.length === before.s && rcCalls.prompt.length === before.p && count === 1,
+    JSON.stringify({ ds: rcCalls.summarize.length - before.s, dp: rcCalls.prompt.length - before.p, count }),
   );
 }
 
-// 80 — flag ON + NON-overflow error → NO-OP: unhandled, no compact, no
-//      promptAsync (the overflow marker gate comes first — in-memory, so a
-//      non-overflow error never touches the fs)
+// 80 — EventSessionIdle clears the guard: after the idle, the next
+//      overflow fires again — now the EMERGENCY slot (count 1 == cap 1):
+//      summarize again, count → 2, and the COMPACT line carries the
+//      ` emergency` suffix
 {
-  const before = { c: rcCalls.compact.length, p: rcCalls.prompt.length };
-  const res = await rcFire({ message: "connection refused: unrelated transport error" }, "ses_rc_non");
+  await rcFireIdle("ses_rc_ok");
+  const before = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+  await rcFireError("ses_rc_ok", rcOVF("exceeds the available context size"));
+  const budget = rcReadBudget();
+  const emgLine = ctxLogLines().find((l) => l.includes("COMPACT ses_rc_ok") && l.includes(" emergency"));
   check(
     "80",
     "S11",
-    "flag ON + NON-overflow error: no-op (unhandled, no compact, no promptAsync)",
-    res === undefined && rcCalls.compact.length === before.c && rcCalls.prompt.length === before.p,
-    JSON.stringify({ res, dc: rcCalls.compact.length - before.c, dp: rcCalls.prompt.length - before.p }),
+    "EventSessionIdle clears the guard: the next overflow fires again — the EMERGENCY slot (count 1 == cap 1): count → 2, the line carries the ` emergency` suffix",
+    rcCalls.summarize.length === before.s + 1 && rcCalls.prompt.length === before.p + 1 &&
+      budget?.sessions?.ses_rc_ok?.count === 2 &&
+      emgLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_rc_ok messages=12 emergency$`).test(emgLine),
+    JSON.stringify({ ds: rcCalls.summarize.length - before.s, count: budget?.sessions?.ses_rc_ok?.count, line: emgLine }),
   );
 }
 
-// 81 — the COMPACT line is in the sandbox ctx.log AFTER THE SUCCESS (stamp
-//      + `COMPACT ses_rc_ok tokens=30_000 messages=12` — the model /
-//      pre-readout fields are absent from the hook context → OMITTED) and
-//      ABSENT after the REFUSAL (no ses_rc_exh line)
+// 81 — budget exhausted (count 2 > cap 1) → CLEAN FAIL: after the idle,
+//      the overflow → no summarize, no promptAsync, NO new COMPACT line,
+//      the budget UNCHANGED (the looping agent is stopped by the budget,
+//      not healed — the -WARNING is the protocol's job)
 {
-  const lines = ctxLogLines();
-  // Shape via numeric comparison — the keep constants as plain numbers (the
-  // 30_000 source form is JS numeric-literal syntax; the log byte is 30_000).
-  const okLine = lines.some((l) => {
-    const m = l.match(new RegExp(`^${DT} COMPACT ses_rc_ok tokens=(\\d+) messages=(\\d+)$`));
-    return m != null && Number(m[1]) === 30_000 && Number(m[2]) === 12;
-  });
-
-  const exhLine = lines.some((l) => l.includes("COMPACT ses_rc_exh"));
-  // (exhausted refusal must leave NO line — verified below)
+  await rcFireIdle("ses_rc_ok");
+  const before = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+  const linesBefore = ctxLogLines().filter((l) => l.includes("COMPACT ses_rc_ok")).length;
+  await rcFireError("ses_rc_ok", rcOVF("prompt is too long"));
+  const budget = rcReadBudget();
+  const linesAfter = ctxLogLines().filter((l) => l.includes("COMPACT ses_rc_ok")).length;
   check(
     "81",
     "S11",
-    "COMPACT line in the sandbox ctx.log after the success (`<dt> COMPACT ses_rc_ok tokens=30_000 messages=12`), ABSENT after the refusal (ses_rc_exh)",
-    okLine && !exhLine,
-    JSON.stringify(lines.filter((l) => l.includes("ses_rc"))),
+    "budget exhausted (count 2 > cap 1): CLEAN FAIL — no summarize, no promptAsync, no new COMPACT line, budget unchanged",
+    rcCalls.summarize.length === before.s && rcCalls.prompt.length === before.p && budget?.sessions?.ses_rc_ok?.count === 2 && linesAfter === linesBefore,
+    JSON.stringify({ ds: rcCalls.summarize.length - before.s, dp: rcCalls.prompt.length - before.p, count: budget?.sessions?.ses_rc_ok?.count, newLines: linesAfter - linesBefore }),
+  );
+}
+
+// 257 — flag ON + NON-overflow error → NO-OP: no summarize, no
+//       promptAsync, no budget entry (the overflow marker gate comes
+//       first — in-memory, so a non-overflow error never touches the fs)
+{
+  const before = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+  await rcFireError("ses_rc_non", rcOVF("connection refused: unrelated transport error"));
+  const after257 = rcReadBudget();
+  check(
+    "257",
+    "S11",
+    "flag ON + NON-overflow error: no-op (no summarize, no promptAsync, no budget entry)",
+    rcCalls.summarize.length === before.s && rcCalls.prompt.length === before.p && (after257 == null || after257.sessions?.ses_rc_non == null),
+    JSON.stringify({ ds: rcCalls.summarize.length - before.s, dp: rcCalls.prompt.length - before.p }),
+  );
+}
+
+// 258 — flag value `false` → OFF (missing file / missing key / any other
+//       value / unparseable — only strictly `true` enables)
+{
+  rcSetFlag(false);
+  const before = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+  await rcFireError("ses_rc_false", rcOVF("context length exceeded"));
+  check(
+    "258",
+    "S11",
+    "flag value `false` → OFF (no summarize, no promptAsync)",
+    rcCalls.summarize.length === before.s && rcCalls.prompt.length === before.p,
+    JSON.stringify({ ds: rcCalls.summarize.length - before.s, dp: rcCalls.prompt.length - before.p }),
+  );
+}
+
+// 259 — the keep override: keepMessages 7 in the budget file (keepTokens
+//       REMOVED — spec 01: never read, never defaulted, never sent) → the
+//       summarize body keep { messages: 7 } (NO tokens key) + the COMPACT
+//       line `messages=7`
+{
+  rcSetStore((store) => { store.emergencyRecovery = true; store.keepMessages = 7; store.model_budget = { default: 1 }; });
+  const before = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+  await rcFireError("ses_rc_keep", rcOVF("context length exceeded"));
+  const sc259 = rcCalls.summarize.at(-1);
+  const budget259 = rcReadBudget();
+  const keepLine = ctxLogLines().find((l) => l.includes("COMPACT ses_rc_keep"));
+  check(
+    "259",
+    "S11",
+    "keep override: keepMessages 7 in the budget file → summarize body keep { messages: 7 } (NO tokens key — spec 01) + the COMPACT line `messages=7`",
+    sc259?.path?.id === "ses_rc_keep" && sc259?.body?.keep?.messages === 7 && sc259?.body?.keep?.tokens === undefined &&
+      budget259?.sessions?.ses_rc_keep?.count === 1 &&
+      keepLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_rc_keep messages=7$`).test(keepLine),
+    JSON.stringify({ keep: sc259?.body?.keep, line: keepLine }),
+  );
+}
+
+// 260 — the config pair override: the sandbox opencode.jsonc
+//       agent.compaction.model (JSONC) → the summarize body carries the
+//       CONFIG pair (over the messages-resolved fallback) and the COMPACT
+//       line's model field — the file is removed afterwards
+{
+  const CFGP = path.join(SANDBOX, "opencode.jsonc");
+  rcSetStore((store) => { store.emergencyRecovery = true; store.model_budget = { default: 1 }; delete store.keepMessages; });
+  writeFileSync(CFGP, `{\n  "agent": { "compaction": { "model": "cfgprov/cfgmodel" } }\n}`, "utf8");
+  const before = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+  await rcFireError("ses_rc_cfg", rcOVF("context length exceeded"));
+  rmSync(CFGP, { force: true });
+  const sc260 = rcCalls.summarize.at(-1);
+  const budget260 = rcReadBudget();
+  const cfgLine = ctxLogLines().find((l) => l.includes("COMPACT ses_rc_cfg"));
+  check(
+    "260",
+    "S11",
+    "config pair override: the sandbox opencode.jsonc agent.compaction.model → the summarize body carries the CONFIG pair + the COMPACT line's model field (the file is removed afterwards)",
+    rcCalls.summarize.length === before.s + 1 && sc260?.path?.id === "ses_rc_cfg" &&
+      sc260?.body?.providerID === "cfgprov" && sc260?.body?.modelID === "cfgmodel" &&
+      budget260?.sessions?.ses_rc_cfg?.count === 1 && budget260?.sessions?.ses_rc_cfg?.model === "cfgmodel" &&
+      cfgLine != null && new RegExp(`^${DT} cfgmodel COMPACT ses_rc_cfg messages=12$`).test(cfgLine),
+    JSON.stringify({ body: sc260?.body, line: cfgLine }),
+  );
+}
+
+// 261 — an UNRESOLVABLE model pair (a client with no session.messages) →
+//       the request is NOT sent: no summarize, no promptAsync, no budget
+//       entry, no COMPACT line (CLEAN FAIL — the v1 summarize body
+//       REQUIRES providerID + modelID)
+{
+  rcSetStore((store) => { store.emergencyRecovery = true; store.model_budget = { default: 1 }; });
+  const rcBareClient = {
+    session: {
+      summarize: (options) => { rcCalls.summarize.push(options); return Promise.resolve(true); },
+      promptAsync: (options) => { rcCalls.prompt.push(options); return Promise.resolve({ ok: true }); },
+    },
+  };
+  const rcBareHooks = await rcFactory({ directory: SANDBOX, client: rcBareClient });
+  const before = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+  await (rcBareHooks?.event ?? (async () => undefined))({ event: { type: "session.error", properties: { sessionID: "ses_rc_nomodel", error: rcOVF("context length exceeded") } } });
+  const budget261 = rcReadBudget();
+  check(
+    "261",
+    "S11",
+    "unresolvable model pair (no session.messages): the request is NOT sent — no summarize, no promptAsync, no budget entry, no COMPACT line (CLEAN FAIL)",
+    rcCalls.summarize.length === before.s && rcCalls.prompt.length === before.p &&
+      (budget261 == null || budget261.sessions?.ses_rc_nomodel == null) && !ctxLogLines().some((l) => l.includes("COMPACT ses_rc_nomodel")),
+    JSON.stringify({ ds: rcCalls.summarize.length - before.s, dp: rcCalls.prompt.length - before.p }),
   );
 }
 
@@ -5538,7 +5655,7 @@ let n24 = 239;
   const postLog = POST["plugin.log"] ?? "";
   const monotonic = postLog.length >= preLog.length && (preLog === "" || postLog.startsWith(preLog));
   const newLines = monotonic ? postLog.slice(preLog.length).split("\n").filter((l) => l.length > 0) : [];
-  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non", "ses_qc_self", "ses_qc_retry", "ses_qc_flat", "ses_qc_nocli", "ses_qc_gate", "ses_qc_cpu", "ses_qc_fail", "ses_qc_msg", "ses_qc_cross", "ses_qc_rpc", "ses_qc_pair", "ses_qc_emg", "ses_qc_emg0", "ses_qc_emgdf", "ses_pc_noscript", "ses_pc_ok", "ses_qc_dumpok", "ses_qc_cfgbody"];
+  const FINGERPRINT = ["s1", "s2", "s3", "c1", "c2", "c3", "c4", "c5", "c6", "d1", "d2", "d3", "t1", "t2", "t3", "t4", "t5", "t6", "t7", "t8", "e1", "e2", "e3", "e4", "e5", "e6", "e7", "e8", "e9", "f1", "f2", "f3", "f4", "f5", "f6", "f7", "f8", "f9", "f10", "f13", "f14", "ses_fx_ok", "ses_fx_unk", "ses_fx_empty", "ses_fx_old", "ses_other", "ses_lad_0", "ses_lad_1", "ses_lad_2", "ses_lad_3", "ses_lad_4", "ses_lad_5", "ses_lad_6", "ses_lad_7", "ses_ro_k", "ses_ro_u", "ses_ro_nom", "ses_ro_empty", "ses_ro_absent", "ses_ro_n1", "ses_ro_n2", "ses_ro_n3", "ses_ro_n4", "ses_ro_n5", "ses_cm_1", "ses_cm_fb", "ses_cm_line", "ses_cm_bare", "ses_cm_budget", "ses_cm_fail", "ses_cm_ptr", "ses_rc_off", "ses_rc_ok", "ses_rc_exh", "ses_rc_non", "ses_rc_keep", "ses_rc_cfg", "ses_rc_nomodel", "ses_qc_self", "ses_qc_retry", "ses_qc_flat", "ses_qc_nocli", "ses_qc_gate", "ses_qc_cpu", "ses_qc_fail", "ses_qc_msg", "ses_qc_cross", "ses_qc_rpc", "ses_qc_pair", "ses_qc_emg", "ses_qc_emg0", "ses_qc_emgdf", "ses_pc_noscript", "ses_pc_ok", "ses_qc_dumpok", "ses_qc_cfgbody"];
   const probeWroteLive = newLines.some((l) => FINGERPRINT.some((fid) => l.includes(`"session":"${fid}"`) || l.includes(`"call":"${fid}"`) || l.includes(`"sess":"${fid}"`)));
   check(
     "43",

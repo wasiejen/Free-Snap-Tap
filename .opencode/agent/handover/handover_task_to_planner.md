@@ -1,146 +1,110 @@
-# Text-worker summary — wave tasks c/e/g/h (spec items 4-9 prompt wave)
+# HANDOVER — TODO #93: port context_recovery.ts to the `event` hook (worker, `worker_Q3S_170K`, 2026-09-25)
 
-Planner-as-text-worker session (2026-09-25), executed per launch scope:
-ONLY tasks c, e, g, h. Tasks a/b/d/f/f2 were already LANDED (spec Status
-section) — not reworked. Text-only: no code, no config, no behavior claims.
-Every factual line traces to the change list
-(`maintainer/inbox_planner/compaction_feedback_by_planner.md`),
-`maintainer/draft/compaction_guide/handout.md`, or the landed specs.
+## Executive summary
+The emergency compact backstop is ported from the retired T5 prototype to the current
+SDK's `event` hook and activated as the live plugin at `.opencode/plugin/context_recovery.ts`
+(the deactivated copy is REMOVED — the single source). On a REAL overflow (the host's
+`session.error` event, the overflow-marker-gated, `emergencyRecovery` flag read per fire) it:
+claims the overflow (once-per-overflow in-memory guard, cleared on `EventSessionIdle`),
+compacts via the v1 `session.summarize` call with the config-resolved summarizer pair
+(root opencode.jsonc `agent.compaction.model`, falling back to the session's own model
+read via `session.messages` — self-contained local copies, NO runtime import from
+`compact_memory.ts`), and on VERIFIED success only: increments the shared v2 budget store
+(read-then-write, no await) + appends the COMPACT line (the current tool's writer shape:
+`<stamp>[ <model>] COMPACT <sid> messages=<m>[ emergency]` — messages-only) + injects the
+spec-2+11 post-compaction directive as a synthetic text part via `promptAsync` (the retry
+vehicle — the hook returns void, so the old `{handled, action:"retry"}` return is gone).
+Over budget / unresolvable pair / failed compact → CLEAN FAIL (no compact, no line, no
+increment — the error propagates).
 
-## What was done per task
+## What changed (ONE commit: code + smoke + probe + TODO.md + this handover)
+- `.opencode/plugin/context_recovery.ts` — NEW (the ported plugin; the hook registers
+  `event` only — no `"session.error":` key; capital-D `sessionID`; the prototype's
+  overflow markers preserved).
+- `.opencode/plugin/deactivated/context_recovery.ts` — REMOVED.
+- `.opencode/plugin/tests/context_recovery.smoke.mjs` — re-pinned to the new file + the
+  event shape (faked client: `summarize`/`promptAsync`/`messages`; faked
+  `EventSessionError`/`EventSessionIdle` SDK events, live error shape
+  `{ name: "MessageAbortedError", data: { message } }`): flag-off, non-overflow, non-error
+  event, the budget states (normal / emergency / exhausted), the keep (override + no
+  tokens key), the line format (incl. the ` emergency` suffix), the once-guard (4-event
+  burst), the idle clear, the directive byte-exact, the config-pair override, the
+  unresolvable-pair clean fail.
+- `.opencode/plugin/probes/handover_probe.mjs` — S11 re-pinned (11 checks: 76-81 updated
+  to the ported file + event shape + v2 gate, new 257-261 for non-overflow / flag-false /
+  keep-override / config-pair / unresolvable-pair; check IDs verified safe against the
+  extracted used-ID set). The header's S11 map + the self-annotated total updated
+  (S11=6 → S11=11, 252 → 257). The S10 section (the retired v1) is UNTOUCHED (byte-
+  identical — verified: it is not in this commit's diff). The S5 fingerprint array gained
+  the 3 new S11 session ids (`ses_rc_keep`/`ses_rc_cfg`/`ses_rc_nomodel`).
+- `TODO.md` #93 — status → LANDED (the commit hash is recorded in the planner's
+  follow-up bookkeeping commit — no self-reference here).
 
-### c. Repo docs
-- `.opencode/agent/prompts/repo/repo_custom_tools.md`:
-  - `loop_log` section: roles line → "planner / worker" (looprunner
-    retired).
-  - `compact_memory` section reworked to the post item-1+10 state: header
-    "SELF / CROSS"; args = `[sessionID, keepMessages, message, emergency]`
-    (old `providerID`/`modelID` line gone, `keepTokens` noted as gone);
-    budget = per target session + model (`compact_budget.json`
-    `model_budget`, bare model id → cap, CPU denied cap 0); `emergency`
-    arg = the one extra compaction after the normal budget is drained
-    (once per session); the old Gemma-flush line → "summarizer is the
-    target session's OWN model (same-model — `agent.compaction.model`
-    commented out in opencode.jsonc) → ONE flush delegation after a CROSS
-    dispatch (llama-swap single slot)". The "server ignores the keep
-    fields" note did not exist in the current file (nothing to remove).
-- `.opencode/agent/prompts/repo/repo_map.md`: roster note →
-  "`planner_*` are not workers" (`looprunner_*` token dropped).
-- `.opencode/agent/prompts/skill/README.md`: `skill_autorun_summary.md`
-  line → "(run at end of loop)" (the "by the looprunner" attribution
-  dropped).
+## Implementation decisions (deviations worth a look, all inside the spec)
+1. **`isOverflowError` text extraction extended to `error.data.message`** (checked
+   FIRST; the prototype's `error.message` fallback stays). The SDK's typed error union
+   (`MessageAbortedError` & co. — spec fact 2) carries the text in `data.message`, NOT
+   top-level `message` — with the prototype's extraction alone, `String(error)` →
+   `[object Object]` and the hook could NEVER match a live overflow. The three markers
+   are unchanged (fact 9); the live 2026-09-23 fork-test text matches marker 1 via
+   `data.message`. The smoke/probe fakes use the live shape.
+2. **The summarize call is AWAITED in the hook** (unlike the tool's fire-and-forget
+   execute): the event hook is a server-side listener — NO turn awaits it, and the
+   overflowing turn is already ABORTED (the single llama-swap slot is free), so the
+   tool's deadlock (spec-era maintainer ruling 2026-09-14) cannot form here. Awaiting is
+   what makes "on SUCCESS only" (fact 5) synchronous and lets the directive land AFTER
+   the verified compaction. The verified-success check mirrors the tool
+   (`compactionFailure` — a resolved promise is success only on the handler's boolean
+   true), and the keep-rejection retry-once mirrors `callSummarize`.
+3. **The guard is claimed BEFORE the compact call** (the burst events land while the
+   first fire's summarize is in flight) and only AFTER the flag read (flag-off fires
+   never claim — a mid-run flag flip still recovers on the next overflow).
+4. **Budget gate = the tool's spec-10 gate, no-arg path**: `count < cap` → normal
+   (count+1); `count == cap && emergency_budget >= 1` → emergency (count → cap+1,
+   ` emergency` suffix); else → CLEAN FAIL. The cap resolves against the
+   config-overridden model (the tool's ordering), CPU guard first (safety invariant).
+5. **Directive = the spec-2+11 relay wording verbatim** (auto_resume
+   `POST_COMPACTION_ADDENDUM`): "post-compaction: re-read your head files per
+   .opencode/agent/prompts/agent_readme_post_compaction.md and CONTINUE — never re-plan
+   from scratch" (the retired looprunner line is gone — fact 8).
 
-### e. Looprunner retirement (item 8)
-- `.opencode/agent/prompts/agent_readme_loop.md`:
-  - header: "the planner reads it when driving the loop (autonomous
-    launch)".
-  - the `--request:` lines bullet (loop-signals Part 2) RETIRED — both
-    directions were looprunner↔planner; no consumer exists post-removal
-    (nothing to restore — flag for your ruling if you want it kept).
-  - Action-line parenthetical: the "INLINED here — the looprunner does NOT
-    load AGENTS.md" clause dropped (states list kept, same vocabulary).
-  - "…the looprunner reads the LAST one" → "the auto-resume plugin reads
-    the LAST one".
-  - Loop-log section: the "(Distinct from the looprunner's own
-    `.opencode/loop_log.md`…)" parenthetical dropped; role enumeration →
-    `planner-N / worker-N / explorer-N` with an annotation that the
-    retired `looprunner` token appears in historical lines only; the
-    `-->START` writers → "planner and worker"; `-RETURN-` writer → "the
-    planner".
-  - "## Looprunner's own file" → "## Looprunner's own file (retired)" with
-    the note that the role is retired (2026-09-24), the auto-resume plugin
-    covers launch/relay/restart, and `.opencode/loop_log.md` no longer
-    exists (verified on disk).
-- `prompt_agent_looprunner.md` MOVED to `.opencode/archive/` via `git mv`
-  (rename staged; archive README needed no change — it does not enumerate
-  files).
-- `skill/README.md` + `repo_map.md` — covered under task c above (the spec
-  lists them for both tasks).
-- `agent_readme_post_compaction.md`: NO looprunner content found in the
-  current file (STEP 1 list is repo parts + agent readmes, none
-  looprunner-specific) → no adjustment needed.
-- opencode.jsonc: see the note below.
+## Measured verification (all re-run; baseline re-run AT START, not trusted)
+Baseline (start, 2026-09-25): probe 252/252, compact_memory smoke 66/66,
+auto_resume smoke 129/129, context_recovery smoke ALL PASS (old shape), pytest
+459 passed + 1 warning, ruff F=0 — matches the spec's baseline.
+After the change:
+- probe: **257/257 PASS** (header self-annotation agrees; S10 untouched)
+- compact_memory smoke: **66/66** (unchanged)
+- auto_resume smoke: **129/129** (unchanged)
+- context_recovery smoke: **15/15** (new count — the old smoke was uncounted)
+- pytest: **459 passed, 1 warning**
+- ruff: **F=0** ("All checks passed!")
 
-### g. Bit-drift primer references (his ruling: RETIRED)
-- `prompt_agent_planner.md`: the fuzzy-numword primer bullet in the
-  Instruction index (L52-57 pre-edit) removed. The planner-prompt index
-  line for `agent_readme_loop.md` also lost its stale
-  "`--request:` lines" parenthetical (crossfire of the task-e removal).
-- `.opencode/agent/research/fuzzy-numword/` area + primer file: untouched,
-  per his ruling (reactivatable).
-- DEFERRED: `prompt_agent_task.md` L40-44 (same primer bullet) — the file
-  is maintainer live-edited (uncommitted changes at launch).
-
-### h. Phase-2 prompt pass (planner side)
-- `prompt_agent_planner.md` §Context-budget trigger (L3) + stop line:
-  reworked compaction-oriented per the handout:
-  - header line pointing at the AGENTS.md `# Compaction Guidelines`
-    section as the general model (this section = role-specific triage +
-    handover mechanics on top of it).
-  - "Default: compact until the budget is spent — routine
-    speed/maintenance tool, not an emergency valve".
-  - "Distilled → drop (mid-unit ok)".
-  - Stop lines reframed as TRIAGE thresholds (80 % ~10-call estimate /
-    90 % ~6-call estimate + emergency handover / 95 % commit + compact
-    NOW, do-not-deliberate).
-  - "Compaction is NOT a restart" kept (same-model summary wording).
-  - keepMessages heuristic added (keep what you would have to RE-DERIVE;
-    committed handover → keep less; when in doubt → keep more; spend the
-    `emergency` 1 PROACTIVELY at the stop line — the auto one takes it
-    blindly (18)).
-  - auto-dump line (no manual dump before compact; dump = recovery source
-    for a forced new session).
-  - Worker-context-limit bullet kept (CROSS compact + task_id resume).
-- `prompt_agent_planner.md` §Delegate-vs-do compacted-worker bullet: the
-  stale Gemma flush line ("host's compaction model (Gemma) differs from
-  the target's model → no flush…") → same-model summarizer + ONE flush
-  delegation (llama-swap single slot).
-- §Early handover (planner, 70 %): UNCHANGED, per his test ruling.
-- ORDER-STOP / WORK STATE DUMP FORM: removal CONFIRMED (his 2026-09-24
-  ruling) — nothing to restore; the rework above adds no dump/stop-order
-  content.
-- DEFERRED: `prompt_agent_task.md` §Context budget (worker side) — the
-  file is maintainer live-edited (uncommitted changes at launch). For the
-  next pass: the worker section still lacks the default-compact /
-  distilled→drop / triage-threshold / keepMessages-heuristic framing, and
-  its self-compaction bullet's "the reload message is attached to the
-  compaction summary" line predates the spec 2+11 message-relay build.
-
-## Verification (per spec DoD)
-- Grep-clean: no `looprunner` outside the two deliberate
-  retired/historical annotations in `agent_readme_loop.md`; no
-  `providerID`/`modelID`/`quant class`/`Gemma`/"server ignores" in
-  `repo_custom_tools.md` (`keepTokens` only in the intentional "is gone"
-  note); no `fuzzy-numword`/`primer`/`Gemma` in `prompt_agent_planner.md`.
-- Read-back of every edited file (full or the edited regions).
-- Zero edits outside the named files (git status: only the 5 files + the
-  rename + this summary).
-- No gate run (markdown only).
-- Branch: `opencode_test` (verified at launch; stayed on the checkout).
-
-## Deferred live-edited files (SKIPPED, not touched)
-Files with uncommitted changes at launch (maintainer live-edited) — their
-edits deferred:
-- `.opencode/agent/prompts/agents/prompt_agent_task.md` — defers the
-  task-g primer bullet (L40-44) and the task-h worker Context-budget
-  rework (§Context budget, L73-93; notes for the next pass above).
-
-Not touched / not staged (per launch scope): `opencode.jsonc`,
-`AGENTS.md`, `.opencode/agent/agent_feedback.md`,
-`.opencode/loop/autorun-2026-09-21_15-33/loop_log.md`,
-`.opencode/maintainer/ideas/ideas.md`, `.opencode/maintainer/priority.md`.
-
-## opencode.jsonc note (MAINTAINER domain — verified, not touched)
-The looprunner agent is ALREADY removed there: the `looprunner_Q3S_170K`
-agent block is commented out (opencode.jsonc L149+; the whole sub-agent
-registration is `//`-commented). Nothing further to do on the file; the
-archived prompt file no longer has a live registration pointing at it.
-Also noted for context: `agent.compaction.model` is commented out there
-(same-model summarizer — the factual basis for the flush-line rewrites).
-
-## Commit
-One commit, named paths only: the 5 edited files + the archive rename
-(staged via `git mv`) + this summary file.
+## Commit facts
+ONE commit (code + smoke + probe + TODO.md + this handover). Staged explicitly — the
+working tree's foreign append-only changes at session start
+(`.opencode/agent/agent_feedback.md`, `.opencode/loop/.../loop_log.md`,
+`.opencode/maintainer/ideas/ideas.md` — not written by this session) are NOT included.
+The hash is recorded in the planner's follow-up bookkeeping commit (no self-reference).
 
 ## TODO entries
-None new (deferrals ride in this handover; the planner curates).
+- #93 status → LANDED (this commit's contents; the hash in the planner's bookkeeping).
+- No new `todo_inbox.md` entries.
+
+## Deliberately NOT done
+- The context_recovery + compact_memory ONE-plugin integration (the follow-up the spec
+  names — the next candidate; the recovery stays self-contained per the T5 constraint).
+- The S10 section / the retired v1 artifact (byte-identical — the v1 removal is the
+  maintainer's call, per the spec).
+- `opencode.jsonc`, `.opencode/maintainer/**`, `compact_memory.ts`, the live
+  `.opencode/temp/compact_budget.json` — all DO-NOT-TOUCH, untouched.
+
+## Maintainer-domain pending items (verbatim, per the spec)
+1. **the host restart (plugin activation)** — moving
+   `deactivated/context_recovery.ts` → `.opencode/plugin/context_recovery.ts` IS the
+   activation (opencode.jsonc has no `plugin` key — files in `.opencode/plugin/*.ts` are
+   auto-loaded); it takes effect at the next process start.
+2. **the live overflow acceptance on a driven/forked session as the 2026-09-23 fork
+   test** (expect: ONE COMPACT line + the budget increment + the session
+   survives/continues — the flag is already `true` in the budget file, no flag work
+   needed).
