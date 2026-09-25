@@ -24,10 +24,24 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   rework, so no live prompt quotes a literal `action: restart` in prose;
   Part A is the primary defense). Baseline re-measured: auto_resume smoke
   **133/133**; standard gate probe 291/291, pytest 459+1w, ruff F=0.
-- **Next:** cp spec -> plan16_ho_task.md; commit spec + plan16_ho_task + NAP;
-  launch worker_Q3S_170K for #98 Parts A+B; on return verify from files
-  (git log + one spot auto_resume smoke), write handover + loop copy,
-  bookkeeping commit, close `action: restart`.
+- **#98 LANDED + planner-verified (2026-09-25):** worker-16 (session
+  ses_f2741890affeDWi2GqkunKqIeX) — Part A (`4f90218`) line-anchored
+  ACTION_RE (non-capturing anchor, `m[1]` = action word; 17 mid-line
+  scripted closing texts re-pinned to own-line, intent unchanged) + Part B
+  (`cf7e6f5`) tick tail-reads ctx.log for NEW `COMPACT <sid>` lines and
+  re-arms watched sids (`idlePending=true`, `recoveryCount=0`) before the
+  routing loop. Part C = not-applicable (Work State dump form removed in
+  the 2026-09-24 rework). **Gates (planner spot-re-verified):**
+  auto_resume smoke **139/139** (133 + 6 new pins A-rechk/A1/A2/B1/B2/B3),
+  pytest 459+1w, ruff F=0, probe 291/291 (no probe pin broke). LIVE
+  acceptance (a next self-compact routes from the real close) PENDING live
+  observation. Commits: `4f90218`/`cf7e6f5`/`80797e4` (+ my spec commit
+  `eda314e`).
+- **Next (next iteration):** per priority.md, **#97 (R8 sandbox redirect)**
+  is the next clear approved build (needs a spec; R3-gate per #95 sub-item
+  order). R3 (fuzzy #95 sub-item 3) remains BLOCKED on a maintainer GO
+  (observable behavior change). The next planner session re-triages from
+  priority.md. Close `action: restart`.
 - Working tree: his live files uncommitted (priority.md, opencode.jsonc,
   repo_opencode.md, agent_feedback.md, ideas.md) — never stage (standing
   rule); feedback entries ride the bookkeeping commit.
