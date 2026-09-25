@@ -4,7 +4,9 @@
 // UNIT 1 (the testbed):
 //   (1) EVENT LOG — EVERY event the host delivers is logged as ONE line to
 //       `.opencode/temp/auto_resume.log` (append; temp dir mkdir'd
-//       recursive): `<ISO time> event=<type> sid=<sessionID> <key fields>`
+//       recursive) — EXCEPT `message.part.delta` (#96: the per-token
+//       stream delta, ~97% of the old log volume — NEVER logged):
+//       `<ISO time> event=<type> sid=<sessionID> <key fields>`
 //       (key fields = the event's properties bits that exist — `status`
 //       for session.status, `tokens` for message.updated — kept short).
 //   (2) INIT SURFACE PROBE — one-shot at plugin load: logs a `surface=`
@@ -183,7 +185,7 @@
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import type { Event } from "@opencode-ai/sdk";
 import { createHash } from "node:crypto";
-import { appendFileSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync } from "node:fs";
+import { appendFileSync, closeSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -1469,6 +1471,11 @@ const onEvent = async (input: { event: Event }) => {
   try {
     const ev = input?.event;
     if (!ev || typeof ev.type !== "string") return;
+    // #96: the per-token stream delta is NEVER logged (~97% of the old
+    // log volume). armEvent is a no-op for this type (the Unit 2
+    // saturation input is message.updated ONLY) — the early return
+    // changes nothing but the missing log line.
+    if (ev.type === "message.part.delta") return;
     const props = (ev.properties ?? {}) as Record<string, unknown>;
     const sid = props.sessionID ?? "unknown";
     const extra = keyFields(props);
@@ -1489,6 +1496,42 @@ function codeVersion(): string {
     return createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex").slice(0, 8);
   } catch {
     return "unknown";
+  }
+}
+
+// #96: the INIT SIZE GUARD (runs BEFORE restoreLineageFromLog — the
+// #90 restore then sees only the surviving tail: an older route=/spawn=
+// pair cut by the trim resets depth to 0 — best-effort by design, the
+// documented accepted consequence). If the log outgrew the cap: keep
+// the byte TAIL (the last tailBytes bytes) and append ONE
+// `log-trim= old=<bytes> new=<bytes>` line (old = the pre-trim size,
+// new = the kept tail size). The file is never held open (log() is a
+// per-line appendFileSync) → a synchronous init-trim is safe.
+// absent/unreadable file → no-op. Best-effort: a trim failure must not
+// break plugin load.
+function trimLogIfNeeded(maxBytes: number, tailBytes: number): void {
+  let size: number;
+  try {
+    size = statSync(logPath).size;
+  } catch {
+    return; // no log yet / unreadable → no-op
+  }
+  if (size <= maxBytes) return;
+  const keep = Math.min(size, tailBytes);
+  if (keep >= size) return; // degenerate caps (tail >= size) → nothing to cut
+  try {
+    const buf = Buffer.alloc(keep);
+    const fd = openSync(logPath, "r");
+    let n = 0;
+    try {
+      n = readSync(fd, buf, 0, keep, size - keep);
+    } finally {
+      closeSync(fd);
+    }
+    writeFileSync(logPath, buf.subarray(0, n));
+    log(`log-trim= old=${size} new=${keep}`);
+  } catch {
+    // swallow — best-effort
   }
 }
 
@@ -1564,6 +1607,15 @@ export default (async (input: PluginInput) => {
   logPath = join(logDir, "auto_resume.log");
   projectDir = input?.directory ?? ""; // #85 part 2: the opencode.jsonc fallback path
   client = input?.client ?? null;
+  // #96: the log size guard caps — factory options (the live host never
+  // passes them → the 20MB/2MB defaults (live: a trim fires only when
+  // the log outgrew 20MB); the smoke passes small values so the trim is
+  // testable without a multi-megabyte fixture — the tickMs pattern).
+  const maxLogOpt: unknown = (input as Record<string, unknown> | undefined)?.maxLogBytes;
+  const maxLogBytes = typeof maxLogOpt === "number" && Number.isFinite(maxLogOpt) && maxLogOpt > 0 ? maxLogOpt : 20 * 1024 * 1024;
+  const tailOpt: unknown = (input as Record<string, unknown> | undefined)?.logTailBytes;
+  const logTailBytes = typeof tailOpt === "number" && Number.isFinite(tailOpt) && tailOpt > 0 ? tailOpt : 2 * 1024 * 1024;
+  trimLogIfNeeded(maxLogBytes, logTailBytes); // #96: BEFORE the #90 restore (it then sees the surviving tail)
   restoreLineageFromLog(); // #90 part C: ONCE per process (before any routing can happen)
   probeSurface(input); // one-shot at load
   // The tick period is a per-factory-call option: the live host never
