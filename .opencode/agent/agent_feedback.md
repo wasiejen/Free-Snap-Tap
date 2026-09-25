@@ -524,3 +524,12 @@ The glob tool skips hidden directories (.opencode) — two wasted calls before f
 ### 2026-09-25_13-32 build ses_f29afbb66ffeRM1EHgBIpTwTg5
 (2) edit-fuzzy worker saga (planner-14, 2026-09-25): launch #1 (ses_f27f41e1) died with ZERO work (empty Task result, no dump/ctx.log line — host-side, #74 family); launch #2 (ses_f27e4e53) did code+smoke (green) then stopped at a clean checkpoint handover; a `task_id` resume of that session returned the IDENTICAL checkpoint (a no-op — the session did not progress on resume, even with the precise resume point in hand); only a 3rd FRESH launch (ses_f27bb616) finished the probe+docs+gate. FRICTION: the task_id resume of a checkpoint-stopped worker was a no-op — fresh re-launch was required. Worth knowing for the worker-death recovery path (fresh launch > task_id resume when the session already returned a checkpoint).
 
+### 2026-09-25_14-47 worker_Q3S_170K ses_f2796c5d8ffe8toe7k2neU01G1
+computeKeepTokens expects tokens INSIDE info (entry.info.tokens), not at top level (entry.tokens) — probe/smoke fixtures initially placed tokens at the wrong level, causing a quick fix on checks 285/287.
+
+### 2026-09-25_15-48 worker_Q3S_170K ses_f2741890affeDWi2GqkunKqIeX
+Task spec's "all existing 133 pins stay green" needed interpretation — Part A's anchor change silently invalidated 17 mid-line scripted closing texts (re-pinned to own-line; "re-pin" wording covered it but the "133" phrasing risks being read as zero fixture changes); also the spec's smoke-pin clause didn't anticipate that a freshly-invented sid character set could break a newly-added regex (underscore in `ses_…` sids) — a throwaway probe caught it.
+
+### 2026-09-25_15-52 planner_Q3S_170K ses_f2761efb2ffeUhMTEM4hgSLKKK
+block_transfer marker matching was unclear this session: COPY failed twice (a line-prefix, then even the full last line of a temp .md file) — traced to the temp file's CRLF last-line (trailing \r) and ambiguity over prefix vs full-line matching; I fell back to the edit tool. A short note in the tool description (CRLF last-line handling + exact-match semantics) or a CRLF-normalize in the matcher would save retries. (He has a block_transfer_tool upgrade draft in progress.)
+
