@@ -381,6 +381,28 @@
       },
       "color": "accent"
     },
+    "explorer_Q3S_245K_slow": {
+      "description": "very high intelligence, speedrating 45, 245k context, high precision, highest general knowledge: for research and exploration of needed information",
+      "mode": "all",
+      "model": "llama-swap/Qwen3.8-27B-Q3S-245K-slow",
+      "prompt": "{file:./.opencode/agent/prompts/agents/prompt_agent_task.md}\n{file:./.opencode/agent/prompts/agents/prompt_agent_explorer.md}",
+      "temperature": 1.0,
+      "permission": {
+        "task": "allow",
+        "edit": {
+          "*": "allow",
+          "C:/Users/Wasiejen/AppData/Local/Temp/opencode" : "allow",
+          "AGENTS.md": "deny",
+          ".opencode/agent/prompts/**": "deny",
+          ".opencode/agent/handover/handover_planner.md": "deny",
+          ".git/**": "deny",
+          ".github/**": "deny"
+        },
+        "bash": "allow",
+        "webfetch": "allow"
+      },
+      "color": "accent"
+    },
     "planner_Q3XS_262K": {
       "description": "plans tasks and delegates to sub-agents: high intelligence, speedrating 62, 262k context, medium-high precision, medium-high general knowledge: best for very complex coding and code review work",
       "mode": "all",

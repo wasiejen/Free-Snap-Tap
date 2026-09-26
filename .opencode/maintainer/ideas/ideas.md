@@ -27,7 +27,10 @@
   So the "second stop" left no result channel at all — only the committed + staged state. Now that both compactions are in, the session should be below the wall. Verifying, then retrying the resume:
 
   submit [feedback=A worker session that stops at the context wall WITHOUT triggering a self-compaction returns only an EMPTY Task result (no error, no Work State, no loop-log line) — recovery required full file forensics (git log + status + in-progress handover). A signal in the result channel (stop reason) or a plugin-side detection + `-WARNING` loop-log line for silent limit-stops would make the resume decision instant instead of forensic.]
-  
+
+2026-09-26_07-50:
+- explorer prompt needs a general makeover as a reseasrch, information finder, map creator for e.g. apis
+
 2026-09-25_14-46 
 - planner-15 session was switched to Build agent on start of the new session?
   - lets see if this repeats
