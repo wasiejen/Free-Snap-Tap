@@ -4,91 +4,38 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 
-## Current session — autorun, 2026-09-26 (ses_f22c8986affegfHMJhzUxDFDkp, planner-21, Qwen3.8-27B-Q3S-245K-slow)
-- **S4 LANDED (37c2479, worker-21 `worker_Q3S_245K_slow`
-  ses_f22c5c7fdffeNsWFzlfdsFterN, planner-verified):** MAP mode
-  (line count + head3/tail3 + heading skeleton max 10 then `+N more`,
-  lines verbatim WITH line numbers; detection = `^#{1,6} ` at column 0
-  only — indented `#` excluded, no file-type sniffing) + `last_write`
-  auto-buffer (SILENT by design — every successful WRITE auto-stores its
-  text, overwritten per WRITE, no parameter; the probe-pinned WRITE
-  feedback line 305–309 byte-unchanged; documented in description +
-  `bufferName` arg) + Part I description rework (WHEN/WHEN-NOT lead,
-  sharpened boundary vs `edit` (string-level exact match) and `write`
-  (whole-file), final 11-mode set, EXAMPLE before EDGE, PEEK full-
-  content sentence kept, pinned first one-liner byte-identical) +
-  schema mode enum gains MAP (11 values, spec order) + 11 new smoke
-  pins (G×6 + H×5) + the sandbox mode-list pin RE-PINNED 8→11 modes
-  (RATIFIED — same semantics, no new check type). Probe 316/316
-  (UNCHANGED per spec — no new probe checks), block_transfer 123/123
-  (112+11), sandbox 64/64 (61+3), pytest 459+1w, ruff F=0 — planner
-  spot re-run: 123/123 + 64/64. Baselines re-verified pre-edit by the
-  worker (all matched — no stale baseline this time). **The bt-v2 WAVE
-  IS COMPLETE (S1–S4).** Journal-COLLECT stays deferred (R6 family).
-- **Planner-inline (this session):** probe check 108 (line 3483)
-  mode-enum pin extended to the final 11 values (MAP in spec order) —
-  probe re-run 316/316 green; todo_inbox entry curated (that fix); the
-  S4 spec's proposal path corrected to `.opencode/proposals/approved/…`
-  (worker friction).
-- **NEW-HIRE + HELD-OUT TESTS BLOCKED on the maintainer's process
-  restart (found this session):** the LIVE process predates S2 —
-  the live `block_transfer` registration carries the 7 pre-S2 modes
-  (no APPEND/WRITE/PEEK/MAP — my own session's tool schema confirms
-  it), so a live new-hire agent cannot exercise the new modes until
-  the maintainer restarts opencode (the SAME pending restart as the
-  #102 live acceptance). On restart: NEW-HIRE TEST (a fresh agent
-  uses every mode from the description ALONE — file-blind task) →
-  HELD-OUT multi-step task (assemble a 3-section file from two
-  sources via COPY-list + APPEND, then a 2-region WRITE-list, verify
-  via PEEK/MAP; measure tool calls / errors / tokens from the raw
-  transcript — script-extract from the transcript, never raw-read).
-- **R3 LANDED** (takeover worker-21 `worker_Q3S_245K_slow`
-  ses_f2241f704ffeRVZb6oMIi5epGP, planner-verified): the first R3 run
-  (ses_f22a9f87) hit the context wall with all four channels already
-  implemented (495-line UNCOMMITTED, never-gate-verified diff) → fresh
-  takeover per the plan6 worker-8 precedent (task_id resume NOT viable
-  — the context_recovery incident below left that session on the wrong
-  agent/window): staged diff committed `3ec1c5c` + probe S31 (21 pins,
-  checks 317–337: per-surface pins + the drift-guard equivalence vs
-  block_transfer's own matchAnchorLines) + ONE real staged-diff bug
-  found and fixed in `44c50a2` (`LOCATOR_MAX_FILE_CHARS` used but never
-  imported — ReferenceError swallowed into intercept-error lines) +
-  9 per-channel smoke checks `20d5a48` (68→77). Gate: probe **337/337**
-  (316+21), intercept smoke **77/77**, pytest 459+1w, ruff F=0 —
-  planner spot re-run: 77/77. R3 live acceptance joins the
-  pending-maintainer queue.
-- **14-26 INCIDENT (the R3 launch) + proposal filed:** context_recovery
-  independently compacted the dead worker AND resumed it (two active
-  sessions on the single slot) with its agent switched to the DEFAULT
-  `planner_Q3S_170K` / 170K model (verified in DB: agent + model
-  fields) — full-prefill ping-pong (maintainer measured 4+ min per
-  step); he stopped it via restart and DEACTIVATED context_recovery
-  (autoCompact 98% of 240k now armed in compact_budget.json). Proposal
-  filed at his request (no sugarcoating):
-  `proposals/2026-09-26_compaction-unification.md` — Part A shared
-  `compaction_core.ts` (one behavior: config/budget/keepTokens/
-  summarizer-pair-with-session-providerID+modelID/summarize call/
-  COMPACT line; both plugins become thin wrappers), Part B
-  context_recovery compacts ONLY (no resume — unit-4 owns resuming),
-  Part C probe equivalence pin (drift guard). Awaiting his approval.
-- THEN: loop_log-v2 (flagged stale 14+ days — his priority.md note
-  says not yet implemented; queued behind the tests).
-- OPEN (maintainer, non-blocking): WRITE-on-absent-file semantic
-  (S3 open question).
-- Live acceptances still pending the maintainer: #102 (post-restart
-  `/tmp` redirect probe — same restart as the new-hire tests),
-  #99 live fork test, #98 (self-compact→idle cycle), R3 (the four
-  channels live), and the compaction-unification proposal (its live
-  acceptance = the context_recovery re-enable itself).
+## Current session — autorun, 2026-09-26 (ses_f21d0ced5ffe2Oyf9h3GdN3CMc, planner-22, Qwen3.8-27B-Q3S-245K-slow)
+- **RESTART DETECTED:** the live process now carries the full 11-mode
+  `block_transfer` (my own live tool schema shows MAP/PEEK/WRITE/
+  APPEND + the `last_write` documentation — plan21's check had found
+  the pre-S2 7-mode registration). The maintainer restarted opencode
+  after plan21 → UNBLOCKED: the new-hire + held-out tests, the #102
+  `/tmp` live acceptance, the R3 four-channel live acceptance.
+- **plan22 = the live-verification pass** (spec `plan22_ho_task.md`,
+  worker `worker_Q3S_245K_slow`, the ONLY active worker in the live
+  opencode.jsonc — verified at spec time): Unit 1 = #102 /tmp redirect
+  (bash + typed-arg forms) + R3's four channels (grep/glob pair,
+  section-anchor resolver, bash quoted-form, bt anchor-marker —
+  trigger shapes pinned from the smoke fixtures); Unit 2 = NEW-HIRE
+  test (11 modes, description-only, file-blind, friction list);
+  Unit 3 = HELD-OUT assembly (COPY-list + APPEND + PASTE + 2-region
+  WRITE-list + PEEK/MAP, exact 9-line expected file). VERIFICATION
+  ONLY — no code change, no gate, no worker commits. The held-out
+  measurement (tool calls / errors / tokens) is PLANNER-side from the
+  worker's transcript (script-extract, never raw-read).
+- THEN (next iteration): loop_log-v2 build
+  (`approved/2026-09-12_loop_log-v2.md` — the maintainer moved it back
+  to approved/ 2026-09-26 because it is not yet implemented).
+- Still pending the maintainer (non-blocking): #99 live fork test,
+  #98 (self-compact→idle cycle), the compaction-unification proposal
+  (`proposals/2026-09-26_compaction-unification.md` — awaiting his
+  approval; live acceptance = the context_recovery re-enable), the
+  WRITE-on-absent-file semantic (S3 open question).
 - Maintainer's live files uncommitted in the tree (his domain,
-  untouched): `opencode.jsonc` + `.opencode/maintainer/priority.md`
-  (the 14-26 observation); `compact_budget.json` (temp file —
-  context_recovery deactivated, autoCompact 98%/240k armed).
-- Friction logged: `todo_inbox.md` lives at the repo ROOT (not under
-  `.opencode/agent/` — the prompts name it without a path).
-
+  untouched): `opencode.jsonc` + `.opencode/maintainer/priority.md`.
 
 ## Compressed archive (one line each
+  - 2026-09-26 autorun (ses_f22c8986affegfHMJhzUxDFDkp, planner-21, Q3S-245K-slow) — bt-v2 S4 LANDED (37c2479 — MAP + last_write + Part I description; wave COMPLETE S1–S4) + R3 LANDED via takeover (3ec1c5c/44c50a2/20d5a48: staged-diff commit + missing-import fix + probe S31 21 pins + 9 smoke checks; gate 337/337 + io 77/77) + 14-26 context_recovery incident → compaction-unification proposal filed (awaiting approval) + new-hire/held-out tests found restart-blocked + todo_inbox-path friction logged — details: loop folder plan21_summary.md + git 60e3cb1..efbff11
  - 2026-09-26 autorun (ses_f24a7fc46ffeHrj1SC7Q9CVpqc, planner-20, Qwen3.8-27B-Q3S-245K-slow) — maintenance pass (iter 20: knowledge inbox empty, #100 header fixed, stale proposals flagged) + bt-v2 S1/S2/S3 LANDED (0d85a8c/f5f888c/8cc8819, planner-verified each) + maintainer live-report triage → TODO #102 LANDED (be07ce6, `/tmp`+`/var/tmp` -> scratchpad root, live acceptance pending maintainer restart) + S15 108/109 re-pin RATIFIED — baseline probe 316/316, bt 112+61; OPEN: WRITE-on-absent-file semantic (maintainer) — details: loop folder plan20_summary.md + git 4b466f1..33b85a7
  - 2026-09-26 autorun (ses_f24c5d8a8ffe4bIlW0kjoMbCCF, planner-19, Qwen3.8-27B-Q3S-245K-slow) — #101 LANDED (explorer_Q3S_170K ses_f24bf71beffekwRYMtnlrWy5UG: spec `37847e8` → map commit `1081e52`, `knowledge/opencode-plugins/host-map.md` 420 lines, all 6 areas dated + located; 4 locator spot-checks all matched the installed build) + queue set for iter 20 (maintenance pass first, then the bt-v2 build) — details: loop folder plan19_summary.md + git 37847e8/1081e52/b4aebbc
 - 2026-09-25/26 autorun (ses_f27282d2dfferl9gScrfLt2AxV, planner-17→18, Q3S-170K→245K-slow) — #100 LANDED (worker-18: bc374b2 removal + 910e767 bookkeeping, planner-verified: smoke 64/64, probe 297/297, pytest 459+1w, ruff F=0) + his 4 autorun decisions resolved (bt-v2 GO → approved by him + model→245k; R3 after bt-v2; same-model delegation; quality-distill/programmer DEFERRED) + orientation.md written + queue set (#101 → bt-v2 → R3 → loop_log-v2; maintenance at iter 20) + friction entry b6cb1b8 — details: loop folder plan17_summary.md + plan18_summary.md + git 4db671b..b6cb1b8
