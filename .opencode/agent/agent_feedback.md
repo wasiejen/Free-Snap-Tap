@@ -578,3 +578,6 @@ todo_inbox.md lives at the repo ROOT, not under .opencode/agent/ — the role pr
 ### 2026-09-26_17-31 worker_Q3S_245K_slow ses_f21bb91c2ffeQg2hBM5li8ZnAQ
 plan22: quantized worker (Q3S) cannot emit numeric-word pair forms in read.offset (7/7 → integer 1) nor block_transfer.startMarker (5/5 → canon form, 1× off-by-one 8≠7); pairs survive only in bash/grep strings — R3 acceptances 1.3/1.5 are unverifiable from a worker session on this model class.
 
+### 2026-09-26_17-53 planner_Q3S_245K_slow ses_f21d0ced5ffe2Oyf9h3GdN3CMc
+plan22 friction: live-acceptance specs assume the live opencode process == current git HEAD — after the 14-26 mid-incident restart that was false (the live process loaded the dead worker's staged diff without the 44c50a2 import fix), so the worker spent ~12 attempts chasing a model-side root cause before the planner's spot-check found the swallowed `intercept-error LOCATOR_MAX_FILE_CHARS is not defined`. Fix: live-acceptance specs should open with a cheap build canary (e.g. trigger one known-current-behavior line and confirm it appears in intercept.log) before the acceptance battery, and the planner should re-verify live process state after ANY mid-incident restart, not just at session start.
+
