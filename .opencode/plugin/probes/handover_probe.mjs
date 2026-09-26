@@ -914,9 +914,26 @@
 //      (337) HOOK targetMarker ownership: the targetMarker resolves
 //          against the EFFECTIVE dstFile (not the srcFile) — mutated
 //          line=1 arg=targetMarker.
+//   S32 compaction unification equivalence (3) — 2026-09-26 (approved
+//      proposal 2026-09-26_compaction-unification.md Part C — the drift
+//      guard: both entry points route through the shared
+//      compaction_core.ts, so they can never silently diverge again):
+//      (338) the core module surface: type-stripped direct import + the
+//          named exports are functions (+ SELF_ROOT) + NO default export
+//          (the plain-module pattern);
+//      (339) the EQUIVALENCE of the summarizer-pair + keep resolution:
+//          the tool dispatch and the hook fire over the SAME session/
+//          model fixture (no sandbox opencode.jsonc — the pair comes
+//          from the session's OWN model, the 14-26 fix) → the SAME
+//          summarize body (pair + keep);
+//      (340) the EQUIVALENCE of the cap semantics: a cap-2 pinned model
+//          — the tool allows 2 then refuses (no emergency arg, naming
+//          the availability); the hook allows 2 normal, then auto-
+//          consumes the emergency 1 (the ` emergency` line suffix),
+//          then clean-fails — NO prompt (Part B).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=13 S12=4 S13=21 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S25=7 S26=20 S27=8 S28=12 S29=8 S30=11 S31=21 hygiene=6  →  "PROBE handover: 337/337 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=13 S12=4 S13=21 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S25=7 S26=20 S27=8 S28=12 S29=8 S30=11 S31=21 S32=3 hygiene=6  →  "PROBE handover: 340/340 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -7666,6 +7683,120 @@ n29++;
       JSON.stringify({ after: bt6.targetMarker, n: lF.length - nF, f: fF }),
     );
     n31++;
+  }
+}
+
+// ------------------------------------------------------------------ S32 compaction unification equivalence (3)
+//
+// 2026-09-26 unification Part C (the drift guard): ONE compaction
+// behavior BY CONSTRUCTION — both entry points (the compact_memory tool
+// + the context_recovery hook) route through the shared core
+// (compaction_core.ts — the T5 plain module). This section pins: (1)
+// the core's module surface, (2) the EQUIVALENCE of the summarizer-pair
+// + keep resolution (the tool dispatch and the hook fire over the SAME
+// session/model fixture — no sandbox opencode.jsonc — the pair must
+// come from the session's OWN model, the 14-26 incident fix), (3) the
+// EQUIVALENCE of the cap semantics (a cap-2 pinned model: the tool
+// allows 2 then refuses without the emergency arg; the hook allows 2
+// normal, then auto-consumes the emergency 1, then clean-fails).
+// Reuses S13's tool import (qcMod) + S11's hook import (rcMod) + the
+// shared sandbox (the store is written per block; fresh ses_eq_* ids;
+// the S14 dump stub keeps the tool dispatch responses byte-exact).
+{
+  const EQ_MODEL = "eq-model-120K";
+  const EQ_PROVIDER = "eq-prov";
+  const eqMsgs = [{ info: { modelID: EQ_MODEL, providerID: EQ_PROVIDER } }];
+  rmSync(path.join(SANDBOX, "opencode.jsonc"), { force: true });
+  rcMessages = eqMsgs;
+  rcMessagesError = null;
+  let n32 = 338;
+
+  // 338 — the core module surface: type-stripped direct import (the same
+  //      way the entry points import it) + the expected named exports
+  //      are functions (+ SELF_ROOT the string constant) + NO default
+  //      export (the plain-module pattern — never loaded by the host
+  //      plugin loader)
+  {
+    const CORE_TS = path.join(REPO_ROOT, ".opencode", "plugin", "compaction_core.ts");
+    const core = await import(pathToFileURL(CORE_TS).href);
+    const fns = ["readCompactionConfig", "computeKeepTokens", "resolveCap", "resolveRoot", "budgetCount", "recordSuccess", "appendCompactLine", "recordVerifiedSuccess", "stripJsoncComments", "resolveCompactionModel", "readRootConfigContent", "resolveModel", "isKeepRejectedError", "compactionFailure", "errorMessage", "callSummarize", "localStamp"];
+    check(
+      String(n32),
+      "S32",
+      "the core module surface: type-stripped direct import + the named exports are functions (+ SELF_ROOT) + NO default export (the plain-module pattern)",
+      fns.every((k) => typeof core[k] === "function") && typeof core.SELF_ROOT === "string" && core.default === undefined,
+      JSON.stringify(Object.keys(core)),
+    );
+    n32++;
+  }
+
+  // 339 — EQUIVALENCE: the summarizer-pair + keep resolution. The tool
+  //      dispatch (CROSS, explicit sessionID) and the hook fire over
+  //      the SAME messages fixture (no sandbox opencode.jsonc — the
+  //      pair resolves from the session's OWN model) → the SAME
+  //      summarize body (providerID + modelID + keep { messages })
+  {
+    rcSetStore((store) => { store.emergencyRecovery = true; store.keepMessages = 5; store.emergency_budget = 1; store.model_budget = { [EQ_MODEL]: 2, default: 1 }; delete store.keepTokens; });
+    const { rec: tRec, res: tRes } = await qcExec({ summarize: true, messages: eqMsgs }, { sessionID: "ses_eq_tool", keepMessages: 5 }, {});
+    await qcTick();
+    const toolBody = tRec.summarize.at(-1)?.body;
+    const beforeHook = rcCalls.summarize.length;
+    await rcFireError("ses_eq_hook", rcOVF("exceeds the available context size"));
+    const hookBody = rcCalls.summarize.slice(beforeHook).at(-1)?.body;
+    const expectedBody = { providerID: EQ_PROVIDER, modelID: EQ_MODEL, keep: { messages: 5 } };
+    check(
+      String(n32),
+      "S32",
+      "EQUIVALENCE: the tool dispatch + the hook fire over the SAME session/model fixture (no sandbox config) → the SAME summarize body (the session's OWN pair + keep { messages: 5 }, no tokens)",
+      /dispatched/i.test(tRes) &&
+        JSON.stringify(toolBody) === JSON.stringify(expectedBody) &&
+        JSON.stringify(hookBody) === JSON.stringify(expectedBody),
+      JSON.stringify({ toolBody, hookBody }),
+    );
+    n32++;
+  }
+
+  // 340 — EQUIVALENCE: the cap semantics (the cap-2 pinned model — the
+  //      tool's arg path + the hook's auto path): the tool dispatches
+  //      twice then REFUSES (no emergency arg — naming the
+  //      availability, count stays 2); the hook fires twice normal
+  //      (count → 2 == cap), then AUTO-CONSUMES the emergency 1 (the
+  //      ` emergency` line suffix, count → 3), then CLEAN-FAILS (no 4th
+  //      compact) — NO prompt anywhere (Part B)
+  {
+    rcSetStore((store) => { store.emergencyRecovery = true; store.keepMessages = 1; store.emergency_budget = 1; store.model_budget = { [EQ_MODEL]: 2, default: 1 }; delete store.keepTokens; });
+    const { res: c1 } = await qcExec({ summarize: true, messages: eqMsgs }, { sessionID: "ses_eq_cap_tool", keepMessages: 1 }, {});
+    await qcTick();
+    const { res: c2 } = await qcExec({ summarize: true, messages: eqMsgs }, { sessionID: "ses_eq_cap_tool", keepMessages: 1 }, {});
+    await qcTick();
+    const { res: c3 } = await qcExec({ summarize: true, messages: eqMsgs }, { sessionID: "ses_eq_cap_tool", keepMessages: 1 }, {});
+    const toolCount = rcReadBudget()?.sessions?.ses_eq_cap_tool?.count;
+    const hBefore = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+    await rcFireError("ses_eq_cap_hook", rcOVF("exceeds the available context size"));
+    await rcFireIdle("ses_eq_cap_hook");
+    await rcFireError("ses_eq_cap_hook", rcOVF("exceeds the available context size"));
+    const hCount2 = rcReadBudget()?.sessions?.ses_eq_cap_hook?.count;
+    await rcFireIdle("ses_eq_cap_hook");
+    await rcFireError("ses_eq_cap_hook", rcOVF("exceeds the available context size"));
+    const hCount3 = rcReadBudget()?.sessions?.ses_eq_cap_hook?.count;
+    const emgLine = ctxLogLines().find((l) => l.includes("COMPACT ses_eq_cap_hook") && l.includes(" emergency"));
+    await rcFireIdle("ses_eq_cap_hook");
+    const hBefore4 = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
+    await rcFireError("ses_eq_cap_hook", rcOVF("exceeds the available context size"));
+    const hCount4 = rcReadBudget()?.sessions?.ses_eq_cap_hook?.count;
+    check(
+      String(n32),
+      "S32",
+      "EQUIVALENCE cap semantics (cap 2): the tool dispatches 2 then refuses (no emergency arg — naming the availability, count 2); the hook fires 2 normal, auto-consumes the emergency 1 (the ` emergency` line, count 3), then clean-fails (count stays 3) — NO prompt (Part B)",
+      /dispatched/i.test(c1) && /dispatched/i.test(c2) &&
+        /refused/i.test(c3) && c3.includes("cap 2") && c3.includes("2/2") && c3.includes("`emergency` argument") &&
+        toolCount === 2 &&
+        rcCalls.summarize.length - hBefore.s === 3 && rcCalls.prompt.length === hBefore.p &&
+        hCount2 === 2 && hCount3 === 3 && emgLine != null &&
+        rcCalls.summarize.length === hBefore4.s && hCount4 === 3,
+      JSON.stringify({ c3: String(c3).slice(0, 160), toolCount, hCount2, hCount3, hCount4, emgLine, dp: rcCalls.prompt.length - hBefore.p }),
+    );
+    n32++;
   }
 }
 
