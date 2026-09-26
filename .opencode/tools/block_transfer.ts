@@ -96,28 +96,168 @@ function resolveAnchorOrError(fileRef: string, label: string, fileText: string, 
   return { error: matches.length === 0 ? notFoundError(fileRef, label, anchor) : nonUniqueError(fileRef, label, anchor) };
 }
 
+// ===== LINE-NUMBER REFS + ASSEMBLY (approved proposal 2026-09-25_block_transfer-v2, Parts B+C) =====
+//
+// Part B: EVERY ref side (startMarker / endMarker / targetMarker, and each
+// item of the Part C 'refs' lists) is a marker string OR an integer line
+// number (1-based, absolute). The disambiguation is at the SCHEMA level
+// (poka-yoke): the schema carries string | integer, so the runtime reads
+// the TYPE — no string sniffing (the string "42" is a prefix MARKER that
+// must match a line beginning with "42"; the number 42 is line 42, full
+// stop). A numeric ref resolves to that exact line of the PRE-call file
+// state (no marker lookup); beyond the file's line count -> the S1
+// ref-out-of-range error (with the count).
+type Ref = string | number;
+
+// The presence test for a ref: absent = null / undefined / "" (the S1 falsy
+// forms — byte-compatible); 0 IS present (it then fails the 1-based check
+// with the teaching error instead of a silent skip).
+function refPresent(ref: Ref | undefined): boolean {
+  return ref !== undefined && ref !== null && ref !== "";
+}
+
+// The file's conceptual line count: the SAME /\r?\n/ split the rest of the
+// tool uses, minus the empty tail element a trailing newline produces
+// ("a\nb\n" = 2 lines; "" = 0 lines).
+export function countLines(fileText: string): number {
+  if (fileText === "") return 0;
+  const n = fileText.split(/\r?\n/).length;
+  return fileText.endsWith("\n") ? n - 1 : n;
+}
+
+// The single routing entry for a REF (marker string OR line number): a
+// number resolves directly (range-checked against the PRE-call state), a
+// string routes through the S1 anchor rule (resolveAnchor — untouched).
+export function resolveRef(fileRef: string, label: string, fileText: string, ref: Ref): AnchorResolution {
+  if (typeof ref === "number") {
+    if (!Number.isInteger(ref) || ref < 1) {
+      return { error: `Error: ${label} ${ref} is not a 1-based line number in ${fileRef}.` };
+    }
+    const lineCount = countLines(fileText);
+    if (ref > lineCount) return { error: refOutOfRangeError(fileRef, ref, lineCount) };
+    return { line: ref };
+  }
+  return resolveAnchorOrError(fileRef, label, fileText, ref);
+}
+
+// Part C: a 'text' form -> lines (split on \r?\n; a trailing newline does
+// NOT add a blank line — the same convention as the file handling).
+function textToLines(text: string): string[] {
+  if (text === "") return [];
+  const lines = text.split(/\r?\n/);
+  return text.endsWith("\n") ? lines.slice(0, -1) : lines;
+}
+
+type AssemblyResolved = { fileRef: string | null; lines: string[]; rangeText: string };
+type AssemblyResult = { error: string } | AssemblyResolved;
+
+// Part C: the shared input resolution for COPY (replace-into-buffer) and
+// APPEND (append-to-buffer). EXACTLY ONE of three forms:
+//   single-ref: srcFile + startMarker..endMarker (each a marker-or-number —
+//     the S1 form, byte-compatible);
+//   refs list:  srcFile + refs (each ref selects ONE line of srcFile; the
+//     sections go into the buffer joined by EXACTLY ONE \n — the documented
+//     default, no parameter);
+//   text:       the text's lines directly (no file).
+// ALL refs resolve against the PRE-call src state; every check runs before
+// any buffer change (no partial state on rejection).
+function resolveAssembly(mode: string, args: any, cwd: string): AssemblyResult {
+  const hasText = typeof args.text === "string";
+  const hasRefs = Array.isArray(args.refs);
+  const hasSingle = args.startMarker !== undefined || args.endMarker !== undefined;
+  if (hasText && (hasRefs || hasSingle)) {
+    return { error: "Error: the 'text' form takes the input alone (no 'refs', no markers)." };
+  }
+  if (hasRefs && hasSingle) {
+    return { error: "Error: the 'refs' list takes the input alone (no markers)." };
+  }
+  if (hasText) {
+    const lines = textToLines(args.text);
+    return { fileRef: null, lines, rangeText: lines.length > 0 ? `1..${lines.length}` : "" };
+  }
+  if (hasRefs) {
+    if (!args.srcFile) return { error: `Error: 'srcFile' is required for the 'refs' form of ${mode} mode.` };
+    const srcPath = path.resolve(cwd, args.srcFile);
+    const violation = sandboxCheck(cwd, args.srcFile);
+    if (violation) return { error: violation };
+    if (!fs.existsSync(srcPath)) return { error: `Error: Source file '${args.srcFile}' not found.` };
+    const srcRaw = fs.readFileSync(srcPath, "utf-8");
+    const srcLines = srcRaw.split(/\r?\n/);
+    const resolved: number[] = [];
+    for (const ref of args.refs) {
+      const r = resolveRef(args.srcFile, "List ref", srcRaw, ref);
+      if ("error" in r) return { error: r.error };
+      resolved.push(r.line);
+    }
+    return { fileRef: args.srcFile, lines: resolved.map((l) => srcLines[l - 1]), rangeText: resolved.join(", ") };
+  }
+  // single-ref form (including the bare call) — the S1 required-error covers
+  // every missing part, byte-compatible.
+  if (!args.srcFile || !refPresent(args.startMarker) || !refPresent(args.endMarker)) {
+    if (mode === "APPEND" && args.srcFile === undefined && args.startMarker === undefined && args.endMarker === undefined) {
+      return { error: "Error: APPEND needs one input form: a 'refs' list, 'startMarker'+'endMarker' (with srcFile), or 'text'." };
+    }
+    return { error: `Error: 'srcFile', 'startMarker', and 'endMarker' are required for mode ${mode}.` };
+  }
+  const srcPath = path.resolve(cwd, args.srcFile);
+  const violation = sandboxCheck(cwd, args.srcFile);
+  if (violation) return { error: violation };
+  if (!fs.existsSync(srcPath)) return { error: `Error: Source file '${args.srcFile}' not found.` };
+  const srcRaw = fs.readFileSync(srcPath, "utf-8");
+  const srcLines = srcRaw.split(/\r?\n/);
+  const start = resolveRef(args.srcFile, "Start marker", srcRaw, args.startMarker);
+  if ("error" in start) return { error: start.error };
+  const end = resolveRef(args.srcFile, "End marker", srcRaw, args.endMarker);
+  if ("error" in end) return { error: end.error };
+  // The unified rule resolves both refs file-wide; an end resolved
+  // BEFORE the start keeps the pinned legacy error (probe 115).
+  if (end.line < start.line) {
+    return { error: `Error: End marker '${args.endMarker}' not found after start marker.` };
+  }
+  return { fileRef: args.srcFile, lines: srcLines.slice(start.line - 1, end.line), rangeText: `${start.line}..${end.line}` };
+}
+
+// Part F feedback (one line per op — the ops S2 adds/touches = COPY/APPEND):
+// resolved line range + line count + truncated first-line echo (capped at
+// 40 chars, '...' marker); buffer ops add the buffer's line count AFTER
+// the op.
+function assemblyFeedback(verb: string, prep: string, a: AssemblyResolved, bufferKey: string, bufferAfter: number): string {
+  const lw = (m: number) => `${m} line${m === 1 ? "" : "s"}`;
+  const first = a.lines[0] ?? "";
+  const echo = first.length > 40 ? first.slice(0, 40) + "..." : first;
+  const srcLabel = a.fileRef === null ? "text" : `'${a.fileRef}'`;
+  const mid = a.rangeText !== "" ? ` (lines ${a.rangeText}, first: '${echo}')` : "";
+  return `${verb} ${lw(a.lines.length)} from ${srcLabel} ${prep} buffer '${bufferKey}'${mid} - buffer: ${lw(bufferAfter)}.`;
+}
+
 export default tool({
    description: `Move, copy, cut, paste, delete, or clear multi-line blocks in files using short unique line-prefix anchors and named clipboard buffers.
 
-MODES — MOVE: immediate cut-and-paste, extracts a block from srcFile and inserts it into dstFile in one call. COPY: extract a block from srcFile into a buffer, leaving the source untouched. CUT: extract into a buffer AND delete from the source. PASTE: write a buffer into dstFile. REPLACE: replace the line-anchored span (startMarker..endMarker inclusive) of dstFile with the contents of a named buffer — edit-like region replacement WITHOUT an exact oldString match (REPLACE never creates a file). DELETE: extract a block and discard it (purge without outputting). CLEAR: empty a buffer. Use MOVE for a single direct transfer; use COPY/CUT + PASTE for multi-buffer work across files (one buffer can be pasted several times); use REPLACE to swap a region in place (PASTE inserts, it does not replace).
+MODES — MOVE: immediate cut-and-paste, extracts a block from srcFile and inserts it into dstFile in one call. COPY: extract a block from srcFile into a buffer, leaving the source untouched — input forms: a single-ref pair (startMarker..endMarker), a 'refs' LIST, or a 'text' key (direct text -> buffer). APPEND: append to the named buffer, created if absent — the SAME input forms as COPY (stepwise assembly, no flags). CUT: extract into a buffer AND delete from the source. PASTE: write a buffer into dstFile. REPLACE: replace the line-anchored span (startMarker..endMarker inclusive) of dstFile with the contents of a named buffer — edit-like region replacement WITHOUT an exact oldString match (REPLACE never creates a file). DELETE: extract a block and discard it (purge without outputting). CLEAR: empty a buffer. Use MOVE for a single direct transfer; use COPY/CUT + PASTE for multi-buffer work across files (one buffer can be pasted several times); use COPY/APPEND to assemble a buffer without a scratchpad round-trip; use REPLACE to swap a region in place (PASTE inserts, it does not replace).
 
-ANCHORS — startMarker and endMarker are short UNIQUE line prefixes; the block spans the start line through the end line INCLUSIVE. For MOVE/PASTE, an optional targetMarker (a unique line prefix in dstFile) sets the insertion point right after that line; omit it to append at EOF. For REPLACE, startMarker/endMarker are the span in dstFile itself (no targetMarker).
+REFS — every ref (startMarker / endMarker / targetMarker, and each item of a COPY/APPEND 'refs' list) is a marker string OR an integer line number (1-based, absolute, resolved against the PRE-call file state). The TYPE decides (schema poka-yoke — no string sniffing: the string "42" is a prefix MARKER, the number 42 is line 42). A line number beyond the file's line count returns the ref-out-of-range error (with the count).
+
+ANCHORS — a marker ref is a short UNIQUE line prefix; the block spans the start line through the end line INCLUSIVE. For MOVE/PASTE, an optional targetMarker (marker or line number in dstFile) sets the insertion point right after that line; omit it to append at EOF. For REPLACE, startMarker/endMarker are the span in dstFile itself (no targetMarker).
+
+ASSEMBLY — COPY 'refs' LIST form: each ref selects ONE line of srcFile; the sections go into the buffer joined by EXACTLY ONE \\n (documented default — no parameter). COPY 'text' form: the text is split into lines (a trailing newline adds no blank line). COPY keeps the REPLACE-into-buffer semantics (the buffer is replaced, never appended); APPEND appends (creates the buffer if absent). Feedback for COPY/APPEND: one line — resolved line range + line count + truncated first-line echo (~40 chars, '...' when cut) — plus the buffer's line count AFTER the op.
 
 BUFFERS — bufferName selects a named clipboard buffer (default 'default'); multiple buffers can coexist in one session; CLEAR empties one. For REPLACE the buffer supplies the replacement content (and is preserved afterwards, like PASTE).
 
 SANDBOX — all file access (reads AND writes) is confined to the working directory and the Windows temp directory; any path outside is rejected with an error.
 
-EDGE — a non-unique anchor, a missing required path, an empty PASTE or REPLACE buffer, or an out-of-sandbox path each return an error naming the cause — read the error, fix the input, re-issue (a non-unique anchor: widen the prefix, do not guess).
+EDGE — a non-unique anchor, a missing required path, an out-of-range line-number ref, an empty PASTE or REPLACE buffer, or an out-of-sandbox path each return an error naming the cause — read the error, fix the input, re-issue (a non-unique anchor: widen the prefix, do not guess).
 
 EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TODO.md into BACKLOG.md, right after its "# Backlog" header line:
   { "mode": "MOVE", "srcFile": "TODO.md", "dstFile": "BACKLOG.md", "startMarker": "## TODO", "endMarker": "## Notes", "targetMarker": "# Backlog" }`,
-  args: {
-    mode: tool.schema.enum(["MOVE", "COPY", "CUT", "PASTE", "REPLACE", "DELETE", "CLEAR"]).describe("Operation mode: MOVE (immediate cut-and-paste), COPY (yank to buffer), CUT (yank to buffer and delete from source), PASTE (write buffer to target), REPLACE (replace the line-anchored span of dstFile with a named buffer), DELETE (cut to null), CLEAR (empty buffer)."),
-    srcFile: tool.schema.string().optional().describe("Source file path. Required for MOVE, COPY, CUT, and DELETE."),
+    args: {
+    mode: tool.schema.enum(["MOVE", "COPY", "APPEND", "CUT", "PASTE", "REPLACE", "DELETE", "CLEAR"]).describe("Operation mode: MOVE (immediate cut-and-paste), COPY (yank to buffer — single-ref pair, 'refs' list, or 'text'), APPEND (append to the named buffer, created if absent — the same forms as COPY), CUT (yank to buffer and delete from source), PASTE (write buffer to target), REPLACE (replace the line-anchored span of dstFile with a named buffer), DELETE (cut to null), CLEAR (empty buffer)."),
+    srcFile: tool.schema.string().optional().describe("Source file path. Required for MOVE, CUT, DELETE, and the single-ref and 'refs' forms of COPY/APPEND."),
     dstFile: tool.schema.string().optional().describe("Destination file path. Required for MOVE, PASTE, or REPLACE. For REPLACE the file must exist (REPLACE never creates a file)."),
-    startMarker: tool.schema.string().optional().describe("Unique line anchor marking the beginning of the block (MOVE, COPY, CUT, DELETE; for REPLACE: the span start in dstFile)."),
-    endMarker: tool.schema.string().optional().describe("Unique line anchor marking the end of the block (MOVE, COPY, CUT, DELETE; for REPLACE: the span end in dstFile)."),
-    targetMarker: tool.schema.string().optional().describe("Unique line anchor in dstFile where the block should be inserted. If omitted in MOVE or PASTE, appends to EOF."),
+    startMarker: tool.schema.union([tool.schema.string(), tool.schema.number().int()]).optional().describe("Block start: a marker string (short UNIQUE line prefix) OR an integer line number (1-based, absolute) — the type decides (no string sniffing). Required for the single-ref form (MOVE, COPY, CUT, DELETE; for REPLACE: the span start in dstFile)."),
+    endMarker: tool.schema.union([tool.schema.string(), tool.schema.number().int()]).optional().describe("Block end: a marker string (short UNIQUE line prefix) OR an integer line number (1-based, absolute) — the type decides (no string sniffing). Required for the single-ref form (MOVE, COPY, CUT, DELETE; for REPLACE: the span end in dstFile)."),
+    targetMarker: tool.schema.union([tool.schema.string(), tool.schema.number().int()]).optional().describe("Insertion point in dstFile: a marker string (short UNIQUE line prefix) OR an integer line number (1-based, absolute); the block goes right after that line. If omitted in MOVE or PASTE, appends to EOF."),
+    refs: tool.schema.array(tool.schema.union([tool.schema.string(), tool.schema.number().int()])).optional().describe("COPY/APPEND list form: a LIST of refs (marker string or integer line number each); each ref selects ONE line of srcFile, and the sections go into the buffer joined by EXACTLY ONE \\n. Mutually exclusive with 'text' and the markers."),
+    text: tool.schema.string().optional().describe("COPY/APPEND direct-text form: the text goes into the buffer (split into lines; a trailing newline adds no blank line). Mutually exclusive with 'refs' and the markers."),
     bufferName: tool.schema.string().optional().describe("Name of the clipboard buffer (defaults to 'default'). Allows managing multiple clipboards.")
   },
 
@@ -154,8 +294,8 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
         }
 
         let insertIdx = dstLines.length;
-        if (args.targetMarker) {
-          const target = resolveAnchorOrError(args.dstFile, "Target marker", dstText, args.targetMarker);
+        if (refPresent(args.targetMarker)) {
+          const target = resolveRef(args.dstFile, "Target marker", dstText, args.targetMarker);
           if ("error" in target) return target.error;
           insertIdx = target.line; // 1-based line number: insert right AFTER that line
         }
@@ -172,8 +312,8 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
       // BEFORE any fs write — no partial writes on rejection.
       if (mode === "REPLACE") {
         if (!args.dstFile) return "Error: 'dstFile' is required for REPLACE mode.";
-        if (!args.startMarker) return "Error: 'startMarker' is required for REPLACE mode.";
-        if (!args.endMarker) return "Error: 'endMarker' is required for REPLACE mode.";
+        if (!refPresent(args.startMarker)) return "Error: 'startMarker' is required for REPLACE mode.";
+        if (!refPresent(args.endMarker)) return "Error: 'endMarker' is required for REPLACE mode.";
 
         const dstPath = path.resolve(cwd, args.dstFile);
         const dstViolation = sandboxCheck(cwd, args.dstFile);
@@ -188,9 +328,9 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
 
         const dstText = fs.readFileSync(dstPath, "utf-8");
         const dstLines = dstText.split(/\r?\n/);
-        const start = resolveAnchorOrError(args.dstFile, "Start marker", dstText, args.startMarker);
+        const start = resolveRef(args.dstFile, "Start marker", dstText, args.startMarker);
         if ("error" in start) return start.error;
-        const end = resolveAnchorOrError(args.dstFile, "End marker", dstText, args.endMarker);
+        const end = resolveRef(args.dstFile, "End marker", dstText, args.endMarker);
         if ("error" in end) return end.error;
         const startIdx = start.line - 1;
         const endIdx = end.line - 1;
@@ -206,8 +346,33 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
         return `REPLACED lines ${startIdx + 1}..${endIdx + 1} (${lineWord(replacedCount)}) in '${args.dstFile}' with buffer '${bufferKey}' (${lineWord(buffer.length)}).`;
       }
 
-      // 3. ANCHOR EXTRACTION (MOVE, COPY, CUT, DELETE)
-      if (!args.srcFile || !args.startMarker || !args.endMarker) {
+      // 2c. COPY — yank to buffer (Part C). THREE input forms, exactly one:
+      // a single-ref pair (startMarker..endMarker — the S1 form, byte-
+      // compatible), a 'refs' LIST (each ref selects ONE line), or a 'text'
+      // key (direct text -> buffer). COPY keeps the REPLACE-into-buffer
+      // semantics: the buffer is REPLACED in every form (never appended —
+      // that is APPEND). Part F feedback (one line): resolved line range +
+      // line count + truncated first-line echo; the buffer's line count
+      // AFTER the op (buffer op).
+      if (mode === "COPY") {
+        const a = resolveAssembly("COPY", args, cwd);
+        if ("error" in a) return a.error;
+        clipboardBuffers[bufferKey] = a.lines;
+        return assemblyFeedback("Copied", "into", a, bufferKey, a.lines.length);
+      }
+
+      // 2d. APPEND (Part C) — append to the named buffer, created if absent:
+      // stepwise assembly without flags. The SAME input forms as COPY.
+      if (mode === "APPEND") {
+        const a = resolveAssembly("APPEND", args, cwd);
+        if ("error" in a) return a.error;
+        const before = clipboardBuffers[bufferKey] ?? [];
+        clipboardBuffers[bufferKey] = [...before, ...a.lines];
+        return assemblyFeedback("Appended", "to", a, bufferKey, before.length + a.lines.length);
+      }
+
+      // 3. ANCHOR EXTRACTION (MOVE, CUT, DELETE)
+      if (!args.srcFile || !refPresent(args.startMarker) || !refPresent(args.endMarker)) {
         return `Error: 'srcFile', 'startMarker', and 'endMarker' are required for mode ${mode}.`;
       }
 
@@ -230,11 +395,11 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
       const srcRaw = fs.readFileSync(srcPath, "utf-8");
       const srcLines = srcRaw.split(/\r?\n/);
 
-      const start = resolveAnchorOrError(args.srcFile, "Start marker", srcRaw, args.startMarker);
+      const start = resolveRef(args.srcFile, "Start marker", srcRaw, args.startMarker);
       if ("error" in start) return start.error;
-      const end = resolveAnchorOrError(args.srcFile, "End marker", srcRaw, args.endMarker);
+      const end = resolveRef(args.srcFile, "End marker", srcRaw, args.endMarker);
       if ("error" in end) return end.error;
-      // The unified rule resolves both markers file-wide; an end resolved
+      // The unified rule resolves both refs file-wide; an end resolved
       // BEFORE the start keeps the pinned legacy error (probe 115).
       if (end.line < start.line) {
         return `Error: End marker '${args.endMarker}' not found after start marker.`;
@@ -244,8 +409,8 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
 
       const extractedBlock = srcLines.slice(startIdx, endIdx + 1);
 
-      // Save to named clipboard buffer for COPY or CUT
-      if (mode === "COPY" || mode === "CUT") {
+      // Save to named clipboard buffer for CUT
+      if (mode === "CUT") {
         clipboardBuffers[bufferKey] = extractedBlock;
       }
 
@@ -261,9 +426,6 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
       // Return immediate feedback
       if (mode === "DELETE") {
         return `Deleted ${extractedBlock.length} lines from '${args.srcFile}'.`;
-      }
-      if (mode === "COPY") {
-        return `Copied ${extractedBlock.length} lines from '${args.srcFile}' into buffer '${bufferKey}'.`;
       }
       if (mode === "CUT") {
         return `Cut ${extractedBlock.length} lines from '${args.srcFile}' into buffer '${bufferKey}'.`;
@@ -282,8 +444,8 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
         }
 
         let insertIdx = dstLines.length;
-        if (args.targetMarker) {
-          const target = resolveAnchorOrError(args.dstFile, "Target marker", dstText, args.targetMarker);
+        if (refPresent(args.targetMarker)) {
+          const target = resolveRef(args.dstFile, "Target marker", dstText, args.targetMarker);
           if ("error" in target) return target.error;
           insertIdx = target.line; // 1-based line number: insert right AFTER that line
         }

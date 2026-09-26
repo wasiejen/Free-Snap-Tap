@@ -554,3 +554,6 @@ Explorer's TODO status update left the entry header line stale (#101 header stil
 ### 2026-09-26_07-21 worker_Q3S_245K_slow ses_f249c8026ffeIXec8cQW3sInJ7
 Worker bash redirect to POSIX /tmp was intercepted ("outside sandbox"): under Git-Bash /tmp resolves to the Git install dir, not the pre-approved scratchpad. The worker-prompt scratchpad note should state it explicitly: temp outputs go to $TMP/opencode (Windows temp) — never bare /tmp.
 
+### 2026-09-26_10-30 worker_Q3S_245K_slow ses_f23d1afbaffeUSeabbt0aArOdj
+S2 spec conflict: Do-NOT-touch `.opencode/plugin/probes/**` vs DoD "gate green @297/297" was unsatisfiable — stale S15 pins 108/109 (exact args-key list + pre-S2 COPY return) break under ANY S2 build; spec pre-authoring should audit existing probe pins against the unit's behavior changes (or name the re-pins explicitly).
+

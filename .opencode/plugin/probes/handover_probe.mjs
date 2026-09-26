@@ -3383,9 +3383,16 @@ const btWrite = (name, body) => {
 let btTool;
 
 // 108 — the tool file imports (type-stripped, direct) and exposes the tool()
-//      default export: description (non-empty string) + the 7 args IN ORDER
-//      (mode = the 6-value enum, the other six OPTIONAL strings) + async
-//      execute + NO `name` field (the host names the tool by FILENAME)
+//      default export: description (non-empty string) + the 9 args IN ORDER
+//      (mode = the 8-value enum; srcFile/dstFile/bufferName OPTIONAL strings;
+//      startMarker/endMarker/targetMarker OPTIONAL marker-string-or-integer
+//      refs — Part B poka-yoke: 42 is a LINE NUMBER (accepted), 2.5 rejected;
+//      refs = OPTIONAL array of marker-or-number refs + text = OPTIONAL
+//      string — Part C) + async execute + NO `name` field (the host names
+//      the tool by FILENAME)
+//      [re-pinned 2026-09-26 per block_transfer v2 S2 (Parts B+C): the args
+//      list gains refs+text, the marker args carry the string|integer union,
+//      the mode enum gains APPEND]
 {
   const toolMod = await import(pathToFileURL(BT_TOOL_TS).href);
   btTool = toolMod.default;
@@ -3395,17 +3402,34 @@ let btTool;
     const s = btTool?.args?.[k];
     return s != null && typeof s.safeParse === "function" && s.safeParse(undefined).success === true && s.safeParse(42).success === false;
   };
+  const optionalRef = (k) => {
+    const s = btTool?.args?.[k];
+    return s != null && typeof s.safeParse === "function" &&
+      s.safeParse(undefined).success === true &&
+      s.safeParse("AAA").success === true &&
+      s.safeParse(42).success === true &&
+      s.safeParse(2.5).success === false;
+  };
+  const refsSch = btTool?.args?.refs;
+  const textSch = btTool?.args?.text;
   check(
     "108",
     "S15",
-    "tool file imports (type-stripped, direct) and exposes the tool() default export (description + args [mode, srcFile, dstFile, startMarker, endMarker, targetMarker, bufferName] + async execute, NO name field)",
+    "tool file imports (type-stripped, direct) and exposes the tool() default export (description + args [mode, srcFile, dstFile, startMarker, endMarker, targetMarker, refs, text, bufferName] + async execute, NO name field)",
     btTool != null && typeof btTool.description === "string" && btTool.description.length > 0 &&
-      JSON.stringify(argKeys) === JSON.stringify(["mode", "srcFile", "dstFile", "startMarker", "endMarker", "targetMarker", "bufferName"]) &&
+      JSON.stringify(argKeys) === JSON.stringify(["mode", "srcFile", "dstFile", "startMarker", "endMarker", "targetMarker", "refs", "text", "bufferName"]) &&
       modeSch != null && typeof modeSch.safeParse === "function" &&
       modeSch.safeParse(undefined).success === false &&
-      ["MOVE", "COPY", "CUT", "PASTE", "DELETE", "CLEAR"].every((v) => modeSch.safeParse(v).success === true) &&
+      ["MOVE", "COPY", "APPEND", "CUT", "PASTE", "REPLACE", "DELETE", "CLEAR"].every((v) => modeSch.safeParse(v).success === true) &&
       modeSch.safeParse("move").success === false && modeSch.safeParse("MOVE ").success === false && modeSch.safeParse("BOGUS").success === false &&
-      ["srcFile", "dstFile", "startMarker", "endMarker", "targetMarker", "bufferName"].every(optionalStr) &&
+      ["srcFile", "dstFile", "bufferName"].every(optionalStr) &&
+      ["startMarker", "endMarker", "targetMarker"].every(optionalRef) &&
+      refsSch != null && typeof refsSch.safeParse === "function" &&
+      refsSch.safeParse(undefined).success === true &&
+      refsSch.safeParse([1, "BT-START"]).success === true &&
+      refsSch.safeParse([1.5]).success === false &&
+      textSch != null && typeof textSch.safeParse === "function" &&
+      textSch.safeParse(undefined).success === true && textSch.safeParse("x").success === true &&
       typeof btTool.execute === "function" && btTool.execute.constructor.name === "AsyncFunction" &&
       !("name" in btTool),
     JSON.stringify({ keys: argKeys, mode: ["MOVE", "move", "MOVE ", "BOGUS"].map((v) => modeSch?.safeParse?.(v)?.success), async: btTool?.execute?.constructor?.name, nameIn: "name" in (btTool ?? {}) }),
@@ -3413,8 +3437,11 @@ let btTool;
 }
 
 // 109 — COPY: the anchor span is INCLUSIVE (the start line through the end
-//      line) and the source is UNTOUCHED: the byte-exact `Copied 4 lines`
-//      return + the source file byte-identical after the call
+//      line) and the source is UNTOUCHED: the byte-exact Part F feedback
+//      line (re-pinned 2026-09-26 per block_transfer v2 S2 — the resolved
+//      range + the truncated first-line echo + the buffer count AFTER the
+//      op; the S3 feedback redesign completes the other modes) + the
+//      source file byte-identical after the call
 {
   const src = btWrite("bt1.txt", "alpha\nBT-START block\nline-2\nline-3\nBT-END block\nomega");
   const before = readFileSync(src, "utf8");
@@ -3425,8 +3452,8 @@ let btTool;
   check(
     "109",
     "S15",
-    "COPY: the inclusive anchor span (BT-START..BT-END = 4 lines) + byte-exact return `Copied 4 lines from 'bt/bt1.txt' into buffer 'bt1'` + source byte-identical",
-    res === "Copied 4 lines from 'bt/bt1.txt' into buffer 'bt1'." && readFileSync(src, "utf8") === before,
+    "COPY: the inclusive anchor span (BT-START..BT-END = 4 lines) + byte-exact Part F feedback `Copied 4 lines from 'bt/bt1.txt' into buffer 'bt1' (lines 2..5, first: 'BT-START block') - buffer: 4 lines.` + source byte-identical",
+    res === "Copied 4 lines from 'bt/bt1.txt' into buffer 'bt1' (lines 2..5, first: 'BT-START block') - buffer: 4 lines." && readFileSync(src, "utf8") === before,
     JSON.stringify({ res, changed: readFileSync(src, "utf8") !== before }),
   );
 }
