@@ -563,3 +563,6 @@ TODO #102 spec: the "verified scope state" assumed the redirect pass already cov
 ### 2026-09-26_12-10 worker_Q3S_245K_slow ses_f2302f58dffeEC2ccjeKmAPbVw
 S3 spec baseline was stale: "current count 297/297" but the measured baseline was 305/305 (#102's S29 section landed after the spec was written) — the spec's baseline numbers should be re-checked against the probe header tally at spec authoring time.
 
+### 2026-09-26_12-15 planner_Q3S_245K_slow ses_f24a7fc46ffeHrj1SC7Q9CVpqc
+edit-fuzzy hint ambiguity: a NAP edit returned `hint reason=d-too-high best-d=24` yet the edit WAS applied (the file carried the new text) — the hint reads like a rejection, so an agent may uselessly retry/verify; the hint should state whether the fuzzy resolution was APPLIED (and at what d) or REJECTED.
+
