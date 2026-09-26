@@ -226,12 +226,23 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   - Orientation doc written (his invitation): `.opencode/agent/
     orientation.md` (goal sketch in my words + idle-initiative guide) +
     init-list pointer in the planner prompt (item 2 — every session reads it).
-  - **Queue:** #100 escape removal (LAUNCHED this iteration,
-    worker_Q3S_245K_slow) → #101 explorer host map → bt-v2 build (spec wave
-    may pre-write bt-v2 + R3 + loop_log-v2 specs; test doctrine: pure-script
+  - **#100 LANDED** (worker-18 ses_f24f0a902ffe4WVaIf7ceNLMWb,
+    worker_Q3S_245K_slow): `bc374b2` (removal, 7 files: code + tests +
+    knowledge move; amended ONCE — primer annotations ride the same commit
+    as the move) + `910e767` (TODO + handover). Planner-verified: git log,
+    grep-clean (4 DoD patterns, zero hits in .opencode/plugin/), targeted
+    smoke re-run. Measured: smoke 64/64 (67−6 escape +3 repurposed note
+    pins), probe 297/297 (303−6 S24), pytest 459+1w, ruff F=0; numwords.json
+    untouched; R8 note delivery repurposed as smoke (13a-13c). Worker
+    lesson → knowledge_tools.md (block_transfer over giant oldString).
+  - **Queue:** #101 explorer host map (NEXT) → bt-v2 build (spec wave may
+    pre-write bt-v2 + R3 + loop_log-v2 specs; test doctrine: pure-script
     version + new-hire worker run from the description without code access)
     → R3 (arg-scope only) → loop_log-v2 v2 parts. Maintenance pass at
     iteration 20.
+  - Budget note: his --info raised the slow-model budget to 5, but my
+    gauge still reads 0 compactions left — session-keyed vs model-keyed
+    is an open question (his, 2026-09-26).
   - Observations (NAP-only): HQKV unproven (memory setting a tad higher,
     real influence unknown); workers probe the sandbox boundary at the
     first opportunity (relevant: the R8 redirect + the bt-v2 sandbox
@@ -352,11 +363,11 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Standing
-- Baselines (re-verified 2026-09-25 by the planner, post-#99):
-  probe **303** [three-oh-three]; smokes **all green**
+- Baselines (re-verified 2026-09-26 by the planner, post-#100):
+  probe **297** (post-#100); smokes **all green**
    (context_recovery 17/17, compact_memory 74/74, auto_resume 139/139
    (post-#98),
-  intercept_observer 67/67 (post-#97), block_transfer 30/30 + 53/53,
+  intercept_observer 64/64 (post-#100), block_transfer 30/30 + 53/53,
   submit 20/20;
   the per-suite counts are in each smoke's own readout — no total kept
   here); pytest **459 passed + 1 warning (the known #10 coroutine

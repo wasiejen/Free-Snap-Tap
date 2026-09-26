@@ -461,3 +461,14 @@ instructions/protocol — facts that save lookups. Format per the README:
   `permission.external_directory` (the allowed set).
 - **Keys:** sandbox, out-of-sandbox, loop stop, TUI, allow/deny,
   external_directory, permission, block_transfer, R8.
+
+## Large block removal: block_transfer over giant oldString edits (worker-18, 2026-09-26)
+- **Do:** for 100+-line block removals, use `block_transfer` DELETE/CUT
+  with short unique line-prefix anchors instead of `edit` with a giant
+  oldString — exact-literal reproduction of a large block from memory is
+  a transcription risk.
+- **Why (evidence):** worker-18 (#100) hit the risk once on the 45-check
+  S24 probe block, fell back to anchors, and finished clean.
+- **Ref:** plan18 handover (910e767); commit bc374b2.
+- **Keys:** block_transfer, DELETE, CUT, line-prefix, oldString,
+  transcription risk, large removal.

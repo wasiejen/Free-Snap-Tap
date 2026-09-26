@@ -539,3 +539,9 @@ worker-17 (Q3S-170K): Pattern-3 token loop on the bracketed sentinel form "[405:
 ### 2026-09-25_18-02 planner_Q3S_170K ses_f27282d2dfferl9gScrfLt2AxV
 A worker session that stops at the context wall WITHOUT triggering a self-compaction returns only an EMPTY Task result (no error, no Work State, no loop-log line) — recovery required full file forensics (git log + status + in-progress handover). A signal in the result channel (stop reason) or a plugin-side detection + `-WARNING` loop-log line for silent limit-stops would make the resume decision instant instead of forensic.
 
+### 2026-09-26_01-11 planner_Q3S_170K ses_f27282d2dfferl9gScrfLt2AxV
+Two frictions, planner-17 (2026-09-25): (1) block_transfer REPLACE failed on a substring end-marker — REPLACE needs exact LINE PREFIXES while COPY matches substrings; the area file plugin_tools/2026-09-25_block_transfer.replace_mode.md already documents this — I should have read the area file before the call. (2) The first gauge readout after compaction (62%) is the COMPACTING model's own gauge, not my settled fill (24%) — I nearly planned on it; the 2026-09-22 clause in knowledge_tools.md already had the answer (grepped only AFTER the maintainer confirmed) — strengthened the entry with the 2nd data point.
+
+### 2026-09-26_02-37 worker_Q3S_245K_slow ses_f24f0a902ffe4WVaIf7ceNLMWb
+Edit tool on a 160-line block: oldString failed to match because I re-typed literal strings from memory (Pattern-5 adjacent); block_transfer DELETE with line-prefix anchors was the reliable path for large block removals — worth a one-line reminder in the worker prompt's output-discipline section.
+

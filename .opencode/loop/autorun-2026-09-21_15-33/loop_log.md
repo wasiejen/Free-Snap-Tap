@@ -116,3 +116,7 @@
 2026-09-25_16-55 -RETURN- planner-17 ses_f27282d2dfferl9gScrfLt2AxV Qwen3.8-27B-Q3S-170K worker-17 ses_f271155b4ffeIWwbQEekkRQRA6 Qwen3.8-27B-Q3S-170K — returned a self-compaction Work State (design complete, no code yet) → resumed via task_id
 2026-09-25_17-58 DONE<--- worker-17 ses_f271155b4ffeIWwbQEekkRQRA6 Qwen3.8-27B-Q3S-170K 48%/87K
 2026-09-25_18-01 DONE<--- planner-17 ses_f27282d2dfferl9gScrfLt2AxV Qwen3.8-27B-Q3S-170K #97 LANDED + verified (07bdd56/0d9b8e6/6684991; planner smoke re-run 67/67, probe 303/303, pytest 459+1w, ruff F=0) + #96 CLOSED live-verified + his loop.log question answered/codified; next queued = loop_log-v2 spec | 56% used, ~74K left
+2026-09-26_02-13 -->START planner-18 ses_f27282d2dfferl9gScrfLt2AxV Qwen3.8-27B-Q3S-230K-slow plan18: #100 escape channel removal (worker_Q3S_245K_slow)
+2026-09-26_02-13 -->START worker-18 ses_f24f0a902ffe4WVaIf7ceNLMWb Qwen3.8-27B-Q3S-245K-slow plan18: #100 escape channel removal
+2026-09-26_02-38 DONE<--- worker-18 ses_f24f0a902ffe4WVaIf7ceNLMWb Qwen3.8-27B-Q3S-245K-slow SESSION=ses_f24f0a902ffe4WVaIf7ceNLMWb CTX=124320 (50%) REM=120680 | 1 compaction left
+2026-09-26_02-41 -RETURN- planner-18 unknown Qwen3.8-27B-Q3S-230K-slow worker-18 ses_f24f0a902ffe4WVaIf7ceNLMWb worker_Q3S_245K_slow
