@@ -31,11 +31,32 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   re-run: smoke 45/45. The richer non-unique format was DEFERRED
   (probe 263 pins the legacy byte-exact string) → curated into the
   committed S3 spec (probe 115/263 re-pin + tool switch).
-- **Queue:** launch S2 NOW → verify; S3 then S4 in following
-  iterations (serial slot); after S4: new-hire test (fresh agent,
-  description-only, file-blind) + held-out multi-step task
-  (planner-side delegations); R3 + loop_log-v2 remain queued behind the
-  bt-v2 wave.
+- **S2 LANDED (f5f888c, worker-20 `worker_Q3S_245K_slow`
+  ses_f23d1afbaffeUSeabbt0aArOdj, planner-verified):** schema-level
+  `string | integer` refs on all ref sides + `refs` list + `text` key;
+  COPY-list (exact-`\n` join) / APPEND mode; `ref-out-of-range` wired;
+  Part F feedback for the touched ops; smoke 87/87 (45+42), sandbox
+  53/53, probe 297/297, pytest 459+1w, ruff F=0 — planner spot re-run:
+  smoke 87/87. **RATIFIED** the flagged minimal re-pin of probe S15
+  108/109 (stale under any S2 build — same semantics, no new checks;
+  the alternative was a red gate).
+- **MAINTAINER LIVE REPORT (2026-09-26, this session):** "worker keep
+  trying to access the temp/tmp folder directly and are stopping the
+  loop repeatedly." Triaged from files: R8 (#97) redirect WORKS for the
+  Windows-Root form (intercept.log L4668 — S2 worker's
+  `C:\...\Temp\bt_smoke_out.txt` redirected 1:1 to `...\Temp\opencode\…`);
+  the POSIX `/tmp` form (Git-Bash habit) has NO mapping -> fail-closed ->
+  gate STOP. Actions: (a) worker-prompt scratchpad bullet (committed
+  this session); (b) NEW TODO #102 — extend the R8 mapping with
+  `/tmp` + `/var/tmp` -> scratchpad root (structural fix); spec
+  written, **QUEUED BEFORE bt-v2 S3** (live pain wins).
+- **Queue:** launch #102 NOW → verify; then S3 → S4 (serial slot);
+  after S4: new-hire test (fresh agent, description-only, file-blind) +
+  held-out multi-step task (planner-side delegations); R3 + loop_log-v2
+  remain queued behind the bt-v2 wave.
+- Note: maintainer commit `1ad0715` ("small explorer additions to
+  worker roster (not live)") landed mid-session — roster is his
+  live-edit domain; `worker_Q3S_245K_slow` verified active (line 362).
 - Host-map findings from #101 to re-read before the next builds: §2 the
   stale 2026-09-12 "plugins-array-only registration" knowledge line; §6
   the `intercept_observer_core.ts` load-error root cause (no default

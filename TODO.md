@@ -1,7 +1,7 @@
 # TODO — maintainer's open items
 
-Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #99, new
-entries start at #100 (closed IDs stay reserved in `todo_records.md`).
+Numbering: every entry ID is UNIQUE and NEVER REUSED — used so far up to #101, new
+entries start at #102 (closed IDs stay reserved in `todo_records.md`).
 Closed entries live in `todo_records.md` (one-line records — resolution in file/git log).
 Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance / scope / status).
 
@@ -795,6 +795,36 @@ All those IDs stay reserved — see the numbering rule in the header.
   the 13-style note pins repurposed to the R8 redirect note (mechanism
   stays covered); primer moved to `knowledge/fuzzy-numword/` (+ README,
   escape section annotated removed); numwords.json untouched.
+
+## #102. (open, 2026-09-26, planner-20; maintainer live report 2026-09-26) R8 redirect extension: map the POSIX `/tmp` (and `/var/tmp`) root into the sandbox — unmappable forms STOP the loop
+- **Problem / evidence:** maintainer live report (2026-09-26, autorun session):
+  "worker keep trying to access the temp/tmp folder directly and are
+  stopping the loop repeatedly." Log evidence: `intercept.log` line 4668
+  (2026-09-26_07-55, S2 worker `ses_f23d1afbaffeUSeabbt0aArOdj`) — the
+  Windows-Root form (`C:\Users\Wasiejen\AppData\Local\Temp\bt_smoke_out.txt`)
+  WAS redirected 1:1 (`kind=redirect ... value=C:/Users/Wasiejen/AppData/
+  Local/Temp/opencode/...`) — that case WORKS since #97. The POSIX `/tmp/...`
+  form (Git-Bash habit; S1 worker friction entry 2026-09-26: "/tmp under
+  Git-Bash resolves outside the sandbox") has NO 1:1 mapping onto an allowed
+  root -> R8 fails closed -> the permission gate STOPS the session until the
+  maintainer intervenes. Worker prompt bullet added (scratchpad discipline,
+  2026-09-26) as the immediate mitigation; this unit is the structural fix.
+- **Desired outcome:** POSIX `/tmp/<rest>` (and `/var/tmp/<rest>`) map 1:1
+  onto the scratchpad root `C:\Users\Wasiejen\AppData\Local\Temp\opencode/<rest>`
+  — redirected + logged (`kind=redirect` line) BEFORE the call runs, for ALL
+  tools incl. the bash `command` string; no new out-of-sandbox access is ever
+  granted (redirect only, never an allow-widening); unmappable forms still
+  fail closed.
+- **Acceptance criteria:** a controlled `/tmp/x` write+read (bash + a typed
+  tool arg) is redirected, the file lands in the sandbox, and the
+  `kind=redirect` line carries orig=/value=; a no-mapping path still fails
+  closed; probe pins per the established pattern; standard gate green.
+- **Suggested scope:** `.opencode/plugin/intercept_observer_core.ts`
+  (the redirect resolver / root mapping), `.opencode/plugin/
+  intercept_observer.ts` (allowed-root resolution from opencode.jsonc),
+  `.opencode/plugin/probes/handover_probe.mjs`, the intercept smoke.
+- **Status:** open — spec written by planner-20 (2026-09-26); QUEUED BEFORE
+  bt-v2 S3 per the maintainer's live report (loop stops are the current pain).
 
 ## #101. (LANDED 2026-09-26, explorer ses_f24bf71beffekwRYMtnlrWy5UG, commit 1081e52; GO 2026-09-25 direct) opencode host map — one-time explorer task: map the installed host internals so planner/worker LOOK UP instead of re-deriving
 - **Problem / evidence:** every task re-pays the derivation cost of opencode host facts (SDK v1/v2 shape, plugin hook surface, session/message/part DB schema, permission system, the compaction/summarize path) — knowledge is gathered per task, not accumulated as a map (maintainer observation 2026-09-25: "we derive the same knowledge often again and again").

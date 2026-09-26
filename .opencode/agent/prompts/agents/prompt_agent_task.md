@@ -51,8 +51,16 @@ All paths below are relative to `.opencode/agent/prompts/`.
 - **Output discipline (maintainer # 2026-09-23_14-19):** untested shell
   commands or commands with unknown / potentially big output -> run them with
   the output redirected to a temp file, check the size first, and let only an
-  overview (e.g. line count) into the context; always bound untested greps
-  (`| head -30`) and similar.
+   overview (e.g. line count) into the context; always bound untested greps
+   (`| head -30`) and similar.
+- **Scratchpad discipline (maintainer live report 2026-09-26):** ALL temp
+   files go into the designated scratchpad only — `$TMP/opencode` under
+   Git-Bash (= `C:/Users/Wasiejen/AppData/Local/Temp/opencode`). NEVER the
+   POSIX `/tmp` or other temp locations: out-of-sandbox paths are only
+   redirected when they map 1:1 onto an allowed root; unmappable forms
+   fail CLOSED and STOP the session until the maintainer intervenes
+   (intercept.log `kind=redirect` lines are the evidence; the `/tmp` POSIX
+   form is NOT mapped — that is the stop case).
 - Helper scripts (bounded DB / binary / log inspection, output-limited): use
   the curated collection `.opencode/agent/scripts/` (README + INVENTORY.md) —
   reuse, do not re-derive throwaway scripts.

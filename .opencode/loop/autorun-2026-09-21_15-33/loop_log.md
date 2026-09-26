@@ -130,3 +130,5 @@
 2026-09-26_07-21 DONE<--- worker-20 ses_f249c8026ffeIXec8cQW3sInJ7 Qwen3.8-27B-Q3S-245K-slow SESSION=ses_f249c8026ffeIXec8cQW3sInJ7 CTX=87386 (35%) REM=157614 | 1 compaction left
 2026-09-26_07-26 -RETURN- planner-20 ses_f24a7fc46ffeHrj1SC7Q9CVpqc Qwen3.8-27B-Q3S-245K-slow worker-20 ses_f249c8026ffeIXec8cQW3sInJ7 worker_Q3S_245K_slow
 2026-09-26_07-27 -->START worker-20 ses_f23d1afbaffeUSeabbt0aArOdj Qwen3.8-27B-Q3S-245K-slow block_transfer v2 S2: line-number refs + assembly (COPY-list/text/APPEND)
+2026-09-26_10-32 DONE<--- worker-20 ses_f23d1afbaffeUSeabbt0aArOdj Qwen3.8-27B-Q3S-245K-slow S2 green @ f5f888c (smokes 87/87+53/53, probe 297/297, pytest 459+1w, ruff F=0; S15 probes 108/109 re-pinned — flagged in handover) SESSION=ses_f23d1afbaffeUSeabbt0aArOdj CTX=143193 (58%) REM=101807
+2026-09-26_10-39 -RETURN- planner-20 ses_f24a7fc46ffeHrj1SC7Q9CVpqc Qwen3.8-27B-Q3S-245K-slow worker-20 ses_f23d1afbaffeUSeabbt0aArOdj worker_Q3S_245K_slow
