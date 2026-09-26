@@ -160,3 +160,6 @@
 2026-09-26_20-10 -->START planner-24 ses_f21359d77ffe2pviXZoIavxweh Qwen3.8-27B-Q3S-245K-slow plan24 (autorun-2026-09-21_15-33 iter 24, unit-4 restart branch after planner-23 action:restart): loop_log-v2 build (approved A+B+C+D, worker_Q3S_245K_slow, spec staged)
 2026-09-26_20-12 -->START worker-24 ses_f2114f171ffeuKJrMkXe1QczCA Qwen3.8-27B-Q3S-245K-slow loop_log-v2 build (parts A-D) on .opencode/tools/loop_log.ts
 2026-09-26_20-41 DONE<--- worker-24 ses_f2114f171ffeuKJrMkXe1QczCA Qwen3.8-27B-Q3S-245K-slow loop_log-v2 build DONE: SESSION=ses_f2114f171ffeuKJrMkXe1QczCA CTX=103291 (42%) REM=141709 | 5 compactions left; gate probe 340/340 + 10 smokes green + pytest 459+1w + ruff F=0
+2026-09-26_20-47 -->START planner-24 ses_f21359d77ffe2pviXZoIavxweh Qwen3.8-27B-Q3S-245K-slow DONE<---
+2026-09-26_20-48 DONE<--- planner-24 ses_f21359d77ffe2pviXZoIavxweh Qwen3.8-27B-Q3S-245K-slow 56%/106K — plan24: loop_log-v2 LANDED+verified (A-D + S16 re-pin, gate 340/340 + 69/69 + 459+1w + F=0); bookkeeping (prompts, proposal verdict, summary) committed
+2026-09-26_20-48 CORRECT- planner-24 ses_f21359d77ffe2pviXZoIavxweh Qwen3.8-27B-Q3S-245K-slow the previous 20-47 line (a START with content "DONE<---") is a MIS-TYPED duplicate (my status/content swap at write time) — invalid; the valid DONE line is the 20-48 one; ignore the 20-47 line

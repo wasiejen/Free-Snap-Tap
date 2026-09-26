@@ -54,15 +54,24 @@ not here.
   `.opencode/loop/autorun-<YYYY-MM-DD_HH-MM>/loop_log.md` — append only,
   created on first write. Logged: loopruns and direct planner runs; plain
   interactive chat has no log.
-- Tool: when the `loop_log` tool is in your toolset, WRITE your lines via it —
-  it resolves the current looprun folder (creating the dated one when absent),
-  machine-stamps, and appends exactly one line, returning what it wrote. The
-  line-format description below stays the FALLBACK for when the tool is not
-  registered (hand-append in that case, in the exact form below).
+- Tool (v2, landed 2026-09-26): when the `loop_log` tool is in your toolset,
+  WRITE your lines via it — it resolves the current looprun folder (creating
+  the dated one when absent), machine-stamps, and appends exactly one line,
+  returning `folder: <name> (created|existing)` + the exact line +
+  `verified: readback-match` (or `readback-MISMATCH: …`), plus
+  `corrects: <previous line>` for a `correct` status. v2 details: `status` is
+  a free-form KEYWORD — `start` / `done` / `return` / `warn` / `info` /
+  `correct` — normalized into the 8-char tokens below; `role`, `model`,
+  `session` are OPTIONAL (auto-filled from the host context: agent
+  identifier + model, your session id). An unrecognized status is rejected
+  with the accepted keywords named (nothing is written). The line-format
+  description below stays the FALLBACK for when the tool is not registered
+  (hand-append in that case, in the exact form below).
 - One line per event:
   `date_time <STATUS> <role>[-<iteration>] <session_id> <agent_model> <content>`
   - `<STATUS>` is exactly one of these 8-char tokens: `-->START`, `DONE<---`,
-    `-RETURN-`, `-WARNING`, `--INFO--`.
+     `-RETURN-`, `-WARNING`, `--INFO--`, `CORRECT-` (the sixth, v2 2026-09-26 —
+     hand-append it in that exact form in the fallback).
   - `<role>[-<iteration>]` — `planner-N` / `worker-N` / `explorer-N` (the
     retired `looprunner` token appears in historical lines only); the
     iteration number when known (it is in the launch message / task spec),
@@ -86,6 +95,11 @@ not here.
     - `--INFO--` — any agent reports a run problem it observed (looping
       behavior, confusion, protocol glitches); content = short info + an
       example if possible.
+    - `CORRECT-` (v2) — a clarification/addition to a PREVIOUS line (append
+      only — the old line is never rewritten); content names the corrected
+      entry (its timestamp or a content fragment). Via the tool: status
+      keyword `correct` — the return carries the previous line for exact
+      referencing.
 - `session_id` is the `SESSION=` field of the injected `ctx:` line.
 - Examples (one per type):
   ```

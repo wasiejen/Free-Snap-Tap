@@ -34,7 +34,8 @@ All paths below are relative to `.opencode/agent/prompts/`.
 - `agent_readme_todo.md` — read when appending findings to `todo_inbox.md`.
 - `agent_readme_loop.md` — §Loop log defines the activity-log lines you write at
   session start and task completion (write them via the `loop_log` tool when it
-  is in your toolset; the format description is the fallback).
+  is in your toolset — status by KEYWORD, role/model/session optional and
+  auto-filled; the format description is the fallback).
 - `.opencode/agent/knowledge/` (repo-root-relative, NOT under agent/prompts) —
   the knowledge base (gained findings, not instructions): read the area file for
   your task's area (e.g. `knowledge_tools.md`, `knowledge_context.md`) before

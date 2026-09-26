@@ -5,43 +5,45 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Current session — autorun, 2026-09-26 (ses_f21359d77ffe2pviXZoIavxweh, planner-24, Qwen3.8-27B-Q3S-245K-slow)
-- **In flight: loop_log-v2 build** (spec staged — this commit; worker
-  `worker_Q3S_245K_slow` launch next). Verified-at-spec state: the tool on
-  disk is v1 (strict 5-token enum, required role/model, no readback, no
-  `CORRECT-`) — the proposal's 09-15 "Planner verdict" line claiming the
-  parts landed is STALE (the maintainer's 09-18 `--info` + the file both
-  confirm unimplemented). Existing v1 pins: `tests/loop_log.smoke.mjs` +
-  probe S16 (6 checks, pins the exact v1 return) — both re-pinned in the
-  build. Spec corrects the proposal's stale "smoke in scratchpad" line
-  (tracked home `.opencode/plugin/tests/` per the smoke-harness ruling).
-- Prompt/doc bookkeeping (per the proposal's bookkeeping section, applied
-  by ME in a separate commit after verification): `agent_readme_loop.md`
-  §Loop log + the role-prompt loop lines (keywords instead of tokens;
-  optional role/model/session) + codify the cheapest iteration
-  determination (his 14-26 priority.md observation: session title
-  `planner-<N>` per #89 spawn naming / a BOUNDED grep of loop_log.md —
-  never a full read).
+- **loop_log-v2 build LANDED + verified** (worker-24
+  `worker_Q3S_245K_slow` ses_f2114f171ffeuKJrMkXe1QczCA, spec `68da83d`):
+  Part A `aa5a411` (auto-identity — role/model/session optional, context
+  chains, agent-identifier preference), Part B `006a137` (write
+  confirmation — readback byte-compare + `(created|existing)` +
+  `verified:`), Part C `320d09f` (lenient status — keyword normalization,
+  unrecognized → error naming keywords, no write), Part D `b9d57c9`
+  (`CORRECT-` + `corrects:` previous line + description rewrite), S16
+  probe re-pin `b1d122c` (6 checks, total stays 340), final handover
+  `445e49d` (+ worker friction entry `87fcedc`). Gates: probe **340/340**,
+  loop_log smoke **69/69**, all 10 smokes green, pytest **459+1w**, ruff
+  **F=0** — planner spot-re-verified by own runs (smoke + probe).
+- Bookkeeping (this session): spec staged against verified state (tool on
+  disk = v1 — the proposal's 09-15 "Planner verdict" line is STALE; S16
+  probe section DID exist per #60, re-pinned; the proposal's "no probe
+  section" + "smoke in scratchpad" lines are stale — corrections in the
+  spec); prompt/doc bookkeeping applied (agent_readme_loop.md §Loop log
+  v2 + planner/worker prompt loop lines — the iteration-determination
+  bullet was ALREADY codified 2026-09-25); proposal → `implemented/` +
+  verdict; worker handover copy + `plan24_summary.md`.
 - Observations triaged (unmarked → NAP only, no action): priority.md
-  `18-48` worker-23 bt line-number-ref friction (the worker's friction
-  entry already committed in plan23); `14-26` recovery_context remarks —
-  already addressed by the landed unification (A carries the session's
-  own providerID+modelID; B compacts-only); the "include loop.log in
-  sparingly-read files" question (folded into the bookkeeping above);
-  repo-split research / knowledge-submit idea / fuzzy-edit-oldstring
-  remark — unmarked, queued themes only. NOTE: `.opencode/maintainer/
-  inbox_planner/` now carries a full COPY of the loop folder's plan files
-  (plan1..23 + loop_log.md) — looks like a maintainer-side copy; NOT
-  touched (no marker designates it).
+  `18-48` worker-23 bt line-number-ref friction (friction entry already
+  committed in plan23); `14-26` recovery_context remarks — already
+  addressed by the landed unification (A: session's own providerID+modelID;
+  B: compact-only, no resume); repo-split / knowledge-submit /
+  fuzzy-edit-oldstring themes — unmarked, queued only. NOTE:
+  `.opencode/maintainer/inbox_planner/` now carries a full COPY of the
+  loop folder's plan files (plan1..23 + loop_log.md) — looks
+  maintainer-side; NOT touched (no marker designates it).
 - Maintainer's live files uncommitted (his domain, untouched):
   `.opencode/maintainer/priority.md`.
-- Still pending the maintainer (non-blocking, unchanged from plan23):
-  `emergencyRecovery` re-enable (= unification live acceptance), #99
-  live fork test, #98 self-compact→idle cycle, the section-anchor schema
+- Pending the maintainer (non-blocking): loop_log-v2 LIVE ACCEPTANCE
+  (registration in the live opencode.jsonc + per-agent grant — effective
+  at his next restart; the hand-format fallback applies until then),
+  `emergencyRecovery` re-enable (= unification live acceptance), #99 live
+  fork test, #98 self-compact→idle cycle, the section-anchor schema
   question, the WRITE-on-absent-file semantic.
-- **NEXT (after worker return):** verify loop_log-v2 from files (git log
-  + targeted spot re-run — NO full gate re-run in my window, his
-  2026-09-23_00-12 ruling) → prompt/doc bookkeeping commit → summary +
-  loop-log DONE.
+- **NEXT (iteration 25):** maintenance pass (N % 5 == 0, at session start),
+  then the queue (currently maintainer-blocked on restarts/rulings).
 
 ## Compressed archive (one line each
   - 2026-09-26 autorun (ses_f219349ffffe1IL7z1xCByoX45, planner-23, Q3S-245K-slow) — plan23: compaction-unification LANDED+verified (worker-23: 218a2c1/d9d93f8/88f902f — shared compaction_core.ts + thin wrappers + S32 equivalence pins; gate 340/340 + 74/74 + 17/17 + 459+1w + F=0) + R3 (b) bt pair channel LIVE-ACCEPTED / (d) section-anchor stays schema-shadowed + plan22 leftovers committed — details: loop folder plan23_summary.md + git 8ea4b2b..54e8bd9
