@@ -587,3 +587,6 @@ block_transfer line-number refs arrive as marker strings in my parameter format 
 ### 2026-09-26_19-35 planner_Q3S_245K_slow ses_f219349ffffe1IL7z1xCByoX45
 plan22 close-down gap: the friction entry + the loop-log DONE line were written at the stop line but left UNCOMMITTED (the session stopped after writing them) — the next session (plan23) had to re-land them in its opening bookkeeping. Actionable: the close-down friction check + loop-log DONE line must ride a commit BEFORE stopping (add to the role prompts' stop-line procedure).
 
+### 2026-09-26_20-41 worker_Q3S_245K_slow ses_f2114f171ffeuKJrMkXe1QczCA
+Approved proposal files can carry stale in-file verdict blocks (the loop_log-v2 proposal's "Planner verdict (2026-09-15)" claimed parts LANDED while the on-disk tool was v1) — consider voiding/removing verdict blocks when the maintainer rolls a proposal back to approved, so the next worker doesn't have to be told the spec wins.
+
