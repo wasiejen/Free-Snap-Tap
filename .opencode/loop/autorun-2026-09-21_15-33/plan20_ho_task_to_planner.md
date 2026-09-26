@@ -1,86 +1,79 @@
-# Worker handover — block_transfer v2 S2 (Parts B+C): line-number refs + assembly
+# Worker handover — TODO #102: R8 redirect extension — map POSIX /tmp (+ /var/tmp) into the sandbox scratchpad root
 
-Session: worker-20 `ses_f23d1afbaffeUSeabbt0aArOdj` (2026-09-26).
-Status: **DONE** — green gate, one commit, ready for S3.
+Session: worker-20 `ses_f23201c0effez6Sl8kZ3BSJ0Pf` (2026-09-26).
+Status: **DONE** — code + pins + probe section committed (green gate); TODO + this handover on the final commit.
+Branch: `opencode_test` (stayed; verified at start).
 
 ## What changed
-- `.opencode/tools/block_transfer.ts`:
-  - **Part B** — every ref side (`startMarker` / `endMarker` / `targetMarker`,
-    and each item of the Part C `refs` lists) is a marker string OR a 1-based
-    absolute line number, disambiguated at the SCHEMA level (zod
-    `string | integer` union on all three ref args — the runtime reads the
-    TYPE, no string sniffing: the string "42" is a prefix marker, the number
-    42 is line 42). New exported `resolveRef` (number → direct line,
-    range-checked against the PRE-call state; string → the S1 `resolveAnchor`
-    rule, untouched) + exported `countLines` (the `/\r?\n/` split minus the
-    trailing-newline tail; `""` = 0 lines). The S1 `ref-out-of-range` error
-    is wired in on every numeric ref (with the file's line count).
-  - **Part C** — `COPY` accepts a `refs` LIST (each ref selects ONE line of
-    `srcFile`; the sections go into the buffer joined by EXACTLY ONE `\n` —
-    documented in the description + code comment) or a `text` key (direct
-    text → buffer; a trailing newline adds no blank line). COPY keeps the
-    REPLACE-into-buffer semantics in every form (replaces, never appends).
-    New `APPEND` mode (same forms) appends to the named buffer, created if
-    absent. The three forms are mutually exclusive (teaching errors); all
-    refs resolve against the PRE-call state and every check runs before any
-    buffer change (no partial state on rejection).
-  - **Part F feedback** (the ops S2 adds/touches = COPY/APPEND): one line —
-    resolved line range + line count + truncated first-line echo (capped at
-    40 chars, `...` marker) + the buffer's line count AFTER the op.
-    MOVE/CUT/PASTE/REPLACE/DELETE/CLEAR keep their S1 byte-exact returns.
-  - Description extended (new REFS + ASSEMBLY paragraphs, APPEND in MODES,
-    out-of-range in EDGE); the pinned one-liner opener kept verbatim.
-- `.opencode/plugin/tests/block_transfer.smoke.mjs`: +42 pins — schema
-  type-disambiguation (refs accept string/int, reject float/bool/bare
-  string; `refs` array; `text`), number refs (single form, mixed
-  marker+number, as list items, on `targetMarker`, in DELETE, in REPLACE),
-  out-of-range on start/end/target/list-item (the S1 error text with the
-  count), COPY-list exact-`\n` join + failed-list-leaves-buffer-untouched,
-  COPY `text` + trailing-newline drop, mutual-exclusion errors, APPEND
-  create/append/span + the full assembled buffer content, feedback
-  truncation (40 chars + `...`) + singular form.
-- `.opencode/plugin/probes/handover_probe.mjs`: **re-pin of S15 checks 108
-  + 109 ONLY** (see the flagged deviation below). No new checks — the
-  section count and the 297 total are unchanged.
 
-## Measured verification (all green, 2026-09-26)
-- `block_transfer.smoke.mjs`: **87/87** (45 pre-existing unchanged + 42 new)
-- `block_transfer.sandbox.smoke.mjs`: **53/53**
-- `handover_probe.mjs`: **297/297 PASS**
-- `pytest -q`: **459 passed, 1 warning**
-- `ruff check --select F .`: **0 findings**
+1. **`intercept_observer_core.ts` — the POSIX temp-root prefix mapping** (the
+   rule from the spec): `/tmp/<rest>` + `/var/tmp/<rest>` →
+   `SCRATCHPAD_ROOT/<rest>` — root substitution, the **full remainder kept**,
+   case preserved (backslash + double-slash forms normalized like the rest of
+   the resolver). The bare root (`/tmp`, `/var/tmp`) → the scratchpad root
+   itself (the case (i) analogy — `ls /tmp` in bash now works too). A **CODE
+   constant** (`POSIX_TEMP_PREFIXES`, documented as the maintainer's scratchpad
+   ruling 2026-09-26) — NOT read from opencode.jsonc (config names the Windows
+   roots only). Implemented as a branch in `resolveRedirect` BEFORE the root
+   loop (a POSIX span can never match a configured Windows root — the 1:1 hit
+   count of the existing mapping is unaffected; the legacy case (i)/(ii)
+   behavior is byte-identical — pinned). `POSIX_PATH_RE` (the note-channel span
+   grammar) is now exported so the bash pass reuses the exact grammar (no
+   duplicated regex).
+2. **`intercept_observer.ts` — the BASH `command`-string redirect** (spec
+   point 2 fallback — the spec's assumption was wrong: the typed-fields table
+   EXPLICITLY excluded bash command strings as "opaque"). New private
+   `runRedirectCommand`: scans the bash command with `POSIX_PATH_RE`, runs the
+   SAME 1:1 resolver on each span, substitutes mapped spans in place (source
+   order), logs ONE `kind=redirect tool=bash arg=command orig=<span>
+   value=<target>` line per mapped span (the `pair-resolved` verdict REUSED —
+   the twelve VERDICTS unchanged). UNmapped spans left byte-identical
+   (fail-closed — the out-of-sandbox note still fires for them). Merged into
+   `onToolBefore` at the existing R8 point (after the fuzzy channels); the
+   note-recompute (filter + `observeSandbox` on effective args) applies to the
+   merged result. Plugin exports unchanged (default factory ONLY — the smoke
+   pin holds).
+3. **Pins** — smoke `intercept_observer.smoke.mjs` (4 new checks, (12k)-(12n):
+   pure resolver mapped + fail-closed forms; typed READ `/tmp` + `/var/tmp`
+   byte-exact; bash command redirect byte-exact; bash unmapped fail-closed) +
+   probe **new S29 section, checks 297-304** (pure resolver forms incl. bare
+   root / double-slash / backslash; typed READ + WRITE e2e; bash two-mapped-
+   spans e2e; bash unmapped fail-closed; bash MIXED mapped/unmapped — the
+   note fires for the unmapped span). Header EXTENDED line + section-sum line
+   updated (S29=8 → `PROBE handover: 305/305 PASS`).
 
-## Compatibility (single-ref vs S1)
-Byte-identical input forms and behavior: all S1 marker returns for
-MOVE/CUT/PASTE/REPLACE/DELETE/CLEAR are untouched (probes 110–117/262
-green without change); the S1 teaching errors (not-found / non-unique /
-end-before-start / required / empty-buffer) are byte-identical. One
-intentional change: the COPY single-ref return is now the Part F line
-(`Copied N lines ... (lines a..b, first: '...') - buffer: M lines.`) —
-the spec's "only the ops this unit adds/touches" reads COPY as touched,
-and the pre-written S3 spec's old-shape list (MOVE/CUT/PASTE/REPLACE/
-DELETE/CLEAR) excludes COPY. All pre-existing smoke pins stayed green
-unchanged (their regexes still match).
+## Measured verification (standard gate, repo root)
 
-## Flagged deviation — S15 probes 108/109 re-pinned (spec conflict)
-The spec's Do-NOT-touch lists `.opencode/plugin/probes/**` (S3), but the
-DoD requires the standard gate green at 297/297 — that was unsatisfiable
-without touching two stale pins: probe 108 pins the EXACT args-key list
-(any S2 schema must carry `refs`+`text`) and probe 109 pins the pre-S2
-byte-exact COPY return (Part F changes it; the probe FAIL detail captured
-before the re-pin: `Copied 4 lines from 'bt/bt1.txt' into buffer 'bt1'
-(lines 2..5, first: 'BT-START block') - buffer: 4 lines.`). Resolution:
-minimal re-pin of those two checks to the S2 contract — same semantics
-(arg surface, inclusive span, source untouched; updated expectations + a
-`[re-pinned 2026-09-26 per S2]` note), per the established re-pin
-convention ("semantic kept, not the old string", the S3 spec's own
-language). No new probe checks; probes 115/263 (the S3-deferred error-
-format switch) untouched. **Flagging for your ratification** — if the
-re-pin is not wanted, the alternative is a red gate (295/297) at S2 close.
+- intercept smoke: **68/68 ALL PASS** (64 existing + 4 new)
+- probe: **305/305 PASS** (baseline 297 measured BEFORE changes + 8 new S29;
+  agrees with the header annotation)
+- pytest: **459 passed, 1 warning** (baseline 459+1w)
+- ruff F: **0** (All checks passed)
 
-## Deliberately NOT done
-- No NEW probe checks (the spec: this unit adds none) — S3's section.
-- Probes 115/263 error-format switch — S3 (per the curated S3 spec).
-- Part F feedback for MOVE/CUT/PASTE/REPLACE/DELETE/CLEAR — S3.
-- The S1 `resolveAnchor` rule — untouched (settled; I found it correct).
-- WRITE/PEEK/MAP/`last_write` — S3/S4.
+## Commits
+
+- Unit commit (code + pins + probe section): see `git log` — subject
+  "R8 #102: map POSIX /tmp + /var/tmp into the sandbox scratchpad root".
+- Final commit: TODO #102 LANDED status + this handover + loop log.
+
+## Deliberately NOT done / notes
+
+- **Live acceptance deferred to the maintainer's process restart.** The DoD's
+  "controlled /tmp write+read (bash + one typed tool arg) redirected, file
+  lands in the sandbox" was verified at the HOOK level: the e2e pins run the
+  REAL before-hook of the NEW code (args mutation + byte-exact kind=redirect
+  lines with orig=/value=; the note recompute; fail-closed cases). A live /tmp
+  touch in THIS session would exercise the OLD (pre-restart) live plugin and
+  would stop the session (the task's own scratchpad warning) — so it was not
+  attempted. After the restart, a live `echo hi > /tmp/x` + a typed
+  `/tmp/x` read should redirect + land in `C:/Users/Wasiejen/AppData/Local/
+  Temp/opencode/` with the kind=redirect lines (the S1 friction entry's
+  scenario is the acceptance probe).
+- No-opencode.jsonc edit (read-only source of the Windows roots — per spec);
+  the other intercept channels (pair/fuzzy/R6/R7) untouched; FST product code
+  untouched; `opencode.jsonc` / `.opencode/maintainer/**` untouched.
+- The spec's line hint for `resolveRedirect` (~L498-514) was off — it is at
+  ~L577 in the core now (was L554 pre-change); same function/semantics as
+  verified in the spec (no STOP condition hit).
+
+Lessons: none beyond the friction entry (spec's bash-coverage assumption).

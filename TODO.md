@@ -796,7 +796,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   stays covered); primer moved to `knowledge/fuzzy-numword/` (+ README,
   escape section annotated removed); numwords.json untouched.
 
-## #102. (open, 2026-09-26, planner-20; maintainer live report 2026-09-26) R8 redirect extension: map the POSIX `/tmp` (and `/var/tmp`) root into the sandbox — unmappable forms STOP the loop
+## #102. (LANDED 2026-09-26, plan20, worker-20 `worker_Q3S_245K_slow`, commit be07ce6 — live acceptance pending the maintainer's process restart; maintainer live report 2026-09-26) R8 redirect extension: map the POSIX `/tmp` (and `/var/tmp`) root into the sandbox — unmappable forms STOP the loop
 - **Problem / evidence:** maintainer live report (2026-09-26, autorun session):
   "worker keep trying to access the temp/tmp folder directly and are
   stopping the loop repeatedly." Log evidence: `intercept.log` line 4668

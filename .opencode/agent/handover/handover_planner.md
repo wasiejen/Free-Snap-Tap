@@ -46,14 +46,27 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   Windows-Root form (intercept.log L4668 — S2 worker's
   `C:\...\Temp\bt_smoke_out.txt` redirected 1:1 to `...\Temp\opencode\…`);
   the POSIX `/tmp` form (Git-Bash habit) has NO mapping -> fail-closed ->
-  gate STOP. Actions: (a) worker-prompt scratchpad bullet (committed
+  gate STOP. Actions: (a)   worker-prompt scratchpad bullet (committed
   this session); (b) NEW TODO #102 — extend the R8 mapping with
-  `/tmp` + `/var/tmp` -> scratchpad root (structural fix); spec
-  written, **QUEUED BEFORE bt-v2 S3** (live pain wins).
-- **Queue:** launch #102 NOW → verify; then S3 → S4 (serial slot);
-  after S4: new-hire test (fresh agent, description-only, file-blind) +
-  held-out multi-step task (planner-side delegations); R3 + loop_log-v2
-  remain queued behind the bt-v2 wave.
+  `/tmp` + `/var/tmp` -> scratchpad root (structural fix).
+- **#102 LANDED (be07ce6, worker-20 `worker_Q3S_245K_slow`
+  ses_f23201c0effez6Sl8kZ3BSJ0Pf, planner-verified):** POSIX `/tmp` +
+  `/var/tmp` -> scratchpad root in the core resolver (code constant,
+  branch BEFORE the root loop — legacy byte-identical) + the bash
+  `command`-string redirect (the spec's typed-fields assumption was
+  wrong — bash was excluded as "opaque"; extended per the spec's
+  fallback: same 1:1 resolver, one `kind=redirect` line per mapped
+  span). Intercept smoke 68/68 (64+4), probe 305/305 (297 + S29×8),
+  pytest 459+1w, ruff F=0 — planner spot re-run: smoke 68/68.
+  **LIVE ACCEPTANCE PENDING the maintainer's process restart** (the
+  live plugin runs pre-restart code; a live `/tmp` touch would stop
+  this session — acceptance probe: `echo hi > /tmp/x` + a typed
+  `/tmp/x` read, expecting redirect + landing in the sandbox +
+  kind=redirect lines).
+- **Queue:** S3 → S4 (serial slot); after S4: new-hire test (fresh
+  agent, description-only, file-blind) + held-out multi-step task
+  (planner-side delegations); R3 + loop_log-v2 remain queued behind
+  the bt-v2 wave.
 - Note: maintainer commit `1ad0715` ("small explorer additions to
   worker roster (not live)") landed mid-session — roster is his
   live-edit domain; `worker_Q3S_245K_slow` verified active (line 362).
@@ -156,12 +169,13 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Standing
-- Baselines (re-verified 2026-09-26 by the planner, post-#100):
-  probe **297** (post-#100); smokes **all green**
-   (context_recovery 17/17, compact_memory 74/74, auto_resume 139/139
-   (post-#98),
-  intercept_observer 64/64 (post-#100), block_transfer 30/30 + 53/53,
-  submit 20/20;
+- Baselines (re-verified 2026-09-26 by the planner, post-#102):
+   probe **305** (297 + S29×8, post-#102); smokes **all green**
+    (context_recovery 17/17, compact_memory 74/74, auto_resume 139/139
+    (post-#98),
+   intercept_observer 68/68 (post-#102), block_transfer 87/87 + 53/53
+   (post-S2),
+   submit 20/20;
   the per-suite counts are in each smoke's own readout — no total kept
   here); pytest **459 passed + 1 warning (the known #10 coroutine
   warning)**; ruff **F=0**.
