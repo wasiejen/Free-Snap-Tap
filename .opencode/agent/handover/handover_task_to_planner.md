@@ -1,91 +1,84 @@
-# Worker handover — TODO #97 (R8 redirect + escape return-info) — worker-17
+# Worker handover — plan18 / #100: remove the numword escape channel
 
-**STATE: COMPLETE (both units green; code-only checkpoint commits + this final handover).**
-Session ses_f271155b4ffeIWwbQEekkRQRA6. Branch: `opencode_test` (verified at start; never switched).
+**Status: DONE — gate green, all DoD items met.**
+worker-18 `worker_Q3S_245K_slow`, session ses_f24f0a902ffe4WVaIf7ceNLMWb,
+2026-09-26.
 
-## Commits (code only, per verified unit)
-- **Unit 1** `07bdd56` "R8 (#97) unit 1 complete: redirect pins + fallback/note fixes" —
-  core resolver + plugin wiring + smoke R8 section (12a–12i) + probe S28 (12 checks) +
-  the three Unit-1 bug fixes (config-unreadable fallback root, `observeSandbox`
-  extra-roots recompute, smoke 12i sibling-ambiguity target).
-- **Unit 2** `0d9b8e6` "R8 (#97) unit 2: escape return-info (after-hook feedback note + journal pre-escape)" —
-  `runEscapeContent` callID + per-field feedback note (truncated first form + count +
-  intercept.log/journal pointers); `appendJournal` trailing `pre-escape=<JSON>` field
-  (only when non-empty — existing payload pins byte-identical); `onToolAfter` delivers
-  noteCache notes for ANY tool, also on SUCCESS, hint first then notes (joined `\n`),
-  consumed once; smoke section 13 (13a–13d).
+## What changed (commit bc374b2, 7 files)
+1. **Core** (`intercept_observer_core.ts`): removed `ESCAPE_RE`, `EscapeHit`,
+   `resolveEscapeSafe`, `resolveEscapes` (the whole L445-506 block) —
+   pure deletion, nothing else in core touched.
+2. **Plugin** (`intercept_observer.ts`): removed `runEscapeContent` + its
+   doc block, the `onToolBefore` escape wiring (pre-escape capture +
+   `escapeForms` computation), the `escapeForms` param of `appendJournal` +
+   its `pre-escape=<JSON>` suffix, the `kind=escape` observation lines, the
+   `resolveEscapes` import, and every stale escape comment (header (3a)
+   exception, verdict vocabulary, R8/pipeline/edit/after-hook/journal
+   comments). The R8 redirect channel, pair/fuzzy channels, R6 journal
+   (5-field line unchanged), noteCache/storeNote/onToolAfter delivery and
+   the `truncEdit40` helper all remain (truncEdit40 is still used by the
+   edit-fuzzy channel).
+3. **Tests**:
+   - smoke: removed the (8h) pair of escape pins + the 4 pins (13a-13d).
+     REPURPOSED the 13-style note-delivery pins to the R8 redirect note —
+     new (13a) R8 read-sibling redirect → after-hook delivers the byte-exact
+     redirect note in the tool result (also on success), (13b) no-note call
+     leaves output byte-identical, (13c) note consumed once.
+   - probe: removed S24 entirely (checks 240-245, `n24` counter, the index
+     entry); section-sum annotation updated 303 → 297 (recomputed via
+     script, not by eye).
+4. **Knowledge**: `git mv` research/fuzzy-numword/primer.md →
+   knowledge/fuzzy-numword/primer.md (rename preserved, 89 % similarity);
+   escape bullet annotated `REMOVED 2026-09-25, #100`, the "except the
+   escape, below" pointer dropped, the stale "decision-record.md NEXT TO
+   THIS FILE" pointer fixed to name the research area; new subfolder
+   `README.md` (17 lines: purpose / what goes here / what does NOT /
+   provenance rule) + one line in the `knowledge/README.md` Files index.
+   All in the SAME commit (spec requirement). NOT added to AGENTS.md
+   (maintainer ruling).
 
-## Per-unit change list
-**Unit 1 (R8 redirect)** — allowed roots resolved ONCE at factory init from
-`opencode.jsonc` (`permission.external_directory` "allow" keys `/**`-stripped +
-`references.*.path` + workspace root; deduped via `normSandboxPath`; unreadable →
-fallback [workspace root, `SCRATCHPAD_ROOT`]; never throws). Pure `resolveRedirect`
-in core (case (i) span==root → root as configured; case (ii) direct sibling → root +
-"/" + basename case-preserved; 0 or ≥2 matches after dedupe → null fail-closed).
-`REDIRECT_PATH_FIELDS` (read/write/edit filePath + block_transfer srcFile/dstFile —
-parallel table, `WRITE_PATH_FIELDS` untouched). `runRedirect` after the fuzzy
-channels: mutates `output.args`, logs `kind=redirect tool=<t> arg=<field>
-orig=<full> value=<full>` (reuses the pinned `pair-resolved` verdict — the 12-token
-VERDICTS vocabulary is pinned), out-of-sandbox note recomputed on effective args
-when fired, feedback note stored per callID. M1 note (code comment only): write
-redirects target already-allowed paths — no new overwrite hazard class.
+## Measured verification (post-change, standard gate)
+- **intercept smoke: 64/64 PASS** (baseline 67/67; −6 escape pins, +3
+  repurposed note pins).
+- **probe: 297/297 PASS** (baseline 303; −6 S24 pins; the self-annotation
+  `PROBE handover: 297/297 PASS` agrees with the header section-sum line).
+- **pytest: 459 passed, 1 warning** (baseline 459+1w — unchanged).
+- **ruff `check --select F .`: All checks passed** (F=0, baseline F=0).
+- **Grep-clean** across `.opencode/plugin` (*.ts, *.mjs): `ESCAPE_RE`,
+  `runEscapeContent`, `kind=escape`, `pre-escape=`, `resolveEscape` →
+  zero hits.
+- `numwords.json` untouched; pair/fuzzy pins unchanged and green; the
+  R8 redirect note is delivered (smoke (13a) green).
 
-**Unit 2 (escape return-info)** — on a `kind=escape` mutation: `storeNote(callID,
-"escape-resolved: <n> escape form(s) in <field> (first: <raw40> len=<L> -> <value>);
-full pre-mutation forms: .opencode/temp/intercept.log (kind=escape) +
-.opencode/temp/journal_<write|edit>.log")` (one note per mutated field,
-content/oldString/newString order). Pre-escape CONTENT fields captured in
-`onToolBefore` BEFORE mutation; per-field raw hit forms computed after;
-`appendJournal(..., escapeForms?)` appends the trailing `pre-escape` field only when
-non-empty. `onToolAfter`: failed-edit hint logic UNCHANGED (edit only), then
-noteCache notes delivered for ANY tool (also on success), hint first then notes,
-consumed once, best-effort. Scope: sentinel-carrying escape forms only — the plain
-`[l:r]` pair channel and the R1/R2 fuzzy channels are untouched (ADDITIONS only).
-
-## Measured gate (green at EACH unit)
-Unit 1: smoke 63/63, probe 303/303, pytest 459 passed + 1 warning, ruff F=0.
-Unit 2 (final): smoke **67/67**, probe **303/303**, pytest **459 passed + 1 warning**,
-ruff **All checks passed (F=0)**. Baseline (pre-#97): probe 291/291, smoke 55/55,
-pytest 459, ruff F=0.
-
-## Smoke pin inventory (added)
-- R8 (Unit 1, section 12, 8 pins): 12a pure resolver (dedupe / two-roots null /
-  no-mapping null); 12b read-sibling redirect (arg mutated + kind=redirect byte-exact
-  + no out-of-sandbox); 12c write-sibling (exactly one new line); 12d span==SCRATCHPAD
-  root case-variant; 12e nested non-sibling (no mutation, no line); 12f config-read
-  second factory (crafted opencode.jsonc: `/**` twin dedupe + references root);
-  12g sibling-of-two-roots fail-closed (no mutation + note fires); 12h single-root
-  config sibling (mutated + byte-exact); 12i span==root case-variant + references
-  sibling.
-- Escape return-info (Unit 2, section 13, 4 pins): 13a escape write (content
-  resolved + after-hook note byte-exact truncated first form + journal trailing
-  pre-escape field); 13b escape edit old+new (both resolved + failed-edit HINT fires
-  FIRST then the two notes oldString/newString + journal pre-escape carries both
-  forms); 13c no-escape call → NO note (output byte-identical); 13d note consumed
-  once (second after call untouched).
-- Probe S28 (Unit 1, 12 checks 285–296): 7 pure resolver + 5 e2e.
+## Commits
+- `bc374b2` — the whole task (code + tests + knowledge, 7 files,
+  84 insertions / 493 deletions). The commit was amended ONCE after
+  creation: the primer annotations + README + index line landed in the
+  index after `git mv`, and the spec requires them in the SAME commit as
+  the primer move — the final hash above is the one to reference.
 
 ## TODO entries
-- None appended to `todo_inbox.md` by this worker (no out-of-scope findings).
-- TODO.md #97: left for the planner to mark LANDED (per spec, the planner records the
-  hashes in its bookkeeping commit). Worker code commits: `07bdd56`, `0d9b8e6`.
+- #100 **Status → LANDED** in `TODO.md` (rides this final commit, with the
+  measured numbers + commit hash). No new TODO entries needed — nothing
+  was found that is out of scope / unfixable. (R3, #95 sub-item 3, remains
+  open as before — untouched by this task.)
 
-## Deliberately NOT done / decisions (for planner sign-off)
-- **Probe section label**: spec said "S18-adjacent section (established pattern)" —
-  I placed it as `S28` AFTER S27 / before S5 hygiene (the established append pattern
-  of S26/S27; inserting physically next to S18 would shift S19–S27's check-number
-  counters). Flagging in case the planner meant a literal S18-adjacent block.
-- **Redirect line verdict**: reuses `pair-resolved` (the `kind=escape`/`kind=dedup`
-  precedent — the 12-token VERDICTS vocabulary is pinned by smoke/probe, so no new
-  token).
-- **Redirect feedback note text** = the `kind=redirect` evidence string (unpinned by
-  spec; paths kept in full — not a dense payload).
-- **13b failed-edit hint token** = `d-too-high best-d=11` (the code's fail-closed
-  reason for a 0-occurrence edit whose best-candidate d is above the threshold —
-  deterministic; the pin encodes the spec's DoD "hint behavior unchanged" via the
-  existing (10h) pin, and 13b pins the hint-FIRST ordering + both notes).
+## Deliberately NOT done
+- No plugin registration change (`opencode.jsonc` is the maintainer's
+  domain — nothing registered).
+- No behavior change beyond the escape removal: the note mechanism,
+  R6 journal line shape, R1/R2/R6/R7/R8 channels, auto_resume /
+  compact_memory / context_recovery / block_transfer, FST code,
+  `.opencode/maintainer/**` all untouched.
+- The primer's escape section was annotated, not deleted (historical
+  record per the spec).
+- `TODO.md` #100 was status-updated, not curator-closed (planner curation).
 
-## NOT touched (per DO-NOT-touch)
-opencode.jsonc, compact_memory.ts (only imported), auto_resume/compact_memory/
-context_recovery/block_transfer/loop_log, FST code, maintainer files (left dirty as
-found), R1/R2/R6 logic (ADDITIONS only — no restructuring of existing channels).
+## Lessons
+- For 100+-line block removals, prefer `block_transfer` DELETE/CUT with
+  short unique line-prefix anchors over `edit` with a giant oldString —
+  exact-literal reproduction from memory is a transcription risk
+  (hit once on the S24 probe block; fell back to anchors).
+
+## Context gauge (verbatim)
+SESSION=ses_f24f0a902ffe4WVaIf7ceNLMWb CTX=120123 (49%) REM=124877 | 1 compaction left

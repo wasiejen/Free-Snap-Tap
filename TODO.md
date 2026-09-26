@@ -788,8 +788,13 @@ All those IDs stay reserved — see the numbering rule in the header.
   README; `numwords.json` untouched.
 - **Interaction:** #95 sub-item (3) R3 is UNAFFECTED (still blocked on his
   GO — a separate unit).
-- **Status:** GO (maintainer, direct session 2026-09-25) — the next
-  autorun build.
+- **Status:** LANDED (2026-09-26, plan18, worker-18
+  `worker_Q3S_245K_slow`, commit bc374b2): escape channel removed
+  (core + plugin + journal extension + pins); grep-clean; smoke 64/64,
+  probe 297/297 (baseline 303 − the 6 S24 pins), pytest 459+1w, ruff F=0;
+  the 13-style note pins repurposed to the R8 redirect note (mechanism
+  stays covered); primer moved to `knowledge/fuzzy-numword/` (+ README,
+  escape section annotated removed); numwords.json untouched.
 
 ## #101. (open, 2026-09-25, direct session; GO 2026-09-25 — after #100) opencode host map — one-time explorer task: map the installed host internals so planner/worker LOOK UP instead of re-deriving
 - **Problem / evidence:** every task re-pays the derivation cost of opencode host facts (SDK v1/v2 shape, plugin hook surface, session/message/part DB schema, permission system, the compaction/summarize path) — knowledge is gathered per task, not accumulated as a map (maintainer observation 2026-09-25: "we derive the same knowledge often again and again").
