@@ -545,3 +545,6 @@ Two frictions, planner-17 (2026-09-25): (1) block_transfer REPLACE failed on a s
 ### 2026-09-26_02-37 worker_Q3S_245K_slow ses_f24f0a902ffe4WVaIf7ceNLMWb
 Edit tool on a 160-line block: oldString failed to match because I re-typed literal strings from memory (Pattern-5 adjacent); block_transfer DELETE with line-prefix anchors was the reliable path for large block removals — worth a one-line reminder in the worker prompt's output-discipline section.
 
+### 2026-09-26_02-45 planner_Q3S_245K_slow ses_f27282d2dfferl9gScrfLt2AxV
+loop_log's -RETURN- line printed my session as "unknown" — the tool needs the session typed per call (submit auto-stamps it from tool context; loop_log does not). Near-miss caught in the log this iteration; consider auto-stamping session/role from context like submit does.
+

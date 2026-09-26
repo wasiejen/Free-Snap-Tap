@@ -120,3 +120,4 @@
 2026-09-26_02-13 -->START worker-18 ses_f24f0a902ffe4WVaIf7ceNLMWb Qwen3.8-27B-Q3S-245K-slow plan18: #100 escape channel removal
 2026-09-26_02-38 DONE<--- worker-18 ses_f24f0a902ffe4WVaIf7ceNLMWb Qwen3.8-27B-Q3S-245K-slow SESSION=ses_f24f0a902ffe4WVaIf7ceNLMWb CTX=124320 (50%) REM=120680 | 1 compaction left
 2026-09-26_02-41 -RETURN- planner-18 unknown Qwen3.8-27B-Q3S-230K-slow worker-18 ses_f24f0a902ffe4WVaIf7ceNLMWb worker_Q3S_245K_slow
+2026-09-26_02-45 DONE<--- planner-18 unknown Qwen3.8-27B-Q3S-230K-slow 59%/100K
