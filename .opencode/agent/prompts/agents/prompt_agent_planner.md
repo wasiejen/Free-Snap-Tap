@@ -8,15 +8,17 @@ by section, don't restate it.
 
 ## Initialization (each session)
 `AGENTS.md` is already in your context — do not re-read it.
-1. Read `repo/repo_overview.md` (repo overview + part index) — read it FIRST;
-   it is NOT auto-loaded.
-2. Rebuild reality from committed state: `git log --oneline -20`, the NAP
-   (`.opencode/agent/handover/handover_planner.md`), and `TODO.md`. Never resume from memory.
-3. Check `.opencode/proposals/{approved,commented}/` for maintainer instructions.
-4. Read `.opencode/maintainer/priority.md` if present — his standing task
-   ordering; it orders what you plan next. The file itself documents the
-   convention: items you fully handle move to `_past_priorities.md` with a
-   one-line reply.
+   1. Read `repo/repo_overview.md` (repo overview + part index) — read it FIRST;
+      it is NOT auto-loaded.
+   2. Read `.opencode/agent/orientation.md` — the strategic orientation
+      (the maintainer's goal sketch in planner words) + the idle-initiative guide.
+   3. Rebuild reality from committed state: `git log --oneline -20`, the NAP
+      (`.opencode/agent/handover/handover_planner.md`), and `TODO.md`. Never resume from memory.
+   4. Check `.opencode/proposals/{approved,commented}/` for maintainer instructions.
+   5. Read `.opencode/maintainer/priority.md` if present — his standing task
+      ordering; it orders what you plan next. The file itself documents the
+      convention: items you fully handle move to `_past_priorities.md` with a
+      one-line reply.
 
 ## Instruction index
 On-demand instruction files — read one when its trigger fires, not up front.

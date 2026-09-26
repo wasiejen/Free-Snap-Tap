@@ -212,6 +212,43 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   action now (no marker/inbox/instruction); it will surface via the
   maintenance unit's knowledge-curation passes and the #101 host map; a
   marker or inbox item makes it a task.
+
+  ### planner-18 (autorun resume, same session — 2026-09-25/26)
+  - His autorun decisions (all 4 resolved): (1) **bt-v2 GO** — he moved it
+    to `approved/` himself (a87a64e) + opencode.json model → 245k;
+    (2) **R3 GO** "as you deem fit" — planned AFTER bt-v2 (its anchor piece
+    is absorbed by Part A; the arg-scope piece remains); (3) **model = the
+    slow 245k + SAME-MODEL delegation** (a model change drops the cache →
+    full re-fill paid; compaction beats re-fill; same-model back-and-forth
+    ~5 s) → knowledge entry written; he set the roster default in
+    repo_map; (4) quality distill / programmer role **DEFERRED** to the
+    new-project phase.
+  - Orientation doc written (his invitation): `.opencode/agent/
+    orientation.md` (goal sketch in my words + idle-initiative guide) +
+    init-list pointer in the planner prompt (item 2 — every session reads it).
+  - **Queue:** #100 escape removal (LAUNCHED this iteration,
+    worker_Q3S_245K_slow) → #101 explorer host map → bt-v2 build (spec wave
+    may pre-write bt-v2 + R3 + loop_log-v2 specs; test doctrine: pure-script
+    version + new-hire worker run from the description without code access)
+    → R3 (arg-scope only) → loop_log-v2 v2 parts. Maintenance pass at
+    iteration 20.
+  - Observations (NAP-only): HQKV unproven (memory setting a tad higher,
+    real influence unknown); workers probe the sandbox boundary at the
+    first opportunity (relevant: the R8 redirect + the bt-v2 sandbox
+    test idea).
+  - Clarification (his --info, 2026-09-26): an OUT-OF-SANDBOX access by any
+    worker (via any tool) = LOOP FULL STOP — it fires an interactive
+    allow/deny on his TUI and halts the loop until he answers. Allowed
+    without a stop: the DB + every `external_directory` path in
+    opencode.json. So the bt-v2 pure-script test must exercise the guard
+    logic WITHOUT triggering a real out-of-sandbox stop; a new-hire worker
+    test that DOES probe the boundary will pause the loop on his TUI
+    (acceptable friction discovery — plan for it, don't surprise it).
+    Recorded in knowledge_tools.md.
+  - North star (his words): "I want you to learn." — folded into
+    orientation.md as the overarching goal.
+  - Gauge is now 245K-based (he renamed the model in 4 places); 0
+    compactions left this session — the #100 launch must finish in-window.
   (e) **Standing duties** — net-zero rule: a new standing duty is added
   only when an existing one is retired or automated.
 - **Pending live observations (maintainer / natural):** #99 fork test (his,

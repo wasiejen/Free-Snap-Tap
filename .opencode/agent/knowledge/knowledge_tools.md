@@ -424,3 +424,40 @@ instructions/protocol — facts that save lookups. Format per the README:
   worker ses_f30807a16ffelPQPUBH50wiXBe.
 - **Keys:** dump_session, --json, --lite, lossless, byte-identical,
   JSON.stringify, part data, #78.
+
+## Same-model delegation — a model change drops the cache (maintainer-verified 2026-09-25)
+- **Do:** launch workers on the SAME model as the planner (for the 245k
+  slow planner: `worker_Q3S_245K_slow` — the roster default). A model
+  change drops the KV cache and a full re-prefill is paid on the switch
+  back; same-model back-and-forth is ~5 s or less per switch. Prefer
+  self-compaction (same model) over any smaller-window model: the
+  post-compaction restart beats re-filling a nearly full 230/245k
+  window. The slow model is the SAME quality as the fast one (a bit more
+  stable per the maintainer) — no quality trade for the cache win.
+- **Why (evidence):** maintainer-verified 2026-09-25 (autorun message to
+  planner-18): "always use the same model you use right now … on model
+  change the cache is dropped and a full refill is paid … the longer the
+  context window the more important it is to use the same model."
+- **Ref:** maintainer autorun message 2026-09-25 (planner-18);
+  `repo_map.md` Worker roster (default line, his a87a64e update);
+  `opencode.jsonc` (245k context limit).
+- **Keys:** same-model, delegation, cache, re-prefill, single slot, 245k,
+  worker model choice, compaction vs refill.
+
+## Out-of-sandbox access = LOOP FULL STOP (interactive TUI allow/deny)
+- **Do:** treat any out-of-sandbox path access as a hard loop stop — it
+  fires an interactive allow/deny request on the maintainer's TUI and
+  halts the loop until he answers. Allowed without a stop: the DB and
+  every `external_directory` path in `opencode.json`. Design tests (the
+  block_transfer sandbox guard, the R8 redirect) to exercise the guard
+  logic WITHOUT triggering a real out-of-sandbox access; a deliberate
+  boundary probe will pause the loop on the maintainer (acceptable
+  friction discovery — plan for it, don't surprise it).
+- **Why (evidence):** maintainer clarification 2026-09-26 (autorun,
+  planner-18): "if any worker tries to access outside of sandbox, the
+  loop will stop. full stop. this triggers a request in my TUI to allow
+  or deny it and will not allow continuation until I answer."
+- **Ref:** maintainer autorun message 2026-09-26; `opencode.json`
+  `permission.external_directory` (the allowed set).
+- **Keys:** sandbox, out-of-sandbox, loop stop, TUI, allow/deny,
+  external_directory, permission, block_transfer, R8.
