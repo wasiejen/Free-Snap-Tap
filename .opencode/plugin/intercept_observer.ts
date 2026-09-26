@@ -208,6 +208,7 @@ import {
   flattenField,
   inQuotedSpan,
   loadNumwordMap,
+  LOCATOR_MAX_FILE_CHARS,
   locateContent,
   matchAnchorPrefixLines,
   matchNearPathSegments,

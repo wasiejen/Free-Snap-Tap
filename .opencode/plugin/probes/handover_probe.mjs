@@ -61,7 +61,19 @@
 // and the S1-deferred v2 teaching error switch (the non-unique error gains
 // the match count + the first match line numbers; the end-before-start
 // error gains the file reference — the S15 pins 108/110/111/115/116/117/
-// 262/263 re-pinned in place)): the
+// 262/263 re-pinned in place) + EXTENDED 2026-09-26 (R3: the arg-scope
+// extension beyond `read` — the new S31 section, checks 317-337: the pure
+// core surface (matchAnchorPrefixLines / countFileLines /
+// resolveSectionAnchor / quotedSpans / inQuotedSpan) + the drift-guard
+// equivalence against the block_transfer tool's own matchAnchorLines /
+// countLines (the S1 unified rule, 0d85a8c) + the hook pins: the glob/grep
+// PAIR channel (the field-parameterized READ gate on the `path` field +
+// the content-scope guard), the section-ANCHOR resolver (exactly-one /
+// zero / multi / numeric-string / file-missing), the BASH QUOTED-FORM
+// channel (the quoted-span ownership split + the mismatch fail-closed),
+// the block_transfer ANCHOR-MARKER channel (the R2 write-scope gate
+// branches: mutated / none-exist / both-exist / non-unique / fail-closed /
+// the targetMarker-dstFile ownership)): the
 // pre-rebuild
 // probe
 // (v2.2.1 era) targeted the DELETED handover.ts, the retired
@@ -835,9 +847,75 @@
 //          byte-exact non-unique error (match count + the first match
 //          line numbers) + byte-exact end-before-start error carrying
 //          the file reference.
+//   S31 R3 arg-scope extension (21) — 2026-09-26 (spec:
+//      research/fuzzy-numword/spec_R3_arg_scope_extension.md; design
+//      source: decision-record.md §2 + research doc §2.6/§3.5): the FOUR
+//      channels beyond `read` — the pure core surface pinned from the
+//      SPLIT core (the S18/S19 load pattern) + the hook pins over the
+//      SAME real factory + sandbox project dir (the S19 pf/ corpus; the
+//      anchor/bt fixtures join it):
+//      (317) matchAnchorPrefixLines: CRLF-tolerant + leading
+//          spaces/tabs stripped + verbatim case-sensitive prefix (a
+//          longer line still matches) + 1-based; empty anchor → [];
+//      (318) drift guard: the core's matchAnchorPrefixLines /
+//          countFileLines EQUIVALENT to the block_transfer tool's own
+//          matchAnchorLines / countLines (the S1 unified rule, 0d85a8c);
+//      (319) resolveSectionAnchor: null file → absent; exactly-one →
+//          resolved (line + scanned total); 0 → rejected matches=0;
+//          >=2 → rejected matches=2 (FAIL-CLOSED);
+//      (320) quotedSpans: double-quote (a backslash escapes) + single-
+//          quote (no escape) + unterminated → to the end + empty span
+//          contributes nothing + source order;
+//      (321) inQuotedSpan: containment exact (inside / the exact
+//          boundaries / straddling / outside / no spans);
+//      (322) HOOK glob PAIR channel: the read `filePath` + the glob
+//          `path` field share ONE READ gate — path MUTATED to the
+//          canonical + pair-resolved gate=mutated (exactly one line);
+//      (323) HOOK grep content-scope guard: a pair in the `pattern`
+//          field → observation-form line ONLY (no gate token, never
+//          mutated) + the `path` field untouched;
+//      (324) HOOK section-ANCHOR resolver EXACTLY-ONE: the string
+//          `offset` REWRITTEN to the 1-based line number (+ `limit`
+//          clamped to the file end: 50 → 3) + the anchor-resolved line;
+//      (325) HOOK anchor ZERO matches: FAIL-CLOSED — the offset runs
+//          (byte-identical) + anchor-rejected matches=0;
+//      (326) HOOK anchor MULTI (2) matches: FAIL-CLOSED — the offset
+//          runs (byte-identical) + anchor-rejected matches=2;
+//      (327) HOOK numeric-string offset: the SILENT type repair (the
+//          string '3' → the number 3) + zero lines (line-offsets stay
+//          the fallback);
+//      (328) HOOK file MISSING: silent fail-closed (no anchor line, args
+//          byte-identical) + the fuzzy channel still runs (fuzzy-
+//          rejected);
+//      (329) HOOK BASH QUOTED-FORM: a quoted pair → the command MUTATED
+//          in place (the quotes stay) + pair-resolved kind=quoted (run
+//          < 4 — no ref gate);
+//      (330) HOOK quoted MISMATCH: FAIL-CLOSED (command byte-identical +
+//          redundancy-mismatch gate=fail-closed — never "helpfully"
+//          rewritten);
+//      (331) HOOK OWNERSHIP SPLIT: one command with a quoted pair (the
+//          quoted-form channel mutates) + an unquoted pair (the git-ref
+//          channel, log-only) — two lines (the unquoted one first), the
+//          unquoted pair untouched;
+//      (332) HOOK block_transfer ANCHOR-MARKER MUTATED: the S1
+//          startsWith+unique gate on the effective srcFile — the
+//          startMarker MUTATED to the canonical + gate=mutated line=2 +
+//          exactly ONE line (the anchor fields are EXCLUDED from the
+//          content-scope loop — no double-logging);
+//      (333) HOOK anchor gate NONE-EXIST: the canonical matches nothing
+//          → NOT mutated + gate=none-exist;
+//      (334) HOOK anchor gate BOTH-EXIST: raw + canonical both match →
+//          NOT mutated + gate=both-exist (the on-disk pair form wins);
+//      (335) HOOK anchor gate NON-UNIQUE: the canonical matches >=2 →
+//          NOT mutated + gate=non-unique (the S1 uniqueness contract);
+//      (336) HOOK anchor MISMATCH FAIL-CLOSED: the pair is a mismatch →
+//          NOT mutated + gate=fail-closed (never a mutated anchor);
+//      (337) HOOK targetMarker ownership: the targetMarker resolves
+//          against the EFFECTIVE dstFile (not the srcFile) — mutated
+//          line=1 arg=targetMarker.
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=13 S12=4 S13=21 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S25=7 S26=20 S27=8 S28=12 S29=8 S30=11 hygiene=6  →  "PROBE handover: 316/316 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=13 S12=4 S13=21 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S25=7 S26=20 S27=8 S28=12 S29=8 S30=11 S31=21 hygiene=6  →  "PROBE handover: 337/337 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -7069,6 +7147,526 @@ n29++;
         r2 === "Error: End marker 'ZZZ' not found after start marker in bt/bt-err3.txt.",
       JSON.stringify({ r1, r2 }),
     );
+  }
+}
+
+// ------------------------------------------------------------------ S31 R3 arg-scope extension (21)
+//
+// The R3 (2026-09-26) arg-scope extension beyond `read` (spec:
+// research/fuzzy-numword/spec_R3_arg_scope_extension.md; design source:
+// decision-record.md §2 + research doc §2.6/§3.5): the FOUR channels —
+// (1) the glob/grep PAIR channel (the field-parameterized READ gate on the
+// `path` field + the content-scope guard on the other string fields),
+// (2) the section-ANCHOR resolver (a string `offset` → the exactly-one
+// line, fail-closed otherwise), (3) the BASH QUOTED-FORM channel (the
+// quoted-span ownership split vs the git-ref channel), (4) the
+// block_transfer ANCHOR-MARKER channel (the R2 write-scope gate logic on
+// the anchor markers, composed with the S1 resolveAnchor taxonomy). The
+// pure core surface (matchAnchorPrefixLines / countFileLines /
+// resolveSectionAnchor / quotedSpans / inQuotedSpan) is pinned from the
+// SPLIT core file (the S18/S19 load pattern) + a drift-guard equivalence
+// against the block_transfer tool's OWN matchAnchorLines / countLines (the
+// S1 unified rule, 0d85a8c); the hook pins use the SAME real factory +
+// sandbox project dir as S18/S19 (the S19 pf/ fixture files are the
+// existence-gate corpus — the anchor/bt fixtures below join it).
+{
+  writeFileSync(path.join(ioPfDir, "anchor-fixture.txt"), "line-1\nline-2\n## Only Anchor line-3\nline-4\nline-5\n", "utf8");
+  writeFileSync(path.join(ioPfDir, "anchor-dup.txt"), "Dup Anchor a\nmid\nDup Anchor b\n", "utf8");
+  writeFileSync(path.join(ioPfDir, "bt-anchor-src.txt"), "intro\nSec 4 T line one\nOther line\noutro\n", "utf8");
+  writeFileSync(path.join(ioPfDir, "bt-anchor-dst.txt"), "dst-head\nmid\n", "utf8");
+  writeFileSync(path.join(ioPfDir, "bt-anchor-both.txt"), "Sec [4:four] T raw\nSec 4 T canon\nmid\n", "utf8");
+  writeFileSync(path.join(ioPfDir, "bt-anchor-nu.txt"), "Sec 4 T a\nSec 4 T b\nmid\n", "utf8");
+  writeFileSync(path.join(ioPfDir, "bt-anchor-dst2.txt"), "Dst 2 T line\nmid\n", "utf8");
+  let n31 = 317;
+
+  // 317 — matchAnchorPrefixLines: CRLF-tolerant (a trailing \r ignored),
+  //      LEADING spaces/tabs stripped, verbatim case-sensitive prefix
+  //      (a longer line still matches — that's the prefix), 1-based; the
+  //      anchor is used as typed (no trimming of it); empty anchor → []
+  {
+    const txt = "alpha\n  beta one\n\tbeta two\nALPHA three\r\nbetafour";
+    const m = (a) => ioCore.matchAnchorPrefixLines(txt, a);
+    check(
+      String(n31),
+      "S31",
+      "matchAnchorPrefixLines: CRLF-tolerant + leading spaces/tabs stripped + verbatim case-sensitive prefix (a longer line still matches) + 1-based; empty anchor → []",
+      JSON.stringify(m("beta")) === JSON.stringify([2, 3, 5]) &&
+        JSON.stringify(m("beta ")) === JSON.stringify([2, 3]) &&
+        JSON.stringify(m("ALPHA")) === JSON.stringify([4]) &&
+        JSON.stringify(m("alpha")) === JSON.stringify([1]) &&
+        JSON.stringify(m("  beta")) === JSON.stringify([]) &&
+        JSON.stringify(m("")) === JSON.stringify([]),
+      JSON.stringify({ beta: m("beta"), "beta ": m("beta "), ALPHA: m("ALPHA"), alpha: m("alpha"), "  beta": m("  beta") }),
+    );
+    n31++;
+  }
+
+  // 318 — DRIFT GUARD: the core's anchor matcher + line counter are
+  //      EQUIVALENT to the block_transfer tool's OWN matchAnchorLines /
+  //      countLines (the S1 unified rule, 0d85a8c — the R3 re-scope note:
+  //      the drift fix already landed in S1; this pin guards it)
+  {
+    const btCore = await import(pathToFileURL(BT_TOOL_TS).href); // the block_transfer tool module (the named core)
+    const eqText = "h1\r\n  Dup A one\nDup B two\nplain\n";
+    const eqFixtures = ["a\nb\n", "", "a\nb", "a\r\nb\r\n", "x"];
+    check(
+      String(n31),
+      "S31",
+      "drift guard: the core's matchAnchorPrefixLines / countFileLines are EQUIVALENT to the block_transfer tool's own matchAnchorLines / countLines (the S1 unified rule, 0d85a8c)",
+      JSON.stringify(btCore.matchAnchorLines(eqText, "Dup")) === JSON.stringify(ioCore.matchAnchorPrefixLines(eqText, "Dup")) &&
+        JSON.stringify(btCore.matchAnchorLines(eqText, "h1")) === JSON.stringify(ioCore.matchAnchorPrefixLines(eqText, "h1")) &&
+        eqFixtures.every((t) => btCore.countLines(t) === ioCore.countFileLines(t)),
+      JSON.stringify({ dup: ioCore.matchAnchorPrefixLines(eqText, "Dup"), h1: ioCore.matchAnchorPrefixLines(eqText, "h1"), counts: eqFixtures.map((t) => [btCore.countLines(t), ioCore.countFileLines(t)]) }),
+    );
+    n31++;
+  }
+
+  // 319 — resolveSectionAnchor: the exactly-one gate — null file → absent
+  //      (silent fail-closed); exactly-one → resolved (the FIRST match
+  //      line + the scanned total for the limit clamp); 0 → rejected
+  //      matches=0; >=2 → rejected matches=2 (FAIL-CLOSED)
+  {
+    const one = "one\ntwo\n## Target only\nfour\n";
+    const dup = "Dup Anchor a\nmid\nDup Anchor b\n";
+    const r0 = ioCore.resolveSectionAnchor(null, "X");
+    const r1 = ioCore.resolveSectionAnchor(one, "## Target");
+    const r2 = ioCore.resolveSectionAnchor(one, "No Such");
+    const r3 = ioCore.resolveSectionAnchor(dup, "Dup Anchor");
+    check(
+      String(n31),
+      "S31",
+      "resolveSectionAnchor: null file → absent; exactly-one → resolved (line=3, scanned total=4); 0 → rejected matches=0; >=2 → rejected matches=2 (FAIL-CLOSED)",
+      r0.kind === "absent" && r1.kind === "resolved" && r1.line === 3 && r1.total === 4 &&
+        r2.kind === "rejected" && r2.matches === 0 && r3.kind === "rejected" && r3.matches === 2,
+      JSON.stringify({ r0, r1, r2, r3 }),
+    );
+    n31++;
+  }
+
+  // 320 — quotedSpans: double-quoted (a backslash escapes the next char —
+  //      \" does not close) + single-quoted (no escape — a backslash is
+  //      literal) + unterminated → to the end of the command + an empty
+  //      span contributes nothing + source order
+  {
+    const s1 = 'echo "a [4:four] b"';
+    const s2 = 'echo "a\\"b"';
+    const s3 = "echo 'a\\'b'";
+    const s4 = 'echo "abc';
+    const s5 = 'echo ""';
+    const s6 = 'echo "one" x \'two\'';
+    check(
+      String(n31),
+      "S31",
+      "quotedSpans: double-quote (a backslash escapes) + single-quote (no escape) + unterminated → to the end + empty span contributes nothing + source order",
+      JSON.stringify(ioCore.quotedSpans(s1)) === JSON.stringify([[6, 18]]) &&
+        JSON.stringify(ioCore.quotedSpans(s2)) === JSON.stringify([[6, 10]]) &&
+        JSON.stringify(ioCore.quotedSpans(s3)) === JSON.stringify([[6, 8]]) &&
+        JSON.stringify(ioCore.quotedSpans(s4)) === JSON.stringify([[6, 9]]) &&
+        JSON.stringify(ioCore.quotedSpans(s5)) === JSON.stringify([]) &&
+        JSON.stringify(ioCore.quotedSpans(s6)) === JSON.stringify([[6, 9], [14, 17]]),
+      JSON.stringify({ s1: ioCore.quotedSpans(s1), s2: ioCore.quotedSpans(s2), s3: ioCore.quotedSpans(s3), s4: ioCore.quotedSpans(s4), s5: ioCore.quotedSpans(s5), s6: ioCore.quotedSpans(s6) }),
+    );
+    n31++;
+  }
+
+  // 321 — inQuotedSpan: the containment test is EXACT single-range — a
+  //      pair fully inside one span (incl. the exact boundaries) → true;
+  //      straddling / outside / no spans → false (the pair grammar has no
+  //      quote characters, so single-range containment is exact)
+  {
+    const spans = [[6, 18]];
+    check(
+      String(n31),
+      "S31",
+      "inQuotedSpan: a pair fully inside ONE span (incl. the exact boundaries) → true; straddling / outside / no spans → false",
+      ioCore.inQuotedSpan(spans, 8, 16) === true &&
+        ioCore.inQuotedSpan(spans, 6, 18) === true &&
+        ioCore.inQuotedSpan(spans, 5, 19) === false &&
+        ioCore.inQuotedSpan(spans, 2, 4) === false &&
+        ioCore.inQuotedSpan([], 1, 2) === false,
+      "n/a",
+    );
+    n31++;
+  }
+
+  // 322 — HOOK glob PAIR channel: the read `filePath` + the glob `path`
+  //      field share ONE READ gate — the canonical path exists + the pair-
+  //      containing path does NOT → path MUTATED to the canonical + a
+  //      pair-resolved line (exactly ONE line — the channel owns it)
+  {
+    const g1 = { pattern: "*.txt", path: ioPfDir + "\\file-[4:four].txt" };
+    const g1Before = JSON.stringify(g1);
+    const n0 = ioReadLines().length;
+    await ioBefore({ tool: "glob", sessionID: "ses_fx_io3", callID: "c322" }, { args: g1 });
+    const g1Lines = ioReadLines();
+    const f1 = g1Lines[g1Lines.length - 1].split(" | ");
+    check(
+      String(n31),
+      "S31",
+      "hook glob PAIR channel: the read `filePath` + the glob `path` field share ONE READ gate — path MUTATED to the canonical + pair-resolved gate=mutated (exactly one 8-field line)",
+      g1.path === ioPfDir + "\\file-4.txt" && JSON.stringify(g1) !== g1Before && g1Lines.length === n0 + 1 &&
+        f1.length === 8 && ioStampRe.test(f1[0]) && f1[1] === "ses_fx_io3" && f1[3] === "glob" &&
+        f1[4] === g1Before && f1[5] === "pair=[4:four] canon=4 dist=0 gate=mutated" && f1[6] === "path" && f1[7] === "pair-resolved",
+      JSON.stringify({ after: g1.path, n: g1Lines.length - n0, f: f1 }),
+    );
+    n31++;
+  }
+
+  // 323 — HOOK grep CONTENT-SCOPE guard: a pair in the OTHER string field
+  //      (`pattern`) → the observation-form line ONLY (no gate token,
+  //      NEVER mutated — the R2 precedent) + the `path` field untouched
+  //      (an existing dir)
+  {
+    const g2 = { pattern: "[4:four]", path: ioPfDir, include: "*.txt" };
+    const g2Before = JSON.stringify(g2);
+    const n1 = ioReadLines().length;
+    await ioBefore({ tool: "grep", sessionID: "ses_fx_io3", callID: "c323" }, { args: g2 });
+    const g2Lines = ioReadLines();
+    const f2 = g2Lines[g2Lines.length - 1].split(" | ");
+    check(
+      String(n31),
+      "S31",
+      "hook grep content-scope guard: a pair in the `pattern` field → observation-form line ONLY (no gate token, never mutated) + the `path` field untouched (1 line)",
+      JSON.stringify(g2) === g2Before && g2Lines.length === n1 + 1 && f2.length === 8 &&
+        f2[3] === "grep" && f2[5] === "pair=[4:four] canon=4 dist=0" && f2[6] === "arg" && f2[7] === "observed-redundancy-ok",
+      JSON.stringify({ args: JSON.stringify(g2), n: g2Lines.length - n1, f: f2 }),
+    );
+    n31++;
+  }
+
+  // 324 — HOOK section-ANCHOR resolver EXACTLY-ONE: the non-numeric STRING
+  //      `offset` is a section anchor — exactly one match → `offset`
+  //      REWRITTEN to the 1-based line number (+ `limit` clamped to the
+  //      file end: 50 → 5-3+1=3) + the anchor-resolved line (1 line)
+  {
+    const a1 = { filePath: path.join(ioPfDir, "anchor-fixture.txt"), offset: "## Only Anchor", limit: 50 };
+    const a1Before = JSON.stringify(a1);
+    const n2 = ioReadLines().length;
+    await ioBefore({ tool: "read", sessionID: "ses_fx_io3", callID: "c324" }, { args: a1 });
+    const l2 = ioReadLines();
+    const f2 = l2[l2.length - 1].split(" | ");
+    check(
+      String(n31),
+      "S31",
+      "hook section-ANCHOR EXACTLY-ONE: the string `offset` REWRITTEN to the 1-based line number (3) + `limit` clamped to the file end (50 → 3) + the anchor-resolved line (1 line, 8 fields)",
+      a1.offset === 3 && a1.limit === 3 && JSON.stringify(a1) !== a1Before && l2.length === n2 + 1 &&
+        f2.length === 8 && f2[3] === "read" && f2[4] === a1Before &&
+        f2[5] === "anchor=## Only Anchor line=3" && f2[6] === "read offset" && f2[7] === "anchor-resolved",
+      JSON.stringify({ after: JSON.stringify(a1), n: l2.length - n2, f: f2 }),
+    );
+    n31++;
+  }
+
+  // 325 — HOOK anchor ZERO matches: FAIL-CLOSED — the string offset RUNS
+  //      (byte-identical args; the host's honest schema/absent error
+  //      surfaces) + the anchor-rejected line with the match count
+  {
+    const a2 = { filePath: path.join(ioPfDir, "anchor-fixture.txt"), offset: "No Such Anchor" };
+    const a2Before = JSON.stringify(a2);
+    const n3 = ioReadLines().length;
+    await ioBefore({ tool: "read", sessionID: "ses_fx_io3", callID: "c325" }, { args: a2 });
+    const l3 = ioReadLines();
+    const f3 = l3[l3.length - 1].split(" | ");
+    check(
+      String(n31),
+      "S31",
+      "hook anchor ZERO matches: FAIL-CLOSED — offset byte-identical (the string runs) + anchor-rejected 'matches=0' (1 line)",
+      JSON.stringify(a2) === a2Before && l3.length === n3 + 1 && f3.length === 8 &&
+        f3[5] === "anchor=No Such Anchor matches=0" && f3[6] === "read offset" && f3[7] === "anchor-rejected",
+      JSON.stringify({ args: JSON.stringify(a2), n: l3.length - n3, f: f3 }),
+    );
+    n31++;
+  }
+
+  // 326 — HOOK anchor MULTI (>=2) matches: FAIL-CLOSED — offset
+  //      byte-identical + the anchor-rejected line with the match count
+  {
+    const a3 = { filePath: path.join(ioPfDir, "anchor-dup.txt"), offset: "Dup Anchor" };
+    const a3Before = JSON.stringify(a3);
+    const n4 = ioReadLines().length;
+    await ioBefore({ tool: "read", sessionID: "ses_fx_io3", callID: "c326" }, { args: a3 });
+    const l4 = ioReadLines();
+    const f4 = l4[l4.length - 1].split(" | ");
+    check(
+      String(n31),
+      "S31",
+      "hook anchor MULTI (2) matches: FAIL-CLOSED — offset byte-identical + anchor-rejected 'matches=2' (1 line)",
+      JSON.stringify(a3) === a3Before && l4.length === n4 + 1 && f4.length === 8 &&
+        f4[5] === "anchor=Dup Anchor matches=2" && f4[6] === "read offset" && f4[7] === "anchor-rejected",
+      JSON.stringify({ args: JSON.stringify(a3), n: l4.length - n4, f: f4 }),
+    );
+    n31++;
+  }
+
+  // 327 — HOOK numeric-string offset: the SILENT type repair (the string
+  //      "3" → the number 3 — line-offsets stay the FALLBACK, always
+  //      working) — no anchor line
+  {
+    const a4 = { filePath: path.join(ioPfDir, "anchor-fixture.txt"), offset: "3" };
+    const n5 = ioReadLines().length;
+    await ioBefore({ tool: "read", sessionID: "ses_fx_io3", callID: "c327" }, { args: a4 });
+    check(
+      String(n31),
+      "S31",
+      "hook numeric-string offset: SILENT type repair (the string '3' → the number 3) + ZERO lines (line-offsets stay the fallback)",
+      a4.offset === 3 && typeof a4.offset === "number" && ioReadLines().length === n5,
+      JSON.stringify({ offset: a4.offset, type: typeof a4.offset, n: ioReadLines().length - n5 }),
+    );
+    n31++;
+  }
+
+  // 328 — HOOK file MISSING: the silent fail-closed (no anchor line — the
+  //      read's honest "not found" surfaces) — the fuzzy channel STILL
+  //      runs on the effective path (the fixed pipeline order: one
+  //      fuzzy-rejected line)
+  {
+    const a5 = { filePath: path.join(ioPfDir, "missing-xyz-q.txt"), offset: "Some Anchor" };
+    const a5Before = JSON.stringify(a5);
+    const n6 = ioReadLines().length;
+    await ioBefore({ tool: "read", sessionID: "ses_fx_io3", callID: "c328" }, { args: a5 });
+    const l6 = ioReadLines();
+    check(
+      String(n31),
+      "S31",
+      "hook file MISSING: silent fail-closed (no anchor line, offset byte-identical) + the fuzzy channel still runs (exactly one fuzzy-rejected line)",
+      JSON.stringify(a5) === a5Before && l6.length === n6 + 1 &&
+        l6[l6.length - 1].split(" | ")[7] === "fuzzy-rejected" &&
+        !l6.slice(n6).some((x) => x.includes("anchor=")),
+      JSON.stringify({ args: JSON.stringify(a5), n: l6.length - n6, verdicts: l6.slice(n6).map((x) => x.split(" | ")[7]) }),
+    );
+    n31++;
+  }
+
+  // 329 — HOOK BASH QUOTED-FORM channel: a [left:right] pair INSIDE a
+  //      quoted span → the canonical digits replace the pair IN PLACE
+  //      (the quotes stay — the shell receives the canonical digits) +
+  //      the pair-resolved kind=quoted line (run < 4 — no ref gate)
+  {
+    const b2 = { command: 'echo "[4:four]"' };
+    const b2Before = JSON.stringify(b2);
+    const n7 = ioReadLines().length;
+    await ioBefore({ tool: "bash", sessionID: "ses_fx_io3", callID: "c329" }, { args: b2 });
+    const l7 = ioReadLines();
+    const f7 = l7[l7.length - 1].split(" | ");
+    check(
+      String(n31),
+      "S31",
+      "hook bash QUOTED-FORM: a quoted pair → the command MUTATED in place ('echo \"4\"') + pair-resolved kind=quoted (exactly one line, 8 fields)",
+      b2.command === 'echo "4"' && JSON.stringify(b2) !== b2Before && l7.length === n7 + 1 &&
+        f7.length === 8 && f7[3] === "bash" && f7[4] === b2Before &&
+        f7[5] === "kind=quoted tool=bash arg=command pair=[4:four] canon=4 dist=0" && f7[7] === "pair-resolved",
+      JSON.stringify({ after: b2.command, n: l7.length - n7, f: f7 }),
+    );
+    n31++;
+  }
+
+  // 330 — HOOK quoted MISMATCH: FAIL-CLOSED — never "helpfully" rewrite a
+  //      mismatched form: the command is byte-identical + the
+  //      redundancy-mismatch gate=fail-closed line
+  {
+    const b3 = { command: 'echo "[7:eight]"' };
+    const b3Before = JSON.stringify(b3);
+    const n8 = ioReadLines().length;
+    await ioBefore({ tool: "bash", sessionID: "ses_fx_io3", callID: "c330" }, { args: b3 });
+    const l8 = ioReadLines();
+    const f8 = l8[l8.length - 1].split(" | ");
+    check(
+      String(n31),
+      "S31",
+      "hook quoted MISMATCH: FAIL-CLOSED — command byte-identical + redundancy-mismatch gate=fail-closed (exactly one line)",
+      JSON.stringify(b3) === b3Before && l8.length === n8 + 1 && f8.length === 8 &&
+        f8[5] === "pair=[7:eight] canon=8 dist=1 gate=fail-closed" && f8[7] === "redundancy-mismatch",
+      JSON.stringify({ args: JSON.stringify(b3), n: l8.length - n8, f: f8 }),
+    );
+    n31++;
+  }
+
+  // 331 — HOOK OWNERSHIP SPLIT: in ONE command, a quoted pair (owned by
+  //      the quoted-form channel — mutated) + an unquoted pair (owned by
+  //      the git-ref channel — run < 4, log-only) → two lines (the
+  //      unquoted one first — the channel order), the unquoted pair
+  //      untouched
+  {
+    const b4 = { command: 'echo "[4:four]" [5:five]' };
+    const n9 = ioReadLines().length;
+    await ioBefore({ tool: "bash", sessionID: "ses_fx_io3", callID: "c331" }, { args: b4 });
+    const l9 = ioReadLines();
+    const p9 = l9.slice(n9);
+    check(
+      String(n31),
+      "S31",
+      "hook OWNERSHIP SPLIT: quoted pair mutated in place + unquoted pair log-only (run < 4) — the command 'echo \"4\" [5:five]' + exactly two lines (unquoted first)",
+      b4.command === 'echo "4" [5:five]' && p9.length === 2 &&
+        p9[0].split(" | ")[7] === "observed-redundancy-ok" && p9[0].split(" | ")[5] === "pair=[5:five] canon=5 dist=0" &&
+        p9[1].split(" | ")[7] === "pair-resolved" && p9[1].split(" | ")[5] === "kind=quoted tool=bash arg=command pair=[4:four] canon=4 dist=0",
+      JSON.stringify({ after: b4.command, lines: p9 }),
+    );
+    n31++;
+  }
+
+  // 332 — HOOK block_transfer ANCHOR-MARKER channel, the MUTATED branch:
+  //      the S1 startsWith+unique gate on the EFFECTIVE srcFile — the
+  //      canonical marker matches EXACTLY ONE line and the pair-form
+  //      marker matches NONE → startMarker MUTATED to the canonical +
+  //      gate=mutated line=N; exactly ONE line (the anchor fields are
+  //      EXCLUDED from the content-scope loop — no double-logging)
+  {
+    const bt1 = {
+      mode: "MOVE",
+      srcFile: path.join(ioPfDir, "bt-anchor-src.txt"),
+      dstFile: path.join(ioPfDir, "bt-anchor-dst.txt"),
+      startMarker: "Sec [4:four] T",
+      endMarker: "Other line",
+    };
+    const nA = ioReadLines().length;
+    await ioBefore({ tool: "block_transfer", sessionID: "ses_fx_io3", callID: "c332" }, { args: bt1 });
+    const lA = ioReadLines();
+    const fA = lA[lA.length - 1].split(" | ");
+    check(
+      String(n31),
+      "S31",
+      "hook block_transfer ANCHOR MUTATED: startMarker MUTATED to the canonical ('Sec 4 T') + pair-resolved gate=mutated line=2 arg=startMarker (exactly one line — no double-logging)",
+      bt1.startMarker === "Sec 4 T" && lA.length === nA + 1 && fA.length === 8 &&
+        fA[3] === "block_transfer" && fA[5] === "pair=[4:four] canon=4 dist=0 gate=mutated line=2 arg=startMarker" && fA[7] === "pair-resolved",
+      JSON.stringify({ after: bt1.startMarker, n: lA.length - nA, f: fA }),
+    );
+    n31++;
+  }
+
+  // 333 — HOOK anchor gate NONE-EXIST: the canonical marker matches
+  //      nothing (and neither does the pair form) → NOT mutated +
+  //      gate=none-exist (the strict existence gate)
+  {
+    const bt2 = {
+      mode: "MOVE",
+      srcFile: path.join(ioPfDir, "bt-anchor-src.txt"),
+      dstFile: path.join(ioPfDir, "bt-anchor-dst.txt"),
+      startMarker: "Sec [9:nine] Z",
+      endMarker: "Other line",
+    };
+    const bt2Before = JSON.stringify(bt2);
+    const nB = ioReadLines().length;
+    await ioBefore({ tool: "block_transfer", sessionID: "ses_fx_io3", callID: "c333" }, { args: bt2 });
+    const lB = ioReadLines();
+    const fB = lB[lB.length - 1].split(" | ");
+    check(
+      String(n31),
+      "S31",
+      "hook anchor gate NONE-EXIST: canonical absent → startMarker NOT mutated + observed-redundancy-ok gate=none-exist arg=startMarker (1 line)",
+      JSON.stringify(bt2) === bt2Before && lB.length === nB + 1 && fB.length === 8 &&
+        fB[5] === "pair=[9:nine] canon=9 dist=0 gate=none-exist arg=startMarker" && fB[7] === "observed-redundancy-ok",
+      JSON.stringify({ args: JSON.stringify(bt2), n: lB.length - nB, f: fB }),
+    );
+    n31++;
+  }
+
+  // 334 — HOOK anchor gate BOTH-EXIST: the pair-form marker and the
+  //      canonical marker both match (the on-disk pair form wins) → NOT
+  //      mutated + gate=both-exist
+  {
+    const bt3 = {
+      mode: "MOVE",
+      srcFile: path.join(ioPfDir, "bt-anchor-both.txt"),
+      dstFile: path.join(ioPfDir, "bt-anchor-dst.txt"),
+      startMarker: "Sec [4:four] T",
+      endMarker: "mid",
+    };
+    const bt3Before = JSON.stringify(bt3);
+    const nC = ioReadLines().length;
+    await ioBefore({ tool: "block_transfer", sessionID: "ses_fx_io3", callID: "c334" }, { args: bt3 });
+    const lC = ioReadLines();
+    const fC = lC[lC.length - 1].split(" | ");
+    check(
+      String(n31),
+      "S31",
+      "hook anchor gate BOTH-EXIST: raw + canonical both match → startMarker NOT mutated + gate=both-exist (1 line)",
+      JSON.stringify(bt3) === bt3Before && lC.length === nC + 1 && fC.length === 8 &&
+        fC[5] === "pair=[4:four] canon=4 dist=0 gate=both-exist arg=startMarker" && fC[7] === "observed-redundancy-ok",
+      JSON.stringify({ args: JSON.stringify(bt3), n: lC.length - nC, f: fC }),
+    );
+    n31++;
+  }
+
+  // 335 — HOOK anchor gate NON-UNIQUE: the canonical marker matches >=2
+  //      lines → NOT mutated + gate=non-unique (the S1 uniqueness
+  //      contract)
+  {
+    const bt4 = {
+      mode: "MOVE",
+      srcFile: path.join(ioPfDir, "bt-anchor-nu.txt"),
+      dstFile: path.join(ioPfDir, "bt-anchor-dst.txt"),
+      startMarker: "Sec [4:four] T",
+      endMarker: "mid",
+    };
+    const bt4Before = JSON.stringify(bt4);
+    const nD = ioReadLines().length;
+    await ioBefore({ tool: "block_transfer", sessionID: "ses_fx_io3", callID: "c335" }, { args: bt4 });
+    const lD = ioReadLines();
+    const fD = lD[lD.length - 1].split(" | ");
+    check(
+      String(n31),
+      "S31",
+      "hook anchor gate NON-UNIQUE: canonical matches 2 lines → startMarker NOT mutated + gate=non-unique arg=startMarker (1 line)",
+      JSON.stringify(bt4) === bt4Before && lD.length === nD + 1 && fD.length === 8 &&
+        fD[5] === "pair=[4:four] canon=4 dist=0 gate=non-unique arg=startMarker" && fD[7] === "observed-redundancy-ok",
+      JSON.stringify({ args: JSON.stringify(bt4), n: lD.length - nD, f: fD }),
+    );
+    n31++;
+  }
+
+  // 336 — HOOK anchor MISMATCH FAIL-CLOSED: a mismatched pair never
+  //      "helpfully" rewrites an anchor target: startMarker NOT mutated +
+  //      the redundancy-mismatch gate=fail-closed line
+  {
+    const bt5 = {
+      mode: "MOVE",
+      srcFile: path.join(ioPfDir, "bt-anchor-src.txt"),
+      dstFile: path.join(ioPfDir, "bt-anchor-dst.txt"),
+      startMarker: "Sec [7:eight] T",
+      endMarker: "Other line",
+    };
+    const bt5Before = JSON.stringify(bt5);
+    const nE = ioReadLines().length;
+    await ioBefore({ tool: "block_transfer", sessionID: "ses_fx_io3", callID: "c336" }, { args: bt5 });
+    const lE = ioReadLines();
+    const fE = lE[lE.length - 1].split(" | ");
+    check(
+      String(n31),
+      "S31",
+      "hook anchor MISMATCH FAIL-CLOSED: [7:eight] → startMarker NOT mutated + redundancy-mismatch gate=fail-closed arg=startMarker (1 line)",
+      JSON.stringify(bt5) === bt5Before && lE.length === nE + 1 && fE.length === 8 &&
+        fE[5] === "pair=[7:eight] canon=8 dist=1 gate=fail-closed arg=startMarker" && fE[7] === "redundancy-mismatch",
+      JSON.stringify({ args: JSON.stringify(bt5), n: lE.length - nE, f: fE }),
+    );
+    n31++;
+  }
+
+  // 337 — HOOK targetMarker ownership: the targetMarker resolves against
+  //      the EFFECTIVE dstFile (NOT the srcFile) — the canonical matches
+  //      exactly one line of the dst (line 1) → MUTATED + gate=mutated
+  //      line=1 arg=targetMarker (the pair-free startMarker adds no line)
+  {
+    const bt6 = {
+      mode: "MOVE",
+      srcFile: path.join(ioPfDir, "bt-anchor-src.txt"),
+      dstFile: path.join(ioPfDir, "bt-anchor-dst2.txt"),
+      startMarker: "Sec 4 T",
+      endMarker: "Other line",
+      targetMarker: "Dst [2:two] T",
+    };
+    const nF = ioReadLines().length;
+    await ioBefore({ tool: "block_transfer", sessionID: "ses_fx_io3", callID: "c337" }, { args: bt6 });
+    const lF = ioReadLines();
+    const fF = lF[lF.length - 1].split(" | ");
+    check(
+      String(n31),
+      "S31",
+      "hook targetMarker ownership: the targetMarker resolves against the EFFECTIVE dstFile — MUTATED to the canonical + gate=mutated line=1 arg=targetMarker (exactly one line)",
+      bt6.targetMarker === "Dst 2 T" && lF.length === nF + 1 && fF.length === 8 &&
+        fF[5] === "pair=[2:two] canon=2 dist=0 gate=mutated line=1 arg=targetMarker" && fF[7] === "pair-resolved",
+      JSON.stringify({ after: bt6.targetMarker, n: lF.length - nF, f: fF }),
+    );
+    n31++;
   }
 }
 
