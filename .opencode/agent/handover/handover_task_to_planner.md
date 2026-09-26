@@ -1,100 +1,102 @@
-# Worker handover — compaction-unification (DONE — worker-23)
+# Worker handover — loop_log v2 (DONE — worker-24)
 
-## Result: build complete — all three units green, all commits in place
+## Result: build complete — parts A–D + smoke + S16 re-pin all green; full gate green
 
-Task: compaction-unification build (approved proposal A+B+C, source
-`.opencode/proposals/approved/2026-09-26_compaction-unification.md`,
-maintainer approved in full 2026-09-26). Branch: `opencode_test`
-(no branch switch). One behavior by construction: both entry points now
-route through the shared plain module `compaction_core.ts`, and
-`context_recovery` compacts ONLY — it never resumes.
+Task spec: `.opencode/agent/handover/handover_task.md` (commit 68da83d). Approved
+design: `.opencode/proposals/approved/2026-09-12_loop_log-v2.md` (parts A–D, build
+order A→B→C→D; the spec's two corrections applied — the model chain prefers
+`context.agent` over the proposal's `context.modelId`/`context.model.id`, and the
+S16 probe section DOES exist and was re-pinned, contra the proposal's stale
+"no probe section" acceptance line). Branch `opencode_test` (no branch switch).
+Code delta = ONE file: `.opencode/tools/loop_log.ts` (+ its smoke + the S16 probe
+section re-pin).
 
-## Commits
-- **Unit 1 (Part A)** — `218a2c1`: NEW `.opencode/plugin/compaction_core.ts`
-  (pure module, NO tool registration, T5 per the intercept_observer_core
-  pattern): config reader (`compact_budget.json`), the shared budget store
-  (read/count/recordSuccess) + cap resolver (model_budget map, CPU denied,
-  emergency-1), keepTokens #99 resolution (computed primary from the DB —
-  last keepMessages messages, user tokens.input, assistant output+reasoning,
-  dual-shape unwrap; budget-file fallback; else omit), summarizer-pair
-  resolution CARRYING THE SESSION'S OWN providerID+modelID (the 14-26
-  incident fix), the v1 `session.summarize` call, the COMPACT-line writer
-  (carries the resolved tokens + source), the verified-success handling
-  (`recordVerifiedSuccess`), the shared failure helpers (+ exported
-  `localStamp` — the tool's DUMP-* lines share the stamp writer).
-  `compact_memory.ts` is now the thin wrapper: tool registration + arg
-  validation + SELF/CROSS routing + the budget gate / EMERGENCY-1 arg + the
-  v2 compact dispatch + the pre-compaction dump hook + the queued-message
-  path (store at queue time, relay-first on resume — NOT regressed).
-  Re-exports keep the smoke/probe import surface pinned at the entry
-  point.
-- **Unit 2 (Part B)** — `d9d93f8`: `context_recovery.ts` local duplicates
-  (config reader, budget store, resolveCap, computeKeepTokens, stamps,
-  COMPACT line, jsonc strip, model resolution, callSummarize, failure
-  helpers) replaced by imports from the core; `COMPACTION_RELOAD_DIRECTIVE`
-  + the promptAsync resume REMOVED — grep-verifiable: ZERO occurrences of
-  `promptAsync` / `COMPACTION_RELOAD` in the file (comment wording
-  adjusted to keep the zero-match true). The hook keeps: the limit
-  trigger, the activation-flag read, the once-per-overflow guard, the
-  per-fire budget gate, the core call, hand control back.
-- **Unit 3 (Part C)** — this commit: new probe section **S32**
-  (3 pins, 338-340) in `handover_probe.mjs` after S31:
-  - 338: the core loads type-stripped + the 17 expected named exports are
-    functions (+ SELF_ROOT) + NO default export (the plain-module
-    pattern);
-  - 339: EQUIVALENCE — the tool dispatch + the hook fire over the SAME
-    session/model fixture (no sandbox opencode.jsonc — the pair comes from
-    the session's OWN model) produce the SAME summarize body
-    (providerID + modelID + keep { messages: 5 }, no tokens);
-  - 340: EQUIVALENCE cap semantics (a cap-2 pinned model): the tool
-    dispatches 2 then refuses (no emergency arg — naming the
-    availability); the hook fires 2 normal, auto-consumes the emergency 1
-    (the ` emergency` line suffix, count → 3), then clean-fails — NO
-    prompt anywhere (Part B).
-  Re-pins from Unit 2 (probe S11 checks 78/80 no-prompt, context_recovery
-  smoke cases 4/6 no-prompt, unused RC_DIRECTIVE const removed) were
-  committed with Unit 2. The probe's section-sum annotations updated:
-  S32 annotation block added after S31 + EXPECTED OUTPUT now
-  `S31=21 S32=3 hygiene=6 → "PROBE handover: 340/340 PASS"` — the
-  self-annotated line agrees (measured).
+## Commits (one per verified unit, in build order)
+- **Part A — auto-identity** — `aa5a411`: `role`/`model`/`session` now OPTIONAL;
+  best-effort chains (first hit wins, else literal `unknown`; never throws):
+  session `args.session → context.sessionID → context.sessionId → context.session?.id`;
+  role `args.role → context.agent`; model `args.model → context.agent`
+  (agent-identifier preference) `→ context.extra.model.id`. Line format
+  byte-unchanged. Smoke + Part A matrix (context-set / each source absent /
+  arg-override / unknown fallbacks / empty-string-arg fall-through) +
+  line-format byte-match + append-only prefix checks. Smoke 35/35.
+- **Part B — write confirmation** — `006a137`: after the append the file is read
+  back and the last line byte-compared. Return gains
+  `folder: <name> (created|existing)` (`(created)` iff THIS call created the folder
+  in an empty root) + `verified: readback-match` /
+  `verified: readback-MISMATCH: <actual last line>`; the ANOMALY note stays
+  appended last. Smoke re-pins (A)/(B)/(E) + a simulated mismatch path
+  (pre-existing file with no trailing newline → the glued last line is surfaced
+  verbatim). Smoke 40/40.
+- **Part C — lenient status** — `320d09f`: `status` is a REQUIRED free-form
+  string; normalize = lowercase + strip non-alphanumerics, keyword check in the
+  spec's order `done/return/warn/info/start/correct` → the established 8-char
+  tokens (`restart` → `-->START`, intended). No keyword → returns
+  `Error: unrecognizable status … — accepted keywords: start / done / return /
+  warn / info / correct (…)` and writes NOTHING (no folder creation, no append);
+  never a silent INFO fallback. Smoke re-pins (D) + the normalization table
+  (22 spellings across the 6 keywords, each ≥3 variants) + no-write error checks.
+  Smoke 66/66.
+- **Part D — `CORRECT-` + description** — `b9d57c9`: `correct` → `CORRECT-`,
+  appended normally (append-only stays absolute — no rewrite/delete anywhere);
+  the return gains `corrects: <previous line of the log>` (byte-exact; the log's
+  last line BEFORE this append; an empty/absent log omits the field). The tool
+  `description` was rewritten (keywords, optional role/model/session auto-filled
+  from host context, the confirmed return format). NOTE: this commit landed
+  AFTER the probe commit below (missed the unit commit at the time — the probe
+  run happened with the Part D code present in the tree; both commits are green
+  on their own scope). Smoke 69/69.
+- **S16 re-pin** — `b1d122c`: `.opencode/plugin/probes/handover_probe.mjs` S16
+  section (6 checks, same sandbox pattern) re-pinned to the v2 return; check
+  count unchanged → the self-annotated total stays 340 (header line 936
+  untouched, `S16=6`).
 
-## Verification (measured, at each unit + final)
-- Baselines re-verified at start: probe 337/337, pytest 459 passed +1w,
-  ruff F=0, cm smoke 74/74, rc smoke 17/17.
-- Unit 1 gate: probe 337/337, pytest 459+1w, ruff F=0, cm 74/74.
-- Unit 2 gate: probe 337/337, pytest 459+1w, ruff F=0, rc 17/17.
-- Final gate (Unit 3): probe **340/340 PASS**, pytest **459 passed +1w**,
-  ruff **F=0**, cm smoke **74/74**, rc smoke **17/17**.
+## S16 re-pin list (what moved per check)
+- **118** (schema): status was pinned as a strict 5-token ENUM (bogus fails
+  safeParse) → now a REQUIRED free-form string (parse accepts any string —
+  rejection is runtime, Part C); `role`/`model` were pinned REQUIRED → now
+  OPTIONAL (Part A); `content` still REQUIRED; `session` still OPTIONAL.
+- **119** (empty root): return pinned at EXACTLY 2 lines
+  `folder: <name>` + `line: <line>` → now EXACTLY 3 lines:
+  `folder: <name> (created)` + `line: <line>` + `verified: readback-match`.
+  (The log-file path derivation strips the new `(created)` suffix.)
+- **120** (line format): the line-byte pin is UNCHANGED (format contract intact;
+  omitted session → literal `unknown`) + the `line:` field byte-match unchanged;
+  gains pins for the ` (created)` folder line and the `verified:` line on the
+  same return.
+- **121** (call #2, session passthrough): 2-line return → 3 lines;
+  `folder: <name>` → `folder: <name> (existing)`; adds the `verified:` pin.
+- **122** (empty session → `unknown`): same line pin; folder line now
+  ` (existing)`-flagged.
+- **123** (anomaly): the byte-exact ANOMALY note was the 3rd return line → now the
+  4th (LAST) line, with `verified: readback-match` on line 3; the folder is
+  flagged ` (existing)` (the two dummy folders pre-existed).
 
-## TODO entries
-None — no unresolved findings. (The two build details below are
-documented design choices, not defects.)
+## Measured verification (full gate, this session)
+- Probe: `PROBE handover: 340/340 PASS` (exit 0; self-annotation == header sum).
+- ALL 10 smokes green, exit 0 each: auto_resume 139/139, block_transfer.sandbox
+  64/64, block_transfer 123/123, compact_memory 74/74, context_recovery 17/17,
+  ctx_gauge 3/3, gauge_core ALL PASS, intercept_observer 77/77,
+  **loop_log 69/69**, submit 20/20.
+- pytest: `459 passed, 1 warning in 2.10s` (matches the spec baseline 459+1w).
+- ruff `--select F`: `All checks passed!` (F=0).
 
-## Deliberately NOT done
-- Did NOT flip `emergencyRecovery` in `.opencode/temp/compact_budget.json`
-  (DO-NOT-touch — the re-enable is the live acceptance, done by the
-  maintainer after verification).
-- No changes to: FST product code, `auto_resume.ts`, `ctx_watchdog.ts`,
-  `intercept_observer*`, `block_transfer.ts`, `submit.ts`,
-  `.opencode/maintainer/**`, `opencode.jsonc`, the agent prompts.
-- The emergency-consumption asymmetry (tool: `emergency` ARG required at
-  count==cap; hook: auto-consume at count==cap) is BY DESIGN — the arg
-  handling stays in the tool, the no-arg auto path in the hook (the spec's
-  gate shapes); S32-340 pins both sides.
+## Deliberately NOT done (per the spec's DO-NOT-TOUCH / division of labor)
+- Prompt bookkeeping (`agent_readme_loop.md` §Loop log + the loop lines in the
+  planner/worker/looprunner role prompts: keywords instead of the 8-char tokens,
+  optional identity) — the proposal assigns this to the PLANNER, after
+  verification, as a separate commit. The tool's `description` (the usage
+  channel) already carries it.
+- `opencode.jsonc` registration + per-agent grant — the maintainer's domain,
+  effective at his next process restart.
+- The five established status tokens + the line format — untouched (public
+  contract); no token renaming anywhere.
+- Everything under `.opencode/maintainer/`, the live `.opencode/loop/` (smoke +
+  probe are sandboxed; the only live-loop writes are this session's own
+  START/DONE loop-log lines, riding this final commit), `AGENTS.md`, all prompt
+  files, all other tools/plugins/tests.
+- TODO entries: none — no discrepancies found (the spec's stated baselines all
+  matched: 340, 459+1w, F=0).
 
-## Notes / discrepancies (no silent re-derivation)
-1. The core's `recordSuccess` uses the tool's model-write form
-   (`typeof model === "string" ? model : ...`); the hook's old local copy
-   additionally guarded empty strings — behavior UNCHANGED because the
-   hook gates `model === ""` before the call (clean fail).
-2. The old S11 probe header comment block and the S11 code-header count
-   "(11)" predate the 257-261/285/286 additions (annotation says S11=13) —
-   pre-existing drift, not touched (the annotation is the source).
-3. `localStamp` is now exported from the core (shared stamp writer for the
-   tool's DUMP-OK/RETRY/FAIL lines) — a small addition beyond the
-   proposal's core list, needed because the dump hook stayed tool-local.
-
-## Lessons
-`block_transfer` WRITE/DELETE line-number refs do not survive the
-parameter format (they arrive as marker strings); unique line-prefix
-markers are the reliable form for span refs.
+## Final gauge
+`SESSION=ses_f2114f171ffeuKJrMkXe1QczCA CTX=103291 (42%) REM=141709 | 5 compactions left`
