@@ -21,6 +21,81 @@ function sandboxCheck(cwd: string, givenPath: string): string | null {
   return `Error: '${givenPath}' is outside the sandbox (allowed: ${roots.join(", ")})`;
 }
 
+// ===== THE UNIFIED ANCHOR RULE (approved proposal 2026-09-25_block_transfer-v2, Part A) =====
+// Every mode's startMarker / endMarker / targetMarker lookup routes through
+// resolveAnchor — ONE rule for ALL modes. This replaces the old per-mode
+// matching: COPY's mid-line substring tolerance is GONE (a flagged, approved
+// decision), and REPLACE now trims the line's leading whitespace before the
+// prefix match (the old bare startsWith did not).
+//
+// The matching rule itself lives in matchAnchorLines, and ONLY there:
+// swapping the general behavior (prefix -> substring / case-insensitive /
+// fuzzy) is a change in this one place, not in the modes.
+//
+// Rule (exactly as approved, Part A):
+//   - the file is split into lines on `\n`; a trailing `\r` on a line is
+//     ignored for matching (CRLF-tolerant);
+//   - an anchor A matches line L if L, after removing LEADING spaces/tabs,
+//     BEGINS with A verbatim (case-sensitive; A is used as typed — no
+//     trimming of the anchor itself);
+//   - the line's remainder after A is irrelevant (a longer line still
+//     matches — that's the prefix);
+//   - the anchor must match EXACTLY ONE line.
+
+// The 1-based line numbers of ALL matching lines (empty array = no match).
+export function matchAnchorLines(fileText: string, anchor: string): number[] {
+  if (!anchor) return [];
+  const out: number[] = [];
+  const lines = fileText.split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    if (line.endsWith("\r")) line = line.slice(0, -1);
+    if (line.replace(/^[ \t]+/, "").startsWith(anchor)) out.push(i + 1);
+  }
+  return out;
+}
+
+// The EXACTLY-ONE contract: the 1-based line number of the EXACT ONE match,
+// else null. The single entry point every mode's anchor lookup resolves
+// through.
+export function resolveAnchor(fileText: string, anchor: string): number | null {
+  const matches = matchAnchorLines(fileText, anchor);
+  return matches.length === 1 ? matches[0] : null;
+}
+
+// The teaching error taxonomy (Part A), one line each:
+//  - not-found: the anchor quoted (with the file);
+//  - non-unique: the anchor quoted (with the file) — the legacy byte form,
+//    probe-pinned (probe 263); the match count + the first match line numbers
+//    land with the v2 probe-section re-pin (S3);
+//  - empty-buffer: the existing message, kept verbatim (probe-pinned, 116);
+//  - ref-out-of-range: PREPARED for the Part B/C line-number refs (they do
+//    not exist yet) — the text exists now; the wiring lands with the refs.
+// Out-of-sandbox is NOT in this taxonomy — the intercept plugin handles it
+// upstream; sandboxCheck above stays the defense-in-depth backstop.
+function notFoundError(fileRef: string, label: string, anchor: string): string {
+  return `Error: ${label} '${anchor}' not found in ${fileRef}.`;
+}
+function nonUniqueError(fileRef: string, label: string, anchor: string): string {
+  return `Error: ${label} '${anchor}' is not unique in ${fileRef}.`;
+}
+// A 1-based line number beyond the file's line count, with the count.
+export function refOutOfRangeError(fileRef: string, lineNo: number, lineCount: number): string {
+  const word = lineCount === 1 ? "line" : "lines";
+  return `Error: line ${lineNo} is out of range in ${fileRef} (the file has ${lineCount} ${word}).`;
+}
+
+// The single routing entry for every mode's anchor lookup: resolves through
+// resolveAnchor; on failure builds the teaching error from the same matcher
+// (not-found / non-unique).
+type AnchorResolution = { line: number } | { error: string };
+function resolveAnchorOrError(fileRef: string, label: string, fileText: string, anchor: string): AnchorResolution {
+  const line = resolveAnchor(fileText, anchor);
+  if (line !== null) return { line };
+  const matches = matchAnchorLines(fileText, anchor);
+  return { error: matches.length === 0 ? notFoundError(fileRef, label, anchor) : nonUniqueError(fileRef, label, anchor) };
+}
+
 export default tool({
    description: `Move, copy, cut, paste, delete, or clear multi-line blocks in files using short unique line-prefix anchors and named clipboard buffers.
 
@@ -69,17 +144,20 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
         const dstPath = path.resolve(cwd, args.dstFile);
         const dstViolation = sandboxCheck(cwd, args.dstFile);
         if (dstViolation) return dstViolation;
+        let dstText = "";
         let dstLines: string[] = [];
         if (fs.existsSync(dstPath)) {
-          dstLines = fs.readFileSync(dstPath, "utf-8").split(/\r?\n/);
+          dstText = fs.readFileSync(dstPath, "utf-8");
+          dstLines = dstText.split(/\r?\n/);
         } else {
           fs.mkdirSync(path.dirname(dstPath), { recursive: true });
         }
 
         let insertIdx = dstLines.length;
         if (args.targetMarker) {
-          const foundIdx = dstLines.findIndex(line => line.includes(args.targetMarker));
-          if (foundIdx !== -1) insertIdx = foundIdx + 1;
+          const target = resolveAnchorOrError(args.dstFile, "Target marker", dstText, args.targetMarker);
+          if ("error" in target) return target.error;
+          insertIdx = target.line; // 1-based line number: insert right AFTER that line
         }
 
         dstLines.splice(insertIdx, 0, ...buffer);
@@ -108,17 +186,14 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
           return `Error: Clipboard buffer '${bufferKey}' is empty. Perform a COPY or CUT first.`;
         }
 
-        const dstLines = fs.readFileSync(dstPath, "utf-8").split(/\r?\n/);
-        const startIdx = dstLines.findIndex(line => line.startsWith(args.startMarker));
-        if (startIdx === -1) return `Error: Start marker '${args.startMarker}' not found in ${args.dstFile}.`;
-        if (dstLines.filter(line => line.startsWith(args.startMarker)).length > 1) {
-          return `Error: Start marker '${args.startMarker}' is not unique in ${args.dstFile}.`;
-        }
-        const endIdx = dstLines.findIndex(line => line.startsWith(args.endMarker));
-        if (endIdx === -1) return `Error: End marker '${args.endMarker}' not found in ${args.dstFile}.`;
-        if (dstLines.filter(line => line.startsWith(args.endMarker)).length > 1) {
-          return `Error: End marker '${args.endMarker}' is not unique in ${args.dstFile}.`;
-        }
+        const dstText = fs.readFileSync(dstPath, "utf-8");
+        const dstLines = dstText.split(/\r?\n/);
+        const start = resolveAnchorOrError(args.dstFile, "Start marker", dstText, args.startMarker);
+        if ("error" in start) return start.error;
+        const end = resolveAnchorOrError(args.dstFile, "End marker", dstText, args.endMarker);
+        if ("error" in end) return end.error;
+        const startIdx = start.line - 1;
+        const endIdx = end.line - 1;
         if (startIdx > endIdx) {
           return `Error: Start marker '${args.startMarker}' is after end marker '${args.endMarker}' in ${args.dstFile}.`;
         }
@@ -155,12 +230,17 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
       const srcRaw = fs.readFileSync(srcPath, "utf-8");
       const srcLines = srcRaw.split(/\r?\n/);
 
-      const startIdx = srcLines.findIndex(line => line.includes(args.startMarker));
-      if (startIdx === -1) return `Error: Start marker '${args.startMarker}' not found in ${args.srcFile}.`;
-
-      const relativeEndIdx = srcLines.slice(startIdx).findIndex(line => line.includes(args.endMarker));
-      if (relativeEndIdx === -1) return `Error: End marker '${args.endMarker}' not found after start marker.`;
-      const endIdx = startIdx + relativeEndIdx;
+      const start = resolveAnchorOrError(args.srcFile, "Start marker", srcRaw, args.startMarker);
+      if ("error" in start) return start.error;
+      const end = resolveAnchorOrError(args.srcFile, "End marker", srcRaw, args.endMarker);
+      if ("error" in end) return end.error;
+      // The unified rule resolves both markers file-wide; an end resolved
+      // BEFORE the start keeps the pinned legacy error (probe 115).
+      if (end.line < start.line) {
+        return `Error: End marker '${args.endMarker}' not found after start marker.`;
+      }
+      const startIdx = start.line - 1;
+      const endIdx = end.line - 1;
 
       const extractedBlock = srcLines.slice(startIdx, endIdx + 1);
 
@@ -192,17 +272,20 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
       // 4. IMMEDIATE MOVE (CUT + PASTE IN ONE STEP)
       if (mode === "MOVE") {
         const dstPath = path.resolve(cwd, args.dstFile);
+        let dstText = "";
         let dstLines: string[] = [];
         if (fs.existsSync(dstPath)) {
-          dstLines = fs.readFileSync(dstPath, "utf-8").split(/\r?\n/);
+          dstText = fs.readFileSync(dstPath, "utf-8");
+          dstLines = dstText.split(/\r?\n/);
         } else {
           fs.mkdirSync(path.dirname(dstPath), { recursive: true });
         }
 
         let insertIdx = dstLines.length;
         if (args.targetMarker) {
-          const foundIdx = dstLines.findIndex(line => line.includes(args.targetMarker));
-          if (foundIdx !== -1) insertIdx = foundIdx + 1;
+          const target = resolveAnchorOrError(args.dstFile, "Target marker", dstText, args.targetMarker);
+          if ("error" in target) return target.error;
+          insertIdx = target.line; // 1-based line number: insert right AFTER that line
         }
 
         dstLines.splice(insertIdx, 0, ...extractedBlock);

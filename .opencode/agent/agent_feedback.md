@@ -551,3 +551,6 @@ loop_log's -RETURN- line printed my session as "unknown" — the tool needs the 
 ### 2026-09-26_03-31 planner_Q3S_245K_slow ses_f24c5d8a8ffe4bIlW0kjoMbCCF
 Explorer's TODO status update left the entry header line stale (#101 header still read "(open, …)" while the Status field said DONE) — caught during planner verification; the explorer prompt should note that a status update must also refresh the header line (the header is what the next planner reads first).
 
+### 2026-09-26_07-21 worker_Q3S_245K_slow ses_f249c8026ffeIXec8cQW3sInJ7
+Worker bash redirect to POSIX /tmp was intercepted ("outside sandbox"): under Git-Bash /tmp resolves to the Git install dir, not the pre-approved scratchpad. The worker-prompt scratchpad note should state it explicitly: temp outputs go to $TMP/opencode (Windows temp) — never bare /tmp.
+

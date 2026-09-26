@@ -76,6 +76,35 @@ fs.writeFileSync(path.join(dir, rep4), "head\nONLY line\nfoot");
 const r13 = await t.execute({ mode: "REPLACE", dstFile: rep4, startMarker: "ONLY line", endMarker: "ONLY line", bufferName: "repbuf" }, ctx);
 chk("REPLACE single-line span (start == end): exact return string + the one line became the 2-line buffer", r13 === "REPLACED lines 2..2 (1 line) in 'bt_rep4.txt' with buffer 'repbuf' (2 lines)." && fs.readFileSync(path.join(dir, rep4), "utf-8") === "head\nline1\nline2\nfoot");
 
+// ---- Part A: the unified anchor rule (2026-09-25_block_transfer-v2 Part A)
+// resolveAnchor is exported and pure — the rule lives in ONE place (own pins).
+const ra = mod.resolveAnchor;
+chk("resolveAnchor is exported (pure fn)", typeof ra === "function");
+chk("resolveAnchor: 1-based line number of the EXACT ONE prefix match", ra("one\nTWO line\nthree", "TWO") === 2);
+chk("resolveAnchor: leading spaces/tabs on the line are trimmed before the prefix match", ra("\tTWO indented\nx", "TWO indented") === 1);
+chk("resolveAnchor: an anchor WITH leading whitespace never matches (used as typed)", ra("TWO x\n   TWO y", " TWO") === null);
+chk("resolveAnchor: case-sensitive (no case fold)", ra("TWO line\nx", "two") === null && ra("TWO line\nx", "TWO") === 1);
+chk("resolveAnchor: CRLF-tolerant (a trailing \\r on the line is ignored for matching)", ra("TWO cr\r\nrest", "TWO cr") === 1);
+chk("resolveAnchor: a LONGER line still matches (the prefix — the remainder is irrelevant)", ra("TWO prefix and more\nx", "TWO") === 1);
+chk("resolveAnchor: a mid-line substring does NOT match (the old COPY substring tolerance is gone)", ra("xx TWO mid\nx", "TWO") === null);
+chk("resolveAnchor: zero matches -> null (not-found)", ra("a\nb", "nope") === null);
+chk("resolveAnchor: two matches -> null (non-unique)", ra("TWO a\nTWO b", "TWO") === null);
+
+// Part A pins — the teaching error taxonomy (one line each), via execute()
+const errFile = "bt_err.txt";
+fs.writeFileSync(path.join(dir, errFile), "head\nDUP one\nmid\nDUP two\nfoot");
+const rA1 = await t.execute({ mode: "COPY", srcFile: errFile, startMarker: "NOPE", endMarker: "mid", bufferName: "errA" }, ctx);
+chk("taxonomy not-found (the anchor quoted, with the file)", rA1 === "Error: Start marker 'NOPE' not found in bt_err.txt.");
+const rA2 = await t.execute({ mode: "COPY", srcFile: errFile, startMarker: "DUP", endMarker: "mid", bufferName: "errA" }, ctx);
+chk("taxonomy non-unique: start marker (the one shared form)", rA2 === "Error: Start marker 'DUP' is not unique in bt_err.txt.");
+const rA3 = await t.execute({ mode: "COPY", srcFile: errFile, startMarker: "head", endMarker: "DUP", bufferName: "errA" }, ctx);
+chk("taxonomy non-unique: end marker — the SAME one rule for every marker", rA3 === "Error: End marker 'DUP' is not unique in bt_err.txt.");
+const rA4 = await t.execute({ mode: "COPY", srcFile: errFile, startMarker: "mid", endMarker: "head", bufferName: "errA" }, ctx);
+chk("extraction: an end resolved before the start -> the pinned legacy error (probe 115)", rA4 === "Error: End marker 'head' not found after start marker.");
+fs.writeFileSync(dst, "head\nmid\nfoot");
+const rA5 = await t.execute({ mode: "PASTE", dstFile: dst, bufferName: "repbuf", targetMarker: "NOPE" }, ctx);
+chk("PASTE: an unresolvable targetMarker -> the not-found error (no silent EOF append), dst untouched", rA5 === `Error: Target marker 'NOPE' not found in ${dst}.` && fs.readFileSync(dst, "utf-8") === "head\nmid\nfoot");
+
 fs.rmSync(dir, { recursive: true, force: true });
 
 finish();

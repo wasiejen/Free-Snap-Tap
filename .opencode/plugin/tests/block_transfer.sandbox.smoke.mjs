@@ -127,7 +127,11 @@ try {
   r = await t.execute({ mode: "COPY", srcFile: tempFile, startMarker: "NOPE", endMarker: "ZZZ" }, ctx);
   chk("error: missing start marker", /Start marker 'NOPE' not found/.test(r));
   r = await t.execute({ mode: "COPY", srcFile: tempFile, startMarker: "AAA", endMarker: "MISSING" }, ctx);
-  chk("error: missing end marker", /End marker 'MISSING' not found after start marker/.test(r));
+  // re-pinned per Part A (2026-09-25_block_transfer-v2): the end marker now
+  // resolves file-wide through resolveAnchor — the teaching not-found error
+  // carries the file (the old "after start marker" wording is gone for the
+  // true not-found case; the semantic — end marker not found — is kept).
+  chk("error: missing end marker", /End marker 'MISSING' not found in/.test(r));
   r = await t.execute({ mode: "PASTE", dstFile: tempFile2, bufferName: "never_used" }, ctx);
   chk("error: PASTE from never-used empty buffer", /is empty/.test(r));
 
