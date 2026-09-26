@@ -569,3 +569,6 @@ edit-fuzzy hint ambiguity: a NAP edit returned `hint reason=d-too-high best-d=24
 ### 2026-09-26_12-34 worker_Q3S_245K_slow ses_f22c5c7fdffeNsWFzlfdsFterN
 S4 spec cited the approved proposal as `proposals/approved/2026-09-25_block_transfer-v2.md` — it lives at `.opencode/proposals/approved/` (not under `.opencode/agent/`); a `find` was needed to locate it.
 
+### 2026-09-26_15-13 worker_Q3S_245K_slow ses_f2241f704ffeRVZb6oMIi5epGP
+intercept_observer.smoke.mjs module-state flip: after the R8 config-read section (line ~712) the SECOND factory makes the module state = proj2 — new smoke sections after it MUST use before2/read2 (I lost one full smoke run hitting the proj log instead; the file's own comment says it, but the convention is easy to miss on a fresh read).
+
