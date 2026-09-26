@@ -3440,7 +3440,8 @@ let btTool;
 
 // 108 — the tool file imports (type-stripped, direct) and exposes the tool()
 //      default export: description (non-empty string) + the 12 args IN ORDER
-//      (mode = the 10-value enum — S3 adds WRITE+PEEK; srcFile/dstFile/
+//      (mode = the 11-value enum — S3 adds WRITE+PEEK, S4 adds MAP;
+//      srcFile/dstFile/
 //      bufferName OPTIONAL strings; startMarker/endMarker/targetMarker
 //      OPTIONAL marker-string-or-integer refs — Part B poka-yoke: 42 is a
 //      LINE NUMBER (accepted), 2.5 rejected; refs = OPTIONAL array of
@@ -3449,7 +3450,8 @@ let btTool;
 //      integers — S3 Parts D+E) + async execute + NO `name` field (the host
 //      names the tool by FILENAME)
 //      [re-pinned 2026-09-26 per block_transfer v2 S3 (Parts D+E): the args
-//      list gains regions+from+count, the mode enum gains WRITE+PEEK]
+//      list gains regions+from+count, the mode enum gains WRITE+PEEK;
+//      re-pinned 2026-09-26 per S4 (Part G): the mode enum gains MAP]
 {
   const toolMod = await import(pathToFileURL(BT_TOOL_TS).href);
   btTool = toolMod.default;
@@ -3480,7 +3482,7 @@ let btTool;
       JSON.stringify(argKeys) === JSON.stringify(["mode", "srcFile", "dstFile", "startMarker", "endMarker", "targetMarker", "refs", "text", "regions", "from", "count", "bufferName"]) &&
       modeSch != null && typeof modeSch.safeParse === "function" &&
       modeSch.safeParse(undefined).success === false &&
-      ["MOVE", "COPY", "APPEND", "CUT", "PASTE", "REPLACE", "WRITE", "PEEK", "DELETE", "CLEAR"].every((v) => modeSch.safeParse(v).success === true) &&
+      ["MOVE", "COPY", "APPEND", "CUT", "PASTE", "REPLACE", "WRITE", "PEEK", "MAP", "DELETE", "CLEAR"].every((v) => modeSch.safeParse(v).success === true) &&
       modeSch.safeParse("move").success === false && modeSch.safeParse("MOVE ").success === false && modeSch.safeParse("BOGUS").success === false &&
       ["srcFile", "dstFile", "bufferName"].every(optionalStr) &&
       ["startMarker", "endMarker", "targetMarker"].every(optionalRef) &&
