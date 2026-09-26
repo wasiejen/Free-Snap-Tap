@@ -42,17 +42,48 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   sources via COPY-list + APPEND, then a 2-region WRITE-list, verify
   via PEEK/MAP; measure tool calls / errors / tokens from the raw
   transcript — script-extract from the transcript, never raw-read).
-- **R3 LAUNCHED this session** (`spec_R3_arg_scope_extension.md`
-  staged + re-scoped: the drift fix is already in S1 — build = the
-  four remaining scope items: glob/grep path args, section-anchor
-  resolver, bash quoted-form, block_transfer anchor pair/fuzzy via
-  the R2 gate). THEN: loop_log-v2 (flagged stale 14+ days — his
-  priority.md note says not yet implemented; queued).
+- **R3 LANDED** (takeover worker-21 `worker_Q3S_245K_slow`
+  ses_f2241f704ffeRVZb6oMIi5epGP, planner-verified): the first R3 run
+  (ses_f22a9f87) hit the context wall with all four channels already
+  implemented (495-line UNCOMMITTED, never-gate-verified diff) → fresh
+  takeover per the plan6 worker-8 precedent (task_id resume NOT viable
+  — the context_recovery incident below left that session on the wrong
+  agent/window): staged diff committed `3ec1c5c` + probe S31 (21 pins,
+  checks 317–337: per-surface pins + the drift-guard equivalence vs
+  block_transfer's own matchAnchorLines) + ONE real staged-diff bug
+  found and fixed in `44c50a2` (`LOCATOR_MAX_FILE_CHARS` used but never
+  imported — ReferenceError swallowed into intercept-error lines) +
+  9 per-channel smoke checks `20d5a48` (68→77). Gate: probe **337/337**
+  (316+21), intercept smoke **77/77**, pytest 459+1w, ruff F=0 —
+  planner spot re-run: 77/77. R3 live acceptance joins the
+  pending-maintainer queue.
+- **14-26 INCIDENT (the R3 launch) + proposal filed:** context_recovery
+  independently compacted the dead worker AND resumed it (two active
+  sessions on the single slot) with its agent switched to the DEFAULT
+  `planner_Q3S_170K` / 170K model (verified in DB: agent + model
+  fields) — full-prefill ping-pong (maintainer measured 4+ min per
+  step); he stopped it via restart and DEACTIVATED context_recovery
+  (autoCompact 98% of 240k now armed in compact_budget.json). Proposal
+  filed at his request (no sugarcoating):
+  `proposals/2026-09-26_compaction-unification.md` — Part A shared
+  `compaction_core.ts` (one behavior: config/budget/keepTokens/
+  summarizer-pair-with-session-providerID+modelID/summarize call/
+  COMPACT line; both plugins become thin wrappers), Part B
+  context_recovery compacts ONLY (no resume — unit-4 owns resuming),
+  Part C probe equivalence pin (drift guard). Awaiting his approval.
+- THEN: loop_log-v2 (flagged stale 14+ days — his priority.md note
+  says not yet implemented; queued behind the tests).
 - OPEN (maintainer, non-blocking): WRITE-on-absent-file semantic
   (S3 open question).
 - Live acceptances still pending the maintainer: #102 (post-restart
   `/tmp` redirect probe — same restart as the new-hire tests),
-  #99 live fork test, #98 (self-compact→idle cycle).
+  #99 live fork test, #98 (self-compact→idle cycle), R3 (the four
+  channels live), and the compaction-unification proposal (its live
+  acceptance = the context_recovery re-enable itself).
+- Maintainer's live files uncommitted in the tree (his domain,
+  untouched): `opencode.jsonc` + `.opencode/maintainer/priority.md`
+  (the 14-26 observation); `compact_budget.json` (temp file —
+  context_recovery deactivated, autoCompact 98%/240k armed).
 - Friction logged: `todo_inbox.md` lives at the repo ROOT (not under
   `.opencode/agent/` — the prompts name it without a path).
 
@@ -151,14 +182,13 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Standing
-- Baselines (re-verified 2026-09-26 by the planner, post-S4):
-   probe **316** (count UNCHANGED post-S4 — S4 adds no probe checks;
-   check 108's enum pin extended to the 11 values); smokes **all
-   green**
+- Baselines (re-verified 2026-09-26 by the planner, post-R3):
+   probe **337** (316 + S31×21, post-R3; check 108's enum pin carries
+   the 11 bt modes post-S4); smokes **all green**
     (context_recovery 17/17, compact_memory 74/74, auto_resume 139/139
     (post-#98),
-   intercept_observer 68/68 (post-#102), block_transfer 123/123 + 64/64
-   (post-S4),
+   intercept_observer 77/77 (post-R3: 68 + 9 channel checks),
+   block_transfer 123/123 + 64/64 (post-S4),
    submit 20/20);
   the per-suite counts are in each smoke's own readout — no total kept
   here); pytest **459 passed + 1 warning (the known #10 coroutine
