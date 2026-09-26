@@ -3854,9 +3854,10 @@ let llRetA = null;
 
 // 10.18 — the tool file imports (type-stripped, direct) and exposes the
 //      tool() default export: description (non-empty string) + the 5 args IN
-//      ORDER (role/model/content REQUIRED strings, the status ENUM of the
-//      five 8-char tokens — a bogus one fails safeParse, session OPTIONAL) +
-//      async execute + NO `name` field (the host names the tool by FILENAME)
+//      ORDER (v2: the status REQUIRED free-form string — parse accepts any
+//      string, the rejection is RUNTIME (Part C) — role/model OPTIONAL
+//      (Part A auto-identity), content REQUIRED, session OPTIONAL) + async
+//      execute + NO `name` field (the host names the tool by FILENAME)
 {
   const toolMod = await import(pathToFileURL(LL_TOOL_TS).href);
   llTool = toolMod.default;
@@ -3866,30 +3867,32 @@ let llRetA = null;
     const s = llTool?.args?.[k];
     return s != null && typeof s.safeParse === "function" && s.safeParse(undefined).success === false && s.safeParse("x").success === true;
   };
-  const sessionSch = llTool?.args?.session;
+  const optStr = (k) => {
+    const s = llTool?.args?.[k];
+    return s != null && typeof s.safeParse === "function" && s.safeParse(undefined).success === true && s.safeParse("x").success === true;
+  };
   check(
     "118",
     "S16",
-    "tool file imports (type-stripped, direct) and exposes the tool() default export (description + args [role, model, status, content, session?] + async execute, NO name field)",
+    "tool file imports (type-stripped, direct) and exposes the tool() default export (description + args [role, model, status, content, session?] + async execute, NO name field) — v2: status = REQUIRED free-form string (parse accepts any string — the rejection is runtime, Part C), role/model OPTIONAL (Part A), content REQUIRED, session OPTIONAL",
     llTool != null && typeof llTool.description === "string" && llTool.description.length > 0 &&
       JSON.stringify(argKeys) === JSON.stringify(["role", "model", "status", "content", "session"]) &&
       statusSch != null && typeof statusSch.safeParse === "function" &&
       statusSch.safeParse(undefined).success === false &&
-      ["-->START", "DONE<---", "-RETURN-", "-WARNING", "--INFO--"].every((v) => statusSch.safeParse(v).success === true) &&
-      statusSch.safeParse("BOGUS").success === false && statusSch.safeParse("-->START ").success === false && statusSch.safeParse("").success === false &&
-      ["role", "model", "content"].every(reqStr) &&
-      sessionSch != null && typeof sessionSch.safeParse === "function" && sessionSch.safeParse(undefined).success === true && sessionSch.safeParse("ses_ll_01").success === true && sessionSch.safeParse(42).success === false &&
+      ["done", "BOGUS", "", "CORRECT-"].every((v) => statusSch.safeParse(v).success === true) && statusSch.safeParse(42).success === false &&
+      ["role", "model", "session"].every(optStr) &&
+      reqStr("content") &&
       typeof llTool.execute === "function" && llTool.execute.constructor.name === "AsyncFunction" &&
       !("name" in llTool),
-    JSON.stringify({ keys: argKeys, status: ["-->START", "BOGUS", ""].map((v) => statusSch?.safeParse?.(v)?.success), async: llTool?.execute?.constructor?.name, nameIn: "name" in (llTool ?? {}) }),
+    JSON.stringify({ keys: argKeys, status: ["done", "BOGUS", ""].map((v) => statusSch?.safeParse?.(v)?.success), async: llTool?.execute?.constructor?.name, nameIn: "name" in (llTool ?? {}) }),
   );
 }
 
 // 10.19 — the empty loop root: the tool CREATES `autorun-<YYYY-MM-DD_HH-MM>`
 //      (the stamp pinned by FORMAT — local clock, minute resolution, never
-//      the exact value) + its loop_log.md (exactly one line); the return is
-//      EXACTLY two lines `folder: <name>` + `line: <line>` (no ANOMALY for a
-//      fresh single folder)
+//      the exact value) + its loop_log.md (exactly one line); the v2 return
+//      is EXACTLY three lines `folder: <name> (created)` + `line: <line>` +
+//      `verified: readback-match` (no ANOMALY for a fresh single folder)
 {
   llRetA = await llTool.execute(
     { role: "probe-s16", model: "probe-model", status: "-->START", content: "probe start line" },
@@ -3897,35 +3900,40 @@ let llRetA = null;
   );
   const lines = String(llRetA).split("\n");
   llFolderA = lines[0]?.startsWith("folder: ") ? lines[0].slice("folder: ".length) : null;
-  const logFile = path.join(LL_A, ".opencode", "loop", llFolderA ?? "", "loop_log.md");
+  const llFolderBareA = (llFolderA ?? "").replace(/\s\((created|existing)\)$/, "");
+  const logFile = path.join(LL_A, ".opencode", "loop", llFolderBareA, "loop_log.md");
   const logBody = existsSync(logFile) ? readFileSync(logFile, "utf8") : null;
   check(
     "119",
     "S16",
-    "empty loop root → auto-created `autorun-<YYYY-MM-DD_HH-MM>` (stamp format pinned) + loop_log.md (one line); return EXACTLY `folder: <name>\\nline: <line>` (no ANOMALY)",
-    lines.length === 2 && llFolderA !== null && llFolderA.startsWith("autorun-") && STAMP_RE.test(llFolderA.slice("autorun-".length)) &&
-      lines[1].startsWith("line: ") && !String(llRetA).includes("ANOMALY") &&
+    "empty loop root → auto-created `autorun-<YYYY-MM-DD_HH-MM>` (stamp format pinned) + loop_log.md (one line); v2 return EXACTLY `folder: <name> (created)\\nline: <line>\\nverified: readback-match` (no ANOMALY)",
+    lines.length === 3 && llFolderA !== null && llFolderA.endsWith(" (created)") && llFolderBareA.startsWith("autorun-") && STAMP_RE.test(llFolderBareA.slice("autorun-".length)) &&
+      lines[1].startsWith("line: ") && lines[2] === "verified: readback-match" && !String(llRetA).includes("ANOMALY") &&
       logBody !== null && logBody.endsWith("\n") && logBody.split("\n").filter((l) => l.length > 0).length === 1,
     JSON.stringify({ lines, logBody }),
   );
 }
 
 // 120 — the line format: `<stamp> <status> <role> <session|unknown>
-//      <model> <content>` (the field order byte-exact, the stamp the same
-//      format as the folder name; the session was OMITTED in the call → the
+//      <model> <content>` (the field order byte-exact — UNCHANGED by v2, the
+//      stamp the same format as the folder name; the session was OMITTED in
+//      the call and the probe context carries no identity fields → the
 //      literal `unknown` in the 4th field), and the return's `line:` field
-//      carries EXACTLY the line that landed in the file
+//      carries EXACTLY the line that landed in the file (+ the v2 flags on
+//      the same return: the ` (created)` folder + `verified: readback-match`)
 {
-  const logFile = path.join(LL_A, ".opencode", "loop", llFolderA ?? "", "loop_log.md");
+  const llFolderBareA2 = (llFolderA ?? "").replace(/\s\((created|existing)\)$/, "");
+  const logFile = path.join(LL_A, ".opencode", "loop", llFolderBareA2, "loop_log.md");
   const logBody = existsSync(logFile) ? readFileSync(logFile, "utf8") : null;
   const lineOnly = logBody === null ? null : logBody.replace(/\n$/, "");
   const lineRe = /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2} -->START probe-s16 unknown probe-model probe start line$/;
   check(
     "120",
     "S16",
-    "line format `<stamp> <status> <role> <session|unknown> <model> <content>` (field order byte-exact; omitted session → literal `unknown`) + the return's `line:` field == the file's line (byte-exact)",
+    "line format `<stamp> <status> <role> <session|unknown> <model> <content>` (field order byte-exact; omitted session → literal `unknown`) + the return's `line:` field == the file's line (byte-exact) + the v2 flags on the same return (` (created)` folder, `verified: readback-match`)",
     lineOnly !== null && lineRe.test(lineOnly) && STAMP_RE.test(lineOnly.slice(0, 16)) &&
-      llRetA != null && llRetA.split("\n")[1] === `line: ${lineOnly}`,
+      llRetA != null && llRetA.split("\n")[1] === `line: ${lineOnly}` &&
+      llRetA.split("\n")[0] === `folder: ${llFolderBareA2} (created)` && llRetA.split("\n")[2] === "verified: readback-match",
     JSON.stringify({ lineOnly, retLine: llRetA?.split("\n")[1] }),
   );
 }
@@ -3933,9 +3941,11 @@ let llRetA = null;
 // 121 — the session passthrough + append-only + single-folder reuse: call
 //      #2 with an explicit session → the NEW line carries it in the 4th
 //      field (field order intact); the file gains EXACTLY one line; the SAME
-//      folder is used (the exactly-one-folder rule — still no ANOMALY)
+//      folder is used, now flagged ` (existing)` + `verified: readback-match`
+//      (the exactly-one-folder rule — still no ANOMALY)
 {
-  const logFile = path.join(LL_A, ".opencode", "loop", llFolderA ?? "", "loop_log.md");
+  const llFolderBareA3 = (llFolderA ?? "").replace(/\s\((created|existing)\)$/, "");
+  const logFile = path.join(LL_A, ".opencode", "loop", llFolderBareA3, "loop_log.md");
   const countLines = () => readFileSync(logFile, "utf8").split("\n").filter((l) => l.length > 0).length;
   const beforeCount = countLines();
   const res2 = await llTool.execute(
@@ -3949,8 +3959,8 @@ let llRetA = null;
   check(
     "121",
     "S16",
-    "call #2 (session `ses_ll_01` given): the new line carries it in the 4th field (field order byte-exact); the file gains EXACTLY one line; the SAME folder is reused (no ANOMALY)",
-    lines2.length === 2 && lines2[0] === `folder: ${llFolderA}` && !String(res2).includes("ANOMALY") &&
+    "call #2 (session `ses_ll_01` given): the new line carries it in the 4th field (field order byte-exact); the file gains EXACTLY one line; the SAME folder is reused, flagged ` (existing)` + `verified: readback-match` (no ANOMALY)",
+    lines2.length === 3 && lines2[0] === `folder: ${llFolderBareA3} (existing)` && lines2[2] === "verified: readback-match" && !String(res2).includes("ANOMALY") &&
       afterCount === beforeCount + 1 &&
       /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2} DONE<--- probe-s16 ses_ll_01 probe-model probe done line$/.test(lastLine) &&
       lines2[1] === `line: ${lastLine}`,
@@ -3962,7 +3972,8 @@ let llRetA = null;
 //      literal `unknown` again (the fallback covers omitted AND empty); the
 //      file gains exactly one more line
 {
-  const logFile = path.join(LL_A, ".opencode", "loop", llFolderA ?? "", "loop_log.md");
+  const llFolderBareA4 = (llFolderA ?? "").replace(/\s\((created|existing)\)$/, "");
+  const logFile = path.join(LL_A, ".opencode", "loop", llFolderBareA4, "loop_log.md");
   const countLines = () => readFileSync(logFile, "utf8").split("\n").filter((l) => l.length > 0).length;
   const beforeCount = countLines();
   const res3 = await llTool.execute(
@@ -3975,8 +3986,8 @@ let llRetA = null;
   check(
     "122",
     "S16",
-    "session: '' (empty) → the 4th field is the literal `unknown` (the fallback covers omitted AND empty); exactly one more line; the SAME folder",
-    String(res3).split("\n")[0] === `folder: ${llFolderA}` &&
+    "session: '' (empty) → the 4th field is the literal `unknown` (the fallback covers omitted AND empty); exactly one more line; the SAME folder, flagged ` (existing)`",
+    String(res3).split("\n")[0] === `folder: ${llFolderBareA4} (existing)` &&
       afterCount === beforeCount + 1 &&
       /^\d{4}-\d{2}-\d{2}_\d{2}-\d{2} -WARNING probe-s16 unknown probe-model probe warning line$/.test(lastLine),
     JSON.stringify({ res3, beforeCount, afterCount, lastLine }),
@@ -3986,7 +3997,8 @@ let llRetA = null;
 // 123 — the SEVERAL-folders anomaly: two dummy autorun-* dirs in a fresh
 //      loop root (their mtimes pinned explicitly — the probe never trusts
 //      the wall clock for the outcome) → the MOST-RECENTLY-MODIFIED folder
-//      is used AND the byte-exact ANOMALY note is the 3rd return line (the
+//      is used (flagged ` (existing)`) AND the byte-exact ANOMALY note is
+//      the LAST return line (the v2 `verified:` line sits above it — the
 //      other folder stays untouched)
 {
   const dOld = path.join(LL_MULTI, ".opencode", "loop", "autorun-2026-09-01_09-05");
@@ -4008,8 +4020,8 @@ let llRetA = null;
   check(
     "123",
     "S16",
-    "SEVERAL autorun-* folders → the most-recently-MODIFIED one is used + the byte-exact ANOMALY note as the 3rd return line (the other folder untouched)",
-    lines.length === 3 && lines[0] === "folder: autorun-2026-09-14_10-05" && lines[2] === expectedAnomaly &&
+    "SEVERAL autorun-* folders → the most-recently-MODIFIED one is used (flagged ` (existing)` + `verified: readback-match`) + the byte-exact ANOMALY note as the LAST (4th) return line (the other folder untouched)",
+    lines.length === 4 && lines[0] === "folder: autorun-2026-09-14_10-05 (existing)" && lines[2] === "verified: readback-match" && lines[3] === expectedAnomaly &&
       logBody !== null && lines[1] === `line: ${logBody.replace(/\n$/, "")}` && logBody.endsWith("\n") && !oldTouched,
     JSON.stringify({ lines, logBody, oldTouched, expectedAnomaly }),
   );
