@@ -31,6 +31,12 @@
 //      returns an Error naming the accepted keywords (it writes NOTHING — no
 //      folder creation, no append); never a silent INFO fallback. (`restart`
 //      normalizes to START — intended.)
+//   Part D — `CORRECT-` status (the `correct` keyword): a clarification line,
+//      appended as a normal append-only line (append-only stays absolute — no
+//      rewrite/delete anywhere); the return also carries
+//        corrects: <previous line of the log>
+//      (byte-exact; the log's last line BEFORE this append; an empty/absent
+//      log omits the field).
 //
 // Behavior (append-only — the tool NEVER rewrites or curates the file):
 //   1. resolve `.opencode/loop/` against `context.directory ?? process.cwd()`;
@@ -109,7 +115,7 @@ function normalizeStatus(raw: unknown): string | null {
 }
 
 export default tool({
-  description: `Appends ONE loop-log line to the current looprun's loop_log.md (auto-creates the dated autorun-* folder when .opencode/loop/ is empty); returns the folder + the exact line written. Fire this for your loop-log bookkeeping (START/DONE/RETURN/WARNING/INFO) instead of hand-formatting the line.`,
+  description: `Appends ONE machine-timestamped loop-log line to the current looprun's loop_log.md (auto-creates the dated autorun-* folder when .opencode/loop/ is empty) and CONFIRMS the write (reads the file back, byte-compares the last line). status = a free-form word containing one of the keywords (checked in order): start / done / return / warn / info / correct -> the established 8-char tokens (-->START / DONE<--- / -RETURN- / -WARNING / --INFO-- / CORRECT-); case/dash/arrow variants normalize ('restart' -> START); an unrecognized status returns an error naming the keywords (nothing is written). role / model / session are OPTIONAL — auto-filled from the host context (role/model <- context.agent, model fallback <- context.extra.model.id, session <- context.sessionID | sessionId | session.id; else the literal 'unknown'). Return: folder: <name> (created|existing) + line: <exact line> + verified: readback-match (or readback-MISMATCH: <actual last line>) + corrects: <previous log line> (status 'correct' only) + the ANOMALY note (several autorun-* folders). The line format is unchanged: <stamp> <status> <role> <session> <model> <content>; append-only (no earlier line is ever rewritten).`,
   args: {
     role: tool.schema
       .string()
@@ -187,6 +193,20 @@ export default tool({
     ]);
     const line = `${localStamp()} ${status} ${role} ${session} ${model} ${args.content}`;
     const logPath = path.join(loopRoot, folderName, "loop_log.md");
+
+    // Part D — for a CORRECT- line: capture the log's PREVIOUS line (byte-exact,
+    // BEFORE this append) so the return can name it cheaply. An empty/absent
+    // log -> the `corrects:` field is omitted.
+    let previousLine: string | null = null;
+    if (status === "CORRECT-") {
+      if (existsSync(logPath)) {
+        const prevLines = readFileSync(logPath, "utf-8")
+          .split("\n")
+          .filter((l) => l !== "");
+        if (prevLines.length > 0) previousLine = prevLines[prevLines.length - 1];
+      }
+    }
+
     appendFileSync(logPath, line + "\n", "utf-8");
 
     // Part B — write confirmation: read the file back and byte-compare the
@@ -201,12 +221,14 @@ export default tool({
         : `verified: readback-MISMATCH: ${rbLast}`;
 
     // Step 4 — return folder (with the created/existing flag) + line + the
-    // write confirmation (+ the anomaly note, appended last).
+    // write confirmation (+ `corrects:` for a CORRECT- line, + the anomaly
+    // note, appended last).
     const parts = [
       `folder: ${folderName} ${loopDirs.length === 0 ? "(created)" : "(existing)"}`,
       `line: ${line}`,
       verified,
     ];
+    if (previousLine !== null) parts.push(`corrects: ${previousLine}`);
     if (anomaly) parts.push(anomaly);
     return parts.join("\n");
   }

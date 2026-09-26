@@ -274,6 +274,33 @@ try {
   chk("(I) 'bogus' -> Error naming the accepted keywords (never a silent INFO fallback)", String(retIb1).startsWith("Error:") && /start \/ done \/ return \/ warn \/ info \/ correct/.test(retIb1), retIb1);
   chk("(I) keyword-less status -> the same Error", String(retIb2).startsWith("Error:") && /start \/ done \/ return \/ warn \/ info \/ correct/.test(retIb2), retIb2);
   chk("(I) error statuses write nothing (the line count is unchanged)", countI() === iBefore);
+
+  // ---- (J) Part D — CORRECT- status: the clarification line + the byte-exact
+  //      `corrects:` previous line (append-only: nothing rewritten)
+  const projJ = mkproj("J");
+  const ctxJ = { directory: projJ, agent: "j-agent", sessionID: "ses_J" };
+  // J0 — a 'correct' status into a FRESH folder: an absent log OMITS the
+  //      `corrects:` field (the line itself is a normal append)
+  const retJ0 = await t.execute({ role: "j-agent", status: "correct", content: "J0 first line is a correction" }, ctxJ);
+  const pJ0 = parseRet(retJ0);
+  const jLines0 = String(retJ0).split("\n");
+  chk("(J0) fresh log: the CORRECT- line is appended and the `corrects:` field is OMITTED (absent log)",
+    pJ0.line.split(" ")[1] === "CORRECT-" && jLines0.length === 3 && !jLines0.some((l) => l.startsWith("corrects:")),
+    retJ0);
+  // J1 — second call: the return carries `corrects: <previous line>` byte-exact
+  //      (position: right after `verified:`)
+  const retJ1 = await t.execute({ role: "j-agent", status: "CORRECT-", content: "J1 correcting J0" }, ctxJ);
+  const pJ1 = parseRet(retJ1);
+  const jLines1 = String(retJ1).split("\n");
+  chk("(J1) the CORRECT- line is appended (token byte-exact) + `corrects:` carries the PREVIOUS line byte-exact, after `verified:`",
+    pJ1.line.split(" ")[1] === "CORRECT-" && jLines1[2] === "verified: readback-match" && jLines1[3] === `corrects: ${pJ0.line}` && jLines1.length === 4,
+    retJ1);
+  const jRoot = path.join(projJ, ".opencode", "loop");
+  const jSub = fs.readdirSync(jRoot, { withFileTypes: true }).filter((e) => e.isDirectory())[0].name;
+  const jFile = fs.readFileSync(path.join(jRoot, jSub, "loop_log.md"), "utf-8").split(/\r?\n/).filter((l) => l.length > 0);
+  chk("(J) append-only: the first line is byte-unchanged; the file holds both lines in order",
+    jFile.length === 2 && jFile[0] === pJ0.line && jFile[1] === pJ1.line,
+    JSON.stringify(jFile));
 } finally {
   fs.rmSync(base, { recursive: true, force: true });
 }
