@@ -21,10 +21,21 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   `handover_task.md` + loop-folder copy `plan20_ho_task.md`. Worker:
   `worker_Q3S_245K_slow` (same-model; roster verified in opencode.jsonc
   line 362).
-- **Queue:** launch S1 NOW → verify → S2 next iteration (serial slot);
-  after S4: new-hire test (fresh agent, description-only, file-blind) +
-  held-out multi-step task (planner-side delegations); R3 + loop_log-v2
-  remain queued behind the bt-v2 wave.
+- **S1 LANDED (0d85a8c, worker-20 `worker_Q3S_245K_slow`
+  ses_f249c8026ffeIXec8cQW3sInJ7, planner-verified):** exported
+  `resolveAnchor` (+ `matchAnchorLines` = the one swappable rule
+  place); all 7 modes routed through it; teaching taxonomy
+  (`ref-out-of-range` prepared, wires in B/C); COPY substring tolerance
+  removed (approved); smoke 45/45 (30 + 15 new), sandbox 53/53 (1
+  re-pin), probe 297/297, pytest 459+1w, ruff F=0 — planner spot
+  re-run: smoke 45/45. The richer non-unique format was DEFERRED
+  (probe 263 pins the legacy byte-exact string) → curated into the
+  committed S3 spec (probe 115/263 re-pin + tool switch).
+- **Queue:** launch S2 NOW → verify; S3 then S4 in following
+  iterations (serial slot); after S4: new-hire test (fresh agent,
+  description-only, file-blind) + held-out multi-step task
+  (planner-side delegations); R3 + loop_log-v2 remain queued behind the
+  bt-v2 wave.
 - Host-map findings from #101 to re-read before the next builds: §2 the
   stale 2026-09-12 "plugins-array-only registration" knowledge line; §6
   the `intercept_observer_core.ts` load-error root cause (no default

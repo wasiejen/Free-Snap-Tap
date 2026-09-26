@@ -45,6 +45,16 @@ not touch them).
    checks per the existing pattern): the new WRITE/PEEK surface +
    the unified feedback shapes (a few pins per mode — the smoke
    carries the breadth).
+   **S1 deferred switch (curated from the S1 worker's inbox entry
+   2026-09-26):** probes 115 + 263 pin the LEGACY byte-exact error
+   strings (`Error: Start marker 'DUP' is not unique in bt/bt-rep-nq.txt.`
+   / `Error: End marker 'ZZ-END' not found after start marker.`), so the
+   Part A richer `non-unique` format (match count + the first match line
+   numbers) was deferred. This unit performs the switch: update S15
+   probes 115/263 to the v2 teaching format AND switch the tool's
+   `nonUniqueError` / `notFoundError` + the legacy end-before-start
+   branch to it (extraction end-not-found carrying the file reference);
+   re-pin the smoke pins to the same format.
 5. Pins in the smoke: WRITE single + LIST descending + overlap error;
    PEEK shape + blank-skip + window cap; feedback line shapes (all
    modes).
