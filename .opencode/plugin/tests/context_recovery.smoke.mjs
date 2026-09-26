@@ -87,16 +87,16 @@ chk(
 //    carries the MESSAGES-RESOLVED fallback pair (no sandbox
 //    opencode.jsonc) + keep { messages: 12 } (the fail-open default — no
 //    keep key in the fixture; NO tokens key — #99: the fake messages have
-//    no token info and the fixture has no keepTokens → the none path), the
-//    directive BYTE-MATCHES the ported constant (synthetic text part), the
-//    budget carries count==1 ON DISK (model recorded), and the COMPACT line
+//    no token info and the fixture has no keepTokens → the none path), NO
+//    prompt (2026-09-26 unification Part B: the hook compacts ONLY — it
+//    never resumes), the budget carries count==1 ON DISK (model
+//    recorded), and the COMPACT line
 //    `<stamp> smoke-model COMPACT ses_smoke_ok keep=12m tok=- none`
 {
   writeBudget({ version: 2, emergencyRecovery: true, sessions: {} });
   const before = { s: clientCalls.summarize.length, p: clientCalls.prompt.length };
   await fireError("ses_smoke_ok", OVF("request (148149 tokens) exceeds the available context size (131072 tokens)"));
   const sc = clientCalls.summarize.at(-1);
-  const pc = clientCalls.prompt.at(-1);
   const budget = readBudget();
   const okLine = ctxLines().find((l) => l.includes("COMPACT ses_smoke_ok"));
   chk(
@@ -107,12 +107,9 @@ chk(
     JSON.stringify(sc),
   );
   chk(
-    "directive byte-exact (the ported constant, synthetic text part)",
-    clientCalls.prompt.length === before.p + 1 && pc?.path?.id === "ses_smoke_ok" &&
-      pc?.body?.parts?.length === 1 && pc?.body?.parts?.[0]?.type === "text" && pc?.body?.parts?.[0]?.synthetic === true &&
-      pc?.body?.parts?.[0]?.text ===
-        "post-compaction: re-read your head files per .opencode/agent/prompts/agent_readme_post_compaction.md and CONTINUE — never re-plan from scratch",
-    JSON.stringify(pc?.body?.parts?.[0]?.text),
+    "NO prompt (Part B: the hook compacts ONLY — it never resumes)",
+    clientCalls.prompt.length === before.p,
+    String(clientCalls.prompt.length - before.p),
   );
   chk(
     "budget count==1 on disk (model recorded)",
@@ -151,8 +148,8 @@ chk(
   const budget = readBudget();
   const emgLine = ctxLines().find((l) => l.includes("COMPACT ses_smoke_ok") && l.includes(" emergency"));
   chk(
-    "idle clears the guard (the emergency slot: count 1 == cap 1)",
-    clientCalls.summarize.length === before.s + 1 && clientCalls.prompt.length === before.p + 1 &&
+    "idle clears the guard (the emergency slot: count 1 == cap 1) — NO prompt (Part B: no resume)",
+    clientCalls.summarize.length === before.s + 1 && clientCalls.prompt.length === before.p &&
       budget.sessions.ses_smoke_ok?.count === 2 &&
       emgLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_smoke_ok keep=12m tok=- none emergency$`).test(emgLine),
     JSON.stringify({ ds: clientCalls.summarize.length - before.s, count: budget.sessions.ses_smoke_ok?.count, line: emgLine }),

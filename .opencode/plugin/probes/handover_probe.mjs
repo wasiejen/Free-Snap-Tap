@@ -298,16 +298,17 @@
   //          event → no summarize, no promptAsync, no budget entry
   //      (78) flag ON + overflow event + fresh budget (cap 1) → the
   //          summarize body carries the messages-resolved pair + keep
-  //          { messages: 12 } (tokens UNRESOLVED → tok=- none), the
-  //          directive byte-matches the ported constant (the spec-2+11
-  //          relay wording), budget count==1 ON DISK, the COMPACT line
+  //          { messages: 12 } (tokens UNRESOLVED → tok=- none), NO
+  //          prompt (2026-09-26 unification Part B: the hook compacts
+  //          ONLY — it never resumes), budget count==1 ON DISK, the
+  //          COMPACT line
   //          `<dt> smoke-model COMPACT ses_rc_ok keep=12m tok=- none`
   //      (79) the once-per-overflow guard: 3 more burst events for the
   //          same overflow → no-ops (exactly ONE compact), budget
   //          unchanged
   //      (80) EventSessionIdle clears the guard: the next overflow → the
   //          emergency slot (count 1 == cap 1): count → 2, the line
-  //          carries the ` emergency` suffix
+  //          carries the ` emergency` suffix, NO prompt (Part B)
   //      (81) budget exhausted (count 2 > cap 1) → CLEAN FAIL: no
   //          summarize, no promptAsync, no new COMPACT line, budget
   //          unchanged
@@ -2368,16 +2369,20 @@ const cmExec = (args, extra) => cmTool.execute(args, cmCtx(extra));
 // ------------------------------------------------------------------ S11 emergency recovery plugin (11) — TODO #93: the 2026-09-25 event-hook port of the T5 prototype
 //
 // The plugin at .opencode/plugin/context_recovery.ts (TODO #93 — the
-// event-hook port; the deactivated copy is REMOVED): imported DIRECT from
+// event-hook port; the deactivated copy is REMOVED; 2026-09-26
+// unification Part B: it compacts ONLY — the reload-directive prompt is
+// REMOVED, so the fake client's prompt recorder must stay EMPTY — the
+// pins 78/80 re-pin the no-prompt behavior): imported DIRECT from
 // the repo path (type-stripped, the same way the plugin loads — the file
 // MUST load that way) and driven with a FAKE client (records every
-// session.summarize / session.promptAsync / session.messages call) +
-// FAKE SDK events (the current host's delivery shape — { type:
-// "session.error", properties: { sessionID, error } } / { type:
-// "session.idle", properties: { sessionID } }; the "session.error" hook
-// does NOT exist in the current SDK — the hooks object carries `event`
-// only) + a sandbox root (directory=SANDBOX steers the flag read, the
-// budget store, and the COMPACT ctx.log line into the sandbox). The
+// session.summarize / session.messages call; the promptAsync recorder
+// pins the no-resume behavior) + FAKE SDK events (the current host's
+// delivery shape — { type: "session.error", properties: { sessionID,
+// error } } / { type: "session.idle", properties: { sessionID } }; the
+// "session.error" hook does NOT exist in the current SDK — the hooks
+// object carries `event` only) + a sandbox root (directory=SANDBOX
+// steers the flag read, the budget store, and the COMPACT ctx.log line
+// into the sandbox). The
 // activation flag is the top-level `emergencyRecovery` key in the SHARED
 // compact_budget.json (the SAME file the S10/S13 tools use): key absent /
 // not `true` → OFF (checks 77/258); the store setter MERGES (the S10
@@ -2390,11 +2395,6 @@ const cmExec = (args, extra) => cmTool.execute(args, cmCtx(extra));
 // tail-strip retries — measured 2026-09-23) — exactly ONE compact;
 // EventSessionIdle (check 80) clears the guard.
 const RC_TS = path.join(REPO_ROOT, ".opencode", "plugin", "context_recovery.ts");
-// The ported plugin's directive constant (the current post-compaction
-// wording — the spec-2+11 relay addendum; the old T5 looprunner
-// directive is RETIRED per TODO #93 fact 8).
-const RC_DIRECTIVE =
-  "post-compaction: re-read your head files per .opencode/agent/prompts/agent_readme_post_compaction.md and CONTINUE — never re-plan from scratch";
 const RC_BUDGET = path.join(SANDBOX, ".opencode", "temp", "compact_budget.json");
 // The store setter MERGES (the S10 session entries + any previously
 // seeded top-level keys survive).
@@ -2488,30 +2488,29 @@ const rcOVF = (text) => ({ name: "MessageAbortedError", data: { message: text } 
 //      default 1 — "smoke-model" UNLISTED) → success: the summarize body
 //      carries the MESSAGES-RESOLVED fallback pair (no sandbox
 //      opencode.jsonc) + keep { messages: 12 } (the fail-open default —
-//      no keep keys in the fixture; tokens UNRESOLVED → `tok=- none`), the
-//      directive BYTE-MATCHES the ported constant (synthetic text part),
-//      the budget file carries count==1 ON DISK (model recorded), and the
-//      COMPACT line `<stamp> smoke-model COMPACT ses_rc_ok keep=12m tok=- none`
+//      no keep keys in the fixture; tokens UNRESOLVED → `tok=- none`), NO
+//      prompt (2026-09-26 unification Part B: the hook compacts ONLY — it
+//      never resumes), the budget file carries count==1 ON DISK (model
+//      recorded), and the COMPACT line `<stamp> smoke-model COMPACT
+//      ses_rc_ok keep=12m tok=- none`
 {
   rcSetStore((store) => { store.emergencyRecovery = true; store.model_budget = { default: 1 }; });
   const before = { s: rcCalls.summarize.length, p: rcCalls.prompt.length };
   await rcFireError("ses_rc_ok", rcOVF("request (148149 tokens) exceeds the available context size (131072 tokens)"));
   const sc = rcCalls.summarize.at(-1);
-  const pc = rcCalls.prompt.at(-1);
   const budget = rcReadBudget();
   const okLine = ctxLogLines().find((l) => l.includes("COMPACT ses_rc_ok"));
   check(
     "78",
     "S11",
-    "flag ON + overflow event + fresh budget (cap 1, default): the summarize body carries the messages-resolved pair + keep { messages: 12 } (tokens UNRESOLVED → tok=- none), the directive byte-exact (the ported constant), budget count==1 on disk (model recorded), the COMPACT line `<dt> smoke-model COMPACT ses_rc_ok keep=12m tok=- none`",
+    "flag ON + overflow event + fresh budget (cap 1, default): the summarize body carries the messages-resolved pair + keep { messages: 12 } (tokens UNRESOLVED → tok=- none), NO prompt (Part B: no resume), budget count==1 on disk (model recorded), the COMPACT line `<dt> smoke-model COMPACT ses_rc_ok keep=12m tok=- none`",
     rcCalls.summarize.length === before.s + 1 && sc?.path?.id === "ses_rc_ok" &&
       sc?.body?.providerID === "smoke-provider" && sc?.body?.modelID === "smoke-model" &&
       sc?.body?.keep?.messages === 12 && sc?.body?.keep?.tokens == null &&
-      rcCalls.prompt.length === before.p + 1 && pc?.path?.id === "ses_rc_ok" && pc?.body?.parts?.length === 1 &&
-      pc?.body?.parts?.[0]?.type === "text" && pc?.body?.parts?.[0]?.synthetic === true && pc?.body?.parts?.[0]?.text === RC_DIRECTIVE &&
+      rcCalls.prompt.length === before.p &&
       budget?.sessions?.ses_rc_ok?.count === 1 && budget?.sessions?.ses_rc_ok?.model === "smoke-model" &&
       okLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_rc_ok keep=12m tok=- none$`).test(okLine),
-    JSON.stringify({ sc, p0text: pc?.body?.parts?.[0]?.text?.slice(0, 60), budget: budget?.sessions?.ses_rc_ok, line: okLine }),
+    JSON.stringify({ sc, dp: rcCalls.prompt.length - before.p, budget: budget?.sessions?.ses_rc_ok, line: okLine }),
   );
 }
 
@@ -2545,8 +2544,8 @@ const rcOVF = (text) => ({ name: "MessageAbortedError", data: { message: text } 
   check(
     "80",
     "S11",
-    "EventSessionIdle clears the guard: the next overflow fires again — the EMERGENCY slot (count 1 == cap 1): count → 2, the line carries the ` emergency` suffix",
-    rcCalls.summarize.length === before.s + 1 && rcCalls.prompt.length === before.p + 1 &&
+    "EventSessionIdle clears the guard: the next overflow fires again — the EMERGENCY slot (count 1 == cap 1): count → 2, the line carries the ` emergency` suffix, NO prompt (Part B: no resume)",
+    rcCalls.summarize.length === before.s + 1 && rcCalls.prompt.length === before.p &&
       budget?.sessions?.ses_rc_ok?.count === 2 &&
       emgLine != null && new RegExp(`^${DT} smoke-model COMPACT ses_rc_ok keep=12m tok=- none emergency$`).test(emgLine),
     JSON.stringify({ ds: rcCalls.summarize.length - before.s, count: budget?.sessions?.ses_rc_ok?.count, line: emgLine }),
