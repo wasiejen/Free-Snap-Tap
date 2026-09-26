@@ -572,3 +572,6 @@ S4 spec cited the approved proposal as `proposals/approved/2026-09-25_block_tran
 ### 2026-09-26_15-13 worker_Q3S_245K_slow ses_f2241f704ffeRVZb6oMIi5epGP
 intercept_observer.smoke.mjs module-state flip: after the R8 config-read section (line ~712) the SECOND factory makes the module state = proj2 — new smoke sections after it MUST use before2/read2 (I lost one full smoke run hitting the proj log instead; the file's own comment says it, but the convention is easy to miss on a fresh read).
 
+### 2026-09-26_15-22 planner_Q3S_245K_slow ses_f22c8986affegfHMJhzUxDFDkp
+todo_inbox.md lives at the repo ROOT, not under .opencode/agent/ — the role prompts name it without a path, so I spent a call globbing the wrong location; naming the path in the planner/worker prompts (or the AGENTS.md interaction table) would remove the discovery cost.
+
