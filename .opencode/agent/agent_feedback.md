@@ -566,3 +566,6 @@ S3 spec baseline was stale: "current count 297/297" but the measured baseline wa
 ### 2026-09-26_12-15 planner_Q3S_245K_slow ses_f24a7fc46ffeHrj1SC7Q9CVpqc
 edit-fuzzy hint ambiguity: a NAP edit returned `hint reason=d-too-high best-d=24` yet the edit WAS applied (the file carried the new text) — the hint reads like a rejection, so an agent may uselessly retry/verify; the hint should state whether the fuzzy resolution was APPLIED (and at what d) or REJECTED.
 
+### 2026-09-26_12-34 worker_Q3S_245K_slow ses_f22c5c7fdffeNsWFzlfdsFterN
+S4 spec cited the approved proposal as `proposals/approved/2026-09-25_block_transfer-v2.md` — it lives at `.opencode/proposals/approved/` (not under `.opencode/agent/`); a `find` was needed to locate it.
+

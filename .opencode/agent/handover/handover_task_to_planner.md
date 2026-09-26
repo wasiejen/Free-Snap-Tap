@@ -1,105 +1,106 @@
-# HANDOVER WORKER → PLANNER — bt-v2 S3 (WRITE + PEEK + feedback complete)
+# HANDOVER WORKER → PLANNER — bt-v2 S4 (MAP + last_write + description rework)
 
-Worker-20 (`worker_Q3S_245K_slow`, ses_f2302f58dffeEC2ccjeKmAPbVw),
-2026-09-26. Task: `.opencode/agent/handover/handover_task.md` (the S3 spec —
-Parts D+E+F + the S1 deferred error switch + probe section).
+Worker-21 (`worker_Q3S_245K_slow`, ses_f22c5c7fdffeNsWFzlfdsFterN),
+2026-09-26. Task: `.opencode/agent/handover/handover_task.md` (the S4 spec —
+Parts G+H+I, the LAST build unit of the block_transfer-v2 wave).
 
-## What changed (ONE code commit: `8cc8819`)
-- `.opencode/tools/block_transfer.ts` — the full S3 surface:
-  - **D. `WRITE` mode** — bufferless direct text → line-anchored region.
-    Single span (`startMarker`..`endMarker`, marker-or-number per S2) OR a
-    `regions` LIST of `{ start, end }` objects — ALL resolved against the
-    PRE-call file state, applied HIGHEST LINE → LOWEST (no shifting);
-    overlap of ANY line → teaching error with the ACTUAL line numbers
-    (`Error: overlapping spans (lines 2..4 and 3..5) in 'dst'.`, the lower
-    span named first). **Flagged detail #2 implemented:** no missing-file
-    guard — an absent file is the EMPTY state for ref resolution (the
-    teaching not-found / out-of-range errors fire as usual), and a
-    successful write creates the file (mkdir + write, like PASTE). PASTE
-    behavior unchanged.
-  - **E. `PEEK` mode** — bounded buffer preview, NEVER the full buffer:
-    default = line count + 3 head + 3 tail NON-BLANK lines (each echoed
-    capped 40 chars, blanks skipped when picking); `from`+`count` window
-    (must be given together), capped at 25 lines. The description carries
-    the boundary sentence: "full content: PASTE it to a file and read."
-  - **F. Part F feedback complete for ALL modes** — one line per op
-    (resolved range + count + truncated first-line echo ~40 chars; buffer
-    ops add `- buffer: N lines` AFTER the op). New shared helper `opLine`.
-    Shapes: `Moved/Cut/Deleted/Pasted/Replaced/Wrote … (lines a..b, first:
-    '…')[- buffer: N lines].`; `Cleared buffer 'b' - buffer: 0 lines.`;
-    multi-region WRITE = one line per applied op (descending) + a summary
-    line. COPY/APPEND feedback (S2) untouched.
-  - **S1 deferred switch (spec item 4)** — `nonUniqueError` now carries the
-    match count + the first match line numbers (up to 3 listed, ` …` when
-    more): `Error: Start marker 'DUP' is not unique in 'f.txt' (2 matches:
-    lines 2, 4).` The extraction end-before-start branch (both COPY/APPEND
-    and MOVE/CUT/DELETE) now carries the file reference: `Error: End marker
-    'ZZ' not found after start marker in 'f.txt'.` `notFoundError`
-    unchanged (already anchor + file).
-  - Schema: mode enum gains WRITE + PEEK (10 values); new args
-    `regions` (array of {start, end} refs), `from` / `count` (integers);
-    `text` description extended (WRITE: the replacement text, required).
-    Description: WRITE + PEEK named in MODES, REFS/ANCHORS/BUFFERS/EDGE
-    extended; the pinned first line UNCHANGED.
-- `.opencode/plugin/tests/block_transfer.smoke.mjs` — 9 re-pins (REPLACE ×3,
-  non-unique ×2, end-before-start, PASTE, DELETE, REPLACE-number-refs) +
-  25 new checks (schema, WRITE ×9, PEEK ×7, feedback all-modes ×5).
-- `.opencode/plugin/tests/block_transfer.sandbox.smoke.mjs` — 1 re-pin
-  (`/cleared/` → `/Cleared buffer/`) + 8 new checks (description modes +
-  PEEK boundary sentence, schema modes + args).
-- `.opencode/plugin/probes/handover_probe.mjs` — S15 re-pins IN PLACE:
-  108 (args list 12 keys + 10-value enum + regions/from/count shapes),
-  110/111 (PASTE Part F), 115 (end-before-start + file), 116 (CLEAR Part F),
-  117 (MOVE Part F), 262 (REPLACE Part F + PASTE preserve), 263 (v2
-  non-unique). NEW S30 section, checks 305-315 (WRITE single/absent/list/
-  overlap/guards; PEEK default/window+cap/guards; feedback CUT+PASTE /
-  DELETE+CLEAR; the v2 error switch). Header updated: history line, the
-  S30 section description, the tally (S30=11 → 316/316).
-- `.opencode/agent/knowledge/plugin_tools/2026-09-26_block_transfer-v2-
-  s3-write-peek-feedback.md` — dated knowledge note (the new feedback
-  shapes, WRITE/PEEK semantics, the v2 error formats).
+## What changed (ONE code commit: `37c2479`)
+- `.opencode/tools/block_transfer.ts` —
+  - **G. `MAP` mode** — buffer structure preview: line count + head 3 +
+    tail 3 + a HEADING SKELETON (max 10, then `+N more`). Lines echoed
+    VERBATIM WITH line numbers (no 40-char cap, blank lines kept).
+    Headings = `^#{1,6} ` at column 0 (markdown H1–H6; indented `#`
+    EXCLUDED) — no file-type sniffing. Byte-exact shape:
+    `Mapped buffer 'b': N line(s) — head: 1: '…', 2: '…', 3: '…' ... tail:
+    N-2: '…', N-1: '…', N: '…' — headings: <entries | (none)>`.
+    Format decisions (proposal left them open — all byte-pinned): the tail
+    never overlaps the head (N ≤ 6 → tail = only the lines beyond the
+    head); N ≤ 3 → no tail part; zero headings → `(none)`; cap suffix
+    `+N more` (N = the remainder beyond the first 10).
+  - **H. `last_write` auto-buffer** — every successful WRITE auto-stores
+    its `text` (its lines) in the buffer `last_write`, OVERWRITTEN per
+    WRITE. Automatic, NO parameter (poka-yoke). **Silent**: the
+    probe-pinned WRITE feedback line is byte-unchanged (probes 305–309
+    still pass); documented in the description + the `bufferName` arg.
+    An explicit `bufferName` arg does NOT divert the auto-store (pinned).
+  - **I. Description rework** per the handout ordering (the
+    `2026-09-18_tool-plugin-design-handout.md` checklist): what / WHEN /
+    WHEN-NOT lead — WHEN-NOT carries the sharpened boundary vs `edit`
+    (edit = exact `oldString` match, string-level; block_transfer =
+    line-anchored, ASCII-safe — no non-ASCII / dense-numeral oldString
+    problems) + the `write` boundary (whole-file rewrite). MODES covers
+    the FINAL 11-mode set (MOVE, COPY, APPEND, CUT, PASTE, REPLACE,
+    WRITE, PEEK, MAP, DELETE, CLEAR) incl. the MAP indented-`#` caveat and
+    the last_write note; the PEEK "full content: PASTE it to a file and
+    read." boundary sentence kept; EXAMPLE moved before EDGE (handout
+    order); EDGE's empty-buffer list gains MAP. The pinned first
+    one-liner kept byte-identical (sandbox smoke pin 55).
+  - Schema: mode enum gains MAP (11 values, spec order); the mode
+    one-liner gains MAP + the WRITE last_write note; `bufferName`
+    description notes the `last_write` auto-fill.
+- `.opencode/plugin/tests/block_transfer.smoke.mjs` — 11 new checks:
+  G ×6 (schema MAP; MAP skeleton byte-exact with a >40-char verbatim line
+  + the indented-`#` exclusion; the 11-heading cap → first 10 + `+1 more`;
+  narrow detection `#tight`/indented excluded; N ≤ 3 short-buffer shape;
+  absent-buffer error) + H ×5 (store; overwrite; feedback-line-unchanged;
+  explicit-bufferName no-divert; the explicit buffer untouched).
+- `.opencode/plugin/tests/block_transfer.sandbox.smoke.mjs` — the
+  description mode-list pin RE-PINNED in place to the final 11-mode set
+  (was 8 modes; same semantics — "the description names mode X", no new
+  check type).
 
-## Measured verification (standard gate, post-commit)
-- Probe: **316/316 PASS** (baseline 305 + 11 new S30 checks).
-- block_transfer smoke: **112/112** (baseline 87 + 25); sandbox smoke:
-  **61/61** (baseline 53 + 8).
+## Measured verification (standard gate, post-commit `37c2479`)
+- Probe: **316/316 PASS** — UNCHANGED (this unit adds no probe checks;
+  existing 316 all pass, incl. the WRITE feedback 305–309).
+- block_transfer smoke: **123/123** (baseline 112 + 11); sandbox smoke:
+  **64/64** (baseline 61 + 3 from the re-pinned mode list).
 - pytest **459 passed + 1 warning** (the known #10); ruff **F=0**.
-- Baseline verified pre-edit (probe 305/305, smokes 87/87 + 53/53).
+- Baselines re-verified PRE-EDIT per the spec: probe 316/316, smokes
+  112/112 + 61/61, pytest 459+1w, ruff F=0 — all matched the spec's
+  numbers (no stale baseline this time).
 
 ## TODO entries
-None — no open findings to curate (see the notes below; nothing reached
-the "can't fix / out of scope" bar).
+- 1 loose entry appended to `todo_inbox.md`: probe 3483's mode-enum pin
+  still lists the pre-S4 10 values (MAP un-pinned at probe level; the
+  spec forbade new probe checks in S4). Awaiting planner curation.
 
 ## Notes / deliberately not done
-1. **Spec baseline number stale:** the spec's "current count 297/297" —
-   the measured baseline was **305/305** (post-#102, per the probe header
-   tally + the NAP baselines). Built against the measured baseline; the
-   DoD's real constraint ("existing all pass + your new checks, report the
-   measured count") is met.
-2. **WRITE file-creation interpretation (flagged detail #2):** implemented
-   as "no missing-file guard; an absent file is the empty state for ref
-   resolution; a successful write creates the file." Consequence: refs
-   can never resolve against an empty file, so WRITE on an absent file
-   always returns a teaching ref error (never creates). The creation path
-   is real code (mkdir + write on success) but is unreachable via refs on
-   a truly empty file. Pinned as such (probe 306). If the maintainer meant
-   a different semantic (e.g. numeric spans creating a new file), that's a
-   separate decision.
-3. **REPLACE start-after-end message left UNCHANGED** (`Error: Start marker
-   'X' is after end marker 'Y' in 'dst'.` — already file-referenced,
-   smoke-pinned): the spec's "legacy end-before-start branch" is the
-   EXTRACTION one; the two wordings were deliberately not unified.
-4. **PEEK out-of-range uses a buffer-worded variant** ("the buffer has N
-   lines") — the settled file-version `refOutOfRangeError` (S2-pinned) was
-   left untouched.
-5. **Description:** first line kept byte-identical (sandbox-pinned);
-   WRITE/PEEK added to MODES + the PEEK boundary sentence. The full
-   description rework (Part I, new-hire test) is S4 scope.
-6. S1/S2 anchor + ref logic untouched (resolveAnchor/matchAnchorLines/
-   resolveRef/refPresent/textToLines/countLines/resolveAssembly all as-is —
-   the only edits in shared code are the error-message strings per spec
-   item 4). No disagreement with the settled logic found.
+1. **Re-pins flagged for ratification:** the sandbox smoke mode-list pin
+   (8 → final 11 modes) — same semantics, no new check type; the 11 new
+   main-smoke checks are the spec-mandated G/H pins. No other pins were
+   stale under this build (nothing else re-pinned).
+2. **Probe untouched** (count 316 unchanged, per spec). MAP is pinned at
+   smoke level only; probe 3483's enum list is now a SUBSET of the real
+   enum (still green — superset check). See the todo_inbox entry.
+3. **`last_write` is silent by design** — the WRITE feedback line is
+   probe-pinned (305–309), so the auto-store carries no feedback note;
+   the description + the `bufferName` arg document it. If the planner
+   wants a feedback note, that requires re-pinning the WRITE probes
+   (separate decision).
+4. **Journal-COLLECT stays DEFERRED** (not in this unit, per spec — the
+   R6 family).
+5. **S1–S3 logic untouched** — no edits in the shared anchor/ref code;
+   the only execute-path changes are the new MAP dispatch block and the
+   one `clipboardBuffers["last_write"]` line in WRITE (after the
+   successful fs write). No disagreement with the settled logic found.
+6. **PLANNER-SIDE (per spec, not done here):** the new-hire test (a
+   fresh agent uses every mode from the description alone, file-blind) +
+   the held-out multi-step task (3-section assembly via COPY-list +
+   APPEND, then a 2-region WRITE-list, verify via PEEK/MAP; measure
+   tool calls / errors / tokens, read the raw transcript).
+
+## Friction
+- 1 entry via `submit(feedback=...)` to `agent_feedback.md`: the spec
+  cited the approved proposal as `proposals/approved/…` — it lives at
+  `.opencode/proposals/approved/` (not under `.opencode/agent/`); a
+  `find` was needed to locate it.
+
+## Lessons
+- When a feedback line is probe-pinned, a new side-effect (auto-buffer)
+  rides SILENTLY + gets documented in the description — the description
+  is the contract surface, the probe pins the byte shapes.
 
 ## Context
-Stop-line discipline kept (gauged mid-run; no compaction needed). Final
-gauge readout at the end of the session — see the last message.
+Stop-line discipline kept (gauged between units; no compaction needed).
+Final gauge readout (VERBATIM):
+`SESSION=ses_f22c5c7fdffeNsWFzlfdsFterN CTX=95877 (39%) REM=149123 | 1 compaction left`

@@ -139,3 +139,6 @@
 2026-09-26_12-10 DONE<--- worker-20 ses_f2302f58dffeEC2ccjeKmAPbVw Qwen3.8-27B-Q3S-245K-slow bt-v2 S3 LANDED 8cc8819 — probe 316/316 (305+11 S30), smokes 112/112 + 61/61, pytest 459+1w, ruff F=0 | SESSION=ses_f2302f58dffeEC2ccjeKmAPbVw CTX=197768 (80%) REM=47232
 2026-09-26_12-12 -RETURN- planner-20 ses_f24a7fc46ffeHrj1SC7Q9CVpqc Qwen3.8-27B-Q3S-245K-slow worker-20 ses_f2302f58dffeEC2ccjeKmAPbVw worker_Q3S_245K_slow
 2026-09-26_12-15 DONE<--- planner-20 ses_f24a7fc46ffeHrj1SC7Q9CVpqc Qwen3.8-27B-Q3S-245K-slow 63%/89K
+2026-09-26_12-18 -->START planner-21 ses_f22c8986affegfHMJhzUxDFDkp Qwen3.8-27B-Q3S-245K-slow plan21 (autorun-2026-09-21_15-33 iter 21, unit-4 restart branch after planner-20 action:restart): stage + launch bt-v2 S4 (MAP + last_write + description rework) per NAP queue
+2026-09-26_12-33 -->START worker-21 ses_f22c5c7fdffeNsWFzlfdsFterN llama-swap/Qwen3.8-27B-Q3S-245K-slow worker-21 bt-v2 S4: MAP mode + last_write auto-buffer + Part I description rework (last build unit of the block_transfer-v2 wave)
+2026-09-26_12-36 DONE<--- worker-21 ses_f22c5c7fdffeNsWFzlfdsFterN llama-swap/Qwen3.8-27B-Q3S-245K-slow bt-v2 S4 LANDED 37c2479 — probe 316/316 (unchanged, no new checks per spec), smokes 123/123 + 64/64, pytest 459+1w, ruff F=0 | SESSION=ses_f22c5c7fdffeNsWFzlfdsFterN CTX=95877 (39%) REM=149123
