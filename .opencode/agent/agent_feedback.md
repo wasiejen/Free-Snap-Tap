@@ -590,3 +590,6 @@ plan22 close-down gap: the friction entry + the loop-log DONE line were written 
 ### 2026-09-26_20-41 worker_Q3S_245K_slow ses_f2114f171ffeuKJrMkXe1QczCA
 Approved proposal files can carry stale in-file verdict blocks (the loop_log-v2 proposal's "Planner verdict (2026-09-15)" claimed parts LANDED while the on-disk tool was v1) — consider voiding/removing verdict blocks when the maintainer rolls a proposal back to approved, so the next worker doesn't have to be told the spec wins.
 
+### 2026-09-26_20-50 planner_Q3S_245K_slow ses_f21359d77ffe2pviXZoIavxweh
+dev_get_tool_context_contents is broken on this host: both calls failed with `undefined is not an object (evaluating 'c.split')` — the debug context-dump tool (the spec-time evidence channel for tool-context fields) is unusable; a fallback (e.g. a tiny throwaway tool that console.logs context keys) or a fix would save the manual evidence re-derivation.
+
