@@ -71,7 +71,9 @@ try {
     : [];
   chk("(A) exactly one autorun-* folder created", subA.length === 1, JSON.stringify(subA));
   chk("(A) folder name form autorun-<date>_<HH-MM>", subA.length === 1 && /^autorun-\d{4}-\d{2}-\d{2}_\d{2}-\d{2}$/.test(subA[0]), subA[0]);
-  chk("(A) return folder == the created folder", pA.folder === subA[0]);
+  chk("(A) return folder == the created folder, flagged (created) (THIS call created it)", pA.folder === subA[0] + " (created)", pA.folder);
+  chk("(A) return is exactly folder/line/verified (3 lines, no ANOMALY for a fresh single folder)", String(retA).split("\n").length === 3 && !String(retA).includes("ANOMALY"), retA);
+  chk("(A) write confirmation: verified: readback-match", pA.verified === "readback-match", pA.verified);
   const logA = path.join(loopRootA, subA[0], "loop_log.md");
   chk("(A) loop_log.md created", fs.existsSync(logA));
   const mkLineA = (stamp) => `${stamp} ${argsA.status} ${argsA.role} ${argsA.session} ${argsA.model} ${argsA.content}`;
@@ -85,7 +87,8 @@ try {
   const retB = await t.execute(argsB, ctxA);
   const tA2 = localStamp();
   const pB = parseRet(retB);
-  chk("(B) the same folder is reused", pB.folder === subA[0]);
+  chk("(B) the same folder is reused, flagged (existing)", pB.folder === subA[0] + " (existing)", pB.folder);
+  chk("(B) write confirmation: verified: readback-match (the append landed)", pB.verified === "readback-match", pB.verified);
   const mkLineB = (stamp) => `${stamp} ${argsB.status} ${argsB.role} ${argsB.session} ${argsB.model} ${argsB.content}`;
   chk("(B) appended line minute-boundary-safe", pB.line === mkLineB(tB2) || pB.line === mkLineB(tA2));
   const fileB = fs.readFileSync(logA, "utf-8").split(/\r?\n/).filter((l) => l.length > 0);
@@ -122,9 +125,10 @@ try {
   const argsE = { role: "worker-13", model: "Qwen3.8-27B-IQ4KT-120K", status: "--INFO--", content: "T3 smoke anomaly case", session: "ses_TEST456" };
   const retE = await t.execute(argsE, { directory: projE });
   const pE = parseRet(retE);
-  chk("(E) the line lands in the most-recently-modified folder", pE.folder === path.basename(dir2) && fs.readFileSync(path.join(dir2, "loop_log.md"), "utf-8").includes(pE.line), pE.folder);
+  chk("(E) the line lands in the most-recently-modified folder, flagged (existing)", pE.folder === path.basename(dir2) + " (existing)" && fs.readFileSync(path.join(dir2, "loop_log.md"), "utf-8").includes(pE.line), pE.folder);
   chk("(E) the other folder is untouched (no loop_log.md)", !fs.existsSync(path.join(dir1, "loop_log.md")));
-  chk("(E) the return value mentions the anomaly", /ANOMALY/.test(retE) && /2 autorun-\* folders/.test(retE) && retE.includes(pE.folder), retE);
+  const eLines = String(retE).split("\n");
+  chk("(E) return is 4 lines: folder/line/verified + the ANOMALY note appended LAST (still naming the folder)", eLines.length === 4 && pE.verified === "readback-match" && eLines[3].startsWith("ANOMALY: 2 autorun-* folders") && eLines[3].includes(path.basename(dir2)), retE);
 
   // ---- (F) Part A — auto-identity: the resolution chains (args -> context -> unknown)
   // F1 — full context, NO identity args: the line carries the context sources
@@ -208,6 +212,32 @@ try {
     .find((p) => fs.existsSync(p));
   const gFile = fs.readFileSync(gLog, "utf-8").split(/\r?\n/).filter((l) => l.length > 0);
   chk("(G) append-only: the file prefix is byte-unchanged across the 3 calls (earlier lines never rewritten)", gFile.length === 3 && gFile.every((l, i) => l === gRetLines[i]), JSON.stringify(gFile));
+
+  // ---- (H) Part B — the mismatch path (simulated): a pre-existing
+  //      loop_log.md whose last line LACKS the trailing newline — the append
+  //      glues the new line onto it, so the readback's last line differs from
+  //      the line written -> `verified: readback-MISMATCH: <actual last line>`
+  const projH = mkproj("H");
+  const logH = path.join(projH, ".opencode", "loop", "autorun-2026-01-01_00-00", "loop_log.md");
+  fs.mkdirSync(path.dirname(logH), { recursive: true });
+  fs.writeFileSync(logH, "partial-line-no-trailing-newline"); // NO trailing \n
+  const argsH = { role: "worker-13", model: "Qwen3.8-27B-IQ4KT-120K", status: "--INFO--", content: "H1 mismatch probe line" };
+  const tH1 = localStamp();
+  const retH = await t.execute(argsH, { directory: projH });
+  const tH2 = localStamp();
+  const pH = parseRet(retH);
+  const mkLineH = (stamp) => `${stamp} --INFO-- worker-13 unknown Qwen3.8-27B-IQ4KT-120K H1 mismatch probe line`;
+  const hLines = String(retH).split("\n");
+  chk("(H) pre-existing folder flagged (existing) + the mismatch names the actual last line (partial + new line)",
+    hLines[0] === "folder: autorun-2026-01-01_00-00 (existing)" &&
+      (pH.verified === `readback-MISMATCH: partial-line-no-trailing-newline${mkLineH(tH1)}` ||
+       pH.verified === `readback-MISMATCH: partial-line-no-trailing-newline${mkLineH(tH2)}`),
+    pH.verified);
+  const hFile = fs.readFileSync(logH, "utf-8").split("\n");
+  chk("(H) the file's content is the glued partial+new line (append-only: nothing removed)",
+    hFile.length === 2 && hFile[1] === "" &&
+      (hFile[0] === `partial-line-no-trailing-newline${mkLineH(tH1)}` || hFile[0] === `partial-line-no-trailing-newline${mkLineH(tH2)}`),
+    JSON.stringify(hFile));
 } finally {
   fs.rmSync(base, { recursive: true, force: true });
 }

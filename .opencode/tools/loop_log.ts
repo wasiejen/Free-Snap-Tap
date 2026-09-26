@@ -19,6 +19,10 @@
 //        model:   args.model   → context.agent (the agent-identifier
 //                 preference, the maintainer's --todo note) →
 //                 context.extra.model.id
+//   Part B — write confirmation: after the append the file is READ BACK and
+//      the last line byte-compared; the return gains
+//        folder: <name> (created)   <- iff THIS call created the folder
+//        verified: readback-match   <- or readback-MISMATCH: <actual last line>
 //
 // Behavior (append-only — the tool NEVER rewrites or curates the file):
 //   1. resolve `.opencode/loop/` against `context.directory ?? process.cwd()`;
@@ -34,7 +38,9 @@
 //        <date_time> <status> <role> <session|unknown> <model> <content>
 //      (`role`/`session`/`model` resolved by the Part A chains -> the literal
 //      `unknown` when absent everywhere);
-//   4. return the folder name + the exact line written (+ the anomaly note).
+//   4. return the folder name (+ the `(created)`/`(existing)` flag, Part B)
+//      + the exact line written + the write confirmation (`verified:`,
+//      Part B) (+ the anomaly note, appended last).
 //
 // The five STATUS tokens (exactly, 8-char) are the `status` zod ENUM — a bogus
 // token is rejected at PARSE time (the schema), not by a runtime check.
@@ -43,7 +49,7 @@
 // form, cf. ctx_gauge.ts / block_transfer.ts). Registration is the maintainer's
 // domain (the live opencode.jsonc + the per-agent tool-access grant — this file
 // is deliberately NOT registered in any repo config).
-import { appendFileSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import { tool } from "@opencode-ai/plugin";
 
@@ -98,6 +104,7 @@ export default tool({
     const loopRoot = path.join(dir, ".opencode", "loop");
 
     // Step 2 — locate (or create) the current looprun folder.
+    // (Part B: an EMPTY root means THIS call creates the folder.)
     let loopDirs: string[] = [];
     if (existsSync(loopRoot)) {
       loopDirs = readdirSync(loopRoot, { withFileTypes: true })
@@ -139,10 +146,27 @@ export default tool({
       context?.extra?.model?.id,
     ]);
     const line = `${localStamp()} ${args.status} ${role} ${session} ${model} ${args.content}`;
-    appendFileSync(path.join(loopRoot, folderName, "loop_log.md"), line + "\n", "utf-8");
+    const logPath = path.join(loopRoot, folderName, "loop_log.md");
+    appendFileSync(logPath, line + "\n", "utf-8");
 
-    // Step 4 — return the folder + the exact line written (+ the anomaly note).
-    const parts = [`folder: ${folderName}`, `line: ${line}`];
+    // Part B — write confirmation: read the file back and byte-compare the
+    // last line against the line just written (a mismatch surfaces the file's
+    // ACTUAL last line — never silent).
+    const readback = readFileSync(logPath, "utf-8");
+    const rbLines = readback.split("\n").filter((l) => l !== "");
+    const rbLast = rbLines.length > 0 ? rbLines[rbLines.length - 1] : "";
+    const verified =
+      rbLast === line
+        ? "verified: readback-match"
+        : `verified: readback-MISMATCH: ${rbLast}`;
+
+    // Step 4 — return folder (with the created/existing flag) + line + the
+    // write confirmation (+ the anomaly note, appended last).
+    const parts = [
+      `folder: ${folderName} ${loopDirs.length === 0 ? "(created)" : "(existing)"}`,
+      `line: ${line}`,
+      verified,
+    ];
     if (anomaly) parts.push(anomaly);
     return parts.join("\n");
   }
