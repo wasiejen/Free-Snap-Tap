@@ -46,7 +46,8 @@ try {
 
   // ---- description = agent-facing usage guide
   const d = t.description;
-  for (const m of ["MOVE", "COPY", "CUT", "PASTE", "DELETE", "CLEAR"]) chk(`description names mode ${m}`, d.includes(m));
+  for (const m of ["MOVE", "COPY", "CUT", "PASTE", "DELETE", "CLEAR", "WRITE", "PEEK"]) chk(`description names mode ${m}`, d.includes(m));
+  chk("description: the PEEK boundary sentence (full content: PASTE it to a file and read)", d.includes("full content: PASTE it to a file and read."));
   chk("description: anchors span INCLUSIVE", d.includes("INCLUSIVE"));
   chk("description: targetMarker sets insertion, else append at EOF", d.includes("targetMarker") && /append at EOF/.test(d));
   chk("description: named buffers, default 'default', multiple per session", d.includes("bufferName") && d.includes("'default'") && /multiple buffers/i.test(d));
@@ -57,8 +58,10 @@ try {
   const args = t.args;
   chk("mode is required (rejects undefined)", args.mode && !args.mode.safeParse(undefined).success);
   chk("mode accepts MOVE", args.mode.safeParse("MOVE").success);
+  chk("mode accepts WRITE", args.mode.safeParse("WRITE").success);
+  chk("mode accepts PEEK", args.mode.safeParse("PEEK").success);
   chk("mode rejects bogus value", !args.mode.safeParse("BOGUS").success);
-  for (const k of ["srcFile", "dstFile", "startMarker", "endMarker", "targetMarker", "bufferName"]) {
+  for (const k of ["srcFile", "dstFile", "startMarker", "endMarker", "targetMarker", "bufferName", "regions", "from", "count"]) {
     chk(`args.${k} is optional (accepts undefined)`, args[k] && args[k].safeParse(undefined).success);
   }
 
@@ -107,7 +110,7 @@ try {
   fs.writeFileSync(tempFile, "AAA start\nZZZ end");
   await t.execute({ mode: "COPY", srcFile: tempFile, startMarker: "AAA", endMarker: "ZZZ", bufferName: "rt_clear" }, ctx);
   r = await t.execute({ mode: "CLEAR", bufferName: "rt_clear" }, ctx);
-  chk("CLEAR reports buffer cleared", /cleared/.test(r));
+  chk("CLEAR reports buffer cleared (Part F shape — re-pinned per S3)", /Cleared buffer/.test(r));
   r = await t.execute({ mode: "PASTE", dstFile: tempFile2, bufferName: "rt_clear" }, ctx);
   chk("PASTE from cleared buffer -> empty-buffer error", /is empty/.test(r));
 

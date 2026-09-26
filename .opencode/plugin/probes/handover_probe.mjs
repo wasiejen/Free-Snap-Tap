@@ -51,7 +51,17 @@
 // (/tmp/<rest> + /var/tmp/<rest> + bare root + double-slash/backslash
 // forms + no-mapping fail-closed) + the hook e2e (typed /tmp + /var/tmp
 // redirect, the BASH `command`-string redirect — two mapped spans, the
-// unmapped-span fail-closed, the mixed mapped/unmapped command): the
+// unmapped-span fail-closed, the mixed mapped/unmapped command)) +
+// EXTENDED 2026-09-26 (bt-v2 S3: block_transfer v2 Parts D+E+F — the new
+// S30 section, checks 305-315: the WRITE mode (single span + the
+// 'regions' LIST applied highest line first + the overlap teaching error
+// + the absent-file creation detail + the input guards), the PEEK mode
+// (the default head/tail shape with blank-skip + the from/count window
+// capped at 25 + the guards), the unified Part F feedback for all modes,
+// and the S1-deferred v2 teaching error switch (the non-unique error gains
+// the match count + the first match line numbers; the end-before-start
+// error gains the file reference — the S15 pins 108/110/111/115/116/117/
+// 262/263 re-pinned in place)): the
 // pre-rebuild
 // probe
 // (v2.2.1 era) targeted the DELETED handover.ts, the retired
@@ -785,9 +795,49 @@
 //      ses_ro_* = the probe wrote out of the sandbox); zero new/changed files
 //      outside the sandbox (.opencode listing + git status, before vs after);
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
+//   S30 block_transfer v2 S3: WRITE + PEEK + unified Part F feedback (11)
+//      — 2026-09-26 (the bt-v2 wave, S3 = proposal Parts D+E+F; the tool
+//      file is imported DIRECT, type-stripped, the S12/S13/S15 load
+//      pattern; the S15 pins 108/110/111/115/116/117/262/263 are re-pinned
+//      in place to the new shapes):
+//      (305) WRITE single span: byte-exact Part F feedback + the span
+//          replaced IN PLACE (byte-exact dst);
+//      (306) WRITE on an ABSENT file (flagged detail #2): no missing-file
+//          guard — the marker refs resolve against the EMPTY state
+//          (teaching not-found) + the number refs are out of range (the
+//          file has 0 lines) + the file never created (no partial state);
+//      (307) WRITE 'regions' LIST (2 regions): ALL refs resolve against
+//          the PRE-call state, applied HIGHEST LINE -> LOWEST (no
+//          shifting) — the 3-line feedback (per-op descending + summary)
+//          + byte-exact dst;
+//      (308) WRITE 'regions' with OVERLAPPING spans: the teaching error
+//          with the ACTUAL line numbers + the dst byte-identical (no
+//          write);
+//      (309) WRITE input guards: missing-dstFile / missing-text /
+//          'regions'+markers mutually exclusive / single-span needs both
+//          markers — byte-exact errors;
+//      (310) PEEK default: the line count + 3 head + 3 tail (byte-exact
+//          shape) — the BLANK line is skipped when picking the echoed
+//          lines;
+//      (311) PEEK window: the from/count bounded window (byte-exact) +
+//          the 25-line CAP (a 40-line request on a 30-line buffer echoes
+//          exactly lines 1..25);
+//      (312) PEEK guards: 'from'+'count' must be given together (either
+//          side alone → the exact error) + the empty-buffer error (absent
+//          buffer) + 'from' beyond the buffer → the ref-out-of-range
+//          error (with the count);
+//      (313) unified Part F feedback (buffer ops): byte-exact CUT line +
+//          PASTE line (resolved range + first-line echo + the buffer
+//          count AFTER) + the source cut byte-exact;
+//      (314) unified Part F feedback (non-buffer + CLEAR): byte-exact
+//          DELETE line + CLEAR line (the buffer count AFTER the op = 0);
+//      (315) the v2 teaching error switch (the S1-deferred format):
+//          byte-exact non-unique error (match count + the first match
+//          line numbers) + byte-exact end-before-start error carrying
+//          the file reference.
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=13 S12=4 S13=21 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S25=7 S26=20 S27=8 S28=12 S29=8 hygiene=6  →  "PROBE handover: 305/305 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=13 S12=4 S13=21 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S25=7 S26=20 S27=8 S28=12 S29=8 S30=11 hygiene=6  →  "PROBE handover: 316/316 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -3389,16 +3439,17 @@ const btWrite = (name, body) => {
 let btTool;
 
 // 108 — the tool file imports (type-stripped, direct) and exposes the tool()
-//      default export: description (non-empty string) + the 9 args IN ORDER
-//      (mode = the 8-value enum; srcFile/dstFile/bufferName OPTIONAL strings;
-//      startMarker/endMarker/targetMarker OPTIONAL marker-string-or-integer
-//      refs — Part B poka-yoke: 42 is a LINE NUMBER (accepted), 2.5 rejected;
-//      refs = OPTIONAL array of marker-or-number refs + text = OPTIONAL
-//      string — Part C) + async execute + NO `name` field (the host names
-//      the tool by FILENAME)
-//      [re-pinned 2026-09-26 per block_transfer v2 S2 (Parts B+C): the args
-//      list gains refs+text, the marker args carry the string|integer union,
-//      the mode enum gains APPEND]
+//      default export: description (non-empty string) + the 12 args IN ORDER
+//      (mode = the 10-value enum — S3 adds WRITE+PEEK; srcFile/dstFile/
+//      bufferName OPTIONAL strings; startMarker/endMarker/targetMarker
+//      OPTIONAL marker-string-or-integer refs — Part B poka-yoke: 42 is a
+//      LINE NUMBER (accepted), 2.5 rejected; refs = OPTIONAL array of
+//      marker-or-number refs + text = OPTIONAL string — Part C; regions =
+//      OPTIONAL array of {start, end} refs + from/count = OPTIONAL
+//      integers — S3 Parts D+E) + async execute + NO `name` field (the host
+//      names the tool by FILENAME)
+//      [re-pinned 2026-09-26 per block_transfer v2 S3 (Parts D+E): the args
+//      list gains regions+from+count, the mode enum gains WRITE+PEEK]
 {
   const toolMod = await import(pathToFileURL(BT_TOOL_TS).href);
   btTool = toolMod.default;
@@ -3418,15 +3469,18 @@ let btTool;
   };
   const refsSch = btTool?.args?.refs;
   const textSch = btTool?.args?.text;
+  const regionsSch = btTool?.args?.regions;
+  const fromSch = btTool?.args?.from;
+  const countSch = btTool?.args?.count;
   check(
     "108",
     "S15",
-    "tool file imports (type-stripped, direct) and exposes the tool() default export (description + args [mode, srcFile, dstFile, startMarker, endMarker, targetMarker, refs, text, bufferName] + async execute, NO name field)",
+    "tool file imports (type-stripped, direct) and exposes the tool() default export (description + args [mode, srcFile, dstFile, startMarker, endMarker, targetMarker, refs, text, regions, from, count, bufferName] + async execute, NO name field)",
     btTool != null && typeof btTool.description === "string" && btTool.description.length > 0 &&
-      JSON.stringify(argKeys) === JSON.stringify(["mode", "srcFile", "dstFile", "startMarker", "endMarker", "targetMarker", "refs", "text", "bufferName"]) &&
+      JSON.stringify(argKeys) === JSON.stringify(["mode", "srcFile", "dstFile", "startMarker", "endMarker", "targetMarker", "refs", "text", "regions", "from", "count", "bufferName"]) &&
       modeSch != null && typeof modeSch.safeParse === "function" &&
       modeSch.safeParse(undefined).success === false &&
-      ["MOVE", "COPY", "APPEND", "CUT", "PASTE", "REPLACE", "DELETE", "CLEAR"].every((v) => modeSch.safeParse(v).success === true) &&
+      ["MOVE", "COPY", "APPEND", "CUT", "PASTE", "REPLACE", "WRITE", "PEEK", "DELETE", "CLEAR"].every((v) => modeSch.safeParse(v).success === true) &&
       modeSch.safeParse("move").success === false && modeSch.safeParse("MOVE ").success === false && modeSch.safeParse("BOGUS").success === false &&
       ["srcFile", "dstFile", "bufferName"].every(optionalStr) &&
       ["startMarker", "endMarker", "targetMarker"].every(optionalRef) &&
@@ -3436,6 +3490,16 @@ let btTool;
       refsSch.safeParse([1.5]).success === false &&
       textSch != null && typeof textSch.safeParse === "function" &&
       textSch.safeParse(undefined).success === true && textSch.safeParse("x").success === true &&
+      regionsSch != null && typeof regionsSch.safeParse === "function" &&
+      regionsSch.safeParse(undefined).success === true &&
+      regionsSch.safeParse([{ start: 1, end: 2 }]).success === true &&
+      regionsSch.safeParse([{ start: "BT-START", end: "BT-END" }]).success === true &&
+      regionsSch.safeParse([1]).success === false &&
+      regionsSch.safeParse([{ start: 1.5, end: 2 }]).success === false &&
+      fromSch != null && typeof fromSch.safeParse === "function" &&
+      fromSch.safeParse(undefined).success === true && fromSch.safeParse(3).success === true && fromSch.safeParse(2.5).success === false &&
+      countSch != null && typeof countSch.safeParse === "function" &&
+      countSch.safeParse(undefined).success === true && countSch.safeParse(5).success === true && countSch.safeParse(true).success === false &&
       typeof btTool.execute === "function" && btTool.execute.constructor.name === "AsyncFunction" &&
       !("name" in btTool),
     JSON.stringify({ keys: argKeys, mode: ["MOVE", "move", "MOVE ", "BOGUS"].map((v) => modeSch?.safeParse?.(v)?.success), async: btTool?.execute?.constructor?.name, nameIn: "name" in (btTool ?? {}) }),
@@ -3465,7 +3529,9 @@ let btTool;
 }
 
 // 10.10 — PASTE (the round-trip, fresh dst, targetMarker omitted → EOF
-//      append): the byte-exact `Pasted 4 lines` return + the dst carries the
+//      append): the byte-exact Part F return (re-pinned 2026-09-26 per
+//      block_transfer v2 S3 — the resolved range = the buffer's own lines +
+//      the first-line echo + the buffer count AFTER) + the dst carries the
 //      inclusive 4-line block BYTE-EXACT
 {
   const res = await btTool.execute({ mode: "PASTE", dstFile: "bt/bt1-dst-eof.txt", bufferName: "bt1" }, BT_CTX);
@@ -3474,8 +3540,8 @@ let btTool;
   check(
     "110",
     "S15",
-    "PASTE round-trip (fresh dst, EOF): byte-exact return + dst content = the inclusive block byte-exact (`BT-START block`..`BT-END block`)",
-    res === "Pasted 4 lines from buffer 'bt1' into 'bt/bt1-dst-eof.txt'." &&
+    "PASTE round-trip (fresh dst, EOF): byte-exact Part F return + dst content = the inclusive block byte-exact (`BT-START block`..`BT-END block`)",
+    res === "Pasted 4 lines from buffer 'bt1' into 'bt/bt1-dst-eof.txt' (lines 1..4, first: 'BT-START block') - buffer: 4 lines." &&
       body === "BT-START block\nline-2\nline-3\nBT-END block",
     JSON.stringify({ res, body }),
   );
@@ -3494,8 +3560,8 @@ let btTool;
   check(
     "111",
     "S15",
-    "PASTE with targetMarker: the block lands RIGHT AFTER the target line (not at EOF) — byte-exact file + byte-exact return",
-    res === "Pasted 4 lines from buffer 'bt1' into 'bt/bt1-dst-t.txt'." &&
+    "PASTE with targetMarker: the block lands RIGHT AFTER the target line (not at EOF) — byte-exact file + byte-exact Part F return",
+    res === "Pasted 4 lines from buffer 'bt1' into 'bt/bt1-dst-t.txt' (lines 1..4, first: 'BT-START block') - buffer: 4 lines." &&
       body === "head\nBT-TARGET line\nBT-START block\nline-2\nline-3\nBT-END block\ntail",
     JSON.stringify({ res, body }),
   );
@@ -3562,9 +3628,10 @@ let btTool;
 }
 
 // 10.15 — anchor errors, the end-after-start rule: the endMarker EXISTS in
-//      the file but ONLY before the startMarker → the byte-exact
-//      `... not found after start marker.` error (the end search starts at
-//      the start line)
+//      the file but ONLY before the startMarker → the teaching
+//      end-not-found error CARRYING THE FILE REFERENCE (re-pinned
+//      2026-09-26 per block_transfer v2 S3 — the S1-deferred switch: the
+//      legacy "after start marker" wording is kept, the file is added)
 {
   const res = await btTool.execute(
     { mode: "COPY", srcFile: "bt/bt-err.txt", startMarker: "YY-START", endMarker: "ZZ-END", bufferName: "bt-err" },
@@ -3573,16 +3640,17 @@ let btTool;
   check(
     "115",
     "S15",
-    "end marker present ONLY before the start → byte-exact `Error: End marker 'ZZ-END' not found after start marker.` (the end search starts at the start line)",
-    res === "Error: End marker 'ZZ-END' not found after start marker.",
+    "end marker present ONLY before the start → byte-exact `Error: End marker 'ZZ-END' not found after start marker in bt/bt-err.txt.` (the v2 teaching format with the file reference)",
+    res === "Error: End marker 'ZZ-END' not found after start marker in bt/bt-err.txt.",
     JSON.stringify({ res }),
   );
 }
 
-// 10.16 — the buffer lifecycle end: CLEAR returns the byte-exact
-//      `Clipboard buffer 'bt1' cleared.` and a subsequent PASTE of the SAME
-//      (now empty) buffer → the byte-exact empty-buffer error (no file
-//      written)
+// 10.16 — the buffer lifecycle end: CLEAR returns the byte-exact Part F
+//      line (re-pinned 2026-09-26 per block_transfer v2 S3 — the buffer's
+//      line count AFTER the op = 0) and a subsequent PASTE of the SAME
+//      (now empty) buffer → the byte-exact empty-buffer error (kept
+//      verbatim, no file written)
 {
   const r1 = await btTool.execute({ mode: "CLEAR", bufferName: "bt1" }, BT_CTX);
   const r2 = await btTool.execute({ mode: "PASTE", dstFile: "bt/bt1-dst-cleared.txt", bufferName: "bt1" }, BT_CTX);
@@ -3590,8 +3658,8 @@ let btTool;
   check(
     "116",
     "S15",
-    "buffer lifecycle end: byte-exact CLEAR return + PASTE of the cleared buffer → byte-exact empty-buffer error (no file written)",
-    r1 === "Clipboard buffer 'bt1' cleared." &&
+    "buffer lifecycle end: byte-exact Part F CLEAR return + PASTE of the cleared buffer → byte-exact empty-buffer error (no file written)",
+    r1 === "Cleared buffer 'bt1' - buffer: 0 lines." &&
       r2 === "Error: Clipboard buffer 'bt1' is empty. Perform a COPY or CUT first." && !created,
     JSON.stringify({ r1, r2, created }),
   );
@@ -3611,8 +3679,8 @@ let btTool;
   check(
     "117",
     "S15",
-    "MOVE success: byte-exact `Moved 3 lines from 'bt/bt-move.txt' to 'bt/bt-move-dst.txt'` + source cut to `m1`+`m3` + dst = the inclusive block",
-    res === "Moved 3 lines from 'bt/bt-move.txt' to 'bt/bt-move-dst.txt'." &&
+    "MOVE success: byte-exact Part F feedback (re-pinned 2026-09-26 per block_transfer v2 S3) + source cut to `m1`+`m3` + dst = the inclusive block",
+    res === "Moved 3 lines from 'bt/bt-move.txt' to 'bt/bt-move-dst.txt' (lines 2..4, first: 'BTMV-START block')." &&
       srcBody === "m1\nm3" && dstBody === "BTMV-START block\nm2\nBTMV-END block",
     JSON.stringify({ res, srcBody, dstBody }),
   );
@@ -3639,17 +3707,19 @@ let btTool;
   check(
     "262",
     "S15",
-    "REPLACE happy path: the span (REP-A..REP-B inclusive) of the existing dst is replaced by the buffer — byte-exact dst + byte-exact `REPLACED lines 2..3 (2 lines) in 'bt/bt-rep.txt' with buffer 'bt-rep' (2 lines).` + the buffer PRESERVED (the later PASTE reports its 2 lines)",
-    res === "REPLACED lines 2..3 (2 lines) in 'bt/bt-rep.txt' with buffer 'bt-rep' (2 lines)." &&
+    "REPLACE happy path: the span (REP-A..REP-B inclusive) of the existing dst is replaced by the buffer — byte-exact dst + byte-exact Part F feedback (re-pinned 2026-09-26 per block_transfer v2 S3) + the buffer PRESERVED (the later PASTE reports its 2 lines in the Part F shape)",
+    res === "Replaced 2 lines in 'bt/bt-rep.txt' with buffer 'bt-rep' (lines 2..3, first: 'RS-A new one') - buffer: 2 lines." &&
       body === "head\nRS-A new one\nRS-B new two\ntail" &&
-      rPreserve === "Pasted 2 lines from buffer 'bt-rep' into 'bt/bt-rep-preserve.txt'.",
+      rPreserve === "Pasted 2 lines from buffer 'bt-rep' into 'bt/bt-rep-preserve.txt' (lines 1..2, first: 'RS-A new one') - buffer: 2 lines.",
     JSON.stringify({ res, body, rPreserve }),
   );
 }
 
 // 263 — TODO #94: REPLACE (the non-unique anchor): the startMarker matches
-//      MORE THAN ONE line → the byte-exact non-unique error + the dst
-//      byte-identical (no write)
+//      MORE THAN ONE line → the v2 teaching non-unique error (match count +
+//      the first match line numbers — re-pinned 2026-09-26 per
+//      block_transfer v2 S3, the S1-deferred switch) + the dst byte-identical
+//      (no write)
 {
   const dst = btWrite("bt-rep-nq.txt", "head\nDUP-A line one\nDUP-B line two\ntail");
   const before = readFileSync(dst, "utf8");
@@ -3660,8 +3730,8 @@ let btTool;
   check(
     "263",
     "S15",
-    "REPLACE non-unique start anchor: 'DUP' matches 2 lines → byte-exact `Error: Start marker 'DUP' is not unique in bt/bt-rep-nq.txt.` + the dst byte-identical (no write)",
-    res === "Error: Start marker 'DUP' is not unique in bt/bt-rep-nq.txt." && readFileSync(dst, "utf8") === before,
+    "REPLACE non-unique start anchor: 'DUP' matches 2 lines → byte-exact v2 teaching error `Error: Start marker 'DUP' is not unique in bt/bt-rep-nq.txt (2 matches: lines 2, 3).` + the dst byte-identical (no write)",
+    res === "Error: Start marker 'DUP' is not unique in bt/bt-rep-nq.txt (2 matches: lines 2, 3)." && readFileSync(dst, "utf8") === before,
     JSON.stringify({ res, changed: readFileSync(dst, "utf8") !== before }),
   );
 }
@@ -6772,6 +6842,232 @@ n29++;
     ignored = false;
   }
   check("64", "S5", "the ctx log path is git-ignored (git check-ignore -q .opencode/temp/ctx.log exits 0)", ignored);
+}
+
+// ------------------------------------------------------------------ S30 block_transfer v2 S3: WRITE + PEEK + unified Part F feedback (11)
+//
+// The custom tool at .opencode/tools/block_transfer.ts (post-S3: the
+// bufferless WRITE mode — single span or a 'regions' LIST, applied highest
+// line first, the overlap teaching error, the absent-file creation detail —
+// the bounded PEEK mode — count + 3 head + 3 tail with blank-skip, or a
+// from/count window capped at 25 — and the unified Part F feedback for ALL
+// modes). The S15 pins 110/111/115/116/117/262/263 are re-pinned IN PLACE to
+// the new shapes (the v2 non-unique error — match count + the first match
+// line numbers — and the end-before-start error carrying the file
+// reference); this section carries the NEW surface + a few feedback pins
+// (the smokes carry the breadth). ONE loaded btTool instance (the buffer
+// state is session-persistent — fresh buffer names here). All fs writes are
+// steered into the sandbox (context.directory=SANDBOX — the bt/ subdir).
+// Plain tool() object: no plugin hooks, no sandbox plugin.log lines — the
+// S5 tallies are unaffected.
+{
+  // 305 — WRITE single span: the region of an EXISTING dst is replaced in
+  //      place by the direct text — byte-exact Part F feedback + byte-exact
+  //      dst
+  const w1 = btWrite("bt-w1.txt", "head\nOLD-A one\nOLD-B two\nfoot");
+  const rW1 = await btTool.execute(
+    { mode: "WRITE", dstFile: "bt/bt-w1.txt", startMarker: "OLD-A", endMarker: "OLD-B", text: "NEW-A one\nNEW-B two" },
+    BT_CTX,
+  );
+  check(
+    "305",
+    "S30",
+    "WRITE single span: byte-exact Part F feedback `Wrote 2 lines to 'bt/bt-w1.txt' (lines 2..3, first: 'NEW-A one').` + the span replaced IN PLACE (byte-exact dst)",
+    rW1 === "Wrote 2 lines to 'bt/bt-w1.txt' (lines 2..3, first: 'NEW-A one')." && readFileSync(w1, "utf8") === "head\nNEW-A one\nNEW-B two\nfoot",
+    JSON.stringify({ rW1, body: readFileSync(w1, "utf8") }),
+  );
+
+  // 306 — WRITE on an ABSENT file (flagged detail #2, approved): NO
+  //      missing-file guard — the refs resolve against the EMPTY state
+  //      (byte-exact teaching not-found / out-of-range errors) + the file
+  //      is never created (no partial state on rejection)
+  {
+    const r1 = await btTool.execute(
+      { mode: "WRITE", dstFile: "bt/bt-w-new.txt", startMarker: "NOPE", endMarker: "NOPE2", text: "x" },
+      BT_CTX,
+    );
+    const r2 = await btTool.execute(
+      { mode: "WRITE", dstFile: "bt/bt-w-new.txt", startMarker: 1, endMarker: 1, text: "x" },
+      BT_CTX,
+    );
+    const exists = existsSync(path.join(BT_DIR, "bt-w-new.txt"));
+    check(
+      "306",
+      "S30",
+      "WRITE on an absent file (flagged detail #2): no missing-file guard — the marker refs resolve against the EMPTY state (teaching not-found) + the number refs are out of range (the file has 0 lines) + the file never created",
+      r1 === "Error: Start marker 'NOPE' not found in bt/bt-w-new.txt." &&
+        r2 === "Error: line 1 is out of range in bt/bt-w-new.txt (the file has 0 lines)." &&
+        !exists,
+      JSON.stringify({ r1, r2, exists }),
+    );
+  }
+
+  // 307 — WRITE 'regions' LIST (2 regions): ALL refs resolve against the
+  //      PRE-call file state and are applied HIGHEST LINE -> LOWEST (no
+  //      shifting) — the 3-line feedback (one line per applied op,
+  //      descending + the summary) + byte-exact dst
+  {
+    const w2 = btWrite("bt-w2.txt", "h1\nA-A one\nA-B two\nmid\nB-A one\nB-B two\nh7");
+    const res = await btTool.execute(
+      { mode: "WRITE", dstFile: "bt/bt-w2.txt", text: "REPL", regions: [{ start: "A-A", end: "A-B" }, { start: "B-A", end: "B-B" }] },
+      BT_CTX,
+    );
+    check(
+      "307",
+      "S30",
+      "WRITE 'regions' LIST (2 regions, applied HIGHEST LINE first — no shifting): the 3-line feedback (per-op descending + summary) + byte-exact dst",
+      res === "Wrote 1 line to 'bt/bt-w2.txt' (lines 5..6, first: 'REPL').\nWrote 1 line to 'bt/bt-w2.txt' (lines 2..3, first: 'REPL').\nWrote 2 regions into 'bt/bt-w2.txt' (2 lines total)." &&
+        readFileSync(w2, "utf8") === "h1\nREPL\nmid\nREPL\nh7",
+      JSON.stringify({ res, body: readFileSync(w2, "utf8") }),
+    );
+  }
+
+  // 308 — WRITE 'regions' with OVERLAPPING spans: the teaching error with
+  //      the ACTUAL line numbers (the lower span named first) + the dst
+  //      byte-identical (no write)
+  {
+    const w3 = btWrite("bt-w3.txt", "l1\nl2\nl3\nl4\nl5");
+    const before = readFileSync(w3, "utf8");
+    const res = await btTool.execute(
+      { mode: "WRITE", dstFile: "bt/bt-w3.txt", text: "X", regions: [{ start: 2, end: 4 }, { start: 3, end: 5 }] },
+      BT_CTX,
+    );
+    check(
+      "308",
+      "S30",
+      "WRITE 'regions' with overlapping spans: byte-exact teaching error `Error: overlapping spans (lines 2..4 and 3..5) in bt/bt-w3.txt.` (the ACTUAL line numbers) + the dst byte-identical (no write)",
+      res === "Error: overlapping spans (lines 2..4 and 3..5) in bt/bt-w3.txt." && readFileSync(w3, "utf8") === before,
+      JSON.stringify({ res, changed: readFileSync(w3, "utf8") !== before }),
+    );
+  }
+
+  // 309 — WRITE input guards: the byte-exact missing-dstFile /
+  //      missing-text / 'regions'+markers-mutually-exclusive /
+  //      single-span-needs-both-markers errors
+  {
+    const r1 = await btTool.execute({ mode: "WRITE", startMarker: "a", endMarker: "b", text: "x" }, BT_CTX);
+    const r2 = await btTool.execute({ mode: "WRITE", dstFile: "bt/bt-w3.txt", startMarker: "l1", endMarker: "l2" }, BT_CTX);
+    const r3 = await btTool.execute({ mode: "WRITE", dstFile: "bt/bt-w3.txt", text: "x", startMarker: "l1", endMarker: "l2", regions: [{ start: 1, end: 1 }] }, BT_CTX);
+    const r4 = await btTool.execute({ mode: "WRITE", dstFile: "bt/bt-w3.txt", text: "x", startMarker: "l1" }, BT_CTX);
+    check(
+      "309",
+      "S30",
+      "WRITE input guards: byte-exact missing-dstFile / missing-text / 'regions'+markers mutually exclusive / single-span needs both markers errors",
+      r1 === "Error: 'dstFile' is required for WRITE mode." &&
+        r2 === "Error: 'text' is required for WRITE mode." &&
+        r3 === "Error: the 'regions' list takes the span alone (no single markers)." &&
+        r4 === "Error: 'startMarker' and 'endMarker' are both required for WRITE mode.",
+      JSON.stringify({ r1, r2, r3, r4 }),
+    );
+  }
+
+  // 310 — PEEK default: the line count + 3 head + 3 tail lines (byte-exact
+  //      shape) — the BLANK line is SKIPPED when picking the echoed lines
+  {
+    await btTool.execute({ mode: "COPY", text: "AAA first\n\nbbb third\nccc fourth\nddd fifth\neee sixth\nfff seventh\nGGG last", bufferName: "bt-pk" }, BT_CTX);
+    const res = await btTool.execute({ mode: "PEEK", bufferName: "bt-pk" }, BT_CTX);
+    check(
+      "310",
+      "S30",
+      "PEEK default: byte-exact `Peeked buffer 'bt-pk': 8 lines — head: 'AAA first', 'bbb third', 'ccc fourth' ... tail: 'eee sixth', 'fff seventh', 'GGG last'` (the count + 3 head + 3 tail; blank line 2 skipped when picking)",
+      res === "Peeked buffer 'bt-pk': 8 lines — head: 'AAA first', 'bbb third', 'ccc fourth' ... tail: 'eee sixth', 'fff seventh', 'GGG last'",
+      JSON.stringify({ res }),
+    );
+  }
+
+  // 311 — PEEK window: the from/count bounded window (byte-exact) + the
+  //      25-line CAP (a 40-line request on a 30-line buffer echoes exactly
+  //      lines 1..25)
+  {
+    const big = Array.from({ length: 30 }, (_, i) => "L" + (i + 1)).join("\n");
+    await btTool.execute({ mode: "COPY", text: big, bufferName: "bt-pk3" }, BT_CTX);
+    const r1 = await btTool.execute({ mode: "PEEK", bufferName: "bt-pk3", from: 5, count: 3 }, BT_CTX);
+    const r2 = await btTool.execute({ mode: "PEEK", bufferName: "bt-pk3", from: 1, count: 40 }, BT_CTX);
+    check(
+      "311",
+      "S30",
+      "PEEK window: byte-exact from/count window (3 lines) + the 25-line CAP (a 40-line request on a 30-line buffer echoes exactly lines 1..25)",
+      r1 === "Peeked buffer 'bt-pk3': lines 5..7 of 30 — 'L5', 'L6', 'L7'" &&
+        r2 === "Peeked buffer 'bt-pk3': lines 1..25 of 30 — " + Array.from({ length: 25 }, (_, i) => `'L${i + 1}'`).join(", "),
+      JSON.stringify({ r1, r2len: r2.length, r2head: r2.slice(0, 60) }),
+    );
+  }
+
+  // 312 — PEEK guards: 'from'+'count' must be given TOGETHER (either side
+  //      alone → the exact error) + the empty-buffer error for an absent
+  //      buffer + 'from' beyond the buffer → the ref-out-of-range error
+  //      (with the count)
+  {
+    const r1 = await btTool.execute({ mode: "PEEK", bufferName: "bt-pk", from: 2 }, BT_CTX);
+    const r2 = await btTool.execute({ mode: "PEEK", bufferName: "bt-pk", count: 2 }, BT_CTX);
+    const r3 = await btTool.execute({ mode: "PEEK", bufferName: "bt-pk-none" }, BT_CTX);
+    const r4 = await btTool.execute({ mode: "PEEK", bufferName: "bt-pk", from: 99, count: 1 }, BT_CTX);
+    check(
+      "312",
+      "S30",
+      "PEEK guards: byte-exact together-errors ('from' or 'count' alone) + the empty-buffer error (absent buffer) + 'from' beyond the buffer → the ref-out-of-range error (with the count)",
+      r1 === "Error: 'from' and 'count' must be given together." &&
+        r2 === "Error: 'from' and 'count' must be given together." &&
+        r3 === "Error: Clipboard buffer 'bt-pk-none' is empty. Perform a COPY or CUT first." &&
+        r4 === "Error: line 99 is out of range in buffer 'bt-pk' (the buffer has 8 lines).",
+      JSON.stringify({ r1, r2, r3, r4 }),
+    );
+  }
+
+  // 313 — the unified Part F feedback (buffer ops): byte-exact CUT line
+  //      (resolved range + echo + the buffer count AFTER) + byte-exact
+  //      PASTE line (the buffer's own range + echo + the buffer count
+  //      AFTER) + the source cut byte-exact
+  {
+    const src = btWrite("bt-fb-cut.txt", "AAA start\nline-1\nline-2\nZZZ end\ntail");
+    const r1 = await btTool.execute({ mode: "CUT", srcFile: "bt/bt-fb-cut.txt", startMarker: "line-1", endMarker: "line-2", bufferName: "bt-fb" }, BT_CTX);
+    btWrite("bt-fb-paste.txt", "head");
+    const r2 = await btTool.execute({ mode: "PASTE", dstFile: "bt/bt-fb-paste.txt", bufferName: "bt-fb", targetMarker: "head" }, BT_CTX);
+    check(
+      "313",
+      "S30",
+      "unified Part F feedback (buffer ops): byte-exact CUT line + byte-exact PASTE line (resolved range + first-line echo + the buffer count AFTER) + the source cut byte-exact",
+      r1 === "Cut 2 lines from 'bt/bt-fb-cut.txt' into buffer 'bt-fb' (lines 2..3, first: 'line-1') - buffer: 2 lines." &&
+        r2 === "Pasted 2 lines from buffer 'bt-fb' into 'bt/bt-fb-paste.txt' (lines 1..2, first: 'line-1') - buffer: 2 lines." &&
+        readFileSync(src, "utf8") === "AAA start\nZZZ end\ntail",
+      JSON.stringify({ r1, r2, srcBody: readFileSync(src, "utf8") }),
+    );
+  }
+
+  // 314 — the unified Part F feedback (non-buffer + CLEAR): byte-exact
+  //      DELETE line (resolved range + echo) + byte-exact CLEAR line
+  //      (the buffer count AFTER the op = 0)
+  {
+    const src = btWrite("bt-fb-del.txt", "AAA start\nline-1\nline-2\nZZZ end\ntail");
+    const r1 = await btTool.execute({ mode: "DELETE", srcFile: "bt/bt-fb-del.txt", startMarker: "line-1", endMarker: "line-2" }, BT_CTX);
+    const r2 = await btTool.execute({ mode: "CLEAR", bufferName: "bt-fb" }, BT_CTX);
+    check(
+      "314",
+      "S30",
+      "unified Part F feedback (non-buffer + CLEAR): byte-exact DELETE line + byte-exact CLEAR line (the buffer count AFTER the op = 0)",
+      r1 === "Deleted 2 lines from 'bt/bt-fb-del.txt' (lines 2..3, first: 'line-1')." &&
+        r2 === "Cleared buffer 'bt-fb' - buffer: 0 lines.",
+      JSON.stringify({ r1, r2 }),
+    );
+  }
+
+  // 315 — the v2 teaching error switch (the S1-deferred format): byte-exact
+  //      non-unique error (match count + the first match line numbers) +
+  //      byte-exact end-before-start error CARRYING THE FILE REFERENCE
+  {
+    btWrite("bt-err2.txt", "p1\nDUP-A one\np3\nDUP-B two\np5");
+    const r1 = await btTool.execute({ mode: "COPY", srcFile: "bt/bt-err2.txt", startMarker: "DUP", endMarker: "p3", bufferName: "bt-err2" }, BT_CTX);
+    btWrite("bt-err3.txt", "p1\nZZZ-A end\np3\nYYY-B start\np5");
+    const r2 = await btTool.execute({ mode: "COPY", srcFile: "bt/bt-err3.txt", startMarker: "YYY", endMarker: "ZZZ", bufferName: "bt-err3" }, BT_CTX);
+    check(
+      "315",
+      "S30",
+      "the v2 teaching error switch (the S1-deferred format): byte-exact non-unique error `Error: Start marker 'DUP' is not unique in bt/bt-err2.txt (2 matches: lines 2, 4).` + byte-exact end-before-start error `Error: End marker 'ZZZ' not found after start marker in bt/bt-err3.txt.` (carrying the file reference)",
+      r1 === "Error: Start marker 'DUP' is not unique in bt/bt-err2.txt (2 matches: lines 2, 4)." &&
+        r2 === "Error: End marker 'ZZZ' not found after start marker in bt/bt-err3.txt.",
+      JSON.stringify({ r1, r2 }),
+    );
+  }
 }
 
 // ------------------------------------------------------------------ summary
