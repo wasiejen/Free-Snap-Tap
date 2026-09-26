@@ -1,106 +1,87 @@
-# HANDOVER WORKER → PLANNER — bt-v2 S4 (MAP + last_write + description rework)
+# HANDOVER WORKER → PLANNER — R3 completion (TAKEOVER of the dead R3 run's staged diff)
 
-Worker-21 (`worker_Q3S_245K_slow`, ses_f22c5c7fdffeNsWFzlfdsFterN),
-2026-09-26. Task: `.opencode/agent/handover/handover_task.md` (the S4 spec —
-Parts G+H+I, the LAST build unit of the block_transfer-v2 wave).
+Worker-21 takeover (`worker_Q3S_245K_slow`, ses_f2241f704ffeRVZb6oMIi5epGP),
+2026-09-26. Task: `.opencode/agent/handover/handover_task.md` (R3 completion —
+take over the dead worker-21 (ses_f22a9f87) UNCOMMITTED, never-gate-verified
+staged diff, complete the missing pins, gate green, commit). Stayed on
+`opencode_test` throughout.
 
-## What changed (ONE code commit: `37c2479`)
-- `.opencode/tools/block_transfer.ts` —
-  - **G. `MAP` mode** — buffer structure preview: line count + head 3 +
-    tail 3 + a HEADING SKELETON (max 10, then `+N more`). Lines echoed
-    VERBATIM WITH line numbers (no 40-char cap, blank lines kept).
-    Headings = `^#{1,6} ` at column 0 (markdown H1–H6; indented `#`
-    EXCLUDED) — no file-type sniffing. Byte-exact shape:
-    `Mapped buffer 'b': N line(s) — head: 1: '…', 2: '…', 3: '…' ... tail:
-    N-2: '…', N-1: '…', N: '…' — headings: <entries | (none)>`.
-    Format decisions (proposal left them open — all byte-pinned): the tail
-    never overlaps the head (N ≤ 6 → tail = only the lines beyond the
-    head); N ≤ 3 → no tail part; zero headings → `(none)`; cap suffix
-    `+N more` (N = the remainder beyond the first 10).
-  - **H. `last_write` auto-buffer** — every successful WRITE auto-stores
-    its `text` (its lines) in the buffer `last_write`, OVERWRITTEN per
-    WRITE. Automatic, NO parameter (poka-yoke). **Silent**: the
-    probe-pinned WRITE feedback line is byte-unchanged (probes 305–309
-    still pass); documented in the description + the `bufferName` arg.
-    An explicit `bufferName` arg does NOT divert the auto-store (pinned).
-  - **I. Description rework** per the handout ordering (the
-    `2026-09-18_tool-plugin-design-handout.md` checklist): what / WHEN /
-    WHEN-NOT lead — WHEN-NOT carries the sharpened boundary vs `edit`
-    (edit = exact `oldString` match, string-level; block_transfer =
-    line-anchored, ASCII-safe — no non-ASCII / dense-numeral oldString
-    problems) + the `write` boundary (whole-file rewrite). MODES covers
-    the FINAL 11-mode set (MOVE, COPY, APPEND, CUT, PASTE, REPLACE,
-    WRITE, PEEK, MAP, DELETE, CLEAR) incl. the MAP indented-`#` caveat and
-    the last_write note; the PEEK "full content: PASTE it to a file and
-    read." boundary sentence kept; EXAMPLE moved before EDGE (handout
-    order); EDGE's empty-buffer list gains MAP. The pinned first
-    one-liner kept byte-identical (sandbox smoke pin 55).
-  - Schema: mode enum gains MAP (11 values, spec order); the mode
-    one-liner gains MAP + the WRITE last_write note; `bufferName`
-    description notes the `last_write` auto-fill.
-- `.opencode/plugin/tests/block_transfer.smoke.mjs` — 11 new checks:
-  G ×6 (schema MAP; MAP skeleton byte-exact with a >40-char verbatim line
-  + the indented-`#` exclusion; the 11-heading cap → first 10 + `+1 more`;
-  narrow detection `#tight`/indented excluded; N ≤ 3 short-buffer shape;
-  absent-buffer error) + H ×5 (store; overwrite; feedback-line-unchanged;
-  explicit-bufferName no-divert; the explicit buffer untouched).
-- `.opencode/plugin/tests/block_transfer.sandbox.smoke.mjs` — the
-  description mode-list pin RE-PINNED in place to the final 11-mode set
-  (was 8 modes; same semantics — "the description names mode X", no new
-  check type).
+## What changed (THREE code commits)
+- `3ec1c5c` — the dead run's staged diff, committed as-is after review +
+  first gate run verified it green (the four R3 channels: the glob/grep
+  PAIR channel, the section-ANCHOR resolver + the two `anchor-*` verdicts,
+  the BASH QUOTED-FORM channel, the block_transfer ANCHOR-MARKER channel;
+  the smoke VERDICTS re-pin 12→14 + the probe S18 VERDICTS re-pin).
+- `44c50a2` — the probe **S31 section: 21 new pins (checks 317-337)** per the
+  R3 DoD + **ONE fix in the staged diff**: `intercept_observer.ts` used
+  `LOCATOR_MAX_FILE_CHARS` in both anchor channels (`runAnchorRead` /
+  `runAnchorMarkers`) WITHOUT importing it — a ReferenceError the hook's
+  try/catch swallowed into `intercept-error` lines (the first gate run's
+  9 probe failures). Import added; nothing else in the staged diff was
+  wrong.
+  New probe pins: 317 `matchAnchorPrefixLines` (CRLF-tolerant / leading-ws /
+  case-sensitive prefix / empty anchor); 318 the drift-guard EQUIVALENCE vs
+  the block_transfer tool's own `matchAnchorLines`/`countLines` (the S1
+  unified rule, 0d85a8c); 319 `resolveSectionAnchor` (absent / exactly-one
+  / zero / multi); 320 `quotedSpans` (double-quote escape / single-quote no-
+  escape / unterminated / empty span / order); 321 `inQuotedSpan`
+  (containment exact); 322 hook glob PAIR (path MUTATED, gate=mutated); 323
+  hook grep content-scope guard (pattern observation-only); 324 anchor
+  EXACTLY-ONE (offset→3, limit 50→3 clamp); 325 anchor zero; 326 anchor
+  multi; 327 numeric-string silent type repair; 328 file-missing silent;
+  329 bash QUOTED-FORM mutation (kind=quoted); 330 quoted MISMATCH fail-
+  closed; 331 the OWNERSHIP SPLIT (quoted mutated + unquoted log-only);
+  332 bt anchor MUTATED (gate=mutated line=2, exactly one line — no double-
+  logging); 333 none-exist; 334 both-exist; 335 non-unique; 336 mismatch
+  fail-closed; 337 targetMarker resolves against the effective dstFile.
+- `20d5a48` — the **nine per-channel smoke checks** in
+  `intercept_observer.smoke.mjs` (68 → 77): (a1) the grep/glob PAIR channel
+  (path MUTATED + pattern observation-only, two lines); (b1) anchor
+  exactly-one + limit clamp; (b2) anchor zero + multi fail-closed; (b3)
+  numeric-string silent repair + file-missing silent; (c1) bash quoted-form
+  mutation + quoted mismatch fail-closed; (c2) the quoted-vs-unquoted
+  ownership split; (d1) bt anchor MUTATED (+ no double-logging); (d2) the
+  none-exist / both-exist / non-unique branches; (d3) bt anchor mismatch +
+  targetMarker-dstFile ownership. All nine run on `before2`/`read2` (the
+  second factory — module state = proj2 after the R8 config-read section).
 
-## Measured verification (standard gate, post-commit `37c2479`)
-- Probe: **316/316 PASS** — UNCHANGED (this unit adds no probe checks;
-  existing 316 all pass, incl. the WRITE feedback 305–309).
-- block_transfer smoke: **123/123** (baseline 112 + 11); sandbox smoke:
-  **64/64** (baseline 61 + 3 from the re-pinned mode list).
-- pytest **459 passed + 1 warning** (the known #10); ruff **F=0**.
-- Baselines re-verified PRE-EDIT per the spec: probe 316/316, smokes
-  112/112 + 61/61, pytest 459+1w, ruff F=0 — all matched the spec's
-  numbers (no stale baseline this time).
+## Measured verification (standard gate, post-commit `20d5a48`)
+- Probe: **337/337 PASS** = baseline 316 + **21 new S31 pins** (annotation
+  refreshed: `S31=21` added to the section-sum line + the EXPECTED OUTPUT).
+- intercept_observer smoke: **77/77 ALL PASS** = baseline 68 + **9 new
+  R3 channel checks**.
+- pytest **459 passed + 1 warning**; ruff **F=0** (both unchanged — the
+  plugin .ts files are not in the pytest/ruff scope's changed surface).
+- Baselines re-verified PRE-EDIT on the staged state per the spec: probe
+  316/316, smoke 68/68, pytest 459+1w, ruff F=0 — all matched the spec's
+  pre-staged numbers.
+- The maintainer's live files (`.opencode/maintainer/priority.md`,
+  `opencode.jsonc`) remain UNTOUCHED (still modified in the tree, as found).
 
 ## TODO entries
-- 1 loose entry appended to `todo_inbox.md`: probe 3483's mode-enum pin
-  still lists the pre-S4 10 values (MAP un-pinned at probe level; the
-  spec forbade new probe checks in S4). Awaiting planner curation.
+- None — no unfixable or out-of-scope findings this unit (the one staged-
+  diff bug was fixed in-place, noted above).
 
-## Notes / deliberately not done
-1. **Re-pins flagged for ratification:** the sandbox smoke mode-list pin
-   (8 → final 11 modes) — same semantics, no new check type; the 11 new
-   main-smoke checks are the spec-mandated G/H pins. No other pins were
-   stale under this build (nothing else re-pinned).
-2. **Probe untouched** (count 316 unchanged, per spec). MAP is pinned at
-   smoke level only; probe 3483's enum list is now a SUBSET of the real
-   enum (still green — superset check). See the todo_inbox entry.
-3. **`last_write` is silent by design** — the WRITE feedback line is
-   probe-pinned (305–309), so the auto-store carries no feedback note;
-   the description + the `bufferName` arg document it. If the planner
-   wants a feedback note, that requires re-pinning the WRITE probes
-   (separate decision).
-4. **Journal-COLLECT stays DEFERRED** (not in this unit, per spec — the
-   R6 family).
-5. **S1–S3 logic untouched** — no edits in the shared anchor/ref code;
-   the only execute-path changes are the new MAP dispatch block and the
-   one `clipboardBuffers["last_write"]` line in WRITE (after the
-   successful fs write). No disagreement with the settled logic found.
-6. **PLANNER-SIDE (per spec, not done here):** the new-hire test (a
-   fresh agent uses every mode from the description alone, file-blind) +
-   the held-out multi-step task (3-section assembly via COPY-list +
-   APPEND, then a 2-region WRITE-list, verify via PEEK/MAP; measure
-   tool calls / errors / tokens, read the raw transcript).
+## Deliberately not done
+1. **Live acceptance** — per the spec's NOT-in-this-unit: the live plugin
+   runs pre-R3 code; the R-unit live acceptances are the separate pending-
+   maintainer queue.
+2. **`context_recovery.ts` / `auto_resume.ts` / FST product code /
+   `block_transfer.ts` + the S1–S4 bt-v2 logic** — do-not-touch per spec.
+3. No `--wip` files touched; no `opencode.jsonc` change.
 
 ## Friction
-- 1 entry via `submit(feedback=...)` to `agent_feedback.md`: the spec
-  cited the approved proposal as `proposals/approved/…` — it lives at
-  `.opencode/proposals/approved/` (not under `.opencode/agent/`); a
-  `find` was needed to locate it.
+- 1 entry via `submit(feedback=...)`: the smoke's module-state flip (the
+  second factory → only `before2`/read2 usable after the R8 section) cost
+  one full smoke run on a fresh read.
 
 ## Lessons
-- When a feedback line is probe-pinned, a new side-effect (auto-buffer)
-  rides SILENTLY + gets documented in the description — the description
-  is the contract surface, the probe pins the byte shapes.
+- Takeover discipline paid: the dead run's staged diff carried a REAL
+  missing-import bug (`LOCATOR_MAX_FILE_CHARS` never imported → swallowed
+  `intercept-error` lines) that only the first full gate run exposed —
+  never trust an un-gated staged diff as complete.
 
 ## Context
 Stop-line discipline kept (gauged between units; no compaction needed).
 Final gauge readout (VERBATIM):
-`SESSION=ses_f22c5c7fdffeNsWFzlfdsFterN CTX=95877 (39%) REM=149123 | 1 compaction left`
+`SESSION=ses_f2241f704ffeRVZb6oMIi5epGP CTX=143429 (58%) REM=101571 | 1 compaction left`
