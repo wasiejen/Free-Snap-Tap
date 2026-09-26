@@ -657,34 +657,6 @@
 //           (## stamp), return byte-exact, the other two targets absent;
 //      (238) never-read preservation: pre-seeded sentinel byte-exact before the
 //           appended entry + the unprovided targets byte-identical.
-//   S24 numword escape content (6) — the #0 pin (2026-09-18; approved
-//      2026-09-17_numword-escape-output.md): the sentinel-gated CONTENT
-//      escape — [incident:safe-form:esc] in the content / oldString /
-//      newString of write/edit/block_transfer resolves at the hook to the
-//      field-2-derived digits (dash digits OR numwords — the EXISTING
-//      grammar; field 1 is log-only; the sentinel is esc/escape,
-//      case-insensitive — one regex, the i flag); the sentinel NEVER
-//      reaches the content; unmarked / invalid forms stay byte-identical
-//      (the gate is the sentinel — Part 4); the pair-resolved verdict is
-//      REUSED for the kind=escape evidence line (the nine verdicts
-//      unchanged — the #73 kind=dedup precedent); the PATH channel is
-//      unaffected (a sentinel form in a path must not change the R1/R2
-//      path-channel outcomes — the maintainer ruling):
-//      (240) write content dash-form escape → content resolved to 320
-//            (sentinel stripped) + the kind=escape evidence line (byte-
-//            exact; field 5 = the ORIGINAL arg);
-//      (241) edit oldString+newString numword-form escape → both resolved
-//            (2 kind=escape lines) + the numword observation on the
-//            ORIGINAL arg (observeArg always sees the pre-mutation argStr);
-//      (242) unmarked pair-form content → NOT escape-resolved (args
-//            byte-identical; the pair line only — zero kind=escape);
-//      (243) invalid safe form [316:foo-bar:esc] → NOT a match (content
-//            byte-identical, zero lines);
-//      (244) sentinel form in a read/write PATH → path channel outcomes
-//            unchanged (args byte-identical, zero lines — the read
-//            fast-paths the existing bracketed file);
-//      (245) case variants ESC/Escape/escape → all resolved (one check,
-//            3 kind=escape lines, hits=3 per field).
 //   S25 compact_memory unit A (7) — 2026-09-21 (priority.md #1): the 3-key
 //      args + the config-resolved summarizer + the DUMP-OK line (the
 //      S13 check 100 explicit-pair override pin is REMOVED):
@@ -809,7 +781,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=13 S12=4 S13=21 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S24=6 S25=7 S26=20 S27=8 S28=12 hygiene=6  →  "PROBE handover: 303/303 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=13 S12=4 S13=21 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S25=7 S26=20 S27=8 S28=12 hygiene=6  →  "PROBE handover: 297/297 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -5622,170 +5594,6 @@ let subTool;
       readFileSync(path.join(SUB_KEEP, SUB_REL.knowledge), "utf8") === "SENTINEL kn — must stay byte-identical.\n" &&
       readFileSync(path.join(SUB_KEEP, SUB_REL.todo), "utf8") === "SENTINEL todo — must stay byte-identical.\n",
     JSON.stringify({ fb }),
-  );
-}
-
-// ------------------------------------------------------------------ S24 numword escape content (6) — the #0 pin (2026-09-18; approved 2026-09-17_numword-escape-output.md)
-//
-// The sentinel-gated CONTENT escape (the approved proposal, Part 1-5):
-// `[<incident>:<safe-form>:esc]` in the `content` / `oldString` /
-// `newString` of write/edit/block_transfer resolves at the hook to the
-// field-2-derived digits (dash digits OR numwords — the EXISTING grammar;
-// field 1 is log-only, never authoritative; the sentinel is `esc`/
-// `escape`, case-insensitive — one regex, the `i` flag). The sentinel
-// NEVER reaches the content. Unmarked / invalid forms stay byte-identical
-// (the gate is the sentinel — Part 4). The `pair-resolved` verdict is
-// REUSED for the `kind=escape scope=content orig=<form> value=<digits>
-// hits=<n>` evidence line (the nine verdicts stay unchanged — the #73
-// `kind=dedup` precedent). The PATH channel is unaffected — a sentinel
-// form in a path must not change the R1/R2 path-channel outcomes (the
-// maintainer ruling). ioBefore / ioReadLines are the S18-S21 drivers.
-// NOTE (measured): a TWO-colon name (the escape form in a filename) is NOT
-// creatable on NTFS — after the first colon the rest parses as an
-// alternate-data-stream name, which may not carry a second colon (ENOENT);
-// the S19 one-colon fixture is legal. The path pin therefore carries the
-// form in a NON-EXISTENT path arg (the dash-digit safe form `4-4` keeps
-// the numword observation quiet: no map word in the arg).
-let n24 = 239;
-
-// 240 — (a) write content dash-form escape → content resolved, sentinel
-//      stripped, the kind=escape evidence line (byte-exact; field 5 = the
-//      ORIGINAL arg — captured pre-mutation)
-{
-  const a1 = { filePath: ioPfDir + "\\esc-a.txt", content: "total is [316:3-2-0:esc] done" };
-  const nL1 = ioReadLines().length;
-  await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c240" }, { args: a1 });
-  const a1Lines = ioReadLines();
-  const a1f = a1Lines[a1Lines.length - 1].split(" | ");
-  check(
-    String(++n24),
-    "S24",
-    "write content dash-form escape → content resolved to 320 (sentinel stripped) + pair-resolved kind=escape line (byte-exact evidence, field 5 = original arg)",
-    a1.content === "total is 320 done" && a1Lines.length === nL1 + 1 && a1f.length === 8 &&
-      a1f[3] === "write" && a1f[7] === "pair-resolved" &&
-      a1f[5] === "kind=escape scope=content orig=[316:3-2-0:esc] value=320 hits=1",
-    JSON.stringify({ content: a1.content, n: a1Lines.length - nL1, f: a1f }),
-  );
-}
-
-// 241 — (b) edit oldString + newString numword-form escape → BOTH resolved
-//      (one kind=escape line per field) + the numword observation on the
-//      ORIGINAL arg (observeArg always sees the pre-mutation argStr — the
-//      token is not a pair span; the pair observation on the fields sees
-//      the RESOLVED text, where there is no pair)
-{
-  const a2 = { filePath: ioPfDir + "\\file-4.txt", oldString: "n [405:four-two-five:esc]", newString: "m [405:five-two-four:esc]" };
-  const nL2 = ioReadLines().length;
-  await ioBefore({ tool: "edit", sessionID: "ses_fx_io2", callID: "c241" }, { args: a2 });
-  const a2Lines = ioReadLines();
-  const a2fa = a2Lines[a2Lines.length - 4].split(" | ");
-  const a2fb = a2Lines[a2Lines.length - 3].split(" | ");
-  const a2fc = a2Lines[a2Lines.length - 2].split(" | ");
-  const a2fd = a2Lines[a2Lines.length - 1].split(" | ");
-  check(
-    String(++n24),
-    "S24",
-    "edit oldString+newString numword-form escape → both resolved (2 kind=escape lines) + the numword observation on the original arg + the R6 hint line LAST (oldString absent → fail-closed no-candidate)",
-    a2.oldString === "n 425" && a2.newString === "m 524" && a2Lines.length === nL2 + 4 &&
-      a2fa[7] === "pair-resolved" && a2fa[5] === "kind=escape scope=content orig=[405:four-two-five:esc] value=425 hits=1" &&
-      a2fb[7] === "pair-resolved" && a2fb[5] === "kind=escape scope=content orig=[405:five-two-four:esc] value=524 hits=1" &&
-      a2fc[7] === "no-candidate" && a2fc[5] === "numword four-two-five→425 five-two-four→524" &&
-      a2fd[7] === "no-candidate" && a2fd[5] === "hint reason=no-anchor-line" && a2fd[6] === "edit oldString",
-    JSON.stringify({ o: a2.oldString, w: a2.newString, n: a2Lines.length - nL2, fd: a2fd }),
-  );
-}
-
-// 242 — (c) UNMARKED pair-form content → NOT escape-resolved (args
-//      byte-identical; the pair is pair-observation-logged only, zero
-//      kind=escape lines)
-{
-  const a3 = { filePath: ioPfDir + "\\file-4.txt", content: "x = args[1:one] + y" };
-  const a3Before = JSON.stringify(a3);
-  const nL3 = ioReadLines().length;
-  await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c242" }, { args: a3 });
-  const a3Lines = ioReadLines();
-  const a3f = a3Lines[a3Lines.length - 1].split(" | ");
-  check(
-    String(++n24),
-    "S24",
-    "unmarked pair-form content → NOT escape-resolved (args byte-identical; the pair line only — zero kind=escape)",
-    JSON.stringify(a3) === a3Before && a3Lines.length === nL3 + 1 &&
-      a3f[7] === "observed-redundancy-ok" && a3f[5] === "pair=[1:one] canon=1 dist=0" &&
-      !a3Lines.slice(nL3).some((l) => l.includes("kind=escape")),
-    JSON.stringify({ args: a3, f: a3f }),
-  );
-}
-
-// 243 — (d) INVALID safe form → NOT a match (content byte-identical,
-//      zero lines — the form has two colons so it is not a pair either;
-//      foo/bar/esc are not map words)
-{
-  const a4 = { filePath: ioPfDir + "\\file-4.txt", content: "bad [316:foo-bar:esc] here" };
-  const a4Before = JSON.stringify(a4);
-  const nL4 = ioReadLines().length;
-  await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c243" }, { args: a4 });
-  check(
-    String(++n24),
-    "S24",
-    "invalid safe form [316:foo-bar:esc] → NOT a match (content byte-identical, zero lines)",
-    JSON.stringify(a4) === a4Before && ioReadLines().length === nL4,
-    JSON.stringify({ args: a4, n: ioReadLines().length - nL4 }),
-  );
-}
-
-// 244 — (e) sentinel-carrying form in a read/write PATH → the path-channel
-//      outcomes are UNCHANGED (args byte-identical, zero lines — the
-//      escape is a content-channel gate, not a path-channel one; the
-//      read fast-paths the existing bracketed file, the write pair
-//      channel finds no pair, the write fuzzy channel is excluded M1)
-{
-  const pEsc = ioPfDir + "\\file-[4:4-4:esc].txt"; // NON-EXISTENT path carrying the sentinel form
-  const e1 = { filePath: pEsc };
-  const e1Before = JSON.stringify(e1);
-  const nL5 = ioReadLines().length;
-  await ioBefore({ tool: "read", sessionID: "ses_fx_io2", callID: "c24a" }, { args: e1 });
-  const e1Lines = ioReadLines();
-  const e1f = e1Lines[e1Lines.length - 1].split(" | ");
-  const e2 = { filePath: pEsc, content: "keep" };
-  const e2Before = JSON.stringify(e2);
-  const nL5b = ioReadLines().length;
-  await ioBefore({ tool: "write", sessionID: "ses_fx_io2", callID: "c24b" }, { args: e2 });
-  const e2Lines = ioReadLines();
-  check(
-    String(++n24),
-    "S24",
-    "sentinel form in a read/write PATH → path channels treat it as plain text (read: ONE fuzzy-rejected line — the channel ran normally; write: zero lines — M1; args byte-identical; zero kind=escape)",
-    JSON.stringify(e1) === e1Before && JSON.stringify(e2) === e2Before &&
-      e1Lines.length === nL5 + 1 && e1f[7] === "fuzzy-rejected" && e1f[5].startsWith("fuzzy orig=") &&
-      e2Lines.length === nL5b &&
-      !e2Lines.slice(nL5).some((l) => l.includes("kind=escape")),
-    JSON.stringify({ args1: e1, args2: e2, f: e1f, n: e2Lines.length - nL5 }),
-  );
-}
-
-// 245 — (f) case variants (ESC / Escape / escape) → ALL resolved (one
-//      check, one field — the sentinel is case-insensitive: one regex,
-//      the `i` flag): oldString → the three values in order + 3
-//      kind=escape lines (hits=3 per field)
-{
-  const f1 = { filePath: ioPfDir + "\\file-4.txt", oldString: "a [316:3-2-0:ESC] b [317:3-2-0:Escape] c [318:3-2-0:escape] d", newString: "done" };
-  const nL6 = ioReadLines().length;
-  await ioBefore({ tool: "edit", sessionID: "ses_fx_io2", callID: "c245" }, { args: f1 });
-  const f1Lines = ioReadLines();
-  const f1fa = f1Lines[f1Lines.length - 4].split(" | ");
-  const f1fb = f1Lines[f1Lines.length - 3].split(" | ");
-  const f1fc = f1Lines[f1Lines.length - 2].split(" | ");
-  const f1fd = f1Lines[f1Lines.length - 1].split(" | ");
-  check(
-    String(++n24),
-    "S24",
-    "case variants ESC/Escape/escape → all resolved (one field, 3 kind=escape lines, hits=3 per field) + the R6 hint line LAST (oldString absent → fail-closed no-candidate)",
-    f1.oldString === "a 320 b 320 c 320 d" && f1Lines.length === nL6 + 4 &&
-      f1fa[7] === "pair-resolved" && f1fa[5] === "kind=escape scope=content orig=[316:3-2-0:ESC] value=320 hits=3" &&
-      f1fb[7] === "pair-resolved" && f1fb[5] === "kind=escape scope=content orig=[317:3-2-0:Escape] value=320 hits=3" &&
-      f1fc[7] === "pair-resolved" && f1fc[5] === "kind=escape scope=content orig=[318:3-2-0:escape] value=320 hits=3" &&
-      f1fd[7] === "no-candidate" && f1fd[5] === "hint reason=no-anchor-line" && f1fd[6] === "edit oldString",
-    JSON.stringify({ o: f1.oldString, n: f1Lines.length - nL6, fd: f1fd }),
   );
 }
 

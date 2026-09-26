@@ -1,7 +1,9 @@
 # Numeral convention — PRIMER (short usage form for agents)
 
-Full record + reasoning: `decision-record.md` NEXT TO THIS FILE — it is
-LARGE (~10k tokens): GREP it by section, do not read it whole.
+Full record + reasoning: `decision-record.md` in
+`research/fuzzy-numword/` (the track's research area — this file moved here
+from that folder, #100) — it is LARGE (~10k tokens): GREP it by section, do
+not read it whole.
 
 ## When
 Passing DENSE numerals — paths with digits, commit/session ids, probe
@@ -20,11 +22,10 @@ strings drift. In doubt, use a pair.
 - YES: tool arguments (paths, git refs), commit messages, prose/TODO.
 - NO: code content (string literals, identifiers) — the form is argument-
   space; NO bare words without delimiters (a bare `four` is never a
-  candidate); NO file content (a form inside a file is just text) — except
-  the escape, below.
+  candidate); NO file content (a form inside a file is just text).
 - bash: QUOTE the form (`git commit -m "[8-6-1]"`) — unquoted `< > |` break
   commands (measured).
-- escape (content, since 2026-09-18): a dense value you cannot type
+- escape (content, since 2026-09-18; REMOVED 2026-09-25, #100): a dense value you cannot type
   reliably can still be WRITTEN into `write` / `edit` content —
   `[<incident>:<safe-form>:esc]` → the digits derived from field 2 (the
   safe form: dash digits or numwords — the existing grammar), e.g.

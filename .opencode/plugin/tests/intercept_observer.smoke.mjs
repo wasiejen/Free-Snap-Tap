@@ -323,46 +323,6 @@ try {
       // flattenField the hook's log path uses
       fS[5] === core.flattenField(`fuzzy kind=dedup scope=write orig=${proj}\\sx\\sx\\real-a.txt -> ${proj}\\sx\\real-a.txt d=0`), JSON.stringify(fS));
 
-  // ---- (8h) the #0 numword escape (2026-09-18; approved
-  //      2026-09-17_numword-escape-output.md): the sentinel-gated CONTENT
-  //      resolution — the ONE legal content mutation:
-  //      `[<incident>:<safe-form>:esc]` → the field-2-derived digits (the
-  //      safe form: dash digits or numwords); the sentinel never reaches
-  //      the content; unmarked / invalid forms are NEVER touched
-  const argsE1 = { filePath: proj + "\\wfx\\file-4.txt", oldString: "n [405:four-two-five:esc]", newString: "m [405:4-2-5:esc]" };
-  const argsE1Before = JSON.stringify(argsE1);
-  const countE1 = readLines().length;
-  await before({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c10h" }, { args: argsE1 });
-  const lE1 = readLines();
-  // line order: escape(oldString) + escape(newString) — the channel lines —
-  // then the observation line on the ORIGINAL argStr (observeNumword sees the
-  // `four-two-five` token inside the oldString form — it is not a pair span;
-  // the observation channel always sees the pre-mutation arg)
-  const fE1a = split8(lE1[countE1]);
-  const fE1b = split8(lE1[countE1 + 1]);
-  const fE1c = split8(lE1[countE1 + 2]);
-  const fE1d = split8(lE1[countE1 + 3]);
-  chk("escape positive (edit oldString+newString) → both resolved (numword + dash-digit forms) + 2 pair-resolved kind=escape lines + the numword observation on the original arg + the R6 hint (oldString absent → fail-closed no-candidate, LAST line)",
-    argsE1.oldString === "n 425" && argsE1.newString === "m 425" && lE1.length === countE1 + 4 &&
-      fE1a[7] === "pair-resolved" && fE1a[5] === "kind=escape scope=content orig=[405:four-two-five:esc] value=425 hits=1" &&
-      fE1b[7] === "pair-resolved" && fE1b[5] === "kind=escape scope=content orig=[405:4-2-5:esc] value=425 hits=1" &&
-      // the log FIELD is cap-truncated (MAX_FIELD_CHARS) — expected via the
-      // SAME flattenField the hook's log path uses
-      fE1a[4] === core.flattenField(argsE1Before) && fE1c[7] === "no-candidate" && fE1c[5] === "numword four-two-five→425" &&
-      fE1d[7] === "no-candidate" && fE1d[5] === "hint reason=no-anchor-line" && fE1d[6] === "edit oldString",
-    JSON.stringify([fE1a, fE1b, fE1c, fE1d]));
-
-  const argsE2 = { filePath: proj + "\\wfx\\file-4.txt", content: "x = args[1:one] + y; [316:foo-bar:esc]" };
-  const argsE2Before = JSON.stringify(argsE2);
-  const countE2 = readLines().length;
-  await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c10i" }, { args: argsE2 });
-  const lE2 = readLines();
-  const fE2 = split8(lE2[lE2.length - 1]);
-  chk("escape negative: unmarked [1:one] pair-logged only (args byte-identical) + INVALID safe form [316:foo-bar:esc] untouched (zero kind=escape lines)",
-    JSON.stringify(argsE2) === argsE2Before && lE2.length === countE2 + 1 && fE2[7] === "observed-redundancy-ok" &&
-      fE2[5] === "pair=[1:one] canon=1 dist=0" &&
-      !lE2.slice(countE2).some((l) => l.includes("kind=escape")), JSON.stringify([argsE2, lE2.slice(countE2)]));
-
   // ---- (10) the R6 payload journal + edit hint channel (2026-09-25;
   //      observation-only): the journal is a SEPARATE file (journal-only
   //      calls add NO intercept.log line); the hint runs on the effective
@@ -696,82 +656,51 @@ try {
       JSON.stringify({ args: a, n: nl.length }));
   }
 
-  // ---- (13) Unit 2 (#97, 2026-09-25): the escape RETURN-INFO — the
-  //      silent escape mutation gets a FEEDBACK NOTE in the tool result
-  //      (the after hook — also on success) + the FULL pre-mutation forms
-  //      in the R6 journal (the trailing `pre-escape` field). Uses the
-  //      FIRST factory's hooks (dir = proj — the (12f) second factory
-  //      below flips the module state).
+  // ---- (13) Unit 2 note delivery (#97, 2026-09-25) — the after-hook
+  //      FEEDBACK NOTE mechanism (the storeNote pattern; delivered also
+  //      on SUCCESS): pinned on the R8 REDIRECT note (the escape note
+  //      producer is retired — #100, 2026-09-26). Uses the FIRST
+  //      factory's hooks (dir = proj — the (12f) second factory below
+  //      flips the module state).
   const eu2 = path.join(proj, "eu2");
   fs.mkdirSync(eu2, { recursive: true });
-  const eu2File = path.join(eu2, "f.txt");
-  fs.writeFileSync(eu2File, "alpha line one\nbeta line two\n", "utf-8");
-  const formNum = "[405:four-two-five:esc]"; // -> 425 (the (8h) proven form)
-  const formDash = "[405:4-2-5:esc]"; // -> 425 (the (8h) proven form)
 
-  // (13a) escape WRITE → content resolved (args mutated) + the after-hook
-  //        FEEDBACK note (byte-exact, the truncated first form) + the
-  //        journal line carries the trailing pre-escape field (the full
-  //        pre-mutation forms)
+  // (13a) R8 read-sibling redirect → the after-hook DELIVERS the redirect
+  //        note in the tool result (byte-exact evidence, also on success)
   {
-    const content = `x ${formNum} y`;
-    const a = { filePath: eu2File, content };
-    const je0 = jRead(journalWriteLog).length;
-    await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13a" }, { args: a });
-    const out = { title: "write", output: "ok", metadata: {} };
-    await after({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13a" }, out);
-    const note = `escape-resolved: 1 escape form(s) in content (first: ${formNum} len=${formNum.length} -> 425); full pre-mutation forms: .opencode/temp/intercept.log (kind=escape) + .opencode/temp/journal_write.log`;
-    const jl = jRead(journalWriteLog)[je0];
-    chk("Unit2 escape write → content resolved (args mutated) + the after-hook FEEDBACK note (byte-exact, the truncated first form) + the journal line carries the trailing pre-escape field (full pre-mutation forms)",
-      a.content === "x 425 y" && out.output === `ok\n${note}` &&
-        jl !== undefined && jl.endsWith(` | pre-escape=${JSON.stringify({ content: [formNum] })}`) &&
-        JSON.parse(jl.split(" | ")[4]) === a.content,
-      JSON.stringify({ content: a.content, out: out.output, jl }));
+    const a = { filePath: base + "\\io-r8-note-sib.txt" };
+    await before({ tool: "read", sessionID: "ses_smoke_io1", callID: "c13a" }, { args: a });
+    const out = { title: "read", output: "ok", metadata: {} };
+    await after({ tool: "read", sessionID: "ses_smoke_io1", callID: "c13a" }, out);
+    const note = `kind=redirect tool=read arg=filePath orig=${base}\\io-r8-note-sib.txt value=${proj}/io-r8-note-sib.txt`;
+    chk("Unit2 R8 read-sibling redirect → the after-hook DELIVERS the redirect note in the tool result (byte-exact, also on success)",
+      a.filePath === proj + "/io-r8-note-sib.txt" && out.output === `ok\n${note}`,
+      JSON.stringify({ after: a.filePath, out: out.output }));
   }
 
-  // (13b) escape EDIT (oldString + newString) → BOTH resolved → 2 notes +
-  //        the failed-edit HINT — the hint FIRST, then the notes (the
-  //        oldString/newString field order); the hint behavior is
-  //        unchanged
-  {
-    const je0 = jRead(journalEditLog).length;
-    const a = { filePath: eu2File, oldString: `n ${formDash}`, newString: `m ${formNum}` };
-    await before({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c13b" }, { args: a });
-    const out = { title: "edit", output: "Error: oldString not found", metadata: {} };
-    await after({ tool: "edit", sessionID: "ses_smoke_io1", callID: "c13b" }, out);
-    const noteOld = `escape-resolved: 1 escape form(s) in oldString (first: ${formDash} len=${formDash.length} -> 425); full pre-mutation forms: .opencode/temp/intercept.log (kind=escape) + .opencode/temp/journal_edit.log`;
-    const noteNew = `escape-resolved: 1 escape form(s) in newString (first: ${formNum} len=${formNum.length} -> 425); full pre-mutation forms: .opencode/temp/intercept.log (kind=escape) + .opencode/temp/journal_edit.log`;
-    const jle = jRead(journalEditLog)[je0];
-    chk("Unit2 escape edit (old+new) → BOTH resolved (args mutated) + the failed-edit HINT fires FIRST, then the two notes (oldString, newString); hint behavior unchanged; journal pre-escape field carries both forms",
-      a.oldString === "n 425" && a.newString === "m 425" &&
-        out.output === `Error: oldString not found\nhint reason=d-too-high best-d=11\n${noteOld}\n${noteNew}` &&
-        jle !== undefined && jle.endsWith(` | pre-escape=${JSON.stringify({ oldString: [formDash], newString: [formNum] })}`),
-      JSON.stringify({ old: a.oldString, nw: a.newString, out: out.output, jle }));
-  }
-
-  // (13c) a call with no escape forms → NO note (the after hook leaves the
+  // (13b) a call with no channel note → NO note (the after hook leaves the
   //        output byte-identical)
   {
-    const a = { filePath: path.join(eu2, "plain.txt"), content: "hello" };
-    await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13c" }, { args: a });
-    const out = { title: "write", output: "ok", metadata: {} };
-    await after({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13c" }, out);
-    chk("Unit2 no-escape call → NO note (the after hook leaves the output byte-identical)",
+    const a = { filePath: path.join(eu2, "plain.txt") };
+    await before({ tool: "read", sessionID: "ses_smoke_io1", callID: "c13b" }, { args: a });
+    const out = { title: "read", output: "ok", metadata: {} };
+    await after({ tool: "read", sessionID: "ses_smoke_io1", callID: "c13b" }, out);
+    chk("Unit2 no-note call → NO note (the after hook leaves the output byte-identical)",
       out.output === "ok",
       JSON.stringify(out.output));
   }
 
-  // (13d) the note is consumed ONCE (a second after call with the same
+  // (13c) the note is consumed ONCE (a second after call with the same
   //        callID → untouched)
   {
-    const a = { filePath: path.join(eu2, "once.txt"), content: `y ${formDash}` };
-    await before({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13d" }, { args: a });
-    const out = { title: "write", output: "ok", metadata: {} };
-    await after({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13d" }, out);
+    const a = { filePath: base + "\\io-r8-note2-sib.txt" };
+    await before({ tool: "read", sessionID: "ses_smoke_io1", callID: "c13c" }, { args: a });
+    const out = { title: "read", output: "ok", metadata: {} };
+    await after({ tool: "read", sessionID: "ses_smoke_io1", callID: "c13c" }, out);
     const first = out.output;
-    await after({ tool: "write", sessionID: "ses_smoke_io1", callID: "c13d" }, out);
+    await after({ tool: "read", sessionID: "ses_smoke_io1", callID: "c13c" }, out);
     chk("Unit2 note consumed once: the second after call leaves the output unchanged (one note line only)",
-      first !== "ok" && first.startsWith("ok\nescape-resolved: 1 escape form(s) in content") && out.output === first,
+      first !== "ok" && first.startsWith("ok\nkind=redirect tool=read") && out.output === first,
       JSON.stringify(out.output));
   }
 

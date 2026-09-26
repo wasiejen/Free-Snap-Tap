@@ -48,14 +48,7 @@
 //       oldString / newString / bufferName / …) carry the observation-form
 //       pair line ONLY — never mutated (the content-scope guard: mutation
 //       is scope, not grammar — `args[1:one]` collides with the python
-//       slice form in the string space). ONE exception (the #0 numword
-//       escape, 2026-09-18): a SENTINEL-carrying form
-//       `[<digits>:<safe-form>:esc]` in `content` / `oldString` /
-//       `newString` IS resolved (the form → the field-2-derived digits;
-//       the sentinel never reaches the file) — the gate is the sentinel,
-//       so unmarked / invalid forms stay byte-identical. Path fields are
-//       untouched by the escape (a sentinel form in a path must not
-//       change the R1/R2 path-channel outcomes — maintainer ruling).
+ //       slice form in the string space).
 //   (3b) FUZZY on the same path fields: the read-scope matcher at the
 //       TIGHTER bar d<=1 (`resolveWritePath`) under the same strict gate —
 //       `fuzzy-resolved`/`fuzzy-rejected` with the `scope=write` flag in
@@ -93,7 +86,7 @@
 //
 // (5) THE EDIT CHANNEL (R6 2026-09-25 + the (2) MUTATING edit-fuzzy,
 //   2026-09-25, #95 sub-item 2 — `edit` only, the EFFECTIVE
-//   post-escape/pair/fuzzy args): oldString occurring EXACTLY ONCE in
+//   post-pair/fuzzy args): oldString occurring EXACTLY ONCE in
 //   the target file → SILENT (no line, no mutation, no after-hook hint —
 //   the edit will succeed); >1 raw occurrences → `edit-ambiguous` line
 //   `hint lines=<n1>,<n2>,…` (the edit tool will reject; the after-hook
@@ -169,12 +162,9 @@
 // the bash git-ref lines (R2) add `gate=ref-mutated|ref-rejected
 // run=<hexrun>` (ref run < 4 → the bare `pair=… canon=… dist=…` form, gate
 // not attempted).
-// Verdict vocabulary: the six observation verdicts (core header) +
-// `fuzzy-resolved` / `fuzzy-rejected` + `pair-resolved` + `error` (the
-// intercept-error line). The #0 escape line (2026-09-18) REUSES the
-// `pair-resolved` verdict — evidence `kind=escape scope=content
-// orig=<form> value=<digits> hits=<n>` (the nine verdicts stay
-// byte-identical — the #73 `kind=dedup` precedent).
+ // Verdict vocabulary: the six observation verdicts (core header) +
+ // `fuzzy-resolved` / `fuzzy-rejected` + `pair-resolved` + `error` (the
+ // intercept-error line).
 //
 // MODEL ID: obtained the same way the watchdog fills its ctx-log model field
 // — readGauge(undefined, sessionID) from ./scripts/gauge.mjs (the shared
@@ -225,7 +215,6 @@ import {
   observeSandbox,
   relForm,
   resolveEditOldString,
-  resolveEscapes,
   resolveReadPath,
   resolveRedirect,
   resolveWritePath,
@@ -508,16 +497,16 @@ function writePathFields(tool: string): string[] {
 
 // R8 (#97, 2026-09-25): the TYPED path fields of the out-of-sandbox path
 // redirect — the 1:1 allowed-root redirect (core `resolveRedirect`). A
-// SEPARATE table from WRITE_PATH_FIELDS (which drives the write-owned
-// pair/escape/fuzzy channels — adding `read` there would break ownership).
+ // SEPARATE table from WRITE_PATH_FIELDS (which drives the write-owned
+ // pair/fuzzy channels — adding `read` there would break ownership).
 // Applies to: read/write/edit `filePath` + block_transfer `srcFile`/
 // `dstFile`. Bash command strings are OUT OF SCOPE (opaque — the
 // fail-closed out-of-sandbox note stays for them). Runs AFTER the R1/R2
 // fuzzy channels (a path fuzzy-resolved in-sandbox is never redirected).
 // On a redirect: the field is MUTATED to the target, the channel line
-// `kind=redirect tool=<t> arg=<field> orig=<full> value=<full>` is logged
-// (the `pair-resolved` verdict is REUSED — the `kind=escape`/`kind=dedup`
-// precedent; the twelve VERDICTS stay byte-identical), the out-of-sandbox
+ // `kind=redirect tool=<t> arg=<field> orig=<full> value=<full>` is logged
+ // (the `pair-resolved` verdict is REUSED — the `kind=dedup` precedent; the
+ // twelve VERDICTS stay byte-identical), the out-of-sandbox
 // NOTE is recomputed on the EFFECTIVE args (the redirected field no longer
 // fires it — see onToolBefore), and a feedback note is stored for the
 // after hook (the Unit 2 delivery). FAIL-CLOSED: no 1:1 mapping → no
@@ -644,56 +633,6 @@ function runPairWrite(output: { args?: unknown }, tool: string): Observation[] {
     }
   }
   return lines.slice(0, MAX_LINES_PER_CALL);
-}
-
-// CONTENT-SCOPED ESCAPE resolution (#0, 2026-09-18; approved
-// 2026-09-17_numword-escape-output.md): the ONE legal content mutation —
-// sentinel-gated, so unmarked / invalid forms are never touched (the
-// content-scope guard's exception, the match gate is the sentinel).
-// Runs FIRST for write/edit/block_transfer — before the pair observation
-// on the same fields (Part 3 pipeline order: the pair channel then sees
-// the resolved text) and before the observation channel. The string args
-// named `content` / `oldString` / `newString` only — block_transfer
-// carries none of these names (natural no-op); the PATH fields are
-// untouched (R1/R2 semantics unchanged — a sentinel-carrying form in a
-// path is not an escape and must not change the path-channel outcomes).
-// A hit MUTATES the arg (form → field-2-derived digits) and logs ONE
-// 8-field line per hit reusing the `pair-resolved` verdict — evidence
-// `kind=escape scope=content orig=<form> value=<digits> hits=<n>` (n =
-// the hits in that field; the nine-verdict vocabulary is unchanged, the
-// #73 `kind=dedup` precedent). Never throws.
-// Unit 2 (#97, 2026-09-25): on a hit, a FEEDBACK NOTE is stored for the
-// after hook (the storeNote pattern) — the mutation the agent cannot
-// perceive gets mandatory return-info: the resolved count + the FIRST
-// orig→value TRUNCATED (first 40 chars + its length — the context-saving
-// ruling), pointing at intercept.log (the kind=escape lines) + the R6
-// journal (the FULL pre-mutation forms — its trailing `pre-escape` field,
-// appended by appendJournal). One note per mutated field (the
-// content/oldString/newString loop order). Never throws.
-function runEscapeContent(output: { args?: unknown }, tool: string, callID: string): Observation[] {
-  const args = output?.args;
-  if (args == null || typeof args !== "object" || map === null) return [];
-  if (!writePathFields(tool).length) return [];
-  const journal = tool === "write" ? "journal_write.log" : "journal_edit.log";
-  const lines: Observation[] = [];
-  for (const field of ["content", "oldString", "newString"]) {
-    const raw = (args as Record<string, unknown>)[field];
-    if (typeof raw !== "string" || raw === "") continue;
-    const res = resolveEscapes(raw, map);
-    if (res.hits.length === 0) continue;
-    (args as Record<string, string>)[field] = res.text;
-    const first = res.hits[0];
-    storeNote(callID,
-      `escape-resolved: ${res.hits.length} escape form(s) in ${field} (first: ${truncEdit40(first.raw)} len=${first.raw.length} -> ${first.value}); full pre-mutation forms: .opencode/temp/intercept.log (kind=escape) + .opencode/temp/${journal}`);
-    for (const h of res.hits) {
-      lines.push({
-        verdict: "pair-resolved",
-        evidence: `kind=escape scope=content orig=${h.raw} value=${h.value} hits=${res.hits.length}`,
-        context: classifyContext(raw),
-      });
-    }
-  }
-  return lines;
 }
 
 // WRITE-scope FUZZY: the read-scope matcher at the tighter bar (d<=1,
@@ -886,9 +825,9 @@ function storeHint(callID: string, text: string): void {
 // (6b) the per-callID FEEDBACK NOTE cache (#97, 2026-09-25) — the
 // after-hook enrichment source for the CHANNEL notes (the storeHint
 // pattern: TTL 10 min, cap 100, FIFO evict — one callID may carry SEVERAL
-// notes, delivered joined). Unit 1 stores the R8 redirect note; Unit 2
-// stores the escape note and extends onToolAfter to DELIVER both (also on
-// SUCCESS — today only the failed-edit hint is delivered).
+ // notes, delivered joined). Stores the R8 redirect note; onToolAfter
+ // DELIVERS it (also on SUCCESS — today only the failed-edit hint is
+ // delivered).
 const noteCache = new Map<string, { at: number; notes: string[] }>();
 
 function storeNote(callID: string, text: string): void {
@@ -913,15 +852,8 @@ function storeNote(callID: string, text: string): void {
 // actually act on — EXCEPT the edit `old` field: it is the ORIGINAL,
 // pre-(2)-mutation oldString (directive b, 2026-09-25 — the recovery
 // fallback captures what the model asked for, NOT what the (2) channel
-// mutated it to).
-// Unit 2 (#97, 2026-09-25): the optional `escapeForms` — the FULL
-// pre-mutation escape forms (field → the raw sentinel forms, in hit
-// order) ride the journal line as a trailing ` | pre-escape=<JSON>` field,
-// appended ONLY when non-empty (a call without escape forms stays
-// byte-identical — the existing payload pins hold). The journal is the
-// full-payload home for the silent escape mutation (the after-hook note
-// is the truncated pointer to it).
-function appendJournal(tool: string, sid: string, args: Record<string, unknown>, editOldOriginal?: string, escapeForms?: Record<string, string[]>): void {
+ // mutated it to).
+function appendJournal(tool: string, sid: string, args: Record<string, unknown>, editOldOriginal?: string): void {
   try {
     const a = args as Record<string, unknown>;
     const s = (k: string): string => (typeof a[k] === "string" ? (a[k] as string) : "");
@@ -942,13 +874,9 @@ function appendJournal(tool: string, sid: string, args: Record<string, unknown>,
       }
       payload = JSON.stringify(o);
     }
-    let suffix = "";
-    if (escapeForms !== undefined && Object.keys(escapeForms).length > 0) {
-      suffix = ` | pre-escape=${JSON.stringify(escapeForms)}`;
-    }
     const p = join(dir, ".opencode", "temp", tool === "write" ? "journal_write.log" : "journal_edit.log");
     mkdirSync(dirname(p), { recursive: true });
-    appendFileSync(p, `${localStamp()} | ${sid || "unknown"} | ${tool} | ${target} | ${payload}${suffix}\n`, "utf8");
+    appendFileSync(p, `${localStamp()} | ${sid || "unknown"} | ${tool} | ${target} | ${payload}\n`, "utf8");
   } catch {
     // best-effort — never break a tool call
   }
@@ -961,8 +889,8 @@ function appendJournal(tool: string, sid: string, args: Record<string, unknown>,
 // oldString).
 const truncEdit40 = (s: string): string => (s.length > 40 ? s.slice(0, 40) + "..." : s);
 
-// (5) the edit channel (`edit` only, effective args). Runs AFTER the
-// escape/pair/fuzzy channels (it sees their result). Raw occurrence count
+ // (5) the edit channel (`edit` only, effective args). Runs AFTER the
+ // pair/fuzzy channels (it sees their result). Raw occurrence count
 // of oldString in the target file: 1 → SILENT (no line, no mutation, no
 // after-hook hint); >1 → edit-ambiguous with ALL occurrence start lines
 // (unchanged from R6); 0 → the (2) MUTATING edit-fuzzy channel
@@ -1047,12 +975,11 @@ function runEditFuzzy(output: { args?: unknown }): Observation | null {
   return { verdict: "no-candidate", evidence: `hint reason=${lc.reason}${bd}`, context: "edit oldString" };
 }
 
-// (6) the after hook — enrich the tool result: the stored edit hint
-// (failed edit — behavior UNCHANGED) + the Unit 2 (#97, 2026-09-25)
-// channel FEEDBACK NOTES (the silent escape resolution + the R8
-// redirects) — delivered for ANY tool, also on SUCCESS (today only the
-// failed-edit hint is delivered). Hint first, then the notes (joined
-// "\n"); consumed once; best-effort, never throw.
+ // (6) the after hook — enrich the tool result: the stored edit hint
+ // (failed edit — behavior UNCHANGED) + the (#97, 2026-09-25) channel
+ // FEEDBACK NOTES (the R8 redirects) — delivered for ANY tool, also on
+ // SUCCESS (today only the failed-edit hint is delivered). Hint first,
+ // then the notes (joined "\n"); consumed once; best-effort, never throw.
 function onToolAfter(
   input: { tool?: string; sessionID?: string; callID?: string },
   output: { title?: string; output?: string; metadata?: unknown },
@@ -1113,38 +1040,10 @@ async function onToolBefore(
     const writeOwned = isObj && writePathFields(tool).length > 0;
     const bashOwned = isObj && tool === "bash" && typeof (output.args as { command?: unknown }).command === "string";
     const skipPairs = pairOwned || writeOwned || bashOwned;
-    // Pipeline order: ESCAPE FIRST (sentinel-gated content mutation — Part
-    // 3 pre-step: the pair observation then sees the resolved text), then
-    // the pair channel (may mutate), then the fuzzy matcher on the
-    // (possibly pair-mutated) result (decision-record §2.6). Channel lines
-    // log BEFORE the observation lines (the pair-before-dense order the
-    // smoke/probe pins).
-    let escape: Observation[] = [];
-    // Unit 2 (#97): capture the pre-escape CONTENT fields BEFORE the
-    // channel mutates them (the journal's trailing `pre-escape` field
-    // carries the FULL pre-mutation forms)
-    let escapePre: Record<string, string> | null = null;
-    if (writeOwned) {
-      const pre: Record<string, string> = {};
-      const args0 = output?.args;
-      if (args0 != null && typeof args0 === "object") {
-        for (const field of ["content", "oldString", "newString"]) {
-          const v = (args0 as Record<string, unknown>)[field];
-          if (typeof v === "string" && v !== "") pre[field] = v;
-        }
-      }
-      escapePre = pre;
-    }
-    if (writeOwned) escape = runEscapeContent(output, tool, str(input?.callID));
-    let escapeForms: Record<string, string[]> | undefined;
-    if (escapePre !== null && Object.keys(escapePre).length > 0 && map !== null) {
-      const forms: Record<string, string[]> = {};
-      for (const [field, pre] of Object.entries(escapePre)) {
-        const res = resolveEscapes(pre, map);
-        if (res.hits.length > 0) forms[field] = res.hits.map((h) => h.raw);
-      }
-      if (Object.keys(forms).length > 0) escapeForms = forms;
-    }
+    // Pipeline order: the pair channel (may mutate), then the fuzzy
+    // matcher on the (possibly pair-mutated) result (decision-record
+    // §2.6). Channel lines log BEFORE the observation lines (the
+    // pair-before-dense order the smoke/probe pins).
     let channel: Observation[] = [];
     let fuzzy: Observation[] = [];
     if (pairOwned) channel = runPairRead(output);
@@ -1182,7 +1081,7 @@ async function onToolBefore(
       storeNote(str(input?.callID), redirect.map((o) => o.evidence).join("; "));
     }
     // R6 (2026-09-25) + (2) (2026-09-25, #95 sub-item 2): the edit channel
-    // (edit only — sees the effective, post-escape/pair/fuzzy args; the
+    // (edit only — sees the effective, post-pair/fuzzy args; the
     // 0-occurrence case is now the MUTATING edit-fuzzy resolve-then-mutate
     // channel) + the payload journal (EVERY write/edit/block_transfer call
     // — the effective args; the journal is a separate file and runs even
@@ -1199,10 +1098,9 @@ async function onToolBefore(
       // (fuzzy-edit) stores NO hint (the edit succeeds, no enrichment)
       if (hint !== null && hint.verdict !== "fuzzy-edit") storeHint(str(input?.callID), hint.evidence);
     }
-    if (writeOwned) appendJournal(tool, sid, output.args as Record<string, unknown>, editOldOriginal, escapeForms);
-    if (escape.length === 0 && obs.length === 0 && channel.length === 0 && redirect.length === 0 && fuzzy.length === 0 && hint === null) return; // nothing to log
+    if (writeOwned) appendJournal(tool, sid, output.args as Record<string, unknown>, editOldOriginal);
+    if (obs.length === 0 && channel.length === 0 && redirect.length === 0 && fuzzy.length === 0 && hint === null) return; // nothing to log
     model = await getModel(sid);
-    for (const o of escape) appendObservation(sid, model, tool, argStr, o);
     for (const o of channel) appendObservation(sid, model, tool, argStr, o);
     for (const o of redirect) appendObservation(sid, model, tool, argStr, o); // channel lines before observation lines
     for (const o of obs) appendObservation(sid, model, tool, argStr, o);
