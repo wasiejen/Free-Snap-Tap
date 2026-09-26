@@ -557,3 +557,6 @@ Worker bash redirect to POSIX /tmp was intercepted ("outside sandbox"): under Gi
 ### 2026-09-26_10-30 worker_Q3S_245K_slow ses_f23d1afbaffeUSeabbt0aArOdj
 S2 spec conflict: Do-NOT-touch `.opencode/plugin/probes/**` vs DoD "gate green @297/297" was unsatisfiable — stale S15 pins 108/109 (exact args-key list + pre-S2 COPY return) break under ANY S2 build; spec pre-authoring should audit existing probe pins against the unit's behavior changes (or name the re-pins explicitly).
 
+### 2026-09-26_11-07 worker_Q3S_245K_slow ses_f23201c0effez6Sl8kZ3BSJ0Pf
+TODO #102 spec: the "verified scope state" assumed the redirect pass already covered the bash `command` string — it did not (the typed-fields table explicitly marked bash strings OUT OF SCOPE/opaque). The spec's fallback clause ("if not, extend it") made it workable, but the verified state should have named it.
+
