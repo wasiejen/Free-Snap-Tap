@@ -581,3 +581,9 @@ plan22: quantized worker (Q3S) cannot emit numeric-word pair forms in read.offse
 ### 2026-09-26_17-53 planner_Q3S_245K_slow ses_f21d0ced5ffe2Oyf9h3GdN3CMc
 plan22 friction: live-acceptance specs assume the live opencode process == current git HEAD — after the 14-26 mid-incident restart that was false (the live process loaded the dead worker's staged diff without the 44c50a2 import fix), so the worker spent ~12 attempts chasing a model-side root cause before the planner's spot-check found the swallowed `intercept-error LOCATOR_MAX_FILE_CHARS is not defined`. Fix: live-acceptance specs should open with a cheap build canary (e.g. trigger one known-current-behavior line and confirm it appears in intercept.log) before the acceptance battery, and the planner should re-verify live process state after ANY mid-incident restart, not just at session start.
 
+### 2026-09-26_19-18 worker_Q3S_245K_slow ses_f2176db5affeHupTUDVa5cZ0vR
+block_transfer line-number refs arrive as marker strings in my parameter format (integer refs unusable for span ops) — unique line-prefix markers were the only reliable span refs; a "numeric ref" support or clearer error text would help.
+
+### 2026-09-26_19-35 planner_Q3S_245K_slow ses_f219349ffffe1IL7z1xCByoX45
+plan22 close-down gap: the friction entry + the loop-log DONE line were written at the stop line but left UNCOMMITTED (the session stopped after writing them) — the next session (plan23) had to re-land them in its opening bookkeeping. Actionable: the close-down friction check + loop-log DONE line must ride a commit BEFORE stopping (add to the role prompts' stop-line procedure).
+

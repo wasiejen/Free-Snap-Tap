@@ -573,13 +573,26 @@ All those IDs stay reserved — see the numbering rule in the header.
   restarted DURING the 14-26 incident, before the R3 import fix 44c50a2
   landed, so both anchor channels throw the swallowed
   `LOCATOR_MAX_FILE_CHARS is not defined` ReferenceError live (planner
-  spot-check: a pair-form startMarker reached the tool VERBATIM + the
-  `intercept-error` log line); the section-anchor channel is additionally
-  shadowed by the integer `offset` schema (constrained decoding — the
-  worker's 7/7 integer-1 observation). Completion path = the maintainer's
-  NEXT restart (the same one pending for #99/#98/compaction-unification)
-  + a re-test of the two channels.
-  2026-09-25 (autorun, ses_f29afbb66ffeRM1EHgBIpTwTg5, planner-14): his
+   spot-check: a pair-form startMarker reached the tool VERBATIM + the
+   `intercept-error` log line); the section-anchor channel is additionally
+   shadowed by the integer `offset` schema (constrained decoding — the
+   worker's 7/7 integer-1 observation).
+   2026-09-26 (plan23, planner-23, post-restart): the re-test — the
+   import-fix 44c50a2 is now LIVE (canary: anchor channels run clean, zero
+   new `intercept-error` lines). (b) the bt anchor-marker PAIR channel is
+   LIVE-ACCEPTED — the pair-form `startMarker` reached the hook VERBATIM +
+   resolved (`pair=[7:seven] canon=7 dist=0 gate=mutated line=2 arg=
+   startMarker ... pair-resolved`, 2/2; the log is the authority — the
+   tool return shows only the post-mutation canonical form, correcting the
+   plan22 "model can't emit pairs" reading as a MEM-0101 false-repeat).
+   (d) the section-anchor channel stays schema-shadowed — `read.offset` is
+   integer-typed, so constrained decoding never delivers a string anchor
+   (the worker's 7/7 integer-1 stands); the pure resolver remains
+   probe-pinned (S31 check 319) while the live channel is dormant on this
+   host. R3's live acceptance is now COMPLETE for this model class (the
+   four channels: grep/glob pair + bash quoted-form + bt anchor-marker
+   pair live-accepted; section-anchor pinned-only).
+   2026-09-25 (autorun, ses_f29afbb66ffeRM1EHgBIpTwTg5, planner-14): his
   GO for sub-item (2) — the normalize-then-compare design is CONFIRMED
   (his words: better than the proportional distance rule; go ahead) +
   two directives folded into the (2) spec: (a) resolutions AND failed

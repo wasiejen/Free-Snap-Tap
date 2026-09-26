@@ -242,3 +242,66 @@ Gained, verified knowledge for opencode plugins. Format per the README:
   `watches`).
 - **Keys:** auto_resume, smoke, factory, module-level, client, spy,
   re-factory, false-fail.
+
+## R3 pair-channel live acceptance: the log is the authority, not self-perception
+- **Do:** to live-verify an R3 pair/anchor channel, fire the REAL tool call
+  then read `.opencode/temp/intercept.log` for the verdict line
+  (`pair=[L:R] canon=N dist=0 gate=mutated line=M arg=...` /
+  `kind=quoted ... pair-resolved`). NEVER judge "the model emitted the pair
+  form" from the tool return or your own memory of the arg — the hook
+  MUTATES the arg in place, so the return and your own view show only the
+  POST-mutation canonical form. A "repeat" you perceive is a false-repeat.
+- **Why (evidence):** 2026-09-26 (planner-23, ses_f219349ffffe1IL7z1xCByoX45,
+  post-restart): a `block_transfer` COPY with `startMarker="Alpha [7:seven] T"`
+  reached the hook VERBATIM (intercept.log `pair=[7:seven] canon=7 dist=0
+  gate=mutated line=2 arg=startMarker ... pair-resolved`, 2/2) even though
+  the tool return showed only the canonical block — the model DID emit the
+  pair. This corrects the plan22 worker's "5/5 → canonical, model can't emit
+  pairs" reading (a MEM-0101 false-repeat). The 14-26 blocked-anchor root
+  cause (live process predating import fix 44c50a2) is gone: the anchor
+  channels run clean, zero new `intercept-error` lines.
+- **Ref:** `.opencode/temp/intercept.log` (2026-09-26_18-20 lines);
+  `TODO.md` #95; planner destill MEM-0101.
+- **Keys:** R3, pair-form, anchor-marker, section-anchor, intercept.log,
+  live-acceptance, false-repeat, gate=mutated, constrained-decoding,
+  read.offset integer.
+
+## The section-anchor channel (R3 1.3) is schema-shadowed on this host
+- **Do:** don't expect the `read` section-anchor channel to fire live from a
+  quantized model on this host — `read.offset` is INTEGER-typed, so
+  constrained decoding delivers a number, never a string anchor, and the
+  resolver (probe-pinned at S31 check 319) is dormant live. Treat pair-form
+  live acceptance as available ONLY on string-typed args (`block_transfer`
+  markers, `glob`/`grep` `path`, `bash` `command`) — not on `read.offset`.
+- **Why (evidence):** 2026-09-26 (planner-23): the anchor resolver + numeric-
+  string repair are probe-pinned (S31 checks 319, 327) but the live `read`
+  offset field cannot carry a string anchor under constrained decoding
+  (worker 7/7 integer-1 stands). Pure resolver stays green; live channel
+  dormant.
+- **Ref:** `.opencode/plugin/probes/handover_probe.mjs` (S31, L7153+);
+  `TODO.md` #95.
+- **Keys:** section-anchor, read.offset, integer schema, constrained
+  decoding, dormant channel, S31-319, R3.
+
+## Compaction is now ONE shared core: `compaction_core.ts` (A+B+C unified)
+- **Do:** when touching compaction, the SHARED behavior lives in
+  `.opencode/plugin/compaction_core.ts` (a PURE module — NO tool
+  registration, the T5 pattern). `compact_memory.ts` = thin wrapper (tool
+  registration + arg validation + SELF/CROSS routing + the pre-compaction
+  dump + queued-message path). `context_recovery.ts` = the hook (limit
+  trigger + per-fire budget gate → the core) and it COMPACTS ONLY — it never
+  resumes (no `promptAsync` / no `COMPACTION_RELOAD_DIRECTIVE` anywhere).
+  The summarizer-pair resolution CARRIES THE SESSION'S OWN providerID+
+  modelID (the 14-26 default-agent-drift fix). Both entry points resolve the
+  SAME summarize body + cap semantics — pinned by probe S32 (checks 338-340).
+  Do NOT re-fork the config/budget/cap/keep/summarize/callSummarize logic
+  back into either wrapper.
+- **Why (evidence):** 2026-09-26 (worker-23, ses_f2176db5affeHupTUDVa5cZ0vR):
+  Parts A/B/C LANDED (218a2c1 / d9d93f8 / 88f902f). Final gate: probe
+  340/340, pytest 459+1w, ruff F=0, cm 74/74, rc 17/17. `emergencyRecovery`
+  left unflipped (the re-enable is the maintainer's live acceptance).
+- **Ref:** `.opencode/plugin/compaction_core.ts`; `.opencode/plugin/
+  context_recovery.ts`; `.opencode/plugin/probes/handover_probe.mjs` (S32,
+  L7689+); `proposals/implemented/2026-09-26_compaction-unification.md`.
+- **Keys:** compaction_core, shared core, context_recovery, no-resume,
+  summarizer-pair, session-own modelID, S32 equivalence, T5, drift-guard.

@@ -92,3 +92,21 @@ rule) — so the two wrappers can never silently diverge again.
   IS the live acceptance.
 
 --comment: A,B and C accepted. good work :-)
+
+Planner verdict (2026-09-26, plan23): BUILT — all three parts LANDED
+(worker-23 `worker_Q3S_245K_slow` ses_f2176db5affeHupTUDVa5cZ0vR): Part A
+`218a2c1` (NEW `compaction_core.ts` — the shared config/budget/cap/
+keepTokens(#99)/summarizer-pair(session-own providerID+modelID)/summarize/
+COMPACT-line/success-handling core; `compact_memory.ts` thin wrapper,
+dump + queued-message stay tool-local), Part B `d9d93f8`
+(`context_recovery.ts` imports the core; `COMPACTION_RELOAD_DIRECTIVE` +
+the promptAsync resume REMOVED — grep-verified zero; the hook compacts
+only), Part C `88f902f` (probe S32 equivalence pins 338-340: core surface,
+same summarize body from both entry points, cap-semantics equivalence
+incl. the hook's auto-consumed emergency-1 + no-prompt). Gate: probe
+340/340, smokes 74/74 + 17/17 (+ auto_resume 139, io 77, bt 123+64, submit
+20), pytest 459+1w, ruff F=0. REMAINING (maintainer): the
+`emergencyRecovery` re-enable in `compact_budget.json` = the live
+acceptance, + the live-fire observation at the next limit hit (the 14-26
+incident must not recur: one COMPACT line, no promptAsync, agent+model
+unchanged, unit-4 resumes).

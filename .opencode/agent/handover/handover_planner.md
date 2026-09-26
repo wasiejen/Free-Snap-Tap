@@ -4,63 +4,64 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 
-## Current session — autorun, 2026-09-26 (ses_f21d0ced5ffe2Oyf9h3GdN3CMc, planner-22, Qwen3.8-27B-Q3S-245K-slow)
-- **RESTART DETECTED:** the live process now carries the full 11-mode
-  `block_transfer` (my own live tool schema shows MAP/PEEK/WRITE/
-  APPEND + the `last_write` documentation — plan21's check had found
-  the pre-S2 7-mode registration). The maintainer restarted opencode
-  after plan21 → UNBLOCKED: the new-hire + held-out tests, the #102
-  `/tmp` live acceptance, the R3 four-channel live acceptance.
-- **plan22 = the live-verification pass — LANDED + verified** (worker-22
-  `worker_Q3S_245K_slow` ses_f21bb91c2ffeQg2hBM5li8ZnAQ, spec fff5bea):
-  - Unit 1: **#102 LIVE-ACCEPTED** (both forms — bash + write-tool,
-    `kind=redirect` lines, files in the scratchpad, content verified);
-    R3 **grep/glob pair** + **bash quoted-form** channels LIVE-ACCEPTED
-    (verbatim log lines in the loop-folder handover); BONUS: the #97
-    Windows-root redirect form live-accepted by planner spot-check.
-    The section-anchor + bt anchor-marker channels NOT live-verifiable —
-    **ROOT CAUSE (planner spot-check): the live opencode process PREDATES
-    the R3 import fix 44c50a2** — the maintainer's 14-26 restart (which
-    stopped the context_recovery ping-pong) loaded the tree while the dead
-    worker's 495-line staged diff was on disk (all four channels, NO import
-    fix) → both anchor channels throw the swallowed `intercept-error
-    LOCATOR_MAX_FILE_CHARS is not defined` live (my MOVE attempt: the pair
-    marker reached the tool VERBATIM — the tool error quotes it — + the
-    intercept-error line). This CORRECTS the worker's "model-side pair-
-    emission" interpretation for 1.5 (partly right: the read `offset`
-    integer schema / constrained decoding still shadows 1.3 — the worker's
-    7/7 integer-1 observation stands for that channel).
-  - Unit 2: NEW-HIRE test — **all 11 modes PASS from the description
-    alone** + the deliberate error case (self-explaining message); no
-    in-tool friction; one cosmetic note (PEEK head/tail overlap on small
-    buffers). Verdict: the description is self-sufficient for a fresh
-    agent.
-  - Unit 3: HELD-OUT assembly — **exact 9-line expected file**, MAP/PEEK/
-    read verified. Measurement (planner script-extract from the worker
-    transcript): 29 block_transfer calls session-wide, 0 hard errors (the
-    deliberate teaching error returned as tool output), worker closed at
-    CTX=80575 (32%).
-- TODO/priority curation (this session): #102 LIVE-ACCEPTED (complete);
-  #97 live-accepted (the priority.md "# TODO #97" line moved to
-  `_past_priorities.md`); #95 status → LANDED (all four sub-items);
-  #67 status → R3 LANDED + the live-acceptance split; todo_inbox worker
-  entry curated (root cause).
-- **NEXT MAINTAINER RESTART completes:** the R3 (b)+(d) live re-test,
-  the #99 live fork test, the #98 self-compact→idle cycle, and the
-  compaction-unification proposal's live acceptance (= the
-  context_recovery re-enable). ONE restart covers all four.
-- THEN (next iteration): loop_log-v2 build
-  (`approved/2026-09-12_loop_log-v2.md` — the maintainer moved it back
-  to approved/ 2026-09-26 because it is not yet implemented).
-- Still pending the maintainer (non-blocking): #99 live fork test,
-  #98 (self-compact→idle cycle), the compaction-unification proposal
-  (`proposals/2026-09-26_compaction-unification.md` — awaiting his
-  approval; live acceptance = the context_recovery re-enable), the
-  WRITE-on-absent-file semantic (S3 open question).
+## Current session — autorun, 2026-09-26 (ses_f219349ffffe1IL7z1xCByoX45, planner-23, Qwen3.8-27B-Q3S-245K-slow)
+- **Compaction-unification build — LANDED + verified** (worker-23
+  `worker_Q3S_245K_slow` ses_f2176db5affeHupTUDVa5cZ0vR, spec `4a9e87d`;
+  approved in full 2026-09-26): Part A `218a2c1` (NEW
+  `.opencode/plugin/compaction_core.ts` — pure module, T5 pattern: shared
+  config/budget store + cap resolver/keepTokens #99 (computed primary)/
+  summarizer-pair resolution CARRYING THE SESSION'S OWN providerID+modelID
+  (the 14-26 default-agent fix)/v1 summarize/COMPACT-line writer
+  (tokens + source)/verified-success handling; `compact_memory.ts`
+  1006→487 lines = thin wrapper — dump + queued-message stay tool-local,
+  NOT regressed); Part B `d9d93f8` (`context_recovery.ts` 728→244 lines —
+  imports the core; `COMPACTION_RELOAD_DIRECTIVE` + the promptAsync resume
+  REMOVED, grep-verified zero; the hook compacts ONLY and hands control
+  back — the resume is owned by unit-4/the planner); Part C `88f902f`
+  (probe S32 checks 338-340: core surface, summarize-body EQUIVALENCE
+  tool-vs-hook over the same session/model, cap-semantics equivalence
+  incl. the hook's auto-consumed emergency-1 + no-prompt pin).
+  Gates (worker-measured, planner file-verified: commits + grep + S32
+  pins + annotation L936): probe **340/340**, smokes **74/74 + 17/17**
+  (+ auto_resume 139, io 77, bt 123+64, submit 20), pytest **459+1w**,
+  ruff **F=0**.
+- **R3 (b)+(d) live re-test (inline, post-restart):** build canary
+  PASSED (anchor channels run clean — zero new `intercept-error` lines;
+  the 44c50a2 import fix is live). (b) **bt anchor-marker PAIR channel
+  LIVE-ACCEPTED** — the pair-form `startMarker` reached the hook VERBATIM
+  + resolved (`pair=[7:seven] canon=7 dist=0 gate=mutated line=2`, 2/2,
+  intercept.log). CORRECTION to plan22: the model DOES emit the pair —
+  the agent perceives only the post-mutation canonical form (MEM-0101
+  false-repeat; the log is the authority). (d) **section-anchor channel
+  stays schema-shadowed** — `read.offset` integer + constrained decoding
+  (worker 7/7 integer-1 + my 1/1 stand); the pure resolver remains
+  probe-pinned (S31-319), the live channel dormant on this host. R3 live
+  acceptance is now COMPLETE for this model class.
+- Bookkeeping (this session): plan22's uncommitted closing leftovers
+  (friction entry + loop-log DONE line) committed (`8ea4b2b`); proposal
+  → `implemented/` + verdict; worker handover copy + `plan23_summary.md`;
+  TODO #95 status updated; knowledge curation (2 entries →
+  `knowledge_plugins.md`); the worker's block_transfer line-number-ref
+  friction entry committed.
+- Still pending the maintainer (non-blocking): **the `emergencyRecovery`
+  re-enable in `.opencode/temp/compact_budget.json` = the
+  compaction-unification live acceptance** (+ the live-fire observation
+  at the next limit hit — one COMPACT line, no promptAsync, agent+model
+  unchanged, unit-4 resumes; the 14-26 incident must not recur); #99
+  live fork test (computed keep.tokens ~27k → ≈52k); #98 self-compact→
+  idle cycle (the next natural cycle covers it); the section-anchor
+  schema question (relax `read.offset` to string, or leave pinned-only);
+  the WRITE-on-absent-file semantic (S3 open question).
 - Maintainer's live files uncommitted in the tree (his domain,
-  untouched): `opencode.jsonc` + `.opencode/maintainer/priority.md`.
+  untouched): `.opencode/maintainer/priority.md`.
+- **NEXT (next iteration):** loop_log-v2 build
+  (`approved/2026-09-12_loop_log-v2.md` — the maintainer moved it back to
+  approved/ 2026-09-26 because it is not yet implemented; the 14-26
+  priority.md "include loop.log in sparingly-read files" observation is
+  the design input).
 
 ## Compressed archive (one line each
+  - 2026-09-26 autorun (ses_f21d0ced5ffe2Oyf9h3GdN3CMc, planner-22, Q3S-245K-slow) — plan22: live-verification pass LANDED (bookkeeping 00843da) — #102 `/tmp` redirect + R3 grep/glob pair + bash quoted-form + #97 Windows-root LIVE-ACCEPTED, NEW-HIRE 11/11 PASS from description alone, HELD-OUT exact 9-line (29 bt calls, 0 hard errors, closed at 32%); ROOT CAUSE of the 2 blocked R3 anchor channels = the live process PREDATES the R3 import fix 44c50a2 (the 14-26 mid-incident restart loaded the dead worker's staged diff without the fix) — details: loop folder plan22_summary.md + git fff5bea..00843da
   - 2026-09-26 autorun (ses_f22c8986affegfHMJhzUxDFDkp, planner-21, Q3S-245K-slow) — bt-v2 S4 LANDED (37c2479 — MAP + last_write + Part I description; wave COMPLETE S1–S4) + R3 LANDED via takeover (3ec1c5c/44c50a2/20d5a48: staged-diff commit + missing-import fix + probe S31 21 pins + 9 smoke checks; gate 337/337 + io 77/77) + 14-26 context_recovery incident → compaction-unification proposal filed (awaiting approval) + new-hire/held-out tests found restart-blocked + todo_inbox-path friction logged — details: loop folder plan21_summary.md + git 60e3cb1..efbff11
  - 2026-09-26 autorun (ses_f24a7fc46ffeHrj1SC7Q9CVpqc, planner-20, Qwen3.8-27B-Q3S-245K-slow) — maintenance pass (iter 20: knowledge inbox empty, #100 header fixed, stale proposals flagged) + bt-v2 S1/S2/S3 LANDED (0d85a8c/f5f888c/8cc8819, planner-verified each) + maintainer live-report triage → TODO #102 LANDED (be07ce6, `/tmp`+`/var/tmp` -> scratchpad root, live acceptance pending maintainer restart) + S15 108/109 re-pin RATIFIED — baseline probe 316/316, bt 112+61; OPEN: WRITE-on-absent-file semantic (maintainer) — details: loop folder plan20_summary.md + git 4b466f1..33b85a7
  - 2026-09-26 autorun (ses_f24c5d8a8ffe4bIlW0kjoMbCCF, planner-19, Qwen3.8-27B-Q3S-245K-slow) — #101 LANDED (explorer_Q3S_170K ses_f24bf71beffekwRYMtnlrWy5UG: spec `37847e8` → map commit `1081e52`, `knowledge/opencode-plugins/host-map.md` 420 lines, all 6 areas dated + located; 4 locator spot-checks all matched the installed build) + queue set for iter 20 (maintenance pass first, then the bt-v2 build) — details: loop folder plan19_summary.md + git 37847e8/1081e52/b4aebbc
@@ -155,11 +156,12 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Standing
-- Baselines (re-verified 2026-09-26 by the planner, post-R3):
-   probe **337** (316 + S31×21, post-R3; check 108's enum pin carries
-   the 11 bt modes post-S4); smokes **all green**
-    (context_recovery 17/17, compact_memory 74/74, auto_resume 139/139
-    (post-#98),
+- Baselines (re-verified 2026-09-26 by the planner, post-unification):
+   probe **340** (337 + S32×3, post-compaction-unification; check 108's
+   enum pin carries the 11 bt modes post-S4); smokes **all green**
+    (context_recovery 17/17 (post-unification Part B re-pins),
+   compact_memory 74/74 (post-unification — the re-exports keep the smoke
+   import surface), auto_resume 139/139 (post-#98),
    intercept_observer 77/77 (post-R3: 68 + 9 channel checks),
    block_transfer 123/123 + 64/64 (post-S4),
    submit 20/20);
