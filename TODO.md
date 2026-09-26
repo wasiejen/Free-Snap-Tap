@@ -796,7 +796,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   stays covered); primer moved to `knowledge/fuzzy-numword/` (+ README,
   escape section annotated removed); numwords.json untouched.
 
-## #101. (open, 2026-09-25, direct session; GO 2026-09-25 — after #100) opencode host map — one-time explorer task: map the installed host internals so planner/worker LOOK UP instead of re-deriving
+## #101. (LANDED 2026-09-26, explorer ses_f24bf71beffekwRYMtnlrWy5UG, commit 1081e52; GO 2026-09-25 direct) opencode host map — one-time explorer task: map the installed host internals so planner/worker LOOK UP instead of re-deriving
 - **Problem / evidence:** every task re-pays the derivation cost of opencode host facts (SDK v1/v2 shape, plugin hook surface, session/message/part DB schema, permission system, the compaction/summarize path) — knowledge is gathered per task, not accumulated as a map (maintainer observation 2026-09-25: "we derive the same knowledge often again and again").
 - **Desired outcome:** a durable, dated host map in the knowledge base of the relevant installed opencode internals (with file/line locators); upstream (web) research delegated to the explorer (cost in its context, finding → knowledge base); the planner reads installed types for VERIFICATION only.
 - **Scope (suggested):** explorer task → new `.opencode/agent/knowledge/opencode-plugins/host-map.md`: SDK surface (v1/v2 endpoints from the installed .d.ts), plugin hook registration + ordering, session/message/part DB schema, permission / external_directory mechanics, the compaction/summarize path, tool registration; every entry dated + locator.

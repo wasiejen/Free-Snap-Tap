@@ -548,3 +548,6 @@ Edit tool on a 160-line block: oldString failed to match because I re-typed lite
 ### 2026-09-26_02-45 planner_Q3S_245K_slow ses_f27282d2dfferl9gScrfLt2AxV
 loop_log's -RETURN- line printed my session as "unknown" — the tool needs the session typed per call (submit auto-stamps it from tool context; loop_log does not). Near-miss caught in the log this iteration; consider auto-stamping session/role from context like submit does.
 
+### 2026-09-26_03-31 planner_Q3S_245K_slow ses_f24c5d8a8ffe4bIlW0kjoMbCCF
+Explorer's TODO status update left the entry header line stale (#101 header still read "(open, …)" while the Status field said DONE) — caught during planner verification; the explorer prompt should note that a status update must also refresh the header line (the header is what the next planner reads first).
+
