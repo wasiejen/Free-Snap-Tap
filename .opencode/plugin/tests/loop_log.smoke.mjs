@@ -48,10 +48,11 @@ try {
   chk("no stale 'name'/'parameters' keys", t && !("name" in t) && !("parameters" in t));
   chk("execute is async fn", typeof t.execute === "function" && t.execute.constructor.name === "AsyncFunction");
 
-  // ---- status enum: reject a bogus token at PARSE time; accept the five
-  chk("status enum rejects a bogus token at parse time", t.args.status.safeParse("BOGUS").success === false);
-  const five = ["-->START", "DONE<---", "-RETURN-", "-WARNING", "--INFO--"];
-  chk("status enum accepts all five tokens", five.every((s) => t.args.status.safeParse(s).success));
+  // ---- status (Part C): a REQUIRED free-form string — the parse accepts
+  //      any string (incl. empty); the keyword rejection is a RUNTIME check
+  //      (tested in section D + the normalization table (I))
+  chk("status is a REQUIRED free-form string (rejects undefined)", t.args.status.safeParse(undefined).success === false);
+  chk("status parse accepts any string (rejection is runtime, Part C)", ["BOGUS", "", "done", "start", "CORRECT-"].every((s) => t.args.status.safeParse(s).success));
   chk("role is OPTIONAL (accepts undefined)", t.args.role.safeParse(undefined).success === true);
   chk("model is OPTIONAL (accepts undefined)", t.args.model.safeParse(undefined).success === true);
   chk("content is required (rejects undefined)", t.args.content.safeParse(undefined).success === false);
@@ -105,10 +106,14 @@ try {
   const mkLineC = (stamp) => `${stamp} ${argsC.status} ${argsC.role} unknown ${argsC.model} ${argsC.content}`;
   chk("(C) unknown-line form minute-boundary-safe", pC.line === mkLineC(tC1) || pC.line === mkLineC(tC2));
 
-  // ---- (D) bogus status: parse fails -> nothing written (a fresh dir stays empty)
+  // ---- (D) bogus status (Part C): execute returns the Error naming the
+  //      accepted keywords and writes NOTHING (a fresh dir stays empty)
   const projD = mkproj("D");
-  const bogusRejected = t.args.status.safeParse("BOGUS").success === false; // parse attempt ONLY — execute is never called
-  chk("(D) bogus token rejected at parse, no folder/line written", bogusRejected && !fs.existsSync(path.join(projD, ".opencode")));
+  const retD = await t.execute({ status: "BOGUS", content: "D1 bogus status" }, { directory: projD });
+  chk("(D) bogus status: the return is an Error naming the accepted keywords (never a silent INFO fallback)", String(retD).startsWith("Error:") && /start \/ done \/ return \/ warn \/ info \/ correct/.test(retD), retD);
+  const retD2 = await t.execute({ status: "", content: "D2 empty status" }, { directory: projD });
+  chk("(D) empty status: the same Error (no keyword matched)", String(retD2).startsWith("Error:") && /start \/ done \/ return \/ warn \/ info \/ correct/.test(retD2), retD2);
+  chk("(D) bogus/empty statuses write nothing (no folder, no line in the fresh dir)", !fs.existsSync(path.join(projD, ".opencode")));
 
   // ---- (E) multi-folder anomaly: two autorun-* dirs, distinct mtimes
   const projE = mkproj("E");
@@ -238,6 +243,37 @@ try {
     hFile.length === 2 && hFile[1] === "" &&
       (hFile[0] === `partial-line-no-trailing-newline${mkLineH(tH1)}` || hFile[0] === `partial-line-no-trailing-newline${mkLineH(tH2)}`),
     JSON.stringify(hFile));
+
+  // ---- (I) Part C — the normalization table: each keyword in >=3 spellings
+  //      (case/dash/arrow variants) -> the exact 8-char token; 'restart' ->
+  //      START; keyword-less / empty statuses -> the Error, nothing written
+  const projI = mkproj("I");
+  const ctxI = { directory: projI, agent: "i-agent", sessionID: "ses_I" };
+  const casesI = [
+    ["start", "-->START"], ["START", "-->START"], ["-->start", "-->START"], ["re-start", "-->START"], ["restart", "-->START"],
+    ["done", "DONE<---"], ["DONE", "DONE<---"], ["done<---", "DONE<---"], ["undone", "DONE<---"],
+    ["return", "-RETURN-"], ["-RETURN", "-RETURN-"], ["returned", "-RETURN-"],
+    ["warn", "-WARNING"], ["-WARN-", "-WARNING"], ["warning", "-WARNING"],
+    ["info", "--INFO--"], ["--INFO--", "--INFO--"], ["INFO", "--INFO--"],
+    ["correct", "CORRECT-"], ["CORRECT-", "CORRECT-"], ["correction", "CORRECT-"],
+  ];
+  let iN = 0;
+  for (const [raw, expected] of casesI) {
+    iN++;
+    const retI = await t.execute({ role: "i-agent", status: raw, content: `I${iN} raw status ${raw}` }, ctxI);
+    const pI = parseRet(retI);
+    chk(`(I) '${raw}' normalizes to ${expected}`, pI.line.split(" ")[1] === expected, pI.line);
+  }
+  const iRoot = path.join(projI, ".opencode", "loop");
+  const iSub = fs.readdirSync(iRoot, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+  const iLog = path.join(iRoot, iSub[0], "loop_log.md");
+  const countI = () => fs.readFileSync(iLog, "utf-8").split(/\r?\n/).filter((l) => l.length > 0).length;
+  const iBefore = countI();
+  const retIb1 = await t.execute({ role: "i-agent", status: "bogus", content: "I-bogus" }, ctxI);
+  const retIb2 = await t.execute({ role: "i-agent", status: "xxxyyy", content: "I-nomatch" }, ctxI);
+  chk("(I) 'bogus' -> Error naming the accepted keywords (never a silent INFO fallback)", String(retIb1).startsWith("Error:") && /start \/ done \/ return \/ warn \/ info \/ correct/.test(retIb1), retIb1);
+  chk("(I) keyword-less status -> the same Error", String(retIb2).startsWith("Error:") && /start \/ done \/ return \/ warn \/ info \/ correct/.test(retIb2), retIb2);
+  chk("(I) error statuses write nothing (the line count is unchanged)", countI() === iBefore);
 } finally {
   fs.rmSync(base, { recursive: true, force: true });
 }

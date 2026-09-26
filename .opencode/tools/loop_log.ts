@@ -23,6 +23,14 @@
 //      the last line byte-compared; the return gains
 //        folder: <name> (created)   <- iff THIS call created the folder
 //        verified: readback-match   <- or readback-MISMATCH: <actual last line>
+//   Part C — lenient status: the `status` arg is a FREE-FORM string,
+//      normalized into the established 8-char tokens (the line format is
+//      UNCHANGED — existing lines and any consumer stay parseable): lowercase
+//      + strip non-alphanumerics, then the keyword check in the order
+//      done/return/warn/info/start/correct. No keyword matched -> the tool
+//      returns an Error naming the accepted keywords (it writes NOTHING — no
+//      folder creation, no append); never a silent INFO fallback. (`restart`
+//      normalizes to START — intended.)
 //
 // Behavior (append-only — the tool NEVER rewrites or curates the file):
 //   1. resolve `.opencode/loop/` against `context.directory ?? process.cwd()`;
@@ -42,8 +50,10 @@
 //      + the exact line written + the write confirmation (`verified:`,
 //      Part B) (+ the anomaly note, appended last).
 //
-// The five STATUS tokens (exactly, 8-char) are the `status` zod ENUM — a bogus
-// token is rejected at PARSE time (the schema), not by a runtime check.
+// The six STATUS tokens (exactly, 8-char) are the line's established tokens;
+// Part C produces them by normalizing the free-form `status` arg (see the
+// Part C note above) — a bogus status is rejected at RUNTIME with an Error
+// return that names the accepted keywords (nothing is written).
 //
 // The host names the tool by FILENAME — no `name` field (the committed tool()
 // form, cf. ctx_gauge.ts / block_transfer.ts). Registration is the maintainer's
@@ -75,6 +85,29 @@ function firstKnown(sources: unknown[]): string {
   return "unknown";
 }
 
+// Part C — lenient status: lowercase + strip everything non-alphanumeric,
+// then the keyword check IN THIS ORDER (no keyword is a substring of another,
+// so order only matters for the intended `restart` -> START case):
+//   done -> DONE<---   return -> -RETURN-   warn -> -WARNING
+//   info -> --INFO--   start -> -->START    correct -> CORRECT-
+// No keyword matched -> null (the caller returns the Error, writes nothing).
+const STATUS_KEYWORDS: ReadonlyArray<readonly [string, string]> = [
+  ["done", "DONE<---"],
+  ["return", "-RETURN-"],
+  ["warn", "-WARNING"],
+  ["info", "--INFO--"],
+  ["start", "-->START"],
+  ["correct", "CORRECT-"],
+];
+
+function normalizeStatus(raw: unknown): string | null {
+  const norm = String(raw ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  for (const [kw, token] of STATUS_KEYWORDS) {
+    if (norm.includes(kw)) return token;
+  }
+  return null;
+}
+
 export default tool({
   description: `Appends ONE loop-log line to the current looprun's loop_log.md (auto-creates the dated autorun-* folder when .opencode/loop/ is empty); returns the folder + the exact line written. Fire this for your loop-log bookkeeping (START/DONE/RETURN/WARNING/INFO) instead of hand-formatting the line.`,
   args: {
@@ -87,8 +120,8 @@ export default tool({
       .optional()
       .describe("Your model id, VERBATIM from your own launch context (e.g. 'Qwen3.8-27B-IQ4KT-120K'). OPTIONAL — auto-filled with the agent-identifier preference (context.agent first, context.extra.model.id as fallback); the literal 'unknown' when absent everywhere."),
     status: tool.schema
-      .enum(["-->START", "DONE<---", "-RETURN-", "-WARNING", "--INFO--"])
-      .describe("Exactly one of the five 8-char loop-log status tokens (a bogus token is rejected at parse time)."),
+      .string()
+      .describe("Free-form status word (Part C): must contain one of the keywords start / done / return / warn / info / correct (checked in that order) -> the established 8-char tokens (-->START / DONE<--- / -RETURN- / -WARNING / --INFO-- / CORRECT-). Case/dash/arrow variants all normalize (e.g. 'restart' -> -->START); an unrecognized status returns an error naming the keywords (never a silent INFO fallback, nothing is written)."),
     content: tool.schema
       .string()
       .describe("The single-line content for this event (task oneliner for START; the final gauge readout for DONE; the returned agent's 'role-N session_id model' for RETURN; the failed session id + cause for WARNING; short run info for INFO)."),
@@ -100,6 +133,13 @@ export default tool({
 
 
   execute: async (args: any, context: any) => {
+    // Part C — normalize the status FIRST (a bogus status writes NOTHING —
+    // no folder creation, no append; never a silent INFO fallback).
+    const status = normalizeStatus(args.status);
+    if (status === null) {
+      return `Error: unrecognizable status ${JSON.stringify(args.status)} — accepted keywords: start / done / return / warn / info / correct (no keyword matched; nothing was written).`;
+    }
+
     const dir = context?.directory ?? process.cwd();
     const loopRoot = path.join(dir, ".opencode", "loop");
 
@@ -145,7 +185,7 @@ export default tool({
       context?.agent, // the agent-identifier preference (before the raw model id)
       context?.extra?.model?.id,
     ]);
-    const line = `${localStamp()} ${args.status} ${role} ${session} ${model} ${args.content}`;
+    const line = `${localStamp()} ${status} ${role} ${session} ${model} ${args.content}`;
     const logPath = path.join(loopRoot, folderName, "loop_log.md");
     appendFileSync(logPath, line + "\n", "utf-8");
 
