@@ -52,8 +52,8 @@ try {
   chk("status enum rejects a bogus token at parse time", t.args.status.safeParse("BOGUS").success === false);
   const five = ["-->START", "DONE<---", "-RETURN-", "-WARNING", "--INFO--"];
   chk("status enum accepts all five tokens", five.every((s) => t.args.status.safeParse(s).success));
-  chk("role is required (rejects undefined)", t.args.role.safeParse(undefined).success === false);
-  chk("model is required (rejects undefined)", t.args.model.safeParse(undefined).success === false);
+  chk("role is OPTIONAL (accepts undefined)", t.args.role.safeParse(undefined).success === true);
+  chk("model is OPTIONAL (accepts undefined)", t.args.model.safeParse(undefined).success === true);
   chk("content is required (rejects undefined)", t.args.content.safeParse(undefined).success === false);
   chk("session is optional (accepts undefined)", t.args.session.safeParse(undefined).success === true);
 
@@ -125,6 +125,89 @@ try {
   chk("(E) the line lands in the most-recently-modified folder", pE.folder === path.basename(dir2) && fs.readFileSync(path.join(dir2, "loop_log.md"), "utf-8").includes(pE.line), pE.folder);
   chk("(E) the other folder is untouched (no loop_log.md)", !fs.existsSync(path.join(dir1, "loop_log.md")));
   chk("(E) the return value mentions the anomaly", /ANOMALY/.test(retE) && /2 autorun-\* folders/.test(retE) && retE.includes(pE.folder), retE);
+
+  // ---- (F) Part A — auto-identity: the resolution chains (args -> context -> unknown)
+  // F1 — full context, NO identity args: the line carries the context sources
+  //      (the model slot = the AGENT-IDENTIFIER preference: context.agent wins
+  //      over context.extra.model.id)
+  const projF = mkproj("F");
+  const ctxF = { directory: projF, sessionID: "ses_ctx_A", agent: "ctx-agent", extra: { model: { id: "ctx-model" } } };
+  const tF1 = localStamp();
+  const retF1 = await t.execute({ status: "-->START", content: "F1 context-set identity" }, ctxF);
+  const tF2 = localStamp();
+  const pF1 = parseRet(retF1);
+  const mkLineF1 = (stamp) => `${stamp} -->START ctx-agent ses_ctx_A ctx-agent F1 context-set identity`;
+  chk("(F1) context-set: role/model/session auto-filled (model slot = agent-identifier preference)", pF1.line === mkLineF1(tF1) || pF1.line === mkLineF1(tF2), `got=${pF1.line}`);
+
+  // F2 — arg override: identity ARGS win over the context sources
+  const tF3 = localStamp();
+  const retF2 = await t.execute({ role: "arg-role", model: "arg-model", session: "ses_arg", status: "--INFO--", content: "F2 arg override" }, ctxF);
+  const tF4 = localStamp();
+  const pF2 = parseRet(retF2);
+  const mkLineF2 = (stamp) => `${stamp} --INFO-- arg-role ses_arg arg-model F2 arg override`;
+  chk("(F2) arg override: the args beat the context sources", pF2.line === mkLineF2(tF3) || pF2.line === mkLineF2(tF4), `got=${pF2.line}`);
+
+  // F3a — the lowercase `sessionId` variant fills the session slot
+  const tF5 = localStamp();
+  const retF3 = await t.execute({ role: "r3", model: "m3", status: "--INFO--", content: "F3a" }, { directory: projF, sessionId: "ses_lc" });
+  const tF6 = localStamp();
+  const pF3 = parseRet(retF3);
+  const mkLineF3 = (stamp) => `${stamp} --INFO-- r3 ses_lc m3 F3a`;
+  chk("(F3a) context.sessionId (lowercase variant) fills the session slot", pF3.line === mkLineF3(tF5) || pF3.line === mkLineF3(tF6), `got=${pF3.line}`);
+
+  // F3b — the nested `session.id` fills the session slot (after the two top-level misses)
+  const tF7 = localStamp();
+  const retF4 = await t.execute({ role: "r3", model: "m3", status: "--INFO--", content: "F3b" }, { directory: projF, session: { id: "ses_nested" } });
+  const tF8 = localStamp();
+  const pF4 = parseRet(retF4);
+  const mkLineF4 = (stamp) => `${stamp} --INFO-- r3 ses_nested m3 F3b`;
+  chk("(F3b) context.session.id (nested) fills the session slot", pF4.line === mkLineF4(tF7) || pF4.line === mkLineF4(tF8), `got=${pF4.line}`);
+
+  // F3c — no agent, no model arg: the model falls to context.extra.model.id;
+  //      the role has no source -> the literal `unknown`
+  const tF9 = localStamp();
+  const retF5 = await t.execute({ status: "--INFO--", content: "F3c" }, { directory: projF, extra: { model: { id: "ctx-model" } } });
+  const tF10 = localStamp();
+  const pF5 = parseRet(retF5);
+  const mkLineF5 = (stamp) => `${stamp} --INFO-- unknown unknown ctx-model F3c`;
+  chk("(F3c) model falls to context.extra.model.id (no agent); role -> unknown", pF5.line === mkLineF5(tF9) || pF5.line === mkLineF5(tF10), `got=${pF5.line}`);
+
+  // F3d — empty context (only directory) + no args: all three slots -> `unknown`
+  const tF11 = localStamp();
+  const retF6 = await t.execute({ status: "--INFO--", content: "F3d" }, { directory: projF });
+  const tF12 = localStamp();
+  const pF6 = parseRet(retF6);
+  const mkLineF6 = (stamp) => `${stamp} --INFO-- unknown unknown unknown F3d`;
+  chk("(F3d) empty context, no args: role/session/model all -> unknown", pF6.line === mkLineF6(tF11) || pF6.line === mkLineF6(tF12), `got=${pF6.line}`);
+
+  // F3e — an EMPTY-STRING session arg is a miss: the chain continues to the context
+  const tF13 = localStamp();
+  const retF7 = await t.execute({ session: "", role: "r7", model: "m7", status: "--INFO--", content: "F3e" }, { directory: projF, sessionID: "ses_ctx_A" });
+  const tF14 = localStamp();
+  const pF7 = parseRet(retF7);
+  const mkLineF7 = (stamp) => `${stamp} --INFO-- r7 ses_ctx_A m7 F3e`;
+  chk("(F3e) empty-string session arg falls through to context.sessionID", pF7.line === mkLineF7(tF13) || pF7.line === mkLineF7(tF14), `got=${pF7.line}`);
+
+  // ---- (G) line-format byte-match + append-only prefix-unchanged across 3 calls
+  const projG = mkproj("G");
+  const ctxG = { directory: projG, agent: "g-agent", sessionID: "ses_G" };
+  const gTokens = ["-->START", "DONE<---", "-WARNING"];
+  const gContents = ["G1 first line", "G2 second line", "G3 third line"];
+  const gRetLines = [];
+  for (let i = 0; i < 3; i++) {
+    const gBefore = localStamp();
+    const retG = await t.execute({ role: "g-agent", status: gTokens[i], content: gContents[i] }, ctxG);
+    const gAfter = localStamp();
+    const pG = parseRet(retG);
+    const mkG = (stamp) => `${stamp} ${gTokens[i]} g-agent ses_G g-agent ${gContents[i]}`;
+    chk(`(G${i + 1}) written line byte-matches <stamp> <status> <role> <session> <model> <content>`, pG.line === mkG(gBefore) || pG.line === mkG(gAfter), `got=${pG.line}`);
+    gRetLines.push(pG.line);
+  }
+  const gLog = fs.readdirSync(path.join(projG, ".opencode", "loop"), { withFileTypes: true })
+    .map((e) => path.join(projG, ".opencode", "loop", e.name, "loop_log.md"))
+    .find((p) => fs.existsSync(p));
+  const gFile = fs.readFileSync(gLog, "utf-8").split(/\r?\n/).filter((l) => l.length > 0);
+  chk("(G) append-only: the file prefix is byte-unchanged across the 3 calls (earlier lines never rewritten)", gFile.length === 3 && gFile.every((l, i) => l === gRetLines[i]), JSON.stringify(gFile));
 } finally {
   fs.rmSync(base, { recursive: true, force: true });
 }

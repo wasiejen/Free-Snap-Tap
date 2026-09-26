@@ -7,6 +7,19 @@
 // AND the per-agent folder-permission management (the single point that grants
 // loop-folder write access to all agents at once).
 //
+// v2 (plan24; the approved design .opencode/proposals/approved/
+// 2026-09-12_loop_log-v2.md, parts A–D, built A→B→C→D):
+//   Part A — auto-identity: `role`/`model`/`session` are OPTIONAL; each is
+//      resolved by a best-effort chain (first hit wins, else the literal
+//      `unknown` in the line; NEVER throws — a missing context field just
+//      falls through):
+//        session: args.session → context.sessionID → context.sessionId
+//                 → context.session?.id
+//        role:    args.role    → context.agent
+//        model:   args.model   → context.agent (the agent-identifier
+//                 preference, the maintainer's --todo note) →
+//                 context.extra.model.id
+//
 // Behavior (append-only — the tool NEVER rewrites or curates the file):
 //   1. resolve `.opencode/loop/` against `context.directory ?? process.cwd()`;
 //   2. NO `autorun-*` folder there  -> create `autorun-<YYYY-MM-DD_HH-MM>`
@@ -19,7 +32,8 @@
 //   3. append ONE machine-timestamped line in the established local
 //      `YYYY-MM-DD_HH-MM` form:
 //        <date_time> <status> <role> <session|unknown> <model> <content>
-//      (`session` omitted/empty -> the literal `unknown`);
+//      (`role`/`session`/`model` resolved by the Part A chains -> the literal
+//      `unknown` when absent everywhere);
 //   4. return the folder name + the exact line written (+ the anomaly note).
 //
 // The five STATUS tokens (exactly, 8-char) are the `status` zod ENUM — a bogus
@@ -44,15 +58,28 @@ function localStamp(d: Date = new Date()): string {
   );
 }
 
+// Part A — best-effort identity resolution (the v2 auto-identity pattern):
+// the FIRST source that is a non-blank string wins (its raw, untrimmed value);
+// all sources absent/blank -> the literal `unknown`. Never throws — a missing
+// context field just falls through to the next source.
+function firstKnown(sources: unknown[]): string {
+  for (const s of sources) {
+    if (s != null && String(s).trim() !== "") return String(s);
+  }
+  return "unknown";
+}
+
 export default tool({
   description: `Appends ONE loop-log line to the current looprun's loop_log.md (auto-creates the dated autorun-* folder when .opencode/loop/ is empty); returns the folder + the exact line written. Fire this for your loop-log bookkeeping (START/DONE/RETURN/WARNING/INFO) instead of hand-formatting the line.`,
   args: {
     role: tool.schema
       .string()
-      .describe("Your full role token, e.g. 'planner-10', 'worker-13', 'looprunner' (the agent writes its own; the iteration suffix when known)."),
+      .optional()
+      .describe("Your full role token, e.g. 'planner-10', 'worker-13', 'looprunner'. OPTIONAL — auto-filled from the host context.agent when omitted; the literal 'unknown' when absent everywhere."),
     model: tool.schema
       .string()
-      .describe("Your model id, VERBATIM from your own launch context (e.g. 'Qwen3.8-27B-IQ4KT-120K')."),
+      .optional()
+      .describe("Your model id, VERBATIM from your own launch context (e.g. 'Qwen3.8-27B-IQ4KT-120K'). OPTIONAL — auto-filled with the agent-identifier preference (context.agent first, context.extra.model.id as fallback); the literal 'unknown' when absent everywhere."),
     status: tool.schema
       .enum(["-->START", "DONE<---", "-RETURN-", "-WARNING", "--INFO--"])
       .describe("Exactly one of the five 8-char loop-log status tokens (a bogus token is rejected at parse time)."),
@@ -62,8 +89,9 @@ export default tool({
     session: tool.schema
       .string()
       .optional()
-      .describe("Your session id, from the SESSION= field of your injected ctx: line. Omitted/empty -> the literal 'unknown' in the line."),
+      .describe("Your session id, from the SESSION= field of your injected ctx: line. OPTIONAL — auto-filled from the host context (sessionID → sessionId → session.id) when omitted/empty; the literal 'unknown' in the line when absent everywhere."),
   },
+
 
   execute: async (args: any, context: any) => {
     const dir = context?.directory ?? process.cwd();
@@ -97,11 +125,20 @@ export default tool({
     }
 
     // Step 3 — build and append the ONE machine-timestamped line (append-only).
-    const session =
-      args.session != null && String(args.session).trim() !== ""
-        ? String(args.session)
-        : "unknown";
-    const line = `${localStamp()} ${args.status} ${args.role} ${session} ${args.model} ${args.content}`;
+    // Part A — auto-identity (best-effort chains; absent everywhere -> unknown).
+    const session = firstKnown([
+      args.session,
+      context?.sessionID,
+      context?.sessionId,
+      context?.session?.id,
+    ]);
+    const role = firstKnown([args.role, context?.agent]);
+    const model = firstKnown([
+      args.model,
+      context?.agent, // the agent-identifier preference (before the raw model id)
+      context?.extra?.model?.id,
+    ]);
+    const line = `${localStamp()} ${args.status} ${role} ${session} ${model} ${args.content}`;
     appendFileSync(path.join(loopRoot, folderName, "loop_log.md"), line + "\n", "utf-8");
 
     // Step 4 — return the folder + the exact line written (+ the anomaly note).
