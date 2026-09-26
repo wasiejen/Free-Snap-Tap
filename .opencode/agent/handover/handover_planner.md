@@ -63,7 +63,25 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   this session — acceptance probe: `echo hi > /tmp/x` + a typed
   `/tmp/x` read, expecting redirect + landing in the sandbox +
   kind=redirect lines).
-- **Queue:** S3 → S4 (serial slot); after S4: new-hire test (fresh
+- **S3 LANDED (8cc8819, worker-20 `worker_Q3S_245K_slow`
+  ses_f2302f58dffeEC2ccjeKmAPbVw, planner-verified):** WRITE mode
+  (single span + `regions` list, highest-line-first, overlap teaching
+  error, file-creation path) + PEEK mode (bounded preview, from/count
+  cap 25, blank-skip) + Part F feedback complete for ALL modes (new
+  `opLine` helper) + the S1 deferred v2 error switch (non-unique with
+  count + first match lines; probes 115/263 + 108/110/111/116/117/262
+  re-pinned in place) + probe S30 (11 checks). Probe 316/316,
+  block_transfer 112/112, sandbox 61/61, pytest 459+1w, ruff F=0 —
+  planner spot re-run: smoke 112/112. OPEN QUESTION (maintainer,
+  non-blocking): WRITE-on-absent-file semantic — refs can't resolve
+  against an empty file, so the creation path is unreachable via refs
+  (worker note 2; flagged detail #2's alternate semantic is a
+  separate decision). Lesson: a staged spec's baseline must be
+  re-verified at staging time (the spec said 297; the measured
+  baseline was 305 post-#102 — the worker built against the measured
+  one).
+- **Queue (next iteration):** stage + launch S4 (`bt_v2_s4_map_
+  lastwrite_description.md`) → verify; after S4: new-hire test (fresh
   agent, description-only, file-blind) + held-out multi-step task
   (planner-side delegations); R3 + loop_log-v2 remain queued behind
   the bt-v2 wave.
@@ -169,12 +187,12 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Standing
-- Baselines (re-verified 2026-09-26 by the planner, post-#102):
-   probe **305** (297 + S29×8, post-#102); smokes **all green**
+- Baselines (re-verified 2026-09-26 by the planner, post-S3):
+   probe **316** (305 + S30×11, post-S3); smokes **all green**
     (context_recovery 17/17, compact_memory 74/74, auto_resume 139/139
     (post-#98),
-   intercept_observer 68/68 (post-#102), block_transfer 87/87 + 53/53
-   (post-S2),
+   intercept_observer 68/68 (post-#102), block_transfer 112/112 + 61/61
+   (post-S3),
    submit 20/20;
   the per-suite counts are in each smoke's own readout — no total kept
   here); pytest **459 passed + 1 warning (the known #10 coroutine

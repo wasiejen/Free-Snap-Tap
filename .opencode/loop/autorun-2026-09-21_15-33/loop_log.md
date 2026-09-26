@@ -137,3 +137,4 @@
 2026-09-26_11-09 -RETURN- planner-20 ses_f24a7fc46ffeHrj1SC7Q9CVpqc Qwen3.8-27B-Q3S-245K-slow worker-20 ses_f23201c0effez6Sl8kZ3BSJ0Pf worker_Q3S_245K_slow
 2026-09-26_11-13 -->START worker-20 ses_f2302f58dffeEC2ccjeKmAPbVw Qwen3.8-27B-Q3S-245K-slow block_transfer v2 unit S3: WRITE mode + PEEK mode + feedback redesign all modes + probe section + S1 deferred non-unique error switch (probes 115/263)
 2026-09-26_12-10 DONE<--- worker-20 ses_f2302f58dffeEC2ccjeKmAPbVw Qwen3.8-27B-Q3S-245K-slow bt-v2 S3 LANDED 8cc8819 — probe 316/316 (305+11 S30), smokes 112/112 + 61/61, pytest 459+1w, ruff F=0 | SESSION=ses_f2302f58dffeEC2ccjeKmAPbVw CTX=197768 (80%) REM=47232
+2026-09-26_12-12 -RETURN- planner-20 ses_f24a7fc46ffeHrj1SC7Q9CVpqc Qwen3.8-27B-Q3S-245K-slow worker-20 ses_f2302f58dffeEC2ccjeKmAPbVw worker_Q3S_245K_slow

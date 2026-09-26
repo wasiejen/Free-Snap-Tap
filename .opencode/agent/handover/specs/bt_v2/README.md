@@ -16,4 +16,9 @@ S1 -> S2 -> S3 -> S4; each leaves the repo green; ONE at a time
   `last_write` auto-buffer, description rework; the new-hire +
   held-out verification is PLANNER-side after this unit.
 Queue order: S1 -> S2 -> S3 -> S4 (new-hire test last).
+Status (2026-09-26, plan20): S1 LANDED `0d85a8c`; S2 LANDED `f5f888c`
+(probe S15 108/109 re-pin ratified by the planner); S3 LANDED `8cc8819`
+(probe 316/316; S15 115/263 v2 switch done per the curated item); S4
+PENDING (next iteration stages it; the new-hire + held-out verification
+is planner-side after S4).
 What does NOT go here: worker summaries, NAP, non-bt-v2 specs.
