@@ -823,8 +823,18 @@ All those IDs stay reserved — see the numbering rule in the header.
   (the redirect resolver / root mapping), `.opencode/plugin/
   intercept_observer.ts` (allowed-root resolution from opencode.jsonc),
   `.opencode/plugin/probes/handover_probe.mjs`, the intercept smoke.
-- **Status:** open — spec written by planner-20 (2026-09-26); QUEUED BEFORE
-  bt-v2 S3 per the maintainer's live report (loop stops are the current pain).
+- **Status:** LANDED (2026-09-26, worker-20 `worker_Q3S_245K_slow`, commit
+  be07ce6): the POSIX temp-root prefix mapping (core `resolveRedirect` — a
+  CODE constant, root-list-independent: `/tmp/<rest>` + `/var/tmp/<rest>` →
+  scratchpad root, full remainder kept; bare root → the root itself) + the
+  BASH `command`-string redirect (same resolver over the mapped POSIX spans;
+  unmapped spans fail-closed, the note stays) + pins (smoke 64→68, probe
+  297→305 — the new S29 section, checks 297-304). Measured: smoke 68/68,
+  probe 305/305, pytest 459+1w, ruff F=0. LIVE acceptance (a live-session
+  /tmp write+read) deferred to the maintainer's process restart (this
+  session's live plugin runs the pre-restart code — a live /tmp touch would
+  test the old code and stop the session; the S1 friction scenario is the
+  acceptance probe after the restart).
 
 ## #101. (LANDED 2026-09-26, explorer ses_f24bf71beffekwRYMtnlrWy5UG, commit 1081e52; GO 2026-09-25 direct) opencode host map — one-time explorer task: map the installed host internals so planner/worker LOOK UP instead of re-deriving
 - **Problem / evidence:** every task re-pays the derivation cost of opencode host facts (SDK v1/v2 shape, plugin hook surface, session/message/part DB schema, permission system, the compaction/summarize path) — knowledge is gathered per task, not accumulated as a map (maintainer observation 2026-09-25: "we derive the same knowledge often again and again").
