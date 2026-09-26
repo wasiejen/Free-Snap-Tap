@@ -560,3 +560,6 @@ S2 spec conflict: Do-NOT-touch `.opencode/plugin/probes/**` vs DoD "gate green @
 ### 2026-09-26_11-07 worker_Q3S_245K_slow ses_f23201c0effez6Sl8kZ3BSJ0Pf
 TODO #102 spec: the "verified scope state" assumed the redirect pass already covered the bash `command` string — it did not (the typed-fields table explicitly marked bash strings OUT OF SCOPE/opaque). The spec's fallback clause ("if not, extend it") made it workable, but the verified state should have named it.
 
+### 2026-09-26_12-10 worker_Q3S_245K_slow ses_f2302f58dffeEC2ccjeKmAPbVw
+S3 spec baseline was stale: "current count 297/297" but the measured baseline was 305/305 (#102's S29 section landed after the spec was written) — the spec's baseline numbers should be re-checked against the probe header tally at spec authoring time.
+
