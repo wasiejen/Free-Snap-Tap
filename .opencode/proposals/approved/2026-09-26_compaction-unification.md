@@ -90,3 +90,5 @@ rule) — so the two wrappers can never silently diverge again.
 - No FST product code, no auto_resume.ts change (unit-4 stays as-is —
   it is the designated resumer); the re-enable of context_recovery
   IS the live acceptance.
+
+--comment: A,B and C accepted. good work :-)
