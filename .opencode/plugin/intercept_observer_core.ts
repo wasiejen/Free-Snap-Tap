@@ -485,7 +485,9 @@ export function observePathAnomaly(arg: string): Observation[] {
 // ------------------------------------------------------------------ sandbox note (observation e)
 
 const WIN_PATH_RE = /(^|[\s"'=({])([A-Za-z]:[\\/][^\s'"|]*)/g;
-const POSIX_PATH_RE = /(^|[\s"'=({])(\/[^\s\\'"|]+)/g;
+// exported for the R8 bash `command`-string redirect (#102, 2026-09-26 —
+// the same span grammar the note channel scans)
+export const POSIX_PATH_RE = /(^|[\s"'=({])(\/[^\s\\'"|]+)/g;
 const UNC_PATH_RE = /(^|[\s"'=({])(\\\\[^\s|]+)/g;
 
 // The approved external scratchpad root (R1, 2026-09-16 — the flag on it
@@ -549,11 +551,37 @@ export function observeSandbox(arg: string, workspaceRoot: string | null, extraR
 //   case (ii): dirname(span) == dirname(root), span != root (a direct
 //              SIBLING) → target = root AS CONFIGURED + separator + the
 //              span's basename (case preserved)
+//   #102 (2026-09-26): the POSIX temp-root prefix mapping (the
+//              maintainer's scratchpad ruling — a CODE constant of the
+//              rule; opencode.jsonc names the Windows roots only):
+//              `/tmp/<rest>` / `/var/tmp/<rest>` (and the bare root — the
+//              case (i) analogy) → SCRATCHPAD_ROOT[/<rest>] — root
+//              substitution, the FULL remainder kept, case preserved.
+//              Checked before the root loop (a POSIX span can never
+//              match a configured Windows root — no 1:1 interaction).
 // Pure over ONE normalized absolute path span + the root list (the plugin
 // resolves the roots ONCE at init from opencode.jsonc). Never throws.
+// #102 (2026-09-26): the POSIX temp-root → scratchpad mapping — the
+// maintainer's scratchpad ruling as a CODE constant (NOT config-derived —
+// opencode.jsonc names the Windows roots only). Redirect-only: unmapped
+// spans (other POSIX roots, `/tmpfile/...`) still fail-close as before.
+const POSIX_TEMP_PREFIXES = ["/tmp/", "/var/tmp/"];
 export function resolveRedirect(span: string, roots: string[]): string | null {
   const s = normSandboxPath(span);
   if (s === "" || !s.includes("/")) return null;
+  // #102 (2026-09-26): the POSIX temp-root prefix mapping (before the
+  // root loop — see the section header above)
+  {
+    const p = String(span ?? "").replace(/\\/g, "/");
+    const pl = p.toLowerCase();
+    for (const prefix of POSIX_TEMP_PREFIXES) {
+      const bare = prefix.slice(0, -1); // "/tmp" / "/var/tmp" (the root itself)
+      if (pl.startsWith(prefix) || pl === bare) {
+        const rest = (pl === bare ? "" : p.slice(prefix.length)).replace(/\/{2,}/g, "/").replace(/^\/+|\/+$/g, "");
+        return rest === "" ? SCRATCHPAD_ROOT : SCRATCHPAD_ROOT + "/" + rest;
+      }
+    }
+  }
   const base = String(span ?? "").split(/[\\/]+/).filter((seg) => seg !== "").pop();
   if (base === undefined || base === "") return null;
   const seen = new Set<string>();

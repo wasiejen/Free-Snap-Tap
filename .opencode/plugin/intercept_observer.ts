@@ -200,6 +200,7 @@ import {
   CORPUS_TTL_MS,
   MAX_LINES_PER_CALL,
   MODEL_CACHE_TTL_MS,
+  POSIX_PATH_RE,
   buildCorpus,
   checkPairs,
   classifyContext,
@@ -500,8 +501,11 @@ function writePathFields(tool: string): string[] {
  // SEPARATE table from WRITE_PATH_FIELDS (which drives the write-owned
  // pair/fuzzy channels — adding `read` there would break ownership).
 // Applies to: read/write/edit `filePath` + block_transfer `srcFile`/
-// `dstFile`. Bash command strings are OUT OF SCOPE (opaque — the
-// fail-closed out-of-sandbox note stays for them). Runs AFTER the R1/R2
+// `dstFile`. BASH `command` strings are covered by a SEPARATE pass
+// (runRedirectCommand, #102 2026-09-26): the mapped POSIX temp-root
+// spans are substituted in place (same 1:1 resolver, same kind=redirect
+// line); UNmapped spans stay byte-identical (fail-closed — the
+// out-of-sandbox note stays for them). Runs AFTER the R1/R2
 // fuzzy channels (a path fuzzy-resolved in-sandbox is never redirected).
 // On a redirect: the field is MUTATED to the target, the channel line
  // `kind=redirect tool=<t> arg=<field> orig=<full> value=<full>` is logged
@@ -542,6 +546,39 @@ function runRedirect(output: { args?: unknown }, tool: string): { lines: Observa
       context: classifyContext(raw),
     });
   }
+  return { lines, fired };
+}
+
+// #102 (2026-09-26): the BASH `command`-string redirect — the same 1:1
+// resolver over the POSIX path spans inside the command (POSIX_PATH_RE —
+// the note-channel span grammar, exported from the core): each span the
+// resolver maps (the POSIX temp-root prefix mapping) is substituted in
+// place, ONE kind=redirect line per mapped span (the `pair-resolved`
+// verdict is REUSED — the twelve VERDICTS stay byte-identical). UNmapped
+// spans are left byte-identical (fail-closed — the out-of-sandbox note
+// still fires for them). No other span class is touched (the command
+// string stays opaque otherwise). The field is MUTATED only when at
+// least one span mapped. Never throws.
+function runRedirectCommand(output: { args?: unknown }, tool: string): { lines: Observation[]; fired: boolean } {
+  if (tool !== "bash") return { lines: [], fired: false };
+  const args = output?.args;
+  if (args == null || typeof args !== "object") return { lines: [], fired: false };
+  const raw = (args as Record<string, unknown>)["command"];
+  if (typeof raw !== "string" || raw.trim() === "") return { lines: [], fired: false };
+  const lines: Observation[] = [];
+  let fired = false;
+  const next = raw.replace(POSIX_PATH_RE, (m, pre, span) => {
+    const target = resolveRedirect(span, allowedRoots);
+    if (target === null || target === span) return m; // fail-closed / no-op
+    fired = true;
+    lines.push({
+      verdict: "pair-resolved",
+      evidence: `kind=redirect tool=bash arg=command orig=${span} value=${target}`,
+      context: classifyContext(raw),
+    });
+    return pre + target;
+  });
+  if (next !== raw) (args as Record<string, string>)["command"] = next;
   return { lines, fired };
 }
 
@@ -1060,18 +1097,21 @@ async function onToolBefore(
       // the pair channel above is unaffected for all three tools)
       fuzzy = runFuzzyWrite(output, tool); // write-scope ONLY
     }
-    // R8 (#97, 2026-09-25): the 1:1 allowed-root redirect over the TYPED
-    // path fields — AFTER the R1/R2 fuzzy channels (a path fuzzy-resolved
-    // in-sandbox is never redirected); FAIL-CLOSED when no 1:1 mapping
-    // (no mutation; the out-of-sandbox note behaves exactly as today).
+    // R8 (#97, 2026-09-25) + #102 (2026-09-26, the bash `command` string):
+    // the 1:1 allowed-root redirect over the TYPED path fields + the
+    // mapped POSIX spans of the bash command — AFTER the R1/R2 fuzzy
+    // channels (a path fuzzy-resolved in-sandbox is never redirected);
+    // FAIL-CLOSED when no 1:1 mapping (no mutation; the out-of-sandbox
+    // note behaves exactly as today).
     // When a redirect fires, the out-of-sandbox NOTE (observation e) is
     // recomputed on the EFFECTIVE args — the redirected field no longer
     // fires it (an unredirected span still does; the cap holds: ≤1 drop,
     // ≤1 re-add). The feedback note is stored for the after hook (the
     // Unit 2 delivery mechanism).
     const rd = runRedirect(output, tool);
-    const redirect = rd.lines;
-    if (rd.fired) {
+    const rdc = runRedirectCommand(output, tool); // #102 (2026-09-26): the bash `command` string
+    const redirect = [...rd.lines, ...rdc.lines];
+    if (rd.fired || rdc.fired) {
       obs = obs.filter((o) => o.verdict !== "out-of-sandbox");
       // the allowed roots join the note check — a redirected field lands
       // under an allowed root and no longer fires the note (an

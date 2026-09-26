@@ -782,6 +782,94 @@ try {
       JSON.stringify({ a: a.filePath, b: b.filePath }));
   }
 
+  // ---- (12k)-(12n) #102 (2026-09-26): the POSIX temp-root → scratchpad
+  //      prefix mapping — /tmp/<rest> + /var/tmp/<rest> map 1:1 onto the
+  //      scratchpad root (root substitution, the FULL remainder kept).
+  //      A CODE constant (opencode.jsonc names the Windows roots only).
+  //      Uses the (12f) second factory (before2 — module state = proj2).
+  {
+    // (12k) pure resolver: the mapped forms (full remainder kept, case
+    //        preserved; the bare root → the scratchpad root itself) + the
+    //        no-mapping fail-closed forms (other temp/POSIX roots)
+    chk("R8#102 pure resolver: /tmp/x → scratchpad/x; /var/tmp/y → scratchpad/y; nested + case-preserved remainder; the bare root → the scratchpad root; /tmpfile/... + /usr/local/... unmapped → null (fail-closed)",
+      core.resolveRedirect("/tmp/x.txt", [r8Scratch]) === r8Scratch + "/x.txt" &&
+        core.resolveRedirect("/var/tmp/y.txt", [r8Scratch]) === r8Scratch + "/y.txt" &&
+        core.resolveRedirect("/tmp/a/b/c.txt", [r8Scratch]) === r8Scratch + "/a/b/c.txt" &&
+        core.resolveRedirect("/tmp/My-File.TXT", [r8Scratch]) === r8Scratch + "/My-File.TXT" &&
+        core.resolveRedirect("/tmp", [r8Scratch]) === r8Scratch &&
+        core.resolveRedirect("/tmpfile/q.txt", [r8Scratch]) === null &&
+        core.resolveRedirect("/usr/local/bin/x", [r8Scratch]) === null,
+      JSON.stringify({
+        tmp: core.resolveRedirect("/tmp/x.txt", [r8Scratch]),
+        vartmp: core.resolveRedirect("/var/tmp/y.txt", [r8Scratch]),
+        nested: core.resolveRedirect("/tmp/a/b/c.txt", [r8Scratch]),
+        case: core.resolveRedirect("/tmp/My-File.TXT", [r8Scratch]),
+        bare: core.resolveRedirect("/tmp", [r8Scratch]),
+        tmpfile: core.resolveRedirect("/tmpfile/q.txt", [r8Scratch]),
+        usr: core.resolveRedirect("/usr/local/bin/x", [r8Scratch]),
+      }));
+  }
+
+  // (12l) typed-arg e2e: READ /tmp/x + /var/tmp/x → filePath MUTATED to
+  //        scratchpad/<rest> + the kind=redirect line FIRST (a fuzzy-
+  //        rejected line may follow) + NO out-of-sandbox line (the note
+  //        is recomputed on the effective args)
+  {
+    const a = { filePath: "/tmp/io-r8-posix.txt" };
+    const aBefore = JSON.stringify(a);
+    const c0 = read2().length;
+    await before2({ tool: "read", sessionID: "ses_smoke_io1", callID: "c12l1" }, { args: a });
+    const nl = read2().slice(c0);
+    const f = split8(nl[0] ?? "");
+    const b = { filePath: "/var/tmp/io-r8-var.txt" };
+    const bBefore = JSON.stringify(b);
+    const c1 = read2().length;
+    await before2({ tool: "read", sessionID: "ses_smoke_io1", callID: "c12l2" }, { args: b });
+    const nl2 = read2().slice(c1);
+    const fb = split8(nl2[0] ?? "");
+    chk("R8#102 typed READ /tmp/x + /var/tmp/x → filePath MUTATED to scratchpad/<rest> + kind=redirect FIRST line (byte-exact, cap-flattened) + no out-of-sandbox",
+      a.filePath === r8Scratch + "/io-r8-posix.txt" && JSON.stringify(a) !== aBefore && f.length === 8 && f[3] === "read" && f[7] === "pair-resolved" &&
+        f[5] === core.flattenField(`kind=redirect tool=read arg=filePath orig=/tmp/io-r8-posix.txt value=${r8Scratch}/io-r8-posix.txt`) &&
+        !nl.some((x) => split8(x)[7] === "out-of-sandbox") &&
+        b.filePath === r8Scratch + "/io-r8-var.txt" && JSON.stringify(b) !== bBefore && fb.length === 8 && fb[7] === "pair-resolved" &&
+        fb[5] === core.flattenField(`kind=redirect tool=read arg=filePath orig=/var/tmp/io-r8-var.txt value=${r8Scratch}/io-r8-var.txt`) &&
+        !nl2.some((x) => split8(x)[7] === "out-of-sandbox"),
+      JSON.stringify({ a: a.filePath, f5: f[5], b: b.filePath, fb5: fb[5], n: nl.length, n2: nl2.length }));
+  }
+
+  // (12m) bash `command`-string redirect e2e: the /tmp span is substituted
+  //        in place + the kind=redirect line (byte-exact, cap-flattened)
+  //        + NO out-of-sandbox line (the note is recomputed on the
+  //        effective args)
+  {
+    const a = { command: "echo R8 > /tmp/io-r8-bash.txt" };
+    const aBefore = JSON.stringify(a);
+    const c0 = read2().length;
+    await before2({ tool: "bash", sessionID: "ses_smoke_io1", callID: "c12m" }, { args: a });
+    const nl = read2().slice(c0);
+    const f = split8(nl[0] ?? "");
+    chk("R8#102 bash command /tmp span → substituted in place + kind=redirect line (byte-exact, cap-flattened) + no out-of-sandbox",
+      a.command === `echo R8 > ${r8Scratch}/io-r8-bash.txt` && JSON.stringify(a) !== aBefore && f.length === 8 && f[3] === "bash" && f[7] === "pair-resolved" &&
+        f[5] === core.flattenField(`kind=redirect tool=bash arg=command orig=/tmp/io-r8-bash.txt value=${r8Scratch}/io-r8-bash.txt`) &&
+        !nl.some((x) => split8(x)[7] === "out-of-sandbox"),
+      JSON.stringify({ after: a.command, f5: f[5], n: nl.length }));
+  }
+
+  // (12n) bash fail-closed: an UNmapped POSIX span stays byte-identical
+  //        (no mutation, no kind=redirect line) + the out-of-sandbox NOTE
+  //        fires (as today)
+  {
+    const a = { command: "cat /etc/hostname" };
+    const aBefore = JSON.stringify(a);
+    const c0 = read2().length;
+    await before2({ tool: "bash", sessionID: "ses_smoke_io1", callID: "c12n" }, { args: a });
+    const nl = read2().slice(c0);
+    chk("R8#102 bash unmapped span → NOT mutated (byte-identical) + NO kind=redirect line + the out-of-sandbox NOTE fires (as today)",
+      JSON.stringify(a) === aBefore && !nl.some((x) => x.includes("kind=redirect")) &&
+        nl.some((x) => split8(x)[7] === "out-of-sandbox"),
+      JSON.stringify({ args: a, nl }));
+  }
+
   // ---- (9) the LIVE log is untouched by this smoke
   const liveAfter = fs.existsSync(LIVE_LOG) ? fs.statSync(LIVE_LOG).size : null;
   chk("live .opencode/temp/intercept.log untouched (sandbox-only writes)",

@@ -46,7 +46,13 @@
 // / root dedupe / degenerate inputs) + the hook e2e over the FALLBACK roots
 // [workspace root, SCRATCHPAD_ROOT] (read/write sibling, span == root,
 // no-mapping note, nested non-sibling); the config-read path is smoke-
-// pinned): the pre-rebuild
+// pinned) + EXTENDED 2026-09-26 (#102: the POSIX temp-root → scratchpad
+// prefix mapping — the new S29 section, checks 297-304: the pure resolver
+// (/tmp/<rest> + /var/tmp/<rest> + bare root + double-slash/backslash
+// forms + no-mapping fail-closed) + the hook e2e (typed /tmp + /var/tmp
+// redirect, the BASH `command`-string redirect — two mapped spans, the
+// unmapped-span fail-closed, the mixed mapped/unmapped command): the
+// pre-rebuild
 // probe
 // (v2.2.1 era) targeted the DELETED handover.ts, the retired
 // experimental.chat.system.transform hook, and the fake-$-shell S4 shapes —
@@ -781,7 +787,7 @@
 //      the ctx log path is git-ignored (git check-ignore -q, REPO_ROOT).
 //
 // EXPECTED OUTPUT:
-//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=13 S12=4 S13=21 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S25=7 S26=20 S27=8 S28=12 hygiene=6  →  "PROBE handover: 297/297 PASS",
+//   S1=3 S2=4 S3=5 S4=8 S6=8 S6b=6 S7=11 S8=8 S9=12 S10=9 S11=13 S12=4 S13=21 S14=7 S15=12 S16=6 S17=26 S18=32 S19=13 S20=15 S21=12 S22=9 S25=7 S26=20 S27=8 S28=12 S29=8 hygiene=6  →  "PROBE handover: 305/305 PASS",
 //   exit code 0. Anything else with THIS file = behavior drift or broken
 //   environment — read the failures, do not "fix" the plugin for the probe.
 //   On failure the sandbox root is KEPT (printed) for forensics.
@@ -6512,6 +6518,170 @@ n28++;
     JSON.stringify({ args: a, n: nl.length }),
   );
   n28++;
+}
+
+// ------------------------------------------------------------------ S29 R8 POSIX temp-root → scratchpad redirect (#102, 2026-09-26)
+//
+// The POSIX temp-root prefix mapping: /tmp/<rest> + /var/tmp/<rest> (and
+// the bare root — the case (i) analogy) map 1:1 onto SCRATCHPAD_ROOT[/
+// <rest>] — root substitution, the FULL remainder kept, case preserved.
+// A CODE constant of the rule (opencode.jsonc names the Windows roots
+// only — NOT config-derived; the mapping is root-list-independent).
+// Pure resolver pins over the SPLIT core; the hook e2e pins use the S18
+// factory (the probe's sandbox proj has NO opencode.jsonc — the FALLBACK
+// roots apply). NEW surface: the BASH `command`-string redirect — mapped
+// POSIX spans substituted in place (same 1:1 resolver, same kind=redirect
+// line); unmapped spans stay byte-identical (fail-closed — the
+// out-of-sandbox note stays for them).
+let n29 = 297;
+
+// 297 — pure: /tmp/<rest> + /var/tmp/<rest> → SCRATCHPAD_ROOT/<rest>
+//      (the full remainder kept, case preserved)
+check(
+  String(n29),
+  "S29",
+  "resolveRedirect #102: /tmp/x + /var/tmp/y → scratchpad/<rest>; nested remainder kept; case preserved",
+  ioCore.resolveRedirect("/tmp/x.txt", []) === "C:/Users/Wasiejen/AppData/Local/Temp/opencode/x.txt" &&
+    ioCore.resolveRedirect("/var/tmp/y.txt", []) === "C:/Users/Wasiejen/AppData/Local/Temp/opencode/y.txt" &&
+    ioCore.resolveRedirect("/tmp/a/b/c.txt", []) === "C:/Users/Wasiejen/AppData/Local/Temp/opencode/a/b/c.txt" &&
+    ioCore.resolveRedirect("/tmp/My-File.TXT", []) === "C:/Users/Wasiejen/AppData/Local/Temp/opencode/My-File.TXT",
+);
+n29++;
+
+// 298 — pure: the bare root → the scratchpad root itself (case (i)
+//      analogy); double-slash + backslash forms normalized
+check(
+  String(n29),
+  "S29",
+  "resolveRedirect #102: bare /tmp → the scratchpad root; /tmp//x/ → scratchpad/x; \\tmp\\z.txt (backslashes) → scratchpad/z.txt",
+  ioCore.resolveRedirect("/tmp", []) === "C:/Users/Wasiejen/AppData/Local/Temp/opencode" &&
+    ioCore.resolveRedirect("/tmp//x/", []) === "C:/Users/Wasiejen/AppData/Local/Temp/opencode/x" &&
+    ioCore.resolveRedirect("\\tmp\\z.txt", []) === "C:/Users/Wasiejen/AppData/Local/Temp/opencode/z.txt",
+);
+n29++;
+
+// 299 — pure fail-closed: other POSIX/temp roots and /tmpfile/... have no
+//      1:1 mapping → null (no mutation, as before)
+check(
+  String(n29),
+  "S29",
+  "resolveRedirect #102: no-mapping fail-closed — /tmpfile/..., /usr/local/..., /etc/... → null",
+  ioCore.resolveRedirect("/tmpfile/q.txt", ["C:/x/rootA"]) === null &&
+    ioCore.resolveRedirect("/usr/local/bin/x", ["C:/x/rootA"]) === null &&
+    ioCore.resolveRedirect("/etc/hostname", []) === null,
+);
+n29++;
+
+// 300 — e2e READ typed /tmp/x → MUTATED to scratchpad/<rest> + the
+//      kind=redirect line FIRST (a fuzzy-rejected line may follow) + NO
+//      out-of-sandbox line
+{
+  const a = { filePath: "/tmp/s29-read.txt" };
+  const aBefore = JSON.stringify(a);
+  const n0 = ioReadLines().length;
+  await ioBefore({ tool: "read", sessionID: "ses_fx_io3", callID: "c300" }, { args: a });
+  const nl = ioReadLines().slice(n0);
+  const f = nl[0] ? nl[0].split(" | ") : [];
+  check(
+    String(n29),
+    "S29",
+    "hook #102 typed READ /tmp/x → MUTATED to scratchpad/<rest> + kind=redirect FIRST line (byte-exact, cap-flattened) + NO out-of-sandbox line",
+    a.filePath === "C:/Users/Wasiejen/AppData/Local/Temp/opencode/s29-read.txt" && JSON.stringify(a) !== aBefore && f.length === 8 &&
+      f[3] === "read" && f[7] === "pair-resolved" &&
+      f[5] === ioCore.flattenField(`kind=redirect tool=read arg=filePath orig=/tmp/s29-read.txt value=C:/Users/Wasiejen/AppData/Local/Temp/opencode/s29-read.txt`) &&
+      !nl.some((x) => x.split(" | ")[7] === "out-of-sandbox"),
+    JSON.stringify({ after: a.filePath, nl }),
+  );
+  n29++;
+}
+
+// 301 — e2e WRITE typed /var/tmp/x → exactly ONE new line (M1: write has
+//      no fuzzy channel — the redirect line only) + args mutated
+{
+  const a = { filePath: "/var/tmp/s29-write.txt", content: "S29" };
+  const aBefore = JSON.stringify(a);
+  const n0 = ioReadLines().length;
+  await ioBefore({ tool: "write", sessionID: "ses_fx_io3", callID: "c301" }, { args: a });
+  const nl = ioReadLines().slice(n0);
+  const f = nl[0] ? nl[0].split(" | ") : [];
+  check(
+    String(n29),
+    "S29",
+    "hook #102 typed WRITE /var/tmp/x → MUTATED + EXACTLY ONE new line: kind=redirect (byte-exact, cap-flattened) — no out-of-sandbox note",
+    a.filePath === "C:/Users/Wasiejen/AppData/Local/Temp/opencode/s29-write.txt" && JSON.stringify(a) !== aBefore && nl.length === 1 && f.length === 8 &&
+      f[3] === "write" && f[7] === "pair-resolved" &&
+      f[5] === ioCore.flattenField(`kind=redirect tool=write arg=filePath orig=/var/tmp/s29-write.txt value=C:/Users/Wasiejen/AppData/Local/Temp/opencode/s29-write.txt`),
+    JSON.stringify({ after: a.filePath, nl }),
+  );
+  n29++;
+}
+
+// 302 — e2e BASH command with TWO mapped spans (/tmp + /var/tmp) → both
+//      substituted in place (source order) + ONE kind=redirect line per
+//      span (byte-exact, cap-flattened) + NO out-of-sandbox line
+{
+  const a = { command: "cp /tmp/s29-a.txt /var/tmp/s29-b.txt" };
+  const aBefore = JSON.stringify(a);
+  const n0 = ioReadLines().length;
+  await ioBefore({ tool: "bash", sessionID: "ses_fx_io3", callID: "c302" }, { args: a });
+  const nl = ioReadLines().slice(n0);
+  const S = "C:/Users/Wasiejen/AppData/Local/Temp/opencode";
+  check(
+    String(n29),
+    "S29",
+    "hook #102 bash command (two mapped spans) → substituted in place + TWO kind=redirect lines (byte-exact, cap-flattened) + no out-of-sandbox",
+    a.command === `cp ${S}/s29-a.txt ${S}/s29-b.txt` && JSON.stringify(a) !== aBefore &&
+      nl.some((x) => x.includes(ioCore.flattenField(`kind=redirect tool=bash arg=command orig=/tmp/s29-a.txt value=${S}/s29-a.txt`))) &&
+      nl.some((x) => x.includes(ioCore.flattenField(`kind=redirect tool=bash arg=command orig=/var/tmp/s29-b.txt value=${S}/s29-b.txt`))) &&
+      nl.filter((x) => x.includes("kind=redirect")).length === 2 &&
+      !nl.some((x) => x.split(" | ")[7] === "out-of-sandbox"),
+    JSON.stringify({ after: a.command, nl }),
+  );
+  n29++;
+}
+
+// 303 — e2e BASH unmapped span (/etc/hostname) → NOT mutated
+//      (byte-identical) + NO kind=redirect line + the out-of-sandbox NOTE
+//      fires (as today)
+{
+  const a = { command: "cat /etc/hostname" };
+  const aBefore = JSON.stringify(a);
+  const n0 = ioReadLines().length;
+  await ioBefore({ tool: "bash", sessionID: "ses_fx_io3", callID: "c303" }, { args: a });
+  const nl = ioReadLines().slice(n0);
+  check(
+    String(n29),
+    "S29",
+    "hook #102 bash unmapped span → NOT mutated (byte-identical) + NO kind=redirect line + the out-of-sandbox NOTE fires (as today)",
+    JSON.stringify(a) === aBefore && !nl.some((x) => x.includes("kind=redirect")) && nl.some((x) => x.split(" | ")[7] === "out-of-sandbox"),
+    JSON.stringify(nl),
+  );
+  n29++;
+}
+
+// 304 — e2e BASH MIXED command (one mapped /tmp span + one unmapped /etc
+//      span) → the mapped span substituted, the unmapped span left
+//      byte-identical + exactly ONE kind=redirect line + the
+//      out-of-sandbox NOTE fires (the note is recomputed on the
+//      EFFECTIVE args — it fires for the unmapped span)
+{
+  const a = { command: "cat /tmp/s29-m.txt && cat /etc/s29-u" };
+  const aBefore = JSON.stringify(a);
+  const n0 = ioReadLines().length;
+  await ioBefore({ tool: "bash", sessionID: "ses_fx_io3", callID: "c304" }, { args: a });
+  const nl = ioReadLines().slice(n0);
+  const S = "C:/Users/Wasiejen/AppData/Local/Temp/opencode";
+  check(
+    String(n29),
+    "S29",
+    "hook #102 bash mixed (mapped /tmp + unmapped /etc) → mapped span substituted, unmapped byte-identical + ONE kind=redirect line + out-of-sandbox NOTE fires",
+    a.command === `cat ${S}/s29-m.txt && cat /etc/s29-u` && JSON.stringify(a) !== aBefore &&
+      nl.filter((x) => x.includes("kind=redirect")).length === 1 &&
+      nl.some((x) => x.includes(ioCore.flattenField(`kind=redirect tool=bash arg=command orig=/tmp/s29-m.txt value=${S}/s29-m.txt`))) &&
+      nl.some((x) => x.split(" | ")[7] === "out-of-sandbox"),
+    JSON.stringify({ after: a.command, nl }),
+  );
+  n29++;
 }
 
 // ------------------------------------------------------------------ S5 hygiene (6)
