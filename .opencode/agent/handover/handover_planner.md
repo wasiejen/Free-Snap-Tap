@@ -4,33 +4,35 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 
-## Current session — autorun, 2026-09-26 (ses_f24c5d8a8ffe4bIlW0kjoMbCCF, planner-19, Qwen3.8-27B-Q3S-245K-slow)
-- **#101 LANDED (this session, explorer):** spec `37847e8` (committed
-  before launch; loop copy plan19_ho_task.md) → `explorer_Q3S_170K`
-  ses_f24bf71beffekwRYMtnlrWy5UG → map commit `1081e52`
-  (`.opencode/agent/knowledge/opencode-plugins/host-map.md`, 420 lines,
-  all 6 areas dated + located; one bounded upstream fetch; 6 unverified
-  items). Planner-verified from files: 4 locator spot-checks all matched
-  the installed build; DoD met; TODO #101 status DONE (header line
-  curation fix rode the bookkeeping commit).
-- Findings to re-read before the next builds (in the map): §2 the stale
-  2026-09-12 "plugins-array-only registration" knowledge line; §6 the
-  `intercept_observer_core.ts` load-error root cause (no default export —
-  feeds the FIX PENDING item in repo_overview).
-- **Queue:** iteration 20 = maintenance pass FIRST (N%5==0, at session
-  start, per agent_readme_loop.md) → then the bt-v2 build (approved
-  `2026-09-25_block_transfer-v2.md`; spec wave may pre-write bt-v2 + R3 +
-  loop_log-v2 specs; test doctrine: pure-script + new-hire run from the
-  description without code access; the out-of-sandbox LOOP-FULL-STOP
-  clarification is recorded in knowledge_tools.md — plan the boundary test
-  accordingly).
-- Budget: gauge is 245K-based; this session launched with the ctx line
-  reading "1 compactions left" while the explorer (170K) read "5 left" —
-  session-keyed vs model-keyed budget remains the open question (his
-  --info 2026-09-26 raised the slow-model budget to 5).
+## Current session — autorun, 2026-09-26 (ses_f24a7fc46ffeHrj1SC7Q9CVpqc, planner-20, Qwen3.8-27B-Q3S-245K-slow)
+- **Maintenance pass (iter 20, N%5==0, done first):** knowledge inbox
+  EMPTY (nothing to cure); TODO #100 header fixed (open→LANDED — body
+  was already LANDED); no open TODO untouched 14+ days (oldest open
+  #74, 2026-09-21); baselines current (no code change since plan19 —
+  #101 was docs-only); FLAGGED stale proposals for the maintainer:
+  `approved/2026-09-12_fst-rebind-repeat.md` +
+  `approved/2026-09-12_loop_log-v2.md` (both 14+ days untouched;
+  loop_log-v2 = his own priority.md note "not yet implemented").
+- **bt-v2 spec wave COMMITTED:** `handover/specs/bt_v2/` — S1
+  `bt_v2_s1_anchor.md` (Part A resolveAnchor + prefix rule + taxonomy)
+  → S2 refs+assembly (B+C) → S3 write+peek+feedback+probe section
+  (D+E+F) → S4 map+last_write+description (G+H+I; the new-hire +
+  held-out verification is PLANNER-side after S4). S1 in
+  `handover_task.md` + loop-folder copy `plan20_ho_task.md`. Worker:
+  `worker_Q3S_245K_slow` (same-model; roster verified in opencode.jsonc
+  line 362).
+- **Queue:** launch S1 NOW → verify → S2 next iteration (serial slot);
+  after S4: new-hire test (fresh agent, description-only, file-blind) +
+  held-out multi-step task (planner-side delegations); R3 + loop_log-v2
+  remain queued behind the bt-v2 wave.
+- Host-map findings from #101 to re-read before the next builds: §2 the
+  stale 2026-09-12 "plugins-array-only registration" knowledge line; §6
+  the `intercept_observer_core.ts` load-error root cause (no default
+  export — feeds the FIX PENDING item in repo_overview).
 
 
 ## Compressed archive (one line each
+ - 2026-09-26 autorun (ses_f24c5d8a8ffe4bIlW0kjoMbCCF, planner-19, Qwen3.8-27B-Q3S-245K-slow) — #101 LANDED (explorer_Q3S_170K ses_f24bf71beffekwRYMtnlrWy5UG: spec `37847e8` → map commit `1081e52`, `knowledge/opencode-plugins/host-map.md` 420 lines, all 6 areas dated + located; 4 locator spot-checks all matched the installed build) + queue set for iter 20 (maintenance pass first, then the bt-v2 build) — details: loop folder plan19_summary.md + git 37847e8/1081e52/b4aebbc
 - 2026-09-25/26 autorun (ses_f27282d2dfferl9gScrfLt2AxV, planner-17→18, Q3S-170K→245K-slow) — #100 LANDED (worker-18: bc374b2 removal + 910e767 bookkeeping, planner-verified: smoke 64/64, probe 297/297, pytest 459+1w, ruff F=0) + his 4 autorun decisions resolved (bt-v2 GO → approved by him + model→245k; R3 after bt-v2; same-model delegation; quality-distill/programmer DEFERRED) + orientation.md written + queue set (#101 → bt-v2 → R3 → loop_log-v2; maintenance at iter 20) + friction entry b6cb1b8 — details: loop folder plan17_summary.md + plan18_summary.md + git 4db671b..b6cb1b8
 - 2026-09-25 autorun (ses_f2761efb2ffeUhMTEM4hgSLKKK, planner-16, Qwen3.8-27B-Q3S-170K) — #98 LANDED + planner-verified (Part A: line-anchored ACTION_RE `4f90218`; Part B: the 5s tick re-arms watched sids on NEW ctx.log COMPACT lines `cf7e6f5`; Part C not-applicable — smoke 139/139, probe 291/291, pytest 459+1w, ruff F=0; live acceptance pending the next self-compact→idle cycle) + #98 spec `eda314e` + friction entry (block_transfer marker-matching CRLF/semantics) `fa6fb38` — details: loop folder plan16_summary.md + git eda314e/4f90218/cf7e6f5/80797e4
 - 2026-09-25 autorun (ses_f27a7d75affeqsh0h1c4LZS3CY, planner-15, Qwen3.8-27B-Q3S-170K) — TODO #99 LANDED + planner-verified (probe 291/291, compact 74/74, context_recovery 17/17, pytest 459+1w, ruff F=0; spec staged keepTokens computed-primary) + live fork test PENDING (maintainer, post-restart; computed ~27k -> ~52k proves body keep.tokens honored) — details: loop folder plan15_summary.md + git ebf59b2/c5859c7/abb0915 + 282a583

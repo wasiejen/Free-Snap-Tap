@@ -751,7 +751,7 @@ All those IDs stay reserved — see the numbering rule in the header.
   compaction chain, only from an N-summarized summary (the budget cap's
   rationale — his review).
 
-## #100. (open, 2026-09-25, direct session; maintainer GO 2026-09-25 — the next autorun build) remove the numword escape channel — bit-drift solved backend-side, the escape's use-case is gone
+## #100. (LANDED 2026-09-26, plan18, worker-18 `worker_Q3S_245K_slow`, commit bc374b2; direct session 2026-09-25; maintainer GO 2026-09-25) remove the numword escape channel — bit-drift solved backend-side, the escape's use-case is gone
 - **Problem / evidence:** the escape sentinel (`[<incident>:<safe-form>:esc]` in
   write/edit content → the digits, the `kind=escape` channel) existed to
   protect dense values from model bit-drift. Bit-drift no longer occurs

@@ -124,3 +124,5 @@
 2026-09-26_03-03 -->START planner-19 ses_f24c5d8a8ffe4bIlW0kjoMbCCF Qwen3.8-27B-Q3S-245K-slow plan19: #101 opencode host map (explorer task) — per the NAP queue after #100 landed
 2026-09-26_03-28 -RETURN- planner-19 ses_f24c5d8a8ffe4bIlW0kjoMbCCF Qwen3.8-27B-Q3S-245K-slow explorer-19 ses_f24bf71beffekwRYMtnlrWy5UG Qwen3.8-27B-Q3S-170K
 2026-09-26_03-32 DONE<--- planner-19 ses_f24c5d8a8ffe4bIlW0kjoMbCCF Qwen3.8-27B-Q3S-245K-slow 49%/124K
+2026-09-26_03-34 -->START planner-20 ses_f24a7fc46ffeHrj1SC7Q9CVpqc Qwen3.8-27B-Q3S-245K-slow plan20: maintenance pass (N%5==0) then the bt-v2 build per the NAP queue
+2026-09-26_03-38 --INFO-- planner-20 ses_f24a7fc46ffeHrj1SC7Q9CVpqc Qwen3.8-27B-Q3S-245K-slow maintenance pass: knowledge inbox empty (nothing to cure); TODO #100 header fixed (open->LANDED, body already LANDED); no open TODO untouched 14+ days (oldest open #74, 2026-09-21); baselines current (no code change since plan19, #101 was docs-only); FLAGGED stale proposals: approved/2026-09-12_fst-rebind-repeat.md + approved/2026-09-12_loop_log-v2.md (both 14+ days untouched, maintainer to decide)
