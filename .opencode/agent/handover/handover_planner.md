@@ -4,97 +4,49 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 
-## Current session — autorun, 2026-09-26 (ses_f24a7fc46ffeHrj1SC7Q9CVpqc, planner-20, Qwen3.8-27B-Q3S-245K-slow)
-- **Maintenance pass (iter 20, N%5==0, done first):** knowledge inbox
-  EMPTY (nothing to cure); TODO #100 header fixed (open→LANDED — body
-  was already LANDED); no open TODO untouched 14+ days (oldest open
-  #74, 2026-09-21); baselines current (no code change since plan19 —
-  #101 was docs-only); FLAGGED stale proposals for the maintainer:
-  `approved/2026-09-12_fst-rebind-repeat.md` +
-  `approved/2026-09-12_loop_log-v2.md` (both 14+ days untouched;
-  loop_log-v2 = his own priority.md note "not yet implemented").
-- **bt-v2 spec wave COMMITTED:** `handover/specs/bt_v2/` — S1
-  `bt_v2_s1_anchor.md` (Part A resolveAnchor + prefix rule + taxonomy)
-  → S2 refs+assembly (B+C) → S3 write+peek+feedback+probe section
-  (D+E+F) → S4 map+last_write+description (G+H+I; the new-hire +
-  held-out verification is PLANNER-side after S4). S1 in
-  `handover_task.md` + loop-folder copy `plan20_ho_task.md`. Worker:
-  `worker_Q3S_245K_slow` (same-model; roster verified in opencode.jsonc
-  line 362).
-- **S1 LANDED (0d85a8c, worker-20 `worker_Q3S_245K_slow`
-  ses_f249c8026ffeIXec8cQW3sInJ7, planner-verified):** exported
-  `resolveAnchor` (+ `matchAnchorLines` = the one swappable rule
-  place); all 7 modes routed through it; teaching taxonomy
-  (`ref-out-of-range` prepared, wires in B/C); COPY substring tolerance
-  removed (approved); smoke 45/45 (30 + 15 new), sandbox 53/53 (1
-  re-pin), probe 297/297, pytest 459+1w, ruff F=0 — planner spot
-  re-run: smoke 45/45. The richer non-unique format was DEFERRED
-  (probe 263 pins the legacy byte-exact string) → curated into the
-  committed S3 spec (probe 115/263 re-pin + tool switch).
-- **S2 LANDED (f5f888c, worker-20 `worker_Q3S_245K_slow`
-  ses_f23d1afbaffeUSeabbt0aArOdj, planner-verified):** schema-level
-  `string | integer` refs on all ref sides + `refs` list + `text` key;
-  COPY-list (exact-`\n` join) / APPEND mode; `ref-out-of-range` wired;
-  Part F feedback for the touched ops; smoke 87/87 (45+42), sandbox
-  53/53, probe 297/297, pytest 459+1w, ruff F=0 — planner spot re-run:
-  smoke 87/87. **RATIFIED** the flagged minimal re-pin of probe S15
-  108/109 (stale under any S2 build — same semantics, no new checks;
-  the alternative was a red gate).
-- **MAINTAINER LIVE REPORT (2026-09-26, this session):** "worker keep
-  trying to access the temp/tmp folder directly and are stopping the
-  loop repeatedly." Triaged from files: R8 (#97) redirect WORKS for the
-  Windows-Root form (intercept.log L4668 — S2 worker's
-  `C:\...\Temp\bt_smoke_out.txt` redirected 1:1 to `...\Temp\opencode\…`);
-  the POSIX `/tmp` form (Git-Bash habit) has NO mapping -> fail-closed ->
-  gate STOP. Actions: (a)   worker-prompt scratchpad bullet (committed
-  this session); (b) NEW TODO #102 — extend the R8 mapping with
-  `/tmp` + `/var/tmp` -> scratchpad root (structural fix).
-- **#102 LANDED (be07ce6, worker-20 `worker_Q3S_245K_slow`
-  ses_f23201c0effez6Sl8kZ3BSJ0Pf, planner-verified):** POSIX `/tmp` +
-  `/var/tmp` -> scratchpad root in the core resolver (code constant,
-  branch BEFORE the root loop — legacy byte-identical) + the bash
-  `command`-string redirect (the spec's typed-fields assumption was
-  wrong — bash was excluded as "opaque"; extended per the spec's
-  fallback: same 1:1 resolver, one `kind=redirect` line per mapped
-  span). Intercept smoke 68/68 (64+4), probe 305/305 (297 + S29×8),
-  pytest 459+1w, ruff F=0 — planner spot re-run: smoke 68/68.
-  **LIVE ACCEPTANCE PENDING the maintainer's process restart** (the
-  live plugin runs pre-restart code; a live `/tmp` touch would stop
-  this session — acceptance probe: `echo hi > /tmp/x` + a typed
-  `/tmp/x` read, expecting redirect + landing in the sandbox +
-  kind=redirect lines).
-- **S3 LANDED (8cc8819, worker-20 `worker_Q3S_245K_slow`
-  ses_f2302f58dffeEC2ccjeKmAPbVw, planner-verified):** WRITE mode
-  (single span + `regions` list, highest-line-first, overlap teaching
-  error, file-creation path) + PEEK mode (bounded preview, from/count
-  cap 25, blank-skip) + Part F feedback complete for ALL modes (new
-  `opLine` helper) + the S1 deferred v2 error switch (non-unique with
-  count + first match lines; probes 115/263 + 108/110/111/116/117/262
-  re-pinned in place) + probe S30 (11 checks). Probe 316/316,
-  block_transfer 112/112, sandbox 61/61, pytest 459+1w, ruff F=0 —
-  planner spot re-run: smoke 112/112. OPEN QUESTION (maintainer,
-  non-blocking): WRITE-on-absent-file semantic — refs can't resolve
-  against an empty file, so the creation path is unreachable via refs
-  (worker note 2; flagged detail #2's alternate semantic is a
-  separate decision). Lesson: a staged spec's baseline must be
-  re-verified at staging time (the spec said 297; the measured
-  baseline was 305 post-#102 — the worker built against the measured
-  one).
-- **Queue (next iteration):** stage + launch S4 (`bt_v2_s4_map_
-  lastwrite_description.md`) → verify; after S4: new-hire test (fresh
-  agent, description-only, file-blind) + held-out multi-step task
-  (planner-side delegations); R3 + loop_log-v2 remain queued behind
-  the bt-v2 wave.
-- Note: maintainer commit `1ad0715` ("small explorer additions to
-  worker roster (not live)") landed mid-session — roster is his
-  live-edit domain; `worker_Q3S_245K_slow` verified active (line 362).
-- Host-map findings from #101 to re-read before the next builds: §2 the
-  stale 2026-09-12 "plugins-array-only registration" knowledge line; §6
-  the `intercept_observer_core.ts` load-error root cause (no default
-  export — feeds the FIX PENDING item in repo_overview).
+## Current session — autorun, 2026-09-26 (ses_f22c8986affegfHMJhzUxDFDkp, planner-21, Qwen3.8-27B-Q3S-245K-slow)
+- **S4 LANDED (37c2479, worker-21 `worker_Q3S_245K_slow`
+  ses_f22c5c7fdffeNsWFzlfdsFterN, planner-verified):** MAP mode
+  (line count + head3/tail3 + heading skeleton max 10 then `+N more`,
+  lines verbatim WITH line numbers; detection = `^#{1,6} ` at column 0
+  only — indented `#` excluded, no file-type sniffing) + `last_write`
+  auto-buffer (SILENT by design — every successful WRITE auto-stores its
+  text, overwritten per WRITE, no parameter; the probe-pinned WRITE
+  feedback line 305–309 byte-unchanged; documented in description +
+  `bufferName` arg) + Part I description rework (WHEN/WHEN-NOT lead,
+  sharpened boundary vs `edit` (string-level exact match) and `write`
+  (whole-file), final 11-mode set, EXAMPLE before EDGE, PEEK full-
+  content sentence kept, pinned first one-liner byte-identical) +
+  schema mode enum gains MAP (11 values, spec order) + 11 new smoke
+  pins (G×6 + H×5) + the sandbox mode-list pin RE-PINNED 8→11 modes
+  (RATIFIED — same semantics, no new check type). Probe 316/316
+  (UNCHANGED per spec — no new probe checks), block_transfer 123/123
+  (112+11), sandbox 64/64 (61+3), pytest 459+1w, ruff F=0 — planner
+  spot re-run: 123/123 + 64/64. Baselines re-verified pre-edit by the
+  worker (all matched — no stale baseline this time). **The bt-v2 WAVE
+  IS COMPLETE (S1–S4).** Journal-COLLECT stays deferred (R6 family).
+- **Planner-inline (this session):** probe check 108 (line 3483)
+  mode-enum pin extended to the final 11 values (MAP in spec order) —
+  probe re-run 316/316 green; todo_inbox entry curated (that fix); the
+  S4 spec's proposal path corrected to `.opencode/proposals/approved/…`
+  (worker friction).
+- **Queue (next iteration):** PLANNER-SIDE verification of the
+  completed tool: NEW-HIRE TEST (a fresh agent uses every mode from the
+  description ALONE — file-blind task) → HELD-OUT multi-step task
+  (assemble a 3-section file from two sources via COPY-list + APPEND,
+  then a 2-region WRITE-list, verify via PEEK/MAP; measure tool calls /
+  errors / tokens from the raw transcript). THEN: R3 + loop_log-v2
+  remain queued behind the wave. OPEN (maintainer, non-blocking):
+  WRITE-on-absent-file semantic (S3 open question).
+- Live acceptances still pending the maintainer: #102 (post-restart
+  `/tmp` redirect probe), #99 live fork test, #98 (self-compact→idle
+  cycle).
+- Friction logged: `todo_inbox.md` lives at the repo ROOT (not under
+  `.opencode/agent/` — the prompts name it without a path).
 
 
 ## Compressed archive (one line each
+ - 2026-09-26 autorun (ses_f24a7fc46ffeHrj1SC7Q9CVpqc, planner-20, Qwen3.8-27B-Q3S-245K-slow) — maintenance pass (iter 20: knowledge inbox empty, #100 header fixed, stale proposals flagged) + bt-v2 S1/S2/S3 LANDED (0d85a8c/f5f888c/8cc8819, planner-verified each) + maintainer live-report triage → TODO #102 LANDED (be07ce6, `/tmp`+`/var/tmp` -> scratchpad root, live acceptance pending maintainer restart) + S15 108/109 re-pin RATIFIED — baseline probe 316/316, bt 112+61; OPEN: WRITE-on-absent-file semantic (maintainer) — details: loop folder plan20_summary.md + git 4b466f1..33b85a7
  - 2026-09-26 autorun (ses_f24c5d8a8ffe4bIlW0kjoMbCCF, planner-19, Qwen3.8-27B-Q3S-245K-slow) — #101 LANDED (explorer_Q3S_170K ses_f24bf71beffekwRYMtnlrWy5UG: spec `37847e8` → map commit `1081e52`, `knowledge/opencode-plugins/host-map.md` 420 lines, all 6 areas dated + located; 4 locator spot-checks all matched the installed build) + queue set for iter 20 (maintenance pass first, then the bt-v2 build) — details: loop folder plan19_summary.md + git 37847e8/1081e52/b4aebbc
 - 2026-09-25/26 autorun (ses_f27282d2dfferl9gScrfLt2AxV, planner-17→18, Q3S-170K→245K-slow) — #100 LANDED (worker-18: bc374b2 removal + 910e767 bookkeeping, planner-verified: smoke 64/64, probe 297/297, pytest 459+1w, ruff F=0) + his 4 autorun decisions resolved (bt-v2 GO → approved by him + model→245k; R3 after bt-v2; same-model delegation; quality-distill/programmer DEFERRED) + orientation.md written + queue set (#101 → bt-v2 → R3 → loop_log-v2; maintenance at iter 20) + friction entry b6cb1b8 — details: loop folder plan17_summary.md + plan18_summary.md + git 4db671b..b6cb1b8
 - 2026-09-25 autorun (ses_f2761efb2ffeUhMTEM4hgSLKKK, planner-16, Qwen3.8-27B-Q3S-170K) — #98 LANDED + planner-verified (Part A: line-anchored ACTION_RE `4f90218`; Part B: the 5s tick re-arms watched sids on NEW ctx.log COMPACT lines `cf7e6f5`; Part C not-applicable — smoke 139/139, probe 291/291, pytest 459+1w, ruff F=0; live acceptance pending the next self-compact→idle cycle) + #98 spec `eda314e` + friction entry (block_transfer marker-matching CRLF/semantics) `fa6fb38` — details: loop folder plan16_summary.md + git eda314e/4f90218/cf7e6f5/80797e4
@@ -187,13 +139,15 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 ## Standing
-- Baselines (re-verified 2026-09-26 by the planner, post-S3):
-   probe **316** (305 + S30×11, post-S3); smokes **all green**
+- Baselines (re-verified 2026-09-26 by the planner, post-S4):
+   probe **316** (count UNCHANGED post-S4 — S4 adds no probe checks;
+   check 108's enum pin extended to the 11 values); smokes **all
+   green**
     (context_recovery 17/17, compact_memory 74/74, auto_resume 139/139
     (post-#98),
-   intercept_observer 68/68 (post-#102), block_transfer 112/112 + 61/61
-   (post-S3),
-   submit 20/20;
+   intercept_observer 68/68 (post-#102), block_transfer 123/123 + 64/64
+   (post-S4),
+   submit 20/20);
   the per-suite counts are in each smoke's own readout — no total kept
   here); pytest **459 passed + 1 warning (the known #10 coroutine
   warning)**; ruff **F=0**.

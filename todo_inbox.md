@@ -158,4 +158,5 @@ block_transfer v2 (S1 finding): probes 115 + 263 pin the LEGACY error strings, s
 
 ## 2026-09-26_12-34 worker_Q3S_245K_slow ses_f22c5c7fdffeNsWFzlfdsFterN
 Probe 3483's block_transfer mode-enum pin still lists the pre-S4 10 values (MAP un-pinned there — covered only by the smoke). The spec forbade new probe checks in S4; extend the probe's enum list in a later unit if the planner wants probe-level MAP coverage.
+- **curated 2026-09-26 (planner-21, plan21):** handled inline — the probe check 108 (line 3483) enum pin extended to the final 11 values (MAP added in spec order), probe re-run 316/316 green.
 

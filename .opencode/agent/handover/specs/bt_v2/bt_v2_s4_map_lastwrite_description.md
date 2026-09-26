@@ -2,7 +2,7 @@
 
 Goal: the Wave-2 additions (MAP structure preview, the `last_write`
 auto-buffer) and the Part I description rework — per the approved
-proposal `proposals/approved/2026-09-25_block_transfer-v2.md`.
+proposal `.opencode/proposals/approved/2026-09-25_block_transfer-v2.md`.
 Built ON TOP of S1+S2+S3 (all core parts settled — do not touch
 them). This is the LAST build unit; the new-hire + held-out
 verification is PLANNER-side AFTER this unit (see DoD).
