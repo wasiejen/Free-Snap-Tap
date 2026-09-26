@@ -871,6 +871,230 @@ try {
       JSON.stringify({ args: a, nl }));
   }
 
+  // ---- (14) the R3 arg-scope extension (2026-09-26, spec:
+  //      research/fuzzy-numword/spec_R3_arg_scope_extension.md): the FOUR
+  //      channels beyond `read` — (a) the glob/grep PAIR channel (the
+  //      field-parameterized READ gate on the `path` field + the content-
+  //      scope guard on the other string fields), (b) the section-ANCHOR
+  //      resolver (a string `offset` → the exactly-one line, fail-closed
+  //      otherwise), (c) the BASH QUOTED-FORM channel (the quoted-span
+  //      ownership split vs the git-ref channel), (d) the block_transfer
+  //      ANCHOR-MARKER channel (the R2 write-scope gate logic on the
+  //      anchor markers — composed with the S1 resolveAnchor taxonomy).
+  {
+    const r3 = path.join(proj2, "r3fx");
+    fs.mkdirSync(r3, { recursive: true });
+    const j = (n) => path.join(r3, n);
+    fs.writeFileSync(j("file-4.txt"), "x", "utf-8");
+    fs.writeFileSync(j("anchor-fixture.txt"), "line-1\nline-2\n## Only Anchor line-3\nline-4\nline-5\n", "utf-8");
+    fs.writeFileSync(j("anchor-dup.txt"), "Dup Anchor a\nmid\nDup Anchor b\n", "utf-8");
+    fs.writeFileSync(j("bt-anchor-src.txt"), "intro\nSec 4 T line one\nOther line\noutro\n", "utf-8");
+    fs.writeFileSync(j("bt-anchor-dst.txt"), "dst-head\nmid\n", "utf-8");
+    fs.writeFileSync(j("bt-anchor-both.txt"), "Sec [4:four] T raw\nSec 4 T canon\nmid\n", "utf-8");
+    fs.writeFileSync(j("bt-anchor-nu.txt"), "Sec 4 T a\nSec 4 T b\nmid\n", "utf-8");
+    fs.writeFileSync(j("bt-anchor-dst2.txt"), "Dst 2 T line\nmid\n", "utf-8");
+
+    // (a1) the glob/grep PAIR channel: the read `filePath` + the glob/grep
+    //       `path` field share ONE READ gate (the canonical exists + the
+    //       pair-form path absent → MUTATED, right-wins) + the content-
+    //       scope guard (a pair in the `pattern` field → observation-form
+    //       line ONLY, never mutated) — exactly two lines
+    {
+      const a = { pattern: "[4:four]", path: j("file-[4:four].txt"), include: "*.txt" };
+      const aBefore = JSON.stringify(a);
+      const c0 = read2().length;
+      await before2({ tool: "grep", sessionID: "ses_smoke_io1", callID: "c14a" }, { args: a });
+      const nl = read2().slice(c0);
+      const fPath = split8(nl[0] ?? "");
+      const fPat = split8(nl[1] ?? "");
+      chk("R3 grep/glob PAIR channel: the `path` field shares ONE READ gate (MUTATED to the canonical + pair-resolved gate=mutated) + the `pattern` pair is observation-form ONLY (never mutated) — exactly two lines",
+        a.path === j("file-4.txt") && a.pattern === "[4:four]" && JSON.stringify(a) !== aBefore &&
+          nl.length === 2 && fPath.length === 8 && fPath[3] === "grep" && fPath[7] === "pair-resolved" &&
+          fPath[5] === "pair=[4:four] canon=4 dist=0 gate=mutated" &&
+          fPat.length === 8 && fPat[7] === "observed-redundancy-ok" && fPat[5] === "pair=[4:four] canon=4 dist=0",
+        JSON.stringify({ after: a, nl }));
+    }
+
+    // (b1) the section-ANCHOR resolver EXACTLY-ONE: the non-numeric STRING
+    //       `offset` → the FIRST match line — `offset` REWRITTEN to the
+    //       1-based line number (+ `limit` clamped to the file end: 50 →
+    //       5-3+1=3) + the anchor-resolved line
+    {
+      const a = { filePath: j("anchor-fixture.txt"), offset: "## Only Anchor", limit: 50 };
+      const c0 = read2().length;
+      await before2({ tool: "read", sessionID: "ses_smoke_io1", callID: "c14b" }, { args: a });
+      const nl = read2().slice(c0);
+      const f = split8(nl[0] ?? "");
+      chk("R3 section-ANCHOR EXACTLY-ONE: the string `offset` REWRITTEN to the line number (3) + `limit` clamped (50 → 3) + the anchor-resolved line (1 line)",
+        a.offset === 3 && a.limit === 3 && nl.length === 1 && f.length === 8 && f[3] === "read" &&
+          f[5] === "anchor=## Only Anchor line=3" && f[6] === "read offset" && f[7] === "anchor-resolved",
+        JSON.stringify({ after: a, nl }));
+    }
+
+    // (b2) the anchor resolver FAIL-CLOSED: 0 matches → anchor-rejected
+    //       matches=0 + the string offset RUNS (byte-identical); >=2
+    //       matches → anchor-rejected matches=2 (same)
+    {
+      const z = { filePath: j("anchor-fixture.txt"), offset: "No Such Anchor" };
+      const zBefore = JSON.stringify(z);
+      const c0 = read2().length;
+      await before2({ tool: "read", sessionID: "ses_smoke_io1", callID: "c14c" }, { args: z });
+      const nz = read2().slice(c0);
+      const m = { filePath: j("anchor-dup.txt"), offset: "Dup Anchor" };
+      const mBefore = JSON.stringify(m);
+      const c1 = read2().length;
+      await before2({ tool: "read", sessionID: "ses_smoke_io1", callID: "c14d" }, { args: m });
+      const nm = read2().slice(c1);
+      chk("R3 section-ANCHOR FAIL-CLOSED: zero matches → anchor-rejected matches=0 + multi (2) matches → anchor-rejected matches=2 (the string offset RUNS in both — args byte-identical)",
+        JSON.stringify(z) === zBefore && nz.length === 1 && split8(nz[0])[7] === "anchor-rejected" &&
+          split8(nz[0])[5] === "anchor=No Such Anchor matches=0" &&
+          JSON.stringify(m) === mBefore && nm.length === 1 && split8(nm[0])[7] === "anchor-rejected" &&
+          split8(nm[0])[5] === "anchor=Dup Anchor matches=2",
+        JSON.stringify({ z: nz, m: nm }));
+    }
+
+    // (b3) the anchor fallback + the file-missing silent fail-closed: a
+    //       NUMERIC-string offset is a SILENT type repair (the string "3"
+    //       → the number 3, zero lines — line-offsets stay the fallback);
+    //       a MISSING file → no anchor line (the read's honest "not
+    //       found" surfaces)
+    {
+      const n1 = { filePath: j("anchor-fixture.txt"), offset: "3" };
+      const c0 = read2().length;
+      await before2({ tool: "read", sessionID: "ses_smoke_io1", callID: "c14e" }, { args: n1 });
+      const nn = read2().slice(c0);
+      const n2 = { filePath: j("missing-xyz-q.txt"), offset: "Some Anchor" };
+      const n2Before = JSON.stringify(n2);
+      const c1 = read2().length;
+      await before2({ tool: "read", sessionID: "ses_smoke_io1", callID: "c14f" }, { args: n2 });
+      const nm = read2().slice(c1);
+      chk("R3 anchor fallback + file-missing: the numeric-string offset '3' → SILENT type repair to the number 3 (zero lines) + the missing file → NO anchor line (args byte-identical)",
+        n1.offset === 3 && typeof n1.offset === "number" && nn.length === 0 &&
+          JSON.stringify(n2) === n2Before && !nm.some((x) => x.includes("anchor=")),
+        JSON.stringify({ offset: n1.offset, nn: nn.length, missing: nm.map((x) => split8(x)[7]) }));
+    }
+
+    // (c1) the BASH QUOTED-FORM channel: a [left:right] pair INSIDE a
+    //       quoted span → the canonical digits replace the pair IN PLACE
+    //       (the quotes stay) + pair-resolved kind=quoted; a QUOTED
+    //       MISMATCH fails closed (byte-identical + gate=fail-closed)
+    {
+      const q = { command: 'echo "[4:four]"' };
+      const qBefore = JSON.stringify(q);
+      const c0 = read2().length;
+      await before2({ tool: "bash", sessionID: "ses_smoke_io1", callID: "c14g" }, { args: q });
+      const nq = read2().slice(c0);
+      const x = { command: 'echo "[7:eight]"' };
+      const xBefore = JSON.stringify(x);
+      const c1 = read2().length;
+      await before2({ tool: "bash", sessionID: "ses_smoke_io1", callID: "c14h" }, { args: x });
+      const nx = read2().slice(c1);
+      chk("R3 bash QUOTED-FORM: a quoted pair → the command MUTATED in place ('echo \"4\"') + pair-resolved kind=quoted + a quoted MISMATCH fails closed (byte-identical + gate=fail-closed)",
+        q.command === 'echo "4"' && JSON.stringify(q) !== qBefore && nq.length === 1 &&
+          split8(nq[0])[7] === "pair-resolved" &&
+          split8(nq[0])[5] === "kind=quoted tool=bash arg=command pair=[4:four] canon=4 dist=0" &&
+          JSON.stringify(x) === xBefore && nx.length === 1 &&
+          split8(nx[0])[7] === "redundancy-mismatch" &&
+          split8(nx[0])[5] === "pair=[7:eight] canon=8 dist=1 gate=fail-closed",
+        JSON.stringify({ q: nq, x: nx }));
+    }
+
+    // (c2) the OWNERSHIP SPLIT: one command with a quoted pair (the quoted-
+    //       form channel mutates) + an unquoted pair (the git-ref channel,
+    //       run < 4 → log-only) → two lines (the unquoted one first), the
+    //       unquoted pair untouched
+    {
+      const a = { command: 'echo "[4:four]" [5:five]' };
+      const c0 = read2().length;
+      await before2({ tool: "bash", sessionID: "ses_smoke_io1", callID: "c14i" }, { args: a });
+      const nl = read2().slice(c0);
+      chk("R3 OWNERSHIP SPLIT: quoted pair mutated in place + unquoted pair log-only — the command 'echo \"4\" [5:five]' + exactly two lines (the unquoted one first)",
+        a.command === 'echo "4" [5:five]' && nl.length === 2 &&
+          split8(nl[0])[7] === "observed-redundancy-ok" && split8(nl[0])[5] === "pair=[5:five] canon=5 dist=0" &&
+          split8(nl[1])[7] === "pair-resolved" && split8(nl[1])[5] === "kind=quoted tool=bash arg=command pair=[4:four] canon=4 dist=0",
+        JSON.stringify({ after: a.command, nl }));
+    }
+
+    // (d1) the block_transfer ANCHOR-MARKER channel, the MUTATED branch:
+    //       the S1 startsWith+unique gate on the effective srcFile — the
+    //       canonical marker matches EXACTLY ONE line and the pair-form
+    //       marker matches NONE → startMarker MUTATED + gate=mutated
+    //       line=2; exactly ONE line (the anchor fields are EXCLUDED from
+    //       the content-scope loop — no double-logging)
+    {
+      const a = {
+        mode: "MOVE",
+        srcFile: j("bt-anchor-src.txt"),
+        dstFile: j("bt-anchor-dst.txt"),
+        startMarker: "Sec [4:four] T",
+        endMarker: "Other line",
+      };
+      const c0 = read2().length;
+      await before2({ tool: "block_transfer", sessionID: "ses_smoke_io1", callID: "c14j" }, { args: a });
+      const nl = read2().slice(c0);
+      const f = split8(nl[0] ?? "");
+      chk("R3 block_transfer ANCHOR MUTATED: the startMarker MUTATED to the canonical ('Sec 4 T') + pair-resolved gate=mutated line=2 arg=startMarker (exactly one line — no double-logging)",
+        a.startMarker === "Sec 4 T" && nl.length === 1 && f.length === 8 && f[3] === "block_transfer" &&
+          f[5] === "pair=[4:four] canon=4 dist=0 gate=mutated line=2 arg=startMarker" && f[7] === "pair-resolved",
+        JSON.stringify({ after: a.startMarker, nl }));
+    }
+
+    // (d2) the anchor gate branches (strict existence, fail-closed):
+    //       NONE-EXIST (the canonical matches nothing) / BOTH-EXIST (the
+    //       raw + canonical both match — the on-disk pair form wins) /
+    //       NON-UNIQUE (the canonical matches >=2 — the S1 uniqueness
+    //       contract) — the startMarker is NEVER mutated in any of them
+    {
+      const n1 = { mode: "MOVE", srcFile: j("bt-anchor-src.txt"), dstFile: j("bt-anchor-dst.txt"), startMarker: "Sec [9:nine] Z", endMarker: "Other line" };
+      const n1Before = JSON.stringify(n1);
+      const c0 = read2().length;
+      await before2({ tool: "block_transfer", sessionID: "ses_smoke_io1", callID: "c14k" }, { args: n1 });
+      const n1l = read2().slice(c0);
+      const n2 = { mode: "MOVE", srcFile: j("bt-anchor-both.txt"), dstFile: j("bt-anchor-dst.txt"), startMarker: "Sec [4:four] T", endMarker: "mid" };
+      const n2Before = JSON.stringify(n2);
+      const c1 = read2().length;
+      await before2({ tool: "block_transfer", sessionID: "ses_smoke_io1", callID: "c14l" }, { args: n2 });
+      const n2l = read2().slice(c1);
+      const n3 = { mode: "MOVE", srcFile: j("bt-anchor-nu.txt"), dstFile: j("bt-anchor-dst.txt"), startMarker: "Sec [4:four] T", endMarker: "mid" };
+      const n3Before = JSON.stringify(n3);
+      const c2 = read2().length;
+      await before2({ tool: "block_transfer", sessionID: "ses_smoke_io1", callID: "c14m" }, { args: n3 });
+      const n3l = read2().slice(c2);
+      chk("R3 anchor gate branches: NONE-EXIST / BOTH-EXIST / NON-UNIQUE — the startMarker NEVER mutated + the gate token in the evidence (one line each)",
+        JSON.stringify(n1) === n1Before && n1l.length === 1 &&
+          split8(n1l[0])[5] === "pair=[9:nine] canon=9 dist=0 gate=none-exist arg=startMarker" &&
+          JSON.stringify(n2) === n2Before && n2l.length === 1 &&
+          split8(n2l[0])[5] === "pair=[4:four] canon=4 dist=0 gate=both-exist arg=startMarker" &&
+          JSON.stringify(n3) === n3Before && n3l.length === 1 &&
+          split8(n3l[0])[5] === "pair=[4:four] canon=4 dist=0 gate=non-unique arg=startMarker",
+        JSON.stringify({ n1: n1l, n2: n2l, n3: n3l }));
+    }
+
+    // (d3) the anchor MISMATCH fail-closed (never "helpfully" rewrite a
+    //       mismatched anchor target) + the targetMarker ownership: the
+    //       targetMarker resolves against the EFFECTIVE dstFile (not the
+    //       srcFile) → mutated line=1 arg=targetMarker
+    {
+      const x = { mode: "MOVE", srcFile: j("bt-anchor-src.txt"), dstFile: j("bt-anchor-dst.txt"), startMarker: "Sec [7:eight] T", endMarker: "Other line" };
+      const xBefore = JSON.stringify(x);
+      const c0 = read2().length;
+      await before2({ tool: "block_transfer", sessionID: "ses_smoke_io1", callID: "c14n" }, { args: x });
+      const nx = read2().slice(c0);
+      const t = { mode: "MOVE", srcFile: j("bt-anchor-src.txt"), dstFile: j("bt-anchor-dst2.txt"), startMarker: "Sec 4 T", endMarker: "Other line", targetMarker: "Dst [2:two] T" };
+      const c1 = read2().length;
+      await before2({ tool: "block_transfer", sessionID: "ses_smoke_io1", callID: "c14o" }, { args: t });
+      const nt = read2().slice(c1);
+      const ft = split8(nt[0] ?? "");
+      chk("R3 anchor MISMATCH fail-closed (byte-identical + gate=fail-closed) + the targetMarker resolves against the EFFECTIVE dstFile (MUTATED to 'Dst 2 T' + gate=mutated line=1 arg=targetMarker)",
+        JSON.stringify(x) === xBefore && nx.length === 1 &&
+          split8(nx[0])[7] === "redundancy-mismatch" &&
+          split8(nx[0])[5] === "pair=[7:eight] canon=8 dist=1 gate=fail-closed arg=startMarker" &&
+        t.targetMarker === "Dst 2 T" && nt.length === 1 &&
+          ft[5] === "pair=[2:two] canon=2 dist=0 gate=mutated line=1 arg=targetMarker" && ft[7] === "pair-resolved",
+        JSON.stringify({ nx, nt }));
+    }
+  }
+
   // ---- (9) the LIVE log is untouched by this smoke
   const liveAfter = fs.existsSync(LIVE_LOG) ? fs.statSync(LIVE_LOG).size : null;
   chk("live .opencode/temp/intercept.log untouched (sandbox-only writes)",
