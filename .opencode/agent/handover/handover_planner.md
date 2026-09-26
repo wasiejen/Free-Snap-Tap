@@ -11,18 +11,44 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   the pre-S2 7-mode registration). The maintainer restarted opencode
   after plan21 → UNBLOCKED: the new-hire + held-out tests, the #102
   `/tmp` live acceptance, the R3 four-channel live acceptance.
-- **plan22 = the live-verification pass** (spec `plan22_ho_task.md`,
-  worker `worker_Q3S_245K_slow`, the ONLY active worker in the live
-  opencode.jsonc — verified at spec time): Unit 1 = #102 /tmp redirect
-  (bash + typed-arg forms) + R3's four channels (grep/glob pair,
-  section-anchor resolver, bash quoted-form, bt anchor-marker —
-  trigger shapes pinned from the smoke fixtures); Unit 2 = NEW-HIRE
-  test (11 modes, description-only, file-blind, friction list);
-  Unit 3 = HELD-OUT assembly (COPY-list + APPEND + PASTE + 2-region
-  WRITE-list + PEEK/MAP, exact 9-line expected file). VERIFICATION
-  ONLY — no code change, no gate, no worker commits. The held-out
-  measurement (tool calls / errors / tokens) is PLANNER-side from the
-  worker's transcript (script-extract, never raw-read).
+- **plan22 = the live-verification pass — LANDED + verified** (worker-22
+  `worker_Q3S_245K_slow` ses_f21bb91c2ffeQg2hBM5li8ZnAQ, spec fff5bea):
+  - Unit 1: **#102 LIVE-ACCEPTED** (both forms — bash + write-tool,
+    `kind=redirect` lines, files in the scratchpad, content verified);
+    R3 **grep/glob pair** + **bash quoted-form** channels LIVE-ACCEPTED
+    (verbatim log lines in the loop-folder handover); BONUS: the #97
+    Windows-root redirect form live-accepted by planner spot-check.
+    The section-anchor + bt anchor-marker channels NOT live-verifiable —
+    **ROOT CAUSE (planner spot-check): the live opencode process PREDATES
+    the R3 import fix 44c50a2** — the maintainer's 14-26 restart (which
+    stopped the context_recovery ping-pong) loaded the tree while the dead
+    worker's 495-line staged diff was on disk (all four channels, NO import
+    fix) → both anchor channels throw the swallowed `intercept-error
+    LOCATOR_MAX_FILE_CHARS is not defined` live (my MOVE attempt: the pair
+    marker reached the tool VERBATIM — the tool error quotes it — + the
+    intercept-error line). This CORRECTS the worker's "model-side pair-
+    emission" interpretation for 1.5 (partly right: the read `offset`
+    integer schema / constrained decoding still shadows 1.3 — the worker's
+    7/7 integer-1 observation stands for that channel).
+  - Unit 2: NEW-HIRE test — **all 11 modes PASS from the description
+    alone** + the deliberate error case (self-explaining message); no
+    in-tool friction; one cosmetic note (PEEK head/tail overlap on small
+    buffers). Verdict: the description is self-sufficient for a fresh
+    agent.
+  - Unit 3: HELD-OUT assembly — **exact 9-line expected file**, MAP/PEEK/
+    read verified. Measurement (planner script-extract from the worker
+    transcript): 29 block_transfer calls session-wide, 0 hard errors (the
+    deliberate teaching error returned as tool output), worker closed at
+    CTX=80575 (32%).
+- TODO/priority curation (this session): #102 LIVE-ACCEPTED (complete);
+  #97 live-accepted (the priority.md "# TODO #97" line moved to
+  `_past_priorities.md`); #95 status → LANDED (all four sub-items);
+  #67 status → R3 LANDED + the live-acceptance split; todo_inbox worker
+  entry curated (root cause).
+- **NEXT MAINTAINER RESTART completes:** the R3 (b)+(d) live re-test,
+  the #99 live fork test, the #98 self-compact→idle cycle, and the
+  compaction-unification proposal's live acceptance (= the
+  context_recovery re-enable). ONE restart covers all four.
 - THEN (next iteration): loop_log-v2 build
   (`approved/2026-09-12_loop_log-v2.md` — the maintainer moved it back
   to approved/ 2026-09-26 because it is not yet implemented).

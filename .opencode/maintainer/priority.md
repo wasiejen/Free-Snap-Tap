@@ -37,6 +37,17 @@
 - you are intelligent - you will find something to do
   - go through my ideas for new research on functions. create a folder in research for each if you find something worthwhile
 
+# 2026-09-26_14-26 observation recovery_context: 
+planner-21 and "Worker_Q3S_245K_slow Task — Launch R3 arg-scope worker"
+- planner-21 started worker
+- worker ran into context limit
+- controlflow back to the planner while the worker was also compacted due to rocovery_context plugin (which came first is unknow)
+- rovery_context than restarted worker while planner-21 was active
+  - also the worker was switched to planner_Q3S_170k, which leads me to conclude that the default agent was applied because no modelID and proverID was provided
+    - also the rocovery_context restarts any session it compacts instead of giving control flow back to unit 4 of auto_resume (which should not happen, because it will cause an orphaned worker)
+    - the switch to planner_Q3S_170k (which was defined as default) lead to cache invalidation on each switch of the active session - thus each step each of the session took needed a full prefill and around 4 minutes + thinking and tool call.
+  - -> so recovery_context needs to supply the correct session providerID and modelID like compact_memory (see this for more detail) + recovery_context should not resume a compacted session.
+
 # include loop.log in your files that are only read sparingly with limit (e.g. to determine current loop number)
   - currently 30000 chars ... around 16k token (lots of numbers and dense strings)
   - easiest was to determine is to just get your session title before trying to read the loop.log?
@@ -48,8 +59,6 @@
 - a very regular problem that an edit fails
   - see # fuzzy_numword fuzzy extension on edit
 - could also be solved by a WRITE function of block_transfer
-
-# TODO #97
 
 # fuzzy_numword R8
 - R8 (to minimze loop disruptions)

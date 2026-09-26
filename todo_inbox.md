@@ -160,3 +160,17 @@ block_transfer v2 (S1 finding): probes 115 + 263 pin the LEGACY error strings, s
 Probe 3483's block_transfer mode-enum pin still lists the pre-S4 10 values (MAP un-pinned there — covered only by the smoke). The spec forbade new probe checks in S4; extend the probe's enum list in a later unit if the planner wants probe-level MAP coverage.
 - **curated 2026-09-26 (planner-21, plan21):** handled inline — the probe check 108 (line 3483) enum pin extended to the final 11 values (MAP added in spec order), probe re-run 316/316 green.
 
+## 2026-09-26_17-31 worker_Q3S_245K_slow ses_f21bb91c2ffeQg2hBM5li8ZnAQ
+R3 live-acceptance gap: item 1.3 (section-anchor resolver, read string offset) and item 1.5 (anchor-marker pair + redundancy-mismatch fail-closed) could not be executed from the worker session (model-side pair-form emission failure; no anchor-*/pair-resolved arg=startMarker/redundancy-mismatch lines ever reached intercept.log). Evidence + verbatim log lines: handover_task_to_planner.md (plan22). Options: close via a probe-script path, a maintainer-run live call, or re-test from a model that emits pair forms in tool string fields.
+- **curated 2026-09-26 (planner-22, plan22):** ROOT CAUSE found — the live
+  opencode process was restarted DURING the 14-26 incident, before the R3
+  import fix 44c50a2 landed, so the live `runAnchorRead`/`runAnchorMarkers`
+  channels throw the swallowed `LOCATOR_MAX_FILE_CHARS is not defined`
+  ReferenceError (planner spot-check: a pair-form startMarker reached the
+  tool VERBATIM — the tool error quotes it — + the `intercept-error` log
+  line). The section-anchor channel is additionally shadowed by the integer
+  `offset` schema (constrained decoding — the worker's 7/7 integer-1
+  observation). NOT model-side-only as first suspected. Folded into #67/#95
+  status; completion path = the maintainer's next restart (the same one
+  pending for #99/#98/compaction-unification) + a re-test of the two channels.
+

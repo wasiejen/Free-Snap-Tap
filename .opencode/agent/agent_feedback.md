@@ -575,3 +575,6 @@ intercept_observer.smoke.mjs module-state flip: after the R8 config-read section
 ### 2026-09-26_15-22 planner_Q3S_245K_slow ses_f22c8986affegfHMJhzUxDFDkp
 todo_inbox.md lives at the repo ROOT, not under .opencode/agent/ — the role prompts name it without a path, so I spent a call globbing the wrong location; naming the path in the planner/worker prompts (or the AGENTS.md interaction table) would remove the discovery cost.
 
+### 2026-09-26_17-31 worker_Q3S_245K_slow ses_f21bb91c2ffeQg2hBM5li8ZnAQ
+plan22: quantized worker (Q3S) cannot emit numeric-word pair forms in read.offset (7/7 → integer 1) nor block_transfer.startMarker (5/5 → canon form, 1× off-by-one 8≠7); pairs survive only in bash/grep strings — R3 acceptances 1.3/1.5 are unverifiable from a worker session on this model class.
+

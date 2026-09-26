@@ -140,9 +140,13 @@ Entries follow the AGENTS.md contract (title / evidence / outcome / acceptance /
   counts move, the log grows live). Census-basis note (worker finding): the
   spec's "139 distinct session ids" was a substring census; the script's
   field-2 census reads 86 at 3130 lines — the field-2 census is the R4
-  per-session basis (the gate is met on either basis). R3 is UNBLOCKED —
-  the build awaits maintainer approval (the plugin-scope extension is an
-  observable behavior change).
+  per-session basis (the gate is met on either basis). R3:
+   the build LANDED 2026-09-26 (3ec1c5c/44c50a2/20d5a48 — gate 337/337 + io
+   77/77; see #95 sub-item (3)). LIVE acceptance 2026-09-26 (plan22): 2 of 4
+   channels live (grep/glob pair + bash quoted-form); the section-anchor +
+   bt anchor-marker channels blocked — the live process predates the import
+   fix 44c50a2 (the 14-26 mid-incident restart) → pending the maintainer's
+   next restart.
 
 ## 68. (closed 2026-09-16, full text in todo_records.md) - Write-scope fuzzy (R2): approved + build landed green (35f8143) + one-shot live-accepted 2026-09-17 (benign mistype corrected; the #72 hazard live-measured; residual hazard -> #72 M1)
 
@@ -559,7 +563,22 @@ All those IDs stay reserved — see the numbering rule in the header.
 - **Pinned design for (2) (agreed 2026-09-25 direct):** oldString miss → the R6 content-locator candidates (anchors = distinctive lines of the oldString) → **normalize BOTH sides before comparing** (`\r\n`→`\n` + strip per-line trailing whitespace) → d=0 normalized → mutate oldString to the file's exact bytes (the CRLF/LF + trailing-whitespace class is unbounded in length — a proportional bar like 1-in-100 REJECTED: a 40-line CRLF drift = 39 chars, far beyond any proportional cap, while normalization removes it exactly); d≤1 normalized → mutate ONLY on exactly-one candidate (typo tolerance, the #72/M1 strict bar); else fail-closed + the edit-hint line; mandatory log line kind=fuzzy-edit orig=/value= (his return-info ruling); no auto-retry beyond the mutation; the R6 journal stays the recovery fallback.
 - **Acceptance:** per sub-item (each spec at launch); overall: a controlled CRLF-drift edit and a single-typo edit both resolve without agent action (log evidence), gate green at each landing.
 - **Suggested scope:** `.opencode/plugin/intercept_observer.ts` (+ core), `.opencode/plugin/tests/`, `.opencode/plugin/probes/handover_probe.mjs`, the `research/fuzzy-numword/` specs.
-- **Status:** OPEN — specs written at launch from this entry.
+- **Status:** LANDED 2026-09-26 (all four sub-items: (1) R6 acb6323;
+  (2) edit-fuzzy 15761d8+78b68e7; (3) R3 3ec1c5c/44c50a2/20d5a48;
+  (4) R8 + return-info #97 07bdd56/0d9b8e6). Live acceptances
+  2026-09-26 (plan22): the grep/glob pair + bash quoted-form R3 channels
+  live-accepted (worker-22) + the #97 Windows-root redirect form
+  (planner spot-check); the section-anchor + bt anchor-marker channels
+  NOT live-verifiable — ROOT CAUSE: the live opencode process was
+  restarted DURING the 14-26 incident, before the R3 import fix 44c50a2
+  landed, so both anchor channels throw the swallowed
+  `LOCATOR_MAX_FILE_CHARS is not defined` ReferenceError live (planner
+  spot-check: a pair-form startMarker reached the tool VERBATIM + the
+  `intercept-error` log line); the section-anchor channel is additionally
+  shadowed by the integer `offset` schema (constrained decoding — the
+  worker's 7/7 integer-1 observation). Completion path = the maintainer's
+  NEXT restart (the same one pending for #99/#98/compaction-unification)
+  + a re-test of the two channels.
   2026-09-25 (autorun, ses_f29afbb66ffeRM1EHgBIpTwTg5, planner-14): his
   GO for sub-item (2) — the normalize-then-compare design is CONFIRMED
   (his words: better than the proportional distance rule; go ahead) +
@@ -639,10 +658,13 @@ All those IDs stay reserved — see the numbering rule in the header.
   handover). The return-info/feedback half landed as Unit 2 (his
   context-saving ruling honored: truncated first form in the feedback,
   full pre-mutation payload in the journal `pre-escape` field).
-  Sign-offs (handover §deliberately-not-done): S28 probe section
-  placement, `pair-resolved` verdict reuse (the 12-token vocabulary is
-  pinned), the redirect note text, the 13b hint token — all accepted by
-  planner-17.
+   Sign-offs (handover §deliberately-not-done): S28 probe section
+   placement, `pair-resolved` verdict reuse (the 12-token vocabulary is
+   pinned), the redirect note text, the 13b hint token — all accepted by
+   planner-17. **LIVE-ACCEPTED 2026-09-26 (plan22, planner spot-check):**
+   the Windows-root form `C:\Users\Wasiejen\AppData\Local\Temp\
+   plan22_r8.txt` redirected 1:1 into the scratchpad (the `kind=redirect`
+   line delivered in the tool feedback — the R8 note mechanism live).
 
 ## #98. (LANDED, 2026-09-25, worker-16; Parts A+B implemented + smoke re-pinned, Part C not-applicable per the planner ruling) unit-4 resume-after-compaction: line-anchor the action regex (A) + re-arm on COMPACT (B) + prompt note (C)
 - **Problem / evidence:** `proposals/approved/2026-09-23_unit4-
@@ -830,11 +852,11 @@ All those IDs stay reserved — see the numbering rule in the header.
   BASH `command`-string redirect (same resolver over the mapped POSIX spans;
   unmapped spans fail-closed, the note stays) + pins (smoke 64→68, probe
   297→305 — the new S29 section, checks 297-304). Measured: smoke 68/68,
-  probe 305/305, pytest 459+1w, ruff F=0. LIVE acceptance (a live-session
-  /tmp write+read) deferred to the maintainer's process restart (this
-  session's live plugin runs the pre-restart code — a live /tmp touch would
-  test the old code and stop the session; the S1 friction scenario is the
-  acceptance probe after the restart).
+  probe 305/305, pytest 459+1w, ruff F=0. **LIVE ACCEPTED 2026-09-26
+  (plan22, worker-22 ses_f21bb91c):** both forms redirected 1:1 — bash
+  `kind=redirect … orig=/tmp/plan22_acc.txt value=C:/…/Temp/opencode/
+  plan22_acc.txt` + the write-tool form (`orig=/tmp/plan22_acc2.txt`); both
+  files landed in the scratchpad with correct content (entry complete).
 
 ## #101. (LANDED 2026-09-26, explorer ses_f24bf71beffekwRYMtnlrWy5UG, commit 1081e52; GO 2026-09-25 direct) opencode host map — one-time explorer task: map the installed host internals so planner/worker LOOK UP instead of re-deriving
 - **Problem / evidence:** every task re-pays the derivation cost of opencode host facts (SDK v1/v2 shape, plugin hook surface, session/message/part DB schema, permission system, the compaction/summarize path) — knowledge is gathered per task, not accumulated as a map (maintainer observation 2026-09-25: "we derive the same knowledge often again and again").
