@@ -4409,11 +4409,11 @@ n18++;
   check(
     String(n18),
     "S18",
-    "export fix: plugin module = default factory ONLY (every Object.values entry a function); named core in the core module (VERDICTS = 6 + 2 fuzzy + pair-resolved + the two R6 edit-hint tokens + the (2) fuzzy-edit mutation token)",
+    "export fix: plugin module = default factory ONLY (every Object.values entry a function); named core in the core module (VERDICTS = 6 + 2 fuzzy + pair-resolved + the two R6 edit-hint tokens + the (2) fuzzy-edit mutation token + the two R3 section-anchor tokens)",
     ioVals.length === 1 && ioVals.every((v) => typeof v === "function") &&
       typeof ioMod.default === "function" &&
       typeof ioCore.resolveReadPath === "function" && typeof ioCore.buildCorpus === "function" &&
-      typeof ioCore.observeArg === "function" && Array.isArray(ioCore.VERDICTS) && ioCore.VERDICTS.length === 12,
+      typeof ioCore.observeArg === "function" && Array.isArray(ioCore.VERDICTS) && ioCore.VERDICTS.length === 14,
     JSON.stringify({ pluginKeys: Object.keys(ioMod), verdicts: ioCore.VERDICTS.length }),
   );
   n18++;

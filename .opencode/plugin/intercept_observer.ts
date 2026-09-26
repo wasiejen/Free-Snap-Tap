@@ -193,7 +193,7 @@
 
 import type { Plugin, PluginInput } from "@opencode-ai/plugin";
 import { spawnSync } from "node:child_process";
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from "node:fs";
+import { appendFileSync, closeSync, existsSync, mkdirSync, openSync, readFileSync, readSync } from "node:fs";
 import { dirname, isAbsolute, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
@@ -206,18 +206,22 @@ import {
   classifyContext,
   collapseAdjacentDup,
   flattenField,
+  inQuotedSpan,
   loadNumwordMap,
   locateContent,
+  matchAnchorPrefixLines,
   matchNearPathSegments,
   nearestExistingDir,
   normPathForm,
   normSandboxPath,
   observeArg,
   observeSandbox,
+  quotedSpans,
   relForm,
   resolveEditOldString,
   resolveReadPath,
   resolveRedirect,
+  resolveSectionAnchor,
   resolveWritePath,
   SCRATCHPAD_ROOT,
 } from "./intercept_observer_core.ts";
@@ -373,10 +377,12 @@ function getCorpus(root: string): string[] {
 // original arg, gate evidence logged). A mutation logs the new
 // `pair-resolved` verdict; a gate-fail logs the pair verdict (ok/mismatch)
 // with the gate evidence. Never throws.
-function runPairRead(output: { args?: unknown }): Observation[] {
+// The field-parameterized READ-scope PAIR channel (R3, 2026-09-26: the
+// read `filePath` + the glob/grep `path` field share ONE gate).
+function runPairField(output: { args?: unknown }, field: string): Observation[] {
   const args = output?.args;
   if (args == null || typeof args !== "object") return [];
-  const filePath = (args as { filePath?: unknown }).filePath;
+  const filePath = (args as Record<string, unknown>)[field];
   if (typeof filePath !== "string" || filePath.trim() === "" || map === null) return [];
   const checks = checkPairs(filePath, map);
   if (checks.length === 0) return [];
@@ -388,7 +394,7 @@ function runPairRead(output: { args?: unknown }): Observation[] {
   const canonExists = existsSync(abs(canon));
   const origExists = existsSync(abs(filePath));
   const mutate = canonExists && !origExists;
-  if (mutate) (args as { filePath: string }).filePath = canon;
+  if (mutate) (args as Record<string, string>)[field] = canon;
   const gate = mutate ? "mutated" : canonExists && origExists ? "both-exist" : "none-exist";
   return checks.map((pc) =>
     pc.verdict === "no-candidate"
@@ -405,15 +411,47 @@ function runPairRead(output: { args?: unknown }): Observation[] {
   );
 }
 
+function runPairRead(output: { args?: unknown }): Observation[] {
+  return runPairField(output, "filePath");
+}
+
+// R3 (2026-09-26): the GLOB / GREP pair channel — READ semantics on the
+// `path` field (the same gate as runPairField: mismatch RESOLVES, right-
+// wins; the existence gate is unchanged) + the content-scope guard for
+// the OTHER string fields (`pattern` / `include` — observation-form pair
+// line ONLY, never mutated; the R2 precedent, the `args[1:one]` guard).
+function runPairGlobGrep(output: { args?: unknown }): Observation[] {
+  const lines = runPairField(output, "path");
+  const args = output?.args;
+  if (args == null || typeof args !== "object" || map === null) return lines;
+  for (const [field, value] of Object.entries(args as Record<string, unknown>)) {
+    if (field === "path" || typeof value !== "string" || value === "") continue;
+    for (const pc of checkPairs(value, map)) {
+      lines.push(
+        pc.verdict === "no-candidate"
+          ? noCandidateLine(pc, classifyContext(value))
+          : {
+              verdict: pc.verdict,
+              evidence: `pair=${pc.raw} canon=${pc.canonical} dist=${pc.dist}`,
+              context: classifyContext(value),
+            },
+      );
+    }
+  }
+  return lines;
+}
+
 // Read-scope ONLY (research §2.3 — the scope rule): a wrong fuzzy match on
 // a READ is self-correcting; on a WRITE it is data loss. Returns the fuzzy
-// Observation (null = untouched: not a read, no string filePath, or an
-// exact/normalized-existing path) and MUTATES `output.args.filePath` to the
-// resolved absolute path when the matcher resolved. Never throws.
-function runFuzzyRead(output: { args?: unknown }): Observation | null {
+// Observation (null = untouched: no string path field, or an exact/
+// normalized-existing path) and MUTATES the field to the resolved absolute
+// path when the matcher resolved. R3 (2026-09-26): field-parameterized —
+// the read `filePath` + the glob/grep `path` field share ONE matcher.
+// Never throws.
+function runFuzzyField(output: { args?: unknown }, field: string): Observation | null {
   const args = output?.args;
   if (args == null || typeof args !== "object") return null;
-  const filePath = (args as { filePath?: unknown }).filePath;
+  const filePath = (args as Record<string, unknown>)[field];
   if (typeof filePath !== "string" || filePath.trim() === "") return null;
   // absolute form against the workspace root (cwd-independent)
   const abs = isAbsolute(filePath) ? filePath : join(dir || ".", filePath);
@@ -427,7 +465,7 @@ function runFuzzyRead(output: { args?: unknown }): Observation | null {
   // (the matchers below, unchanged).
   const collapsed = collapseAdjacentDup(abs);
   if (collapsed !== null && existsSync(collapsed)) {
-    (args as { filePath: string }).filePath = collapsed;
+    (args as Record<string, string>)[field] = collapsed;
     return {
       verdict: "fuzzy-resolved",
       evidence: `fuzzy kind=dedup scope=read orig=${filePath} -> ${collapsed} d=0`,
@@ -448,7 +486,7 @@ function runFuzzyRead(output: { args?: unknown }): Observation | null {
     const seg = matchNearPathSegments(rel, corpus);
     if (seg.kind === "exact") return null;
     if (seg.kind === "resolved") {
-      (args as { filePath: string }).filePath = join(root, seg.path);
+      (args as Record<string, string>)[field] = join(root, seg.path);
       return {
         verdict: "fuzzy-resolved",
         evidence: `fuzzy kind=seg scope=read orig=${filePath} -> ${seg.path} d=${seg.d} gap=${seg.gap === Infinity ? "inf" : seg.gap}`,
@@ -459,7 +497,7 @@ function runFuzzyRead(output: { args?: unknown }): Observation | null {
   const res = resolveReadPath(rel, corpus);
   if (res.kind === "exact") return null; // normalized-equal — untouched
   if (res.kind === "resolved") {
-    (args as { filePath: string }).filePath = join(root, res.path);
+    (args as Record<string, string>)[field] = join(root, res.path);
     return {
       verdict: "fuzzy-resolved",
       evidence: `fuzzy orig=${filePath} -> ${res.path} d=${res.d} gap=${res.gap === Infinity ? "inf" : res.gap}`,
@@ -471,6 +509,10 @@ function runFuzzyRead(output: { args?: unknown }): Observation | null {
     evidence: `fuzzy orig=${filePath} cands=${res.cands.map(([p, d]) => `${p} ${d}`).join(",")} reason=${res.reason}`,
     context: classifyContext(filePath),
   };
+}
+
+function runFuzzyRead(output: { args?: unknown }): Observation | null {
+  return runFuzzyField(output, "filePath");
 }
 
 // ------------------------------------------------------------------ write-scoped resolution (R2, 2026-09-16)
@@ -652,10 +694,14 @@ function runPairWrite(output: { args?: unknown }, tool: string): Observation[] {
     }
   }
   // the content-scope guard: the OTHER string fields of the same call carry
-  // the observation-form pair line only (never mutated, no gate evidence)
+  // the observation-form pair line only (never mutated, no gate evidence).
+  // R3 (2026-09-26): the block_transfer ANCHOR fields are owned by the
+  // anchor-marker channel (runAnchorMarkers) — excluded here (no double-
+  // logging).
+  const anchorOwned = tool === "block_transfer" ? ["startMarker", "endMarker", "targetMarker"] : [];
   for (const [field, value] of Object.entries(args as Record<string, unknown>)) {
     if (lines.length >= MAX_LINES_PER_CALL) break;
-    if (fields.includes(field) || typeof value !== "string" || value === "") continue;
+    if (fields.includes(field) || anchorOwned.includes(field) || typeof value !== "string" || value === "") continue;
     for (const pc of checkPairs(value, map)) {
       if (lines.length >= MAX_LINES_PER_CALL) break;
       lines.push(
@@ -781,14 +827,17 @@ function gitRefExists(run: string): boolean {
 // candidate). run < 4 hex chars → the bare log-only line (the gate is not
 // even attempted — the `echo [4:four]` form); run >= 4 → the ref-existence
 // gate; MUTATE (all pairs, all-or-nothing) only when EVERY run exists. A
-// MISMATCH fails closed (bare mismatch lines, no gate attempt). Never
-// throws.
+// MISMATCH fails closed (bare mismatch lines, no gate attempt). R3 (2026-
+// 09-26): the OWNERSHIP SPLIT — pairs INSIDE a quoted span are owned by the
+// quoted-form channel (runQuotedBash); this channel keeps the UNQUOTED
+// pairs (its behavior for them is unchanged). Never throws.
 function runGitRefBash(output: { args?: unknown }): Observation[] {
   const args = output?.args;
   if (args == null || typeof args !== "object" || map === null) return [];
   const command = (args as { command?: unknown }).command;
   if (typeof command !== "string" || command.trim() === "") return [];
-  const checks = checkPairs(command, map);
+  const spans = quotedSpans(command); // R3: the quoted-pair ownership split
+  const checks = checkPairs(command, map).filter((pc) => !inQuotedSpan(spans, pc.start, pc.end));
   if (checks.length === 0) return [];
   const ctx = classifyContext(command);
   const okPairs = checks.filter((pc) => pc.verdict !== "no-candidate");
@@ -838,6 +887,251 @@ function runGitRefBash(output: { args?: unknown }): Observation[] {
           context: ctx,
         },
   );
+}
+
+// ------------------------------------------------------------------ R3 (2026-09-26) — the arg-scope extension
+//
+// (7) THE BASH QUOTED-FORM CHANNEL (spec R3 — "quoted-form resolution"):
+// every `[left:right]` pair INSIDE a quoted string of the bash `command`
+// resolves (right-wins) — the quoted span is the safe carrier (the
+// AGENTS.md quoting rule is the companion: the form is QUOTED when it
+// passes through a bash command, which both protects the span from the
+// shell's glob expansion and delimits it for the resolver). One
+// kind=redirect-STYLE line per resolved span (the `kind=quoted` flag; the
+// twelve VERDICTS stay byte-identical — `pair-resolved` is REUSED, the
+// kind=dedup/kind=seg/kind=redirect precedent). The REF gate is PRESERVED
+// where the canonical digits sit in a >=4-hex run (gitRefExists — the
+// gate stays MANDATORY): ref exists → mutate (gate=ref-mutated, the R2
+// form); ref absent → FAIL-CLOSED for that pair (gate=ref-rejected, log
+// only — the R2 form). A run < 4 → the quoted resolution (no gate). A
+// MISMATCH pair fails closed (gate=fail-closed, the R2 write form — no
+// mutation). Mutation is PER PAIR (each quoted span is an independent
+// shell word — no all-or-nothing across spans; the ref channel's
+// all-or-nothing stays for the unquoted pairs). Runs AFTER runGitRefBash
+// (the effective command). Never throws.
+function runQuotedBash(output: { args?: unknown }): Observation[] {
+  const args = output?.args;
+  if (args == null || typeof args !== "object" || map === null) return [];
+  const command = (args as { command?: unknown }).command;
+  if (typeof command !== "string" || command.trim() === "") return [];
+  const spans = quotedSpans(command);
+  if (spans.length === 0) return [];
+  const checks = checkPairs(command, map).filter((pc) => inQuotedSpan(spans, pc.start, pc.end));
+  if (checks.length === 0) return [];
+  const ctx = classifyContext(command);
+  const okPairs = checks.filter((pc) => pc.verdict === "observed-redundancy-ok");
+  // candidate command with every ok pair replaced by its canonical digits
+  let full = command;
+  for (const pc of okPairs) full = full.split(pc.raw).join(pc.canonical!);
+  const isHex = (ch: string) => (ch >= "0" && ch <= "9") || (ch >= "a" && ch <= "f") || (ch >= "A" && ch <= "F");
+  // per ok pair (source order, disjoint spans): the maximal hex run spanning
+  // the canonical digits in the candidate; a left pair's substitution
+  // shifts the span by its length delta (the R2 runGitRefBash shape)
+  let shift = 0;
+  const runOf = new Map<PairCheck, string>();
+  for (const pc of okPairs) {
+    const start = pc.start + shift;
+    const end = start + (pc.canonical ?? "").length;
+    let a = start;
+    while (a > 0 && isHex(full[a - 1])) a--;
+    let b = end;
+    while (b < full.length && isHex(full[b])) b++;
+    runOf.set(pc, full.slice(a, b));
+    shift += (pc.canonical ?? "").length - pc.raw.length;
+  }
+  let cur = command;
+  const lines: Observation[] = [];
+  for (const pc of checks) {
+    if (pc.verdict === "no-candidate") {
+      lines.push(noCandidateLine(pc, ctx));
+      continue;
+    }
+    if (pc.verdict === "redundancy-mismatch") {
+      // FAIL-CLOSED: never "helpfully" rewrite a mismatched form
+      lines.push({
+        verdict: pc.verdict,
+        evidence: `pair=${pc.raw} canon=${pc.canonical} dist=${pc.dist} gate=fail-closed`,
+        context: ctx,
+      });
+      continue;
+    }
+    const run = runOf.get(pc)!;
+    if (run.length < 4 || gitRefExists(run)) {
+      // the quoted resolution (run < 4 — no gate) OR the ref gate PASSED
+      // (run >= 4, the ref exists — the R2 gate stays MANDATORY): the pair
+      // is replaced in place (the quotes stay — the shell receives the
+      // canonical digits)
+      cur = cur.split(pc.raw).join(pc.canonical!);
+      lines.push(
+        run.length < 4
+          ? {
+              verdict: "pair-resolved",
+              evidence: `kind=quoted tool=bash arg=command pair=${pc.raw} canon=${pc.canonical} dist=${pc.dist}`,
+              context: ctx,
+            }
+          : {
+              verdict: "pair-resolved",
+              evidence: `pair=${pc.raw} canon=${pc.canonical} dist=${pc.dist} gate=ref-mutated run=${run}`,
+              context: ctx,
+            },
+      );
+    } else {
+      // FAIL-CLOSED: the ref does not exist — log only, no mutation
+      lines.push({
+        verdict: "observed-redundancy-ok",
+        evidence: `pair=${pc.raw} canon=${pc.canonical} dist=${pc.dist} gate=ref-rejected run=${run}`,
+        context: ctx,
+      });
+    }
+  }
+  if (cur !== command) (args as { command: string }).command = cur;
+  return lines;
+}
+
+// The bounded file read (R3 — the anchor channels read only the first
+// `cap` chars; NEVER the whole file): null when missing / unreadable.
+// Never throws.
+function readFileCapped(p: string, cap: number): string | null {
+  try {
+    const fd = openSync(p, "r");
+    try {
+      const buf = Buffer.alloc(cap);
+      const n = readSync(fd, buf, 0, cap, 0);
+      return buf.toString("utf8", 0, n);
+    } finally {
+      closeSync(fd);
+    }
+  } catch {
+    return null;
+  }
+}
+
+// (8) THE SECTION-ANCHOR RESOLVER (`read` only, research §2.6 — design
+// source: research doc §2.6, the resolver shape): a non-numeric STRING
+// `offset` is a section anchor (a short UNIQUE line prefix — the
+// block_transfer marker convention). BOUNDED grep on the NAMED file only
+// (the effective, post-pair/fuzzy path — the resolver runs AFTER the
+// fuzzy channel): exactly one match → `offset` is REWRITTEN to that
+// 1-based line number (+ `limit` clamped to the file end when present) +
+// the `anchor-resolved` line; 0 or >=2 matches → FAIL-CLOSED (the string
+// offset RUNS — the host's honest schema/absent error surfaces) + the
+// `anchor-rejected` line with the match count. A numeric STRING offset is
+// a TYPE REPAIR → a number (silent, no line — line-offsets stay the
+// FALLBACK, always working). File missing → silent fail-closed (no anchor
+// line — the read's honest "not found" surfaces). Field 7 = `read offset`
+// (the "what the arg is" convention). Never throws.
+function runAnchorRead(output: { args?: unknown }): Observation | null {
+  const args = output?.args;
+  if (args == null || typeof args !== "object") return null;
+  const a = args as { filePath?: unknown; offset?: unknown; limit?: unknown };
+  if (typeof a.filePath !== "string" || a.filePath.trim() === "") return null;
+  const offset = a.offset;
+  if (typeof offset !== "string" || offset === "") return null; // numeric offset — the fallback (untouched)
+  if (/^\d+$/.test(offset)) {
+    a.offset = parseInt(offset, 10); // a numeric string — the type repair (silent)
+    return null;
+  }
+  const abs = isAbsolute(a.filePath) ? a.filePath : join(dir || ".", a.filePath);
+  const fileText = readFileCapped(abs, LOCATOR_MAX_FILE_CHARS);
+  if (fileText === null) return null; // file missing — silent fail-closed
+  const res = resolveSectionAnchor(fileText, offset);
+  if (res.kind === "rejected") {
+    return { verdict: "anchor-rejected", evidence: `anchor=${offset} matches=${res.matches}`, context: "read offset" };
+  }
+  // resolved: rewrite offset to the line number (+ clamp limit to the end)
+  a.offset = res.line;
+  if (typeof a.limit === "number" && a.limit > res.total - res.line + 1) a.limit = res.total - res.line + 1;
+  return { verdict: "anchor-resolved", evidence: `anchor=${offset} line=${res.line}`, context: "read offset" };
+}
+
+// (9) THE BLOCK_TRANSFER ANCHOR-MARKER CHANNEL (spec R3 — "pair/fuzzy on
+// anchor markers"): the anchor markers decide WHERE a block lands, so
+// this rides the R2 WRITE-SCOPE gate logic (strict existence, fail-closed
+// on mismatch) — NOT read semantics. Composed with the S1 resolveAnchor
+// taxonomy (the re-scope note, 2026-09-26): the pair form is resolved
+// FIRST (right-wins canonical marker text), then the SAME startsWith+
+// unique rule (matchAnchorPrefixLines — the S1 matcher, the
+// exactly-one contract) is applied to the RESOLVED marker in the target
+// file: startMarker / endMarker → the effective srcFile; targetMarker →
+// the effective dstFile (both post pair/fuzzy mutation — the channel runs
+// after runPairWrite / runFuzzyWrite).
+//   EXISTENCE GATE (strict): the field is MUTATED to the canonical marker
+//   only when the canonical marker matches EXACTLY ONE line AND the
+//   pair-form marker matches NONE — gate tokens: `mutated line=<n>` /
+//   `both-exist` (the original resolves too) / `non-unique` (the
+//   canonical matches >=2 — the S1 uniqueness contract) / `none-exist`.
+//   A MISMATCH pair FAILS CLOSED (gate=fail-closed, never a mutated
+//   anchor). One line per pair (the channel cap: MAX_LINES_PER_CALL).
+//   The anchor fields are EXCLUDED from runPairWrite's content-scope loop
+//   (this channel owns them — no double-logging). Never throws.
+function runAnchorMarkers(output: { args?: unknown }): Observation[] {
+  const args = output?.args;
+  if (args == null || typeof args !== "object" || map === null) return [];
+  const a = args as Record<string, unknown>;
+  const abs = (p: unknown) => (typeof p === "string" && p.trim() !== "" ? (isAbsolute(p) ? p : join(dir || ".", p)) : "");
+  const srcFile = abs(a.srcFile);
+  const dstFile = abs(a.dstFile);
+  const fields: Array<{ field: string; file: string }> = [
+    { field: "startMarker", file: srcFile },
+    { field: "endMarker", file: srcFile },
+    { field: "targetMarker", file: dstFile },
+  ];
+  const lines: Observation[] = [];
+  for (const { field, file } of fields) {
+    if (lines.length >= MAX_LINES_PER_CALL) break;
+    const raw = a[field];
+    if (typeof raw !== "string" || raw.trim() === "") continue;
+    const checks = checkPairs(raw, map);
+    if (checks.length === 0) continue;
+    const ctx = classifyContext(raw);
+    if (checks.some((pc) => pc.verdict === "redundancy-mismatch")) {
+      // FAIL-CLOSED: never "helpfully" rewrite a mismatched anchor target
+      for (const pc of checks) {
+        if (lines.length >= MAX_LINES_PER_CALL) break;
+        lines.push(
+          pc.verdict === "no-candidate"
+            ? noCandidateLine(pc, ctx)
+            : {
+                verdict: pc.verdict,
+                evidence: `pair=${pc.raw} canon=${pc.canonical} dist=${pc.dist} gate=fail-closed arg=${field}`,
+                context: ctx,
+              },
+        );
+      }
+      continue;
+    }
+    // the canonical marker: every resolved pair → its right-derived digits
+    let canon = raw;
+    for (const pc of checks) if (pc.canonical !== null) canon = canon.split(pc.raw).join(pc.canonical);
+    // the S1 anchor taxonomy on the target file (bounded read; missing
+    // file → no matches — the honest gate evidence)
+    const fileText = file === "" ? null : readFileCapped(file, LOCATOR_MAX_FILE_CHARS);
+    const canonMatches = fileText === null ? [] : matchAnchorPrefixLines(fileText, canon);
+    const origMatches = fileText === null ? [] : matchAnchorPrefixLines(fileText, raw);
+    const mutate = canonMatches.length === 1 && origMatches.length === 0;
+    if (mutate) a[field] = canon;
+    const gate =
+      mutate
+        ? `mutated line=${canonMatches[0]}`
+        : canonMatches.length >= 1 && origMatches.length >= 1
+          ? "both-exist"
+          : canonMatches.length >= 2
+            ? "non-unique"
+            : "none-exist";
+    for (const pc of checks) {
+      if (lines.length >= MAX_LINES_PER_CALL) break;
+      lines.push(
+        pc.verdict === "no-candidate"
+          ? noCandidateLine(pc, ctx)
+          : {
+              verdict: mutate ? "pair-resolved" : pc.verdict,
+              evidence: `pair=${pc.raw} canon=${pc.canonical} dist=${pc.dist} gate=${gate} arg=${field}`,
+              context: ctx,
+            },
+      );
+    }
+  }
+  return lines.slice(0, MAX_LINES_PER_CALL);
 }
 
 // ------------------------------------------------------------------ R6 payload journal + edit hint (2026-09-25)
@@ -1064,31 +1358,51 @@ async function onToolBefore(
     // CORRECTION-CHANNEL OWNERSHIP (no double-logging — observeArg skips the
     // pair class for a call whose channel owns the pair lines):
     //   read + string filePath            → the read pair channel (R1)
+    //   glob/grep + string path           → the glob/grep pair channel (R3;
+    //                                        READ semantics on `path`, the
+    //                                        other string fields observation-
+    //                                        form — the R2 content-scope guard)
     //   write/edit/block_transfer         → the write pair channel (R2; owns
     //                                        ALL pair lines of the call —
     //                                        path fields gated, the other
     //                                        string fields observation-form)
-    //   bash + string `command`           → the git-ref channel (R2)
+    //                                        + the block_transfer ANCHOR-
+    //                                        MARKER channel (R3; the anchor
+    //                                        fields are owned by it, not by
+    //                                        the content-scope loop)
+    //   bash + string `command`           → the git-ref channel (R2, the
+    //                                        UNQUOTED pairs) + the quoted-
+    //                                        form channel (R3, the quoted
+    //                                        pairs — the ownership split)
     // Raw-string args (not an object) keep the R1 observation behavior —
     // the channels never mutate unstructured strings.
     const isObj = output?.args != null && typeof output.args === "object";
     const readFilePath = isObj ? (output.args as { filePath?: unknown }).filePath : undefined;
     const pairOwned = tool === "read" && typeof readFilePath === "string";
+    const globGrepOwned =
+      isObj && (tool === "glob" || tool === "grep") && typeof (output.args as { path?: unknown }).path === "string";
     const writeOwned = isObj && writePathFields(tool).length > 0;
     const bashOwned = isObj && tool === "bash" && typeof (output.args as { command?: unknown }).command === "string";
-    const skipPairs = pairOwned || writeOwned || bashOwned;
+    const skipPairs = pairOwned || globGrepOwned || writeOwned || bashOwned;
     // Pipeline order: the pair channel (may mutate), then the fuzzy
     // matcher on the (possibly pair-mutated) result (decision-record
     // §2.6). Channel lines log BEFORE the observation lines (the
     // pair-before-dense order the smoke/probe pins).
     let channel: Observation[] = [];
     let fuzzy: Observation[] = [];
+    let anchorLines: Observation[] = [];
     if (pairOwned) channel = runPairRead(output);
+    else if (globGrepOwned) channel = runPairGlobGrep(output); // R3 (2026-09-26)
     else if (writeOwned) channel = runPairWrite(output, tool);
-    else if (bashOwned) channel = runGitRefBash(output);
+    else if (bashOwned) channel = [...runGitRefBash(output), ...runQuotedBash(output)]; // R3: the quoted-form channel (after the ref channel — the effective command)
     let obs = argStr === "" ? [] : observeArg(argStr, map, dir || null, skipPairs);
     if (pairOwned) {
       const f = runFuzzyRead(output); // read-scope ONLY
+      if (f !== null) fuzzy = [f];
+      const a = runAnchorRead(output); // R3: the section-anchor resolver (AFTER the fuzzy channel — the effective path)
+      if (a !== null) anchorLines = [a];
+    } else if (globGrepOwned) {
+      const f = runFuzzyField(output, "path"); // R3: read-scope (d<=2/gap>=2)
       if (f !== null) fuzzy = [f];
     } else if (writeOwned && tool !== "write") {
       // M1, 2026-09-17, #72: `write` excluded from the fuzzy channel —
@@ -1096,6 +1410,11 @@ async function onToolBefore(
       // never hijack the target (edit/block_transfer keep the channel;
       // the pair channel above is unaffected for all three tools)
       fuzzy = runFuzzyWrite(output, tool); // write-scope ONLY
+    }
+    if (writeOwned && tool === "block_transfer") {
+      // R3 (2026-09-26): the ANCHOR-MARKER channel (block_transfer only —
+      // runs on the EFFECTIVE src/dst, after the pair/fuzzy channels)
+      anchorLines = runAnchorMarkers(output);
     }
     // R8 (#97, 2026-09-25) + #102 (2026-09-26, the bash `command` string):
     // the 1:1 allowed-root redirect over the TYPED path fields + the
@@ -1139,12 +1458,14 @@ async function onToolBefore(
       if (hint !== null && hint.verdict !== "fuzzy-edit") storeHint(str(input?.callID), hint.evidence);
     }
     if (writeOwned) appendJournal(tool, sid, output.args as Record<string, unknown>, editOldOriginal);
-    if (obs.length === 0 && channel.length === 0 && redirect.length === 0 && fuzzy.length === 0 && hint === null) return; // nothing to log
+    if (obs.length === 0 && channel.length === 0 && redirect.length === 0 && fuzzy.length === 0 && anchorLines.length === 0 && hint === null)
+      return; // nothing to log
     model = await getModel(sid);
     for (const o of channel) appendObservation(sid, model, tool, argStr, o);
     for (const o of redirect) appendObservation(sid, model, tool, argStr, o); // channel lines before observation lines
     for (const o of obs) appendObservation(sid, model, tool, argStr, o);
     for (const o of fuzzy) appendObservation(sid, model, tool, argStr, o);
+    for (const o of anchorLines) appendObservation(sid, model, tool, argStr, o); // R3: the anchor channels (after the fuzzy channels — the effective args)
     if (hint !== null) appendObservation(sid, model, tool, argStr, hint);
   } catch (e) {
     // at most ONE intercept-error line; the hook returns silently (the model

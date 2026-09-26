@@ -71,13 +71,14 @@ try {
       typeof core.flattenField === "function" && typeof core.resolveReadPath === "function" &&
       typeof core.matchNearPathSegments === "function" && typeof core.buildCorpus === "function" &&
       Array.isArray(core.VERDICTS));
-   chk("VERDICTS vocabulary (exactly the twelve: the six observation + the two fuzzy + pair-resolved + the two R6 edit-hint + the (2) fuzzy-edit)",
-     JSON.stringify([...core.VERDICTS]) === JSON.stringify([
-       "observed-redundancy-ok", "redundancy-mismatch", "no-candidate",
-       "ambiguous", "out-of-sandbox", "path-anomaly",
-       "fuzzy-resolved", "fuzzy-rejected", "pair-resolved",
-       "edit-hint", "edit-ambiguous", "fuzzy-edit",
-     ]));
+    chk("VERDICTS vocabulary (exactly the fourteen: the six observation + the two fuzzy + pair-resolved + the two R6 edit-hint + the (2) fuzzy-edit + the two R3 section-anchor)",
+      JSON.stringify([...core.VERDICTS]) === JSON.stringify([
+        "observed-redundancy-ok", "redundancy-mismatch", "no-candidate",
+        "ambiguous", "out-of-sandbox", "path-anomaly",
+        "fuzzy-resolved", "fuzzy-rejected", "pair-resolved",
+        "edit-hint", "edit-ambiguous", "fuzzy-edit",
+        "anchor-resolved", "anchor-rejected",
+      ]));
    chk("the (2) edit-fuzzy core surface (normEditBytes + resolveEditOldString + EDIT_FUZZY_MAX_D=1)",
      typeof core.normEditBytes === "function" && typeof core.resolveEditOldString === "function" && core.EDIT_FUZZY_MAX_D === 1 &&
        core.normEditBytes("a  \r\nb\t\n c ") === "a\nb\n c");

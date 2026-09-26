@@ -56,8 +56,12 @@
 // rule (§2.3): READ-ONLY tools only — writes/edit/delete NEVER fuzzy
 // (a wrong fuzzy match on a read is self-correcting; on a write it is data
 // loss). The plugin hook wires this for `input.tool === "read"` with a
-// string `output.args.filePath` ONLY (glob/grep/section-anchors are NOT in
-// this unit).
+// string `output.args.filePath` — and (R3, 2026-09-26) for `glob` / `grep`
+// with a string `output.args.path` (READ semantics: the same d<=2/gap>=2
+// bar; mismatch resolves). The R3 section-anchor resolver (research §2.6)
+// lives below: a named anchor (short UNIQUE line prefix) in the read
+// `offset` string → the first line number, exactly-one match, fail-closed
+// otherwise.
 //
 // WRITE-SCOPED FUZZY (R2, 2026-09-16): the SAME matcher at the tighter
 // accept bar WRITE_FUZZY_MAX_D (1) — `resolveWritePath`. The plugin hook
@@ -89,10 +93,12 @@
 // BOTH outcomes logged — plus `pair-resolved`, the R1 read-scope pair
 // mutation token, plus the two R6 edit-hint tokens appended, 2026-09-25,
 // plus `fuzzy-edit`, the (2) mutating edit-fuzzy token appended last,
-// 2026-09-25 — twelve total):
+// 2026-09-25, plus the two R3 section-anchor tokens appended last,
+// 2026-09-26 — fourteen total):
 //   observed-redundancy-ok | redundancy-mismatch | no-candidate | ambiguous |
 //   out-of-sandbox | path-anomaly | fuzzy-resolved | fuzzy-rejected |
-//   pair-resolved | edit-hint | edit-ambiguous | fuzzy-edit
+//   pair-resolved | edit-hint | edit-ambiguous | fuzzy-edit |
+//   anchor-resolved | anchor-rejected
 // Fuzzy evidence forms (field 6):
 //   resolved: `fuzzy orig=<arg> -> <resolved-rel> d=<n> gap=<g|inf>`
 //   rejected: `fuzzy orig=<arg> cands=<p1 d1,p2 d2,p3 d3> reason=<r>`
@@ -173,6 +179,8 @@ export const VERDICTS = Object.freeze([
   "edit-hint", // R6 (2026-09-25): the edit-hint channel (locator resolved)
   "edit-ambiguous", // R6 (2026-09-25): multiple candidate lines (exact or fuzzy)
   "fuzzy-edit", // (2) (2026-09-25, #95): the MUTATING edit-fuzzy oldString verdict
+  "anchor-resolved", // R3 (2026-09-26): the section-anchor resolver (exactly-one)
+  "anchor-rejected", // R3 (2026-09-26): the section-anchor fail-closed (0 or >=2)
 ]) as readonly string[];
 
 // Priority for the per-call line cap (index = rank; ties keep input order —
@@ -192,6 +200,8 @@ const VERDICT_RANK: Record<string, number> = {
   "edit-hint": 9, // documentary (the R6 hint channel logs it separately)
   "edit-ambiguous": 10, // documentary (same)
   "fuzzy-edit": 11, // documentary (the (2) edit-fuzzy channel logs it separately)
+  "anchor-resolved": 12, // documentary (the R3 anchor channel logs it separately)
+  "anchor-rejected": 13, // documentary (same)
 };
 
 // ------------------------------------------------------------------ core types
@@ -1214,4 +1224,132 @@ export function resolveEditOldString(query: string, fileText: string, cap: numbe
     }
   }
   return { kind: "fail", bestD };
+}
+
+// ------------------------------------------------------------------ R3
+// (2026-09-26) — the arg-scope extension beyond `read`
+//
+// (1) THE SECTION-ANCHOR RESOLVER (research §2.6): a named section anchor
+// (a short UNIQUE line prefix — the `block_transfer` marker convention)
+// resolves to the FIRST line number BEFORE the read executes. The anchor
+// matcher reuses the S1 block_transfer anchor rule (block_transfer.ts
+// `matchAnchorLines`, the unified `resolveAnchor` taxonomy, 0d85a8c):
+// split on `\n`, a trailing `\r` ignored (CRLF-tolerant), the line's
+// LEADING spaces/tabs removed, then a verbatim case-sensitive prefix
+// (`startsWith`; the anchor is used as typed — no trimming of the anchor
+// itself). EXACTLY-ONE match is the gate: 1 → the first match line; 0 or
+// >=2 → fail-closed (the match count is logged). The rule is
+// self-contained here (the core stays pure — no tool-module import); the
+// PROBE pins equivalence against the block_transfer tool's own
+// `matchAnchorLines` (the drift guard).
+//
+// (2) THE QUOTED-SPAN SCANNER (the bash `command` string): the content
+// ranges of quoted spans — double-quoted (a backslash escapes the next
+// character — `\"` does not close the span) and single-quoted (no escape
+// — a backslash is literal). The R3 QUOTED-FORM channel owns every pair
+// form inside a quoted span (the AGENTS.md quoting rule is the companion:
+// the form is quoted when it passes through a bash command, so the quoted
+// span is the safe, well-delimited carrier); the R2 git-ref channel keeps
+// the UNQUOTED pairs (its ownership split is pinned in the probe).
+
+// The 1-based line numbers of ALL lines that start with the anchor after
+// removing LEADING spaces/tabs (CRLF-tolerant; the anchor verbatim,
+// case-sensitive) — the S1 block_transfer rule (matchAnchorLines).
+export function matchAnchorPrefixLines(fileText: string, anchor: string): number[] {
+  if (!anchor) return [];
+  const out: number[] = [];
+  const lines = String(fileText ?? "").split("\n");
+  for (let i = 0; i < lines.length; i++) {
+    let line = lines[i];
+    if (line.endsWith("\r")) line = line.slice(0, -1);
+    if (line.replace(/^[ \t]+/, "").startsWith(anchor)) out.push(i + 1);
+  }
+  return out;
+}
+
+// The file's conceptual line count (the SAME convention as the block_
+// transfer tool's countLines): split on /\r?\n/, minus the empty tail
+// element a trailing newline produces ("a\nb\n" = 2 lines; "" = 0).
+export function countFileLines(fileText: string): number {
+  const s = String(fileText ?? "");
+  if (s === "") return 0;
+  const n = s.split(/\r?\n/).length;
+  return s.endsWith("\n") ? n - 1 : n;
+}
+
+// The R3 section-anchor result (research §2.6):
+//   absent   — the file text is unavailable (missing / unreadable): the
+//              caller fails SILENT (no anchor line — the honest "file not
+//              found" surfaces from the read itself)
+//   resolved — EXACTLY ONE match: the FIRST match line (1-based) + the
+//              scanned total (for the caller's limit clamp)
+//   rejected — 0 or >=2 matches (FAIL-CLOSED: the match count is logged;
+//              the original args run and the honest schema/absent error
+//              surfaces)
+export type SectionAnchorResolution =
+  | { kind: "absent" }
+  | { kind: "resolved"; line: number; total: number }
+  | { kind: "rejected"; matches: number };
+
+// Resolve a section anchor against the file text (BOUNDED: the first `cap`
+// chars — the R6 locator cap LOCATOR_MAX_FILE_CHARS; a truncated scan can
+// only MISS a match, and the exactly-one gate is computed on the scanned
+// prefix — a match beyond the cap is indistinguishable from an absent
+// file, which is already the safe fail-closed direction). Never throws.
+export function resolveSectionAnchor(
+  fileText: string | null,
+  anchor: string,
+  cap: number = LOCATOR_MAX_FILE_CHARS,
+): SectionAnchorResolution {
+  if (fileText === null) return { kind: "absent" };
+  const scanned = String(fileText).slice(0, cap);
+  const matches = matchAnchorPrefixLines(scanned, anchor);
+  if (matches.length === 1) return { kind: "resolved", line: matches[0], total: countFileLines(scanned) };
+  return { kind: "rejected", matches: matches.length };
+}
+
+// The quoted-CONTENT ranges of a bash command string: [start, end) pairs,
+// source order, EXCLUDING the quote characters themselves (an empty quoted
+// span contributes nothing). Unterminated quote → the span runs to the end
+// of the command (the rest of the line is quoted). Never throws.
+export function quotedSpans(command: string): Array<[number, number]> {
+  const s = String(command ?? "");
+  const out: Array<[number, number]> = [];
+  let i = 0;
+  while (i < s.length) {
+    const c = s[i];
+    if (c === '"') {
+      let j = i + 1;
+      while (j < s.length) {
+        if (s[j] === "\\") {
+          j += 2; // an escaped char inside double quotes (\" does not close)
+          continue;
+        }
+        if (s[j] === '"') break;
+        j += 1;
+      }
+      const end = j < s.length ? j : s.length; // j = the closing quote (or EOF)
+      if (i + 1 < end) out.push([i + 1, end]);
+      i = end + 1;
+      continue;
+    }
+    if (c === "'") {
+      let j = i + 1;
+      while (j < s.length && s[j] !== "'") j += 1; // no escape inside single quotes
+      const end = j < s.length ? j : s.length;
+      if (i + 1 < end) out.push([i + 1, end]);
+      i = end + 1;
+      continue;
+    }
+    i += 1;
+  }
+  return out;
+}
+
+// Containment: does the span [start, end) lie entirely inside ONE quoted
+// content range? (A pair form cannot straddle a quote — the pair grammar
+// has no quote characters — so single-range containment is exact.)
+export function inQuotedSpan(spans: Array<[number, number]>, start: number, end: number): boolean {
+  for (const [a, b] of spans) if (start >= a && end <= b) return true;
+  return false;
 }
