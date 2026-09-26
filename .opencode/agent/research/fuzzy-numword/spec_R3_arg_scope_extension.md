@@ -32,5 +32,28 @@ Probe pins per surface (glob/grep resolution, anchor exactly-one/zero/multi,
 bash quoted-form, block_transfer anchor gate branches), smoke green,
 standard gate green.
 
+## Re-scope note (2026-09-26, planner-21 — staging)
+- The anchor-semantics drift fix (MOVE/COPY/CUT/DELETE
+  includes→startsWith + unique) is **ALREADY LANDED** in bt-v2 S1
+  (`0d85a8c` — the unified `resolveAnchor` routes ALL modes through the
+  prefix+unique rule; COPY substring tolerance removed). It no longer
+  belongs to R3 — build only the four remaining scope items above
+  (glob/grep path args, section-anchor resolver, bash quoted-form,
+  block_transfer anchor pair/fuzzy via the R2 gate logic).
+- The bash `command`-string redirect (#102, `be07ce6`) is already in the
+  core resolver — the R3 bash quoted-form resolution extends that same
+  1:1 resolver (one `kind=redirect`-style line per resolved span).
+- Baselines at staging (planner-verified 2026-09-26, post-S4): probe
+  **316/316**, block_transfer **123/123** + sandbox **64/64**,
+  intercept_observer **68/68**, pytest 459+1w, ruff F=0. Re-verify at
+  start; the measured baseline wins (S3 staging lesson).
+- The `block_transfer` anchor markers now resolve via the S1
+  `resolveAnchor` taxonomy — R3's pair/fuzzy form must COMPOSE with it
+  (pair/fuzzy resolves the marker to a line, then the same
+  startsWith+unique rule applies at the resolved site — confirm against
+  `decision-record.md` §2 if ambiguous).
+
 ## Worker
-`worker_Q4_140K`.
+`worker_Q3S_245K_slow` (spec line was `worker_Q4_140K` — stale, not in the
+live opencode.jsonc; 245K-slow = the proven worker for this build family,
+verified active).

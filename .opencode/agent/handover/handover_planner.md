@@ -30,17 +30,29 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
   probe re-run 316/316 green; todo_inbox entry curated (that fix); the
   S4 spec's proposal path corrected to `.opencode/proposals/approved/…`
   (worker friction).
-- **Queue (next iteration):** PLANNER-SIDE verification of the
-  completed tool: NEW-HIRE TEST (a fresh agent uses every mode from the
-  description ALONE — file-blind task) → HELD-OUT multi-step task
-  (assemble a 3-section file from two sources via COPY-list + APPEND,
-  then a 2-region WRITE-list, verify via PEEK/MAP; measure tool calls /
-  errors / tokens from the raw transcript). THEN: R3 + loop_log-v2
-  remain queued behind the wave. OPEN (maintainer, non-blocking):
-  WRITE-on-absent-file semantic (S3 open question).
+- **NEW-HIRE + HELD-OUT TESTS BLOCKED on the maintainer's process
+  restart (found this session):** the LIVE process predates S2 —
+  the live `block_transfer` registration carries the 7 pre-S2 modes
+  (no APPEND/WRITE/PEEK/MAP — my own session's tool schema confirms
+  it), so a live new-hire agent cannot exercise the new modes until
+  the maintainer restarts opencode (the SAME pending restart as the
+  #102 live acceptance). On restart: NEW-HIRE TEST (a fresh agent
+  uses every mode from the description ALONE — file-blind task) →
+  HELD-OUT multi-step task (assemble a 3-section file from two
+  sources via COPY-list + APPEND, then a 2-region WRITE-list, verify
+  via PEEK/MAP; measure tool calls / errors / tokens from the raw
+  transcript — script-extract from the transcript, never raw-read).
+- **R3 LAUNCHED this session** (`spec_R3_arg_scope_extension.md`
+  staged + re-scoped: the drift fix is already in S1 — build = the
+  four remaining scope items: glob/grep path args, section-anchor
+  resolver, bash quoted-form, block_transfer anchor pair/fuzzy via
+  the R2 gate). THEN: loop_log-v2 (flagged stale 14+ days — his
+  priority.md note says not yet implemented; queued).
+- OPEN (maintainer, non-blocking): WRITE-on-absent-file semantic
+  (S3 open question).
 - Live acceptances still pending the maintainer: #102 (post-restart
-  `/tmp` redirect probe), #99 live fork test, #98 (self-compact→idle
-  cycle).
+  `/tmp` redirect probe — same restart as the new-hire tests),
+  #99 live fork test, #98 (self-compact→idle cycle).
 - Friction logged: `todo_inbox.md` lives at the repo ROOT (not under
   `.opencode/agent/` — the prompts name it without a path).
 
