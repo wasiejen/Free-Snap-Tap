@@ -4,63 +4,47 @@ FIRST read AGENTS.md, repo_overview.md, TODO.md, this file.
 
 
 
-## Current session — autorun, 2026-09-26 (ses_f219349ffffe1IL7z1xCByoX45, planner-23, Qwen3.8-27B-Q3S-245K-slow)
-- **Compaction-unification build — LANDED + verified** (worker-23
-  `worker_Q3S_245K_slow` ses_f2176db5affeHupTUDVa5cZ0vR, spec `4a9e87d`;
-  approved in full 2026-09-26): Part A `218a2c1` (NEW
-  `.opencode/plugin/compaction_core.ts` — pure module, T5 pattern: shared
-  config/budget store + cap resolver/keepTokens #99 (computed primary)/
-  summarizer-pair resolution CARRYING THE SESSION'S OWN providerID+modelID
-  (the 14-26 default-agent fix)/v1 summarize/COMPACT-line writer
-  (tokens + source)/verified-success handling; `compact_memory.ts`
-  1006→487 lines = thin wrapper — dump + queued-message stay tool-local,
-  NOT regressed); Part B `d9d93f8` (`context_recovery.ts` 728→244 lines —
-  imports the core; `COMPACTION_RELOAD_DIRECTIVE` + the promptAsync resume
-  REMOVED, grep-verified zero; the hook compacts ONLY and hands control
-  back — the resume is owned by unit-4/the planner); Part C `88f902f`
-  (probe S32 checks 338-340: core surface, summarize-body EQUIVALENCE
-  tool-vs-hook over the same session/model, cap-semantics equivalence
-  incl. the hook's auto-consumed emergency-1 + no-prompt pin).
-  Gates (worker-measured, planner file-verified: commits + grep + S32
-  pins + annotation L936): probe **340/340**, smokes **74/74 + 17/17**
-  (+ auto_resume 139, io 77, bt 123+64, submit 20), pytest **459+1w**,
-  ruff **F=0**.
-- **R3 (b)+(d) live re-test (inline, post-restart):** build canary
-  PASSED (anchor channels run clean — zero new `intercept-error` lines;
-  the 44c50a2 import fix is live). (b) **bt anchor-marker PAIR channel
-  LIVE-ACCEPTED** — the pair-form `startMarker` reached the hook VERBATIM
-  + resolved (`pair=[7:seven] canon=7 dist=0 gate=mutated line=2`, 2/2,
-  intercept.log). CORRECTION to plan22: the model DOES emit the pair —
-  the agent perceives only the post-mutation canonical form (MEM-0101
-  false-repeat; the log is the authority). (d) **section-anchor channel
-  stays schema-shadowed** — `read.offset` integer + constrained decoding
-  (worker 7/7 integer-1 + my 1/1 stand); the pure resolver remains
-  probe-pinned (S31-319), the live channel dormant on this host. R3 live
-  acceptance is now COMPLETE for this model class.
-- Bookkeeping (this session): plan22's uncommitted closing leftovers
-  (friction entry + loop-log DONE line) committed (`8ea4b2b`); proposal
-  → `implemented/` + verdict; worker handover copy + `plan23_summary.md`;
-  TODO #95 status updated; knowledge curation (2 entries →
-  `knowledge_plugins.md`); the worker's block_transfer line-number-ref
-  friction entry committed.
-- Still pending the maintainer (non-blocking): **the `emergencyRecovery`
-  re-enable in `.opencode/temp/compact_budget.json` = the
-  compaction-unification live acceptance** (+ the live-fire observation
-  at the next limit hit — one COMPACT line, no promptAsync, agent+model
-  unchanged, unit-4 resumes; the 14-26 incident must not recur); #99
-  live fork test (computed keep.tokens ~27k → ≈52k); #98 self-compact→
-  idle cycle (the next natural cycle covers it); the section-anchor
-  schema question (relax `read.offset` to string, or leave pinned-only);
-  the WRITE-on-absent-file semantic (S3 open question).
-- Maintainer's live files uncommitted in the tree (his domain,
-  untouched): `.opencode/maintainer/priority.md`.
-- **NEXT (next iteration):** loop_log-v2 build
-  (`approved/2026-09-12_loop_log-v2.md` — the maintainer moved it back to
-  approved/ 2026-09-26 because it is not yet implemented; the 14-26
-  priority.md "include loop.log in sparingly-read files" observation is
-  the design input).
+## Current session — autorun, 2026-09-26 (ses_f21359d77ffe2pviXZoIavxweh, planner-24, Qwen3.8-27B-Q3S-245K-slow)
+- **In flight: loop_log-v2 build** (spec staged — this commit; worker
+  `worker_Q3S_245K_slow` launch next). Verified-at-spec state: the tool on
+  disk is v1 (strict 5-token enum, required role/model, no readback, no
+  `CORRECT-`) — the proposal's 09-15 "Planner verdict" line claiming the
+  parts landed is STALE (the maintainer's 09-18 `--info` + the file both
+  confirm unimplemented). Existing v1 pins: `tests/loop_log.smoke.mjs` +
+  probe S16 (6 checks, pins the exact v1 return) — both re-pinned in the
+  build. Spec corrects the proposal's stale "smoke in scratchpad" line
+  (tracked home `.opencode/plugin/tests/` per the smoke-harness ruling).
+- Prompt/doc bookkeeping (per the proposal's bookkeeping section, applied
+  by ME in a separate commit after verification): `agent_readme_loop.md`
+  §Loop log + the role-prompt loop lines (keywords instead of tokens;
+  optional role/model/session) + codify the cheapest iteration
+  determination (his 14-26 priority.md observation: session title
+  `planner-<N>` per #89 spawn naming / a BOUNDED grep of loop_log.md —
+  never a full read).
+- Observations triaged (unmarked → NAP only, no action): priority.md
+  `18-48` worker-23 bt line-number-ref friction (the worker's friction
+  entry already committed in plan23); `14-26` recovery_context remarks —
+  already addressed by the landed unification (A carries the session's
+  own providerID+modelID; B compacts-only); the "include loop.log in
+  sparingly-read files" question (folded into the bookkeeping above);
+  repo-split research / knowledge-submit idea / fuzzy-edit-oldstring
+  remark — unmarked, queued themes only. NOTE: `.opencode/maintainer/
+  inbox_planner/` now carries a full COPY of the loop folder's plan files
+  (plan1..23 + loop_log.md) — looks like a maintainer-side copy; NOT
+  touched (no marker designates it).
+- Maintainer's live files uncommitted (his domain, untouched):
+  `.opencode/maintainer/priority.md`.
+- Still pending the maintainer (non-blocking, unchanged from plan23):
+  `emergencyRecovery` re-enable (= unification live acceptance), #99
+  live fork test, #98 self-compact→idle cycle, the section-anchor schema
+  question, the WRITE-on-absent-file semantic.
+- **NEXT (after worker return):** verify loop_log-v2 from files (git log
+  + targeted spot re-run — NO full gate re-run in my window, his
+  2026-09-23_00-12 ruling) → prompt/doc bookkeeping commit → summary +
+  loop-log DONE.
 
 ## Compressed archive (one line each
+  - 2026-09-26 autorun (ses_f219349ffffe1IL7z1xCByoX45, planner-23, Q3S-245K-slow) — plan23: compaction-unification LANDED+verified (worker-23: 218a2c1/d9d93f8/88f902f — shared compaction_core.ts + thin wrappers + S32 equivalence pins; gate 340/340 + 74/74 + 17/17 + 459+1w + F=0) + R3 (b) bt pair channel LIVE-ACCEPTED / (d) section-anchor stays schema-shadowed + plan22 leftovers committed — details: loop folder plan23_summary.md + git 8ea4b2b..54e8bd9
   - 2026-09-26 autorun (ses_f21d0ced5ffe2Oyf9h3GdN3CMc, planner-22, Q3S-245K-slow) — plan22: live-verification pass LANDED (bookkeeping 00843da) — #102 `/tmp` redirect + R3 grep/glob pair + bash quoted-form + #97 Windows-root LIVE-ACCEPTED, NEW-HIRE 11/11 PASS from description alone, HELD-OUT exact 9-line (29 bt calls, 0 hard errors, closed at 32%); ROOT CAUSE of the 2 blocked R3 anchor channels = the live process PREDATES the R3 import fix 44c50a2 (the 14-26 mid-incident restart loaded the dead worker's staged diff without the fix) — details: loop folder plan22_summary.md + git fff5bea..00843da
   - 2026-09-26 autorun (ses_f22c8986affegfHMJhzUxDFDkp, planner-21, Q3S-245K-slow) — bt-v2 S4 LANDED (37c2479 — MAP + last_write + Part I description; wave COMPLETE S1–S4) + R3 LANDED via takeover (3ec1c5c/44c50a2/20d5a48: staged-diff commit + missing-import fix + probe S31 21 pins + 9 smoke checks; gate 337/337 + io 77/77) + 14-26 context_recovery incident → compaction-unification proposal filed (awaiting approval) + new-hire/held-out tests found restart-blocked + todo_inbox-path friction logged — details: loop folder plan21_summary.md + git 60e3cb1..efbff11
  - 2026-09-26 autorun (ses_f24a7fc46ffeHrj1SC7Q9CVpqc, planner-20, Qwen3.8-27B-Q3S-245K-slow) — maintenance pass (iter 20: knowledge inbox empty, #100 header fixed, stale proposals flagged) + bt-v2 S1/S2/S3 LANDED (0d85a8c/f5f888c/8cc8819, planner-verified each) + maintainer live-report triage → TODO #102 LANDED (be07ce6, `/tmp`+`/var/tmp` -> scratchpad root, live acceptance pending maintainer restart) + S15 108/109 re-pin RATIFIED — baseline probe 316/316, bt 112+61; OPEN: WRITE-on-absent-file semantic (maintainer) — details: loop folder plan20_summary.md + git 4b466f1..33b85a7
