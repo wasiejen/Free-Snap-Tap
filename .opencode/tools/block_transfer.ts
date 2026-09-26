@@ -252,7 +252,11 @@ function opLine(verb: string, count: number, phrase: string, rangeText: string, 
 export default tool({
     description: `Move, copy, cut, paste, delete, or clear multi-line blocks in files using short unique line-prefix anchors and named clipboard buffers.
 
-MODES — MOVE: immediate cut-and-paste, extracts a block from srcFile and inserts it into dstFile in one call. COPY: extract a block from srcFile into a buffer, leaving the source untouched — input forms: a single-ref pair (startMarker..endMarker), a 'refs' LIST, or a 'text' key (direct text -> buffer). APPEND: append to the named buffer, created if absent — the SAME input forms as COPY (stepwise assembly, no flags). CUT: extract into a buffer AND delete from the source. PASTE: write a buffer into dstFile. REPLACE: replace the line-anchored span (startMarker..endMarker inclusive) of dstFile with the contents of a named buffer — edit-like region replacement WITHOUT an exact oldString match (REPLACE never creates a file). WRITE: replace a line-anchored region of dstFile with direct text (bufferless — no DELETE + extra write call): one 'text' into a single span (startMarker..endMarker) or into a 'regions' LIST (each { start, end }, ALL resolved against the PRE-call file state, applied HIGHEST LINE first — no shifting; overlapping spans are rejected with the actual line numbers); the file is created if absent. PEEK: a bounded preview of a buffer — NEVER the full content: default = the line count + 3 head + 3 tail lines (each echoed capped ~40 chars, blank lines skipped when picking); or a 'from'+'count' window (capped at 25 lines). DELETE: extract a block and discard it (purge without outputting). CLEAR: empty a buffer. Use MOVE for a single direct transfer; use COPY/CUT + PASTE for multi-buffer work across files (one buffer can be pasted several times); use COPY/APPEND to assemble a buffer without a scratchpad round-trip; use REPLACE to swap a region in place (PASTE inserts, it does not replace); use WRITE for a direct text -> region write; use PEEK to inspect a buffer without pasting it out.
+WHEN — block-level file surgery: moving a section to another file (MOVE), assembling a buffer from file lines or direct text (COPY/APPEND), swapping a region from a buffer or direct text (REPLACE/WRITE), purging a block (CUT/DELETE), or inspecting a buffer without pasting it out (PEEK/MAP).
+
+WHEN-NOT — a small exact string replacement inside one file: use 'edit' — it matches an exact oldString (string-level); block_transfer is LINE-anchored (a short unique line prefix or a line number) and ASCII-safe — no non-ASCII / dense-numeral oldString problems. block_transfer cannot replace a mid-line substring (use 'edit' for that); 'write' rewrites the whole file (use REPLACE/WRITE for an in-place region swap).
+
+MODES — MOVE: immediate cut-and-paste, extracts a block from srcFile and inserts it into dstFile in one call. COPY: extract a block from srcFile into a buffer, leaving the source untouched — input forms: a single-ref pair (startMarker..endMarker), a 'refs' LIST, or a 'text' key (direct text -> buffer); the buffer is REPLACED (never appended). APPEND: append to the named buffer, created if absent — the SAME input forms as COPY (stepwise assembly, no flags). CUT: extract into a buffer AND delete from the source. PASTE: write a buffer into dstFile. REPLACE: replace the line-anchored span (startMarker..endMarker inclusive) of dstFile with the contents of a named buffer — edit-like region replacement WITHOUT an exact oldString match (REPLACE never creates a file). WRITE: replace a line-anchored region of dstFile with direct text (bufferless — no DELETE + extra write call): one 'text' into a single span (startMarker..endMarker) or into a 'regions' LIST (each { start, end }, ALL resolved against the PRE-call file state, applied HIGHEST LINE first — no shifting; overlapping spans are rejected with the actual line numbers); the file is created if absent. Every WRITE auto-stores its 'text' in the buffer 'last_write' (overwritten per WRITE — automatic, no parameter): reuse it directly when an anchor resolution fails. PEEK: a bounded preview of a buffer — NEVER the full content: default = the line count + 3 head + 3 tail lines (each echoed capped ~40 chars, blank lines skipped when picking); or a 'from'+'count' window (capped at 25 lines). Full content: PASTE it to a file and read. MAP: a buffer structure at a glance — the line count + 3 head + 3 tail lines + a HEADING SKELETON (max 10, then '+N more'); lines echoed VERBATIM WITH line numbers (no cap, blank lines kept). Headings = '^#{1,6} ' at column 0 (markdown H1-H6; indented '#' EXCLUDED) — no file-type sniffing: a '#' comment in a code buffer is self-evident from the verbatim echo. DELETE: extract a block and discard it (purge without outputting). CLEAR: empty a buffer. Use MOVE for a single direct transfer; use COPY/APPEND + PASTE/REPLACE for multi-buffer work across files (one buffer can be pasted several times); use REPLACE to swap a region in place (PASTE inserts, it does not replace); use WRITE for a direct text -> region write; use PEEK/MAP to inspect a buffer without pasting it out.
 
 REFS — every ref (startMarker / endMarker / targetMarker, each item of a COPY/APPEND 'refs' list, and each start/end of a WRITE 'regions' item) is a marker string OR an integer line number (1-based, absolute, resolved against the PRE-call file state). The TYPE decides (schema poka-yoke — no string sniffing: the string "42" is a prefix MARKER, the number 42 is line 42). A line number beyond the file's line count returns the ref-out-of-range error (with the count).
 
@@ -260,16 +264,16 @@ ANCHORS — a marker ref is a short UNIQUE line prefix; the block spans the star
 
 ASSEMBLY — COPY 'refs' LIST form: each ref selects ONE line of srcFile; the sections go into the buffer joined by EXACTLY ONE \\n (documented default — no parameter). COPY 'text' form: the text is split into lines (a trailing newline adds no blank line). COPY keeps the REPLACE-into-buffer semantics (the buffer is replaced, never appended); APPEND appends (creates the buffer if absent). Feedback for COPY/APPEND: one line — resolved line range + line count + truncated first-line echo (~40 chars, '...' when cut) — plus the buffer's line count AFTER the op.
 
-BUFFERS — bufferName selects a named clipboard buffer (default 'default'); multiple buffers can coexist in one session; CLEAR empties one. For REPLACE the buffer supplies the replacement content (and is preserved afterwards, like PASTE). PEEK previews a buffer (bounded, see the PEEK mode); full content: PASTE it to a file and read.
+BUFFERS — bufferName selects a named clipboard buffer (default 'default'); multiple buffers can coexist in one session; CLEAR empties one. For REPLACE the buffer supplies the replacement content (and is preserved afterwards, like PASTE). The buffer 'last_write' is auto-filled by every WRITE (overwritten per WRITE, no parameter) — PASTE/MAP/PEEK it like any buffer. PEEK previews a buffer (bounded, see the PEEK mode); full content: PASTE it to a file and read.
 
 SANDBOX — all file access (reads AND writes) is confined to the working directory and the Windows temp directory; any path outside is rejected with an error.
 
-EDGE — a non-unique anchor (the error carries the match count + the first match line numbers), a missing required path, an out-of-range line-number ref, an empty PASTE/REPLACE/PEEK buffer, an overlapping WRITE 'regions' list, or an out-of-sandbox path each return an error naming the cause — read the error, fix the input, re-issue (a non-unique anchor: widen the prefix, do not guess).
-
 EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TODO.md into BACKLOG.md, right after its "# Backlog" header line:
-  { "mode": "MOVE", "srcFile": "TODO.md", "dstFile": "BACKLOG.md", "startMarker": "## TODO", "endMarker": "## Notes", "targetMarker": "# Backlog" }`,
+  { "mode": "MOVE", "srcFile": "TODO.md", "dstFile": "BACKLOG.md", "startMarker": "## TODO", "endMarker": "## Notes", "targetMarker": "# Backlog" }
+
+EDGE — a non-unique anchor (the error carries the match count + the first match line numbers), a missing required path, an out-of-range line-number ref, an empty PASTE/REPLACE/PEEK/MAP buffer, an overlapping WRITE 'regions' list, or an out-of-sandbox path each return an error naming the cause — read the error, fix the input, re-issue (a non-unique anchor: widen the prefix, do not guess).`,
     args: {
-    mode: tool.schema.enum(["MOVE", "COPY", "APPEND", "CUT", "PASTE", "REPLACE", "WRITE", "PEEK", "DELETE", "CLEAR"]).describe("Operation mode: MOVE (immediate cut-and-paste), COPY (yank to buffer — single-ref pair, 'refs' list, or 'text'), APPEND (append to the named buffer, created if absent — the same forms as COPY), CUT (yank to buffer and delete from source), PASTE (write buffer to target), REPLACE (replace the line-anchored span of dstFile with a named buffer), WRITE (replace a line-anchored region of dstFile with direct 'text' — a single span or a 'regions' list; creates the file if absent), PEEK (bounded buffer preview — head/tail or a from/count window), DELETE (cut to null), CLEAR (empty buffer)."),
+    mode: tool.schema.enum(["MOVE", "COPY", "APPEND", "CUT", "PASTE", "REPLACE", "WRITE", "PEEK", "MAP", "DELETE", "CLEAR"]).describe("Operation mode: MOVE (immediate cut-and-paste), COPY (yank to buffer — single-ref pair, 'refs' list, or 'text'), APPEND (append to the named buffer, created if absent — the same forms as COPY), CUT (yank to buffer and delete from source), PASTE (write buffer to target), REPLACE (replace the line-anchored span of dstFile with a named buffer), WRITE (replace a line-anchored region of dstFile with direct 'text' — a single span or a 'regions' list; creates the file if absent; auto-stores the text in the 'last_write' buffer), PEEK (bounded buffer preview — head/tail or a from/count window), MAP (buffer structure at a glance — line count + head/tail + a heading skeleton, lines verbatim with line numbers), DELETE (cut to null), CLEAR (empty buffer)."),
     srcFile: tool.schema.string().optional().describe("Source file path. Required for MOVE, CUT, DELETE, and the single-ref and 'refs' forms of COPY/APPEND."),
     dstFile: tool.schema.string().optional().describe("Destination file path. Required for MOVE, PASTE, REPLACE, or WRITE. For REPLACE the file must exist (REPLACE never creates a file); for WRITE the file is created if absent."),
     startMarker: tool.schema.union([tool.schema.string(), tool.schema.number().int()]).optional().describe("Block start: a marker string (short UNIQUE line prefix) OR an integer line number (1-based, absolute) — the type decides (no string sniffing). Required for the single-ref form (MOVE, COPY, CUT, DELETE; for REPLACE: the span start in dstFile; for WRITE: the single-span start in dstFile)."),
@@ -283,7 +287,7 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
     })).optional().describe("WRITE list form: a LIST of regions, each an object { start, end } (each ref a marker string or integer line number); ALL regions resolve against the PRE-call file state and are applied HIGHEST LINE first (no shifting). Mutually exclusive with the single startMarker/endMarker pair."),
     from: tool.schema.number().int().optional().describe("PEEK window start: a 1-based line number in the buffer. Given together with 'count' (both or neither)."),
     count: tool.schema.number().int().optional().describe("PEEK window length in lines (capped at 25). Given together with 'from' (both or neither)."),
-    bufferName: tool.schema.string().optional().describe("Name of the clipboard buffer (defaults to 'default'). Allows managing multiple clipboards.")
+    bufferName: tool.schema.string().optional().describe("Name of the clipboard buffer (defaults to 'default'). Allows managing multiple clipboards. Note: the buffer 'last_write' is auto-filled by every WRITE (overwritten per WRITE) — no parameter to request it.")
   },
 
   execute: async (args: any, context: any) => {
@@ -342,6 +346,38 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
         const pick = (idxs: number[]) => (idxs.length === 0 ? "(none)" : idxs.map((i) => quoted(buffer[i - 1])).join(", "));
         const lw = (m: number) => `${m} line${m === 1 ? "" : "s"}`;
         return `Peeked buffer '${bufferKey}': ${lw(buffer.length)} — head: ${pick(nonBlank.slice(0, 3))} ... tail: ${pick(nonBlank.slice(-3))}`;
+      }
+
+      // 1c. MAP BUFFER (Part G) — a buffer structure preview: the line
+      // count + 3 head + 3 tail lines + a HEADING SKELETON (max 10, then
+      // '+N more'). Lines are echoed VERBATIM WITH line numbers (no
+      // truncation, blank lines kept — verbatim by design). Headings =
+      // '^#{1,6} ' at column 0 (markdown H1-H6; indented '#' EXCLUDED) —
+      // no file-type sniffing: a '#' comment in a code buffer is
+      // self-evident from the verbatim echo. Head and tail never overlap:
+      // for N <= 6 the tail is only the lines beyond the head.
+      if (mode === "MAP") {
+        const buffer = clipboardBuffers[bufferKey];
+        if (!buffer || buffer.length === 0) {
+          return `Error: Clipboard buffer '${bufferKey}' is empty. Perform a COPY or CUT first.`;
+        }
+        const total = buffer.length;
+        const entry = (i: number) => `${i}: '${buffer[i - 1]}'`;
+        const lw = (m: number) => `${m} line${m === 1 ? "" : "s"}`;
+        const head = Array.from({ length: Math.min(3, total) }, (_, k) => entry(k + 1));
+        const tail: string[] = [];
+        for (let i = Math.max(4, total - 2); i <= total; i++) tail.push(entry(i));
+        const headings: number[] = [];
+        for (let i = 0; i < total; i++) {
+          if (/^#{1,6} /.test(buffer[i])) headings.push(i + 1);
+        }
+        const shown = headings.slice(0, 10);
+        const extra = headings.length - shown.length;
+        const headingPart = shown.length === 0
+          ? "(none)"
+          : shown.map(entry).join(", ") + (extra > 0 ? ` +${extra} more` : "");
+        const tailPart = tail.length > 0 ? ` ... tail: ${tail.join(", ")}` : "";
+        return `Mapped buffer '${bufferKey}': ${lw(total)} — head: ${head.join(", ")}${tailPart} — headings: ${headingPart}`;
       }
 
       // 2. PASTE FROM BUFFER
@@ -501,6 +537,13 @@ EXAMPLE — move the block spanning "## TODO" .. "## Notes" (inclusive) from TOD
         }
         fs.mkdirSync(path.dirname(dstPath), { recursive: true });
         fs.writeFileSync(dstPath, work.join("\n"), "utf-8");
+        // Part H (S4): the last_write auto-buffer — the WRITE text is
+        // auto-stored in the buffer 'last_write' (overwritten per WRITE —
+        // automatic, NO parameter: poka-yoke), for direct reuse when an
+        // anchor resolution fails. The WRITE feedback line is UNCHANGED
+        // (probe-pinned) — the auto-store is silent. An explicit
+        // bufferName arg does not divert it.
+        clipboardBuffers["last_write"] = newLines;
         if (spans.length > 1) {
           feedback.push(`Wrote ${spans.length} regions into '${args.dstFile}' (${newLines.length * spans.length} lines total).`);
         }

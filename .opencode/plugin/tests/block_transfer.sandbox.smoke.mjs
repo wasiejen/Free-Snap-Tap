@@ -46,7 +46,9 @@ try {
 
   // ---- description = agent-facing usage guide
   const d = t.description;
-  for (const m of ["MOVE", "COPY", "CUT", "PASTE", "DELETE", "CLEAR", "WRITE", "PEEK"]) chk(`description names mode ${m}`, d.includes(m));
+  // re-pinned per S4 (2026-09-25_block_transfer-v2): the final 11-mode set
+  // (the description names every mode).
+  for (const m of ["MOVE", "COPY", "APPEND", "CUT", "PASTE", "REPLACE", "WRITE", "PEEK", "MAP", "DELETE", "CLEAR"]) chk(`description names mode ${m}`, d.includes(m));
   chk("description: the PEEK boundary sentence (full content: PASTE it to a file and read)", d.includes("full content: PASTE it to a file and read."));
   chk("description: anchors span INCLUSIVE", d.includes("INCLUSIVE"));
   chk("description: targetMarker sets insertion, else append at EOF", d.includes("targetMarker") && /append at EOF/.test(d));

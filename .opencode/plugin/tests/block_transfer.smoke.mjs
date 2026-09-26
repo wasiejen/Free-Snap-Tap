@@ -247,6 +247,46 @@ chk("E: PEEK 'count' without 'from': the exact together-error", rK6 === "Error: 
 const rK7 = await t.execute({ mode: "PEEK", bufferName: "nopeek" }, ctx);
 chk("E: PEEK of an absent buffer: the empty-buffer error", rK7 === "Error: Clipboard buffer 'nopeek' is empty. Perform a COPY or CUT first.");
 
+// ---- Part G: MAP mode (2026-09-25_block_transfer-v2 S4) — buffer
+// structure: line count + head 3 + tail 3 + heading skeleton (max 10,
+// '+N more'); lines echoed VERBATIM WITH line numbers. Headings =
+// '^#{1,6} ' at column 0 (indented '#' excluded).
+chk("schema: mode accepts MAP", args.mode.safeParse("MAP").success);
+await t.execute({ mode: "COPY", text: "# Title\nlong line that exceeds forty chars for sure\n  # indented hash\nbody\n## Sub\nx\ny\nz\nw\nv\nu\ntail line", bufferName: "mp" }, ctx);
+const rG1 = await t.execute({ mode: "MAP", bufferName: "mp" }, ctx);
+chk("G: MAP: line count + head 3 + tail 3 + heading skeleton — lines echoed VERBATIM (no 40-char cap) WITH line numbers (byte-exact); the indented '#' is NOT a heading", rG1 === "Mapped buffer 'mp': 12 lines — head: 1: '# Title', 2: 'long line that exceeds forty chars for sure', 3: '  # indented hash' ... tail: 10: 'v', 11: 'u', 12: 'tail line' — headings: 1: '# Title', 5: '## Sub'");
+await t.execute({ mode: "COPY", text: Array.from({ length: 11 }, (_, i) => "# h" + (i + 1)).join("\n"), bufferName: "mh" }, ctx);
+const rG2 = await t.execute({ mode: "MAP", bufferName: "mh" }, ctx);
+chk("G: MAP heading cap: 11 headings -> the first 10 listed + '+1 more' (byte-exact)", rG2 === "Mapped buffer 'mh': 11 lines — head: 1: '# h1', 2: '# h2', 3: '# h3' ... tail: 9: '# h9', 10: '# h10', 11: '# h11' — headings: 1: '# h1', 2: '# h2', 3: '# h3', 4: '# h4', 5: '# h5', 6: '# h6', 7: '# h7', 8: '# h8', 9: '# h9', 10: '# h10' +1 more");
+await t.execute({ mode: "COPY", text: "#tight\n  # indented\n## ok\nbody", bufferName: "mp2" }, ctx);
+const rG3 = await t.execute({ mode: "MAP", bufferName: "mp2" }, ctx);
+chk("G: MAP heading detection is narrow — only '^#{1,6} ' at column 0 (a no-space '#' and an indented '#' are excluded; byte-exact)", rG3 === "Mapped buffer 'mp2': 4 lines — head: 1: '#tight', 2: '  # indented', 3: '## ok' ... tail: 4: 'body' — headings: 3: '## ok'");
+await t.execute({ mode: "COPY", text: "a\nb\nc", bufferName: "m3" }, ctx);
+const rG4 = await t.execute({ mode: "MAP", bufferName: "m3" }, ctx);
+chk("G: MAP short buffer (N <= 3): head only (no tail part), headings '(none)' (byte-exact)", rG4 === "Mapped buffer 'm3': 3 lines — head: 1: 'a', 2: 'b', 3: 'c' — headings: (none)");
+const rG5 = await t.execute({ mode: "MAP", bufferName: "nomap" }, ctx);
+chk("G: MAP of an absent buffer: the empty-buffer error (byte-exact)", rG5 === "Error: Clipboard buffer 'nomap' is empty. Perform a COPY or CUT first.");
+
+// ---- Part H: the last_write auto-buffer (2026-09-25_block_transfer-v2
+// S4) — every WRITE auto-stores its text in the buffer 'last_write'
+// (overwritten per WRITE; automatic, NO parameter — poka-yoke).
+const lwFile = "bt_lw.txt";
+fs.writeFileSync(path.join(dir, lwFile), "one\ntwo");
+await t.execute({ mode: "WRITE", dstFile: lwFile, startMarker: "one", endMarker: "two", text: "AAA first" }, ctx);
+const lwDst = "bt_lwd.txt";
+fs.writeFileSync(path.join(dir, lwDst), "top");
+await t.execute({ mode: "PASTE", dstFile: lwDst, bufferName: "last_write" }, ctx);
+chk("H: the WRITE auto-stores its text in the 'last_write' buffer (no parameter — PASTE shows it)", fs.readFileSync(path.join(dir, lwDst), "utf-8") === "top\nAAA first");
+await t.execute({ mode: "WRITE", dstFile: lwFile, startMarker: "AAA first", endMarker: "AAA first", text: "BBB second\nCCC third" }, ctx);
+await t.execute({ mode: "PASTE", dstFile: lwDst, bufferName: "last_write" }, ctx);
+chk("H: a second WRITE OVERWRITES 'last_write' (PASTE shows the new text)", fs.readFileSync(path.join(dir, lwDst), "utf-8") === "top\nAAA first\nBBB second\nCCC third");
+const rH3 = await t.execute({ mode: "WRITE", dstFile: lwFile, startMarker: "BBB second", endMarker: "CCC third", text: "DDD fourth", bufferName: "explicit" }, ctx);
+chk("H: the WRITE feedback line is UNCHANGED (the auto-store is silent — no last_write note)", rH3 === "Wrote 1 line to 'bt_lw.txt' (lines 1..2, first: 'DDD fourth').");
+await t.execute({ mode: "PASTE", dstFile: lwDst, bufferName: "last_write" }, ctx);
+chk("H: an explicit bufferName does NOT divert the auto-store ('last_write' still gets the text)", fs.readFileSync(path.join(dir, lwDst), "utf-8") === "top\nAAA first\nBBB second\nCCC third\nDDD fourth");
+const rH4 = await t.execute({ mode: "PASTE", dstFile: lwDst, bufferName: "explicit" }, ctx);
+chk("H: the WRITE's own bufferName buffer is untouched (empty-buffer error)", /is empty/.test(rH4));
+
 // ---- Part F: the unified feedback line for ALL the remaining modes
 const mSrc = "bt_m.txt";
 const mDst = "bt_m_dst.txt";
