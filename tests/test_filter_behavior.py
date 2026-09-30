@@ -90,12 +90,87 @@ class TestRebindFiring:
         assert kb_env_ns.kb_mock.release.call_count == 0
         kb._listener.suppress_event.assert_called_once_with()
 
-    def test_repeated_trigger_key_is_suppressed_without_refiring(self, kb_env_ns):
+    def test_repeated_trigger_key_is_suppressed_without_refiring(self, kb_env_ns, monkeypatch):
+        # macro/toggle triggers keep the suppressed repeat behaviour
+        # (2026-09-12 proposal: only repeated REBIND triggers are let through)
+        kb = kb_env_ns.kb
+        fired = []
+        monkeypatch.setattr(FST_Keyboard, 'start_macro_playback',
+                            lambda self, alias, seq: fired.append((alias, seq)))
+        build(kb, macros=[['(m)', [['a'], ['b']]]])
+        down(kb, VK_A, 1000)
+        down(kb, VK_A, 1500)  # OS auto-repeat of an already pressed trigger
+        assert len(fired) == 1  # the macro fires once, not on the repeat
+        assert kb._listener.suppress_event.call_count == 2
+
+
+class TestRebindRepeat:
+    """Held REBIND keys auto-repeat their target key (approved proposal
+    2026-09-12; maintainer ruling 2026-09-15: a rebind trigger that is also
+    in a tap group keeps the suppressed repeat behaviour)."""
+
+    def test_repeated_rebind_trigger_repeats_target_key(self, kb_env_ns):
         kb = kb_env_ns.kb
         build(kb, rebinds=[['(r)', [['a'], 'b']]])
         down(kb, VK_A, 1000)
         down(kb, VK_A, 1500)  # OS auto-repeat of an already pressed trigger
+        # the target key repeats with the trigger; the source stays suppressed
+        assert kb_env_ns.kb_mock.press.call_args_list == [
+            call(pynput_keyboard.KeyCode.from_vk(VK_B)),
+            call(pynput_keyboard.KeyCode.from_vk(VK_B)),
+        ]
+        assert kb._listener.suppress_event.call_count == 2
+
+    def test_rebind_to_suppress_stays_suppressed_on_repeat(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['a'], 'suppress']]])
+        down(kb, VK_A, 1000)
+        down(kb, VK_A, 1500)
+        assert kb_env_ns.kb_mock.press.call_count == 0
+        assert kb_env_ns.kb_mock.release.call_count == 0
+        assert kb._listener.suppress_event.call_count == 2
+
+    def test_rebind_and_macro_trigger_repeats_target_only_macro_never_fires(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        fired = []
+        monkeypatch.setattr(FST_Keyboard, 'start_macro_playback',
+                            lambda self, alias, seq: fired.append((alias, seq)))
+        build(kb, rebinds=[['(r)', [['a'], 'b']]],
+              macros=[['(m)', [['a'], ['c']]]])
+        down(kb, VK_A, 1000)  # first press = rebind (rebind loop runs first)
         assert kb_env_ns.kb_mock.press.call_count == 1
+        assert fired == []  # the rebind consumes the trigger, macro never fires
+        down(kb, VK_A, 1500)  # repeats = target-key repeats only
+        assert kb_env_ns.kb_mock.press.call_count == 2
+        assert fired == []  # the macro still never fires on the repeat
+        assert kb._listener.suppress_event.call_count == 2
+
+    def test_rebind_press_state_bookkeeping_stays_consistent_on_repeat(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['a'], 'b']]])
+        down(kb, VK_A, 1000)
+        down(kb, VK_A, 1500)
+        # pressed-keys set tracks the replacement across repeats (set
+        # semantics make the remove + re-add idempotent)
+        assert kb.state_manager.get_key_press_state(VK_B) is True
+        assert kb.state_manager.get_key_press_state(VK_A) is False
+        # the real held trigger keeps its real press state
+        assert kb.state_manager.get_real_key_press_state(VK_A) is True
+
+    def test_rebind_trigger_in_tap_group_does_not_repeat(self, kb_env_ns):
+        # maintainer ruling 2026-09-15: a rebind trigger that is also in a
+        # tap group keeps the current (suppressed) repeat behaviour - it must
+        # NOT auto-repeat its replacement (the failed first attempt's area)
+        kb = kb_env_ns.kb
+        build(kb, taps=[['(TAP_1)', ['a', 'b']]],
+              rebinds=[['(r)', [['a'], 'c']]])
+        down(kb, VK_A, 1000)
+        down(kb, VK_A, 1500)  # OS auto-repeat of the tap-group trigger
+        code = pynput_keyboard.KeyCode.from_vk
+        # the replacement c is sent exactly once (no auto-repeat); the tap
+        # group then owns the held key itself (current tap-group behaviour)
+        assert kb_env_ns.kb_mock.press.call_args_list == [call(code(VK_C)), call(code(VK_A))]
+        # both source events stay suppressed on the listener
         assert kb._listener.suppress_event.call_count == 2
 
 

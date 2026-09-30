@@ -561,6 +561,28 @@ class FST_Keyboard():
         is_simulated = is_simulated_key_event(data.flags)
         self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated)
 
+    # repeated real press of a REBIND trigger may be let through so the
+    # replacement re-fires (proposal 2026-09-12; maintainer ruling 2026-09-15):
+    # only for triggers that sit in no tap group and whose replacement sits in
+    # no tap group. Macro/toggle triggers and tap-group keys stay suppressed.
+    # Base only: constraints are decided by the rebind loop in
+    # _win32_event_filter, exactly as for the first press.
+    def _rebind_repeat_let_through(self, current_ke):
+        for trigger_group in self._rebind_triggers:
+            trigger = trigger_group.get_trigger()
+            if current_ke.vk_code != trigger.vk_code or current_ke.is_press != trigger.is_press:
+                continue
+            if any(current_ke.vk_code in tg.get_vk_codes() for tg in self._tap_groups):
+                return False
+            try:
+                replacement_vk = self._rebinds_dict[trigger_group].replacement.vk_code
+            except KeyError:
+                return False  # conservative: no replacement known -> suppress
+            if any(replacement_vk in tg.get_vk_codes() for tg in self._tap_groups):
+                return False
+            return True
+        return False
+
     def _win32_event_filter(self, vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event=False):
         """
         Filter and handle keyboard and mouse events.
@@ -629,9 +651,18 @@ class FST_Keyboard():
                     if any(current_ke.vk_code == trigger.vk_code
                            and current_ke.is_press == trigger.is_press
                            for trigger in self._all_trigger_events):
-                        if CONSTANTS.DEBUG3:
-                            print(f"repeated key supressed: {current_ke}")
-                        to_be_suppressed = True
+                        # repeated REBIND triggers not in a tap group are let
+                        # through so they re-fire their replacement below: macro
+                        # and toggle repeats stay suppressed (the 'STOP REPEATED
+                        # KEYS FROM HERE' guard), and a replacement that the tap
+                        # section would consume keeps the suppression (not
+                        # covered by the proposal - conservative)
+                        if not self._rebind_repeat_let_through(current_ke):
+                            if CONSTANTS.DEBUG3:
+                                print(f"repeated key supressed: {current_ke}")
+                            to_be_suppressed = True
+                        elif CONSTANTS.DEBUG3:
+                            print(f"repeated rebind key let through: {current_ke}")
                         trigger_key_repeated = True
                     real_input_repeated = True
             else:
