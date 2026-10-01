@@ -109,6 +109,18 @@ class GUI_Manager(QWidget):
         self.tray_icon = Tray_Icon(fst_keyboard, parent=self)
         self.overlay = StatusOverlay(fst_keyboard, parent=self)
         self.toast_manager = ToastManager(fst_keyboard, self.overlay)
+        # Pre-warm the first-toast path (#130): the first toast used to pay
+        # first-call costs on live Windows (~2 s lag, retriggers instant):
+        # - the toast window's native side is created only on its first
+        #   show() (add_toast) - create it now: show/hide before the event
+        #   loop; the handle persists after hide, so the first trigger only
+        #   re-shows the existing window, like a retrigger;
+        # - the first ToastWidget build pays the process-wide first
+        #   font/stylesheet cost - build one throwaway toast now (its own
+        #   timer destroys it after the first tick).
+        self.toast_manager.show()
+        self.toast_manager.hide()
+        ToastWidget("prewarm", 0.1, 12)
         self.crosshair = CrosshairOverlay(fst_keyboard, parent=self)
         self.color = None
 

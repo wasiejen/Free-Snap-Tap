@@ -54,6 +54,15 @@ def test_construct_builds_children(qtbot, manager):
     assert manager.color == 'red'  # not ALWAYS_ACTIVE
 
 
+def test_toast_window_prewarmed_at_startup(manager):
+    """#130: the native side of the toast window must already exist after GUI
+    init (created by show/hide at startup, hidden like the steady state) so
+    the first toast no longer pays the first-window-creation cost - it only
+    re-shows the existing window, like a retrigger."""
+    assert manager.toast_manager.windowHandle() is not None
+    assert not manager.toast_manager.isVisible()
+
+
 def test_initial_color_blue_when_always_active(qtbot, fst, app_mock):
     fst.arg_manager.ALWAYS_ACTIVE = True
     m = GUI_Manager(fst, app_mock)
