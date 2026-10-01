@@ -592,7 +592,9 @@ class StatusOverlay(QWidget):
         event.accept()
 
     def contextMenuEvent(self, event):
-        self.context_menu.exec_(event.globalPosition().toPoint())
+        # QContextMenuEvent has no globalPosition() (unlike QMouseEvent) —
+        # pos() is widget-local; map it to a global point for the menu.
+        self.context_menu.exec_(self.mapToGlobal(event.pos()))
 
     # --- Menu Actions ---
     def toggle_pause(self):

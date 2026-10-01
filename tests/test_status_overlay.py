@@ -1,14 +1,15 @@
 """StatusOverlay unit tests (offscreen pytest-qt): construction, color,
 indicator show/hide, double-click, left-button drag (widget move, toast
 manager re-position, screen-change counter), release recenter, menu action
-slots and paintEvent. The blocking contextMenuEvent/exec_ path is NOT
-exercised; menu actions are invoked directly or via QAction.trigger()."""
+slots and paintEvent. contextMenuEvent is exercised by spying on the menu's
+exec_ (captured, so it does not block the loop); menu actions are invoked
+directly or via QAction.trigger()."""
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 from PySide6.QtCore import QPoint, QRect, Qt
-from PySide6.QtGui import QPaintEvent, QColor
+from PySide6.QtGui import QContextMenuEvent, QPaintEvent, QColor
 from PySide6.QtWidgets import QApplication, QWidget
 
 import fst_overlay
@@ -197,6 +198,20 @@ def test_context_menu_crosshair_action_emits_signal(qtbot, overlay):
     action.trigger()
 
     assert fired == [1]
+
+
+def test_context_menu_event_executes_at_global_point(qtbot, overlay):
+    captured = []
+    # Spy on exec_ so the real contextMenuEvent runs without a modal block.
+    overlay.context_menu.exec_ = lambda point: captured.append(point)
+
+    local = QPoint(3, 4)
+    overlay.contextMenuEvent(
+        QContextMenuEvent(
+            QContextMenuEvent.Reason.Mouse, local, overlay.mapToGlobal(local)))
+
+    assert len(captured) == 1
+    assert captured[0] == overlay.mapToGlobal(local)
 
 
 def test_paint_event(qtbot, overlay):
