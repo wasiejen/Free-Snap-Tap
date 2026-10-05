@@ -6,10 +6,9 @@ delegated _win32_event_filter is mocked. Simulated events go through the real
 _win32_event_filter - they only update state and the mock listener, no real
 input is ever emitted.
 """
+import logging
 from types import SimpleNamespace
 from unittest.mock import MagicMock
-
-from fst_manager import CONSTANTS
 
 from kb_helpers import build
 
@@ -110,14 +109,14 @@ class TestSimulatedContradiction:
         self.sim_up(kb, VK_C, 1000)
         kb._listener.suppress_event.assert_not_called()
 
-    def test_debug2_prints_contradiction_diagnostics(self, kb_env_mouse, capsys):
+    def test_contradiction_diagnostics_logged_at_flow_debug(self, kb_env_mouse, caplog):
         kb = kb_env_mouse
-        CONSTANTS.DEBUG2 = True
+        logging.getLogger('fst.flow').setLevel(logging.DEBUG)
+        caplog.set_level(logging.DEBUG)
         build(kb)
         kb.state_manager.add_key_press_state(VK_A)
-        self.sim_up(kb, VK_A, 1000)  # -> D2 press-state diagnostics
+        self.sim_up(kb, VK_A, 1000)  # -> flow press-state diagnostic
         kb.state_manager.get_toggle_state(VK_C)
-        self.sim_up(kb, VK_C, 2000)  # -> D2 not suppressed (toggle)
-        out = capsys.readouterr().out
-        assert 'D2: ' in out
-        assert 'D2 not suppressed' in out
+        self.sim_up(kb, VK_C, 2000)  # -> flow not suppressed (toggle)
+        assert 'may be contrary to real input' in caplog.text
+        assert 'not suppressed' in caplog.text

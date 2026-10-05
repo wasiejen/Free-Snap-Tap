@@ -81,7 +81,7 @@ class FakeFST(SimpleNamespace):
 
 @pytest.fixture(autouse=True)
 def restore_constants():
-    attrs = ['DEBUG', 'DEBUG2', 'DEBUG3', 'DEBUG4', 'DEBUG_NUMPAD', 'FILE_NAME',
+    attrs = ['DEBUG_NUMPAD', 'FILE_NAME',
              'EXIT_Combination', 'TOGGLE_ON_OFF_Combination', 'MENU_Combination']
     saved = {attr: getattr(CONSTANTS, attr) for attr in attrs}
     yield

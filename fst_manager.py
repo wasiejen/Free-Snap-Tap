@@ -117,11 +117,8 @@ def is_any_debug_active():
 
 class CONSTANTS():
 
-    # will not overwrite debug settings in config
-    DEBUG = False
-    DEBUG2 = False
-    DEBUG3 = False
-    DEBUG4 = False
+    # safety gate: only run the numpad debug-combination checks when enabled
+    # (so alt+num* is not swallowed while gaming)
     DEBUG_NUMPAD = False
 
     # Define File name for saving of everything, can be any filetype
@@ -197,8 +194,7 @@ class Output_Manager():
                 if isinstance(constraint, int):
                     temp_delays.append(constraint)
                 elif isinstance(constraint, str):
-                    if CONSTANTS.DEBUG3:
-                        print(f"D3: string as constraint found - {constraint}")
+                    logger_eval.debug(f"string as constraint found - {constraint}")
                     result = self.constraint_evaluation(constraint, key_event)
                     if isinstance(result, bool):
                         fullfilled = fullfilled and result
@@ -271,20 +267,16 @@ class Output_Manager():
             if is_press:
                 try:
                     key_time = time_released[vk_code]
-                    if CONSTANTS.DEBUG2:
-                        print(f"vk_code: {vk_code} time released: {key_time}")
+                    logger_state.debug(f"vk_code: {vk_code} time released: {key_time}")
                 except KeyError as error:
-                    if CONSTANTS.DEBUG2:
-                        print(f"time_release: no value yet for vk_code: {error}")
+                    logger_state.debug(f"time_release: no value yet for vk_code: {error}")
                     return 0
             else:
                 try:
                     key_time = time_pressed[vk_code]
-                    if CONSTANTS.DEBUG2:
-                        print(f"vk_code: {vk_code} time pressed: {key_time}")
+                    logger_state.debug(f"vk_code: {vk_code} time pressed: {key_time}")
                 except KeyError as error:
-                    if CONSTANTS.DEBUG2:
-                        print(f"time_press: no value yet for vk_code: {error}")
+                    logger_state.debug(f"time_press: no value yet for vk_code: {error}")
                     return 0
             return key_time
 
@@ -353,9 +345,8 @@ class Output_Manager():
             time_last_pressed, time_last_released, _, _ = time_list
             vk_code, is_press = get_vk_code_and_press_from_keystring(key_string)
             try:
-                if CONSTANTS.DEBUG:
-                    print(f"D1: {time_in_millisec() - self._fst.TIME_DIFF}")
-                    print(f"D1: {time_last_pressed[vk_code]}")
+                logger_state.debug(f"{time_in_millisec() - self._fst.TIME_DIFF}")
+                logger_state.debug(f"{time_last_pressed[vk_code]}")
                 current_time = time_in_millisec() - self._fst.TIME_DIFF
                 return current_time - time_last_pressed[vk_code] if is_press else current_time - time_last_released[vk_code]
             except KeyError:
@@ -370,8 +361,7 @@ class Output_Manager():
             else:
                 vk_code, _ = get_vk_code_and_press_from_keystring(key_string)
             try:
-                if CONSTANTS.DEBUG:
-                    print(f"D1: {time_released[vk_code] + time_pressed[vk_code]}")
+                logger_state.debug(f"{time_released[vk_code] + time_pressed[vk_code]}")
                 return time_released[vk_code] + time_pressed[vk_code]
             except KeyError:
                 ##2
@@ -399,8 +389,7 @@ class Output_Manager():
                     repeat_task.cancel_playback()
                     _handle.cancel()
             except (KeyError, AttributeError, ValueError):
-                if CONSTANTS.DEBUG3:
-                    print(f"can not find a Repeat called {alias_string} - stop_repeat()")
+                logger_eval.warning(f"can not find a Repeat called {alias_string} - stop_repeat()")
             return True
 
         def toggle_repeat(alias_string, repeat_time):
@@ -427,8 +416,7 @@ class Output_Manager():
                 else:
                     return False
             except (KeyError, AttributeError, ValueError):
-                if CONSTANTS.DEBUG3:
-                    print(f"can not find a Repeat called {alias_string} - stop_repeat()")
+                logger_eval.debug(f"can not find a Repeat called {alias_string} - is_repeat_active()")
             return False
 
         def reset_repeat(alias_string):
@@ -437,9 +425,7 @@ class Output_Manager():
                 if not _handle.done():
                     repeat_task.reset()
             except (KeyError, AttributeError, ValueError):
-                if CONSTANTS.DEBUG3:
-                    print(f"can not find a Repeat called {alias_string} - reset_repeat()")
-                # raise KeyError(error)
+                logger_eval.warning(f"can not find a Repeat called {alias_string} - reset_repeat()")
             return True
 
         def stop_all_repeat():
@@ -449,11 +435,9 @@ class Output_Manager():
                     if not _handle.done():
                         repeat_task.cancel_playback()
                         _handle.cancel()
-                if CONSTANTS.DEBUG4:
-                    print("D4: -- Eval: stopped all Repeat")
+                logger_eval.debug("-- Eval: stopped all Repeat")
             except (AttributeError, ValueError):
-                if CONSTANTS.DEBUG3:
-                    print(f"can not find a Repeat called {alias_name} - reset_all_repeat()")
+                logger_eval.warning(f"can not find a Repeat called {alias_name} - stop_all_repeat()")
             return True
 
 
@@ -464,8 +448,7 @@ class Output_Manager():
 
         def release_all_keys():
             self._fst.release_all_currently_pressed_simulated_keys()
-            if CONSTANTS.DEBUG4:
-                print("D4: -- Eval: released all keys")
+            logger_eval.debug("-- Eval: released all keys")
             return True
 
         def type(key_string):
@@ -482,8 +465,7 @@ class Output_Manager():
             elif value is False:
                 value = 0
             self.variables[key_string] = value
-            if CONSTANTS.DEBUG4:
-                print(f'variable {key_string} set to: {value}')
+            logger_eval.debug(f'variable {key_string} set to: {value}')
             return True
 
         def is_set(key_string):
@@ -492,8 +474,7 @@ class Output_Manager():
                 return True if self.variables[key_string] != 0 else False
             except KeyError:
                 set(key_string, 0)
-                if CONSTANTS.DEBUG3:
-                    print(f'variable {key_string} not set')
+                logger_eval.debug(f'variable {key_string} not set')
                 return False
 
         def get(key_string):
@@ -501,22 +482,8 @@ class Output_Manager():
                 return self.variables[key_string]
             except KeyError:
                 set(key_string, 0)
-                if CONSTANTS.DEBUG3:
-                    print(f'variable {key_string} not set')
+                logger_eval.debug(f'variable {key_string} not set')
                 return 0
-
-        # def inc(key_string, delta=1):
-        #     try:
-        #         set(key_string, self.variables[key_string] + delta)
-        #         return True
-        #     except KeyError:
-        #         set(key_string, delta)
-        #         if CONSTANTS.DEBUG3:
-        #             print(f'variable {key_string} not set')
-        #         return True
-
-        # def decr(key_string, delta=1):
-        #     inc(key_string, delta=-delta)
 
 
         def check(key_string, value = 1):
@@ -525,22 +492,19 @@ class Output_Manager():
                     return self.variables[key_string] == value
                 except KeyError:
                     set(key_string, 0)
-                    if CONSTANTS.DEBUG3:
-                        print(f'variable {key_string} not set')
+                    logger_eval.debug(f'variable {key_string} not set')
                     return False
             elif isinstance(value, (list, tuple)):
                 try:
                     return self.variables[key_string] in value
                 except KeyError:
                     set(key_string, 0)
-                    if CONSTANTS.DEBUG3:
-                        print(f'variable {key_string} not set')
+                    logger_eval.debug(f'variable {key_string} not set')
                     return False
 
         def clear(key_string):
             self.variables[key_string] = 0
-            if CONSTANTS.DEBUG4:
-                print(f'variable {key_string} cleared')
+            logger_eval.debug(f'variable {key_string} cleared')
             return True
 
         def clear_all_variables():
@@ -590,16 +554,14 @@ class Output_Manager():
             backup_path, backup_name = mb(save_dir, backup_root_dir)
             print(f"Made backup to {backup_path}")
             show_message(f"Made backup to {backup_name}", d=5., ts=10, bgc="rgba(40, 150, 40, 200)")
-            if CONSTANTS.DEBUG4:
-                print(f"D4: -- Eval: made backup to {backup_path}")
+            logger.info(f"made backup to {backup_path}")
             return True
 
         def restore_backup(save_dir=self._fst.arg_manager.SAVE_DIR, backup_root_dir=self._fst.arg_manager.BACKUP_ROOT_DIR):
             restored_path, restored_name = rb(save_dir, backup_root_dir)
             print(f"Restored backup from {restored_path}")
             show_message(f"Restored backup from {restored_name}", d=5., ts=10, bgc="rgba(150, 40, 40, 200)")
-            if CONSTANTS.DEBUG4:
-                print(f"D4: -- Eval: restored backup from {restored_path}")
+            logger.info(f"restored backup from {restored_path}")
             return True
 
         def scroll_up(value):
@@ -726,8 +688,7 @@ class Output_Manager():
         # ---------------------------
         # eval starts from here
 
-        if CONSTANTS.DEBUG4:
-            print(f"D4: received for eval: {constraint_to_evaluate} : {current_ke}")
+        logger_eval.debug(f"received for eval: {constraint_to_evaluate} : {current_ke}")
 
         # short eval for (False)
         if constraint_to_evaluate in ['', '!']:
@@ -772,13 +733,10 @@ class Output_Manager():
                 # unknown key in a constraint function call fails the constraint (fail-closed)
                 return False
             except NameError as error:
-                # unknown name (e.g. invocation of a macro that never played) -> silent no-op
-                if CONSTANTS.DEBUG3:
-                    print(f"constraint {constraint_to_evaluate} not recognized - ignored: {error}")
+                # unknown name (e.g. invocation of a macro that never played) -> ignored
+                logger_eval.warning(f"constraint {constraint_to_evaluate} not recognized - ignored: {error}")
                 return True
-            ### print(f"result of '{constraint_to_evaluate}' is '{result}'")
-            if CONSTANTS.DEBUG4:
-                print(f"D4: evaluated {constraint_to_evaluate} to: {result}")
+            logger_eval.debug(f"evaluated {constraint_to_evaluate} to: {result}")
             # if it is a number and if negativ change it to 0
             if isinstance(result, float):
                 result = int(result)
@@ -824,15 +782,13 @@ class Output_Manager():
                 # only use crossover is activated and probility is over percentage
                 is_crossover = randint(0,100) > (100 - self._fst.arg_manager.ACT_CROSSOVER_PROPABILITY_IN_PERCENT) and self._fst.arg_manager.ACT_CROSSOVER # 50% possibility
             if is_crossover:
-                if CONSTANTS.DEBUG:
-                    print("D1: crossover")
+                logger_flow.debug("crossover")
                 self._keyboard_controller.press(key_code_to_send)
             else:
                 self._keyboard_controller.release(key_code_last_key_send)
             if self._fst.arg_manager.ACT_DELAY or self._fst.arg_manager.ACT_CROSSOVER:
                 delay = randint(self._fst.arg_manager.ACT_MIN_DELAY_IN_MS, self._fst.arg_manager.ACT_MAX_DELAY_IN_MS)
-                if CONSTANTS.DEBUG:
-                    print(f"D1: delayed by {delay} ms")
+                logger_flow.debug(f"delayed by {delay} ms")
                 await asyncio.sleep(delay / 1000) # in ms
             if is_crossover:
                 self._keyboard_controller.release(key_code_last_key_send)
@@ -843,9 +799,8 @@ class Output_Manager():
         key_to_send = tap_group.get_active_key()
         last_key_send = tap_group.get_last_key_send()
 
-        if CONSTANTS.DEBUG:
-            print(f"D1: last_key_send: {last_key_send}")
-            print(f"D1: key_to_send: {key_to_send}")
+        logger_flow.debug(f"last_key_send: {last_key_send}")
+        logger_flow.debug(f"key_to_send: {key_to_send}")
 
         key_code_to_send = keyboard.KeyCode.from_vk(key_to_send)
         key_code_last_key_send = keyboard.KeyCode.from_vk(last_key_send)
@@ -1343,11 +1298,6 @@ class Argument_Manager():
     TRAY_ICON = False
 
     # global variables
-    # (the old per-flag debug booleans died in favor of the area-loggers;
-    # DEBUG/DEBUG2/DEBUG3 snapshots stay until the last reader is converted)
-    DEBUG  = False
-    DEBUG2 = False
-    DEBUG3 = False
 
     WIN32_FILTER_PAUSED = True
     MANUAL_PAUSED = False
@@ -1377,9 +1327,6 @@ class Argument_Manager():
 
     def __init__(self, fst_keyboard):
         self._fst = fst_keyboard
-        Argument_Manager.DEBUG  = CONSTANTS.DEBUG
-        Argument_Manager.DEBUG2 = CONSTANTS.DEBUG2
-        Argument_Manager.DEBUG3 = CONSTANTS.DEBUG3
         # to only set up the variable and not reset it with every focus change
         self.STATUS_INDICATOR = Argument_Manager.STATUS_INDICATOR
         self.STATUS_INDICATOR_SIZE = Argument_Manager.STATUS_INDICATOR_SIZE
@@ -1789,8 +1736,7 @@ class Input_State_Manager():
     def set_toggle_state_to_curr_ke(self, key_event):
         vk_code, is_press, _ =  key_event.get_all()
         if vk_code in self._toggle_states_dict_keys:
-            if CONSTANTS.DEBUG4:
-                print(f"D4: -- toggle state for {key_event} updated")
+            logger_flow.debug(f"-- toggle state for {key_event} updated")
             self.set_toggle_state(vk_code, is_press)
 
     def stop_all_repeating_keys(self):
@@ -1816,46 +1762,6 @@ class Input_State_Manager():
 
 
 
-###XXX 241014-1926 backup
-
-    # def release_all_currently_pressed_keys(self):
-    #     ###XXX 241009-1049 do not release real keys, 241009-1100 now again release all keys - works better
-    #     if CONSTANTS.DEBUG2:
-    #         print("D2: releasing all keys")
-
-
-    #     # release remaining simulated keys
-    #     for vk_code, is_press in self._all_key_press_states_dict.items():
-    #         if is_press:
-    #             # only reset simulated keys
-    #             if self.get_simulated_key_press_state(vk_code) is True:
-    #             # if self.get_simulated_key_press_state(vk_code) is True and not vk_code in self.pressed_keys:
-    #                 if CONSTANTS.DEBUG2:
-    #                     print(f"D2: released key: {vk_code}")
-    #                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
-
-    #     self.release_all_modifier_keys()
-    #     self.release_all_toggles()
-    #     self.reset_states_dicts()
-
-    # def release_all_modifier_keys(self):
-    #     # first release all modifert keys
-    #     for vk_code in Input_State_Manager.ALL_MODIFIER_KEYS:
-
-    #         # self._pressed_keys = set()
-    #         self._real_key_press_states_dict = {}
-    #         ###XXX 241014-0308
-    #         ### -
-    #         # if not self.get_real_key_press_state(vk_code):
-    #         if not self.pressed_keys:
-    #         ### -
-    #         ### + trying to prevent supression of releasing of keys
-    #         ### +
-    #             if CONSTANTS.DEBUG2:
-    #                 print(f"D2: released pressed modifier key: {vk_code}")
-    #             self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
-    #             self.set_simulated_key_press_state(vk_code, False)
-
 ###XXX 241014-1926 changed
 
     def release_all_currently_pressed_simulated_keys(self):
@@ -1867,16 +1773,14 @@ class Input_State_Manager():
         # print(f"pressed simulated keys on release: {active_keys}")
 
         ###XXX 241009-1049 do not release real keys, 241009-1100 now again release all keys - works better
-        if CONSTANTS.DEBUG2:
-            print("D2: releasing all keys")
+        logger_state.debug("releasing all keys")
 
         # release remaining simulated keys
         for vk_code, is_press in self._simulated_key_press_states_dict.items():
         # for vk_code, is_press in self._all_key_press_states_dict.items():
             if is_press:
                 # only reset simulated keys
-                if CONSTANTS.DEBUG2:
-                    print(f"D2: released key: {vk_code}")
+                logger_state.debug(f"released key: {vk_code}")
                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
 
         # self.release_all_modifier_keys()
@@ -1888,8 +1792,7 @@ class Input_State_Manager():
         # first release all modifier keys
         for vk_code in Input_State_Manager.ALL_MODIFIER_KEYS:
             if vk_code in self.pressed_keys:
-                if CONSTANTS.DEBUG2:
-                    print(f"D2: released pressed modifier key: {vk_code}")
+                logger_state.debug(f"released pressed modifier key: {vk_code}")
                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
                 #self.set_simulated_key_press_state(vk_code, False)
 
