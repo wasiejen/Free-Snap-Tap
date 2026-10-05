@@ -5,6 +5,7 @@ Input_State_Manager timing semantics. pynput controllers are mocked - no real
 keys are ever emitted. Wall-clock dependent eval (last()) is frozen with
 freezegun.
 """
+import logging
 import sys
 from time import time
 from unittest.mock import MagicMock, call
@@ -604,11 +605,13 @@ class TestConstraintResultTypes:
         assert fulfilled is True
         assert delays == [2]
 
-    def test_string_result_prints_invalid_warning(self, om_env, capsys):
+    def test_string_result_logs_invalid_warning(self, om_env, caplog):
         om_env.om.variables['x'] = 'hello'
         ke = Key_Event(VK_A, constraints=["get_var('x')"])
         om_env.om.check_constraint_fulfillment(ke)
-        assert 'not valid' in capsys.readouterr().out
+        assert 'not valid' in caplog.text
+        assert any(r.levelno == logging.WARNING and 'not valid' in r.getMessage()
+                   for r in caplog.records)
 
     def test_eval_none_result_is_treated_as_true(self, om_env, capsys):
         ke = make_ke()

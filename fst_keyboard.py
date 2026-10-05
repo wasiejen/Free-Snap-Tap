@@ -273,10 +273,10 @@ class FST_Keyboard():
                 self._key_group_by_alias[alias] = convert_key_string_group(group)
 
         except ConfigError as error:
-            print(f"ERROR: {error} \n -> in Alias: {group}")
+            logger_config.error(f"{error} -> in Alias: {group}")
             raise
         except Exception as error:
-            print(f"ERROR: {error} \n -> in Alias: {group}")
+            logger_config.error(f"{error} -> in Alias: {group}")
             raise Exception(error)
 
         # extract tap groups
@@ -288,10 +288,10 @@ class FST_Keyboard():
                     keys.append(Key(key, key_string=key_string))
                 self._tap_groups.append(Tap_Group(keys))
         except ConfigError as error:
-            print(f"ERROR: {error} \n -> in Tap Group: {group}")
+            logger_config.error(f"{error} -> in Tap Group: {group}")
             raise
         except Exception as error:
-            print(f"ERROR: {error} \n -> in Tap Group: {group}")
+            logger_config.error(f"{error} -> in Tap Group: {group}")
             raise Exception(error)
 
         # extract rebinds
@@ -350,10 +350,10 @@ class FST_Keyboard():
                 self._rebinds.append(rebind)
 
         except ConfigError as error:
-            print(f"ERROR: {error} \n -> in Rebind: {rebind}")
+            logger_config.error(f"{error} -> in Rebind: {rebind}")
             raise
         except Exception as error:
-            print(f"ERROR: {error} \n -> in Rebind: {rebind}")
+            logger_config.error(f"{error} -> in Rebind: {rebind}")
             raise Exception(error)
 
         # extract macros
@@ -384,10 +384,10 @@ class FST_Keyboard():
                 self._macros.append(macro)
 
         except ConfigError as error:
-            print(f"ERROR: {error} \n -> in Macro: {macro}")
+            logger_config.error(f"{error} -> in Macro: {macro}")
             raise
         except Exception as error:
-            print(f"ERROR: {error} \n -> in Macro: {macro}")
+            logger_config.error(f"{error} -> in Macro: {macro}")
             raise Exception(error)
 
         logger_config.debug(f"config loaded: {len(self._tap_groups)} tap groups, "
@@ -882,12 +882,13 @@ class FST_Keyboard():
         logger_flow.debug(f"--> {'-- | ' if is_simulated else ''}OUT ({key_event_time - FST_Keyboard.START_TIME}) {'sim' if is_simulated else 'real'} {current_ke}")
 
     def check_result(self, fut):
-        # try:
-        #     fut.result() # This will raise the exception if the task crashed
-        # except Exception as e:
-        #     logger.error(f"Exception in macro task: {e}")
-        #     print(f"CRASH IN REPEAT TASK: {e}")
-        pass
+        try:
+            fut.result() # This will raise the exception if the task crashed
+        except asyncio.CancelledError:
+            # intentional cancel (interrupt/reset) - not a crash
+            logger_macro.debug(f"macro task cancelled: {fut}")
+        except Exception as e:
+            logger_macro.error(f"Exception in macro task: {e}")
 
     # MACRO PLAYBACK for direct call from Listener Threads
     def start_macro_playback(self, alias_name, key_sequence):

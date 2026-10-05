@@ -201,7 +201,7 @@ class Output_Manager():
                     elif isinstance(result, int):
                         temp_delays.append(result)
                     else:
-                        print(f"! Constraint {constraint} is not valid.")
+                        logger_eval.warning(f"constraint {constraint} is not valid")
 
         if get_also_delays:
             return fullfilled, temp_delays
@@ -507,11 +507,11 @@ class Output_Manager():
             logger_eval.debug(f'variable {key_string} cleared')
             return True
 
+        # eval-scope shim (NOT dead): a bare clear_all_variables() call in a
+        # config constraint resolves to this local and forwards to the real
+        # Output_Manager method - deleting it would silently no-op live configs
         def clear_all_variables():
             self.clear_all_variables()
-            # for key_string in self.variables:
-            #     self.variables[key_string] = False
-            #     print(f'variable {key_string} cleared')
             return True
 
         def incr(key_string):
@@ -707,8 +707,8 @@ class Output_Manager():
                 if isinstance(error, ConfigError):
                     self._fst.surface_config_error(error)
                 else:
-                    # defensive: any other unexpected exception stays console-only
-                    print(error)
+                    # defensive: any other unexpected exception is logged (fail-closed)
+                    logger_eval.error(f"constraint evaluation failed for {constraint_to_evaluate}: {error}")
                 # unknown key in a state constraint fails the constraint (fail-closed)
                 return False
 

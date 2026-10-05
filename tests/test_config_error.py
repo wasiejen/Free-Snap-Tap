@@ -1,5 +1,6 @@
 """P08: ConfigError surfacing - raise sites, user-facing boundaries, and
 hot-path listener survival when a focus group name went stale."""
+import logging
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -199,3 +200,12 @@ class TestConstraintEvalConfigError:
         assert 'FST config error' in fake_fst.toast_callback.call_args.args[0]
         assert 'zz' in fake_fst.toast_callback.call_args.args[0]
         assert capsys.readouterr().out == ''
+
+
+class TestConfigLoadErrorLogging:
+    def test_bad_key_in_tap_group_logs_error_and_raises(self, kb_env_mouse, caplog):
+        kb = kb_env_mouse
+        with caplog.at_level(logging.ERROR, logger='fst.config'):
+            with pytest.raises(ConfigError):
+                build(kb, taps=[['(TAP_1)', ['no_such_key']]])
+        assert 'in Tap Group' in caplog.text
