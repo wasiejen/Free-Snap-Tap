@@ -173,7 +173,8 @@ class TestFilterEdges:
 
         monkeypatch.setattr(asyncio, 'run_coroutine_threadsafe', raise_error)
         build(kb, rebinds=[['(r)', [['mm'], 'scroll_vert']]])
-        with caplog.at_level(logging.ERROR, logger='fst_keyboard'):
+        # the dispatch error is re-homed to the flow area logger
+        with caplog.at_level(logging.ERROR, logger='fst.flow'):
             kb._win32_event_filter(VK_MIDDLE, 1000, True, False, True)
         assert any('mouse_key to mouse_key rebind' in record.message
                    for record in caplog.records)

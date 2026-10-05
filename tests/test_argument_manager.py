@@ -6,10 +6,12 @@ values), -crossover/-crossover=N (incl. out-of-range), -exec_one_macro,
 -crosshair=, -save_dir=/-backup_root_dir= and unknown arguments.
 The FST_Keyboard facade is a FakeFST - no real config file or GUI is touched.
 """
+import logging
 from types import SimpleNamespace
 
 import pytest
 
+import fst_manager
 from fst_manager import Argument_Manager, CONSTANTS, Focus_Group_Manager
 
 
@@ -115,10 +117,10 @@ def test_save_dir_and_backup_root_dir(am_env):
     assert am_env.am.BACKUP_ROOT_DIR == 'backuproot'
 
 
-def test_unknown_argument_prints_notice(am_env, capsys):
+def test_unknown_argument_logs_warning(am_env, caplog):
     am_env.am.apply_start_arguments(['-no_such_argument'])
-    captured = capsys.readouterr()
-    assert 'unknown start argument' in captured.out
+    assert 'unknown start argument' in caplog.text
+    assert any(record.levelno == logging.WARNING for record in caplog.records)
 
 
 def test_multiple_arguments_applied_in_order(am_env):
@@ -180,11 +182,49 @@ class TestInvalidArgumentsDoNotCrash:
         captured = capsys.readouterr()
         assert 'unknown start argument' not in captured.out
 
-    def test_debug_does_not_print_unknown_argument(self, am_env, capsys):
+    def test_debug_argument_is_replaced_by_log_level(self, am_env, caplog):
+        # -debug died in favor of -log=LEVEL: it is an unknown argument now
         am_env.am.apply_start_arguments(['-debug'])
-        captured = capsys.readouterr()
-        assert 'unknown start argument' not in captured.out
-        assert am_env.am.DEBUG is True
+        assert 'unknown start argument' in caplog.text
+
+
+class TestLoggingStartArguments:
+    """The -log=LEVEL and -flow start arguments (design §3.4)."""
+
+    def test_log_debug_sets_area_levels_not_flow(self, am_env):
+        am_env.am.apply_start_arguments(['-log=debug'])
+        for name in ('fst', 'fst.eval', 'fst.state', 'fst.macro', 'fst.config'):
+            assert logging.getLogger(name).level == logging.DEBUG
+        # -log=debug does not open the flow stream - that is -flow's channel
+        assert logging.getLogger('fst.flow').level != logging.DEBUG
+        assert not logging.getLogger('fst.flow').handlers
+
+    def test_log_info_is_the_default_level(self, am_env):
+        am_env.am.apply_start_arguments(['-log=info'])
+        assert logging.getLogger('fst').level == logging.INFO
+        assert logging.getLogger('fst.eval').level == logging.INFO
+        am_env.am.apply_start_arguments(['-log=warning'])
+        assert logging.getLogger('fst').level == logging.WARNING
+        am_env.am.apply_start_arguments(['-log=error'])
+        assert logging.getLogger('fst').level == logging.ERROR
+
+    def test_invalid_log_level_logs_warning(self, am_env, caplog):
+        am_env.am.apply_start_arguments(['-log=verbose'])
+        assert 'invalid log level' in caplog.text
+        assert logging.getLogger('fst').level != logging.DEBUG
+
+    def test_flow_argument_opens_flow_file_once(self, am_env, monkeypatch, tmp_path):
+        flow_file = tmp_path / 'fst_flow.log'
+        monkeypatch.setattr(fst_manager, 'FLOW_LOG_FILE', str(flow_file))
+        am_env.am.apply_start_arguments(['-flow'])
+        flow = logging.getLogger('fst.flow')
+        assert flow.level == logging.DEBUG
+        assert flow.propagate is False
+        assert [h.baseFilename for h in flow.handlers] == [str(flow_file)]
+        # apply_start_arguments re-runs on every focus change: re-applying
+        # -flow must not add a second handler
+        am_env.am.apply_start_arguments(['-flow'])
+        assert len(flow.handlers) == 1
 
 
 class TestRemainingStartArguments:

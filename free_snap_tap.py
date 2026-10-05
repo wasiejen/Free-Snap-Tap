@@ -10,35 +10,19 @@ from time import sleep
 import datetime
 
 from fst_keyboard import FST_Keyboard
-from fst_manager import CONSTANTS
+from fst_manager import CONSTANTS, setup_fst_logging
 from fst_data_types import ConfigError
 from fst_overlay import GUI_Manager, set_console_visibility, ToastBridge
 from PySide6.QtWidgets import QApplication
 
 
 import logging
-# Use __name__ to automatically label logs with the filename
-logging.basicConfig(
-    filename='fst.log',
-    filemode='w', # 'a' for append (default), 'w' to overwrite each time
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.DEBUG # Capture everything from DEBUG level and up
-)
-logger = logging.getLogger(__name__)
+# app-root logger of the FST logger tree; the tree itself is configured by
+# setup_fst_logging() at startup (fst.log append-only + WARNING console)
+logger = logging.getLogger('fst')
 
-# will not overwrite debug settings in config
-CONSTANTS.DEBUG = False
-# CONSTANTS.DEBUG = True
-CONSTANTS.DEBUG2 = False
-# CONSTANTS.DEBUG2 = True
-CONSTANTS.DEBUG3 = False
-# CONSTANTS.DEBUG3 = True
-CONSTANTS.DEBUG4 = False
-# CONSTANTS.DEBUG4 = True
-
-# debug options on numpad numbers - if you use them do not turn on
-CONSTANTS.DEBUG_NUMPAD = False
-# CONSTANTS.DEBUG_NUMPAD = True
+# debug is controlled via start arguments (-log=LEVEL, -flow) and the
+# numpad toggles (alt+num1..4, gated by -debug_numpad) - not source edits
 
 
 # Compilation mode, support OS-specific options
@@ -107,9 +91,8 @@ class MainLogic:
 
     async def run(self):
 
-        if CONSTANTS.DEBUG:
-            print(f"D1: tap_groups_hr: {self.fst_keyboard.config_manager.tap_groups_hr}")
-            print(f"D1: tap_groups: {self.fst_keyboard._tap_groups}")
+        logger.info(f"tap_groups_hr: {self.fst_keyboard.config_manager.tap_groups_hr}")
+        logger.info(f"tap_groups: {self.fst_keyboard._tap_groups}")
 
         focus_active = self.fst_keyboard.focus_manager.init_focus_task()
 
@@ -148,6 +131,7 @@ class MainLogic:
 
 
 if __name__ == "__main__":
+    setup_fst_logging()
     logger.info("--- FST startet ---")
 
     set_console_visibility(False)  # Hide console window at startup
@@ -175,7 +159,7 @@ if __name__ == "__main__":
         set_console_visibility(True)
 
     if fst_keyboard.arg_manager.TRAY_ICON or fst_keyboard.arg_manager.STATUS_INDICATOR:
-        logging.info("Starting in GUI mode with tray icon or status indicator enabled.")
+        logger.info("Starting in GUI mode with tray icon or status indicator enabled.")
         # GUI MODE: Start logic in a secondary thread
         # Spawn and start the thread
         logic_thread = Thread(target=logic.start_async_thread, daemon=True)
@@ -209,10 +193,10 @@ if __name__ == "__main__":
     else:
         # if no tray icon or status indicator, just run the main function
         # HEADLESS MODE: Run logic in the current (__main__) thread
-        logging.info("Starting in headless mode with no tray icon or status indicator.")
+        logger.info("Starting in headless mode with no tray icon or status indicator.")
         try:
             asyncio.run(logic.run())
         except KeyboardInterrupt:
-            logging.info("Keyboard interrupt received.")
+            logger.info("Keyboard interrupt received.")
 
     sys.exit(1)  # Exit the script after main function completes

@@ -5,13 +5,14 @@ startfile / msvcrt / exit; the print-only display methods are checked with
 capsys against a MagicMock FST_Keyboard. No real console clearing, no file
 opening, no keyboard input.
 """
+import logging
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
 import fst_manager
-from fst_manager import CLI_menu, CONSTANTS
+from fst_manager import CLI_menu
 
 
 def make_menu_fst():
@@ -42,17 +43,22 @@ def scripted_menu(monkeypatch):
 
 
 class TestDisplayMenu:
-    def test_choice_zero_toggles_debug4_and_loops(self, scripted_menu):
+    def test_choice_zero_toggles_flow_and_loops(self, scripted_menu, monkeypatch, tmp_path):
         script = scripted_menu
         fst = make_menu_fst()
-        initial = CONSTANTS.DEBUG4
+        monkeypatch.setattr(fst_manager, 'FLOW_LOG_FILE', str(tmp_path / 'fst_flow.log'))
 
         script(['0', ''])
         CLI_menu(fst).display_menu()
 
-        assert CONSTANTS.DEBUG4 is not initial
-        # choice 0 does not break: the menu looped until Enter
-        assert fst_manager.system.call_count == 2  # clear_cli once per loop pass
+        # choice 0 toggled the flow stream on (was off at start)
+        flow = logging.getLogger('fst.flow')
+        assert flow.level == logging.DEBUG
+        assert flow.propagate is False
+        assert flow.handlers
+        # the flow toggle activates the CLI keep-open gate: the second
+        # loop pass does NOT clear the console (only the first did)
+        assert fst_manager.system.call_count == 1
         assert fst.arg_manager.PRINT_VK_CODES is False  # reset on entry
 
     def test_choice_one_opens_config_file(self, scripted_menu):

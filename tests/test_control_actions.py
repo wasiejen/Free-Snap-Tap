@@ -4,10 +4,10 @@ The control handlers mutate arg flags and stop the (mocked) listeners; the
 pause-toggle reload path is exercised with the config load and console clear
 stubbed so no file is opened and no real console is cleared.
 """
+import logging
 from unittest.mock import MagicMock
 
 import fst_manager
-from fst_manager import CONSTANTS
 
 
 class TestReturnToMenu:
@@ -56,14 +56,37 @@ class TestTogglePause:
 
 
 class TestDebugNumpad:
-    def test_all_numpad_actions(self, kb_env_plain, capsys):
+    def test_all_numpad_actions(self, kb_env_plain, monkeypatch, tmp_path, capsys, caplog):
         kb = kb_env_plain
         for key in ['alt', 'num1', 'num2', 'num3', 'num4', 'num5', 'num7', 'num8']:
             kb.state_manager.set_real_key_press_state(kb.convert_to_vk_code(key), True)
-        initial = CONSTANTS.DEBUG
+        monkeypatch.setattr(fst_manager, 'FLOW_LOG_FILE', str(tmp_path / 'fst_flow.log'))
+        caplog.set_level(logging.DEBUG)
         kb.check_debug_numpad_actions()
-        # num1..num4 each toggle their debug flag; num5/num7/num8 print
-        assert CONSTANTS.DEBUG is not initial
+        # num1..num3 all toggle the shared root debug level (3 toggles -> on)
+        assert logging.getLogger('fst').level == logging.DEBUG
+        assert logging.getLogger('fst.eval').level == logging.DEBUG
+        # num4 toggled the flow stream on
+        flow = logging.getLogger('fst.flow')
+        assert flow.level == logging.DEBUG
+        assert flow.propagate is False
+        assert any('fst_flow.log' in str(getattr(h, 'baseFilename', ''))
+                   for h in flow.handlers)
+        # num5 still dumps the internal groups to the console
         out = capsys.readouterr().out
-        assert 'real_key_state' in out  # num7
-        assert 'all_key_state' in out  # num8
+        assert 'Aliases' in out
+        # num7/num8 state dumps are DEBUG records via the state logger
+        assert 'real_key_state' in caplog.text
+        assert 'all_key_state' in caplog.text
+
+    def test_num1_toggles_root_debug_level_off(self, kb_env_plain, caplog):
+        kb = kb_env_plain
+        kb.state_manager.set_real_key_press_state(kb.convert_to_vk_code('alt'), True)
+        kb.state_manager.set_real_key_press_state(kb.convert_to_vk_code('num1'), True)
+        caplog.set_level(logging.DEBUG)
+        kb.check_debug_numpad_actions()
+        assert logging.getLogger('fst').level == logging.DEBUG
+        # a second alt+num1 toggles the root debug level back off
+        kb.check_debug_numpad_actions()
+        assert logging.getLogger('fst').level == logging.INFO
+        assert logging.getLogger('fst.state').level == logging.INFO

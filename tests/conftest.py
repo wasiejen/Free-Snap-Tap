@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from pathlib import Path
@@ -86,6 +87,27 @@ def restore_constants():
     yield
     for attr, value in saved.items():
         setattr(CONSTANTS, attr, value)
+
+
+@pytest.fixture(autouse=True)
+def restore_fst_loggers():
+    """Save/restore the FST area-logger levels, propagate flags and handlers
+    so logging toggles in one test never leak into the next."""
+    names = ['fst', 'fst.flow', 'fst.eval', 'fst.state', 'fst.macro', 'fst.config']
+    saved = {}
+    for name in names:
+        lg = logging.getLogger(name)
+        saved[name] = (lg.level, lg.propagate, list(lg.handlers))
+    yield
+    for name, (level, propagate, handlers) in saved.items():
+        lg = logging.getLogger(name)
+        for handler in lg.handlers[:]:
+            lg.removeHandler(handler)
+            handler.close()
+        for handler in handlers:
+            lg.addHandler(handler)
+        lg.setLevel(level)
+        lg.propagate = propagate
 
 
 @pytest.fixture

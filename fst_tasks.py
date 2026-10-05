@@ -8,8 +8,9 @@ import pygetwindow as gw
 import re #regular expression
 
 import logging
-# Use __name__ to automatically label logs with the filename
-logger = logging.getLogger(__name__)
+# the macro-area logger of the FST logger tree (same cached instance as
+# fst_manager's logger_macro - no circular import, fst_manager imports us)
+logger_macro = logging.getLogger('fst.macro')
 
 
 class Macro_Repeat_Task:
@@ -26,7 +27,7 @@ class Macro_Repeat_Task:
         self._handle = None
 
     async def run(self):
-        logger.debug(f"Macro_Repeat_Task started for {self.alias_name} with repeat time {self.repeat_time} ms")
+        logger_macro.debug(f"Macro_Repeat_Task started for {self.alias_name} with repeat time {self.repeat_time} ms")
         print(f"START REPEAT: {self.alias_name} with interval of {self.repeat_time} ms")
 
         while not self.stop_event.is_set():

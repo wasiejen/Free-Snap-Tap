@@ -8,18 +8,14 @@ import asyncio
 from pynput import keyboard, mouse
 from time import time # sleep(0.005) = 5 ms
 from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_dict.py
-import pprint
 from os import startfile
 
 from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro, ConfigError
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
 from fst_manager import Input_State_Manager, Config_Manager
-
-
-import logging
-# Use __name__ to automatically label logs with the filename
-logger = logging.getLogger(__name__)
+from fst_manager import (logger, logger_flow, logger_state, logger_macro)
+from fst_manager import toggle_debug_level, toggle_flow
 
 
 class FST_Keyboard():
@@ -814,7 +810,7 @@ class FST_Keyboard():
                         try:
                             asyncio.run_coroutine_threadsafe(self._output_manager.execute_key_event(current_ke, with_delay=False), self.loop)
                         except Exception as e:
-                            logger.error(f"Error occurred while calling async execute_keys_event in mouse_key to mouse_key rebind: {e}")
+                            logger_flow.error(f"Error occurred while calling async execute_keys_event in mouse_key to mouse_key rebind: {e}")
                     else:
                         self._output_manager.send_key_event(current_ke)
 
@@ -918,7 +914,7 @@ class FST_Keyboard():
         self.interrupt_macro_by_name(alias_name)
 
         _handle = asyncio.run_coroutine_threadsafe(self.macro_task(key_sequence, alias_name), self.loop)
-        logger.debug(f"Started macro playback for {alias_name} with key sequence: {key_sequence}")
+        logger_macro.debug(f"Started macro playback for {alias_name} with key sequence: {key_sequence}")
         self._macro_task_dict[alias_name] = _handle
         _handle.add_done_callback(self.check_result)
         return _handle
@@ -928,7 +924,7 @@ class FST_Keyboard():
         self.interrupt_macro_by_name(alias_name)
 
         _handle = self.loop.create_task(self.macro_task(key_sequence, alias_name))
-        logger.debug(f"Started macro playback for {alias_name} with key sequence: {key_sequence}")
+        logger_macro.debug(f"Started macro playback for {alias_name} with key sequence: {key_sequence}")
         self._macro_task_dict[alias_name] = _handle
         _handle.add_done_callback(self.check_result)
         return _handle
@@ -943,7 +939,7 @@ class FST_Keyboard():
                 _handle.cancel()
 
         except KeyError:
-            logger.debug(f"D1: no macro task found for {alias_name} - maybe just the first start of it")
+            logger_macro.debug(f"no macro task found for {alias_name} - maybe just the first start of it")
 
 
     async def macro_task(self, key_group, alias_name):
@@ -964,7 +960,7 @@ class FST_Keyboard():
                     await self._output_manager.execute_key_event(key_event, delay_times, with_delay=True)
 
         except Exception as error:
-            logger.exception(f"Error in macro playback of {alias_name}: {key_group} | {error}")
+            logger_macro.exception(f"Error in macro playback of {alias_name}: {key_group} | {error}")
 
 
 
@@ -1010,21 +1006,23 @@ class FST_Keyboard():
         #     self._state_manager.release_all_currently_pressed_keys()
 
     def check_debug_numpad_actions(self):
+        # alt+num1/2/3 all toggle the shared root debug level (the old
+        # per-flag D1/D2/D3 channels collapsed into one)
         if self.check_for_combination(['alt','num1']):
-            CONSTANTS.DEBUG = not CONSTANTS.DEBUG
+            toggle_debug_level()
         if self.check_for_combination(['alt','num2']):
-            CONSTANTS.DEBUG2 = not CONSTANTS.DEBUG2
+            toggle_debug_level()
         if self.check_for_combination(['alt','num3']):
-            CONSTANTS.DEBUG3 = not CONSTANTS.DEBUG3
+            toggle_debug_level()
         if self.check_for_combination(['alt','num4']):
-            CONSTANTS.DEBUG4 = not CONSTANTS.DEBUG4
+            toggle_flow()
         if self.check_for_combination(['alt','num5']):
             self.display_internal_repr_groups()
         if self.check_for_combination(['alt','num7']):
-            pprint.pp(f"real_key_state: {self._state_manager._real_key_press_states_dict}")
-            pprint.pp(f"sim_key_state: {self._state_manager._simulated_key_press_states_dict}")
+            logger_state.debug(f"real_key_state: {self._state_manager._real_key_press_states_dict}")
+            logger_state.debug(f"sim_key_state: {self._state_manager._simulated_key_press_states_dict}")
         if self.check_for_combination(['alt','num8']):
-            pprint.pp(f"all_key_state: {self._state_manager._all_key_press_states_dict}")
+            logger_state.debug(f"all_key_state: {self._state_manager._all_key_press_states_dict}")
 
     def control_return_to_menu(self):
         self._arg_manager.MENU_ENABLED = True

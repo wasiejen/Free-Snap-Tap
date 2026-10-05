@@ -20,8 +20,100 @@ import asyncio
 import copy
 
 import logging
-# Use __name__ to automatically label logs with the filename
-logger = logging.getLogger(__name__)
+# FST area-logger tree (design 2026-10-01_fst-logging-design.md §3):
+#   fst           app root: lifecycle, errors -> fst.log + console (WARNING+)
+#   fst.flow      per-key pipeline (IN/rebind/toggle/SUPPRESSED/OUT) -> own fst_flow.log
+#   fst.eval      constraint evaluation + eval variables
+#   fst.state     key-state dicts, press/release tracking, timings
+#   fst.macro     macro/repeat task lifecycle
+#   fst.config    start-arg parsing, config load
+logger = logging.getLogger('fst')
+logger_flow = logging.getLogger('fst.flow')
+logger_eval = logging.getLogger('fst.eval')
+logger_state = logging.getLogger('fst.state')
+logger_macro = logging.getLogger('fst.macro')
+logger_config = logging.getLogger('fst.config')
+
+MAIN_LOG_FILE = 'fst.log'
+FLOW_LOG_FILE = 'fst_flow.log'
+
+# -log=LEVEL start argument values -> logging levels
+LOG_LEVELS = {'debug': logging.DEBUG, 'info': logging.INFO,
+              'warning': logging.WARNING, 'error': logging.ERROR}
+
+# area loggers covered by the root debug level (-log=LEVEL, alt+num1/2/3);
+# fst.flow is on its own channel (-flow / alt+num4 / menu option 0)
+AREA_LOGGER_NAMES = ('fst', 'fst.eval', 'fst.state', 'fst.macro', 'fst.config')
+
+
+def setup_fst_logging():
+    '''Configure the FST area-logger tree once at startup: fst.log is
+    append-only (never wiped between runs), the console shows WARNING+.'''
+    root = logging.getLogger('fst')
+    if root.handlers:
+        return  # already set up
+    root.setLevel(logging.INFO)
+    for name in AREA_LOGGER_NAMES[1:]:
+        logging.getLogger(name).setLevel(logging.INFO)
+    flow = logging.getLogger('fst.flow')
+    flow.setLevel(logging.WARNING)
+    flow.propagate = True
+    file_handler = logging.FileHandler(MAIN_LOG_FILE, mode='a')
+    file_handler.setFormatter(logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    root.addHandler(file_handler)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.WARNING)
+    console_handler.setFormatter(logging.Formatter('%(levelname)s %(name)s: %(message)s'))
+    root.addHandler(console_handler)
+
+
+def set_area_log_level(level):
+    '''Set the root debug level on fst + all area loggers except fst.flow.'''
+    for name in AREA_LOGGER_NAMES:
+        logging.getLogger(name).setLevel(level)
+
+
+def is_flow_enabled():
+    return logging.getLogger('fst.flow').level == logging.DEBUG
+
+
+def set_flow_enabled(enabled):
+    '''Enable/disable the per-key flow stream: DEBUG -> own append-only
+    fst_flow.log (propagation off, excluded from the main file); off ->
+    WARNING+ records propagate to the main log.'''
+    flow = logging.getLogger('fst.flow')
+    if enabled:
+        if is_flow_enabled() and flow.handlers:
+            return  # already on (apply_start_arguments re-runs on focus change)
+        flow.setLevel(logging.DEBUG)
+        flow.propagate = False
+        flow_handler = logging.FileHandler(FLOW_LOG_FILE, mode='a')
+        flow_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s %(message)s'))
+        flow.addHandler(flow_handler)
+    else:
+        for handler in flow.handlers[:]:
+            flow.removeHandler(handler)
+            handler.close()
+        flow.setLevel(logging.WARNING)
+        flow.propagate = True
+
+
+def toggle_flow():
+    set_flow_enabled(not is_flow_enabled())
+
+
+def toggle_debug_level():
+    '''Toggle the root debug level between DEBUG and INFO (alt+num1/2/3).'''
+    current = logging.getLogger('fst').level
+    set_area_log_level(logging.INFO if current == logging.DEBUG else logging.DEBUG)
+
+
+def is_any_debug_active():
+    '''CLI keep-open gate: any area logger (incl. flow) at DEBUG -> keep console.'''
+    return any(logging.getLogger(name).level == logging.DEBUG
+               for name in AREA_LOGGER_NAMES + ('fst.flow',))
+
 
 class CONSTANTS():
 
@@ -351,7 +443,7 @@ class Output_Manager():
             return True
 
         def stop_all_repeat():
-            logger.debug(f"Stop all repeat called: {self._repeat_thread_dict.items()}")
+            logger_eval.debug(f"Stop all repeat called: {self._repeat_thread_dict.items()}")
             try:
                 for alias_name, (repeat_task, _handle) in self._repeat_thread_dict.items():
                     if not _handle.done():
@@ -773,7 +865,7 @@ class Output_Manager():
                         try:
                             asyncio.run_coroutine_threadsafe(send_async(key_to_send, last_key_send, key_code_to_send, key_code_last_key_send), self._fst.loop)
                         except Exception as e:
-                            logger.error(f"Error occurred while calling send_keys_with_delay: {e}")
+                            logger_flow.error(f"Error occurred while calling send_keys_with_delay: {e}")
                 else:
                     self._keyboard_controller.press(key_code_to_send)
                 tap_group.set_last_key_send(key_to_send)
@@ -1251,10 +1343,11 @@ class Argument_Manager():
     TRAY_ICON = False
 
     # global variables
+    # (the old per-flag debug booleans died in favor of the area-loggers;
+    # DEBUG/DEBUG2/DEBUG3 snapshots stay until the last reader is converted)
     DEBUG  = False
     DEBUG2 = False
     DEBUG3 = False
-    DEBUG_NUMPAD = False
 
     WIN32_FILTER_PAUSED = True
     MANUAL_PAUSED = False
@@ -1287,7 +1380,6 @@ class Argument_Manager():
         Argument_Manager.DEBUG  = CONSTANTS.DEBUG
         Argument_Manager.DEBUG2 = CONSTANTS.DEBUG2
         Argument_Manager.DEBUG3 = CONSTANTS.DEBUG3
-        Argument_Manager.DEBUG_NUMPAD = CONSTANTS.DEBUG_NUMPAD
         # to only set up the variable and not reset it with every focus change
         self.STATUS_INDICATOR = Argument_Manager.STATUS_INDICATOR
         self.STATUS_INDICATOR_SIZE = Argument_Manager.STATUS_INDICATOR_SIZE
@@ -1305,9 +1397,6 @@ class Argument_Manager():
         self._sys_start_args = new_list
 
     def reset_global_variable_changes(self):
-        # self.DEBUG = Argument_Manager.DEBUG
-        # self.DEBUG2 = Argument_Manager.DEBUG2
-        # self.DEBUG3 = Argument_Manager.DEBUG3
         self.MENU_ENABLED = Argument_Manager.MENU_ENABLED
         self.CONTROLS_ENABLED = Argument_Manager.CONTROLS_ENABLED
         self.ACT_DELAY = Argument_Manager.ACT_DELAY
@@ -1357,12 +1446,17 @@ class Argument_Manager():
             # if commented out do nothing
             if arg[0] in (':', '#'):
                 continue
-            if self.DEBUG:
-                print(f"D1: {arg}")
-            # enable debug print outs
-            if arg == "-debug":
-                self.DEBUG = True
-                CONSTANTS.DEBUG = True
+            logger_config.debug(f"start argument: {arg}")
+            # log level control: -log=debug/info/warning/error
+            if arg[:5] == '-log=' and len(arg) > 5:
+                level = arg[5:].lower()
+                if level in LOG_LEVELS:
+                    set_area_log_level(LOG_LEVELS[level])
+                else:
+                    logger_config.warning(f"invalid log level: {arg[5:]} - use debug, info, warning or error")
+            # enable the per-key flow stream -> fst_flow.log
+            elif arg == "-flow":
+                set_flow_enabled(True)
             elif arg == "-debug_numpad":
                 CONSTANTS.DEBUG_NUMPAD = True
             # start directly without showing the menu
@@ -1371,8 +1465,7 @@ class Argument_Manager():
             # use custom tap groups file for loading and saving
             elif arg[:6] == '-file=' and len(arg) > 6:
                 file_name = arg[6:]
-                if self.DEBUG:
-                    print(f"D1: {file_name}")
+                logger_config.info(f"config file set to: {file_name}")
                 self._fst.config_manager.file_name = file_name
             # Start with controls disabled
             elif arg == "-nocontrols":
@@ -1458,7 +1551,7 @@ class Argument_Manager():
                 self.BACKUP_ROOT_DIR = arg[17:].strip()
                 print(f"set backup root directory to: {self.BACKUP_ROOT_DIR}")
             else:
-                print("unknown start argument: ", arg)
+                logger_config.warning(f"unknown start argument: {arg}")
 
 class Focus_Group_Manager():
     '''
@@ -1853,8 +1946,8 @@ class CLI_menu():
         self._fst = fst_keyboard
 
     def clear_cli(self):
-        if CONSTANTS.DEBUG or CONSTANTS.DEBUG2 or CONSTANTS.DEBUG3:
-            print("D1: cli not cleared")
+        if is_any_debug_active():
+            print("cli not cleared - debug logging active")
         else:
             system('cls||clear')
 
@@ -1889,7 +1982,7 @@ class CLI_menu():
             choice = input("\nHit [Enter] to start or enter your choice: " )
 
             if choice == '0':
-                CONSTANTS.DEBUG4 = not CONSTANTS.DEBUG4
+                toggle_flow()
             elif choice == '1':
                 startfile(self._fst.config_manager.file_name)
             elif choice == '2':
