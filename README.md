@@ -253,6 +253,14 @@ or navigate to the Free-Snap-Tap repo folder and type in:
 python ./free_snap_tap.py
 ```
 
+## Running the tests
+
+The test suite needs the repo virtual environment (system Python has no pytest):
+
+```bash
+.venv/Scripts/python.exe -m pytest tests -q
+```
+
 ## On Linux 
 
 Not working due to no support of selective key suppression in Linux OS.
@@ -268,4 +276,5 @@ If you have wishes or ideas what to add, just `create a issue` or `start a discu
 
 ## Version History
 
-Moved to [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
+Changes since V1.2.0 are listed in [CHANGELOG.md](CHANGELOG.md).
+Earlier releases are listed in the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
