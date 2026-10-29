@@ -1,0 +1,653 @@
+"""Behavior tests of the win32 filter hot path (FST_Keyboard._win32_event_filter).
+
+Covers trigger activation, rebind/macro firing, suppression, toggles, alias
+expansion, tap-group idealization, sequence cycling and playback interrupt.
+All pynput controllers and the listener are mocked - no real input, no live
+listeners.
+"""
+from types import SimpleNamespace
+from unittest.mock import MagicMock, call
+
+import asyncio
+from pynput import keyboard as pynput_keyboard
+import pytest
+
+import fst_manager
+import fst_keyboard
+from fst_data_types import Key_Event
+from fst_keyboard import FST_Keyboard
+
+from kb_helpers import build, down, up, hold_keys, mock_control_handlers
+
+VK_A = 0x41
+VK_B = 0x42
+VK_C = 0x43
+VK_SHIFT = 160
+
+
+def base_events(seq):
+    """(vk_code, is_press) pairs - key_string/constraints of config-derived
+    events differ from the bare events built in the tests."""
+    return [(ke.vk_code, ke.is_press) for ke in seq]
+
+
+class TestRebindFiring:
+    def test_replacement_sent_source_suppressed(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['a'], 'b']]])
+        down(kb, VK_A, 1000)
+        kb_env_ns.kb_mock.press.assert_called_once_with(pynput_keyboard.KeyCode.from_vk(VK_B))
+        assert kb_env_ns.kb_mock.release.call_count == 0
+        kb._listener.suppress_event.assert_called_once_with()
+        # pressed-keys set tracks the replacement, not the source
+        assert kb.state_manager.get_key_press_state(VK_B) is True
+        assert kb.state_manager.get_key_press_state(VK_A) is False
+
+    def test_release_without_trigger_passes_through(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['-a'], '-b']]])  # press-only rebind
+        down(kb, VK_A, 1000)
+        up(kb, VK_A, 2000)  # no rebind for the release -> passes through
+        assert kb_env_ns.kb_mock.press.call_count == 1
+        assert kb_env_ns.kb_mock.release.call_count == 0
+        assert kb._listener.suppress_event.call_count == 1
+
+    def test_key_pair_rebind_expands_to_press_and_release(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['c'], 'shift']]])
+        down(kb, VK_C, 1000)
+        up(kb, VK_C, 2000)
+        kb_env_ns.kb_mock.press.assert_called_once_with(pynput_keyboard.KeyCode.from_vk(VK_SHIFT))
+        kb_env_ns.kb_mock.release.assert_called_once_with(pynput_keyboard.KeyCode.from_vk(VK_SHIFT))
+        assert kb._listener.suppress_event.call_count == 2
+
+    def test_constraint_not_met_neither_fires_nor_suppresses(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['a', '-shift'], 'b']]])
+        down(kb, VK_A, 1000)  # shift not pressed -> no match
+        assert kb_env_ns.kb_mock.press.call_count == 0
+        assert kb._listener.suppress_event.call_count == 0
+        up(kb, VK_A, 2000)
+        down(kb, VK_SHIFT, 3000)
+        down(kb, VK_A, 4000)  # now constraint holds -> fires
+        kb_env_ns.kb_mock.press.assert_called_once_with(pynput_keyboard.KeyCode.from_vk(VK_B))
+
+    def test_trigger_evaluation_constraint(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['a|(p("shift"))'], 'b']]])
+        down(kb, VK_A, 1000)
+        assert kb_env_ns.kb_mock.press.call_count == 0
+        up(kb, VK_A, 2000)
+        down(kb, VK_SHIFT, 3000)
+        down(kb, VK_A, 4000)
+        kb_env_ns.kb_mock.press.assert_called_once_with(pynput_keyboard.KeyCode.from_vk(VK_B))
+
+    def test_suppress_rebind_sends_nothing(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['a'], 'suppress']]])
+        down(kb, VK_A, 1000)
+        assert kb_env_ns.kb_mock.press.call_count == 0
+        assert kb_env_ns.kb_mock.release.call_count == 0
+        kb._listener.suppress_event.assert_called_once_with()
+
+    def test_repeated_trigger_key_is_suppressed_without_refiring(self, kb_env_ns, monkeypatch):
+        # macro/toggle triggers keep the suppressed repeat behaviour
+        # (2026-09-12 proposal: only repeated REBIND triggers are let through)
+        kb = kb_env_ns.kb
+        fired = []
+        monkeypatch.setattr(FST_Keyboard, 'start_macro_playback',
+                            lambda self, alias, seq: fired.append((alias, seq)))
+        build(kb, macros=[['(m)', [['a'], ['b']]]])
+        down(kb, VK_A, 1000)
+        down(kb, VK_A, 1500)  # OS auto-repeat of an already pressed trigger
+        assert len(fired) == 1  # the macro fires once, not on the repeat
+        assert kb._listener.suppress_event.call_count == 2
+
+
+class TestRebindRepeat:
+    """Held REBIND keys auto-repeat their target key (approved proposal
+    2026-09-12; maintainer ruling 2026-09-15: a rebind trigger that is also
+    in a tap group keeps the suppressed repeat behaviour)."""
+
+    def test_repeated_rebind_trigger_repeats_target_key(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['a'], 'b']]])
+        down(kb, VK_A, 1000)
+        down(kb, VK_A, 1500)  # OS auto-repeat of an already pressed trigger
+        # the target key repeats with the trigger; the source stays suppressed
+        assert kb_env_ns.kb_mock.press.call_args_list == [
+            call(pynput_keyboard.KeyCode.from_vk(VK_B)),
+            call(pynput_keyboard.KeyCode.from_vk(VK_B)),
+        ]
+        assert kb._listener.suppress_event.call_count == 2
+
+    def test_rebind_to_suppress_stays_suppressed_on_repeat(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['a'], 'suppress']]])
+        down(kb, VK_A, 1000)
+        down(kb, VK_A, 1500)
+        assert kb_env_ns.kb_mock.press.call_count == 0
+        assert kb_env_ns.kb_mock.release.call_count == 0
+        assert kb._listener.suppress_event.call_count == 2
+
+    def test_rebind_and_macro_trigger_repeats_target_only_macro_never_fires(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        fired = []
+        monkeypatch.setattr(FST_Keyboard, 'start_macro_playback',
+                            lambda self, alias, seq: fired.append((alias, seq)))
+        build(kb, rebinds=[['(r)', [['a'], 'b']]],
+              macros=[['(m)', [['a'], ['c']]]])
+        down(kb, VK_A, 1000)  # first press = rebind (rebind loop runs first)
+        assert kb_env_ns.kb_mock.press.call_count == 1
+        assert fired == []  # the rebind consumes the trigger, macro never fires
+        down(kb, VK_A, 1500)  # repeats = target-key repeats only
+        assert kb_env_ns.kb_mock.press.call_count == 2
+        assert fired == []  # the macro still never fires on the repeat
+        assert kb._listener.suppress_event.call_count == 2
+
+    def test_rebind_press_state_bookkeeping_stays_consistent_on_repeat(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['a'], 'b']]])
+        down(kb, VK_A, 1000)
+        down(kb, VK_A, 1500)
+        # pressed-keys set tracks the replacement across repeats (set
+        # semantics make the remove + re-add idempotent)
+        assert kb.state_manager.get_key_press_state(VK_B) is True
+        assert kb.state_manager.get_key_press_state(VK_A) is False
+        # the real held trigger keeps its real press state
+        assert kb.state_manager.get_real_key_press_state(VK_A) is True
+
+    def test_rebind_trigger_in_tap_group_does_not_repeat(self, kb_env_ns):
+        # maintainer ruling 2026-09-15: a rebind trigger that is also in a
+        # tap group keeps the current (suppressed) repeat behaviour - it must
+        # NOT auto-repeat its replacement (the failed first attempt's area)
+        kb = kb_env_ns.kb
+        build(kb, taps=[['(TAP_1)', ['a', 'b']]],
+              rebinds=[['(r)', [['a'], 'c']]])
+        down(kb, VK_A, 1000)
+        down(kb, VK_A, 1500)  # OS auto-repeat of the tap-group trigger
+        code = pynput_keyboard.KeyCode.from_vk
+        # the replacement c is sent exactly once (no auto-repeat); the tap
+        # group then owns the held key itself (current tap-group behaviour)
+        assert kb_env_ns.kb_mock.press.call_args_list == [call(code(VK_C)), call(code(VK_A))]
+        # both source events stay suppressed on the listener
+        assert kb._listener.suppress_event.call_count == 2
+
+
+class TestToggle:
+    def test_toggle_rebind_presses_then_releases_on_next_press(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(t)', [['c'], '^shift']]])
+        down(kb, VK_C, 1000)  # first press -> -shift
+        kb_env_ns.kb_mock.press.assert_called_once_with(pynput_keyboard.KeyCode.from_vk(VK_SHIFT))
+        up(kb, VK_C, 2000)  # key release of a toggle is suppressed, no second toggle
+        assert kb_env_ns.kb_mock.release.call_count == 0
+        down(kb, VK_C, 3000)  # second press -> +shift
+        kb_env_ns.kb_mock.release.assert_called_once_with(pynput_keyboard.KeyCode.from_vk(VK_SHIFT))
+        assert kb.state_manager.get_toggle_state(VK_SHIFT) is False
+
+
+class TestMacroFiring:
+    def test_macro_trigger_fires_and_suppresses(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        fired = []
+        monkeypatch.setattr(FST_Keyboard, 'start_macro_playback',
+                            lambda self, alias, seq: fired.append((alias, seq)))
+        build(kb, macros=[['(m)', [['a'], ['b']]]])
+        down(kb, VK_A, 1000)
+        # bare key in a played group expands to a press + release pair
+        assert fired[0][0] == 'm'
+        assert base_events(fired[0][1]) == [(VK_B, True), (VK_B, False)]
+        kb._listener.suppress_event.assert_called_once_with()
+
+    def test_sequence_cycles_and_wraps_groups(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        fired = []
+        monkeypatch.setattr(FST_Keyboard, 'start_macro_playback',
+                            lambda self, alias, seq: fired.append((alias, seq)))
+        build(kb, macros=[['(seq)', [['a'], ['b'], ['c']]]])
+        for i in range(3):
+            down(kb, VK_A, 1000 + i * 1000)
+            up(kb, VK_A, 1500 + i * 1000)
+        assert [alias for alias, _ in fired] == ['seq', 'seq', 'seq']
+        assert base_events(fired[0][1]) == [(VK_B, True), (VK_B, False)]
+        assert base_events(fired[1][1]) == [(VK_C, True), (VK_C, False)]
+        # auto-reset after the last group: third trigger plays group 1 again
+        assert base_events(fired[2][1]) == [(VK_B, True), (VK_B, False)]
+
+    def test_alias_expanded_in_macro_key_group(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        fired = []
+        monkeypatch.setattr(FST_Keyboard, 'start_macro_playback',
+                            lambda self, alias, seq: fired.append((alias, seq)))
+        build(kb, aliases=[['<world>', ['-shift', 'a', '+shift']]],
+              macros=[['(m)', [['b'], ['<world>', 'c']]]])
+        down(kb, VK_B, 1000)
+        assert fired[0][0] == 'm'
+        assert base_events(fired[0][1]) == [(VK_SHIFT, True),
+                                            (VK_A, True), (VK_A, False),
+                                            (VK_SHIFT, False),
+                                            (VK_C, True), (VK_C, False)]
+
+    def test_unknown_alias_raises_at_build(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        with pytest.raises(Exception):
+            build(kb, macros=[['(m)', [['a'], ['<nope>']]]])
+
+    def test_reset_macro_sequence_by_name(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, macros=[['(seq)', [['a'], ['b'], ['c']]]])
+        macro = kb._macros_alias_dict['seq']
+        macro.get_key_events_of_current_sequence()  # counter -> 1
+        kb.reset_macro_sequence_by_name('seq')
+        assert macro.get_sequence_counter() == 0
+        # unknown name: prints, no raise
+        kb.reset_macro_sequence_by_name('nope')
+
+    def test_interrupt_macro_by_name(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        handle = MagicMock()
+        handle.done.return_value = False
+        kb.macro_thread_dict['m'] = handle
+        kb.interrupt_macro_by_name('m')
+        handle.cancel.assert_called_once_with()
+        kb.interrupt_macro_by_name('unknown')  # no raise
+
+
+class TestTapGroupFilter:
+    def test_snap_tap_idealization_sequence(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        build(kb, taps=[['(TAP_1)', ['a', 'b']]])
+        down(kb, VK_A, 1000)
+        down(kb, VK_B, 2000)  # switch: release a, press b
+        up(kb, VK_B, 3000)    # a still pressed: release b, re-press a
+        up(kb, VK_A, 4000)    # nothing left: release a
+        code = pynput_keyboard.KeyCode.from_vk
+        assert kb_env_ns.kb_mock.method_calls == [
+            call.press(code(VK_A)),
+            call.release(code(VK_A)), call.press(code(VK_B)),
+            call.release(code(VK_B)), call.press(code(VK_A)),
+            call.release(code(VK_A)),
+        ]
+        assert kb._listener.suppress_event.call_count == 4
+
+
+class TestMacroPlayback:
+    @pytest.mark.asyncio
+    async def test_macro_task_plays_keys_with_delays(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        sleeps = []
+
+        async def fake_sleep(t):
+            sleeps.append(t)
+
+        monkeypatch.setattr(asyncio, 'sleep', fake_sleep)
+        monkeypatch.setattr(fst_manager, 'randint', lambda lo, hi: (lo + hi) // 2)
+        kb.arg_manager.MACRO_MIN_DELAY_IN_MS = 4
+        kb.arg_manager.MACRO_MAX_DELAY_IN_MS = 6
+
+        await kb.macro_task([Key_Event(VK_B, constraints=[100])], 'm')
+
+        kb_env_ns.kb_mock.press.assert_called_once_with(pynput_keyboard.KeyCode.from_vk(VK_B))
+        assert sleeps == [0.1]
+
+    @pytest.mark.asyncio
+    async def test_macro_task_toggle_key_toggles_state(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+
+        async def fake_sleep(t):
+            pass
+
+        monkeypatch.setattr(asyncio, 'sleep', fake_sleep)
+        # first toggle -> press, second -> release (regression: method must live
+        # on state_manager, not output_manager)
+        await kb.macro_task([Key_Event(VK_SHIFT, is_toggle=True)], 'm')
+        kb_env_ns.kb_mock.press.assert_called_once_with(pynput_keyboard.KeyCode.from_vk(VK_SHIFT))
+        assert kb.state_manager.get_toggle_state(VK_SHIFT) is True
+        await kb.macro_task([Key_Event(VK_SHIFT, is_toggle=True)], 'm')
+        kb_env_ns.kb_mock.release.assert_called_once_with(pynput_keyboard.KeyCode.from_vk(VK_SHIFT))
+        assert kb.state_manager.get_toggle_state(VK_SHIFT) is False
+
+    @pytest.mark.asyncio
+    async def test_interrupt_cancels_running_playback(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        kb.loop = asyncio.get_running_loop()
+        seq = [Key_Event(VK_B, constraints=[500, 500]),
+               Key_Event(VK_C, constraints=[500, 500])]
+        kb.start_macro_playback_repeat('m', seq)
+        await asyncio.sleep(0.01)
+        kb.interrupt_macro_by_name('m')
+        await asyncio.sleep(0.01)
+        # b was sent before the delay; c was cancelled away with the delay
+        assert kb_env_ns.kb_mock.press.call_count == 1
+        assert kb_env_ns.kb_mock.release.call_count == 0
+
+
+VK_ALT = 0xA4
+VK_END = 0x23
+VK_DELETE = 0x2E
+VK_PAGE_DOWN = 0x22
+
+
+class TestControlActions:
+    def test_check_for_combination_string_and_int_codes(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        assert kb.check_for_combination(['alt', 'end']) is False
+        hold_keys(kb, VK_ALT, VK_END)
+        assert kb.check_for_combination(['alt', 'end']) is True
+        assert kb.check_for_combination([VK_ALT, VK_END]) is True
+        kb.state_manager.set_real_key_press_state(VK_END, False)
+        assert kb.check_for_combination(['alt', 'end']) is False
+
+    def test_alt_end_exits_program(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        mock_control_handlers(kb)
+        hold_keys(kb, VK_ALT, VK_END)
+        kb.check_control_actions()
+        kb.control_exit_program.assert_called_once_with()
+        kb.control_return_to_menu.assert_not_called()
+        kb.control_toggle_pause.assert_not_called()
+
+    def test_alt_page_down_returns_to_menu(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        mock_control_handlers(kb)
+        hold_keys(kb, VK_ALT, VK_PAGE_DOWN)
+        kb.check_control_actions()
+        kb.control_return_to_menu.assert_called_once_with()
+        kb.control_exit_program.assert_not_called()
+        kb.control_toggle_pause.assert_not_called()
+
+    def test_alt_delete_toggles_pause(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        mock_control_handlers(kb)
+        hold_keys(kb, VK_ALT, VK_DELETE)
+        kb.check_control_actions()
+        kb.control_toggle_pause.assert_called_once_with()
+        kb.control_return_to_menu.assert_not_called()
+        kb.control_exit_program.assert_not_called()
+
+    def test_menu_combination_wins_when_multiple_match(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        mock_control_handlers(kb)
+        hold_keys(kb, VK_ALT, VK_END, VK_DELETE, VK_PAGE_DOWN)
+        kb.check_control_actions()
+        kb.control_return_to_menu.assert_called_once_with()
+        kb.control_exit_program.assert_not_called()
+        kb.control_toggle_pause.assert_not_called()
+
+    def test_partial_combination_does_nothing(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        mock_control_handlers(kb)
+        hold_keys(kb, VK_ALT)  # modifier alone is no control
+        kb.check_control_actions()
+        assert not (kb.control_return_to_menu.call_count
+                    or kb.control_exit_program.call_count
+                    or kb.control_toggle_pause.call_count)
+
+    def test_controls_disabled_gate(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        mock_control_handlers(kb)
+        kb.arg_manager.CONTROLS_ENABLED = False
+        hold_keys(kb, VK_ALT, VK_END)
+        kb.check_control_actions()
+        assert not (kb.control_return_to_menu.call_count
+                    or kb.control_exit_program.call_count
+                    or kb.control_toggle_pause.call_count)
+
+
+def mouse_msg_data(mouse_data=0, flags=0, t=1234):
+    return SimpleNamespace(pt=SimpleNamespace(x=1, y=2), mouseData=mouse_data,
+                           flags=flags, time=t, dwExtraInfo=0)
+
+
+class TestMouseWin32Filter:
+    def patch_filter(self, kb, monkeypatch):
+        monkeypatch.setattr(kb, '_win32_event_filter', MagicMock())
+
+    def test_movement_returns_false_and_is_ignored(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        assert kb.mouse_win32_event_filter(512, mouse_msg_data()) is False
+        kb._win32_event_filter.assert_not_called()
+        kb._listener.suppress.assert_not_called()
+
+    def test_button_messages_map_to_vk_codes(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        cases = [(513, 1, True), (514, 1, False),
+                 (516, 2, True), (517, 2, False),
+                 (519, 3, True), (520, 3, False)]
+        for msg, vk, is_press in cases:
+            kb.mouse_win32_event_filter(msg, mouse_msg_data())
+            kb._win32_event_filter.assert_called_with(vk, 1234, is_press, False, True)
+
+    def test_x_buttons_use_mousedata_for_vk(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=65536))   # x1 down
+        kb._win32_event_filter.assert_called_with(4, 1234, True, False, True)
+        kb.mouse_win32_event_filter(524, mouse_msg_data(mouse_data=65536))   # x1 up
+        kb._win32_event_filter.assert_called_with(4, 1234, False, False, True)
+        kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=131072))  # x2 down
+        kb._win32_event_filter.assert_called_with(5, 1234, True, False, True)
+
+    def test_x_buttons_ignores_key_state_low_word(self, kb_env_ns, monkeypatch):
+        # x-button identifier = high 16 bits of mouseData; the low word holds
+        # key state (ctrl/shift) and must not matter (#42 ruling)
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=65536 | 0x0010))  # x1 down + shift
+        kb._win32_event_filter.assert_called_with(4, 1234, True, False, True)
+        kb.mouse_win32_event_filter(524, mouse_msg_data(mouse_data=65536 | 0x0101))  # x1 up + ctrl/alt
+        kb._win32_event_filter.assert_called_with(4, 1234, False, False, True)
+        kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=131072 | 0x0101))  # x2 down
+        kb._win32_event_filter.assert_called_with(5, 1234, True, False, True)
+
+    def test_x_button_other_identifier_suppresses(self, kb_env_ns, monkeypatch):
+        # an x-button identifier other than x1/x2 resolves no vk_code ->
+        # suppress path (unchanged behavior, regression guard)
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        kb._mouse_listener = MagicMock()
+        kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=196608))  # x3
+        kb._win32_event_filter.assert_not_called()
+        kb._mouse_listener.suppress_event.assert_called_once_with()
+        kb._listener.suppress_event.assert_not_called()
+
+    def test_scroll_messages_map_to_vk_6_and_7(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        kb.mouse_win32_event_filter(522, mouse_msg_data(mouse_data=4287102976))  # vertical down
+        kb._win32_event_filter.assert_called_with(6, 1234, True, False, True)
+        kb.mouse_win32_event_filter(522, mouse_msg_data(mouse_data=7864320))     # vertical up
+        kb._win32_event_filter.assert_called_with(6, 1234, False, False, True)
+        kb.mouse_win32_event_filter(526, mouse_msg_data(mouse_data=4287102976))  # horizontal
+        kb._win32_event_filter.assert_called_with(7, 1234, True, False, True)
+
+    def test_multi_notch_scroll_keeps_single_notch_phase(self, kb_env_ns, monkeypatch):
+        # 2-notch events (delta +/-240) resolve the same phase as single-notch:
+        # direction = sign bit of the delta word, magnitude not aggregated
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        kb.mouse_win32_event_filter(522, mouse_msg_data(mouse_data=4279238656))  # vertical down, 2 notches
+        kb._win32_event_filter.assert_called_with(6, 1234, True, False, True)
+        kb.mouse_win32_event_filter(522, mouse_msg_data(mouse_data=15728640))    # vertical up, 2 notches
+        kb._win32_event_filter.assert_called_with(6, 1234, False, False, True)
+        kb.mouse_win32_event_filter(526, mouse_msg_data(mouse_data=4279238656))  # horizontal down, 2 notches
+        kb._win32_event_filter.assert_called_with(7, 1234, True, False, True)
+
+    def test_simulated_flag_passthrough(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        kb.mouse_win32_event_filter(513, mouse_msg_data(flags=1))
+        kb._win32_event_filter.assert_called_with(1, 1234, True, True, True)
+        kb.mouse_win32_event_filter(513, mouse_msg_data(flags=0))
+        kb._win32_event_filter.assert_called_with(1, 1234, True, False, True)
+
+    def test_simulated_flag_bit0_only(self, kb_env_ns, monkeypatch):
+        # packed LLKHF word: bit 0 = injected; other status bits (e.g.
+        # LLKHF_LOWER_IL_INJECTED 0x20) must not change the outcome
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        kb.mouse_win32_event_filter(513, mouse_msg_data(flags=1))
+        kb._win32_event_filter.assert_called_with(1, 1234, True, True, True)
+        kb.mouse_win32_event_filter(513, mouse_msg_data(flags=0x21))  # injected + lower-IL
+        kb._win32_event_filter.assert_called_with(1, 1234, True, True, True)
+        kb.mouse_win32_event_filter(513, mouse_msg_data(flags=0))
+        kb._win32_event_filter.assert_called_with(1, 1234, True, False, True)
+        kb.mouse_win32_event_filter(513, mouse_msg_data(flags=0x20))  # lower-IL only
+        kb._win32_event_filter.assert_called_with(1, 1234, True, False, True)
+
+    def test_unrecognized_mouse_event_suppresses(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        self.patch_filter(kb, monkeypatch)
+        kb._mouse_listener = MagicMock()
+        # x-button message without x1/x2 mousedata resolves no vk_code
+        kb.mouse_win32_event_filter(523, mouse_msg_data(mouse_data=0))
+        kb._win32_event_filter.assert_not_called()
+        # suppression happens on the mouse listener, not the keyboard one
+        kb._mouse_listener.suppress_event.assert_called_once_with()
+        kb._listener.suppress_event.assert_not_called()
+
+
+class TestMouseToMouseRebind:
+    @pytest.mark.asyncio
+    async def test_replacement_plays_async_not_in_hook_thread(self, kb_env_ns, monkeypatch):
+        """Mouse-to-mouse rebinds must not send input synchronously in the
+        win32 hook thread: the replacement is scheduled on the asyncio loop."""
+        kb = kb_env_ns.kb
+        kb.loop = asyncio.get_running_loop()
+        kb._mouse_listener = MagicMock()
+
+        async def fake_sleep(t):
+            # no real waiting, but yield to the loop so tasks scheduled via
+            # run_coroutine_threadsafe get their turn
+            loop = asyncio.get_running_loop()
+            future = loop.create_future()
+            loop.call_soon(future.set_result, None)
+            await future
+
+        monkeypatch.setattr(asyncio, 'sleep', fake_sleep)
+        build(kb, rebinds=[['(r)', [['mm'], 'scroll_vert']]])
+
+        kb._win32_event_filter(3, 1000, True, False, True)  # middle mouse down, as a mouse event
+
+        # nothing is sent while the hook call is still in flight
+        assert kb_env_ns.mouse_mock.scroll.call_count == 0
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert kb_env_ns.mouse_mock.scroll.call_args_list == [call(0, 1)]  # scroll_vertical press
+        assert kb_env_ns.kb_mock.press.call_count == 0
+        assert kb_env_ns.kb_mock.release.call_count == 0
+        # the original mouse event is suppressed on the mouse listener
+        kb._mouse_listener.suppress_event.assert_called_once_with()
+        kb._listener.suppress_event.assert_not_called()
+
+        kb._win32_event_filter(3, 1500, False, False, True)  # middle mouse up
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert kb_env_ns.mouse_mock.scroll.call_args_list == [call(0, 1), call(0, -1)]
+        assert kb._mouse_listener.suppress_event.call_count == 2
+
+
+class TestListenerLifecycle:
+    """init/start/stop_listener wire the pynput Listener classes with the
+    instance-bound win32 filters. The Listener classes are monkeypatched so no
+    live hook is ever created."""
+
+    def patch_listener_classes(self, monkeypatch):
+        """Replace the Listener classes with callables returning instance
+        mocks; the class mocks record the win32_event_filter wiring."""
+        kb_listener = MagicMock()
+        mouse_listener = MagicMock()
+        kb_cls = MagicMock(return_value=kb_listener)
+        mouse_cls = MagicMock(return_value=mouse_listener)
+        monkeypatch.setattr('pynput.keyboard.Listener', kb_cls)
+        monkeypatch.setattr('pynput.mouse.Listener', mouse_cls)
+        return kb_listener, mouse_listener, kb_cls, mouse_cls
+
+    def test_init_listener_binds_win32_filters(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        kb._listener = None
+        kb._mouse_listener = None
+        kb_listener, mouse_listener, kb_cls, mouse_cls = \
+            self.patch_listener_classes(monkeypatch)
+
+        kb.init_listener()
+
+        kb_cls.assert_called_once_with(win32_event_filter=kb.keyboard_win32_event_filter)
+        mouse_cls.assert_called_once_with(win32_event_filter=kb.mouse_win32_event_filter)
+        assert kb._listener is kb_listener
+        assert kb._mouse_listener is mouse_listener
+
+    def test_start_listener_inits_when_missing_and_starts_both(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        kb._listener = None
+        kb._mouse_listener = None
+        kb_listener, mouse_listener, _, _ = self.patch_listener_classes(monkeypatch)
+
+        kb.start_listener()
+
+        assert kb._listener is kb_listener
+        assert kb._mouse_listener is mouse_listener
+        kb_listener.start.assert_called_once_with()
+        mouse_listener.start.assert_called_once_with()
+
+    def test_start_listener_reuses_existing_listeners(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        monkeypatch.setattr('pynput.keyboard.Listener', MagicMock())
+        monkeypatch.setattr('pynput.mouse.Listener', MagicMock())
+        kb._listener = MagicMock()
+        kb._mouse_listener = MagicMock()
+
+        kb.start_listener()
+
+        kb._listener.start.assert_called_once_with()
+        kb._mouse_listener.start.assert_called_once_with()
+
+    def test_stop_listener_stops_both(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        kb._mouse_listener = MagicMock()
+
+        kb.stop_listener()
+
+        kb._listener.stop.assert_called_once_with()
+        kb._mouse_listener.stop.assert_called_once_with()
+
+
+class TestDisplayFunctions:
+    def test_display_internal_repr_groups_dumps_all_collections(self, kb_env_ns, capsys):
+        kb = kb_env_ns.kb
+        build(kb, aliases=[['<world>', ['a', 'b']]],
+              taps=[['(TAP_1)', ['a', 'b']]],
+              rebinds=[['(r)', [['a'], 'b']]],
+              macros=[['(seq)', [['a'], ['b'], ['c']]]])
+
+        kb.display_internal_repr_groups()
+
+        out = capsys.readouterr().out
+        assert 'Aliases' in out and 'Tap Groups' in out and 'Rebinds' in out
+        assert 'Macros' in out and 'Macro Sequences' in out
+        assert '<world>' in out  # alias name from the key_group_by_alias dict
+
+    def test_open_config_file_uses_config_manager_file_name(self, kb_env_ns, monkeypatch):
+        kb = kb_env_ns.kb
+        kb.config_manager._file_name = 'myconfig.txt'
+        monkeypatch.setattr('fst_keyboard.startfile', MagicMock())
+
+        kb.open_config_file()
+
+        fst_keyboard.startfile.assert_called_once_with('myconfig.txt')
+
+    def test_reload_from_file_reloads_groups_for_current_focus(self, kb_env_ns, capsys, monkeypatch):
+        kb = kb_env_ns.kb
+        kb.focus_manager.FOCUS_APP_NAME = 'cs2'
+        update = MagicMock()
+        monkeypatch.setattr(kb, 'update_args_and_groups', update)
+        kb.cli_menu.update_group_display = MagicMock()
+
+        kb.reload_from_file()
+
+        update.assert_called_once_with('cs2')
+        kb.cli_menu.update_group_display.assert_called_once_with()
+        assert 'cs2' in capsys.readouterr().out

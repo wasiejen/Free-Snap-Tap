@@ -1,0 +1,6 @@
+# packaging the app into an executable (Nuitka / PyInstaller) - not needed to run or test
+Nuitka
+pyinstaller
+pyinstaller-hooks-contrib
+altgraph==0.17.4
+pefile==2023.2.7

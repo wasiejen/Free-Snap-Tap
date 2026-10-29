@@ -3,23 +3,25 @@ Free-Snap-Tap V1.1.4b
 last updated: 241023-1056
 '''
 
+import asyncio
+
 from pynput import keyboard, mouse
-from threading import Event # to play aliases without interfering with keyboard listener
 from time import time # sleep(0.005) = 5 ms
 from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_dict.py
-import pprint
-from os import startfile 
+from os import startfile
 
-from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro
-from fst_threads import Macro_Thread
+from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro, ConfigError
 from fst_manager import CONSTANTS, CLI_menu
-from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager 
+from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
 from fst_manager import Input_State_Manager, Config_Manager
+from fst_manager import (logger, logger_flow, logger_state, logger_macro,
+                         logger_config)
+from fst_manager import toggle_debug_level, toggle_flow
 
-   
+
 class FST_Keyboard():
     '''
-    #XXX
+    Main class to handle keyboard and mouse input and output
     '''
     # CONSTANTS for key events
     WM_KEYDOWN = [256,260] # _PRESS_MESSAGES = (_WM_KEYDOWN, _WM_SYSKEYDOWN)
@@ -28,31 +30,38 @@ class FST_Keyboard():
     # CONSTANTS for mouse events
     MSG_MOUSE_MOVE = 512
     MSG_MOUSE_SCROLL_VERTICAL = 522
-    MSG_MOUSE_SCROLL_HORIZONTAL = 526   
+    MSG_MOUSE_SCROLL_HORIZONTAL = 526
 
     MSG_MOUSE_DOWN = [513,516,519,523]
     MSG_MOUSE_UP = [514,517,520,524]
     MSG_MOUSE_SCROLL = [MSG_MOUSE_SCROLL_VERTICAL, MSG_MOUSE_SCROLL_HORIZONTAL]
 
     SUPPRESS_CODE = -999
-    
+
     TIME_DIFF = None
     START_TIME = None
-        
+
     def __init__(self):
-        
+
         # self._focus_manager = Focus_Group_Manager() if focus_manager is None else focus_manager
         # self._config_manager = config_manager(CONSTANTS.FILE_NAME, self._focus_manager) if config_manager is None else config_manager
         # self._args = Argument_Manager(self) if args is None else args
-        self._focus_manager = Focus_Group_Manager(self) 
-        self._config_manager = Config_Manager(CONSTANTS.FILE_NAME) 
-        self._arg_manager = Argument_Manager(self) 
+        self._focus_manager = Focus_Group_Manager(self)
+        self._config_manager = Config_Manager(CONSTANTS.FILE_NAME)
+        self._arg_manager = Argument_Manager(self)
 
-            
+
         self._output_manager = Output_Manager(self)
         self._state_manager = Input_State_Manager(self)
         self._cli_menu = CLI_menu(self)
-        
+
+        self._warned_config_errors = set()
+
+        self.toast_callback = None # Will hold bridge.trigger_toast
+        self.timer_callback = None # Will hold bridge.trigger_timer
+        self.remove_callback = None # Will hold bridge.remove_toast
+        self.remove_all_callback = None # Will hold bridge.remove_all_toast
+
         # Tap groups define which keys are mutually exclusive
         # Key Groups define which key1 will be replaced by key2
         # if a Key Group has more than 2 keys if will be handled als alias
@@ -60,37 +69,42 @@ class FST_Keyboard():
         self._rebinds_dict = {}       # Key_Event : Key_Event
         self._rebind_triggers = []
         self._macros_dict = {}        # [Key_Group : Key_Group]  # triggers are the Keys to the Item Makro
-        self._macro_triggers = [] 
+        self._macro_triggers = []
         self._all_trigger_events = []
-        
-        self._macro_thread_dict = {}        
-        
+
+        self._macro_task_dict = {}
+
         # colletor of all rebinds and macros, not used for anything yet 241011-1117
         self._rebinds = []
         self._macros = []
         self._macros_alias_dict = {}
         self._macro_sequence_alias_list = []
         self._key_group_by_alias = {}
-        
+
+        self.loop = None
         self._mouse_listener = None
         self._listener = None
-            
+
+
     def init_listener(self):
         self._mouse_listener = mouse.Listener(win32_event_filter=self.mouse_win32_event_filter)
         self._listener = keyboard.Listener(win32_event_filter=self.keyboard_win32_event_filter)
-        
+        logger.debug("Keyboard and mouse listeners initialized.")
+
     def start_listener(self):
         if self._mouse_listener is None or self._listener is None:
             self.init_listener()
         self._listener.start()
         self._mouse_listener.start()
-        
+        logger.debug("Keyboard and mouse listeners started.")
+
     def stop_listener(self):
         self._listener.stop()
         self._mouse_listener.stop()
-        
-    def join_listener(self):
-        self._listener.join()
+        logger.debug("Keyboard and mouse listeners stopped.")
+
+    # def join_listener(self):
+    #     self._listener.join()
 
     @property
     def focus_manager(self):
@@ -112,14 +126,14 @@ class FST_Keyboard():
         return self._cli_menu
     @property
     def macro_thread_dict(self):
-        return self._macro_thread_dict
+        return self._macro_task_dict
     @property
     def macro_sequence_alias_list(self):
         return self._macro_sequence_alias_list
     @property
     def key_group_by_alias(self):
         return self._key_group_by_alias
-    
+
     def convert_to_vk_code(self, key):
         '''
         try to convert string input of a key into a vk_code based on vk_code_dict
@@ -133,9 +147,19 @@ class FST_Keyboard():
                 if 0 <= key_int < 256:
                 # if 0 < key_int < 256:
                     return key_int
-            except ValueError as error:
-                print(error)
-                raise KeyError
+                raise ConfigError(f"key '{key}' does not resolve to a vk code", str(key))
+            except ValueError:
+                raise ConfigError(f"key '{key}' does not resolve to a vk code", str(key))
+
+    def surface_config_error(self, error):
+        '''
+        surface a ConfigError to the user at a hot path / vk-resolution site:
+        GUI mode (toast bridge wired) -> P08 error toast; headless -> console print
+        '''
+        if self.toast_callback is not None:
+            self.toast_callback(f"[FST] {error}", 5, 12, "rgba(200, 40, 40, 200)", "white")
+        else:
+            print(f"[FST] {error}")
 
     def initialize_groups_from_presorted_lines(self):
         '''
@@ -150,19 +174,18 @@ class FST_Keyboard():
         self._macros_dict = {}
         self._macro_triggers = []
         self._all_trigger_events = []
-        
+
         self._key_group_by_alias = {}
-        
+
         # only for display purposes
         self._rebinds = []
         self._macros = []
-                
-        def extract_data_from_key(key_string):           
+
+        def extract_data_from_key(key_string):
             #separate delay info from string
             if '|' in key_string:
                 key_string, *constraints = key_string.split('|')
-                if CONSTANTS.DEBUG: 
-                    print(f"D1: Constraints for {key_string}: {constraints}")
+                logger_config.debug(f"Constraints for {key_string}: {constraints}")
                 temp_constraints = []
                 # constraints = []
                 for constraint in constraints:
@@ -173,18 +196,18 @@ class FST_Keyboard():
                     else:
                         temp_constraints.append(int(constraint))
                 constraints = temp_constraints
-                
+
             else:
                 constraints = [self._arg_manager.MACRO_MAX_DELAY_IN_MS, self._arg_manager.MACRO_MIN_DELAY_IN_MS]
-                
+
             # to enable empty ke with empty string
             # if key_string == '':
             #     return False
-        
+
             # recognition of mofidiers +, -, !, ^
             # only interpret it as such when more then one char is in key
             key_modifier = None
-            if len(key_string) > 1: 
+            if len(key_string) > 1:
                 if key_string[0] == '-':
                     # down key
                     key_modifier = 'down'
@@ -204,12 +227,12 @@ class FST_Keyboard():
 
             # convert string to actual vk_code
             vk_code = self.convert_to_vk_code(key_string)
-            
+
             # if none key is found set it as up to force it to be seen as key_event
             if vk_code <= 0:
                 key_modifier = 'up'
-                
-                            
+
+
             if key_modifier is None:
                 new_element = (Key(vk_code, constraints=constraints, key_string=key_string))
             elif key_modifier == 'down':
@@ -219,8 +242,8 @@ class FST_Keyboard():
             elif key_modifier == 'toggle':
                 new_element = (Key(vk_code, constraints=constraints, key_string=key_string, is_toggle=True))
             return new_element
-        
-        def convert_key_string_group(list_of_strings, is_trigger_group = False):  
+
+        def convert_key_string_group(list_of_strings, is_trigger_group = False):
             key_group = []
             for key_string in list_of_strings:
                 if key_string.startswith('<'):
@@ -228,8 +251,8 @@ class FST_Keyboard():
                         key_group = key_group + self._key_group_by_alias[key_string]
                     except KeyError:
                         raise KeyError(f"Alias {key_string} is not known")
-                else:   
-                    new_element = extract_data_from_key(key_string)    
+                else:
+                    new_element = extract_data_from_key(key_string)
                     if new_element is not False:
                         if isinstance(new_element, Key_Event):
                             key_group.append(new_element)
@@ -240,63 +263,72 @@ class FST_Keyboard():
                                 key_group.append(key_press)
                             # if not in trigger group - so Key Instances as triggers are handled correctly
                             if not is_trigger_group or new_element.vk_code <= 0:
-                                key_group.append(key_releae)               
+                                key_group.append(key_releae)
             return key_group
 
-        # extract aliases 
+        # extract aliases
 
         try:
-            for alias, group in self.config_manager.alias_hr:
+            for alias, group in self._config_manager.alias_hr:
                 self._key_group_by_alias[alias] = convert_key_string_group(group)
 
+        except ConfigError as error:
+            logger_config.error(f"{error} -> in Alias: {group}")
+            raise
         except Exception as error:
-            print(f"ERROR: {error} \n -> in Alias: {group}")
+            logger_config.error(f"{error} -> in Alias: {group}")
             raise Exception(error)
-        
+
         # extract tap groups
         try:
-            for alias, group in self.config_manager.tap_groups_hr:
+            for alias, group in self._config_manager.tap_groups_hr:
                 keys = []
                 for key_string in group:
                     key = self.convert_to_vk_code(key_string)
                     keys.append(Key(key, key_string=key_string))
                 self._tap_groups.append(Tap_Group(keys))
+        except ConfigError as error:
+            logger_config.error(f"{error} -> in Tap Group: {group}")
+            raise
         except Exception as error:
-            print(f"ERROR: {error} \n -> in Tap Group: {group}")
+            logger_config.error(f"{error} -> in Tap Group: {group}")
             raise Exception(error)
-            
+
         # extract rebinds
         try:
-            for alias, rebind in self.config_manager.rebinds_hr:
+            for alias, rebind in self._config_manager.rebinds_hr:
                 trigger_group, replacement_key = rebind
-                
+
                 # evaluate the given key strings
                 new_trigger_group = convert_key_string_group(trigger_group, is_trigger_group=True)
                 replacement_key = extract_data_from_key(replacement_key)
-                
-                # check if any given key is a Key Instance - has to be treated differently just to 
+
+                # check if any given key is a Key Instance - has to be treated differently just to
                 # be able to use v:8 instead of -v:-8 and +v:+8
-                both_are_Keys = False                
+                both_are_Keys = False
                 if isinstance(new_trigger_group[0], Key) or isinstance(replacement_key, Key):
                     # if one is Key Instance but the other Key_Event -> convert Key_Event into Key
                     if not isinstance(new_trigger_group[0], Key):
                         temp = new_trigger_group[0]
                         ###XXX 241022-1341
-                        new_trigger_group[0] = Key(temp.vk_code, constraints=temp.constraints, key_string=temp.key_string)    
+                        new_trigger_group[0] = Key(temp.vk_code, constraints=temp.constraints, key_string=temp.key_string)
                     if not isinstance(replacement_key, Key):
                         temp = replacement_key
                         replacement_key = Key(temp.vk_code, constraints=temp.constraints, key_string=temp.key_string)
                     both_are_Keys = True
-                
+
                 trigger_key, *trigger_rest = new_trigger_group
-                
+
                 # if both are key_events create ke:ke
                 if not both_are_Keys:
                     trigger_group = Key_Group(new_trigger_group)
                     new_rebind = Rebind(trigger_group, replacement_key)
-                    self._rebinds.append(new_rebind)
-                    self._rebind_triggers.append(trigger_group)
+
+                    #260426-1931
+                    if trigger_group not in self._rebinds_dict.keys():
+                        self._rebind_triggers.append(trigger_group)
                     self._rebinds_dict[trigger_group] = new_rebind
+
                 # if both are Keys then create 2 Key_Event: Key_Event rebind sinstead
                 else:
                     trigger_events = trigger_key.get_key_events()
@@ -304,17 +336,29 @@ class FST_Keyboard():
                     for index in [0,1]:
                         trigger_group = Key_Group([trigger_events[index]] + trigger_rest)
                         new_rebind = Rebind(trigger_group, replacement_events[index])
-                        self._rebinds.append(new_rebind)
-                        self._rebind_triggers.append(new_rebind.trigger_group)
+
+                        #260426-1931
+                        # if a trigger is already existing do not add another trigger in self._rebind_triggers
+                        # maybe better to replace with check if trigger_group in self._rebind_dict.keys()?
+                        if new_rebind.trigger_group not in self._rebinds_dict.keys():
+                            self._rebind_triggers.append(new_rebind.trigger_group)
                         self._rebinds_dict[new_rebind.trigger_group] = new_rebind
 
+
+            # 260426-1920: collect self._rebinds for printout after loop to prevent multiple cases of the same trigger before being able to be recognised in loop
+            for rebind in self._rebinds_dict.values():
+                self._rebinds.append(rebind)
+
+        except ConfigError as error:
+            logger_config.error(f"{error} -> in Rebind: {rebind}")
+            raise
         except Exception as error:
-            print(f"ERROR: {error} \n -> in Rebind: {rebind}")
+            logger_config.error(f"{error} -> in Rebind: {rebind}")
             raise Exception(error)
-                    
-        # extract macros   
-        try:      
-            for alias, macro in self.config_manager.macros_hr:
+
+        # extract macros
+        try:
+            for alias, macro in self._config_manager.macros_hr:
                 # convert Keys into Key_Events
                 trigger_group, *key_groups = macro
                 extracted_trigger_group = Key_Group(convert_key_string_group(trigger_group, is_trigger_group=True))
@@ -323,53 +367,85 @@ class FST_Keyboard():
                     key_group = Key_Group(convert_key_string_group(key_group))
                     extracted_key_groups.append(key_group)
                 new_macro = Macro(extracted_trigger_group, extracted_key_groups)
-                
+
                 ###XXX 241014-2035
                 new_macro.alias = alias[1:-1]
 
-                if new_macro.num_sequences > 1: 
+                if new_macro.num_sequences > 1:
                     self._macros_alias_dict[new_macro.alias] = new_macro
 
-                self._macros.append(new_macro)
-                self._macro_triggers.append(new_macro.trigger_group)
+                #self._macros.append(new_macro)
+                if new_macro.trigger_group not in self._macros_dict.keys():
+                    self._macro_triggers.append(new_macro.trigger_group)
                 self._macros_dict[new_macro.trigger_group] = new_macro
-                
+
+            #260426-1935 collect self._macros for printout after loop to prevent multiple cases of the same trigger before being able to be recognised in loop
+            for macro in self._macros_dict.values():
+                self._macros.append(macro)
+
+        except ConfigError as error:
+            logger_config.error(f"{error} -> in Macro: {macro}")
+            raise
         except Exception as error:
-            print(f"ERROR: {error} \n -> in Macro: {macro}")
+            logger_config.error(f"{error} -> in Macro: {macro}")
             raise Exception(error)
 
-        if CONSTANTS.DEBUG3:
-            self.display_internal_repr_groups()
+        logger_config.debug(f"config loaded: {len(self._tap_groups)} tap groups, "
+                            f"{len(self._rebinds)} rebinds, {len(self._macros)} macros, "
+                            f"{len(self._macros_alias_dict)} macro sequences")
 
         # extract all triggers for suppression of repeated keys: test V1.0.2.1 Bugfix
         all_triggers = self._rebind_triggers + self._macro_triggers
         for trigger_group in all_triggers:
             self._all_trigger_events.append(trigger_group.get_trigger())#
-        
+
         self._macro_sequence_alias_list = self._macros_alias_dict.keys()
 
     def apply_focus_groups(self, focus_name = ''):
+        default_lines = self._focus_manager.default_group_lines
         if focus_name != '':
-            _, focus_group_lines = self.focus_manager.multi_focus_dict[focus_name]
+            if focus_name not in self._focus_manager.multi_focus_dict:
+                raise ConfigError(f"focus group '{focus_name}' not found - renamed or removed in config?", focus_name)
+            _, focus_group_lines = self._focus_manager.multi_focus_dict[focus_name]
         else:
             _, focus_group_lines = [],[]
-        default_lines = self.focus_manager.alias_lines + self.focus_manager.default_group_lines
         self._config_manager.presort_lines(default_lines + focus_group_lines)
         self.initialize_groups_from_presorted_lines()
-        
-    def update_focus_groups(self):
-        self.focus_manager.update_groups_from_config(self.config_manager.load_config())
 
-    def update_args_and_groups(self, focus_name = ''):
+    def update_focus_groups(self):
+        self._focus_manager.update_groups_from_config(self._config_manager.load_config())
+
+    def update_args_and_groups(self, focus_name = '', startup=True):
         self.release_all_currently_pressed_simulated_keys()
         self._state_manager.stop_all_repeating_keys()
         self._arg_manager.reset_global_variable_changes()
-        self.apply_start_args_by_focus_name(focus_name)    
-        self.apply_focus_groups(focus_name)    
+        # reset all lists to make sure nothing remains from previous focus groups
+        self._state_manager.reset_all_lists()
+        # if not startup:
+        #     self.remove_all_callback()
+        self.apply_start_args_by_focus_name(focus_name)
+        self.apply_focus_groups(focus_name)
+
+    def set_loop(self, loop):
+        self.loop = loop
+
+    # def mouse_task(self, msg, data):
+    #     '''
+    #     Task to handle mouse events, can be used for async handling if needed
+    #     '''
+    #     # asyncio.run_coroutine_threadsafe(self.mouse_win32_event_filter(msg, data), self.loop)
+    #     self.loop.call_soon_threadsafe(self.mouse_win32_event_filter, msg, data)
+
+    # def keyboard_task(self, msg, data):
+    #     '''
+    #     Task to handle keyboard events, can be used for async handling if needed
+    #     '''
+    #     # asyncio.run_coroutine_threadsafe(self.keyboard_win32_event_filter(msg, data), self.loop)
+    #     self.loop.call_soon_threadsafe(self.keyboard_win32_event_filter, msg, data)
 
     def mouse_win32_event_filter(self, msg, data):#
         '''
-        #XXX
+        Mouse event filter for Win32 API messages.
         '''
         # data:
         # typedef struct tagMSLLHOOKSTRUCT {
@@ -384,7 +460,7 @@ class FST_Keyboard():
         # mousedata for x2: 131072: 2x2^16
         # mousedata for scroll up/left: 7864320 : 120*2^16
         # mousedata for scroll down/right: 4287102976 : 65416*2^16: 8177 *2^19
-        
+
         # buttons received:
         # Button.right
         # Button.left
@@ -392,21 +468,22 @@ class FST_Keyboard():
         # Button.x2
         # Button.middle
 
-        
         def is_simulated_key_event(flags):
-            return flags == 1
-        
+            # packed LLKHF word: bit 0 = injected; other status bits in the
+            # same word must not matter
+            return bool(flags & 1)
+
         def is_press(msg):
             if msg in FST_Keyboard.MSG_MOUSE_DOWN:
                 return True
             if msg in FST_Keyboard.MSG_MOUSE_UP:
                 return False
             if msg in FST_Keyboard.MSG_MOUSE_SCROLL:
-                if data.mouseData == 7864320: # up
-                    return False
-                if data.mouseData == 4287102976: # down
-                    return True
-            
+                # wheel delta = high 16 bits of mouseData (signed << 16); the low
+                # word holds key state and must not matter - direction = sign bit
+                # of the delta word (multi-notch keeps the single-notch phase)
+                return bool((data.mouseData >> 16) & 0x8000)
+
         def get_mouse_vk_code():
             # mouse left
             if msg in [513, 514]:
@@ -416,9 +493,11 @@ class FST_Keyboard():
             if msg in [519, 520]:
                 return 3
             if msg in [523, 524]:
-                if data.mouseData == 65536:
+                # x-button identifier = high 16 bits of mouseData; the low
+                # word holds key state (ctrl/shift) and must not matter
+                if (data.mouseData >> 16) == 1:
                     return 4
-                if data.mouseData == 131072:
+                if (data.mouseData >> 16) == 2:
                     return 5
             if msg == FST_Keyboard.MSG_MOUSE_SCROLL_VERTICAL:
                 return 6
@@ -426,35 +505,42 @@ class FST_Keyboard():
                 return 7
             return None
 
-        
+        def get_coordinates():
+            x = data.pt.x
+            y = data.pt.y
+            return (x,y)
+
         # if DEBUG
         #print(f"pt: {data.pt}")
         #print(f"mouseData: {data.mouseData}")
         #print(f"flags: {data.flags}")
         #print(f"time: {data.time}")
         #print(f"dwExtraInfo: {data.dwExtraInfo}")
-        
-        
+
+
         # skip_event = False
         # # mouse movement
         # if msg == MSG_MOUSE_MOVE:
         #     skip_event = True
 
-        if not msg == FST_Keyboard.MSG_MOUSE_MOVE:
-            
+        if msg == FST_Keyboard.MSG_MOUSE_MOVE:
+            return False
+
+        else:
             vk_code = get_mouse_vk_code()
             key_event_time = data.time
             is_keydown = is_press(msg)
             is_simulated = is_simulated_key_event(data.flags)
-            # if CONSTANTS.DEBUG:
-            #     print(f"D1: vk_coe: {vk_code}, simulated: {is_simulated}, msg: {msg}")       
-            if vk_code is not None:      
-                self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event=True)
+            is_mouse_event = True
+            if vk_code is not None:
+                self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event)
+                # self.loop.call_soon_threadsafe(self._win32_event_filter, vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event)
             else:
-                self._listener.suppress()
-        
+                self._mouse_listener.suppress_event()
+
+
     def keyboard_win32_event_filter(self, msg, data):
-        
+
         def is_simulated_key_event(flags):
             return flags & 0x10
 
@@ -463,112 +549,144 @@ class FST_Keyboard():
                 return True
             if msg in FST_Keyboard.WM_KEYUP:
                 return False
-        
+
         vk_code = data.vkCode
         key_event_time = data.time
         is_keydown = is_press(msg)
         is_simulated = is_simulated_key_event(data.flags)
         self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated)
 
+    # repeated real press of a REBIND trigger may be let through so the
+    # replacement re-fires (proposal 2026-09-12; maintainer ruling 2026-09-15):
+    # only for triggers that sit in no tap group and whose replacement sits in
+    # no tap group. Macro/toggle triggers and tap-group keys stay suppressed.
+    # Base only: constraints are decided by the rebind loop in
+    # _win32_event_filter, exactly as for the first press.
+    def _rebind_repeat_let_through(self, current_ke):
+        for trigger_group in self._rebind_triggers:
+            trigger = trigger_group.get_trigger()
+            if current_ke.vk_code != trigger.vk_code or current_ke.is_press != trigger.is_press:
+                continue
+            if any(current_ke.vk_code in tg.get_vk_codes() for tg in self._tap_groups):
+                return False
+            try:
+                replacement_vk = self._rebinds_dict[trigger_group].replacement.vk_code
+            except KeyError:
+                return False  # conservative: no replacement known -> suppress
+            if any(replacement_vk in tg.get_vk_codes() for tg in self._tap_groups):
+                return False
+            return True
+        return False
+
     def _win32_event_filter(self, vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event=False):
         """
         Filter and handle keyboard and mouse events.
         """
-        
+
         def time_in_millisec():
             return int(time() * 1000)
-       
+
         def is_trigger_activated(current_ke, trigger_group):
             keys = trigger_group.get_key_events()
             # only trigger on the first key_event in trigger group
             # so only if that key is pressed the trigger can be activated
-            if current_ke != keys[0]:    
-                return False      
-                    
+            # compare base only: runtime events carry no key_string/constraints
+            if current_ke.vk_code != keys[0].vk_code or current_ke.is_press != keys[0].is_press:
+                return False
+
             activated = True
-            for key in keys:                         
+            for key in keys:
                 if key.is_press:
-                    activated = activated and self.state_manager.get_real_key_press_state(key.vk_code)
+                    activated = activated and self._state_manager.get_real_key_press_state(key.vk_code)
                 else:
-                    activated = activated and not self.state_manager.get_real_key_press_state(key.vk_code)
-                    
-            # first check every other given trigger before evaluating constraints    
+                    activated = activated and not self._state_manager.get_real_key_press_state(key.vk_code)
+
+            # first check every other given trigger before evaluating constraints
             if activated:
                 for key in keys:
                     if activated:
-                        constraints_fulfilled = self.output_manager.check_constraint_fulfillment(key)
+                        constraints_fulfilled = self._output_manager.check_constraint_fulfillment(key)
                         activated = activated and constraints_fulfilled
-            return activated    
-        
+            return activated
+
         key_replaced = False
         alias_fired = False
         trigger_key_repeated = False
         real_input_repeated = False
         to_be_suppressed = False
-        
+
         current_ke = Key_Event(vk_code, is_keydown)
-        
+
         # get the time difference from system time to the key_event_time
         if FST_Keyboard.TIME_DIFF is None:
             FST_Keyboard.TIME_DIFF = time_in_millisec() - key_event_time
             FST_Keyboard.START_TIME = key_event_time
             # set all key_times to starting time
-            self.state_manager.init_all_key_times_to_starting_time(key_event_time)
-        
-        if CONSTANTS.DEBUG4:
-            # print(f"D4:->{"->" if is_simulated else ""} IN  ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
-            print(f"D4: {"-- | ->" if is_simulated else "->"} IN  ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
-            
+            self._state_manager.init_all_key_times_to_starting_time(key_event_time)
+
+        logger_flow.debug(f"--> {'-- | ' if is_simulated else ''}IN ({key_event_time - FST_Keyboard.START_TIME}) {'sim' if is_simulated else 'real'} {current_ke}")
+
         # to help identify vk_codes on key presses
         if self._arg_manager.PRINT_VK_CODES:
         # if True:
             print(f"D1: time: {key_event_time}, vk_code: {vk_code} - {"press  " if is_keydown else "release"} - {"simulated" if is_simulated else "real"}")
 
         # handle real key input here
-        if not is_simulated: 
+        if not is_simulated:
             # stop repeating keys from being evaluated
             vk_code = current_ke.vk_code
             # exclude mouse events from this
             if not is_mouse_event and current_ke.is_press:
-                press_state = self.state_manager.get_real_key_press_state(vk_code)
+                press_state = self._state_manager.get_real_key_press_state(vk_code)
                 if press_state == current_ke.is_press:
                     # if the key is repeated and is a trigger, it will be suppressed
-                    if current_ke in self._all_trigger_events:
-                        if CONSTANTS.DEBUG3:
-                            print(f"repeated key supressed: {current_ke}")
-                        to_be_suppressed = True
+                    # compare base only: runtime events carry no key_string/constraints
+                    if any(current_ke.vk_code == trigger.vk_code
+                           and current_ke.is_press == trigger.is_press
+                           for trigger in self._all_trigger_events):
+                        # repeated REBIND triggers not in a tap group are let
+                        # through so they re-fire their replacement below: macro
+                        # and toggle repeats stay suppressed (the 'STOP REPEATED
+                        # KEYS FROM HERE' guard), and a replacement that the tap
+                        # section would consume keeps the suppression (not
+                        # covered by the proposal - conservative)
+                        if not self._rebind_repeat_let_through(current_ke):
+                            logger_flow.debug(f"repeated key suppressed: {current_ke}")
+                            to_be_suppressed = True
+                        else:
+                            logger_flow.debug(f"repeated rebind key let through: {current_ke}")
                         trigger_key_repeated = True
                     real_input_repeated = True
             else:
                 trigger_key_repeated = False
-            
+
             # track every real key state in a dict - to recognise repeating
-            self.state_manager.set_real_key_press_state(current_ke.vk_code, current_ke.is_press)
+            self._state_manager.set_real_key_press_state(current_ke.vk_code, current_ke.is_press)
             # track real key presses extra (in a set())
-            self.state_manager.manage_key_press_states_by_event(current_ke)
-            
-            
+            self._state_manager.manage_key_press_states_by_event(current_ke)
+
+
             # here best place to start tracking the timings of presses and releases of real keys
             # only update times if not repeated
             if not real_input_repeated:
-                self.state_manager.set_key_times(key_event_time, vk_code, is_keydown, self.state_manager.REAL)
-                self.state_manager.set_key_times(key_event_time, vk_code, is_keydown, self.state_manager.ALL)       
+                self._state_manager.set_key_times(key_event_time, vk_code, is_keydown, self._state_manager.REAL)
+                self._state_manager.set_key_times(key_event_time, vk_code, is_keydown, self._state_manager.ALL)
 
                 'DEBUG COMBINATIONS HANDLING'
                 if CONSTANTS.DEBUG_NUMPAD:
                     self.check_debug_numpad_actions()
-                
+
                 'CONTROL HANDLING'
                 self.check_control_actions()
- 
+
             # Replace some Buttons :-D
             if not self._arg_manager.WIN32_FILTER_PAUSED and not self._arg_manager.PRINT_VK_CODES:
-                
+
                 if not to_be_suppressed:
                     'REBINDS HANDLING'
                     # check for rebinds and replace current key event with replacement key event
                     for trigger_group in self._rebind_triggers:
-                        
+
                         if is_trigger_activated(current_ke, trigger_group):
                             try:
                                 rebind = self._rebinds_dict[trigger_group]
@@ -577,34 +695,32 @@ class FST_Keyboard():
                                 current_ke = replacement_ke
                                 key_replaced = True
                             except KeyError as error:
-                                if CONSTANTS.DEBUG:
-                                    print(f"D1: rebind not found: {error}")
-                                    print(self._rebinds_dict)
-                                    
+                                logger_flow.warning(f"rebind not found: {error}")
+                                logger_flow.debug(f"rebinds dict: {self._rebinds_dict}")
+
                             if key_replaced:
                                 # if key is supressed
                                 if current_ke.vk_code == FST_Keyboard.SUPPRESS_CODE:
                                     to_be_suppressed = True
                                 else:
                                     # check constraints to run evaluation on it
-                                    constraints_fulfilled = self.output_manager.check_constraint_fulfillment(current_ke)
-                                    
+                                    constraints_fulfilled = self._output_manager.check_constraint_fulfillment(current_ke)
+
                                     if not constraints_fulfilled:
                                         to_be_suppressed = True
-                                    
+
                                 break
-                            
-                    if key_replaced and not to_be_suppressed:                     
+
+                    if key_replaced and not to_be_suppressed:
                         # 241009-1459 press state set is updated here with new key (not the press state dict!)
-                        self.state_manager.remove_key_press_state(old_ke.vk_code)
-                        self.state_manager.manage_key_press_states_by_event(current_ke)
-                        if CONSTANTS.DEBUG4:
-                           print(f"D4: -- rebind found: {old_ke} -> {current_ke}") 
-                                                                                 
-                    'STOP REPEATED KEYS FROM HERE'        
+                        self._state_manager.remove_key_press_state(old_ke.vk_code)
+                        self._state_manager.manage_key_press_states_by_event(current_ke)
+                        logger_flow.debug(f"-- rebind {old_ke} -> {current_ke}")
+
+                    'STOP REPEATED KEYS FROM HERE'
                     # prevent evaluation of repeated key events
-                    # not earliert to keep rebinds and supression intact - toggling can be a bit fast if key is pressed a long time  
-                    
+                    # not earliert to keep rebinds and supression intact - toggling can be a bit fast if key is pressed a long time
+
                     if not real_input_repeated and not to_be_suppressed:
 
                         'TOGGLE STATE'
@@ -612,77 +728,80 @@ class FST_Keyboard():
                         # if key is to be toggled
                             if current_ke.is_toggle:
                                 if old_ke.is_press:
-                                    toggle_ke = self.state_manager.get_next_toggle_state_key_event(current_ke)
-                                    if CONSTANTS.DEBUG4:
-                                        print(f"D4: -- toggle arrived: {current_ke} -> {toggle_ke}")
+                                    toggle_ke = self._state_manager.get_next_toggle_state_key_event(current_ke)
+                                    logger_flow.debug(f"-- toggle {current_ke} -> {toggle_ke}")
                                     current_ke = toggle_ke
                                 else:
                                     # key up needs to be supressed or else it will be evaluated 2 times each tap
-                                    if CONSTANTS.DEBUG4:
-                                        print(f"D4: -- toggle suppress: {current_ke}")
+                                    logger_flow.debug(f"-- toggle-suppress {current_ke}")
                                     to_be_suppressed = True
 
                         # reset toggle state of key manually released - so toggle will start anew by pressing the key
                         else:
-                            self.state_manager.set_toggle_state_to_curr_ke(current_ke)
-                        
+                            self._state_manager.set_toggle_state_to_curr_ke(current_ke)
+
                         'MACROS HERE'
                         for trigger_group in self._macro_triggers:
-                            if is_trigger_activated(current_ke, trigger_group): 
+                            if is_trigger_activated(current_ke, trigger_group):
                                 alias_fired = True
-                                
+
                                 # macro sequence handling is internal in class Macro
                                 macro = self._macros_dict[trigger_group]
                                 key_sequence = macro.get_key_events_of_current_sequence()
-                                    
+
                                 'MACRO playback'
                                 # only spawn a thread for execution if more than one key event in to be played key sequence
-                                if CONSTANTS.DEBUG:
-                                    print(f"D1: key_sequence: {key_sequence}")
-                                # if there is an empty key group ... just ignore it and do not supress the triggerkey
+                                logger_macro.debug(f"key_sequence: {key_sequence}")
+                                # an empty key group does not start playback, but the trigger key is still
+                                # suppressed (alias_fired is set before this empty check)
                                 if len(key_sequence) == 0:
                                     pass
                                 elif len(key_sequence) > 0:
-                                    
-                                    
-                                    self.start_macro_playback(macro.alias, key_sequence) 
-                                    
-                                if CONSTANTS.DEBUG:
-                                    print("D1: > playing makro:", trigger_group)
-                                    
+
+
+                                    self.start_macro_playback(macro.alias, key_sequence)
+
+                                logger_macro.debug(f"> playing macro: {trigger_group}")
+
                                 if self._arg_manager.EXEC_ONLY_ONE_TRIGGERED_MACRO:
                                     break
-                
+
                 'TAP GROUP EVALUATION HERE'
                 # Snap Tap Part of Evaluation
                 # Intercept key events if not PAUSED
                 if not self._arg_manager.WIN32_FILTER_PAUSED and not self._arg_manager.PRINT_VK_CODES:
                     vk_code, is_keydown, _ = current_ke.get_all()
-                    if CONSTANTS.DEBUG: 
-                        print("D1: tap group #0")
-                        # print(self._tap_groups)               
-                        # print(vk_code, is_keydown)               
+                    logger_flow.debug("tap group #0")
                     for tap_group in self._tap_groups:
                         if vk_code in tap_group.get_vk_codes():
-                            if CONSTANTS.DEBUG: 
-                                print(f"D1: tap group {vk_code}")
+                            logger_flow.debug(f"tap group {vk_code}")
                             if key_replaced is True:
                                 key_replaced = False
-                            tap_group.update_tap_states(vk_code, is_keydown) 
+                            tap_group.update_tap_states(vk_code, is_keydown)
 
                             # send keys
-                            self.output_manager.send_keys_for_tap_group(tap_group)
+                            self._output_manager.send_keys_for_tap_group(tap_group)
+                            #XXX 260428-2341
+                            #self.loop.create_task(self._output_manager.send_keys_for_tap_group(tap_group))
                             # to allow repeated keys from hold, key_to_send is a vk_code
                             if tap_group.get_active_key() != vk_code or not trigger_key_repeated:
                                 to_be_suppressed = True
                                 break
                             break
-                
-                # if replacement happened suppress source key event   
+
+                # if replacement happened suppress source key event
                 if key_replaced is True and not to_be_suppressed:
-                    self.output_manager.send_key_event(current_ke)
+                    # 260907-1027: if it is a rebind from a mouse key to another mouse key starte it async to no interfere with the syncronous hook
+                    if is_mouse_event and self._output_manager.check_for_mouse_vk_code(current_ke.vk_code):
+                        try:
+                            asyncio.run_coroutine_threadsafe(self._output_manager.execute_key_event(current_ke, with_delay=False), self.loop)
+                        except Exception as e:
+                            logger_flow.error(f"Error occurred while calling async execute_keys_event in mouse_key to mouse_key rebind: {e}")
+                    else:
+                        self._output_manager.send_key_event(current_ke)
+
                     to_be_suppressed = True
-                
+
                 # supress event that triggered an alias - done here because it should also update tap groups before
                 if alias_fired is True:
                     to_be_suppressed = True
@@ -691,7 +810,7 @@ class FST_Keyboard():
         # here the interception of interference of alias with tap groups is realized
         if is_simulated:
             vk_code, is_keydown, _ = current_ke.get_all()
-                        
+
             key_is_in_tap_groups = False
             for tap_group in self._tap_groups:
                 vk_codes = tap_group.get_vk_codes()
@@ -708,133 +827,188 @@ class FST_Keyboard():
                                 to_be_suppressed = True
                                 break
                         # not the active key -> only release allowed
-                        else: 
+                        else:
                             if is_keydown:
                                 to_be_suppressed = True
                                 break
-            
-            ###XXX 241016-1101 general condradiction prevention disabled to test
-            # # intercept simulated releases of keys that are still pressed           
+
+            ###XXX 241016-1101 general contradiction prevention disabled to test
+            # 2026-09-15 maintainer ruling (D1-A, proposals/2026-09-15_backlog-decisions.md):
+            # kept OFF as an intentional decision (no re-enable); the pin above is retained
+            # as his find-marker and stays untouched; tests/test_filter_simulated.py pins
+            # the non-suppression.
+            # # intercept simulated releases of keys that are still pressed
             if not key_is_in_tap_groups and not is_keydown:
-                if CONSTANTS.DEBUG2:
-                    print(f"D2: {current_ke} may be contrary to real input: real press is: {self.state_manager.get_real_key_press_state(vk_code)}")
+                logger_flow.debug(f"{current_ke} may be contrary to real input: real press is: {self._state_manager.get_real_key_press_state(vk_code)}")
                 # if it is a toggle key, then let it through even if it contradicts real key state
-                if vk_code in self.state_manager.toggle_states_dict_keys:
-                    if CONSTANTS.DEBUG2:
-                        print(f"D2 not suppressed {current_ke} because it is toggle")
+                if vk_code in self._state_manager.toggle_states_dict_keys:
+                    logger_flow.debug(f"not suppressed {current_ke} because it is toggle")
                     pass
                 # 241009-1456
-                elif not is_mouse_event and self.state_manager.get_key_press_state(vk_code):
-                    if CONSTANTS.DEBUG2:
-                        print(f"D2 suppressed {current_ke} because it would release real key press state")
-            #         to_be_suppressed = True
-        
-        
+                elif not is_mouse_event and self._state_manager.get_key_press_state(vk_code):
+                    ### 250730-2308 reactivated - why was is deactivated?
+                    ### 250819 macros with control keys need the supression ability to release the modifier keys when playing macros
+                    #to_be_suppressed = True
+                    pass
+
+
         'ALL SUPPRESSION DONE HERE'
         # here arrive all key_events that will be send - last place to intercept
         if to_be_suppressed:
-            
-            # 241009-1541 if real key was used in a macro, remove it from pressed key set, 
+
+            # 241009-1541 if real key was used in a macro, remove it from pressed key set,
             # to be not used to filter out opposing sim keys
             if alias_fired:
-                self.state_manager.remove_key_press_state(current_ke.vk_code)
-                if CONSTANTS.DEBUG3:
-                    print(f"D3: -- removed {current_ke} from pressed keys")
-            if CONSTANTS.DEBUG4:
-                print(f"D4: {"-- | XX" if is_simulated else "XX"} SUPPRESSED: {current_ke}")
+                self._state_manager.remove_key_press_state(current_ke.vk_code)
+                logger_flow.debug(f"-- removed {current_ke} from pressed keys")
+            logger_flow.debug(f"-- XX {'-- | ' if is_simulated else ''}SUPPRESSED {current_ke}")
 
-            self._listener.suppress_event()     
-                
-        # everything that will be send arrives here      
+            if is_mouse_event:
+                self._mouse_listener.suppress_event()
+            else:
+                self._listener.suppress_event()
+
+
+        # everything that will be send arrives here
         vk_code, is_keydown, _ = current_ke.get_all()
         if vk_code > 0:
             if is_simulated:
                 # save time of simulated and send keys
-                self.state_manager.set_key_times(key_event_time, vk_code, is_keydown, self.state_manager.SIMULATED)
-                self.state_manager.set_key_times(key_event_time, vk_code, is_keydown, self.state_manager.ALL) 
+                self._state_manager.set_key_times(key_event_time, vk_code, is_keydown, self._state_manager.SIMULATED)
+                self._state_manager.set_key_times(key_event_time, vk_code, is_keydown, self._state_manager.ALL)
                 # save press state of all keys to release them on focus change
-                self.state_manager.set_simulated_key_press_state(vk_code, current_ke.is_press)
-            
-        if CONSTANTS.DEBUG4:
-            print(f"D4: {"-- | <-" if is_simulated else "<-"} OUT ({key_event_time - FST_Keyboard.START_TIME}): {current_ke } - {"simulated key: " if is_simulated else "real key: "}")
+                self._state_manager.set_simulated_key_press_state(vk_code, current_ke.is_press)
 
-    def start_macro_playback(self, alias_name, key_sequence, stop_event = Event()):
+        logger_flow.debug(f"--> {'-- | ' if is_simulated else ''}OUT ({key_event_time - FST_Keyboard.START_TIME}) {'sim' if is_simulated else 'real'} {current_ke}")
 
+    def check_result(self, fut):
+        try:
+            fut.result() # This will raise the exception if the task crashed
+        except asyncio.CancelledError:
+            # intentional cancel (interrupt/reset) - not a crash
+            logger_macro.debug(f"macro task cancelled: {fut}")
+        except Exception as e:
+            logger_macro.error(f"Exception in macro task: {e}")
+
+    # MACRO PLAYBACK for direct call from Listener Threads
+    def start_macro_playback(self, alias_name, key_sequence):
         self.interrupt_macro_by_name(alias_name)
-        
-        if stop_event.is_set():
-            stop_event.clear()
-        # stop_event = Event()
-        macro_thread = Macro_Thread(key_sequence, stop_event, alias_name, self)
-        # save thread and stop event to find it again for possible interruption
-        self._macro_thread_dict[alias_name] = [macro_thread, stop_event]
-        macro_thread.start()
-    
+
+        _handle = asyncio.run_coroutine_threadsafe(self.macro_task(key_sequence, alias_name), self.loop)
+        logger_macro.debug(f"Started macro playback for {alias_name} with key sequence: {key_sequence}")
+        self._macro_task_dict[alias_name] = _handle
+        _handle.add_done_callback(self.check_result)
+        return _handle
+
+    # change to asyncio - repeat version for macro repeat function that is already asyncio based
+    def start_macro_playback_repeat(self, alias_name, key_sequence):
+        self.interrupt_macro_by_name(alias_name)
+
+        _handle = self.loop.create_task(self.macro_task(key_sequence, alias_name))
+        logger_macro.debug(f"Started macro playback for {alias_name} with key sequence: {key_sequence}")
+        self._macro_task_dict[alias_name] = _handle
+        _handle.add_done_callback(self.check_result)
+        return _handle
+
     def interrupt_macro_by_name(self, alias_name):
         try:
-            macro_thread, stop_event_old = self._macro_thread_dict[alias_name]
+            _handle = self._macro_task_dict[alias_name]
              ## interruptable threads
-            if macro_thread.is_alive():
-                if CONSTANTS.DEBUG:
-                    print(f"D1: {alias_name} is still alive - trying to stop")
-                stop_event_old.set()
-                macro_thread.join()
-        except KeyError:
-            if CONSTANTS.DEBUG4:
-                print(f"D4: -- macro stop unsucessful - might just be the first start of {alias_name}")
-            pass          
+            if not _handle.done():
+                logger_macro.debug(f"{alias_name} is still alive - trying to stop")
+                _handle.cancel()
 
-    def check_for_combination(self, vk_codes):                 
+        except KeyError:
+            logger_macro.debug(f"no macro task found for {alias_name} - maybe just the first start of it")
+
+
+    async def macro_task(self, key_group, alias_name):
+        '''execute the macro/alias - can be stopped by using cancel on the handle of the asyncio task from the outside'''
+
+        try:
+            logger_macro.debug(f"> playing macro: {alias_name} :: {key_group}")
+            for key_event in key_group:
+                # check all constraints at start!
+                constraint_fulfilled, delay_times = self._output_manager.check_constraint_fulfillment(key_event, get_also_delays=True)
+
+                if constraint_fulfilled:
+
+                    if key_event.is_toggle:
+                        key_event = self._state_manager.get_next_toggle_state_key_event(key_event)
+                    # send key event and handles interruption of delay
+                    await self._output_manager.execute_key_event(key_event, delay_times, with_delay=True)
+
+        except Exception as error:
+            logger_macro.exception(f"Error in macro playback of {alias_name}: {key_group} | {error}")
+
+
+
+
+    def check_for_combination(self, vk_codes):
         all_active = True
         for vk_code in vk_codes:
             if isinstance(vk_code, str):
-                vk_code = self.convert_to_vk_code(vk_code)
-            all_active = all_active and self.state_manager.get_real_key_press_state(vk_code)
+                try:
+                    vk_code = self.convert_to_vk_code(vk_code)
+                except ConfigError as error:
+                    if vk_code not in self._warned_config_errors:
+                        self._warned_config_errors.add(vk_code)
+                        self.surface_config_error(error)
+                    return False
+            all_active = all_active and self._state_manager.get_real_key_press_state(vk_code)
         return all_active
-    
+
     def check_control_actions(self):
         'CONTROLS HERE'
-        if self._arg_manager.CONTROLS_ENABLED:                  
+        if self._arg_manager.CONTROLS_ENABLED:
                     # # Stop the listener if the MENU combination is pressed
             if self.check_for_combination(CONSTANTS.MENU_Combination):
-                self.control_return_to_menu()  
+                self.control_return_to_menu()
                     # # Stop the listener if the END combination is pressed
             elif self.check_for_combination(CONSTANTS.EXIT_Combination):
                 self.control_exit_program()
                     # Toggle paused/resume if the DELETE combination is pressed
             elif self.check_for_combination(CONSTANTS.TOGGLE_ON_OFF_Combination):
-                self.control_toggle_pause()
-                
+                try:
+                    self.control_toggle_pause()
+                except ConfigError as error:
+                    self.surface_config_error(error)
+                    self.update_args_and_groups('')
+                    self._arg_manager.WIN32_FILTER_PAUSED = False
+                    self._arg_manager.MANUAL_PAUSED = False
+
         # 'RESET ON ESC AND ALT+TAB'
         # if self.check_for_combination(['esc']):
-        #     self.state_manager.release_all_currently_pressed_simulated_keys()
-            # self.state_manager.stop_all_repeating_keys()
+        #     self._state_manager.release_all_currently_pressed_simulated_keys()
+            # self._state_manager.stop_all_repeating_keys()
         # if self.check_for_combination(['alt', 'tab']):
-        #     self.state_manager.release_all_currently_pressed_keys()
+        #     self._state_manager.release_all_currently_pressed_keys()
 
     def check_debug_numpad_actions(self):
-        if self.check_for_combination(['num1']):
-            CONSTANTS.DEBUG = not CONSTANTS.DEBUG
-        if self.check_for_combination(['num2']):
-            CONSTANTS.DEBUG2 = not CONSTANTS.DEBUG2
-        if self.check_for_combination(['num3']):
-            CONSTANTS.DEBUG3 = not CONSTANTS.DEBUG3
-        if self.check_for_combination(['num4']):
-            CONSTANTS.DEBUG4 = not CONSTANTS.DEBUG4
-        if self.check_for_combination(['num5']):
+        # alt+num1/2/3 all toggle the shared root debug level (the old
+        # per-flag D1/D2/D3 channels collapsed into one)
+        if self.check_for_combination(['alt','num1']):
+            toggle_debug_level()
+        if self.check_for_combination(['alt','num2']):
+            toggle_debug_level()
+        if self.check_for_combination(['alt','num3']):
+            toggle_debug_level()
+        if self.check_for_combination(['alt','num4']):
+            toggle_flow()
+        if self.check_for_combination(['alt','num5']):
             self.display_internal_repr_groups()
-        if self.check_for_combination(['num7']):
-            pprint.pp(f"real_key_state: {self.state_manager._real_key_press_states_dict}")
-            pprint.pp(f"sim_key_state: {self.state_manager._simulated_key_press_states_dict}")
-        if self.check_for_combination(['num8']):
-            pprint.pp(f"all_key_state: {self.state_manager._all_key_press_states_dict}")
+        if self.check_for_combination(['alt','num7']):
+            logger_state.debug(f"real_key_state: {self._state_manager._real_key_press_states_dict}")
+            logger_state.debug(f"sim_key_state: {self._state_manager._simulated_key_press_states_dict}")
+        if self.check_for_combination(['alt','num8']):
+            logger_state.debug(f"all_key_state: {self._state_manager._all_key_press_states_dict}")
 
     def control_return_to_menu(self):
         self._arg_manager.MENU_ENABLED = True
         self._arg_manager.WIN32_FILTER_PAUSED = True
         print('--- Stopping - Return to menu ---')
-        if CONSTANTS.DEBUG3:
-            print(f"D3: return to menu with pressed keys: \n {self.state_manager._real_key_press_states_dict}")
+        logger.info("return to menu")
+        logger_state.debug(f"return to menu with pressed keys: {self._state_manager._real_key_press_states_dict}")
         self.release_all_currently_pressed_simulated_keys()
         self._state_manager.stop_all_repeating_keys()
         self._mouse_listener.stop()
@@ -855,12 +1029,12 @@ class FST_Keyboard():
             self._arg_manager.reset_global_variable_changes()
             self.apply_start_args_by_focus_name(self._focus_manager.FOCUS_APP_NAME)
             self.apply_focus_groups(self._focus_manager.FOCUS_APP_NAME)
-            self.cli_menu.clear_cli()
+            self._cli_menu.clear_cli()
             self._config_manager.display_groups()
             print("\n--- reloaded sucessfully ---")
             print('--- manuelly resumed ---\n')
             if self._arg_manager.CONTROLS_ENABLED:
-                self.cli_menu.display_control_text()
+                self._cli_menu.display_control_text()
             # with paused_lock:
             self._arg_manager.WIN32_FILTER_PAUSED = False
             self._arg_manager.MANUAL_PAUSED = False
@@ -871,51 +1045,51 @@ class FST_Keyboard():
             self._arg_manager.WIN32_FILTER_PAUSED = True
             self._arg_manager.MANUAL_PAUSED = True
             self.release_all_currently_pressed_simulated_keys()
-            self._state_manager.stop_all_repeating_keys() 
-            
-              
+            self._state_manager.stop_all_repeating_keys()
+
+
     def reset_macro_sequence_by_name(self, alias_name, current_ke = ''):
-        
+
         ###XXX if macro and not macro sequence? interrupt the macro without starting it
-        ###XXX different easy eval for that - not needed here any more even if it would work - 
+        ###XXX different easy eval for that - not needed here any more even if it would work -
         # only triggered when a seqence macro and restart will interrupt it anyway
         ###self.interrupt_macro_by_name(alias_name)
-        
+
         ### +
         try:
             macro_to_reset = self._macros_alias_dict[alias_name]
             ###XXX 241014-1952 only reset if not already resetted or unused
             if macro_to_reset.get_sequence_counter() > 0:
                 macro_to_reset.reset_sequence_counter()
-                if CONSTANTS.DEBUG4:
-                    print(f"D4: -- Macro ({alias_name}) reseted successfully by {current_ke}")
+                logger_macro.debug(f"-- Macro ({alias_name}) reseted successfully by {current_ke}")
         except KeyError:
-            print(f"--- No Macro Sequence with name {alias_name} - reset failed")
-            if CONSTANTS.DEBUG:
-                print(f"all sequence names: {self._macros_alias_dict.keys()}")
+            logger_macro.warning(f"no macro sequence with name {alias_name} - reset failed "
+                                f"(all sequence names: {list(self._macros_alias_dict.keys())})")
 
     def apply_start_args_by_focus_name(self, focus_name = ''):
         self._arg_manager.apply_start_arguments(self._arg_manager._sys_start_args)
         self.update_focus_groups()
         # needs to be done after reloading of file or else it will not have the actual data
         if focus_name != '':
-            focus_start_arguments, _ = self.focus_manager.multi_focus_dict[focus_name]
+            if focus_name not in self._focus_manager.multi_focus_dict:
+                raise ConfigError(f"focus group '{focus_name}' not found - renamed or removed in config?", focus_name)
+            focus_start_arguments, _ = self._focus_manager.multi_focus_dict[focus_name]
         else:
-            focus_start_arguments, _ = [],[]  
-        self._arg_manager.apply_start_arguments(self.focus_manager.default_start_arguments + focus_start_arguments)
-        
+            focus_start_arguments, _ = [],[]
+        self._arg_manager.apply_start_arguments(self._focus_manager.default_start_arguments + focus_start_arguments)
+
     def set_sys_start_arguments(self, sys_args):
         self._arg_manager.sys_start_args = sys_args
-          
+
     def release_all_currently_pressed_simulated_keys(self):
         self._state_manager.release_all_currently_pressed_simulated_keys()
         self._output_manager.clear_all_variables()
-        
-    def display_internal_repr_groups(self):                    
+
+    def display_internal_repr_groups(self):
 
         print("Aliases")
-        for alias, group in self.key_group_by_alias.items():
-            print(f"{alias} {group}")  
+        for alias, group in self._key_group_by_alias.items():
+            print(f"{alias} {group}")
         print("\n# Tap Groups")
         for group in self._tap_groups:
             print(f"{group}")
@@ -928,13 +1102,12 @@ class FST_Keyboard():
         print("\n# Macro Sequences")
         for alias, group in self._macros_alias_dict.items():
             print(f"{group}")
-            
+
     def open_config_file(self):
         startfile(self._config_manager.file_name)
-        
-        
+
+
     def reload_from_file(self):
         self.update_args_and_groups(self._focus_manager.FOCUS_APP_NAME)
         self._cli_menu.update_group_display()
         print(f'\n>>> file reloaded for focus app: {self._focus_manager.FOCUS_APP_NAME}\n')
-    

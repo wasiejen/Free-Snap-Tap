@@ -12,8 +12,13 @@ free_snap_tap.spec
 test_batch.bat
 FSTconfig_test.txt
 new_features.md
-wiki.md
 *.exe
 *.dll
 *.cmd
 *.vbs
+fst.log
+/tests/__pycache__
+__pycache__/
+.coverage
+coverage.json
+.pytest_cache/
