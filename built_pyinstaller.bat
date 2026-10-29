@@ -2,8 +2,9 @@
 :: Activate virtual environment
 call ./.venv/Scripts/activate.bat
 
-:: Update requirements.txt (optional)
-pip3 freeze > requirements.txt
+:: NOTE: requirements files are maintained by hand (runtime / dev / build
+:: split) — do NOT write `pip freeze` over them: the build venv also holds
+:: packaging and test tools, which belong in requirements-build/-dev.txt.
 
 :: Build with Pyinstaller
 pyinstaller --onefile --windowed --exclude=PyQt5 --icon=./icons/keyboard.ico free_snap_tap.py %*
