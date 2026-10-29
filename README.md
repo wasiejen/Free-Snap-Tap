@@ -1,7 +1,5 @@
 # Free Snap Tap: Universal Keyboard Snap Tap with Tap Groups, Rebinds (Key Replacements), Macros, Aliases and custom adjustable delay for each key.
 
-**Works as of V0.8.0 without triggering Valve Anti Cheat (if delays are not set too short :-) )**
-
 **Only works on Windows.**
 
 A minimalistic Python-based Snap Tapping program compatible with all keyboards and supports:
