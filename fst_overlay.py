@@ -1,5 +1,5 @@
 '''
-Free-Snap-Tap V1.2.0
+Free-Snap-Tap V1.3.0
 last updated: 250724-1434
 '''
 
