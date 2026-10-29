@@ -14,10 +14,9 @@ pyinstaller --onefile --windowed --exclude=PyQt5 --icon=./icons/keyboard.ico fre
 set src=dist\free_snap_tap.exe
 set dest=.
 
-:: Get current date and time in YYMMDD-HHMM format
-for /f "tokens=2 delims==" %%a in ('wmic os get localdatetime /value') do set datetime=%%a
-set filedate=%datetime:~2,6%-%datetime:~8,4%
-set filedate=%filedate: =0%
+:: Get current date and time in YYMMDD-HHMM format.
+:: wmic is deprecated/removed on Windows 11 24H2+, so use PowerShell here.
+for /f %%a in ('powershell -NoProfile -Command "Get-Date -Format yyMMdd-HHmm"') do set filedate=%%a
 
 :: Define new filename (with date/time suffix)
 set newname=free_snap_tap_pyinst_%filedate%.exe
