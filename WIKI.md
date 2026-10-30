@@ -441,8 +441,8 @@ Everything else should be put in the config file and then can be applied on a pe
 - `<arg>-delay`: re-enable the delays - the delays are active on default, so this is only meaningful after an earlier `-nodelay`
 - `<arg>-exec_one_macro`: of all macros triggered by one real key event only the FIRST is played
 - `<arg>-debug_numpad`: enable the numpad debug combos (see [Numpad debug combos])
-- `<arg>-tap_reconcile`: reconcile tap-group press states against the live OS key state (`GetAsyncKeyState`) on every tap-group event - heals a stale pressed state when Windows dropped a press/release of a tap key in the input queue (multi-key rollover limit); default OFF, existing behavior byte-identical
-- `<arg>-debug_tap_reconcile`: report a reconciled drop via overlay toast (needs `-tap_reconcile`); never notifies in normal runs, the flow log records every reconciled key
+- `<arg>-tap_reconcile` / `<arg>-no_tap_reconcile`: reconcile tap-group press states against the live OS key state (`GetAsyncKeyState`) on every tap-group event - heals a stale pressed state when Windows dropped a press/release of a tap key in the input queue (multi-key rollover limit); default ON per maintainer ruling 2026-10-31, `-tap_reconcile` stays an accepted no-op, `-no_tap_reconcile` restores the pre-reconcile event-stream-only behavior
+- `<arg>-debug_tap_reconcile`: report a reconciled drop via overlay toast (needs tap reconcile enabled); never notifies in normal runs, the flow log records every reconciled key
 - `<arg>-always_active`: if no focus app matches, the default groups stay active instead of the filter being paused - the status indicator shows blue while in this default-active state
 - `<arg>-tray_icon`: start the GUI loop with a tray icon (with or without status indicator) - the tray menu offers Open config / Reload / Toggle Pause / Return to Menu / Toggle Indicator / Toggle Crosshair / Toggle Console / Exit
 - `<arg>-hide_cmd_window`: keep the console window hidden after start-up - it can be re-shown via the tray menu "Toggle Console"

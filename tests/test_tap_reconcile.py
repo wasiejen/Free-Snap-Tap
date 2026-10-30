@@ -13,6 +13,7 @@ observed ("stuck until re-pressed and re-released").
 """
 from unittest.mock import MagicMock, call
 
+import pytest
 from pynput import keyboard as pynput_keyboard
 
 from kb_helpers import build, down, up
@@ -24,7 +25,14 @@ VK_B = vk_codes_dict['b']
 
 
 class TestStuckTapKeyRepro:
-    """Green against the current (pre-reconcile) code: documents the bug."""
+    """Pins the PRE-RECONCILE (option OFF) behavior explicitly: documents the
+    bug the reconcile option heals (default flipped ON 2026-10-31)."""
+
+    @pytest.fixture(autouse=True)
+    def force_reconcile_off(self, kb_env_ns):
+        """The option defaults ON since the 2026-10-31 ruling, so force it
+        OFF per test: these repro pins document the unhealed event stream."""
+        kb_env_ns.kb.arg_manager.RECONCILE_TAP_STATES = False
 
     def _hold_a_and_b_with_dropped_b_release(self, kb, kb_mock):
         """down a, down b, then the real release of b is dropped: the
@@ -82,7 +90,8 @@ class TestStuckTapKeyRepro:
 
 class TestReconcileOption:
     """Option RECONCILE_TAP_STATES (packet b2): event-time reconciliation of
-    Tap_Group.states against GetAsyncKeyState. Default OFF; reconciled drops
+    Tap_Group.states against GetAsyncKeyState. Default ON since maintainer
+    ruling 2026-10-31 (off-switch -no_tap_reconcile); reconciled drops are
     reported debug-only (packet c)."""
 
     def make_fake_os(self, kb, monkeypatch):
@@ -104,10 +113,32 @@ class TestReconcileOption:
         down(kb, VK_B, t_b)
         pressed.discard(VK_B)  # b physically released; event dropped
 
-    def test_default_off_keeps_behavior_identical(self, kb_env_ns):
+    def test_default_on_reconciles_without_flag(self, kb_env_ns, monkeypatch):
+        """Default ON (maintainer ruling 2026-10-31): a fresh option-less
+        environment heals a dropped release without any start argument."""
         kb = kb_env_ns.kb
         kb_mock = kb_env_ns.kb_mock
-        assert kb.arg_manager.RECONCILE_TAP_STATES is False
+        assert kb.arg_manager.RECONCILE_TAP_STATES is True
+        pressed = self.make_fake_os(kb, monkeypatch)
+        code = pynput_keyboard.KeyCode.from_vk
+        self._hold_a_and_b_with_dropped_b_release(kb, pressed)
+        pressed.discard(VK_A)
+        up(kb, VK_A, 3000)  # any tap event reconciles the stale b
+        tg = kb._tap_groups[0]
+        assert tg.get_states()[VK_B] == 0
+        assert tg.get_active_key() is None
+        assert kb_mock.method_calls == [
+            call.press(code(VK_A)),
+            call.release(code(VK_A)), call.press(code(VK_B)),
+            call.release(code(VK_B)),  # healed: the stuck b gets released
+        ]
+
+    def test_off_switch_keeps_event_stream_behavior(self, kb_env_ns):
+        """Option OFF (what -no_tap_reconcile selects) pins the pre-reconcile
+        event-stream behavior: a dropped release stays stale."""
+        kb = kb_env_ns.kb
+        kb_mock = kb_env_ns.kb_mock
+        kb.arg_manager.RECONCILE_TAP_STATES = False
         build(kb, taps=[['(TAP_1)', ['a', 'b']]])
         code = pynput_keyboard.KeyCode.from_vk
         down(kb, VK_A, 1000)
@@ -189,15 +220,25 @@ class TestReconcileOption:
         down(kb, VK_A, 6000)  # a tap event reconciles b - silently
         assert kb.toast_callback.call_count == 0
 
-    def test_start_arguments_enable_option(self, kb_env_ns):
+    def test_start_arguments_accept_noop_flag(self, kb_env_ns):
         am = kb_env_ns.kb.arg_manager
         am.apply_start_arguments(['-tap_reconcile', '-debug_tap_reconcile'])
+        # -tap_reconcile is a no-op since default ON: the option stays True
         assert am.RECONCILE_TAP_STATES is True
         assert CONSTANTS.DEBUG_TAP_RECONCILE is True
-        # focus-change reset returns the instance to the class default OFF
-        # (start args are re-applied afterwards, keeping the opt set)
+        # focus-change reset returns the instance to the class default ON
+        # (start args are re-applied afterwards)
         am.reset_global_variable_changes()
+        assert am.RECONCILE_TAP_STATES is True
+
+    def test_off_switch_argument_disables_option(self, kb_env_ns):
+        am = kb_env_ns.kb.arg_manager
+        assert am.RECONCILE_TAP_STATES is True  # class default ON
+        am.apply_start_arguments(['-no_tap_reconcile'])
         assert am.RECONCILE_TAP_STATES is False
+        # the off-switch is instance state: reset returns to class default ON
+        am.reset_global_variable_changes()
+        assert am.RECONCILE_TAP_STATES is True
 
     def test_os_key_pressed_real_ctypes(self, kb_env_ns):
         # sanity check of the real ctypes leg: the test harness runs without

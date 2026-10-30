@@ -1313,9 +1313,10 @@ class Argument_Manager():
     EXEC_ONLY_ONE_TRIGGERED_MACRO = False
 
     # tap-group event-time OS reconciliation (proposal 2026-10-31, option b2):
-    # heals press states when Windows drops queued key events; default OFF
-    # keeps existing configs byte-identical
-    RECONCILE_TAP_STATES = False
+    # heals press states when Windows drops queued key events. Default ON per
+    # maintainer ruling 2026-10-31 ("should be default on"); the off-switch
+    # -no_tap_reconcile restores the pre-reconcile event-stream-only behavior
+    RECONCILE_TAP_STATES = True
 
     ALWAYS_ACTIVE = False
     CMD_WINDOW_HIDDEN = False
@@ -1416,9 +1417,12 @@ class Argument_Manager():
                 set_flow_enabled(True)
             elif arg == "-debug_numpad":
                 CONSTANTS.DEBUG_NUMPAD = True
-            # tap-state reconcile: heal stale tap-group states via OS reads
+            # tap-state reconcile is default ON (maintainer ruling 2026-10-31):
+            # -tap_reconcile stays accepted as a no-op, -no_tap_reconcile disables
             elif arg == "-tap_reconcile":
-                self.RECONCILE_TAP_STATES = True
+                pass
+            elif arg == "-no_tap_reconcile":
+                self.RECONCILE_TAP_STATES = False
             elif arg == "-debug_tap_reconcile":
                 CONSTANTS.DEBUG_TAP_RECONCILE = True
             # start directly without showing the menu

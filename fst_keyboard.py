@@ -580,8 +580,9 @@ class FST_Keyboard():
         return False
 
     # Event-time OS reconciliation of tap-group press states (proposal
-    # 2026-10-31_fst-tap-group-repeat-hardening, option b2, default OFF via
-    # Argument_Manager.RECONCILE_TAP_STATES). Windows drops queued input when
+    # 2026-10-31_fst-tap-group-repeat-hardening, option b2, default ON since
+    # maintainer ruling 2026-10-31 via Argument_Manager.RECONCILE_TAP_STATES;
+    # off-switch -no_tap_reconcile). Windows drops queued input when
     # many keys are held, so a tap key's release can miss the hook entirely
     # and leave Tap_Group.states stale (see tests/test_tap_reconcile.py repro).
     # GetAsyncKeyState reports the live OS truth (held keys keep it set via

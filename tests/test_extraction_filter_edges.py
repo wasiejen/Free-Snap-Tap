@@ -140,7 +140,11 @@ class TestFilterEdges:
         assert played == ['m1', 'm2']
 
     def test_rebind_into_tap_group_resets_key_replaced(self, kb_env_ns):
+        # Pins the OFF behavior explicitly: the default-ON reconcile (2026-10-31)
+        # would heal the replacement press against the harness OS (b/c read as
+        # unpressed), so the group-send path pinned here needs option OFF.
         kb = kb_env_ns.kb
+        kb.arg_manager.RECONCILE_TAP_STATES = False
         build(kb, taps=[['(TAP_1)', ['b', 'c']]],
               rebinds=[['(r)', [['-a'], '-b']]])
         down(kb, VK_A, 1000)
@@ -151,7 +155,11 @@ class TestFilterEdges:
         assert kb._listener.suppress_event.call_count == 1
 
     def test_repeated_active_tap_trigger_breaks_without_resend(self, kb_env_ns, monkeypatch):
+        # Pins the OFF behavior explicitly: the active-key resend break (260428)
+        # is event-stream semantics - default-ON reconcile clears the active
+        # key against the unpressed harness OS, so this edge needs option OFF.
         kb = kb_env_ns.kb
+        kb.arg_manager.RECONCILE_TAP_STATES = False
         played = []
         monkeypatch.setattr(FST_Keyboard, 'start_macro_playback',
                             lambda self, alias, seq: played.append(alias))
