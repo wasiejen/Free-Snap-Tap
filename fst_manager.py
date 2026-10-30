@@ -121,6 +121,10 @@ class CONSTANTS():
     # (so alt+num* is not swallowed while gaming)
     DEBUG_NUMPAD = False
 
+    # debug gate: tap-state reconcile repairs (RECONCILE_TAP_STATES) report a
+    # reconciled drop via toast only when enabled - never in normal runs
+    DEBUG_TAP_RECONCILE = False
+
     # Define File name for saving of everything, can be any filetype
     # But .txt or .cfg recommended for easier editing
     FILE_NAME = 'FSTconfig.txt'
@@ -1308,6 +1312,11 @@ class Argument_Manager():
 
     EXEC_ONLY_ONE_TRIGGERED_MACRO = False
 
+    # tap-group event-time OS reconciliation (proposal 2026-10-31, option b2):
+    # heals press states when Windows drops queued key events; default OFF
+    # keeps existing configs byte-identical
+    RECONCILE_TAP_STATES = False
+
     ALWAYS_ACTIVE = False
     CMD_WINDOW_HIDDEN = False
 
@@ -1354,6 +1363,7 @@ class Argument_Manager():
         self.MACRO_MIN_DELAY_IN_MS = Argument_Manager.MACRO_MIN_DELAY_IN_MS
         self.MACRO_MAX_DELAY_IN_MS = Argument_Manager.MACRO_MAX_DELAY_IN_MS
         self.EXEC_ONLY_ONE_TRIGGERED_MACRO = Argument_Manager.EXEC_ONLY_ONE_TRIGGERED_MACRO
+        self.RECONCILE_TAP_STATES = Argument_Manager.RECONCILE_TAP_STATES
         self.CROSSHAIR_ENABLED = Argument_Manager.CROSSHAIR_ENABLED
         self.CROSSHAIR_DELTA_X = Argument_Manager.CROSSHAIR_DELTA_X
         self.CROSSHAIR_DELTA_Y = Argument_Manager.CROSSHAIR_DELTA_Y
@@ -1406,6 +1416,11 @@ class Argument_Manager():
                 set_flow_enabled(True)
             elif arg == "-debug_numpad":
                 CONSTANTS.DEBUG_NUMPAD = True
+            # tap-state reconcile: heal stale tap-group states via OS reads
+            elif arg == "-tap_reconcile":
+                self.RECONCILE_TAP_STATES = True
+            elif arg == "-debug_tap_reconcile":
+                CONSTANTS.DEBUG_TAP_RECONCILE = True
             # start directly without showing the menu
             elif arg == "-nomenu":
                 self.MENU_ENABLED = False

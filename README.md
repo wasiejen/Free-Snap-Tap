@@ -45,6 +45,8 @@ For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
     - `-delay` / `-nodelay`: re-enable / disable the delays (arguments are processed in order, later overrides earlier)
     - `-exec_one_macro`: only the first macro triggered by one real key event is played
     - `-debug_numpad`: enables the ALT+NUM1..NUM8 numpad debug combos
+    - `-tap_reconcile`: heals stale tap-group press states by reconciling them with the live OS key state (recovers press/releases dropped by the Windows input queue during multi-key holds)
+    - `-debug_tap_reconcile`: report a reconciled drop via overlay toast in debug mode (needs `-tap_reconcile`; silent in normal runs)
     - `-always_active`: the default groups stay active when no focus app matches
     - `-tray_icon` / `-hide_cmd_window`: start the GUI loop with a tray icon / keep the console window hidden after start-up
     - `-save_dir=*dir*` / `-backup_root_dir=*dir*`: the directories used by the `make_backup` / `restore_backup` invocations

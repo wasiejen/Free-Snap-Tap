@@ -4,6 +4,7 @@ last updated: 241023-1056
 '''
 
 import asyncio
+import ctypes
 
 from pynput import keyboard, mouse
 from time import time # sleep(0.005) = 5 ms
@@ -578,6 +579,36 @@ class FST_Keyboard():
             return True
         return False
 
+    # Event-time OS reconciliation of tap-group press states (proposal
+    # 2026-10-31_fst-tap-group-repeat-hardening, option b2, default OFF via
+    # Argument_Manager.RECONCILE_TAP_STATES). Windows drops queued input when
+    # many keys are held, so a tap key's release can miss the hook entirely
+    # and leave Tap_Group.states stale (see tests/test_tap_reconcile.py repro).
+    # GetAsyncKeyState reports the live OS truth (held keys keep it set via
+    # auto-repeat); one cheap win32 read per tap-group key on a tap event.
+    def _os_key_pressed(self, vk_code):
+        # high-order bit of GetAsyncKeyState = physically pressed right now
+        return bool(ctypes.windll.user32.GetAsyncKeyState(vk_code) & 0x8000)
+
+    def _reconcile_tap_group_states(self, tap_group):
+        # flip states that disagree with the OS truth; report debug-only
+        # (packet c): flow-log line always, toast only in debug mode
+        dropped = []
+        states = tap_group.get_states()
+        for vk in tap_group.get_vk_codes():
+            os_pressed = self._os_key_pressed(vk)
+            if bool(states.get(vk)) != os_pressed:
+                # update_tap_states recomputes active_key from the repaired states
+                tap_group.update_tap_states(vk, os_pressed)
+                dropped.append((vk, os_pressed))
+        for vk, os_pressed in dropped:
+            logger_flow.debug(f"tap-reconcile: vk {vk} -> "
+                              f"{'pressed' if os_pressed else 'released'} (event stream stale)")
+        if dropped and CONSTANTS.DEBUG_TAP_RECONCILE and self.toast_callback is not None:
+            keys = ', '.join(str(vk) for vk, _ in dropped)
+            self.toast_callback(f"[FST] tap-group reconciled: {keys}",
+                                5, 12, "rgba(60, 60, 200, 200)", "white")
+
     def _win32_event_filter(self, vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event=False):
         """
         Filter and handle keyboard and mouse events.
@@ -778,6 +809,8 @@ class FST_Keyboard():
                             if key_replaced is True:
                                 key_replaced = False
                             tap_group.update_tap_states(vk_code, is_keydown)
+                            if self._arg_manager.RECONCILE_TAP_STATES:
+                                self._reconcile_tap_group_states(tap_group)
 
                             # send keys
                             self._output_manager.send_keys_for_tap_group(tap_group)
