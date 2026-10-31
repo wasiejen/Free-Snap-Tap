@@ -14,6 +14,9 @@ from fst_data_types import Key_Event, type_check, ConfigError
 from fst_tasks import Focus_Task, Macro_Repeat_Task
 import datetime
 import re #regular expression
+import ast # structural constraint check (Config_Validator)
+from collections import namedtuple
+from vk_codes import vk_codes_dict
 from fst_save_file_handler import make_backup as mb, restore_backup as rb
 import pyperclip # to copy mouse position to clipboard for easier pasting
 import asyncio
@@ -833,6 +836,471 @@ class Output_Manager():
         self.variables = {}
 
 
+# ---------------------------------------------------------------------------
+# Config validation (U69, proposal 2026-10-31_fst-config-validator a,b,c,d)
+#
+# ONE pass over the CLEANED config lines (after _clean_comments /
+# _combine_multilines) that collects ALL violations before any group is
+# built; nothing is evaluated and eval() is untouched. Each violation is a
+# (line number, item alias, rule, message, severity) record.
+#
+# severity ERROR: the line cannot build a correct group or would crash the
+#   hot path at eval time -> load_config raises one consolidated ConfigError.
+# severity WARNING: the line runs today through a silent no-op or a silent
+#   strip -> it is reported through the same surface channel and the load
+#   proceeds, so valid configs keep their exact behavior.
+# ---------------------------------------------------------------------------
+
+Config_Violation = namedtuple('Config_Violation',
+                              'line item rule message severity')
+
+
+# constraint-expression functions and their positional-argument arity
+# (mirrors the nested helpers of Output_Manager.constraint_evaluation)
+CONSTRAINT_FUNCTIONS = {
+    # time / state queries
+    'tr': (1, 1), 'ts': (1, 1), 'ta': (1, 1),
+    'cs': (1, 1), 'csl': (1, 1),
+    'p': (1, 1), 'r': (1, 1), 'ap': (1, 1), 'ar': (1, 1),
+    'last': (1, 2), 'dc': (0, 2),
+    # alias repetition + macro/sequence control
+    'start_repeat': (2, 3), 'stop_repeat': (1, 1), 'toggle_repeat': (2, 2),
+    'is_repeat_active': (1, 1), 'reset_repeat': (1, 1), 'stop_all_repeat': (0, 0),
+    'reset': (1, 1), 'release_all_keys': (0, 0),
+    # typing
+    'type': (1, 1), 'write': (1, 1), 'release_modifier': (0, 0),
+    # integer variables
+    'set': (1, 2), 'is_set': (1, 1), 'get': (1, 1), 'check': (1, 2),
+    'clear': (1, 1), 'clear_all_variables': (0, 0), 'incr': (1, 1), 'decr': (1, 1),
+    # text variables and misc
+    'set_var': (2, 2), 'get_var': (1, 1), 'cli': (1, 1),
+    'date': (0, 0), 'date_time': (0, 0), 'get_time': (0, 0),
+    'make_backup': (0, 2), 'restore_backup': (0, 2),
+    # mouse
+    'scroll_up': (1, 1), 'scroll_down': (1, 1),
+    'scroll_right': (1, 1), 'scroll_left': (1, 1),
+    'mouse_move_abs': (2, 2), 'mouse_move': (2, 2), 'mouse_get_pos': (0, 0),
+    'mouse_save_to_var': (1, 1), 'mouse_move_to_var': (1, 1),
+    # toasts
+    'show_message': (1, 4), 'show_timer': (1, 4),
+    'remove_toast': (0, 1), 'remove_all_toasts': (0, 1),
+    # clipboard / files
+    'copy_to_clipboard': (1, 1), 'paste': (0, 0),
+    'save_into_file': (1, 4), 'append_to_file': (1, 3), 'empty_file': (0, 1),
+    'print_all_variables': (0, 0), 'clear_console': (0, 0),
+}
+
+# python builtins resolvable inside eval() of a constraint expression
+CONSTRAINT_BUILTINS = frozenset({
+    'abs', 'all', 'any', 'bin', 'bool', 'bytes', 'callable', 'chr', 'dict',
+    'divmod', 'enumerate', 'filter', 'float', 'format', 'frozenset', 'hex',
+    'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'ord', 'pow',
+    'range', 'reversed', 'round', 'set', 'sorted', 'str', 'sum', 'tuple',
+    'zip', 'print',
+})
+
+# invocations whose first string argument is an alias <name> reference
+ALIAS_ARG_FUNCTIONS = ('start_repeat', 'stop_repeat', 'toggle_repeat',
+                       'is_repeat_active', 'reset_repeat')
+
+# key-string prefixes carrying a press/release/toggle meaning
+KEY_MODIFIER_PREFIXES = '-+!^'
+
+# start arguments: valueless switches and value-taking arguments
+START_ARG_FLAGS = frozenset({
+    '-flow', '-debug_numpad', '-nomenu', '-nocontrols', '-delay', '-crossover',
+    '-nodelay', '-exec_one_macro', '-status_indicator', '-crosshair',
+    '-always_active', '-tray_icon', '-hide_cmd_window',
+})
+START_ARG_VALUES = frozenset({
+    '-log', '-file', '-tapdelay', '-aliasdelay', '-macrodelay', '-crossover',
+    '-focusapp', '-status_indicator', '-crosshair', '-save_dir', '-backup_root_dir',
+})
+
+# delay values accepted by Argument_Manager.extract_delays
+DELAY_RANGE = (0, 1000)
+
+
+def split_key_group(group):
+    '''split a key group on commas, ignoring commas inside parentheses;
+    same rule as the bracket-aware split of Config_Manager.presort_lines'''
+    parts = group.split(',')
+    new_group = []
+    temp = ''
+    total_open = 0
+    for part in parts:
+        if temp == '':
+            temp += part
+        else:
+            temp += ', ' + part
+        total_open += part.count('(') - part.count(')')
+        if total_open == 0:
+            new_group.append(temp)
+            temp = ''
+    return new_group
+
+
+class Config_Validator():
+    '''
+    structural evaluation of the cleaned config lines - collects ALL
+    violations (not fail-fast); no group building and no constraint eval
+    '''
+
+    ERROR = 'error'
+    WARNING = 'warning'
+
+    def __init__(self):
+        self.violations = []
+        self._count_tap = 1
+        self._count_rebind = 1
+        self._count_macro = 1
+        self._count_sequence = 1
+
+    def validate(self, numbered_lines):
+        '''numbered_lines: list of (line_number, cleaned_line) tuples'''
+        self._collect_alias_definitions(numbered_lines)
+        scope = ''
+        aliases_by_scope = self._aliases_by_scope
+        for line_number, line in numbered_lines:
+            if line.startswith('<focus>'):
+                self._check_focus_line(line_number, line)
+                scope = self._focus_scope_of(line)
+                continue
+            if line.startswith('<arg>'):
+                self._check_arg_line(line_number, line)
+                continue
+            self._check_group_line(line_number, line, scope,
+                                   aliases_by_scope.get(scope, set()))
+        return self.violations
+
+    # -- reporting helpers ---------------------------------------------------
+
+    def _add(self, line_number, item, rule, message, severity):
+        self.violations.append(
+            Config_Violation(line_number, item, rule, message, severity))
+
+    def _error(self, line_number, item, rule, message):
+        self._add(line_number, item, rule, message, self.ERROR)
+
+    def _warn(self, line_number, item, rule, message):
+        self._add(line_number, item, rule, message, self.WARNING)
+
+    @staticmethod
+    def format_report(violations):
+        '''one consolidated user-facing report text'''
+        errors = sum(1 for v in violations if v.severity == Config_Validator.ERROR)
+        warnings = len(violations) - errors
+        lines = [f'{len(violations)} config violation(s) '
+                 f'({errors} error(s), {warnings} warning(s)):']
+        for v in violations:
+            lines.append(f'  line {v.line} {v.item or "(unnamed)"} '
+                         f'[{v.rule}] {v.severity}: {v.message}')
+        return '\n'.join(lines)
+
+    # -- scope / alias definitions -------------------------------------------
+
+    def _collect_alias_definitions(self, numbered_lines):
+        '''alias <name> definitions per scope (default + each focus section)'''
+        self._aliases_by_scope = {'': set()}
+        scope = ''
+        for _, line in numbered_lines:
+            if line.startswith('<focus>'):
+                scope = self._focus_scope_of(line)
+                # a focus section sees the default aliases plus its own ones
+                if scope not in self._aliases_by_scope:
+                    self._aliases_by_scope[scope] = set(
+                        self._aliases_by_scope.get('', set()))
+            elif line.startswith('<'):
+                alias_end = line.find('>')
+                if alias_end > 1:
+                    self._aliases_by_scope.setdefault(scope, set()).add(
+                        line[:alias_end + 1])
+
+    @staticmethod
+    def _focus_scope_of(line):
+        cleaned = line.replace('<focus>', '')
+        return re.sub(r'[^a-zA-Z0-9,_. ]', '', cleaned).split(',')[0].strip()
+
+    # -- focus and argument lines --------------------------------------------
+
+    def _check_focus_line(self, line_number, line):
+        name = line.replace('<focus>', '')
+        stripped = re.sub(r'[^a-zA-Z0-9,_. ]', '', name)
+        if not stripped.strip(', ').strip():
+            self._error(line_number, '(focus)', 'focus',
+                        'empty focus name - add the window name after <focus>')
+            return
+        if stripped != name:
+            self._warn(line_number, '(focus)', 'focus',
+                       f'invalid focus-name characters removed: {name!r} -> {stripped!r}')
+
+    def _check_arg_line(self, line_number, line):
+        arg = line.replace('<arg>', '').strip().lower()
+        if not arg or arg[0] in (':', '#'):
+            return
+        if arg[0] != '-':
+            self._warn(line_number, '(arg)', 'arg',
+                       f'start argument {arg!r} must start with "-"')
+            return
+        name, _, value = arg.partition('=')
+        has_value = value != ''
+        if has_value:
+            if name in START_ARG_VALUES:
+                self._check_arg_value(line_number, name, value)
+            elif name in START_ARG_FLAGS:
+                self._error(line_number, '(arg)', 'arg',
+                            f'{name} takes no value - remove the "=" part')
+            else:
+                self._warn(line_number, '(arg)', 'arg',
+                           f'unknown start argument: {arg}')
+            return
+        if name in START_ARG_FLAGS:
+            return
+        if name in START_ARG_VALUES:
+            self._error(line_number, '(arg)', 'arg',
+                        f'{name} needs a value after "="')
+            return
+        self._warn(line_number, '(arg)', 'arg',
+                   f'unknown start argument: {arg}')
+
+    def _check_arg_value(self, line_number, name, value):
+        if name == '-log':
+            if value not in LOG_LEVELS:
+                self._error(line_number, '(arg)', 'arg',
+                            f'invalid log level {value!r} - use debug, info, warning or error')
+        elif name == '-focusapp':
+            self._error(line_number, '(arg)', 'arg',
+                        '-focusapp is removed since V1.0.0 - use <focus>name in the config')
+        elif name in ('-tapdelay', '-aliasdelay', '-macrodelay'):
+            delays = self._parse_int_list(value)
+            if delays is None:
+                self._error(line_number, '(arg)', 'arg',
+                            f'invalid delay {value!r} - needs number(s) separated by comma')
+                return
+            if len(delays) > 2:
+                self._warn(line_number, '(arg)', 'arg',
+                           f'{name} gets {len(delays)} values - only the first two are used')
+            for delay in delays:
+                if not DELAY_RANGE[0] <= delay <= DELAY_RANGE[1]:
+                    self._error(line_number, '(arg)', 'arg',
+                                f'delay {delay} not in range {DELAY_RANGE[0]}<delay<={DELAY_RANGE[1]} ms')
+        elif name == '-crossover':
+            crossover = self._parse_int_list(value)
+            if crossover is None or len(crossover) != 1:
+                self._error(line_number, '(arg)', 'arg',
+                            f'invalid probability {value!r} - needs one number')
+            elif not 0 <= crossover[0] <= 100:
+                self._error(line_number, '(arg)', 'arg',
+                            f'probability {crossover[0]} not in range 0<=prob<=100 %')
+        elif name == '-status_indicator':
+            size = self._parse_int_list(value)
+            if size is None or len(size) != 1 or size[0] <= 0:
+                self._error(line_number, '(arg)', 'arg',
+                            f'invalid indicator size {value!r} - needs one number > 0')
+        elif name == '-crosshair':
+            delta = self._parse_int_list(value)
+            if delta is None or len(delta) != 2:
+                self._error(line_number, '(arg)', 'arg',
+                            f'invalid crosshair delta {value!r} - needs two numbers, e.g. -crosshair=5,-10')
+
+    @staticmethod
+    def _parse_int_list(value):
+        try:
+            return [int(part) for part in value.replace(' ', '').split(',')]
+        except ValueError:
+            return None
+
+    # -- group lines: arity per item type ------------------------------------
+
+    def _check_group_line(self, line_number, line, scope, aliases):
+        alias = ''
+        body = line
+        is_alias_line = False
+
+        if body.startswith('<'):
+            alias_end = body.find('>')
+            if alias_end > 1:
+                alias = body[:alias_end + 1]
+                body = body[alias_end + 1:].strip()
+                is_alias_line = True
+                if not re.fullmatch(r'<[A-Za-z0-9_]+>', alias):
+                    self._error(line_number, alias, 'alias',
+                                f'invalid alias name {alias} - letters, numbers and "_" only')
+        elif body.startswith('('):
+            name_end = body.find(')')
+            if name_end > 1:
+                alias = body[:name_end + 1]
+                body = body[name_end + 1:].strip()
+
+        if is_alias_line:
+            if not body:
+                self._warn(line_number, alias, 'alias', 'alias without keys - nothing to insert')
+            self._check_key_group(line_number, alias, body, aliases, 'group')
+            return
+
+        # ':' splits the item types exactly like presort_lines does
+        groups = [x.strip() for x in body.split(':')]
+
+        if len(groups) == 1:
+            item = alias or f'(TAP_{self._count_tap})'
+            self._count_tap += 1
+            if groups[0].count('(') == groups[0].count(')') and len(split_key_group(groups[0])) < 2:
+                self._warn(line_number, item, 'arity',
+                           'tap group needs 2 or more keys')
+            self._check_key_group(line_number, item, groups[0], aliases, 'tap')
+        elif len(groups) == 2:
+            item = alias or f'(REB_{self._count_rebind})'
+            self._count_rebind += 1
+            key_group = split_key_group(groups[1])
+            if not any(k for k in split_key_group(groups[0])):
+                self._error(line_number, item, 'shape',
+                            'rebind without trigger key - add the trigger before ":"')
+            if groups[1].count('(') == groups[1].count(')') and len(key_group) != 1:
+                self._error(line_number, item, 'arity',
+                            f'{key_group} is not a valid rebind (only one key_event/key allowed) '
+                            '- use "::" instead of ":" to declare it as a macro')
+            self._check_key_group(line_number, item, groups[0], aliases, 'trigger')
+            self._check_key_group(line_number, item, groups[1], aliases, 'group')
+        elif len(groups) > 2 and len(groups[1]) == 0:
+            if len(groups) > 3:
+                item = alias or f'(SEQ_{self._count_sequence})'
+                self._count_sequence += 1
+                key_groups = groups[2:]
+                if len(key_groups) < 2:
+                    self._error(line_number, item, 'arity',
+                                'macro sequence needs 2 or more key groups')
+            else:
+                item = alias or f'(MAC_{self._count_macro})'
+                self._count_macro += 1
+                key_groups = [groups[2]]
+            if not any(k for k in split_key_group(groups[0])):
+                self._error(line_number, item, 'shape',
+                            'macro without trigger key - add the trigger before "::"')
+            self._check_key_group(line_number, item, groups[0], aliases, 'trigger')
+            for key_group in key_groups:
+                self._check_key_group(line_number, item, key_group, aliases, 'group')
+        else:
+            # presort_lines drops this line today: the middle group is not empty
+            self._error(line_number, alias or '(unnamed)', 'dropped',
+                        'line dropped - ":" after a "::" group needs an empty '
+                        'middle group (use "a :: b : c" for a macro sequence)')
+
+    def _check_key_group(self, line_number, item, group_text, aliases, kind):
+        '''one key group: unbalanced brackets drop it in presort_lines'''
+        if not group_text:
+            return
+        if group_text.count('(') != group_text.count(')'):
+            self._error(line_number, item, 'parens',
+                        f'unbalanced parentheses in "{group_text}" - group dropped')
+            return
+        for key_string in split_key_group(group_text):
+            self._check_key_string(line_number, item, key_string, aliases, kind)
+
+    # -- key strings and constraint expressions ------------------------------
+
+    def _check_key_string(self, line_number, item, key_string, aliases, kind):
+        segments = key_string.split('|')
+        base = segments[0]
+
+        if kind == 'tap':
+            if len(base) > 1 and base[0] in KEY_MODIFIER_PREFIXES:
+                self._error(line_number, item, 'shape',
+                            f'tap group key {base} must be a plain key (no -/+ ! ^ prefix)')
+                return
+            if len(segments) > 1:
+                self._error(line_number, item, 'shape',
+                            f'tap group key {base} must be a plain key (no delay suffix)')
+                return
+            self._check_vk_resolvable(line_number, item, base)
+            return
+
+        if base.startswith('<'):
+            # groups resolve a "<name>" string through the alias dict only
+            if base not in aliases:
+                self._error(line_number, item, 'alias',
+                            f'alias {base} is not defined in this focus section')
+            if len(segments) > 1:
+                self._warn(line_number, item, 'suffix',
+                           f'suffixes on the alias {base} are ignored')
+            return
+
+        if len(base) > 1 and base[0] in KEY_MODIFIER_PREFIXES:
+            base = base[1:]
+        self._check_vk_resolvable(line_number, item, base)
+
+        for segment in segments[1:]:
+            self._check_constraint_segment(line_number, item, segment, aliases)
+
+    def _check_vk_resolvable(self, line_number, item, key):
+        if key in vk_codes_dict:
+            return
+        try:
+            valid = 0 <= int(key) < 256
+        except ValueError:
+            valid = False
+        if not valid:
+            self._error(line_number, item, 'vk',
+                        f'key {key!r} does not resolve to a vk code')
+
+    def _check_constraint_segment(self, line_number, item, segment, aliases):
+        if segment.startswith('('):
+            inner = segment[1:-1]
+            if not segment.endswith(')') or inner.count('(') != inner.count(')'):
+                self._error(line_number, item, 'constraint',
+                            f'unbalanced parentheses in constraint {segment}')
+                return
+            self._check_constraint_expression(line_number, item, inner, aliases)
+            return
+        try:
+            int(segment)
+        except ValueError:
+            self._error(line_number, item, 'constraint',
+                        f'constraint {segment!r} needs to be a delay number or "(...)"')
+
+    def _check_constraint_expression(self, line_number, item, expression, aliases):
+        '''structural pass over one "(...)" constraint - no evaluation'''
+        if expression in ('', '!', 'True', 'False', 'None'):
+            return
+        try:
+            tree = ast.parse(expression, mode='eval')
+        except SyntaxError as error:
+            self._error(line_number, item, 'constraint',
+                        f'constraint ({expression}) is not a valid expression: {error.msg}')
+            return
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if isinstance(node.func, ast.Name):
+                name = node.func.id
+            elif isinstance(node.func, ast.Attribute):
+                name = node.func.attr
+            else:
+                continue
+            args = node.args
+            if name in CONSTRAINT_FUNCTIONS:
+                min_args, max_args = CONSTRAINT_FUNCTIONS[name]
+                if not min_args <= len(args) <= max_args:
+                    self._error(line_number, item, 'constraint',
+                                f'{name}() takes {min_args}-{max_args} arguments, got {len(args)}')
+                if name in ALIAS_ARG_FUNCTIONS and args and isinstance(args[0], ast.Constant) \
+                        and isinstance(args[0].value, str):
+                    self._check_alias_argument(line_number, item, args[0].value, aliases)
+            elif name not in CONSTRAINT_BUILTINS:
+                self._warn(line_number, item, 'constraint',
+                           f'unknown function {name}() - evaluates to True (no-op)')
+
+    @staticmethod
+    def _alias_reference_in_text(text):
+        match = re.search(r'<[A-Za-z0-9_]+>', text)
+        return match.group(0) if match else ''
+
+    def _check_alias_argument(self, line_number, item, text, aliases):
+        reference = self._alias_reference_in_text(text)
+        if reference and reference not in aliases:
+            self._error(line_number, item, 'alias',
+                        f'alias {reference} is not defined in this focus section')
+
+
 class Config_Manager():
     '''
     file handling and hr display of groups
@@ -848,6 +1316,8 @@ class Config_Manager():
         self._rebinds_hr = []
         self._macros_hr = []
         self._alias_hr = []
+        # validator violations of the last load_config that only warn
+        self.config_warnings = []
 
     @property
     def file_name(self):
@@ -887,8 +1357,11 @@ class Config_Manager():
 
 
     def _clean_comments(self, lines):
+        return [cleaned for _, cleaned in self._clean_comments_numbered(lines)]
+
+    def _clean_comments_numbered(self, lines):
         comments_cleaned_lines = []
-        for line in lines:
+        for line_number, line in enumerate(lines, start=1):
             ###XXX 241029-0711 strip to allow whitespaces in front
             line = line.replace('\n', '').replace('\t', '').strip()
             if not line:
@@ -903,11 +1376,11 @@ class Config_Manager():
                 else:
                     focus_group_names = focus_group_names[0].strip()
                 cleaned_line += focus_group_names
-                comments_cleaned_lines.append(cleaned_line)
+                comments_cleaned_lines.append((line_number, cleaned_line))
             elif line.startswith('<arg>'):
                 cleaned_line = '<arg>'
                 cleaned_line += line[5:].split('#')[0].strip()
-                comments_cleaned_lines.append(cleaned_line)
+                comments_cleaned_lines.append((line_number, cleaned_line))
             elif line[0] == '#':
                 continue
             else:
@@ -927,19 +1400,25 @@ class Config_Manager():
                             cleaned_group.append(cleaned_key)
                 cleaned_line = ','.join(cleaned_group)
                 if cleaned_line:
-                    comments_cleaned_lines.append(cleaned_line)
+                    comments_cleaned_lines.append((line_number, cleaned_line))
 
         return comments_cleaned_lines
 
     def _combine_multilines(self, cleaned_lines):
-        # clean multiline macro sequences and joins them together
+        return [cleaned for _, cleaned in
+                self._combine_multilines_numbered([(0, cleaned) for cleaned in cleaned_lines])]
+
+    def _combine_multilines_numbered(self, numbered_lines):
+        # clean multiline macro sequences and joins them together;
+        # the line number of the sequence head is kept for the validator
         multiline_cleaned_lines = []
-        for line in cleaned_lines:
+        for line_number, line in numbered_lines:
             if len(line) > 1 and line[0] == ':':
                 # add multiline to last multiline sequence
-                multiline_cleaned_lines[-1] += line
+                last_number, last_line = multiline_cleaned_lines[-1]
+                multiline_cleaned_lines[-1] = (last_number, last_line + line)
             else:
-                multiline_cleaned_lines.append(line)
+                multiline_cleaned_lines.append((line_number, line))
 
         return multiline_cleaned_lines
 
@@ -950,9 +1429,20 @@ class Config_Manager():
         '''
         reads in the file and removes the commented out lines, keys and inline comments;
         joins multiline macro sequences;
+        validates the cleaned lines before any group is built
         '''
 
-        cleaned_lines = self._combine_multilines(self._clean_comments(file_lines) )
+        cleaned_lines = self._combine_multilines_numbered(self._clean_comments_numbered(file_lines))
+
+        violations = Config_Validator().validate(cleaned_lines)
+        self.config_warnings = [v for v in violations
+                                if v.severity == Config_Validator.WARNING]
+        if any(v.severity == Config_Validator.ERROR for v in violations):
+            logger_config.error(f"config violations:\n{Config_Validator.format_report(violations)}")
+            raise ConfigError(Config_Validator.format_report(violations),
+                              'config file')
+
+        group_lines = [line for _, line in cleaned_lines]
 
         focus_name = ''
         multi_focus_dict = {}
@@ -960,7 +1450,7 @@ class Config_Manager():
         default_group_lines = []
         extra_focus_names = []
 
-        for line in cleaned_lines:
+        for line in group_lines:
             if line.startswith('<focus>'):
                 focus_name = line.replace('<focus>', '')
                 # #only allow letters, numbers and spaces in focus_name
@@ -1047,6 +1537,10 @@ class Config_Manager():
         '''
         saves cleaned lines according to formatting in different containers;
         saved in variable_hr (human readable)
+
+        a line with >2 groups and a non-empty middle group is dropped here;
+        Config_Validator reports it as rule "dropped" before load_config
+        returns, so it is never silently lost anymore
         '''
 
         def split_ignore_brackets2(group):
@@ -1127,26 +1621,7 @@ class Config_Manager():
             return split_group
 
         def split_ignore_brackets(group):
-            split_group = group.split(',')
-            count_open = []
-            new_group = []
-
-            for el in split_group:
-                count_open.append(el.count('(') - el.count(')'))
-
-            temp = ''
-            sum = 0
-            for el, count in zip(split_group, count_open):
-                if temp == '':
-                    temp += el
-                else:
-                    temp += ', ' + el
-                sum += count
-                if sum == 0:
-                    new_group.append(temp)
-                    temp = ''
-
-            return new_group
+            return split_key_group(group)
 
 
         self._tap_groups_hr = []
@@ -1184,9 +1659,8 @@ class Config_Manager():
                         count_rebind += 1
                     if len(key_group) == 1:
                         self._rebinds_hr.append([alias, [trigger_group, key_group[0]]])
-                    else:
-                        print(f"{key_group} is not a valid rebind (only one key_event/key allowed")
-                        print("   use :: instead of : to declare it as a macro")
+                    # the multi-key replacement is reported by Config_Validator
+                    # (rule "arity") before this point is ever reached
                     # macro
                 elif len(groups) > 2 and len(groups[1]) == 0:
                     trigger_group = split_ignore_brackets(groups[0])

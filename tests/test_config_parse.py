@@ -23,18 +23,18 @@ caps_lock : shift
 
 MULTI_FOCUS_CONFIG = """\
 <focus>A, B
-ab
+a, b
 
 <focus>C
-cd
+c, d
 """
 
 MULTI_FOCUS_LAST_CONFIG = """\
 <focus>C
-cd
+c, d
 
 <focus>A, B
-ab
+a, b
 """
 
 
@@ -78,8 +78,8 @@ def test_multi_focus_shares_group(tmp_path):
 
     assert set(multi_focus) == {'A', 'B', 'C'}
     assert multi_focus['B'] is multi_focus['A']
-    assert multi_focus['A'][1] == [ ['', 'ab'] ]
-    assert multi_focus['C'][1] == [ ['', 'cd'] ]
+    assert multi_focus['A'][1] == [ ['', 'a,b'] ]
+    assert multi_focus['C'][1] == [ ['', 'c,d'] ]
 
 
 def test_multi_focus_extras_of_last_section_registered(tmp_path):
@@ -87,8 +87,8 @@ def test_multi_focus_extras_of_last_section_registered(tmp_path):
 
     assert set(multi_focus) == {'A', 'B', 'C'}
     assert multi_focus['B'] is multi_focus['A']
-    assert multi_focus['A'][1] == [ ['', 'ab'] ]
-    assert multi_focus['C'][1] == [ ['', 'cd'] ]
+    assert multi_focus['A'][1] == [ ['', 'a,b'] ]
+    assert multi_focus['C'][1] == [ ['', 'c,d'] ]
 
 
 def test_real_config_parses():
