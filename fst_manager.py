@@ -1002,7 +1002,10 @@ class Config_Validator():
         for _, line in numbered_lines:
             if line.startswith('<focus>'):
                 scope = self._focus_scope_of(line)
-                self._aliases_by_scope.setdefault(scope, set())
+                # a focus section sees the default aliases plus its own ones
+                if scope not in self._aliases_by_scope:
+                    self._aliases_by_scope[scope] = set(
+                        self._aliases_by_scope.get('', set()))
             elif line.startswith('<'):
                 alias_end = line.find('>')
                 if alias_end > 1:
@@ -1128,8 +1131,7 @@ class Config_Validator():
         if is_alias_line:
             if not body:
                 self._warn(line_number, alias, 'alias', 'alias without keys - nothing to insert')
-            self._check_key_group(line_number, alias, split_key_group(body),
-                                  aliases, 'group')
+            self._check_key_group(line_number, alias, body, aliases, 'group')
             return
 
         # ':' splits the item types exactly like presort_lines does
@@ -1138,43 +1140,39 @@ class Config_Validator():
         if len(groups) == 1:
             item = alias or f'(TAP_{self._count_tap})'
             self._count_tap += 1
-            keys = split_key_group(groups[0])
-            if len(keys) < 2:
+            if groups[0].count('(') == groups[0].count(')') and len(split_key_group(groups[0])) < 2:
                 self._warn(line_number, item, 'arity',
                            'tap group needs 2 or more keys')
-            self._check_key_group(line_number, item, keys, aliases, 'tap')
+            self._check_key_group(line_number, item, groups[0], aliases, 'tap')
         elif len(groups) == 2:
             item = alias or f'(REB_{self._count_rebind})'
             self._count_rebind += 1
-            trigger_group = split_key_group(groups[0])
             key_group = split_key_group(groups[1])
-            if not any(k for k in trigger_group):
+            if not any(k for k in split_key_group(groups[0])):
                 self._error(line_number, item, 'shape',
                             'rebind without trigger key - add the trigger before ":"')
-            if len(key_group) != 1:
+            if groups[1].count('(') == groups[1].count(')') and len(key_group) != 1:
                 self._error(line_number, item, 'arity',
                             f'{key_group} is not a valid rebind (only one key_event/key allowed) '
                             '- use "::" instead of ":" to declare it as a macro')
-            self._check_key_group(line_number, item, trigger_group, aliases, 'trigger')
-            self._check_key_string(line_number, item, key_group[0] if key_group else '',
-                                   aliases, 'group')
+            self._check_key_group(line_number, item, groups[0], aliases, 'trigger')
+            self._check_key_group(line_number, item, groups[1], aliases, 'group')
         elif len(groups) > 2 and len(groups[1]) == 0:
             if len(groups) > 3:
                 item = alias or f'(SEQ_{self._count_sequence})'
                 self._count_sequence += 1
-                key_groups = [split_key_group(group) for group in groups[2:]]
+                key_groups = groups[2:]
                 if len(key_groups) < 2:
                     self._error(line_number, item, 'arity',
                                 'macro sequence needs 2 or more key groups')
             else:
                 item = alias or f'(MAC_{self._count_macro})'
                 self._count_macro += 1
-                key_groups = [split_key_group(groups[2])]
-            trigger_group = split_key_group(groups[0])
-            if not any(k for k in trigger_group):
+                key_groups = [groups[2]]
+            if not any(k for k in split_key_group(groups[0])):
                 self._error(line_number, item, 'shape',
                             'macro without trigger key - add the trigger before "::"')
-            self._check_key_group(line_number, item, trigger_group, aliases, 'trigger')
+            self._check_key_group(line_number, item, groups[0], aliases, 'trigger')
             for key_group in key_groups:
                 self._check_key_group(line_number, item, key_group, aliases, 'group')
         else:
@@ -1183,8 +1181,15 @@ class Config_Validator():
                         'line dropped - ":" after a "::" group needs an empty '
                         'middle group (use "a :: b : c" for a macro sequence)')
 
-    def _check_key_group(self, line_number, item, keys, aliases, kind):
-        for key_string in keys:
+    def _check_key_group(self, line_number, item, group_text, aliases, kind):
+        '''one key group: unbalanced brackets drop it in presort_lines'''
+        if not group_text:
+            return
+        if group_text.count('(') != group_text.count(')'):
+            self._error(line_number, item, 'parens',
+                        f'unbalanced parentheses in "{group_text}" - group dropped')
+            return
+        for key_string in split_key_group(group_text):
             self._check_key_string(line_number, item, key_string, aliases, kind)
 
     # -- key strings and constraint expressions ------------------------------
@@ -1197,9 +1202,11 @@ class Config_Validator():
             if len(base) > 1 and base[0] in KEY_MODIFIER_PREFIXES:
                 self._error(line_number, item, 'shape',
                             f'tap group key {base} must be a plain key (no -/+ ! ^ prefix)')
+                return
             if len(segments) > 1:
                 self._error(line_number, item, 'shape',
                             f'tap group key {base} must be a plain key (no delay suffix)')
+                return
             self._check_vk_resolvable(line_number, item, base)
             return
 
