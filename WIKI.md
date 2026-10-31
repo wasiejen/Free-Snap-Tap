@@ -25,7 +25,7 @@ It interpretes the real input (of keyboard and mouse) and according to defined r
 - **prefix/modifier** `-key_event`, `+key_event`, `!key_event`, `^Key`: the prefix is the sign before a key_event or Key. If `-`, `-`, `!` are present it will define a key_event of press or release. `^` defines a toggled Key and is the only prefix for a Key. If there is no prefix, it will be handled as a Key (press + release).
 - **suffix** `key_event|suffix|suffix|...` are written behind key_events or Keys and are interpreted as:
   - **suffix/delays** `ke|*time in ms*` time after a key_event that will be waited before next will be played. Delay is defined by if the suffix is a number (time in ms for delay) or can be evaluated to a number.
-  - **suffix/constraints** `ke|-ke|+ke`defines when to trigger or send a key_event based on True or False statements
+  - **suffix/constraints** `ke|(-ke)|(+ke)` defines when to trigger or send a key_event based on True or False statements
   - **suffix/evaluations** `ke|(evaluation)` can result in a constraint if evaluated to True/False or as delay when evaluated to a number
   - **suffix/function invocation** `ke1 :: ke2|(repeat_toggle(10000))` a function that will always evaluate to True - the suffixed key_event is still played as usual, and the function defined in the invocation will be started
     - in this example: trigger `ke1` will start a repeated sending of the `ke2` every 10 seconds until ```ke1` is pressed again and stop it
@@ -178,7 +178,9 @@ Every key event supports prefixes **prefix/modifier**
 ## [Suffixes]
 
 - every key_event supports **suffixes** (constraints, evaluation, function invocation)
-  - as constraints: `-ke`, `+ke`/`!ke`: e.g. `ke1|-ke2|-ke3 : ...` is functionally the same as trigger group: `ke1, -ke2, -ke3 : ...`
+  - a suffix segment is either a delay number or a parenthesized expression `(...)` - a bare segment is parsed as a delay number, so `ke1|-ke2` is rejected
+  - as constraints: `(-ke)`, `(+ke)`/`(!ke)`: e.g. `ke1|(-ke2)|(-ke3) : ...` is functionally the same as trigger group: `ke1, -ke2, -ke3 : ...`
+    - inside the parentheses the sign names the state to check: `(-ke)` is True while ke is pressed, `(+ke)`/`(!ke)` while ke is not pressed (real and simulated state)
 - suffixes in trigger_group will only be checked/activated when trigger and constraints all check for True
 
 ### [Suffix/Delays]
@@ -267,14 +269,14 @@ Every key event supports prefixes **prefix/modifier**
   - the semantics differ by the type of the name:
     - `|(name)` on a macro name interrupts a started macro playback - it stops as soon as possible (normally in < 10 ms) and does not reset anything
     - `|(name)` on a sequence name resets the sequence counter only - the currently in-flight playback is not interrupted
-    - `|reset('name')` on a sequence name resets the counter; on a non-sequence name it prints "No Macro Sequence with name ... - reset failed" and does nothing else (it does not interrupt a macro)
+    - `|(reset('name'))` on a sequence name resets the counter; on a non-sequence name it prints "No Macro Sequence with name ... - reset failed" and does nothing else (it does not interrupt a macro)
     - an unknown name is a silent no-op (evaluates to True)
   - resetting of a sequence will let the next playback of the sequence start again on the first key group
 
 #### [General key control]
 
-- `|stop_all_repeat()` - will stop all active repeats
-- `|release_all_keys()` - will release all currently simulated keys that are pressed
+- `|(stop_all_repeat())` - will stop all active repeats
+- `|(release_all_keys())` - will release all currently simulated keys that are pressed
 
 #### [Function results in general]
 

@@ -56,6 +56,17 @@ class TestKeyExtraction:
         build(kb, rebinds=[['(r)', [['a'], 'e']]])
         assert len(kb._rebinds_dict) == 2
 
+    def test_suffix_constraint_needs_parentheses(self, kb_env_ns):
+        # U90 docs-vs-runtime pin (#270): extract_data_from_key int()s every
+        # bare suffix segment - the documented constraint form is parenthesized
+        # and stored as a string constraint, a bare state segment raises.
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['-a|(-shift)'], 'b']]])
+        trigger_ke = kb._rebind_triggers[0].get_key_events()[0]
+        assert trigger_ke.constraints == ['-shift']
+        with pytest.raises(Exception, match='invalid literal'):
+            build(kb, rebinds=[['(r)', [['-a|-shift'], 'b']]])
+
 
 class TestConfigExceptionPaths:
     def test_alias_referencing_unknown_alias_raises(self, kb_env_ns):

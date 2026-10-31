@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Earlier releases (v1.2.0 and below) are listed in the version history on the
 [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
 
+## [Unreleased]
+
+### Fixed
+- WIKI suffix-constraint syntax now matches the runtime: state constraints are
+  documented parenthesized (`ke1|(-ke2)`); bare suffix segments parse as delay
+  numbers, so the old bare `ke1|-ke2` example raised at config load.
+
 ## [1.3.0] - 2026-10-29
 
 ### Added
