@@ -13,7 +13,7 @@ from os import startfile
 from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro, ConfigError
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
-from fst_manager import Input_State_Manager, Config_Manager
+from fst_manager import Input_State_Manager, Config_Manager, Config_Validator
 from fst_manager import (logger, logger_flow, logger_state, logger_macro,
                          logger_config)
 from fst_manager import toggle_debug_level, toggle_flow
@@ -414,6 +414,12 @@ class FST_Keyboard():
 
     def update_focus_groups(self):
         self._focus_manager.update_groups_from_config(self._config_manager.load_config())
+        # validator warnings that do not block the load surface through the
+        # same user-facing channel (GUI toast / headless console print)
+        if self._config_manager.config_warnings:
+            self.surface_config_error(ConfigError(
+                Config_Validator.format_report(self._config_manager.config_warnings),
+                'config warnings'))
 
     def update_args_and_groups(self, focus_name = '', startup=True):
         self.release_all_currently_pressed_simulated_keys()
