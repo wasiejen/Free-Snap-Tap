@@ -102,6 +102,12 @@ def get_device_pixel_ratio(screen):
     
     
 
+# Eval-on-save debounce window (ms) - one editor save fires a burst of Qt
+# fileChanged events (save-via-rename), the burst coalesces into ONE reload
+# (P1 U290R). Keep above the burst spacing and below the human re-save cadence.
+CONFIG_RELOAD_DEBOUNCE_MS = 400
+
+
 class GUI_Manager(QWidget):
     def __init__(self, fst_keyboard, app):
         super().__init__()
@@ -138,13 +144,22 @@ class GUI_Manager(QWidget):
         self.overlay.signal_toggle_crosshair.connect(self.toggle_crosshair) 
 
         # eval-on-save: watch the config file. A save in the user's editor
-        # fires the watcher -> reload_from_file -> the validator pass runs at
-        # load (facade load_config); violations surface through the existing
+        # fires the watcher -> the coalesced reload -> the validator pass runs
+        # at load (facade load_config); violations surface through the existing
         # red/consolidated toast, a clean pass lands the green OK result
         # toast from the facade. Qt drops a watched path on Windows after a
-        # save-via-rename event, so the handler re-arms it.
+        # save-via-rename event, so the flush re-arms it.
         self.config_watcher = QFileSystemWatcher(self)
         self.config_watcher.fileChanged.connect(self._on_config_file_changed)
+        # P1 (U290R): Qt fires fileChanged MULTIPLE times per in-place editor
+        # save (rename-save event burst), so a direct reload in the handler
+        # runs a reload chain per save - group rebuilds, released-key side
+        # effects and result toasts per event. A single-shot debounce timer
+        # coalesces the burst of one save into exactly ONE reload; every
+        # event restarts the window, the flush re-arms the watch and reloads.
+        self._config_reload_timer = QTimer(self)
+        self._config_reload_timer.setSingleShot(True)
+        self._config_reload_timer.timeout.connect(self._flush_config_reload)
         self.watch_config_file()
         
         self.update_timer = QTimer()
@@ -246,8 +261,15 @@ class GUI_Manager(QWidget):
             self.config_watcher.addPath(path)
 
     def _on_config_file_changed(self, path):
-        # the watcher engine dropped the path after the save-via-rename
-        # event - re-arm it, then run the validator pass through the
+        # debounce: Qt emits fileChanged several times per in-place save and
+        # the watcher engine drops the path after the save-via-rename event.
+        # (Re)start the single-shot window on every event of the burst; the
+        # flush runs once, after the last event.
+        self._config_reload_timer.start(CONFIG_RELOAD_DEBOUNCE_MS)
+
+    def _flush_config_reload(self):
+        # the coalesced reload of ONE editor save: re-arm the watch (the
+        # engine dropped the path), then run the validator pass through the
         # existing reload wrapper (red toast on ConfigError)
         self.watch_config_file()
         self.reload_from_file()

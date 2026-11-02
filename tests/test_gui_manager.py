@@ -246,11 +246,18 @@ def test_start_starts_timer_and_event_loop(qtbot, fst, app_mock):
 class TestEvalOnSaveWatcher:
     """U290T(2): a config file save triggers the validator pass (facade
     reload -> load_config validates at load) and the result toast path.
-    The watcher lives on GUI_Manager: registration, the change handler's
-    re-arm + reload, and the signal->slot wiring are pinned
-    deterministically; the Qt watcher ENGINE's live event delivery is
-    platform timing (offscreen) - acceptance on the maintainer's
-    machine is pending-hardware."""
+    The watcher lives on GUI_Manager: registration, the change handler and
+    the signal->slot wiring are pinned deterministically; the Qt watcher
+    ENGINE's live event delivery is platform timing (offscreen) - acceptance
+    on the maintainer's machine is pending-hardware.
+
+    U290R(P1): Qt fires fileChanged MULTIPLE times per in-place editor save
+    (save-via-rename burst), so the direct reload used to chain one reload
+    per event - group rebuilds, released-key side effects, result-toast
+    spam per save. A single-shot debounce timer coalesces the burst of ONE
+    save into exactly ONE reload; the flush re-arms the watch (Windows drops
+    the path on a rename-save). The burst pins drive the watcher signal and
+    the flush directly; the live timer leg is pinned through qtbot.wait."""
 
     def make_config(self, tmp_path):
         cfg = tmp_path / 'FSTconfig_watch.txt'
@@ -276,22 +283,22 @@ class TestEvalOnSaveWatcher:
         qtbot.addWidget(m)
         assert m.config_watcher.files() == []
 
-    def test_change_handler_rearms_watch_and_reloads(self, qtbot, fst, app_mock, tmp_path):
+    def test_burst_of_events_coalesces_to_one_reload(self, qtbot, fst, app_mock, tmp_path):
         cfg = self.make_config(tmp_path)
         fst.config_manager.file_name = str(cfg)
         m = GUI_Manager(fst, app_mock)
         qtbot.addWidget(m)
         m.reload_from_file = MagicMock()
         path = os.path.abspath(str(cfg))
-        m.config_watcher.removePath(path)  # simulate the rename-save drop
 
-        m._on_config_file_changed(path)
+        for _ in range(3):  # the rename-save burst of ONE editor save
+            m.config_watcher.fileChanged.emit(path)
+        m._flush_config_reload()
 
-        assert path in m.config_watcher.files()  # re-armed
-        m.reload_from_file.assert_called_once()  # validator pass + result toast
+        m.reload_from_file.assert_called_once()  # ONE reload per save
+        assert path in m.config_watcher.files()
 
-    def test_fileChanged_signal_routes_to_slot(self, qtbot, fst, app_mock, tmp_path):
-        # the signal->slot wiring a live fileChanged event rides
+    def test_event_arms_single_shot_debounce(self, qtbot, fst, app_mock, tmp_path):
         cfg = self.make_config(tmp_path)
         fst.config_manager.file_name = str(cfg)
         m = GUI_Manager(fst, app_mock)
@@ -300,5 +307,38 @@ class TestEvalOnSaveWatcher:
 
         m.config_watcher.fileChanged.emit(os.path.abspath(str(cfg)))
 
+        assert m._config_reload_timer.isSingleShot() is True
+        assert m._config_reload_timer.isActive() is True
+        m.reload_from_file.assert_not_called()  # coalesced, not one per event
+        qtbot.wait(fst_overlay.CONFIG_RELOAD_DEBOUNCE_MS + 250)  # live leg
         m.reload_from_file.assert_called_once()
+        assert not m._config_reload_timer.isActive()
 
+    def test_debounce_flush_rearms_watch_and_reloads(self, qtbot, fst, app_mock, tmp_path):
+        cfg = self.make_config(tmp_path)
+        fst.config_manager.file_name = str(cfg)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        m.reload_from_file = MagicMock()
+        path = os.path.abspath(str(cfg))
+        m.config_watcher.removePath(path)  # simulate the rename-save drop
+
+        m._on_config_file_changed(path)  # the handler arms the debounce only
+        m._flush_config_reload()
+
+        assert path in m.config_watcher.files()  # the flush re-arms
+        m.reload_from_file.assert_called_once()  # validator pass + result toast
+
+    def test_fileChanged_signal_routes_to_flush(self, qtbot, fst, app_mock, tmp_path):
+        # the signal->slot wiring a live fileChanged event rides: the event
+        # arms the debounce, the timer flush runs the single reload
+        cfg = self.make_config(tmp_path)
+        fst.config_manager.file_name = str(cfg)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        m.reload_from_file = MagicMock()
+
+        m.config_watcher.fileChanged.emit(os.path.abspath(str(cfg)))
+        qtbot.wait(fst_overlay.CONFIG_RELOAD_DEBOUNCE_MS + 250)
+
+        m.reload_from_file.assert_called_once()
