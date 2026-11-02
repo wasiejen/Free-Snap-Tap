@@ -5,6 +5,7 @@ last updated: 250724-1434
 
 import sys
 import os
+import re
 from PySide6.QtWidgets import QWidget, QApplication, QMenu, QSystemTrayIcon, QLabel, QVBoxLayout, QFrame
 from PySide6.QtCore import QObject, Qt, qInstallMessageHandler, Signal, QTimer, QFileSystemWatcher
 from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont, QFontMetrics
@@ -750,11 +751,34 @@ class StatusOverlay(QWidget):
 # at window width). Keep this below the ToastManager fixed width (500).
 TOAST_TEXT_MAX_WIDTH = 480
 
+# Toast label font chain, single-sourced (U290R): the stylesheet chain below
+# resolves family by family, so the QFontMetrics that pre-wraps the text must
+# carry the SAME chain - a Consolas-only metrics font measured a font the
+# stylesheet can fall away from (no Consolas on the machine: the label renders
+# 'Courier New' / monospace at a different advance width, and the pre-wrapped
+# lines no longer matched the rendered text).
+TOAST_FONT_FAMILIES = ('Consolas', 'Courier New', 'monospace')
+TOAST_QSS_FONT_FAMILIES = ', '.join(f"'{family}'" for family in TOAST_FONT_FAMILIES)
+
+
+def toast_font(text_size):
+    '''the toast label font: bold at a pixel size, with the full family chain
+    of the stylesheet (mirrors TOAST_FONT_FAMILIES) so the wrap-time metrics
+    and the rendered text resolve to the same font'''
+    font = QFont()
+    font.setFamilies(list(TOAST_FONT_FAMILIES))
+    font.setPixelSize(text_size)
+    font.setBold(True)
+    return font
+
 
 def wrap_toast_text(text, max_width, font_metrics):
     '''greedy-fill word wrap at max_width pixels; a single word longer than
     the width is hard-broken, embedded newlines (paragraphs) are preserved
-    line by line'''
+    line by line, and a run of spaces INSIDE a line is kept (U290R: the
+    split-on-space token loop dropped the empty tokens between the words, so
+    "a  b" collapsed to "a b" on the wrap path only - the fits path returns
+    the paragraph verbatim, so the two paths diverged on whitespace)'''
     lines = []
     for paragraph in text.split('\n'):
         if font_metrics.horizontalAdvance(paragraph) <= max_width:
@@ -762,24 +786,38 @@ def wrap_toast_text(text, max_width, font_metrics):
             lines.append(paragraph)
             continue
         current = ''
-        for word in paragraph.split(' '):
-            if not word:
+        pending_space = ''
+        # the split keeps each space run as a token: fidelity for runs > 1
+        for token in re.split('( +)', paragraph):
+            if token == '':
+                continue  # split artifacts at the paragraph ends
+            if token[0] == ' ':
+                if current == '':
+                    # leading run: keep it (the fits path keeps leading spaces)
+                    current = token
+                    pending_space = ''
+                else:
+                    pending_space += token
                 continue
-            trial = f"{current} {word}" if current else word
-            if font_metrics.horizontalAdvance(trial) <= max_width:
-                current = trial
-            else:
+            if font_metrics.horizontalAdvance(
+                    current + pending_space + token) > max_width:
                 if current:
                     lines.append(current)
-                    current = ''
-                chunk = ''
-                for char in word:
-                    if font_metrics.horizontalAdvance(chunk + char) > max_width and chunk:
-                        lines.append(chunk)
-                        chunk = char
-                    else:
-                        chunk += char
-                current = chunk
+                current = ''
+                pending_space = ''  # the break consumes the separator run
+                if font_metrics.horizontalAdvance(token) > max_width:
+                    # over-long word: hard-break at the width
+                    chunk = ''
+                    for char in token:
+                        if font_metrics.horizontalAdvance(chunk + char) > max_width and chunk:
+                            lines.append(chunk)
+                            chunk = char
+                        else:
+                            chunk += char
+                    current = chunk
+                    continue
+            current += pending_space + token
+            pending_space = ''
         lines.append(current)
     return '\n'.join(lines)
 
@@ -807,7 +845,7 @@ class ToastWidget(QFrame):
             }}
             QLabel {{ 
                 background: {bg_color}; 
-                font-family: 'Consolas', 'Courier New', monospace; 
+                font-family: {TOAST_QSS_FONT_FAMILIES}; 
                 font-size: {text_size}px; 
                 font-weight: bold; 
             }}
@@ -820,17 +858,14 @@ class ToastWidget(QFrame):
 
 
         # Set the initial text, pre-wrapped near the manager box width (the
-        # self-drawn text was cut at the window width; the label font spec
-        # here mirrors the stylesheet font below so the metrics match)
-        font = QFont('Consolas')
-        font.setPixelSize(text_size)
-        font.setBold(True)
+        # self-drawn text was cut at the window width; the metrics font is
+        # toast_font - it mirrors the stylesheet chain above exactly)
         if self.use_timer_display:
             display_text = self.get_display_text()
         else:
             display_text = f" {text} "
         display_text = wrap_toast_text(display_text, TOAST_TEXT_MAX_WIDTH,
-                                       QFontMetrics(font))
+                                       QFontMetrics(toast_font(text_size)))
         self.label = QLabel(display_text)
         # insurance: QLabel word wrap + the fixed box width
         self.label.setWordWrap(True)
@@ -881,7 +916,7 @@ class ToastWidget(QFrame):
                     padding: 0px;
                 }}
                 QLabel {{ 
-                    font-family: 'Consolas'; 
+                    font-family: {TOAST_QSS_FONT_FAMILIES}; 
                     font-size: {self.text_size}px; 
                     font-weight: bold; 
                 }}

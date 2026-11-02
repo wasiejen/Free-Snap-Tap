@@ -11,8 +11,9 @@ exact pixel/font assumptions, the offscreen font is the fallback font.
 """
 from types import SimpleNamespace
 
-from fst_overlay import (TOAST_TEXT_MAX_WIDTH, ToastManager, ToastWidget,
-                         wrap_toast_text)
+from fst_overlay import (TOAST_FONT_FAMILIES, TOAST_QSS_FONT_FAMILIES,
+                         TOAST_TEXT_MAX_WIDTH, ToastManager, ToastWidget,
+                         toast_font, wrap_toast_text)
 
 
 class FakeMetrics:
@@ -32,6 +33,31 @@ def test_wrap_toast_text_pure_function():
     # greedy fill: the second word goes to a new line (61 chars > 60)
     assert wrap_toast_text('a' * 30 + ' ' + 'b' * 30, 480,
                            FakeMetrics()) == 'a' * 30 + '\n' + 'b' * 30
+
+
+def test_wrap_path_keeps_space_runs_like_fits_path():
+    # U290R: the wrap-path token loop split on single spaces and dropped the
+    # empty tokens, so "a  b" collapsed to "a b" while wrapping - the fits
+    # path returned the paragraph verbatim and the two paths diverged
+    text = 'a' * 10 + '  ' + 'b' * 10 + ' ' + 'c' * 40  # 63 chars > 60
+    out = wrap_toast_text(text, 480, FakeMetrics())
+    assert out == 'a' * 10 + '  ' + 'b' * 10 + '\n' + 'c' * 40
+    # a leading run survives on the wrap path too
+    assert wrap_toast_text('  ' + 'd' * 60, 480, FakeMetrics()).startswith('  ')
+
+
+def test_toast_font_mirrors_the_stylesheet_chain():
+    # U290R: the pre-wrap metrics used a Consolas-only QFont while the label
+    # stylesheet carries a fallback chain - on a machine without Consolas the
+    # measured width came from a font the text never rendered in
+    assert toast_font(12).families() == list(TOAST_FONT_FAMILIES)
+    assert toast_font(12).pixelSize() == 12
+    toast = ToastWidget('hi', 3, 12, 'rgba(40, 40, 40, 200)', 'white')
+    # the stylesheet chain is single-sourced from the metrics chain
+    assert TOAST_QSS_FONT_FAMILIES in toast.styleSheet()
+    assert "font-family: 'Consolas';" not in toast.styleSheet()
+    toast.master_timer.stop()
+    toast.deleteLater()
 
 
 def make_toast(qtbot, text, timer=0):
