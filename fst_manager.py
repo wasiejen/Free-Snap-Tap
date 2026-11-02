@@ -978,11 +978,18 @@ class Config_Validator():
         aliases_by_scope = self._aliases_by_scope
         self._suppress_scopes = set()
         for line_number, line in numbered_lines:
-            self._current_scope = scope
             if line.startswith('<focus>'):
-                self._check_focus_line(line_number, line)
+                # ruling A (maintainer 2026-11-03, TODO #300): the <focus>
+                # header line belongs to ITS OWN new section - take the scope
+                # from the header BEFORE recording its warnings, so the
+                # header's warnings land in the new section and that
+                # section's -no_warnings can suppress them (the previous
+                # section no longer leaks them)
                 scope = self._focus_scope_of(line)
+                self._current_scope = scope
+                self._check_focus_line(line_number, line)
                 continue
+            self._current_scope = scope
             if line.startswith('<arg>'):
                 self._check_arg_line(line_number, line, scope)
                 continue

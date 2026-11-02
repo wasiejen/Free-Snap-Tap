@@ -362,7 +362,10 @@ class TestCheckSuppressionAndDefaultAlwaysActiveArgs:
     """U290T(3): config-line options - validator accepts both new flags
     without an unknown-arg warning; -no_warnings drops the WARNING
     violations of its section (default scope counts as a section) and
-    never the ERROR severity; -default_always_active is a plain flag."""
+    never the ERROR severity; -default_always_active is a plain flag.
+    Ruling A (maintainer 2026-11-03, TODO #300): a <focus> header line
+    belongs to ITS OWN section, so a section flag suppresses its own
+    header warning."""
 
     def test_flags_accepted_without_unknown_arg_warning(self):
         content = ('<focus>Game\n'
@@ -371,26 +374,29 @@ class TestCheckSuppressionAndDefaultAlwaysActiveArgs:
         assert violations_of(content) == []
 
     def test_suppresses_warnings_in_default_scope(self):
-        content = '<arg>-no_warnings\n<focus>Half-Life\n'
+        content = '<arg>-no_warnings\n<arg>-bogus\n<focus>Game\n'
         assert warnings_of(content) == []
 
     def test_suppresses_warnings_in_its_section(self):
-        content = '<focus>Game\n<arg>-no_warnings\n<focus>Half-Life\n'
+        content = '<focus>Game-S\n<arg>-no_warnings\n'
         assert warnings_of(content) == []
 
     def test_other_sections_keep_their_warnings(self):
-        content = ('<focus>Game\n<arg>-no_warnings\n'
-                   '<focus>Other\n<focus>Half-Life\n')
+        # ruling A: each non-suppressed section keeps its OWN header
+        # warning; the suppressed section's flag drops its own header
+        # warning - so 2 warnings, in the header line's own scopes
+        content = ('<focus>Half-Life\n<focus>Game\n<arg>-no_warnings\n'
+                   '<focus>Other-S\n')
         warnings = warnings_of(content)
-        assert len(warnings) == 1
-        assert warnings[0].scope == 'Other'
+        assert len(warnings) == 2
+        assert {w.scope for w in warnings} == {'HalfLife', 'OtherS'}
 
     def test_errors_in_suppressed_section_stay(self):
         content = '<focus>Game\n<arg>-no_warnings\na, no_such_key\n'
         assert len(errors_of(content)) == 1
 
     def test_load_with_suppression_yields_no_stored_warnings(self, tmp_path):
-        path = write_config(tmp_path, '<arg>-no_warnings\n<focus>Half-Life\n')
+        path = write_config(tmp_path, '<arg>-no_warnings\n<focus>Game\n')
         cm = Config_Manager(path)
         cm.load_config()
         assert cm.config_warnings == []
