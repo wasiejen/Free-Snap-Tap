@@ -852,7 +852,7 @@ class Output_Manager():
 # ---------------------------------------------------------------------------
 
 Config_Violation = namedtuple('Config_Violation',
-                              'line item rule message severity')
+                               'line item rule message severity scope')
 
 
 # constraint-expression functions and their positional-argument arity
@@ -921,6 +921,7 @@ START_ARG_FLAGS = frozenset({
     '-flow', '-debug_numpad', '-nomenu', '-nocontrols', '-delay', '-crossover',
     '-nodelay', '-exec_one_macro', '-status_indicator', '-crosshair',
     '-always_active', '-tray_icon', '-hide_cmd_window',
+    '-no_warnings', '-default_always_active',
 })
 START_ARG_VALUES = frozenset({
     '-log', '-file', '-tapdelay', '-aliasdelay', '-macrodelay', '-crossover',
@@ -965,29 +966,43 @@ class Config_Validator():
         self._count_rebind = 1
         self._count_macro = 1
         self._count_sequence = 1
+        # scope of the line currently checked (violations record it) and the
+        # focus sections carrying the -no_warnings check-suppression arg
+        self._current_scope = ''
+        self._suppress_scopes = set()
 
     def validate(self, numbered_lines):
         '''numbered_lines: list of (line_number, cleaned_line) tuples'''
         self._collect_alias_definitions(numbered_lines)
         scope = ''
         aliases_by_scope = self._aliases_by_scope
+        self._suppress_scopes = set()
         for line_number, line in numbered_lines:
+            self._current_scope = scope
             if line.startswith('<focus>'):
                 self._check_focus_line(line_number, line)
                 scope = self._focus_scope_of(line)
                 continue
             if line.startswith('<arg>'):
-                self._check_arg_line(line_number, line)
+                self._check_arg_line(line_number, line, scope)
                 continue
             self._check_group_line(line_number, line, scope,
                                    aliases_by_scope.get(scope, set()))
+        # check-suppression (-no_warnings): drop WARNING violations of the
+        # suppressed sections (the default scope '' counts as a section);
+        # ERROR severity is never suppressed
+        if self._suppress_scopes:
+            self.violations = [v for v in self.violations
+                               if not (v.severity == self.WARNING
+                                       and v.scope in self._suppress_scopes)]
         return self.violations
 
     # -- reporting helpers ---------------------------------------------------
 
     def _add(self, line_number, item, rule, message, severity):
         self.violations.append(
-            Config_Violation(line_number, item, rule, message, severity))
+            Config_Violation(line_number, item, rule, message, severity,
+                             self._current_scope))
 
     def _error(self, line_number, item, rule, message):
         self._add(line_number, item, rule, message, self.ERROR)
@@ -1046,7 +1061,7 @@ class Config_Validator():
                        f'invalid focus-name characters removed: {name!r} -> {stripped!r} '
                        f'(removed: {removed!r})')
 
-    def _check_arg_line(self, line_number, line):
+    def _check_arg_line(self, line_number, line, scope):
         arg = line.replace('<arg>', '').strip().lower()
         if not arg or arg[0] in (':', '#'):
             return
@@ -1055,6 +1070,12 @@ class Config_Validator():
                        f'start argument {arg!r} must start with "-"')
             return
         name, _, value = arg.partition('=')
+        if name == '-no_warnings':
+            # check-suppression arg (maintainer observation 1): warnings of
+            # this section are dropped from the report; the section carries
+            # the flag - a bare <arg>-no_warnings in the default scope
+            # suppresses the default group's warnings
+            self._suppress_scopes.add(scope)
         has_value = value != ''
         if has_value:
             if name in START_ARG_VALUES:
@@ -2010,6 +2031,16 @@ class Argument_Manager():
                     print("invalid crosshair delta - needs to be two numbers, e.g. -crosshair=5,-10")
             elif arg[:14] == "-always_active":
                 self.ALWAYS_ACTIVE = True
+            elif arg == "-no_warnings":
+                # consumed by the config validator (per-scope warning
+                # suppression, U290T) - nothing to do at runtime
+                pass
+            elif arg == "-default_always_active":
+                # focus-section arg: the default groups stay active whenever
+                # this group's args are applied (ALWAYS_ACTIVE resets on
+                # every focus change, reset_global_variable_changes)
+                self.ALWAYS_ACTIVE = True
+                print(f"set default always active to: {self.ALWAYS_ACTIVE}")
             elif arg[:10] == "-tray_icon":
                 self.TRAY_ICON = True
             elif arg[:16] == "-hide_cmd_window":

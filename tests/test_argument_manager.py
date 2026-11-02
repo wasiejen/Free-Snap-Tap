@@ -123,6 +123,22 @@ def test_unknown_argument_logs_warning(am_env, caplog):
     assert any(record.levelno == logging.WARNING for record in caplog.records)
 
 
+def test_default_always_active_sets_always_active(am_env):
+    # U290T focus-section arg: default groups stay active with this group
+    am_env.am.apply_start_arguments(['-default_always_active'])
+    assert am_env.am.ALWAYS_ACTIVE is True
+    am_env.am.reset_global_variable_changes()
+    assert am_env.am.ALWAYS_ACTIVE is False  # resets on focus change
+
+
+def test_no_warnings_runtime_is_noop(am_env, caplog):
+    # U290T: the check-suppression arg is consumed by the validator; the
+    # runtime apply accepts it silently (no unknown-argument warning)
+    am_env.am.apply_start_arguments(['-no_warnings'])
+    assert am_env.am.ALWAYS_ACTIVE is False
+    assert 'unknown start argument' not in caplog.text
+
+
 def test_multiple_arguments_applied_in_order(am_env):
     am_env.am.apply_start_arguments(['-tapdelay=8,2', '-crossover=40', '-nomenu'])
     assert am_env.am.ACT_MIN_DELAY_IN_MS == 2

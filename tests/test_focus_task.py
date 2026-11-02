@@ -32,6 +32,7 @@ def make_fst(focus_names=(), always_active=False, win32_paused=False,
         ),
         update_args_and_groups=MagicMock(),
         cli_menu=MagicMock(),
+        toast_group_activated=MagicMock(),
     )
 
 
@@ -189,6 +190,32 @@ async def test_always_active_uses_default_groups(monkeypatch):
     fst.update_args_and_groups.assert_called_once_with()
     fst.cli_menu.display_default_active.assert_called_once_with()
     assert fst.arg_manager.WIN32_FILTER_PAUSED is False
+    fst.toast_group_activated.assert_called_once_with('default groups')
+
+
+@pytest.mark.asyncio
+async def test_activation_toast_names_the_group(monkeypatch):
+    # U290T: activation of a focus group toasts its name (maintainer 8+9)
+    fst = make_fst(focus_names=['CS2'], win32_paused=True)
+    fake_windows(monkeypatch, ['CS2 2024'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    fst.toast_group_activated.assert_called_once_with('CS2')
+
+
+@pytest.mark.asyncio
+async def test_activation_toast_not_repeated_for_same_group(monkeypatch):
+    fst = make_fst(focus_names=['CS2'])
+    fake_windows(monkeypatch, ['CS2 A', 'CS2 B'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=4)
+
+    await task.run()
+
+    fst.toast_group_activated.assert_called_once_with('CS2')  # one activation
 
 
 @pytest.mark.asyncio

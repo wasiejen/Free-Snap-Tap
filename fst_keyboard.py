@@ -162,6 +162,23 @@ class FST_Keyboard():
         else:
             print(f"[FST] {error}")
 
+    def surface_config_ok(self):
+        '''clean validator pass result: one green OK toast in GUI mode,
+        console line in headless mode (compliance toast, U290T)'''
+        if self.toast_callback is not None:
+            self.toast_callback("[FST] config OK - reload valid", 3, 12,
+                                "rgba(40, 150, 40, 200)", "white")
+        else:
+            print("[FST] config OK - reload valid")
+
+    def toast_group_activated(self, group_name):
+        '''activation toast naming the focus group that just became active
+        (U290T, maintainer items 8+9); GUI mode only - the headless focus
+        flow already prints through the CLI menu displays'''
+        if self.toast_callback is not None:
+            self.toast_callback(f"[FST] focus group active: {group_name}",
+                                3, 12, "rgba(40, 150, 40, 200)", "white")
+
     def initialize_groups_from_presorted_lines(self):
         '''
         in new form there are rebinds and macros
@@ -1151,3 +1168,8 @@ class FST_Keyboard():
         self.update_args_and_groups(self._focus_manager.FOCUS_APP_NAME)
         self._cli_menu.update_group_display()
         print(f'\n>>> file reloaded for focus app: {self._focus_manager.FOCUS_APP_NAME}\n')
+        # compliance result (U290T): the validator ran at load; warnings, if
+        # any, were already surfaced by update_focus_groups - a clean pass
+        # gets the single green OK toast (errors raised before this point)
+        if not self._config_manager.config_warnings:
+            self.surface_config_ok()

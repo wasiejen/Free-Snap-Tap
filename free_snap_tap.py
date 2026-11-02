@@ -181,6 +181,12 @@ if __name__ == "__main__":
         fst_keyboard.remove_callback = bridge.trigger_remove
         fst_keyboard.remove_all_callback = bridge.trigger_remove_all
 
+        # startup compliance toast (U290T): the validator ran at the startup
+        # load; warnings were surfaced on the console there, a clean pass
+        # gets the single green OK toast now the toast bridge is wired
+        if not fst_keyboard.config_manager.config_warnings:
+            fst_keyboard.surface_config_ok()
+
         if fst_keyboard.arg_manager.TRAY_ICON:
             gui_manager.tray_icon.show()
 

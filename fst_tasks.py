@@ -110,6 +110,8 @@ class Focus_Task:
                                 self._fst.cli_menu.update_group_display()
                                 self._fst.cli_menu.display_focus_found(active_window)
                                 self._fst.arg_manager.WIN32_FILTER_PAUSED = False
+                                # activation toast names the group (U290T)
+                                self._fst.toast_group_activated(focus_name)
                             except Exception as error:
                                 print('--- reloading of groups files failed - not resumed, still paused ---')
                                 print(f" -> aborted reloading due to: {error}")
@@ -125,6 +127,8 @@ class Focus_Task:
                                     self._fst.cli_menu.update_group_display()
                                     self._fst.cli_menu.display_default_active()
                                     self._fst.arg_manager.WIN32_FILTER_PAUSED = False
+                                    # default groups activated (U290T)
+                                    self._fst.toast_group_activated('default groups')
                             else:
                                 if self._fst.arg_manager.WIN32_FILTER_PAUSED:
                                     print(f"> Active Window: {active_window}")

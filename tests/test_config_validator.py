@@ -298,3 +298,73 @@ class TestReloadWiring:
         kb.reload_from_file()
         kb.toast_callback.assert_called_once()
         assert 'warning' in kb.toast_callback.call_args.args[0]
+
+
+class TestComplianceResultToast:
+    """U290T(3): a reload of a clean config emits exactly one green OK
+    toast; the warnings-only reload keeps its single report toast."""
+
+    def test_reload_clean_config_emits_ok_toast(self, kb_env_ns, tmp_path):
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.toast_callback = MagicMock()
+        kb.config_manager.file_name = write_config(tmp_path, 'a, d\n')
+        kb.reload_from_file()
+        kb.toast_callback.assert_called_once_with(
+            "[FST] config OK - reload valid", 3, 12,
+            "rgba(40, 150, 40, 200)", "white")
+
+    def test_reload_clean_config_ok_on_console(self, kb_env_ns, tmp_path, capsys):
+        kb = kb_env_ns.kb
+        assert kb.toast_callback is None
+        kb.config_manager.file_name = write_config(tmp_path, 'a, d\n')
+        kb.reload_from_file()
+        out = capsys.readouterr().out
+        assert 'config OK' in out
+
+    def test_warnings_only_reload_keeps_single_toast(self, kb_env_ns, tmp_path):
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.toast_callback = MagicMock()
+        kb.config_manager.file_name = write_config(tmp_path, '<focus>Half-Life\n')
+        kb.reload_from_file()
+        # the warning report toast is THE result toast - no OK on warnings
+        kb.toast_callback.assert_called_once()
+
+
+class TestCheckSuppressionAndDefaultAlwaysActiveArgs:
+    """U290T(3): config-line options - validator accepts both new flags
+    without an unknown-arg warning; -no_warnings drops the WARNING
+    violations of its section (default scope counts as a section) and
+    never the ERROR severity; -default_always_active is a plain flag."""
+
+    def test_flags_accepted_without_unknown_arg_warning(self):
+        content = ('<focus>Game\n'
+                   '<arg>-no_warnings\n'
+                   '<arg>-default_always_active\n')
+        assert violations_of(content) == []
+
+    def test_suppresses_warnings_in_default_scope(self):
+        content = '<arg>-no_warnings\n<focus>Half-Life\n'
+        assert warnings_of(content) == []
+
+    def test_suppresses_warnings_in_its_section(self):
+        content = '<focus>Game\n<arg>-no_warnings\n<focus>Half-Life\n'
+        assert warnings_of(content) == []
+
+    def test_other_sections_keep_their_warnings(self):
+        content = ('<focus>Game\n<arg>-no_warnings\n'
+                   '<focus>Other\n<focus>Half-Life\n')
+        warnings = warnings_of(content)
+        assert len(warnings) == 1
+        assert warnings[0].scope == 'Other'
+
+    def test_errors_in_suppressed_section_stay(self):
+        content = '<focus>Game\n<arg>-no_warnings\na, no_such_key\n'
+        assert len(errors_of(content)) == 1
+
+    def test_load_with_suppression_yields_no_stored_warnings(self, tmp_path):
+        path = write_config(tmp_path, '<arg>-no_warnings\n<focus>Half-Life\n')
+        cm = Config_Manager(path)
+        cm.load_config()
+        assert cm.config_warnings == []
