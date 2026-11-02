@@ -899,6 +899,11 @@ CONSTRAINT_BUILTINS = frozenset({
     'zip', 'print',
 })
 
+# module roots whose dotted attribute chains resolve inside eval() of a
+# constraint expression (imported at the top of this module, so the module
+# globals hold them) - their attributes are NOT checked as unknown functions
+CONSTRAINT_MODULES = frozenset({'datetime'})
+
 # invocations whose first string argument is an alias <name> reference
 ALIAS_ARG_FUNCTIONS = ('start_repeat', 'stop_repeat', 'toggle_repeat',
                        'is_repeat_active', 'reset_repeat')
@@ -1257,6 +1262,22 @@ class Config_Validator():
             self._error(line_number, item, 'constraint',
                         f'constraint {segment!r} needs to be a delay number or "(...)"')
 
+    @staticmethod
+    def _module_root_of(func):
+        '''root module name of a dotted call chain, crossing calls on the way:
+        datetime.datetime.now().strftime -> 'datetime' (a chain not rooted at a
+        module name - a helper-call result, a subscript - yields '')'''
+        node = func
+        while True:
+            if isinstance(node, ast.Attribute):
+                node = node.value
+            elif isinstance(node, ast.Call) and isinstance(
+                    node.func, (ast.Name, ast.Attribute)):
+                node = node.func
+            else:
+                break
+        return node.id if isinstance(node, ast.Name) else ''
+
     def _check_constraint_expression(self, line_number, item, expression, aliases):
         '''structural pass over one "(...)" constraint - no evaluation'''
         if expression in ('', '!', 'True', 'False', 'None'):
@@ -1273,6 +1294,8 @@ class Config_Validator():
             if isinstance(node.func, ast.Name):
                 name = node.func.id
             elif isinstance(node.func, ast.Attribute):
+                if self._module_root_of(node.func) in CONSTRAINT_MODULES:
+                    continue
                 name = node.func.attr
             else:
                 continue

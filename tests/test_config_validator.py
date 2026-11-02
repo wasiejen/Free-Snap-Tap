@@ -218,6 +218,13 @@ class TestConstraintRule:
                    '(o) -e :: f|()|(!)|(False)\n')
         assert errors_of(content) == []
 
+    def test_datetime_attribute_chain_is_accepted(self):
+        # the maintainer's date line (feedback_fst-observations 2026-11-02):
+        # the datetime.* chain is whitelisted, no unknown-function warning
+        content = '(m) -x :: b|(write(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M")))\n'
+        assert violations_of(content) == []
+        assert 'strftime' not in str(violations_of(content))
+
 
 class TestDroppedLineRule:
     def test_line_with_non_empty_middle_group_is_reported(self):
