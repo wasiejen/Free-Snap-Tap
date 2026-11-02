@@ -911,6 +911,11 @@ ALIAS_ARG_FUNCTIONS = ('start_repeat', 'stop_repeat', 'toggle_repeat',
 # key-string prefixes carrying a press/release/toggle meaning
 KEY_MODIFIER_PREFIXES = '-+!^'
 
+# focus-name sanitizer rule: letters, numbers, spaces, "_", "." and "," keep,
+# everything else is stripped - one pattern for the runtime strip
+# (Config_Manager) and the validator mirror, so the warning can name them
+FOCUS_NAME_ILLEGAL = r'[^a-zA-Z0-9,_. ]'
+
 # start arguments: valueless switches and value-taking arguments
 START_ARG_FLAGS = frozenset({
     '-flow', '-debug_numpad', '-nomenu', '-nocontrols', '-delay', '-crossover',
@@ -1024,20 +1029,22 @@ class Config_Validator():
     @staticmethod
     def _focus_scope_of(line):
         cleaned = line.replace('<focus>', '')
-        return re.sub(r'[^a-zA-Z0-9,_. ]', '', cleaned).split(',')[0].strip()
+        return re.sub(FOCUS_NAME_ILLEGAL, '', cleaned).split(',')[0].strip()
 
     # -- focus and argument lines --------------------------------------------
 
     def _check_focus_line(self, line_number, line):
         name = line.replace('<focus>', '')
-        stripped = re.sub(r'[^a-zA-Z0-9,_. ]', '', name)
+        stripped = re.sub(FOCUS_NAME_ILLEGAL, '', name)
         if not stripped.strip(', ').strip():
             self._error(line_number, '(focus)', 'focus',
                         'empty focus name - add the window name after <focus>')
             return
         if stripped != name:
+            removed = ''.join(sorted(set(re.findall(FOCUS_NAME_ILLEGAL, name))))
             self._warn(line_number, '(focus)', 'focus',
-                       f'invalid focus-name characters removed: {name!r} -> {stripped!r}')
+                       f'invalid focus-name characters removed: {name!r} -> {stripped!r} '
+                       f'(removed: {removed!r})')
 
     def _check_arg_line(self, line_number, line):
         arg = line.replace('<arg>', '').strip().lower()
@@ -1477,7 +1484,7 @@ class Config_Manager():
             if line.startswith('<focus>'):
                 focus_name = line.replace('<focus>', '')
                 # #only allow letters, numbers and spaces in focus_name
-                focus_name = re.sub(r'[^a-zA-Z0-9,_. ]', '', focus_name)
+                focus_name = re.sub(FOCUS_NAME_ILLEGAL, '', focus_name)
 
                 ##260426-1851 allow multiple focus groups seperated by comma
                 focus_group_names = focus_name.split(',')

@@ -144,6 +144,10 @@ class TestFocusRule:
         assert len(violations) == 1
         assert violations[0].rule == 'focus'
         assert 'Half-Life' in violations[0].message
+        # the warning names the removed character
+        assert "(removed: '-')" in violations[0].message
+        multi = warnings_of('<focus>Foo*Bar?Baz\n')
+        assert "(removed: '*?')" in multi[0].message
 
 
 class TestArgRule:
