@@ -4,8 +4,9 @@ last updated: 250724-1434
 '''
 
 import sys
+import os
 from PySide6.QtWidgets import QWidget, QApplication, QMenu, QSystemTrayIcon, QLabel, QVBoxLayout, QFrame
-from PySide6.QtCore import QObject, Qt, qInstallMessageHandler, Signal, QTimer
+from PySide6.QtCore import QObject, Qt, qInstallMessageHandler, Signal, QTimer, QFileSystemWatcher
 from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont, QFontMetrics
 
 import ctypes
@@ -136,6 +137,16 @@ class GUI_Manager(QWidget):
         self.tray_icon.signal_toggle_crosshair.connect(self.toggle_crosshair) 
         self.overlay.signal_toggle_crosshair.connect(self.toggle_crosshair) 
 
+        # eval-on-save: watch the config file. A save in the user's editor
+        # fires the watcher -> reload_from_file -> the validator pass runs at
+        # load (facade load_config); violations surface through the existing
+        # red/consolidated toast, a clean pass lands the green OK result
+        # toast from the facade. Qt drops a watched path on Windows after a
+        # save-via-rename event, so the handler re-arms it.
+        self.config_watcher = QFileSystemWatcher(self)
+        self.config_watcher.fileChanged.connect(self._on_config_file_changed)
+        self.watch_config_file()
+        
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.perform_periodic_update)
         
@@ -223,6 +234,23 @@ class GUI_Manager(QWidget):
             self._fst.reload_from_file()
         except ConfigError as error:
             self._fst.toast_callback(str(error), 5, 12, "rgba(200, 40, 40, 200)", "white")
+
+    def watch_config_file(self):
+        '''(re-)arm the file watch on the config file; a not-yet-existing
+        file (created at first load) has nothing to watch'''
+        file_name = self._fst.config_manager.file_name
+        if not file_name:
+            return
+        path = os.path.abspath(file_name)
+        if os.path.exists(path) and path not in self.config_watcher.files():
+            self.config_watcher.addPath(path)
+
+    def _on_config_file_changed(self, path):
+        # the watcher engine dropped the path after the save-via-rename
+        # event - re-arm it, then run the validator pass through the
+        # existing reload wrapper (red toast on ConfigError)
+        self.watch_config_file()
+        self.reload_from_file()
 
     def toggle_pause(self):
         try:

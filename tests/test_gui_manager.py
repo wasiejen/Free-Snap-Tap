@@ -1,8 +1,11 @@
 """GUI_Manager unit tests (offscreen): construction with a stand-in fst
 (doubles as an integration check of its four children), perform_periodic_update
 called DIRECTLY (update_timer is never started), color logic and tray/overlay
-sync, signal wiring, delegation methods, exit_program and start with a
-mocked QApplication (app.exec() is mocked, the real loop is never entered)."""
+sync, signal wiring, delegation methods, eval-on-save config watcher
+(U290T: file save -> validator pass + result toast via the facade reload),
+exit_program and start with a mocked QApplication (app.exec() is mocked,
+the real loop is never entered)."""
+import os
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -25,6 +28,7 @@ def fst():
             STATUS_INDICATOR_SIZE=10,
         ),
         focus_manager=SimpleNamespace(FOCUS_APP_NAME=''),
+        config_manager=SimpleNamespace(file_name=''),
         open_config_file=MagicMock(),
         reload_from_file=MagicMock(),
         control_toggle_pause=MagicMock(),
@@ -237,3 +241,63 @@ def test_start_starts_timer_and_event_loop(qtbot, fst, app_mock):
     assert m.update_timer.isActive()
     app_mock.exec.assert_called_once()
     m.update_timer.stop()
+
+
+class TestEvalOnSaveWatcher:
+    """U290T(2): a config file save triggers the validator pass (facade
+    reload -> load_config validates at load) and the result toast path.
+    The watcher lives on GUI_Manager; the live-save test drives the Qt
+    watcher engine (offscreen: the engine polls file changes - generous
+    timeout, no real listeners involved)."""
+
+    def make_config(self, tmp_path):
+        cfg = tmp_path / 'FSTconfig_watch.txt'
+        cfg.write_text('a, b\n', encoding='utf-8')
+        return cfg
+
+    def test_config_file_watched_at_startup(self, qtbot, fst, app_mock, tmp_path):
+        cfg = self.make_config(tmp_path)
+        fst.config_manager.file_name = str(cfg)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+
+        assert os.path.abspath(str(cfg)) in m.config_watcher.files()
+
+    def test_empty_file_name_watches_nothing(self, qtbot, fst, app_mock):
+        m = GUI_Manager(fst, app_mock)  # fixture: file_name '' (no config set)
+        qtbot.addWidget(m)
+        assert m.config_watcher.files() == []
+
+    def test_missing_file_watches_nothing(self, qtbot, fst, app_mock, tmp_path):
+        fst.config_manager.file_name = str(tmp_path / 'not_created_yet.txt')
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        assert m.config_watcher.files() == []
+
+    def test_change_handler_rearms_watch_and_reloads(self, qtbot, fst, app_mock, tmp_path):
+        cfg = self.make_config(tmp_path)
+        fst.config_manager.file_name = str(cfg)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        m.reload_from_file = MagicMock()
+        path = os.path.abspath(str(cfg))
+        m.config_watcher.removePath(path)  # simulate the rename-save drop
+
+        m._on_config_file_changed(path)
+
+        assert path in m.config_watcher.files()  # re-armed
+        m.reload_from_file.assert_called_once()  # validator pass + result toast
+
+    def test_live_save_fires_reload(self, qtbot, fst, app_mock, tmp_path):
+        cfg = self.make_config(tmp_path)
+        fst.config_manager.file_name = str(cfg)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        calls = []
+        m.reload_from_file = lambda: calls.append(True)
+
+        cfg.write_text('a, b, c\n', encoding='utf-8')  # a save in the editor
+        qtbot.waitUntil(lambda: len(calls) > 0, timeout=5000)
+
+        assert len(calls) == 1
+
