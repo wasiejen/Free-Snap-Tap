@@ -342,3 +342,38 @@ class TestEvalOnSaveWatcher:
         qtbot.wait(fst_overlay.CONFIG_RELOAD_DEBOUNCE_MS + 250)
 
         m.reload_from_file.assert_called_once()
+
+    def test_delete_event_skips_reload_and_keeps_file_gone(self, qtbot, fst, app_mock, tmp_path):
+        # U290R: a watcher event of a DELETED config must not reload - the
+        # facade load_config recreates the default template on
+        # FileNotFoundError, which silently wiped the user's setup
+        cfg = self.make_config(tmp_path)
+        fst.config_manager.file_name = str(cfg)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        m.reload_from_file = MagicMock()
+        path = os.path.abspath(str(cfg))
+        cfg.unlink()  # the user removed the config file
+
+        m._on_config_file_changed(path)
+        m._flush_config_reload()
+
+        m.reload_from_file.assert_not_called()
+        assert not cfg.exists()  # no default-template rewrite
+        # (the watcher engine's own drop of the deleted path is live-event
+        # platform timing - the re-arm attempt above is a no-op while gone)
+
+    def test_watch_arms_when_config_created_after_construction(self, qtbot, fst, app_mock, tmp_path):
+        # U290R: construction with a missing config file left the watcher
+        # empty and eval-on-save dead; the periodic-update hook arms the
+        # watch once the first-run config is created
+        late = tmp_path / 'FSTconfig_late.txt'
+        fst.config_manager.file_name = str(late)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        assert m.config_watcher.files() == []
+
+        late.write_text('a, b\n', encoding='utf-8')  # the created config
+        m.perform_periodic_update()
+
+        assert os.path.abspath(str(late)) in m.config_watcher.files()

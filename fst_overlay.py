@@ -189,7 +189,10 @@ class GUI_Manager(QWidget):
         self.update_timer.start(500)
         
     def perform_periodic_update(self):
-               
+        # arm-on-create: a config file created after construction (first-run
+        # template write) has no watch until this hook arms it
+        self.ensure_config_watch()
+
         if self.status != self._fst.arg_manager.STATUS_INDICATOR:
             self.status = self._fst.arg_manager.STATUS_INDICATOR
             if self.status:
@@ -260,6 +263,18 @@ class GUI_Manager(QWidget):
         if os.path.exists(path) and path not in self.config_watcher.files():
             self.config_watcher.addPath(path)
 
+    def ensure_config_watch(self):
+        '''arm-on-create hook (U290R): the startup arm only sees a config
+        file that already exists - a first-run config is created AFTER the
+        GUI is built, which left eval-on-save dead. The periodic update runs
+        this hook; it is a no-op (no stat) while a path is already watched'''
+        if not self.config_watcher.files():
+            self.watch_config_file()
+
+    def _config_file_present(self):
+        file_name = self._fst.config_manager.file_name
+        return bool(file_name) and os.path.exists(os.path.abspath(file_name))
+
     def _on_config_file_changed(self, path):
         # debounce: Qt emits fileChanged several times per in-place save and
         # the watcher engine drops the path after the save-via-rename event.
@@ -272,6 +287,15 @@ class GUI_Manager(QWidget):
         # engine dropped the path), then run the validator pass through the
         # existing reload wrapper (red toast on ConfigError)
         self.watch_config_file()
+        if not self._config_file_present():
+            # the event came from a DELETED config (editor temp cleanup, user
+            # removed the file): the reload would hit the load_config
+            # FileNotFoundError branch and silently recreate the default
+            # template, wiping the user's setup - surface the event instead,
+            # the next save re-arms and reloads through the hook
+            logger.warning("config file deleted - reload skipped "
+                           "(no default-template rewrite)")
+            return
         self.reload_from_file()
 
     def toggle_pause(self):
