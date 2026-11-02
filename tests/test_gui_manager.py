@@ -35,6 +35,7 @@ def fst():
         control_return_to_menu=MagicMock(),
         control_exit_program=MagicMock(),
         display_internal_repr_groups=MagicMock(),
+        toast_callback=MagicMock(),
     )
 
 
@@ -360,6 +361,8 @@ class TestEvalOnSaveWatcher:
 
         m.reload_from_file.assert_not_called()
         assert not cfg.exists()  # no default-template rewrite
+        fst.toast_callback.assert_called_once()  # the event surfaces visibly
+        assert 'config file deleted' in fst.toast_callback.call_args.args[0]
         # (the watcher engine's own drop of the deleted path is live-event
         # platform timing - the re-arm attempt above is a no-op while gone)
 

@@ -292,10 +292,14 @@ class GUI_Manager(QWidget):
             # the event came from a DELETED config (editor temp cleanup, user
             # removed the file): the reload would hit the load_config
             # FileNotFoundError branch and silently recreate the default
-            # template, wiping the user's setup - surface the event instead,
-            # the next save re-arms and reloads through the hook
+            # template, wiping the user's setup - the event surfaces through
+            # the standard red toast (GUI mode hides the console, the log
+            # line alone is invisible there), the next save re-arms and
+            # reloads through the arm-on-create hook
             logger.warning("config file deleted - reload skipped "
                            "(no default-template rewrite)")
+            self._fst.toast_callback("[FST] config file deleted - reload skipped",
+                                     5, 12, "rgba(200, 40, 40, 200)", "white")
             return
         self.reload_from_file()
 
@@ -775,10 +779,11 @@ def toast_font(text_size):
 def wrap_toast_text(text, max_width, font_metrics):
     '''greedy-fill word wrap at max_width pixels; a single word longer than
     the width is hard-broken, embedded newlines (paragraphs) are preserved
-    line by line, and a run of spaces INSIDE a line is kept (U290R: the
-    split-on-space token loop dropped the empty tokens between the words, so
-    "a  b" collapsed to "a b" on the wrap path only - the fits path returns
-    the paragraph verbatim, so the two paths diverged on whitespace)'''
+    line by line. Whitespace fidelity (U290R): the fits path returns the
+    paragraph verbatim, so the wrap path keeps a space run of any length (the
+    old split-on-space token loop dropped the empty tokens and collapsed
+    "a  b" to "a b"), keeps a leading/trailing run, consumes only the run
+    that causes a break, and emits no whitespace-only line'''
     lines = []
     for paragraph in text.split('\n'):
         if font_metrics.horizontalAdvance(paragraph) <= max_width:
@@ -801,8 +806,10 @@ def wrap_toast_text(text, max_width, font_metrics):
                 continue
             if font_metrics.horizontalAdvance(
                     current + pending_space + token) > max_width:
-                if current:
+                if current.strip():
                     lines.append(current)
+                # a spaces-only leading run is dropped with the break - a
+                # whitespace-only line renders as a blank line in the toast
                 current = ''
                 pending_space = ''  # the break consumes the separator run
                 if font_metrics.horizontalAdvance(token) > max_width:
@@ -818,7 +825,10 @@ def wrap_toast_text(text, max_width, font_metrics):
                     continue
             current += pending_space + token
             pending_space = ''
-        lines.append(current)
+        # the paragraph's trailing space run stays on the last line: the fits
+        # path keeps trailing whitespace verbatim, so only the run that causes
+        # a break is consumed (U290R fidelity)
+        lines.append(current + pending_space)
     return '\n'.join(lines)
 
 

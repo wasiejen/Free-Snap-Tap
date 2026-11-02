@@ -42,8 +42,16 @@ def test_wrap_path_keeps_space_runs_like_fits_path():
     text = 'a' * 10 + '  ' + 'b' * 10 + ' ' + 'c' * 40  # 63 chars > 60
     out = wrap_toast_text(text, 480, FakeMetrics())
     assert out == 'a' * 10 + '  ' + 'b' * 10 + '\n' + 'c' * 40
-    # a leading run survives on the wrap path too
-    assert wrap_toast_text('  ' + 'd' * 60, 480, FakeMetrics()).startswith('  ')
+    # a leading run that JOINS the first word is kept (no standalone line)
+    assert wrap_toast_text('  ' + 'd' * 58 + ' x', 480, FakeMetrics()).startswith('  ')
+    # a leading run that cannot join is dropped at the break: a
+    # whitespace-only line would render as a blank line in the toast (P2)
+    lines = wrap_toast_text('  ' + 'x' * 70, 60, FakeMetrics()).split('\n')
+    assert all(line.strip() for line in lines)
+    # a trailing run stays on the last line (only the run that causes a break
+    # is consumed - the fits path keeps trailing whitespace verbatim)
+    assert wrap_toast_text('word ' + 'x' * 40 + ' ', 60,
+                           FakeMetrics()).endswith(' ')
 
 
 def test_toast_font_mirrors_the_stylesheet_chain():
