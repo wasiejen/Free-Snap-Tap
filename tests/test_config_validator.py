@@ -69,6 +69,10 @@ class TestArityRule:
         violations = warnings_of('q\n')
         assert len(violations) == 1
         assert violations[0].rule == 'arity'
+        assert '2 or more keys' in violations[0].message
+        # the config line reference (the report prefix "line N" carries it)
+        assert violations[0].line == 1
+        assert warnings_of('<focus>G\nq\n')[0].line == 2
 
     def test_macro_sequence_needing_two_key_groups_is_error(self):
         assert errors_of('(seq) x :: : a\n') == []  # empty middle group: valid macro
