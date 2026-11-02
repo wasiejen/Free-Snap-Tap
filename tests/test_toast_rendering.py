@@ -52,6 +52,12 @@ def test_wrap_path_keeps_space_runs_like_fits_path():
     # is consumed - the fits path keeps trailing whitespace verbatim)
     assert wrap_toast_text('word ' + 'x' * 40 + ' ', 60,
                            FakeMetrics()).endswith(' ')
+    # a run that would over-widen the LAST line is consumed, not appended
+    assert wrap_toast_text('aaa bbb   ', 60, FakeMetrics()) == 'aaa bbb'
+    # a tab-word at a break is kept: the droppable rule is space-run only
+    out = wrap_toast_text('\t' + ' ' + 'x' * 30, 60, FakeMetrics())
+    assert out.startswith('\t')
+    assert out.count('x') == 30
 
 
 def test_toast_font_mirrors_the_stylesheet_chain():

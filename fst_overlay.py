@@ -782,8 +782,11 @@ def wrap_toast_text(text, max_width, font_metrics):
     line by line. Whitespace fidelity (U290R): the fits path returns the
     paragraph verbatim, so the wrap path keeps a space run of any length (the
     old split-on-space token loop dropped the empty tokens and collapsed
-    "a  b" to "a b"), keeps a leading/trailing run, consumes only the run
-    that causes a break, and emits no whitespace-only line'''
+    "a  b" to "a b"), joins a leading run to its first word, keeps the
+    paragraph's trailing run while the last line still fits, and consumes
+    only the run that causes a break. A leading space run that cannot join is
+    dropped, so no whitespace-only line opens at a break; the space-only
+    PARAGRAPH case keeps its verbatim line (fits-path fidelity)'''
     lines = []
     for paragraph in text.split('\n'):
         if font_metrics.horizontalAdvance(paragraph) <= max_width:
@@ -792,25 +795,29 @@ def wrap_toast_text(text, max_width, font_metrics):
             continue
         current = ''
         pending_space = ''
+        leading_run = ''  # the spaces-only run kept at a line start
         # the split keeps each space run as a token: fidelity for runs > 1
         for token in re.split('( +)', paragraph):
             if token == '':
                 continue  # split artifacts at the paragraph ends
             if token[0] == ' ':
                 if current == '':
-                    # leading run: keep it (the fits path keeps leading spaces)
+                    # leading run: kept, it joins the first word when it fits
                     current = token
+                    leading_run = token
                     pending_space = ''
                 else:
                     pending_space += token
                 continue
             if font_metrics.horizontalAdvance(
                     current + pending_space + token) > max_width:
-                if current.strip():
+                if current and current != leading_run:
                     lines.append(current)
-                # a spaces-only leading run is dropped with the break - a
-                # whitespace-only line renders as a blank line in the toast
+                # a spaces-only leading run is dropped with the break - it
+                # would render as a blank line in the toast; the droppable
+                # rule is for SPACE runs, so a tab-word (a word token) stays
                 current = ''
+                leading_run = ''
                 pending_space = ''  # the break consumes the separator run
                 if font_metrics.horizontalAdvance(token) > max_width:
                     # over-long word: hard-break at the width
@@ -825,9 +832,12 @@ def wrap_toast_text(text, max_width, font_metrics):
                     continue
             current += pending_space + token
             pending_space = ''
-        # the paragraph's trailing space run stays on the last line: the fits
-        # path keeps trailing whitespace verbatim, so only the run that causes
-        # a break is consumed (U290R fidelity)
+        # the paragraph's trailing space run stays on the last line while the
+        # line still fits (the fits path keeps trailing whitespace verbatim);
+        # a run that would over-widen the last line is consumed (U290R)
+        if pending_space and font_metrics.horizontalAdvance(
+                current + pending_space) > max_width:
+            pending_space = ''
         lines.append(current + pending_space)
     return '\n'.join(lines)
 
