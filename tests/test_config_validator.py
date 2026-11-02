@@ -331,6 +331,32 @@ class TestComplianceResultToast:
         # the warning report toast is THE result toast - no OK on warnings
         kb.toast_callback.assert_called_once()
 
+    def test_startup_warnings_re_surface_as_report_toast(self, kb_env_ns, tmp_path):
+        # U290R: the GUI startup load runs BEFORE the toast bridge is wired,
+        # so its warning report went console-only; the startup branch
+        # re-surfaces the stored warnings through the bridge
+        from unittest.mock import MagicMock
+        import free_snap_tap
+        kb = kb_env_ns.kb
+        kb.config_manager.file_name = write_config(tmp_path, '<focus>Half-Life\n')
+        kb.reload_from_file()  # no bridge yet: console leg, warnings stored
+        kb.toast_callback = MagicMock()  # the bridge, wired after the load
+        free_snap_tap.surface_startup_config_result(kb)
+        kb.toast_callback.assert_called_once()
+        assert 'warning' in kb.toast_callback.call_args.args[0]
+
+    def test_startup_clean_pass_gets_ok_toast(self, kb_env_ns, tmp_path):
+        from unittest.mock import MagicMock
+        import free_snap_tap
+        kb = kb_env_ns.kb
+        kb.config_manager.file_name = write_config(tmp_path, 'a, d\n')
+        kb.reload_from_file()
+        kb.toast_callback = MagicMock()
+        free_snap_tap.surface_startup_config_result(kb)
+        kb.toast_callback.assert_called_once_with(
+            "[FST] config OK - reload valid", 3, 12,
+            "rgba(40, 150, 40, 200)", "white")
+
 
 class TestCheckSuppressionAndDefaultAlwaysActiveArgs:
     """U290T(3): config-line options - validator accepts both new flags

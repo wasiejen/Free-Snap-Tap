@@ -289,3 +289,45 @@ def test_stop_method_stops_the_run_loop():
     assert task._stop is False
     task.stop()
     assert task._stop is True
+
+
+@pytest.mark.asyncio
+async def test_reload_failure_names_the_reload_cause(monkeypatch, capsys):
+    """U290R: the group-reload failure handler keeps its own message - and the
+    activation toast is out of that handler, so a toast failure can never
+    print a reload failure there (see the next test)."""
+    fst = make_fst(focus_names=['CS2'], win32_paused=True)
+    fst.update_args_and_groups.side_effect = RuntimeError('boom-config')
+    fake_windows(monkeypatch, ['CS2 2024'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    out = capsys.readouterr().out
+    assert 'reloading of groups files failed' in out
+    assert 'boom-config' in out
+    assert 'toast' not in out
+    fst.toast_group_activated.assert_not_called()  # toast skipped on reload fail
+
+
+@pytest.mark.asyncio
+async def test_toast_failure_not_reported_as_reload_failure(monkeypatch, capsys):
+    """U290R: the activation toast used to sit INSIDE the reload handler, so
+    a failing toast printed 'reloading of groups files failed' and left the
+    user thinking the config reload broke. The toast now has its own handler:
+    its failure is named as a toast failure, the groups stay resumed."""
+    fst = make_fst(focus_names=['CS2'], win32_paused=True)
+    fst.toast_group_activated.side_effect = RuntimeError('toast-broke')
+    fake_windows(monkeypatch, ['CS2 2024'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    out = capsys.readouterr().out
+    assert 'focus activation toast failed' in out
+    assert 'toast-broke' in out
+    assert 'reloading of groups files failed' not in out
+    fst.update_args_and_groups.assert_called_once_with('CS2')
+    assert fst.arg_manager.WIN32_FILTER_PAUSED is False  # groups stay resumed

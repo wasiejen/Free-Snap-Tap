@@ -130,6 +130,18 @@ class MainLogic:
                 await asyncio.sleep(3600)
 
 
+def surface_startup_config_result(fst_keyboard):
+    '''startup compliance result through the toast bridge (U290T): the
+    validator ran at the startup load, which in GUI mode runs BEFORE the
+    bridge is wired - a warning report was console-only there (U290R), so
+    stored warnings re-surface as the report toast now; a clean pass gets
+    the single green OK toast'''
+    if fst_keyboard.config_manager.config_warnings:
+        fst_keyboard.surface_config_warnings()
+    else:
+        fst_keyboard.surface_config_ok()
+
+
 if __name__ == "__main__":
     setup_fst_logging()
     logger.info("--- FST startet ---")
@@ -181,11 +193,11 @@ if __name__ == "__main__":
         fst_keyboard.remove_callback = bridge.trigger_remove
         fst_keyboard.remove_all_callback = bridge.trigger_remove_all
 
-        # startup compliance toast (U290T): the validator ran at the startup
-        # load; warnings were surfaced on the console there, a clean pass
-        # gets the single green OK toast now the toast bridge is wired
-        if not fst_keyboard.config_manager.config_warnings:
-            fst_keyboard.surface_config_ok()
+        # startup compliance result (U290T): the validator ran at the startup
+        # load, BEFORE this bridge existed - warnings were console-only there
+        # (U290R); they re-surface as the report toast now, a clean pass gets
+        # the single green OK toast
+        surface_startup_config_result(fst_keyboard)
 
         if fst_keyboard.arg_manager.TRAY_ICON:
             gui_manager.tray_icon.show()

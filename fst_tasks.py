@@ -110,11 +110,17 @@ class Focus_Task:
                                 self._fst.cli_menu.update_group_display()
                                 self._fst.cli_menu.display_focus_found(active_window)
                                 self._fst.arg_manager.WIN32_FILTER_PAUSED = False
-                                # activation toast names the group (U290T)
-                                self._fst.toast_group_activated(focus_name)
                             except Exception as error:
                                 print('--- reloading of groups files failed - not resumed, still paused ---')
                                 print(f" -> aborted reloading due to: {error}")
+                            else:
+                                # activation toast names the group (U290T); OUT of
+                                # the reload handler (U290R): a toast failure is not
+                                # a group-reload failure - report it as its own cause
+                                try:
+                                    self._fst.toast_group_activated(focus_name)
+                                except Exception as error:
+                                    print(f" -> focus activation toast failed: {error}")
                         elif found_valid_focus_name and not focus_name_changed:
                             pass
                         # if not found a focus group set input filter to paused
@@ -127,8 +133,13 @@ class Focus_Task:
                                     self._fst.cli_menu.update_group_display()
                                     self._fst.cli_menu.display_default_active()
                                     self._fst.arg_manager.WIN32_FILTER_PAUSED = False
-                                    # default groups activated (U290T)
-                                    self._fst.toast_group_activated('default groups')
+                                    # default groups activated (U290T); a toast
+                                    # failure must not kill the focus poll loop
+                                    # (U290R, same defect class as the focus branch)
+                                    try:
+                                        self._fst.toast_group_activated('default groups')
+                                    except Exception as error:
+                                        print(f" -> focus activation toast failed: {error}")
                             else:
                                 if self._fst.arg_manager.WIN32_FILTER_PAUSED:
                                     print(f"> Active Window: {active_window}")

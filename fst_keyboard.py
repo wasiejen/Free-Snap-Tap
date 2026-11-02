@@ -432,8 +432,14 @@ class FST_Keyboard():
 
     def update_focus_groups(self):
         self._focus_manager.update_groups_from_config(self._config_manager.load_config())
-        # validator warnings that do not block the load surface through the
-        # same user-facing channel (GUI toast / headless console print)
+        self.surface_config_warnings()
+
+    def surface_config_warnings(self):
+        '''validator warnings that do not block the load surface through the
+        same user-facing channel (GUI toast / headless console print); the
+        startup load runs in GUI mode BEFORE the toast bridge is wired, so
+        free_snap_tap re-surfaces the stored warnings once the bridge exists
+        (U290R: they were console-only there)'''
         if self._config_manager.config_warnings:
             self.surface_config_error(ConfigError(
                 Config_Validator.format_report(self._config_manager.config_warnings),
