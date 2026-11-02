@@ -6,7 +6,7 @@ last updated: 250724-1434
 import sys
 from PySide6.QtWidgets import QWidget, QApplication, QMenu, QSystemTrayIcon, QLabel, QVBoxLayout, QFrame
 from PySide6.QtCore import QObject, Qt, qInstallMessageHandler, Signal, QTimer
-from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont
+from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont, QFontMetrics
 
 import ctypes
 
@@ -670,6 +670,46 @@ class StatusOverlay(QWidget):
         
            
            
+# Toast text rendering width: the label wraps at this width so long toast
+# texts render fully in multiple lines - the ToastManager box is fixed at
+# 500 px and self-drawn text that is wider is cut off (maintainer: text cut
+# at window width). Keep this below the ToastManager fixed width (500).
+TOAST_TEXT_MAX_WIDTH = 480
+
+
+def wrap_toast_text(text, max_width, font_metrics):
+    '''greedy-fill word wrap at max_width pixels; a single word longer than
+    the width is hard-broken, embedded newlines (paragraphs) are preserved
+    line by line'''
+    lines = []
+    for paragraph in text.split('\n'):
+        if font_metrics.horizontalAdvance(paragraph) <= max_width:
+            # fits: return it exactly (whitespace preserved)
+            lines.append(paragraph)
+            continue
+        current = ''
+        for word in paragraph.split(' '):
+            if not word:
+                continue
+            trial = f"{current} {word}" if current else word
+            if font_metrics.horizontalAdvance(trial) <= max_width:
+                current = trial
+            else:
+                if current:
+                    lines.append(current)
+                    current = ''
+                chunk = ''
+                for char in word:
+                    if font_metrics.horizontalAdvance(chunk + char) > max_width and chunk:
+                        lines.append(chunk)
+                        chunk = char
+                    else:
+                        chunk += char
+                current = chunk
+        lines.append(current)
+    return '\n'.join(lines)
+
+
 class ToastWidget(QFrame):
     def __init__(self, text, duration=3.0, text_size=12, bg_color="rgba(40, 40, 40, 200)", text_color="white", timer=0, parent=None):
         super().__init__(parent)
@@ -705,11 +745,22 @@ class ToastWidget(QFrame):
         
 
 
-        # Set the initial text
+        # Set the initial text, pre-wrapped near the manager box width (the
+        # self-drawn text was cut at the window width; the label font spec
+        # here mirrors the stylesheet font below so the metrics match)
+        font = QFont('Consolas')
+        font.setPixelSize(text_size)
+        font.setBold(True)
         if self.use_timer_display:
-            self.label = QLabel(self.get_display_text())
+            display_text = self.get_display_text()
         else:
-            self.label = QLabel(f" {text} ")
+            display_text = f" {text} "
+        display_text = wrap_toast_text(display_text, TOAST_TEXT_MAX_WIDTH,
+                                       QFontMetrics(font))
+        self.label = QLabel(display_text)
+        # insurance: QLabel word wrap + the fixed box width
+        self.label.setWordWrap(True)
+        self.label.setFixedWidth(TOAST_TEXT_MAX_WIDTH)
         layout.addWidget(self.label)
 
         # 2. Single Master Timer
