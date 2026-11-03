@@ -256,6 +256,43 @@ async def test_default_groups_activation_toast_skips_silent_default(monkeypatch)
 
 
 @pytest.mark.asyncio
+async def test_silent_guard_failure_kills_only_the_announce(monkeypatch, capsys):
+    # U330 reviewer P2 (the U290R defect class): the silent guard sits in the
+    # toast handler, so a raise there names a toast failure, NOT a group
+    # reload failure, and never exits the focus poll loop
+    fst = make_fst(focus_names=['CS2'], win32_paused=True)
+    fst.is_silent_focus_group = MagicMock(side_effect=RuntimeError('guard-broke'))
+    fake_windows(monkeypatch, ['CS2 2024'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    out = capsys.readouterr().out
+    assert 'guard-broke' in out
+    assert 'focus activation toast failed' in out
+    assert 'reloading of groups files failed' not in out
+    fst.toast_group_activated.assert_not_called()
+    assert fst.arg_manager.WIN32_FILTER_PAUSED is False  # groups stay resumed
+
+
+@pytest.mark.asyncio
+async def test_default_branch_guard_failure_kills_only_the_announce(monkeypatch, capsys):
+    # the ALWAYS_ACTIVE default-groups branch carries the same handler rule
+    fst = make_fst(focus_names=[], always_active=True, win32_paused=True)
+    fst.is_silent_focus_group = MagicMock(side_effect=RuntimeError('guard-broke'))
+    fake_windows(monkeypatch, ['Unknown Window'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    out = capsys.readouterr().out
+    assert 'guard-broke' in out
+    assert 'focus activation toast failed' in out
+
+
+@pytest.mark.asyncio
 async def test_manually_paused_gates_until_resumed(monkeypatch):
     fst = make_fst(focus_names=['CS2'], manual_paused=True)
     fake_windows(monkeypatch, ['CS2 2024'])

@@ -435,6 +435,19 @@ class TestStartupActivationToast:
         kb.toast_callback.assert_called_once()
         assert 'focus group active: CS2' in kb.toast_callback.call_args.args[0]
 
+    def test_startup_activation_quiet_when_focus_task_owns_announce(self, kb_env_ns):
+        # reviewer P2 (U330): a config with focus apps hands the announce to
+        # the focus task (it announces per window match, ask 3 gated) - the
+        # startup pass must NOT announce a scope it did not activate, and
+        # the focus task's first poll then announces once, not twice
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.focus_manager._multi_focus_dict_keys = ['CS2']  # the read-only property's store
+        kb.focus_manager.FOCUS_APP_NAME = ''
+        kb.toast_callback = MagicMock()
+        kb.toast_startup_activation()
+        kb.toast_callback.assert_not_called()
+
 
 class TestCheckSuppressionAndDefaultAlwaysActiveArgs:
     """U290T(3): config-line options - validator accepts both new flags
@@ -534,6 +547,18 @@ class TestSilentFocusGroup:
         kb.toast_startup_activation()
         kb.toast_callback.assert_called_once()
 
+    def test_silent_check_resolves_multi_name_section(self, kb_env_ns, tmp_path):
+        # reviewer P1 (U330): -no_warnings in a multi-name section marks the
+        # section SILENT for EVERY name of that section (the validator scopes
+        # the section by its first name; the load stores the name->scope map)
+        kb = kb_env_ns.kb
+        kb.config_manager.file_name = write_config(
+            tmp_path, '<focus>Alpha-B,AlphaC\n<arg>-no_warnings\n')
+        kb.update_focus_groups()  # loads, fills the map + suppressed scopes
+        assert kb.config_manager.config_suppressed_scopes == {'AlphaB'}
+        assert kb.is_silent_focus_group('AlphaB') is True
+        assert kb.is_silent_focus_group('AlphaC') is True
+
 
 class TestScopedWarningReport:
     """U330 ask 4 (maintainer 2026-11-03): a focus-group change shows only
@@ -590,3 +615,30 @@ class TestScopedWarningReport:
         text = kb.toast_callback.call_args.args[0]
         assert 'Game-A' in text  # every section: the full output on save
         assert 'GameB' in text
+
+    def test_multi_name_section_scopes_by_its_first_name(self, kb_env_ns, tmp_path):
+        # reviewer P1 (U330): a multi-name section is scoped by its FIRST
+        # cleaned name, and the runtime maps EVERY name to the same group
+        # lines - a focus change to a second name still shows that
+        # section's own warnings (resolved through the load's name->scope map)
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.toast_callback = MagicMock()
+        kb.config_manager.file_name = write_config(
+            tmp_path, '<focus>Alpha-B,AlphaC\n')
+        kb.focus_manager.FOCUS_APP_NAME = 'AlphaC'
+        kb.update_args_and_groups('AlphaC', startup=False)
+        kb.toast_callback.assert_called_once()
+        text = kb.toast_callback.call_args.args[0]
+        assert 'AlphaC' in text      # the section's header warning is named
+        assert '1 config violation' in text
+
+    def test_load_stores_the_focus_name_scope_map(self, tmp_path):
+        # the map every name of a multi-name section to the section scope
+        path = write_config(tmp_path,
+                            '<focus>Alpha-B,AlphaC\n<focus>GameX\n')
+        cm = Config_Manager(path)
+        cm.load_config()
+        assert cm.config_focus_scopes == {'AlphaB': 'AlphaB',
+                                          'AlphaC': 'AlphaB',
+                                          'GameX': 'GameX'}

@@ -200,19 +200,38 @@ class FST_Keyboard():
         display_focus_names), so the toast leg stays quiet'''
         if self.toast_callback is None:
             return
+        # reviewer P2 (U330): a config with focus apps hands the announce to
+        # the focus task (it announces per window match, ask 3 gated) - the
+        # startup pass announces ONLY the scope the startup load activated
+        # (the auto-activated default sections, no focus apps configured),
+        # so the startup scope announces exactly once
+        if self._focus_manager.multi_focus_dict_keys:
+            return
         scope = self._focus_manager.FOCUS_APP_NAME
         # ask 3: a SILENT scope (-no_warnings section, the default scope
         # counts as a section) announces nothing - its warnings are
         # suppressed, so the activation toast has nothing to show
-        if scope in self._config_manager.config_suppressed_scopes:
+        if self._scope_of_focus_name(scope) in \
+                self._config_manager.config_suppressed_scopes:
             return
         self.toast_group_activated(scope or 'default groups')
+
+    def _scope_of_focus_name(self, focus_name):
+        '''the validator scope of a focus name: a multi-name section is
+        scoped by its FIRST cleaned name, the runtime maps every name of the
+        section to the same group lines - the load stores this name -> scope
+        map (U330 reviewer P1: the scoped report and the silent check
+        resolve every name of a section, not only its first name)'''
+        return self._config_manager.config_focus_scopes.get(
+            focus_name, focus_name)
 
     def is_silent_focus_group(self, scope):
         '''True for a focus group (or the default scope) carrying
         -no_warnings: a SILENT section - the activation toast skips it
-        (U330 ask 3); the load stores the suppressed scopes'''
-        return scope in self._config_manager.config_suppressed_scopes
+        (U330 ask 3); the load stores the suppressed scopes, and every
+        name of a multi-name section resolves to the section scope'''
+        return self._scope_of_focus_name(scope) in \
+            self._config_manager.config_suppressed_scopes
 
     def initialize_groups_from_presorted_lines(self):
         '''
@@ -487,7 +506,8 @@ class FST_Keyboard():
         group) - an empty scoped set surfaces nothing (silent/quiet group)'''
         warnings = self._config_manager.config_warnings
         if scope is not None:
-            warnings = [v for v in warnings if v.scope in (scope, '')]
+            section_scope = self._scope_of_focus_name(scope)
+            warnings = [v for v in warnings if v.scope in (section_scope, '')]
         if warnings:
             self.surface_config_warning_report(
                 Config_Validator.format_report(warnings))

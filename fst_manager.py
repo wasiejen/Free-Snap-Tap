@@ -1380,6 +1380,12 @@ class Config_Manager():
         # SILENT scopes of the last load_config: sections carrying
         # -no_warnings (U330 ask 3) - the activation toast skips them
         self.config_suppressed_scopes = set()
+        # cleaned focus name -> validator scope of the last load_config:
+        # a multi-name section is scoped by its FIRST cleaned name, and the
+        # runtime maps EVERY name of the section to the same group lines
+        # (U330 reviewer P1: the scoped report and the silent check resolve
+        # every name through this map)
+        self.config_focus_scopes = {}
 
     @property
     def file_name(self):
@@ -1515,6 +1521,9 @@ class Config_Manager():
         default_start_arguments = []
         default_group_lines = []
         extra_focus_names = []
+        # every cleaned name of the section -> the section's validator scope
+        # (the FIRST cleaned name); built fresh every load, stored at return
+        focus_scopes = {}
 
         for line in group_lines:
             if line.startswith('<focus>'):
@@ -1527,6 +1536,15 @@ class Config_Manager():
                 if len(focus_group_names) > 1:
                    focus_name = focus_group_names[0]
                    extra_focus_names = focus_group_names[1:]
+
+                # U330 (reviewer P1): the validator scopes this section by
+                # its first cleaned name (Config_Validator._focus_scope_of)
+                # - map every name of the section to that scope
+                section_names = [name.strip() for name in focus_group_names
+                                  if name.strip()]
+                if section_names:
+                    for name in section_names:
+                        focus_scopes[name] = section_names[0]
 
                 multi_focus_dict[focus_name] = copy.deepcopy([[], []])
 
@@ -1568,6 +1586,7 @@ class Config_Manager():
                 else:
                     multi_focus_dict[focus_name][1].append([line_name, line])
 
+        self.config_focus_scopes = focus_scopes
         return multi_focus_dict, default_start_arguments, default_group_lines
 
 
