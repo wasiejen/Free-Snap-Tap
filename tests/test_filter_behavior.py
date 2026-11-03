@@ -161,11 +161,9 @@ class TestRebindRepeat:
         # maintainer ruling 2026-09-15: a rebind trigger that is also in a
         # tap group keeps the current (suppressed) repeat behaviour - it must
         # NOT auto-repeat its replacement (the failed first attempt's area)
-        # Pins the OFF behavior explicitly (event-stream idealization): the
-        # default-ON reconcile (2026-10-31) heals every state against the
-        # harness OS, which reports a/b unpressed here.
+        # event-stream idealization (U301 reversal): tap-group states are fed
+        # by the event stream only.
         kb = kb_env_ns.kb
-        kb.arg_manager.RECONCILE_TAP_STATES = False
         build(kb, taps=[['(TAP_1)', ['a', 'b']]],
               rebinds=[['(r)', [['a'], 'c']]])
         down(kb, VK_A, 1000)
@@ -260,12 +258,9 @@ class TestMacroFiring:
 
 class TestTapGroupFilter:
     def test_snap_tap_idealization_sequence(self, kb_env_ns):
-        # Pins the OFF behavior explicitly (event-stream idealization with no
-        # OS truth in the harness); the ON-equivalent normal sequence is
-        # test_reconcile_on_normal_sequence_unchanged (fake OS truth) in
-        # tests/test_tap_reconcile.py.
+        # event-stream idealization (U301 reversal): tap-group states are fed
+        # by the event stream only, no OS truth in the harness
         kb = kb_env_ns.kb
-        kb.arg_manager.RECONCILE_TAP_STATES = False
         build(kb, taps=[['(TAP_1)', ['a', 'b']]])
         down(kb, VK_A, 1000)
         down(kb, VK_B, 2000)  # switch: release a, press b

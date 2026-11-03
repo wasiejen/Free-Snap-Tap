@@ -124,10 +124,6 @@ class CONSTANTS():
     # (so alt+num* is not swallowed while gaming)
     DEBUG_NUMPAD = False
 
-    # debug gate: tap-state reconcile repairs (RECONCILE_TAP_STATES) report a
-    # reconciled drop via toast only when enabled - never in normal runs
-    DEBUG_TAP_RECONCILE = False
-
     # Define File name for saving of everything, can be any filetype
     # But .txt or .cfg recommended for easier editing
     FILE_NAME = 'FSTconfig.txt'
@@ -1844,12 +1840,6 @@ class Argument_Manager():
 
     EXEC_ONLY_ONE_TRIGGERED_MACRO = False
 
-    # tap-group event-time OS reconciliation (proposal 2026-10-31, option b2):
-    # heals press states when Windows drops queued key events. Default ON per
-    # maintainer ruling 2026-10-31 ("should be default on"); the off-switch
-    # -no_tap_reconcile restores the pre-reconcile event-stream-only behavior
-    RECONCILE_TAP_STATES = True
-
     ALWAYS_ACTIVE = False
     CMD_WINDOW_HIDDEN = False
 
@@ -1896,7 +1886,6 @@ class Argument_Manager():
         self.MACRO_MIN_DELAY_IN_MS = Argument_Manager.MACRO_MIN_DELAY_IN_MS
         self.MACRO_MAX_DELAY_IN_MS = Argument_Manager.MACRO_MAX_DELAY_IN_MS
         self.EXEC_ONLY_ONE_TRIGGERED_MACRO = Argument_Manager.EXEC_ONLY_ONE_TRIGGERED_MACRO
-        self.RECONCILE_TAP_STATES = Argument_Manager.RECONCILE_TAP_STATES
         self.CROSSHAIR_ENABLED = Argument_Manager.CROSSHAIR_ENABLED
         self.CROSSHAIR_DELTA_X = Argument_Manager.CROSSHAIR_DELTA_X
         self.CROSSHAIR_DELTA_Y = Argument_Manager.CROSSHAIR_DELTA_Y
@@ -1949,14 +1938,6 @@ class Argument_Manager():
                 set_flow_enabled(True)
             elif arg == "-debug_numpad":
                 CONSTANTS.DEBUG_NUMPAD = True
-            # tap-state reconcile is default ON (maintainer ruling 2026-10-31):
-            # -tap_reconcile stays accepted as a no-op, -no_tap_reconcile disables
-            elif arg == "-tap_reconcile":
-                pass
-            elif arg == "-no_tap_reconcile":
-                self.RECONCILE_TAP_STATES = False
-            elif arg == "-debug_tap_reconcile":
-                CONSTANTS.DEBUG_TAP_RECONCILE = True
             # start directly without showing the menu
             elif arg == "-nomenu":
                 self.MENU_ENABLED = False
