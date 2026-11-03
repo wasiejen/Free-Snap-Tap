@@ -116,11 +116,15 @@ class Focus_Task:
                             else:
                                 # activation toast names the group (U290T); OUT of
                                 # the reload handler (U290R): a toast failure is not
-                                # a group-reload failure - report it as its own cause
-                                try:
-                                    self._fst.toast_group_activated(focus_name)
-                                except Exception as error:
-                                    print(f" -> focus activation toast failed: {error}")
+                                # a group-reload failure - report it as its own cause.
+                                # U330 ask 3: a SILENT focus group (-no_warnings)
+                                # is skipped - its warnings are suppressed, so
+                                # there is nothing for the toast to show
+                                if not self._fst.is_silent_focus_group(focus_name):
+                                    try:
+                                        self._fst.toast_group_activated(focus_name)
+                                    except Exception as error:
+                                        print(f" -> focus activation toast failed: {error}")
                         elif found_valid_focus_name and not focus_name_changed:
                             pass
                         # if not found a focus group set input filter to paused
@@ -136,10 +140,14 @@ class Focus_Task:
                                     # default groups activated (U290T); a toast
                                     # failure must not kill the focus poll loop
                                     # (U290R, same defect class as the focus branch)
-                                    try:
-                                        self._fst.toast_group_activated('default groups')
-                                    except Exception as error:
-                                        print(f" -> focus activation toast failed: {error}")
+                                    # U330 ask 3: a SILENT default scope
+                                    # (-no_warnings in the default section) skips
+                                    # the activation toast
+                                    if not self._fst.is_silent_focus_group(''):
+                                        try:
+                                            self._fst.toast_group_activated('default groups')
+                                        except Exception as error:
+                                            print(f" -> focus activation toast failed: {error}")
                             else:
                                 if self._fst.arg_manager.WIN32_FILTER_PAUSED:
                                     print(f"> Active Window: {active_window}")

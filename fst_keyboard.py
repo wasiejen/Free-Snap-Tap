@@ -200,8 +200,19 @@ class FST_Keyboard():
         display_focus_names), so the toast leg stays quiet'''
         if self.toast_callback is None:
             return
-        self.toast_group_activated(
-            self._focus_manager.FOCUS_APP_NAME or 'default groups')
+        scope = self._focus_manager.FOCUS_APP_NAME
+        # ask 3: a SILENT scope (-no_warnings section, the default scope
+        # counts as a section) announces nothing - its warnings are
+        # suppressed, so the activation toast has nothing to show
+        if scope in self._config_manager.config_suppressed_scopes:
+            return
+        self.toast_group_activated(scope or 'default groups')
+
+    def is_silent_focus_group(self, scope):
+        '''True for a focus group (or the default scope) carrying
+        -no_warnings: a SILENT section - the activation toast skips it
+        (U330 ask 3); the load stores the suppressed scopes'''
+        return scope in self._config_manager.config_suppressed_scopes
 
     def initialize_groups_from_presorted_lines(self):
         '''

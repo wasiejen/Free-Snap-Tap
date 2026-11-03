@@ -966,6 +966,10 @@ class Config_Validator():
         # focus sections carrying the -no_warnings check-suppression arg
         self._current_scope = ''
         self._suppress_scopes = set()
+        # the SILENT sections (U330 ask 3): scopes whose warnings are
+        # suppressed - the activation toast skips them; public so the load
+        # can store it (Config_Manager.config_suppressed_scopes)
+        self.suppressed_scopes = set()
 
     def validate(self, numbered_lines):
         '''numbered_lines: list of (line_number, cleaned_line) tuples'''
@@ -998,6 +1002,7 @@ class Config_Validator():
             self.violations = [v for v in self.violations
                                if not (v.severity == self.WARNING
                                        and v.scope in self._suppress_scopes)]
+        self.suppressed_scopes = set(self._suppress_scopes)
         return self.violations
 
     # -- reporting helpers ---------------------------------------------------
@@ -1372,6 +1377,9 @@ class Config_Manager():
         self._alias_hr = []
         # validator violations of the last load_config that only warn
         self.config_warnings = []
+        # SILENT scopes of the last load_config: sections carrying
+        # -no_warnings (U330 ask 3) - the activation toast skips them
+        self.config_suppressed_scopes = set()
 
     @property
     def file_name(self):
@@ -1488,9 +1496,13 @@ class Config_Manager():
 
         cleaned_lines = self._combine_multilines_numbered(self._clean_comments_numbered(file_lines))
 
-        violations = Config_Validator().validate(cleaned_lines)
+        validator = Config_Validator()
+        violations = validator.validate(cleaned_lines)
         self.config_warnings = [v for v in violations
                                 if v.severity == Config_Validator.WARNING]
+        # the silent sections of THIS load (U330 ask 3): re-saved every load,
+        # never carried over from a previous one
+        self.config_suppressed_scopes = set(validator.suppressed_scopes)
         if any(v.severity == Config_Validator.ERROR for v in violations):
             logger_config.error(f"config violations:\n{Config_Validator.format_report(violations)}")
             raise ConfigError(Config_Validator.format_report(violations),

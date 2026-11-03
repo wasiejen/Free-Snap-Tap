@@ -33,6 +33,7 @@ def make_fst(focus_names=(), always_active=False, win32_paused=False,
         update_args_and_groups=MagicMock(),
         cli_menu=MagicMock(),
         toast_group_activated=MagicMock(),
+        is_silent_focus_group=MagicMock(return_value=False),
     )
 
 
@@ -216,6 +217,42 @@ async def test_activation_toast_not_repeated_for_same_group(monkeypatch):
     await task.run()
 
     fst.toast_group_activated.assert_called_once_with('CS2')  # one activation
+
+
+@pytest.mark.asyncio
+async def test_activation_toast_skips_silent_focus_group(monkeypatch):
+    """U330 ask 3: a focus group carrying -no_warnings is SILENT - the
+    activation toast skips it; the groups still resume (the skip is a toast
+    rule, not an activation rule)."""
+    fst = make_fst(focus_names=['CS2'], win32_paused=True)
+    fst.is_silent_focus_group = MagicMock(return_value=True)
+    fake_windows(monkeypatch, ['CS2 2024'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    fst.is_silent_focus_group.assert_called_once_with('CS2')
+    fst.update_args_and_groups.assert_called_once_with('CS2')
+    fst.toast_group_activated.assert_not_called()
+    assert fst.arg_manager.WIN32_FILTER_PAUSED is False  # still resumed
+
+
+@pytest.mark.asyncio
+async def test_default_groups_activation_toast_skips_silent_default(monkeypatch):
+    # the ALWAYS_ACTIVE default-groups branch carries the same skip: the
+    # default scope ('') is silent when it carries -no_warnings
+    fst = make_fst(focus_names=[], always_active=True, win32_paused=True)
+    fst.is_silent_focus_group = MagicMock(return_value=True)
+    fake_windows(monkeypatch, ['Unknown Window'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    fst.is_silent_focus_group.assert_called_once_with('')
+    fst.update_args_and_groups.assert_called_once_with()
+    fst.toast_group_activated.assert_not_called()
 
 
 @pytest.mark.asyncio

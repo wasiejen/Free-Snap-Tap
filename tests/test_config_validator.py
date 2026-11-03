@@ -478,3 +478,58 @@ class TestCheckSuppressionAndDefaultAlwaysActiveArgs:
         cm = Config_Manager(path)
         cm.load_config()
         assert cm.config_warnings == []
+
+    def test_load_stores_the_suppressed_scopes(self, tmp_path):
+        # U330 ask 3: a section carrying -no_warnings is SILENT; the load
+        # stores the suppressed scopes so the activation toast can skip them
+        path = write_config(tmp_path,
+                            '<focus>Game\n<arg>-no_warnings\n<focus>Other\n')
+        cm = Config_Manager(path)
+        cm.load_config()
+        assert cm.config_suppressed_scopes == {'Game'}
+
+    def test_load_without_flags_stores_no_suppressed_scopes(self, tmp_path):
+        path = write_config(tmp_path, '<focus>Game\n')
+        cm = Config_Manager(path)
+        cm.load_config()
+        assert cm.config_suppressed_scopes == set()
+
+
+class TestSilentFocusGroup:
+    """U330 ask 3: a focus group carrying -no_warnings is silent - the
+    activation toast skips it (the startup activation pass and the
+    focus-change flow); a non-silent group keeps its toast."""
+
+    def test_facade_reads_the_stored_suppressed_scopes(self, kb_env_ns):
+        kb = kb_env_ns.kb
+        kb.config_manager.config_suppressed_scopes = {'Game'}
+        assert kb.is_silent_focus_group('Game') is True
+        assert kb.is_silent_focus_group('Other') is False
+        assert kb.is_silent_focus_group('') is False
+
+    def test_startup_activation_skips_silent_focus_group(self, kb_env_ns):
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.focus_manager.FOCUS_APP_NAME = 'Game'
+        kb.config_manager.config_suppressed_scopes = {'Game'}
+        kb.toast_callback = MagicMock()
+        kb.toast_startup_activation()
+        kb.toast_callback.assert_not_called()
+
+    def test_startup_activation_skips_silent_default_scope(self, kb_env_ns):
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.focus_manager.FOCUS_APP_NAME = ''
+        kb.config_manager.config_suppressed_scopes = {''}
+        kb.toast_callback = MagicMock()
+        kb.toast_startup_activation()
+        kb.toast_callback.assert_not_called()
+
+    def test_startup_activation_non_silent_keeps_toast(self, kb_env_ns):
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.focus_manager.FOCUS_APP_NAME = 'Game'
+        kb.config_manager.config_suppressed_scopes = set()
+        kb.toast_callback = MagicMock()
+        kb.toast_startup_activation()
+        kb.toast_callback.assert_called_once()
