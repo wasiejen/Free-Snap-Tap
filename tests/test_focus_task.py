@@ -83,7 +83,7 @@ async def test_focus_found_resumes_groups(monkeypatch):
     await task.run()
 
     assert fst.focus_manager.FOCUS_APP_NAME == 'CS2'
-    fst.update_args_and_groups.assert_called_once_with('CS2')
+    fst.update_args_and_groups.assert_called_once_with('CS2', startup=False)  # focus-change leg: scoped report
     fst.cli_menu.update_group_display.assert_called_once_with()
     fst.cli_menu.display_focus_found.assert_called_once_with('CS2 2024')
     assert fst.arg_manager.WIN32_FILTER_PAUSED is False
@@ -114,7 +114,7 @@ async def test_focus_matching_is_case_sensitive_substring(monkeypatch):
     await task.run()
 
     assert fst.focus_manager.FOCUS_APP_NAME == ''
-    fst.update_args_and_groups.assert_called_once_with()  # fall back to default groups
+    fst.update_args_and_groups.assert_called_once_with(startup=False)  # fall back to default groups (scoped leg)
     fst.cli_menu.display_focus_not_found.assert_called_once_with()
     assert fst.arg_manager.WIN32_FILTER_PAUSED is True
 
@@ -159,7 +159,7 @@ async def test_no_match_pauses_filter(monkeypatch):
     await task.run()
 
     assert fst.focus_manager.FOCUS_APP_NAME == ''
-    fst.update_args_and_groups.assert_called_once_with()
+    fst.update_args_and_groups.assert_called_once_with(startup=False)  # default-groups leg: scoped report
     fst.cli_menu.display_focus_not_found.assert_called_once_with()
     assert fst.arg_manager.WIN32_FILTER_PAUSED is True
 
@@ -188,7 +188,7 @@ async def test_always_active_uses_default_groups(monkeypatch):
     await task.run()
 
     assert fst.focus_manager.FOCUS_APP_NAME == ''
-    fst.update_args_and_groups.assert_called_once_with()
+    fst.update_args_and_groups.assert_called_once_with(startup=False)  # default-groups leg: scoped report
     fst.cli_menu.display_default_active.assert_called_once_with()
     assert fst.arg_manager.WIN32_FILTER_PAUSED is False
     fst.toast_group_activated.assert_called_once_with('default groups')
@@ -233,7 +233,7 @@ async def test_activation_toast_skips_silent_focus_group(monkeypatch):
     await task.run()
 
     fst.is_silent_focus_group.assert_called_once_with('CS2')
-    fst.update_args_and_groups.assert_called_once_with('CS2')
+    fst.update_args_and_groups.assert_called_once_with('CS2', startup=False)  # focus-change leg: scoped report
     fst.toast_group_activated.assert_not_called()
     assert fst.arg_manager.WIN32_FILTER_PAUSED is False  # still resumed
 
@@ -251,7 +251,7 @@ async def test_default_groups_activation_toast_skips_silent_default(monkeypatch)
     await task.run()
 
     fst.is_silent_focus_group.assert_called_once_with('')
-    fst.update_args_and_groups.assert_called_once_with()
+    fst.update_args_and_groups.assert_called_once_with(startup=False)  # default-groups leg: scoped report
     fst.toast_group_activated.assert_not_called()
 
 
@@ -270,7 +270,7 @@ async def test_manually_paused_gates_until_resumed(monkeypatch):
 
     # while manually paused the window was ignored; after resume it is picked up
     assert fst.focus_manager.FOCUS_APP_NAME == 'CS2'
-    fst.update_args_and_groups.assert_called_once_with('CS2')
+    fst.update_args_and_groups.assert_called_once_with('CS2', startup=False)  # focus-change leg: scoped report
     assert fst.arg_manager.WIN32_FILTER_PAUSED is False
 
 
@@ -366,5 +366,5 @@ async def test_toast_failure_not_reported_as_reload_failure(monkeypatch, capsys)
     assert 'focus activation toast failed' in out
     assert 'toast-broke' in out
     assert 'reloading of groups files failed' not in out
-    fst.update_args_and_groups.assert_called_once_with('CS2')
+    fst.update_args_and_groups.assert_called_once_with('CS2', startup=False)  # focus-change leg: scoped report
     assert fst.arg_manager.WIN32_FILTER_PAUSED is False  # groups stay resumed

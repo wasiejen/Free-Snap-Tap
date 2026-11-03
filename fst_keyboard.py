@@ -465,20 +465,32 @@ class FST_Keyboard():
         self._config_manager.presort_lines(default_lines + focus_group_lines)
         self.initialize_groups_from_presorted_lines()
 
-    def update_focus_groups(self):
+    def update_focus_groups(self, scoped=False):
+        '''(re)load the focus groups from the config; scoped=True (U330
+        ask 4, the focus-change leg) surfaces only the activated scope's
+        warnings; scoped=False (startup load, config save, menu reload)
+        surfaces the FULL report'''
         self._focus_manager.update_groups_from_config(self._config_manager.load_config())
-        self.surface_config_warnings()
+        self.surface_config_warnings(
+            scope=self._focus_manager.FOCUS_APP_NAME if scoped else None)
 
-    def surface_config_warnings(self):
+    def surface_config_warnings(self, scope=None):
         '''validator warnings that do not block the load surface through the
         same user-facing channel (GUI toast / headless console print); the
         startup load runs in GUI mode BEFORE the toast bridge is wired, so
         free_snap_tap re-surfaces the stored warnings once the bridge exists
         (U290R: they were console-only there). U330 ask 1: the warnings-only
-        report is YELLOW - red marks the serious ConfigError report'''
-        if self._config_manager.config_warnings:
-            self.surface_config_warning_report(Config_Validator.format_report(
-                self._config_manager.config_warnings))
+        report is YELLOW - red marks the serious ConfigError report.
+        U330 ask 4: scope=None surfaces the FULL report (start + config
+        save); a scope surfaces only that section's warnings plus the
+        default section (the default lines are part of every activated
+        group) - an empty scoped set surfaces nothing (silent/quiet group)'''
+        warnings = self._config_manager.config_warnings
+        if scope is not None:
+            warnings = [v for v in warnings if v.scope in (scope, '')]
+        if warnings:
+            self.surface_config_warning_report(
+                Config_Validator.format_report(warnings))
 
     def update_args_and_groups(self, focus_name = '', startup=True):
         self.release_all_currently_pressed_simulated_keys()
@@ -488,7 +500,10 @@ class FST_Keyboard():
         self._state_manager.reset_all_lists()
         # if not startup:
         #     self.remove_all_callback()
-        self.apply_start_args_by_focus_name(focus_name)
+        # U330 ask 4: the focus-change leg (startup=False) shows ONLY the
+        # activated group's warnings; startup and the config-save reload run
+        # the validator pass and show the FULL report
+        self.apply_start_args_by_focus_name(focus_name, scoped=not startup)
         self.apply_focus_groups(focus_name)
 
     def set_loop(self, loop):
@@ -1131,9 +1146,9 @@ class FST_Keyboard():
             logger_macro.warning(f"no macro sequence with name {alias_name} - reset failed "
                                 f"(all sequence names: {list(self._macros_alias_dict.keys())})")
 
-    def apply_start_args_by_focus_name(self, focus_name = ''):
+    def apply_start_args_by_focus_name(self, focus_name = '', scoped=False):
         self._arg_manager.apply_start_arguments(self._arg_manager._sys_start_args)
-        self.update_focus_groups()
+        self.update_focus_groups(scoped=scoped)
         # needs to be done after reloading of file or else it will not have the actual data
         if focus_name != '':
             if focus_name not in self._focus_manager.multi_focus_dict:

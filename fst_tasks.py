@@ -106,7 +106,7 @@ class Focus_Task:
                         if found_valid_focus_name and focus_name_changed:
                             try:
                                 default_active = False
-                                self._fst.update_args_and_groups(focus_name)
+                                self._fst.update_args_and_groups(focus_name, startup=False)
                                 self._fst.cli_menu.update_group_display()
                                 self._fst.cli_menu.display_focus_found(active_window)
                                 self._fst.arg_manager.WIN32_FILTER_PAUSED = False
@@ -133,7 +133,7 @@ class Focus_Task:
                             if self._fst.arg_manager.ALWAYS_ACTIVE:
                                 if not default_active:
                                     default_active = True
-                                    self._fst.update_args_and_groups()
+                                    self._fst.update_args_and_groups(startup=False)  # U330 ask 4: scoped report leg
                                     self._fst.cli_menu.update_group_display()
                                     self._fst.cli_menu.display_default_active()
                                     self._fst.arg_manager.WIN32_FILTER_PAUSED = False
@@ -153,7 +153,7 @@ class Focus_Task:
                                     print(f"> Active Window: {active_window}")
                                     pass
                                 else:
-                                    self._fst.update_args_and_groups()
+                                    self._fst.update_args_and_groups(startup=False)  # U330 ask 4: scoped report leg
                                     self._fst.cli_menu.update_group_display()
                                     self._fst.cli_menu.display_focus_not_found()
                                     ###XXX give chance to the controller to release the pressed keys

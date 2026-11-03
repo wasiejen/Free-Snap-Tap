@@ -533,3 +533,60 @@ class TestSilentFocusGroup:
         kb.toast_callback = MagicMock()
         kb.toast_startup_activation()
         kb.toast_callback.assert_called_once()
+
+
+class TestScopedWarningReport:
+    """U330 ask 4 (maintainer 2026-11-03): a focus-group change shows only
+    THAT group's warnings (plus the default section, part of every activated
+    group); the FULL report surfaces on start and on a config-file save
+    (the watcher flush runs the facade reload)."""
+
+    def test_focus_change_surfaces_only_the_activated_sections(self, kb_env_ns, tmp_path):
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.toast_callback = MagicMock()
+        kb.config_manager.file_name = write_config(
+            tmp_path, '<focus>Game-A\n<focus>GameB!\n')
+        kb.focus_manager.FOCUS_APP_NAME = 'GameB'
+        kb.update_args_and_groups('GameB', startup=False)  # the focus-change leg
+        kb.toast_callback.assert_called_once()
+        text = kb.toast_callback.call_args.args[0]
+        assert 'GameB' in text
+        assert 'Game-A' not in text  # the other section: full output is start/save
+
+    def test_scoped_set_includes_the_default_section(self, kb_env_ns, tmp_path):
+        # 'and default if part of the current groups': the default section
+        # is part of every activated group, so its warnings stay visible
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.toast_callback = MagicMock()
+        kb.config_manager.file_name = write_config(tmp_path, 'q\n<focus>GameB!\n')
+        kb.focus_manager.FOCUS_APP_NAME = 'GameB'
+        kb.update_args_and_groups('GameB', startup=False)
+        text = kb.toast_callback.call_args.args[0]
+        assert '2 or more keys' in text  # the default section's warning
+        assert 'GameB' in text           # the activated section's warning
+
+    def test_scoped_empty_set_surfaces_no_toast(self, kb_env_ns, tmp_path):
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.toast_callback = MagicMock()
+        kb.config_manager.file_name = write_config(
+            tmp_path, '<focus>Game-A\n<focus>GameB\nb, c\n')
+        kb.focus_manager.FOCUS_APP_NAME = 'GameB'
+        kb.update_args_and_groups('GameB', startup=False)
+        # the only warning is the OTHER section's: scoped set empty, nothing
+        # to show for this group
+        kb.toast_callback.assert_not_called()
+
+    def test_save_and_start_surface_the_full_report(self, kb_env_ns, tmp_path):
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.toast_callback = MagicMock()
+        kb.config_manager.file_name = write_config(
+            tmp_path, '<focus>Game-A\n<focus>GameB!\n')
+        kb.focus_manager.FOCUS_APP_NAME = 'GameB'
+        kb.reload_from_file()  # the watcher flush of a live editor save
+        text = kb.toast_callback.call_args.args[0]
+        assert 'Game-A' in text  # every section: the full output on save
+        assert 'GameB' in text
