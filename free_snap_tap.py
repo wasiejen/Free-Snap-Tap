@@ -143,6 +143,13 @@ def surface_startup_config_result(fst_keyboard):
         fst_keyboard.surface_config_ok()
 
 
+def surface_startup_activation(fst_keyboard):
+    '''startup activation pass, post-load (U330 ask 2): the GUI branch runs
+    this right after the compliance result - the activated scope announces
+    itself once through the toast bridge ('auto activated' info)'''
+    fst_keyboard.toast_startup_activation()
+
+
 if __name__ == "__main__":
     setup_fst_logging()
     logger.info("--- FST startet ---")
@@ -199,6 +206,10 @@ if __name__ == "__main__":
         # (U290R); they re-surface as the report toast now, a clean pass gets
         # the single green OK toast
         surface_startup_config_result(fst_keyboard)
+
+        # startup activation pass, post-load (U330 ask 2): the scope the
+        # startup load activated announces itself once ('auto activated')
+        surface_startup_activation(fst_keyboard)
 
         if fst_keyboard.arg_manager.TRAY_ICON:
             gui_manager.tray_icon.show()

@@ -189,6 +189,20 @@ class FST_Keyboard():
             self.toast_callback(f"[FST] focus group active: {group_name}",
                                 3, 12, "rgba(40, 150, 40, 200)", "white")
 
+    def toast_startup_activation(self):
+        '''startup activation pass, post-load (U330 ask 2): the startup load
+        activates the scope (focus groups by the focus task, the default
+        sections when nothing was matched); once the toast bridge exists the
+        activated scope announces itself - a focus group by name, the
+        default sections as 'default groups' (the maintainer's 'auto
+        activated' info). GUI mode only: the headless startup announces
+        through the CLI menu displays (display_default_active /
+        display_focus_names), so the toast leg stays quiet'''
+        if self.toast_callback is None:
+            return
+        self.toast_group_activated(
+            self._focus_manager.FOCUS_APP_NAME or 'default groups')
+
     def initialize_groups_from_presorted_lines(self):
         '''
         in new form there are rebinds and macros

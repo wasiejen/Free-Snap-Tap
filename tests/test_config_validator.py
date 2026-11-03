@@ -387,6 +387,55 @@ class TestComplianceResultToast:
             "rgba(40, 150, 40, 200)", "white")
 
 
+class TestStartupActivationToast:
+    """U330 ask 2: the startup load runs the activation pass; post-load
+    (toast bridge wired) the activated scope announces itself once - a focus
+    group by name, the always-active default sections as 'default groups'
+    (the maintainer's 'auto activated' info). The GUI branch fires it right
+    after the startup compliance result."""
+
+    def test_startup_activation_names_the_activated_focus_group(self, kb_env_ns):
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.focus_manager.FOCUS_APP_NAME = 'CS2'
+        kb.toast_callback = MagicMock()
+        kb.toast_startup_activation()
+        kb.toast_callback.assert_called_once_with(
+            "[FST] focus group active: CS2", 3, 12,
+            "rgba(40, 150, 40, 200)", "white")
+
+    def test_startup_activation_default_scope_names_default_groups(self, kb_env_ns):
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.focus_manager.FOCUS_APP_NAME = ''
+        kb.toast_callback = MagicMock()
+        kb.toast_startup_activation()
+        kb.toast_callback.assert_called_once_with(
+            "[FST] focus group active: default groups", 3, 12,
+            "rgba(40, 150, 40, 200)", "white")
+
+    def test_startup_activation_silent_headless_leg_stays_quiet(self, kb_env_ns):
+        # no bridge (headless): the CLI menu displays already announce the
+        # startup activation - the toast leg stays quiet
+        kb = kb_env_ns.kb
+        kb.focus_manager.FOCUS_APP_NAME = ''
+        assert kb.toast_callback is None
+        kb.toast_startup_activation()  # must not raise
+
+    def test_startup_bridge_leg_fires_the_activation_toast(self, kb_env_ns):
+        # the free_snap_tap GUI branch runs the activation pass right after
+        # surface_startup_config_result (bridge wired); pinned through the
+        # module function, the same way the compliance result is pinned
+        from unittest.mock import MagicMock
+        import free_snap_tap
+        kb = kb_env_ns.kb
+        kb.focus_manager.FOCUS_APP_NAME = 'CS2'
+        kb.toast_callback = MagicMock()
+        free_snap_tap.surface_startup_activation(kb)
+        kb.toast_callback.assert_called_once()
+        assert 'focus group active: CS2' in kb.toast_callback.call_args.args[0]
+
+
 class TestCheckSuppressionAndDefaultAlwaysActiveArgs:
     """U290T(3): config-line options - validator accepts both new flags
     without an unknown-arg warning; -no_warnings drops the WARNING
