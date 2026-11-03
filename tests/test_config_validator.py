@@ -287,7 +287,10 @@ class TestReloadWiring:
         kb.config_manager.file_name = write_config(tmp_path, '<focus>Half-Life\n')
         kb.reload_from_file()
         out = capsys.readouterr().out
-        assert 'FST config error' in out
+        # a warnings-only report is NOT a config error - the console leg
+        # names it a warning report (maintainer ask 2026-11-03: yellow/red split)
+        assert 'config warning report' in out
+        assert 'FST config error' not in out
         assert 'warning' in out
 
     def test_reload_surfaces_warnings_as_toast_in_gui_mode(self, kb_env_ns, tmp_path):
@@ -330,6 +333,32 @@ class TestComplianceResultToast:
         kb.reload_from_file()
         # the warning report toast is THE result toast - no OK on warnings
         kb.toast_callback.assert_called_once()
+
+    def test_warnings_only_report_toast_is_yellow(self, kb_env_ns, tmp_path):
+        # U330 ask 1: a warnings-only validation pass is NOT a serious
+        # problem - the report toast turns YELLOW; red keeps the serious
+        # ConfigError report (maintainer 2026-11-03)
+        from unittest.mock import MagicMock
+        kb = kb_env_ns.kb
+        kb.toast_callback = MagicMock()
+        kb.config_manager.file_name = write_config(tmp_path, '<focus>Half-Life\n')
+        kb.reload_from_file()
+        kb.toast_callback.assert_called_once()
+        text, duration, size, bg, fg = kb.toast_callback.call_args.args
+        assert 'warning' in text
+        assert bg == "rgba(200, 180, 0, 200)"  # YELLOW, not the red error color
+        assert bg != "rgba(200, 40, 40, 200)"
+
+    def test_warnings_only_report_console_leg_names_warning_report(self, kb_env_ns, tmp_path, capsys):
+        # U330 ask 1 headless leg: the warnings-only report is a warning
+        # report on the console, never an 'FST config error' line
+        kb = kb_env_ns.kb
+        assert kb.toast_callback is None
+        kb.config_manager.file_name = write_config(tmp_path, '<focus>Half-Life\n')
+        kb.reload_from_file()
+        out = capsys.readouterr().out
+        assert 'config warning report' in out
+        assert 'FST config error' not in out
 
     def test_startup_warnings_re_surface_as_report_toast(self, kb_env_ns, tmp_path):
         # U290R: the GUI startup load runs BEFORE the toast bridge is wired,

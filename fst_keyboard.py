@@ -161,6 +161,17 @@ class FST_Keyboard():
         else:
             print(f"[FST] {error}")
 
+    def surface_config_warning_report(self, report_text):
+        '''warnings-report surface (U330 ask 1, maintainer 2026-11-03): a
+        warnings-only validation pass is NOT a serious problem - the toast
+        is YELLOW (red keeps the serious ConfigError report); console leg
+        in headless mode names it a warning report, not a config error'''
+        if self.toast_callback is not None:
+            self.toast_callback(f"[FST] {report_text}", 5, 12,
+                                "rgba(200, 180, 0, 200)", "white")
+        else:
+            print(f"[FST] config warning report\n{report_text}")
+
     def surface_config_ok(self):
         '''clean validator pass result: one green OK toast in GUI mode,
         console line in headless mode (compliance toast, U290T)'''
@@ -438,11 +449,11 @@ class FST_Keyboard():
         same user-facing channel (GUI toast / headless console print); the
         startup load runs in GUI mode BEFORE the toast bridge is wired, so
         free_snap_tap re-surfaces the stored warnings once the bridge exists
-        (U290R: they were console-only there)'''
+        (U290R: they were console-only there). U330 ask 1: the warnings-only
+        report is YELLOW - red marks the serious ConfigError report'''
         if self._config_manager.config_warnings:
-            self.surface_config_error(ConfigError(
-                Config_Validator.format_report(self._config_manager.config_warnings),
-                'config warnings'))
+            self.surface_config_warning_report(Config_Validator.format_report(
+                self._config_manager.config_warnings))
 
     def update_args_and_groups(self, focus_name = '', startup=True):
         self.release_all_currently_pressed_simulated_keys()

@@ -135,7 +135,8 @@ def surface_startup_config_result(fst_keyboard):
     validator ran at the startup load, which in GUI mode runs BEFORE the
     bridge is wired - a warning report was console-only there (U290R), so
     stored warnings re-surface as the report toast now; a clean pass gets
-    the single green OK toast'''
+    the single green OK toast. U330 ask 1: the warnings-only report toast
+    is YELLOW (warnings are not serious - red marks the ConfigError report)'''
     if fst_keyboard.config_manager.config_warnings:
         fst_keyboard.surface_config_warnings()
     else:
