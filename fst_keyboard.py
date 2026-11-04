@@ -4,6 +4,7 @@ last updated: 241023-1056
 '''
 
 import asyncio
+from collections import deque
 
 from pynput import keyboard, mouse
 from time import time # sleep(0.005) = 5 ms
@@ -15,8 +16,83 @@ from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
 from fst_manager import Input_State_Manager, Config_Manager, Config_Validator
 from fst_manager import (logger, logger_flow, logger_state, logger_macro,
-                         logger_config)
-from fst_manager import toggle_debug_level, toggle_flow
+                         logger_config, logger_drop, DROP_RING_MAXLEN)
+from fst_manager import toggle_debug_level, toggle_flow, toggle_drop_watch
+from fst_manager import is_drop_watch_enabled
+
+
+class Toast_Offload:
+    '''U345 H2 fix: move the toast bridge post OFF the LL hook pump.
+
+    H2 investigation (2026-11-04, estate handover_u345.md): the hook pump
+    (pynput listener thread) runs the FST filter synchronously
+    (pynput/_util/win32.py _handler); Windows removes a low-level hook whose
+    callback blocks past LowLevelHooksTimeout (250 ms class) and drops
+    events during removal/reinstall - the repeat-toast gaming scenario
+    (maintainer 2026-11-04: A/D tap-group moves + sidearm '2' triggers
+    <halbautomatic_start> on left_mouse REPEAT, which shows a toast every
+    repeat iteration, fst_tasks.py Macro_Repeat_Task.run) names the toast
+    bridge call as the contender in the repeat path.
+
+    Poster threads (hook pump / asyncio loop) do ONE deque.append (µs cost,
+    GIL-atomic, no lock, no I/O); a pump task on the asyncio loop drains
+    into the bridge (50 ms interval), so the bridge emit NEVER runs on a
+    poster thread. Overflow drops the OLDEST posts (newest wins) and counts
+    them. -no_toast_offload (CONSTANTS.TOAST_OFFLOAD, default ON) restores
+    the legacy direct emit. Without a bridge (headless mode) posts are
+    drop-counted no-ops - the legacy toast_callback=None TypeError landmine
+    (constraint show_message headless) is closed on both paths.
+    '''
+    TOAST = 'toast'
+    TIMER = 'timer'
+    REMOVE = 'remove'
+    REMOVE_ALL = 'remove_all'
+
+    def __init__(self, fst_keyboard, maxlen=64):
+        self._fst = fst_keyboard
+        self._queue = deque(maxlen=maxlen)
+        self._bridge = None
+        self._dropped = 0
+
+    @property
+    def dropped(self):
+        return self._dropped
+
+    def attach(self, bridge):
+        self._bridge = bridge
+
+    def _post(self, kind, args):
+        if CONSTANTS.TOAST_OFFLOAD:
+            if len(self._queue) == self._queue.maxlen:
+                self._dropped += 1
+            self._queue.append((kind, args))
+        else:
+            self._direct(kind, args)
+
+    def _direct(self, kind, args):
+        if self._bridge is None:
+            self._dropped += 1
+            return
+        getattr(self._bridge, 'trigger_' + kind)(*args)
+
+    def drain(self):
+        while self._queue:
+            kind, args = self._queue.popleft()
+            self._direct(kind, args)
+
+    def toast(self, text, duration, text_size, bg_color, text_color):
+        self._post(self.TOAST, (text, duration, text_size, bg_color,
+                                text_color))
+
+    def timer(self, text, duration, text_size, bg_color, text_color):
+        self._post(self.TIMER, (text, duration, text_size, bg_color,
+                                text_color))
+
+    def remove(self, text, immediately=0):
+        self._post(self.REMOVE, (text, immediately))
+
+    def remove_all(self, immediately=0):
+        self._post(self.REMOVE_ALL, (immediately,))
 
 
 class FST_Keyboard():
@@ -62,6 +138,16 @@ class FST_Keyboard():
         self.remove_callback = None # Will hold bridge.remove_toast
         self.remove_all_callback = None # Will hold bridge.remove_all_toast
 
+        # U345 H2: bridge calls ride this offload queue (poster threads do
+        # one deque.append; the asyncio pump task drains into the bridge)
+        self._toast_offload = Toast_Offload(self)
+
+        # U345 H1 drop-watch: bounded raw ring of every filter entry
+        # (no format, no I/O) + cumulative drop counter (named drop lines
+        # land when a filter leg dies - pynput would swallow the exception)
+        self._drop_ring = deque(maxlen=DROP_RING_MAXLEN)
+        self._drop_count = 0
+
         # Tap groups define which keys are mutually exclusive
         # Key Groups define which key1 will be replaced by key2
         # if a Key Group has more than 2 keys if will be handled als alias
@@ -102,6 +188,50 @@ class FST_Keyboard():
         self._listener.stop()
         self._mouse_listener.stop()
         logger.debug("Keyboard and mouse listeners stopped.")
+        # U345 H1: one summary line per stop - cumulative drop counter
+        # lands in fst.log (INFO) and in fst_drop.log while the watch is on
+        logger_drop.info(f"drop_watch stop drops={self._drop_count}")
+
+    # U345 H2: toast bridge wiring (replaces the direct bridge wiring in
+    # free_snap_tap.py): the four callbacks now post to the offload queue
+    def init_toast_offload(self, bridge):
+        self._toast_offload.attach(bridge)
+        self.toast_callback = self._toast_offload.toast
+        self.timer_callback = self._toast_offload.timer
+        self.remove_callback = self._toast_offload.remove
+        self.remove_all_callback = self._toast_offload.remove_all
+
+    def drain_toast_queue(self):
+        self._toast_offload.drain()
+
+    async def toast_pump(self):
+        '''Drain the toast offload queue on the asyncio loop (pump task
+        started in MainLogic.run - runs in both GUI and headless mode);
+        the drain thread is the loop thread, never a hook pump.'''
+        while True:
+            self.drain_toast_queue()
+            await asyncio.sleep(0.05)
+
+    # U345 H1: named, ASCII-safe drop record (H1 falsifier: an '--> IN'
+    # release with no matching SUPPRESSED/OUT line - now caught at the
+    # filter entry so pynput never sees the exception and the listener
+    # survives; the drop line names the dead leg)
+    def report_event_drop(self, source, vk_code, is_press, is_simulated,
+                          is_mouse, exc):
+        self._drop_count += 1
+        text = (f"event drop {source} vk={vk_code} "
+                f"{'press' if is_press else 'release'}"
+                f"{' simulated' if is_simulated else ''}"
+                f" exc={ascii(exc)} drops={self._drop_count}")
+        if is_drop_watch_enabled():
+            # ring tail: last recorded pump entries, compact ASCII form
+            tail = '|'.join(
+                f"0x{vk:02X}.{'P' if press else 'R'}"
+                f"{'S' if sim else ''}{'M' if mouse else ''}"
+                for vk, press, sim, mouse in list(self._drop_ring)[-12:])
+            text += f" ring_tail={tail}"
+        logger_drop.error(text)
+
 
     # def join_listener(self):
     #     self._listener.join()
@@ -633,7 +763,16 @@ class FST_Keyboard():
             is_simulated = is_simulated_key_event(data.flags)
             is_mouse_event = True
             if vk_code is not None:
-                self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event)
+                # U345 H1 drop-watch: ring tuple + entry-level catch (the
+                # pynput _handler swallows filter exceptions - a mouse
+                # release that dies mid-leg leaks unfiltered, H1 class)
+                self._drop_ring.append(
+                    (vk_code, is_keydown, bool(is_simulated), True))
+                try:
+                    self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event)
+                except Exception as exc:
+                    self.report_event_drop('mouse', vk_code, is_keydown,
+                                           is_simulated, True, exc)
                 # self.loop.call_soon_threadsafe(self._win32_event_filter, vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event)
             else:
                 self._mouse_listener.suppress_event()
@@ -654,7 +793,17 @@ class FST_Keyboard():
         key_event_time = data.time
         is_keydown = is_press(msg)
         is_simulated = is_simulated_key_event(data.flags)
-        self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated)
+        # U345 H1 drop-watch: one raw ring tuple per pump entry (bounded
+        # deque, no format, no I/O - the pump cost stays microseconds)
+        self._drop_ring.append((vk_code, is_keydown, bool(is_simulated), False))
+        # U345 H1: catch a leg exception AT the entry: pynput's _handler
+        # would swallow it and pass the event UNFILTERED (dropped-release
+        # stuck class); the named drop line makes the death visible
+        try:
+            self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated)
+        except Exception as exc:
+            self.report_event_drop('key', vk_code, is_keydown,
+                                   is_simulated, False, exc)
 
     # repeated real press of a REBIND trigger may be let through so the
     # replacement re-fires (proposal 2026-09-12; maintainer ruling 2026-09-15):
@@ -1097,6 +1246,9 @@ class FST_Keyboard():
             toggle_flow()
         if self.check_for_combination(['alt','num5']):
             self.display_internal_repr_groups()
+        if self.check_for_combination(['alt','num6']):
+            # U345 H1 drop-watch toggle (-drop_watch sets it at startup)
+            toggle_drop_watch()
         if self.check_for_combination(['alt','num7']):
             logger_state.debug(f"real_key_state: {self._state_manager._real_key_press_states_dict}")
             logger_state.debug(f"sim_key_state: {self._state_manager._simulated_key_press_states_dict}")

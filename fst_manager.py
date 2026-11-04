@@ -30,15 +30,24 @@ import logging
 #   fst.state     key-state dicts, press/release tracking, timings
 #   fst.macro     macro/repeat task lifecycle
 #   fst.config    start-arg parsing, config load
+#   fst.drop      named event-drop records (U345 H1 drop-watch lane)
 logger = logging.getLogger('fst')
 logger_flow = logging.getLogger('fst.flow')
 logger_eval = logging.getLogger('fst.eval')
 logger_state = logging.getLogger('fst.state')
 logger_macro = logging.getLogger('fst.macro')
 logger_config = logging.getLogger('fst.config')
+logger_drop = logging.getLogger('fst.drop')
 
 MAIN_LOG_FILE = 'fst.log'
 FLOW_LOG_FILE = 'fst_flow.log'
+# drop-watch lane (U345 H1): named release-event drop records land in
+# the dedicated append-only file while the watch is on (records ride
+# fst.log + console at WARNING+ via propagation, like the flow channel)
+DROP_LOG_FILE = 'fst_drop.log'
+# bounded raw-event ring (U345 H1): filter entries append a raw tuple
+# (no format, no I/O); flush writes only when a drop happens (rare)
+DROP_RING_MAXLEN = 200
 
 # -log=LEVEL start argument values -> logging levels
 LOG_LEVELS = {'debug': logging.DEBUG, 'info': logging.INFO,
@@ -106,6 +115,43 @@ def toggle_flow():
     set_flow_enabled(not is_flow_enabled())
 
 
+def is_drop_watch_enabled():
+    '''Drop-watch lane state (U345 H1): the ring at the filter entries is
+    always recording (cheap raw tuples); this flag gates the dedicated
+    fst_drop.log handler and the ring tail appended to drop lines.'''
+    return CONSTANTS.DROP_WATCH
+
+
+def set_drop_watch_enabled(enabled):
+    '''Enable/disable the drop-watch lane (U345 H1): ON -> dedicated
+    append-only fst_drop.log handler on the fst.drop logger (records
+    propagate to fst.log + console at WARNING+, like the flow channel);
+    OFF -> handler removed. Idempotent on focus-change re-applies
+    (apply_start_arguments re-runs).'''
+    drop = logging.getLogger('fst.drop')
+    if enabled:
+        if is_drop_watch_enabled() and drop.handlers:
+            return  # already on
+        drop.setLevel(logging.DEBUG)
+        drop.propagate = True
+        drop_handler = logging.FileHandler(DROP_LOG_FILE, mode='a')
+        drop_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s %(message)s'))
+        drop.addHandler(drop_handler)
+        CONSTANTS.DROP_WATCH = True
+    else:
+        for handler in drop.handlers[:]:
+            drop.removeHandler(handler)
+            handler.close()
+        drop.setLevel(logging.WARNING)
+        drop.propagate = True
+        CONSTANTS.DROP_WATCH = False
+
+
+def toggle_drop_watch():
+    set_drop_watch_enabled(not is_drop_watch_enabled())
+
+
 def toggle_debug_level():
     '''Toggle the root debug level between DEBUG and INFO (alt+num1/2/3).'''
     current = logging.getLogger('fst').level
@@ -123,6 +169,17 @@ class CONSTANTS():
     # safety gate: only run the numpad debug-combination checks when enabled
     # (so alt+num* is not swallowed while gaming)
     DEBUG_NUMPAD = False
+
+    # U345 H2: toast bridge calls ride the offload queue + asyncio pump task
+    # (the hook-pump leg becomes one deque append; the bridge emit never runs
+    # on a poster thread). -no_toast_offload restores the direct emit path
+    # (A/B switch for the maintainer's gaming test).
+    TOAST_OFFLOAD = True
+
+    # U345 H1 drop-watch: gates the dedicated fst_drop.log flush + ring tail
+    # on drop lines (-drop_watch start arg / alt+num6 numpad toggle); the
+    # ring recording itself is always on (raw tuples, no format, no I/O).
+    DROP_WATCH = False
 
     # Define File name for saving of everything, can be any filetype
     # But .txt or .cfg recommended for easier editing
@@ -918,6 +975,7 @@ START_ARG_FLAGS = frozenset({
     '-nodelay', '-exec_one_macro', '-status_indicator', '-crosshair',
     '-always_active', '-tray_icon', '-hide_cmd_window',
     '-no_warnings', '-default_always_active',
+    '-drop_watch', '-no_toast_offload',
 })
 START_ARG_VALUES = frozenset({
     '-log', '-file', '-tapdelay', '-aliasdelay', '-macrodelay', '-crossover',
@@ -1969,6 +2027,12 @@ class Argument_Manager():
                 set_flow_enabled(True)
             elif arg == "-debug_numpad":
                 CONSTANTS.DEBUG_NUMPAD = True
+            # drop-watch lane -> named drop records in fst_drop.log (U345 H1)
+            elif arg == "-drop_watch":
+                set_drop_watch_enabled(True)
+            # restore the direct toast bridge emit (U345 H2 A/B switch)
+            elif arg == "-no_toast_offload":
+                CONSTANTS.TOAST_OFFLOAD = False
             # start directly without showing the menu
             elif arg == "-nomenu":
                 self.MENU_ENABLED = False

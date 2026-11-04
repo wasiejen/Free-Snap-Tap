@@ -91,6 +91,12 @@ class MainLogic:
 
     async def run(self):
 
+        # U345 H2: toast offload pump task on the asyncio loop (runs in
+        # both GUI and headless mode) - drains the toast queue into the
+        # bridge; the drain thread is this loop, never a hook pump.
+        # get_running_loop: MainLogic.loop is not set on the headless path
+        asyncio.get_running_loop().create_task(self.fst_keyboard.toast_pump())
+
         logger.info(f"tap_groups_hr: {self.fst_keyboard.config_manager.tap_groups_hr}")
         logger.info(f"tap_groups: {self.fst_keyboard._tap_groups}")
 
@@ -195,11 +201,12 @@ if __name__ == "__main__":
         bridge.signal_show_timer.connect(gui_manager.toast_manager.add_timer)
         bridge.signal_remove_toast.connect(gui_manager.toast_manager.remove_toast)
         bridge.signal_remove_all_toasts.connect(gui_manager.toast_manager.remove_all_toasts)
-        # Inject the bridge methods into the keyboard logic for thread-safe calls
-        fst_keyboard.toast_callback = bridge.trigger_toast
-        fst_keyboard.timer_callback = bridge.trigger_timer
-        fst_keyboard.remove_callback = bridge.trigger_remove
-        fst_keyboard.remove_all_callback = bridge.trigger_remove_all
+        # Inject the bridge methods into the keyboard logic for thread-safe
+        # calls (U345 H2: through the toast offload queue - poster threads
+        # (hook pumps) do one deque.append; the asyncio pump task drains
+        # into the bridge, so the emit never runs on a poster thread.
+        # -no_toast_offload restores the direct emit path)
+        fst_keyboard.init_toast_offload(bridge)
 
         # startup compliance result (U290T): the validator ran at the startup
         # load, BEFORE this bridge existed - warnings were console-only there

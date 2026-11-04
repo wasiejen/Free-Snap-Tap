@@ -15,6 +15,22 @@ keep emitting. The mocked harness (kb_env_ns / FakeFST, no live listeners -
 gate rule) cannot observe any real-keyboard repeat signal at all, so the
 pin is xfail BY DESIGN; the fix and its hardware acceptance are
 pending-maintainer (#291).
+
+U345 (maintainer hardware answers 2026-11-04, estate handover_u301.md
+comments §H1..H5):
+- H3 (UIPI/elevated-window boundary) FALSIFIED: the stuck key happens
+  in-game with NO window change and the window works WITHOUT elevated
+  status - an elevation boundary cannot be the cause.
+- H5 (focus-change race): his comment is TRUNCATED mid-list of trigger
+  classes ("no button or macro fires this in action") - recorded as an
+  OPEN QUESTION: the remaining non-focus callers of
+  update_args_and_groups are not fully enumerated.
+- H2 (toast bridge on the repeat path, PRIME SUSPECT per his answer):
+  the toast offload queue + asyncio pump landed (U345; see
+  tests/test_toast_offload.py) and the drop-watch lane (U345;
+  tests/test_drop_watch.py) catches H1-class release drops during a
+  gaming session (-drop_watch / ALT+NUM6), so the gaming-session test
+  can now OBSERVE the drop directly.
 """
 import pytest
 from unittest.mock import call

@@ -81,7 +81,7 @@ class FakeFST(SimpleNamespace):
 
 @pytest.fixture(autouse=True)
 def restore_constants():
-    attrs = ['DEBUG_NUMPAD', 'FILE_NAME',
+    attrs = ['DEBUG_NUMPAD', 'TOAST_OFFLOAD', 'DROP_WATCH', 'FILE_NAME',
              'EXIT_Combination', 'TOGGLE_ON_OFF_Combination', 'MENU_Combination']
     saved = {attr: getattr(CONSTANTS, attr) for attr in attrs}
     yield
@@ -93,7 +93,8 @@ def restore_constants():
 def restore_fst_loggers():
     """Save/restore the FST area-logger levels, propagate flags and handlers
     so logging toggles in one test never leak into the next."""
-    names = ['fst', 'fst.flow', 'fst.eval', 'fst.state', 'fst.macro', 'fst.config']
+    names = ['fst', 'fst.flow', 'fst.eval', 'fst.state', 'fst.macro', 'fst.config',
+             'fst.drop']
     saved = {}
     for name in names:
         lg = logging.getLogger(name)

@@ -47,7 +47,10 @@ You can change the control key combinations in the py file under # Control key c
 - only active with the start argument `<arg>-debug_numpad`
 - `ALT + NUM1` to `ALT + NUM4` toggle the internal debug outputs DEBUG, DEBUG2, DEBUG3 and DEBUG4
 - `ALT + NUM5` prints the internal representation of all groups
-- `ALT + NUM6` is unassigned (reserved)
+- `ALT + NUM6` toggles the drop-watch lane (U345, #291 H1): filter legs that
+  die mid-event land named, ASCII-safe drop lines in the append-only
+  `fst_drop.log` (and in `fst.log`); the raw-event ring rides always (µs
+  cost) - `ALT + NUM6` on adds the ring tail + the dedicated file
 - `ALT + NUM7` prints the real pressed-key states
 - `ALT + NUM8` prints all pressed-key states (real and simulated)
 
@@ -443,6 +446,8 @@ Everything else should be put in the config file and then can be applied on a pe
 - `<arg>-delay`: re-enable the delays - the delays are active on default, so this is only meaningful after an earlier `-nodelay`
 - `<arg>-exec_one_macro`: of all macros triggered by one real key event only the FIRST is played
 - `<arg>-debug_numpad`: enable the numpad debug combos (see [Numpad debug combos])
+- `<arg>-drop_watch`: enable the drop-watch lane (U345, #291 H1) - filter legs that die mid-event land named drop lines in `fst_drop.log` + `fst.log`; `ALT + NUM6` toggles it at runtime
+- `<arg>-no_toast_offload`: restore the direct toast bridge emit (default is the offload queue + asyncio pump, U345 H2 - A/B switch for the stuck-key hunt)
 - `<arg>-always_active`: if no focus app matches, the default groups stay active instead of the filter being paused - the status indicator shows blue while in this default-active state
 - `<arg>-tray_icon`: start the GUI loop with a tray icon (with or without status indicator) - the tray menu offers Open config / Reload / Toggle Pause / Return to Menu / Toggle Indicator / Toggle Crosshair / Toggle Console / Exit
 - `<arg>-hide_cmd_window`: keep the console window hidden after start-up - it can be re-shown via the tray menu "Toggle Console"
