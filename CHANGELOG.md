@@ -15,6 +15,9 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 - A multi-name section with a blank first name (`<focus> ,Alpha`) is now scoped
   as the validator scopes it (default scope `''`), so its `-no_warnings`
   silences the activation announce for every name of the section (U330 review).
+- A rejected config load now refreshes the focus name→scope map together with
+  the warnings and silent-section scopes — no stale map survives from the
+  previously loaded config (U330 review).
 
 ## [1.3.0] - 2026-10-29
 

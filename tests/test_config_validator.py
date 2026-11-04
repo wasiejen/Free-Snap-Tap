@@ -575,6 +575,46 @@ class TestSilentFocusGroup:
         assert kb.is_silent_focus_group('Alpha') is True
 
 
+class TestFocusScopeMapRefresh:
+    """U355 edge 2: a rejected load refreshes config_warnings and
+    config_suppressed_scopes from the FAILING file (stored before the
+    ConfigError raise), but the focus scope map was stored only at the end
+    of a successful parse - the rejected load kept the PREVIOUS map. The
+    map must refresh in the SAME load as warnings/suppressed
+    (single-transaction feel)."""
+
+    def test_rejected_load_refreshes_the_focus_scope_map(self, tmp_path):
+        good = write_config(tmp_path, '<focus>Alpha\n')
+        cm = Config_Manager(good)
+        cm.load_config()
+        assert cm.config_focus_scopes == {'Alpha': 'Alpha'}
+        bad = str(tmp_path / 'bad_config.txt')
+        with open(bad, 'w') as fh:
+            fh.write('<focus>Beta\nb, no_such_key\n')
+        cm.file_name = bad
+        with pytest.raises(ConfigError):
+            cm.load_config()
+        # RED-before: pre-fix this fails - the map stays {'Alpha': 'Alpha'}
+        # (the ConfigError raise precedes the map store at the parse tail)
+        assert cm.config_focus_scopes == {'Beta': 'Beta'}
+
+    def test_rejected_load_refreshes_warnings_and_suppressed(self, tmp_path):
+        # the reference behavior edge 2 matches: warnings/suppressed already
+        # refresh from the failing file (pinned, U330 ask 3)
+        good = write_config(tmp_path,
+                            '<focus>Alpha\n<arg>-no_warnings\n<focus>X!\n')
+        cm = Config_Manager(good)
+        cm.load_config()
+        assert cm.config_suppressed_scopes == {'Alpha'}
+        bad = str(tmp_path / 'bad_config.txt')
+        with open(bad, 'w') as fh:
+            fh.write('<focus>Beta\nb, no_such_key\n')
+        cm.file_name = bad
+        with pytest.raises(ConfigError):
+            cm.load_config()
+        assert cm.config_suppressed_scopes == set()
+
+
 class TestScopedWarningReport:
     """U330 ask 4 (maintainer 2026-11-03): a focus-group change shows only
     THAT group's warnings (plus the default section, part of every activated

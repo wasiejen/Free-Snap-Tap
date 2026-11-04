@@ -1551,6 +1551,29 @@ class Config_Manager():
 
         return multiline_cleaned_lines
 
+    def _focus_scope_map_from_lines(self, cleaned_lines):
+        '''every cleaned name of every focus section -> the validator scope
+        of that section (Config_Validator._focus_scope_of: the cleaned
+        header's split(',')[0].strip() - a blank first name ('<focus>
+        ,Alpha') scopes the section to '' = the default scope). Built from
+        the cleaned lines so the map refreshes BEFORE the ConfigError
+        check (U355 edge 2) and scopes sections exactly as the validator
+        does (U330 reviewer P1, U355 edge 1)'''
+        focus_scopes = {}
+        for _, line in cleaned_lines:
+            if not line.startswith('<focus>'):
+                continue
+            cleaned = re.sub(FOCUS_NAME_ILLEGAL, '',
+                             line.replace('<focus>', ''))
+            names = [name.strip() for name in cleaned.split(',')
+                     if name.strip()]
+            if not names:
+                continue
+            scope = cleaned.split(',')[0].strip()
+            for name in names:
+                focus_scopes[name] = scope
+        return focus_scopes
+
     def parse_line(self, line):
         pass
 
@@ -1570,6 +1593,10 @@ class Config_Manager():
         # the silent sections of THIS load (U330 ask 3): re-saved every load,
         # never carried over from a previous one
         self.config_suppressed_scopes = set(validator.suppressed_scopes)
+        # U355 edge 2: the focus name->scope map refreshes in the SAME load
+        # as warnings/suppressed - built from the cleaned lines BEFORE the
+        # ConfigError raise, so a rejected load leaves no stale map behind
+        self.config_focus_scopes = self._focus_scope_map_from_lines(cleaned_lines)
         if any(v.severity == Config_Validator.ERROR for v in violations):
             logger_config.error(f"config violations:\n{Config_Validator.format_report(violations)}")
             raise ConfigError(Config_Validator.format_report(violations),
@@ -1582,9 +1609,6 @@ class Config_Manager():
         default_start_arguments = []
         default_group_lines = []
         extra_focus_names = []
-        # every cleaned name of the section -> the section's validator scope
-        # (the FIRST cleaned name); built fresh every load, stored at return
-        focus_scopes = {}
 
         for line in group_lines:
             if line.startswith('<focus>'):
@@ -1597,20 +1621,6 @@ class Config_Manager():
                 if len(focus_group_names) > 1:
                    focus_name = focus_group_names[0]
                    extra_focus_names = focus_group_names[1:]
-
-                # U330 (reviewer P1): the validator scopes this section by
-                # its first cleaned name (Config_Validator._focus_scope_of:
-                # split(',')[0].strip()) - map every name of the section to
-                # that scope. U355 edge 1: take the scope from the FIRST
-                # name (a blank first name '<focus> ,Alpha' scopes the
-                # section to '' - the default scope - exactly as the
-                # validator does), NOT from the first non-blank name
-                section_names = [name.strip() for name in focus_group_names
-                                  if name.strip()]
-                if section_names:
-                    section_scope = focus_group_names[0].strip()
-                    for name in section_names:
-                        focus_scopes[name] = section_scope
 
                 multi_focus_dict[focus_name] = copy.deepcopy([[], []])
 
@@ -1652,7 +1662,6 @@ class Config_Manager():
                 else:
                     multi_focus_dict[focus_name][1].append([line_name, line])
 
-        self.config_focus_scopes = focus_scopes
         return multi_focus_dict, default_start_arguments, default_group_lines
 
 
