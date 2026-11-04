@@ -9,9 +9,10 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 ## [Unreleased]
 
 ### Added
-- Start arguments accept dashed spellings: `-` and `_` are interchangeable in the
-  arg NAME (`-always-active` == `-always_active`); the value after `=` stays verbatim
-  and truly-unknown args still warn (U361, TODO #356, ruling A 2026-11-04).
+- Start arguments accept dashed spellings of underscore args: '-' and '_' are
+  interchangeable in the arg NAME (`-always-active` == `-always_active`; names
+  without an underscore, like `-tapdelay`, have no dashed twin); the value after
+  `=` stays verbatim and truly-unknown args still warn (U361, TODO #356, ruling A 2026-11-04).
 - The GUI-branch call site of the startup activation pass (right after the
   startup compliance toast) is now pinned by a main-block wiring test
   (test-only: the branch invocation and its order are observed).

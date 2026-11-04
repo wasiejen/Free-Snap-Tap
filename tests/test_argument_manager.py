@@ -338,11 +338,22 @@ class TestDashedStartArgNames:
     def test_dashed_value_args_keep_value_verbatim(self, am_env):
         am_env.am.apply_start_arguments(['-save-dir=C:/my-dir/x',
                                          '-backup-root-dir=D:/my-backup',
-                                         '-status-indicator=20'])
-        # dashes inside the value text stay untouched (name-only normalize)
+                                         '-status-indicator=20',
+                                         '-file=a=b=c'])
+        # dashes inside the value text stay untouched (name-only normalize);
+        # the value keeps everything after the FIRST '=' verbatim
         assert am_env.am.SAVE_DIR == 'C:/my-dir/x'
         assert am_env.am.BACKUP_ROOT_DIR == 'D:/my-backup'
         assert am_env.am.STATUS_INDICATOR_SIZE == 20
+        assert am_env.fst.config_manager.file_name == 'a=b=c'
+
+    def test_non_dash_starting_names_are_not_rewritten(self, am_env, caplog):
+        # ruling A scope: normalization applies to '-'-prefixed names only -
+        # the validator twin REJECTS '.nomenu'/'xlog=debug' (must start with
+        # '-'), the parser must not rewrite them into valid args (U361 review P1)
+        am_env.am.apply_start_arguments(['.nomenu', 'xlog=debug'])
+        assert am_env.am.MENU_ENABLED is True
+        assert 'unknown start argument' in caplog.text
 
     def test_dashed_unknown_still_warns_with_original_spelling(self, am_env, caplog):
         am_env.am.apply_start_arguments(['-not-an-arg'])

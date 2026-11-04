@@ -2041,10 +2041,13 @@ class Argument_Manager():
             # accepted - normalize '-' -> '_' in the arg NAME part for
             # matching ('-always-active' == '-always_active'); the text
             # after '=' stays verbatim; the unknown-arg warning below
-            # echoes the original spelling
+            # echoes the original spelling. Names NOT starting with '-'
+            # stay untouched (ruling scope: the validator twin rejects
+            # them, parser must not rewrite them into valid args)
             original_arg = arg
             arg_name, arg_sep, arg_value = arg.partition('=')
-            arg = '-' + arg_name[1:].replace('-', '_') + arg_sep + arg_value
+            if arg_name[:1] == '-':
+                arg = '-' + arg_name[1:].replace('-', '_') + arg_sep + arg_value
             # log level control: -log=debug/info/warning/error
             if arg[:5] == '-log=' and len(arg) > 5:
                 level = arg[5:].lower()
