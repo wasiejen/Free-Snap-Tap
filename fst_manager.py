@@ -143,7 +143,10 @@ def set_drop_watch_enabled(enabled):
         for handler in drop.handlers[:]:
             drop.removeHandler(handler)
             handler.close()
-        drop.setLevel(logging.WARNING)
+        # INFO level kept (unlike the flow channel's WARNING-off): the
+        # stop-summary INFO line must reach fst.log even after an ON->OFF
+        # cycle - the cumulative drop counter is the point of the hunt
+        drop.setLevel(logging.INFO)
         drop.propagate = True
         CONSTANTS.DROP_WATCH = False
 

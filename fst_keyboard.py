@@ -38,10 +38,13 @@ class Toast_Offload:
     GIL-atomic, no lock, no I/O); a pump task on the asyncio loop drains
     into the bridge (50 ms interval), so the bridge emit NEVER runs on a
     poster thread. Overflow drops the OLDEST posts (newest wins) and counts
-    them. -no_toast_offload (CONSTANTS.TOAST_OFFLOAD, default ON) restores
-    the legacy direct emit. Without a bridge (headless mode) posts are
-    drop-counted no-ops - the legacy toast_callback=None TypeError landmine
-    (constraint show_message headless) is closed on both paths.
+    them (counters best-effort: read-modify-write on multiple poster threads
+    can drift by small amounts - counts are diagnostics, not control flow).
+    -no_toast_offload (CONSTANTS.TOAST_OFFLOAD, default ON) restores the
+    legacy direct emit. Without a bridge (headless mode, wiring
+    init_toast_offload(None)) posts are drop-counted no-ops - the legacy
+    toast_callback=None TypeError landmine (constraint show_message /
+    repeat overlay headless) is closed on both paths.
     '''
     TOAST = 'toast'
     TIMER = 'timer'
@@ -49,7 +52,6 @@ class Toast_Offload:
     REMOVE_ALL = 'remove_all'
 
     def __init__(self, fst_keyboard, maxlen=64):
-        self._fst = fst_keyboard
         self._queue = deque(maxlen=maxlen)
         self._bridge = None
         self._dropped = 0
@@ -1247,7 +1249,10 @@ class FST_Keyboard():
         if self.check_for_combination(['alt','num5']):
             self.display_internal_repr_groups()
         if self.check_for_combination(['alt','num6']):
-            # U345 H1 drop-watch toggle (-drop_watch sets it at startup)
+            # U345 H1 drop-watch toggle (-drop_watch sets it at startup).
+            # CAUTION: the ON leg does a synchronous FileHandler open on
+            # the LL keyboard pump thread (toggle-time only, gated by
+            # -debug_numpad, rare) - the per-event legs stay I/O-free.
             toggle_drop_watch()
         if self.check_for_combination(['alt','num7']):
             logger_state.debug(f"real_key_state: {self._state_manager._real_key_press_states_dict}")

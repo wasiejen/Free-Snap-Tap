@@ -94,8 +94,10 @@ class MainLogic:
         # U345 H2: toast offload pump task on the asyncio loop (runs in
         # both GUI and headless mode) - drains the toast queue into the
         # bridge; the drain thread is this loop, never a hook pump.
-        # get_running_loop: MainLogic.loop is not set on the headless path
-        asyncio.get_running_loop().create_task(self.fst_keyboard.toast_pump())
+        # get_running_loop: MainLogic.loop is not set on the headless path.
+        # Keep the task reference (GC-unsafe pattern, asyncio docs).
+        self.toast_pump_task = asyncio.get_running_loop().create_task(
+            self.fst_keyboard.toast_pump())
 
         logger.info(f"tap_groups_hr: {self.fst_keyboard.config_manager.tap_groups_hr}")
         logger.info(f"tap_groups: {self.fst_keyboard._tap_groups}")
@@ -231,6 +233,11 @@ if __name__ == "__main__":
         # if no tray icon or status indicator, just run the main function
         # HEADLESS MODE: Run logic in the current (__main__) thread
         logger.info("Starting in headless mode with no tray icon or status indicator.")
+        # U345 H2: wire the toast offload with NO bridge - posts become
+        # drop-counted no-ops (the pump task in run() drains); closes the
+        # legacy toast_callback=None TypeError landmine on the headless
+        # product path (constraint show_message / repeat overlay)
+        fst_keyboard.init_toast_offload(None)
         try:
             asyncio.run(logic.run())
         except KeyboardInterrupt:

@@ -146,6 +146,21 @@ def asyncio_is_coroutine_pump(kb):
     return inspect.iscoroutinefunction(kb.toast_pump)
 
 
+def test_facade_headless_wiring_no_bridge_is_noop(kb_env_plain):
+    """Product headless path: init_toast_offload(None) wires the offload
+    with no bridge; the legacy toast_callback=None TypeError landmine
+    (constraint show_message / Macro_Repeat_Task overlay headless) closes.
+    RED-before: pre-U345 wiring left toast_callback None -> TypeError."""
+    kb = kb_env_plain
+    kb.init_toast_offload(None)
+    kb.toast_callback('x', 1, 2, 'bg', 'tc')
+    kb.timer_callback('tm', 1, 2, 'bg', 'tc')
+    kb.remove_callback('x')
+    kb.remove_all_callback()
+    kb.drain_toast_queue()  # drain without bridge: counted no-ops, no crash
+    assert kb._toast_offload.dropped == 4
+
+
 def test_start_argument_turns_offload_off(fake_fst):
     am = fst_manager.Argument_Manager(fake_fst)
     am.apply_start_arguments(['-no_toast_offload'])
