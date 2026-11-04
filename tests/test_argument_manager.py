@@ -304,3 +304,49 @@ class TestFocusGroupManagerDataHolders:
         fm = Focus_Group_Manager(SimpleNamespace())
         fm.default_group_lines = [('', 'a')]
         assert fm.default_group_lines == [('', 'a')]
+
+
+class TestDashedStartArgNames:
+    """U361 (TODO #356, ruling A 2026-11-04): '-' and '_' are interchangeable
+    in start-arg NAMES: '-always-active' == '-always_active'. The text after
+    '=' stays verbatim (dashes inside values survive); truly-unknown args
+    still warn, echoing the original spelling."""
+
+    def test_dashed_flags_match_underscore_twins(self, am_env, caplog):
+        am_env.am.apply_start_arguments([
+            '-always-active', '-debug-numpad', '-exec-one-macro',
+            '-tray-icon', '-hide-cmd-window', '-status-indicator',
+            '-no-warnings', '-drop-watch', '-no-toast-offload',
+        ])
+        assert am_env.am.ALWAYS_ACTIVE is True
+        assert CONSTANTS.DEBUG_NUMPAD is True
+        assert am_env.am.EXEC_ONLY_ONE_TRIGGERED_MACRO is True
+        assert am_env.am.TRAY_ICON is True
+        assert am_env.am.CMD_WINDOW_HIDDEN is True
+        assert am_env.am.STATUS_INDICATOR is True
+        assert 'unknown start argument' not in caplog.text
+
+    def test_dashed_default_always_active(self, am_env):
+        am_env.am.apply_start_arguments(['-default-always-active'])
+        assert am_env.am.ALWAYS_ACTIVE is True
+
+    def test_dashed_value_args_keep_value_verbatim(self, am_env):
+        am_env.am.apply_start_arguments(['-save-dir=C:/my-dir/x',
+                                         '-backup-root-dir=D:/my-backup',
+                                         '-status-indicator=20'])
+        # dashes inside the value text stay untouched (name-only normalize)
+        assert am_env.am.SAVE_DIR == 'C:/my-dir/x'
+        assert am_env.am.BACKUP_ROOT_DIR == 'D:/my-backup'
+        assert am_env.am.STATUS_INDICATOR_SIZE == 20
+
+    def test_dashed_unknown_still_warns_with_original_spelling(self, am_env, caplog):
+        am_env.am.apply_start_arguments(['-not-an-arg'])
+        assert 'unknown start argument' in caplog.text
+        assert '-not-an-arg' in caplog.text
+
+    def test_dashed_spellings_are_normalized_not_dash_stripped(self, am_env, caplog):
+        # '-focus-app' normalizes to '-focus_app'; the canonical name is
+        # '-focusapp' (no underscore) - so it stays an unknown argument:
+        # normalization is dash->underscore on NAME matching, never dash removal
+        am_env.am.apply_start_arguments(['-focus-app=cs2'])
+        assert 'unknown start argument' in caplog.text

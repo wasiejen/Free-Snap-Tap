@@ -811,3 +811,50 @@ class TestScopedWarningReport:
         assert cm.config_focus_scopes == {'AlphaB': 'AlphaB',
                                           'AlphaC': 'AlphaB',
                                           'GameX': 'GameX'}
+
+
+class TestDashedStartArgNames:
+    """U361 (TODO #356, ruling A 2026-11-04): the Config_Validator twin
+    normalizes '-' -> '_' in start-arg NAMES; the checks route to the same
+    rules; dashed '-no-warnings' suppresses its section; truly-unknown
+    dashed args still warn with the original spelling in the message."""
+
+    def test_dashed_flags_are_valid(self):
+        content = ('<arg>-always-active\n'
+                   '<arg>-default-always-active\n'
+                   '<arg>-no-warnings\n'
+                   '<arg>-status-indicator=10\n')
+        assert violations_of(content) == []
+
+    def test_dashed_value_arg_keeps_value_verbatim(self):
+        # a dash inside the value text must not affect the name match
+        assert violations_of('<arg>-save-dir=C:/my-dir\n') == []
+
+    def test_dashed_value_flag_without_value_is_error(self):
+        # twin of the underscore check '-save_dir' (a bare '-status_indicator'
+        # is legal: the FLAGS entry wins - the dashed twin must mirror it)
+        violations = errors_of('<arg>-save-dir\n')
+        assert len(violations) == 1
+        assert violations[0].rule == 'arg'
+
+    def test_dashed_flag_with_value_is_error(self):
+        violations = errors_of('<arg>-no-warnings=1\n')
+        assert len(violations) == 1
+        assert violations[0].rule == 'arg'
+
+    def test_dashed_bare_status_indicator_mirrors_the_underscore_twin(self):
+        # a bare '-status_indicator' is legal (the FLAGS entry wins over
+        # VALUES) - the dashed twin must mirror the underscore twin
+        assert violations_of('<arg>-status-indicator\n') == []
+
+    def test_dashed_no_warnings_suppresses_its_section(self):
+        content = '<focus>Game\n<arg>-no-warnings\n<focus>Other-S\n'
+        warnings = warnings_of(content)
+        assert len(warnings) == 1
+        assert {w.scope for w in warnings} == {'OtherS'}
+
+    def test_dashed_unknown_still_warns(self):
+        violations = warnings_of('<arg>-not-an-arg\n')
+        assert len(violations) == 1
+        assert violations[0].rule == 'arg'
+        assert '-not-an-arg' in violations[0].message

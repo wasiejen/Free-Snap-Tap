@@ -1139,7 +1139,12 @@ class Config_Validator():
                        f'start argument {arg!r} must start with "-"')
             return
         name, _, value = arg.partition('=')
-        if name == '-no_warnings':
+        # U361 (TODO #356, ruling A 2026-11-04): dashed spellings are
+        # accepted - normalize '-' -> '_' in the NAME part for matching
+        # ('-always-active' == '-always_active'); the value stays verbatim
+        # and the messages below echo the original spelling
+        match_name = '-' + name[1:].replace('-', '_')
+        if match_name == '-no_warnings':
             # check-suppression arg (maintainer observation 1): warnings of
             # this section are dropped from the report; the section carries
             # the flag - a bare <arg>-no_warnings in the default scope
@@ -1147,18 +1152,18 @@ class Config_Validator():
             self.suppressed_scopes.add(scope)
         has_value = value != ''
         if has_value:
-            if name in START_ARG_VALUES:
-                self._check_arg_value(line_number, name, value)
-            elif name in START_ARG_FLAGS:
+            if match_name in START_ARG_VALUES:
+                self._check_arg_value(line_number, match_name, value)
+            elif match_name in START_ARG_FLAGS:
                 self._error(line_number, '(arg)', 'arg',
                             f'{name} takes no value - remove the "=" part')
             else:
                 self._warn(line_number, '(arg)', 'arg',
                            f'unknown start argument: {arg}')
             return
-        if name in START_ARG_FLAGS:
+        if match_name in START_ARG_FLAGS:
             return
-        if name in START_ARG_VALUES:
+        if match_name in START_ARG_VALUES:
             self._error(line_number, '(arg)', 'arg',
                         f'{name} needs a value after "="')
             return
@@ -2032,6 +2037,14 @@ class Argument_Manager():
             if arg[0] in (':', '#'):
                 continue
             logger_config.debug(f"start argument: {arg}")
+            # U361 (TODO #356, ruling A 2026-11-04): dashed spellings are
+            # accepted - normalize '-' -> '_' in the arg NAME part for
+            # matching ('-always-active' == '-always_active'); the text
+            # after '=' stays verbatim; the unknown-arg warning below
+            # echoes the original spelling
+            original_arg = arg
+            arg_name, arg_sep, arg_value = arg.partition('=')
+            arg = '-' + arg_name[1:].replace('-', '_') + arg_sep + arg_value
             # log level control: -log=debug/info/warning/error
             if arg[:5] == '-log=' and len(arg) > 5:
                 level = arg[5:].lower()
@@ -2152,7 +2165,7 @@ class Argument_Manager():
                 self.BACKUP_ROOT_DIR = arg[17:].strip()
                 print(f"set backup root directory to: {self.BACKUP_ROOT_DIR}")
             else:
-                logger_config.warning(f"unknown start argument: {arg}")
+                logger_config.warning(f"unknown start argument: {original_arg}")
 
 class Focus_Group_Manager():
     '''
