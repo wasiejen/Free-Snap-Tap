@@ -1023,13 +1023,14 @@ class Config_Validator():
         self._count_rebind = 1
         self._count_macro = 1
         self._count_sequence = 1
-        # scope of the line currently checked (violations record it) and the
-        # focus sections carrying the -no_warnings check-suppression arg
+        # scope of the line currently checked (violations record it)
         self._current_scope = ''
-        self._suppress_scopes = set()
         # the SILENT sections (U330 ask 3): scopes whose warnings are
-        # suppressed - the activation toast skips them; public so the load
-        # can store it (Config_Manager.config_suppressed_scopes)
+        # suppressed - the activation toast skips them. U355 edge 4: ONE
+        # live set, public so the load stores it directly
+        # (Config_Manager.config_suppressed_scopes) - the private
+        # _suppress_scopes twin and its end-of-validate mirror are gone,
+        # a reused instance cannot report stale silent scopes
         self.suppressed_scopes = set()
 
     def validate(self, numbered_lines):
@@ -1037,7 +1038,7 @@ class Config_Validator():
         self._collect_alias_definitions(numbered_lines)
         scope = ''
         aliases_by_scope = self._aliases_by_scope
-        self._suppress_scopes = set()
+        self.suppressed_scopes = set()
         for line_number, line in numbered_lines:
             if line.startswith('<focus>'):
                 # ruling A (maintainer 2026-11-03, TODO #300): the <focus>
@@ -1059,11 +1060,10 @@ class Config_Validator():
         # check-suppression (-no_warnings): drop WARNING violations of the
         # suppressed sections (the default scope '' counts as a section);
         # ERROR severity is never suppressed
-        if self._suppress_scopes:
+        if self.suppressed_scopes:
             self.violations = [v for v in self.violations
                                if not (v.severity == self.WARNING
-                                       and v.scope in self._suppress_scopes)]
-        self.suppressed_scopes = set(self._suppress_scopes)
+                                       and v.scope in self.suppressed_scopes)]
         return self.violations
 
     # -- reporting helpers ---------------------------------------------------
@@ -1144,7 +1144,7 @@ class Config_Validator():
             # this section are dropped from the report; the section carries
             # the flag - a bare <arg>-no_warnings in the default scope
             # suppresses the default group's warnings
-            self._suppress_scopes.add(scope)
+            self.suppressed_scopes.add(scope)
         has_value = value != ''
         if has_value:
             if name in START_ARG_VALUES:

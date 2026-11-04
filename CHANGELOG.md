@@ -18,6 +18,9 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 - A rejected config load now refreshes the focus name→scope map together with
   the warnings and silent-section scopes — no stale map survives from the
   previously loaded config (U330 review).
+- `Config_Validator` keeps ONE live silent-section set (the private twin and
+  its end-of-validate mirror are gone): a reused validator instance always
+  reports the current load's silent scopes, never a stale mirror (U330 review).
 
 ## [1.3.0] - 2026-10-29
 

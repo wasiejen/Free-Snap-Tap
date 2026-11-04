@@ -615,6 +615,35 @@ class TestFocusScopeMapRefresh:
         assert cm.config_suppressed_scopes == set()
 
 
+class TestValidatorReuseContract:
+    """U355 edge 4: Config_Validator kept a private _suppress_scopes plus a
+    public mirror copied at the end of validate() - a REUSED instance could
+    report stale silent scopes (the public mirror only catches up when a
+    full validate() run completes). Resolution: ONE live set (mirror gone)."""
+
+    def _numbered(self, content):
+        cm = Config_Manager()
+        return cm._combine_multilines_numbered(
+            cm._clean_comments_numbered(content.splitlines(keepends=True)))
+
+    def test_one_live_set_the_mirror_is_gone(self):
+        # RED-before: pre-fix the '_suppress_scopes' __dict__ assert fails
+        # (the validator keeps the private twin set next to the mirror)
+        v = Config_Validator()
+        v.validate(self._numbered('<focus>Game\n<arg>-no_warnings\n'))
+        assert v.suppressed_scopes == {'Game'}
+        assert '_suppress_scopes' not in v.__dict__
+
+    def test_reused_validator_reports_the_latest_load(self):
+        # the anti-staleness contract (pinned both sides - the discriminating
+        # RED check is the __dict__ assert in the test above): the second
+        # run on the SAME instance reports the SECOND run's silent scopes
+        v = Config_Validator()
+        v.validate(self._numbered('<focus>Game\n<arg>-no_warnings\n'))
+        v.validate(self._numbered('<focus>Other\n<arg>-no_warnings\n'))
+        assert v.suppressed_scopes == {'Other'}
+
+
 class TestScopedWarningReport:
     """U330 ask 4 (maintainer 2026-11-03): a focus-group change shows only
     THAT group's warnings (plus the default section, part of every activated
