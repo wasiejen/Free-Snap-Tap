@@ -14,18 +14,20 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   (test-only: the branch invocation and its order are observed).
 
 ### Fixed
-- Macro/rebind/tap-group suppression over the hook pump restored: the keyboard
-  filter decoded `is_simulated` from the ALTDOWN bit (`0x10`) instead of
-  `LLKHF_INJECTED` (`0x04`), so every FST-injected keyboard event ran the REAL
-  leg — the macro write lane's `release_modifier()` ctrl release flipped the
-  real press state of the physically held ctrl to released, closing the
-  ctrl+trigger suppression window mid-macro: the next trigger press was no
-  longer recognized and landed unsuppressed in the focused app (the trigger
-  key leaked into the typed output; the app fired its own shortcut). Synthetic
-  raw-hook-event coverage added for all three action classes (macros,
-  rebinding, tap groups) plus the pump contract (a macro task stalled in its
-  write lane and a saturated toast queue never block suppression), both
-  toast-offload modes.
+- U359 macro-suppression regression hunt: the win32 injected-flag decode of the
+  keyboard filter was audited against the documented `KBDLLHOOKSTRUCT` contract
+  (`LLKHF_INJECTED = 0x10`, `ALTDOWN = 0x20`, `UP = 0x80`) and confirmed CORRECT;
+  the U345-era source note claiming `0x04` was wrong and is replaced (a fix
+  proposed on that basis was falsified and reverted — `0x04` is a reserved bit,
+  it would have classified every FST-injected event as real input). Shipped:
+  synthetic raw-hook-event suppression coverage pins for ALL three action
+  classes (macros, rebinding, tap groups) — the suppression at macro start, the
+  injected-event lane, and the pump contract (a macro task stalled in its write
+  lane plus a saturated toast offload queue never block suppression on the hook
+  pump) — in both toast-offload modes. The reported leak itself is the LL-hook
+  removal class (the hook pump blocked past `LowLevelHooksTimeout` drops events
+  unfiltered): live A/B on the maintainer's hardware (`-drop_watch`,
+  `-no_toast_offload`, `-flow` window) is the arbiter.
 - WIKI suffix-constraint syntax now matches the runtime: state constraints are
   documented parenthesized (`ke1|(-ke2)`); bare suffix segments parse as delay
   numbers, so the old bare `ke1|-ke2` example raised at config load.

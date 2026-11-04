@@ -783,16 +783,13 @@ class FST_Keyboard():
     def keyboard_win32_event_filter(self, msg, data):
 
         def is_simulated_key_event(flags):
-            # U359: KBDLLHOOKSTRUCT.flags - LLKHF_INJECTED = 0x04 marks events
-            # FST itself injected (macro write lane, rebind replacement, tap
-            # sends, modifier releases). The historical 0x10 = LLKHF_ALTDOWN
-            # (alt state), so every injected keyboard event ran the REAL leg:
-            # the write lane's release_modifier ctrl release flipped the real
-            # press state of the physically held ctrl to released, closing the
-            # ctrl+trigger suppression window mid-macro (trigger key leaks,
-            # app fires the original shortcut). Symmetric to the mouse filter
-            # (LLMHF_INJECTED = 0x01, bit test since TODO #48).
-            return flags & 0x04
+            # LLKHF_INJECTED = 0x10 (bit 4) per the win32 KBDLLHOOKSTRUCT
+            # contract (U359 review: the U345-era note claiming 0x04 was
+            # falsified - 0x04 is a RESERVED bit; ALTDOWN = 0x20, UP = 0x80).
+            # Every FST-injected keyboard event (macro write chars, rebind
+            # replacement, tap snap send, modifier release) is classified
+            # SIMULATED and runs the simulated leg of _win32_event_filter.
+            return flags & 0x10
 
         def is_press(msg):
             if msg in FST_Keyboard.WM_KEYDOWN:

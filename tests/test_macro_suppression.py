@@ -3,26 +3,35 @@
 Synthetic raw win32 hook events (msg + data with a flags word) are fed to the
 keyboard wrapper - no real keyboard, no SendInput, pynput controllers mocked.
 
-The flags word is the point of this file: the wrapper decodes
-is_simulated from data.flags. For keyboard events LLKHF_INJECTED = 0x04 marks
-events FST itself injected (macro write lane, rebind replacement, tap sends,
-modifier releases); LLKHF_ALTDOWN = 0x10 is the alt state. A wrapper that
-reads 0x10 classifies every FST-injected keyboard event as REAL: the real leg
-then flips the real press state of a physically held modifier to released
-(the macro's write lane releases ctrl through release_modifier) - the
-suppression window of ctrl+<trigger> closes mid-macro, the next trigger press
-is no longer recognized and lands in the focused app (the maintainer's
-"trigger key leaks into the typed output" + "the original shortcut fires").
+Flags word per the win32 KBDLLHOOKSTRUCT contract (U359 review, MS Learn
+KBDLLHOOKSTRUCT page): LLKHF_INJECTED = 0x10 (bit 4) marks events FST itself
+injected (macro write lane, rebind replacement, tap snap send, modifier
+releases); LLKHF_LOWER_IL_INJECTED = 0x02 (bit 1); LLKHF_ALTDOWN = 0x20
+(bit 5); LLKHF_UP = 0x80 (bit 7); 0x04 is RESERVED.
 
-Coverage per action class (all three untested for suppression before U359):
-macro, rebind, tap group - plus the pump contract: a macro task stalled in
-its write lane (loop thread) and a saturated toast offload queue must never
-block the suppression on the hook pump. A/B: both toast-offload modes
-(-no_toast_offload switch = CONSTANTS.TOAST_OFFLOAD) take the same path for
-the suppression lane, so every test runs in both modes.
+The U359 hunt opened with the hypothesis that the wrapper decoded
+is_simulated from a wrong bit and that the write lane's injected ctrl release
+(release_modifier) clobbered the real press state of the physically held
+ctrl, closing the ctrl+trigger suppression window mid-macro (the maintainer's
+"trigger key leaks" + "the app fires its own shortcut"). RED-before falsified
+the DECODE half: the wrapper's 0x10 test is the documented injected bit, the
+injected release belongs to the simulated leg, and the real ctrl state and the
+trigger suppression survive it (the window pins below are green on the
+pre-change code). What remains pinnable at unit level is the CONTRACT this
+file locks for all three action classes - all previously untested for
+suppression - plus the pump contract: a macro task stalled in its write lane
+(loop thread) and a saturated toast offload queue never block the suppression
+on the hook pump. The leak itself is the LL-hook removal class (the pump
+blocked past LowLevelHooksTimeout passes events unfiltered wholesale):
+wall-time/live lane, the drop-watch is the designed diagnostic, the live A/B
+is the maintainer's.
+
+A/B: CONSTANTS.TOAST_OFFLOAD (-no_toast_offload switch) - the suppression lane
+is mode-independent, so every test runs in both modes.
 """
 import asyncio
 import threading
+import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -40,9 +49,10 @@ VK_CTRL = 162          # left_control, in Input_State_Manager.ALL_MODIFIER_KEYS
 WM_KEYDOWN = 256
 WM_KEYUP = 257
 
-LLKHF_INJECTED = 0x04  # keyboard injected flag (SendInput)
-LLKHF_UP = 0x20        # keyboard release flag
-LLKHF_ALTDOWN = 0x10   # alt state bit - NOT the injected bit
+LLKHF_INJECTED = 0x10
+LLKHF_LOWER_IL_INJECTED = 0x02
+LLKHF_ALTDOWN = 0x20
+LLKHF_UP = 0x80
 
 
 def key_data(vk, t, flags=0):
@@ -57,11 +67,19 @@ def raw_release(kb, vk, t, flags=0):
     kb.keyboard_win32_event_filter(WM_KEYUP, key_data(vk, t, flags))
 
 
+def wait_for(predicate, timeout=2.0):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if predicate():
+            return True
+        time.sleep(0.005)
+    return predicate()
+
+
 @pytest.fixture
 def loop_thread():
     """Real asyncio loop on a background thread = the product's macro/toast
-    pump thread (MainLogic.run in GUI mode); the test thread plays the hook
-    pump."""
+    pump thread (MainLogic.run); the test thread plays the hook pump."""
     loop = asyncio.new_event_loop()
     th = threading.Thread(target=loop.run_forever, daemon=True)
     th.start()
@@ -79,8 +97,9 @@ def offload_mode(request):
 
 
 class TestMacroSuppressionWindow:
-    """Macro class: the injected ctrl release of the write lane must keep the
-    ctrl+trigger suppression window open (the physical ctrl is still held)."""
+    """Macro class: the suppression at macro start is active, and the
+    injected ctrl release of the write lane keeps the ctrl+trigger
+    suppression window OPEN (the physical ctrl is still held)."""
 
     def test_injected_modifier_release_keeps_suppression_window(
             self, kb_env_ns, loop_thread, offload_mode):
@@ -127,8 +146,6 @@ class TestMacroSuppressionWindow:
 
     def test_second_trigger_press_mid_write_is_interrupt_and_restart(
             self, kb_env_ns, loop_thread, offload_mode):
-        """The mid-write interrupt: the stalled task is cancelled by the next
-        press and the new task runs after the stall ends (both modes)."""
         kb = kb_env_ns.kb
         kb.set_loop(loop_thread)
         kb.init_toast_offload(MagicMock())
@@ -150,18 +167,27 @@ class TestMacroSuppressionWindow:
             raw_press(kb, VK_I, 1100)             # fires macro 2
             assert entered.wait(2) is True
             assert kb._listener.suppress_event.call_count == 1
-            # second press mid-write: 'i' suppressed, running task interrupted
+            first_handle = kb.macro_thread_dict['m2']
+            # the user releases 'i' and presses again mid-write: a NEW trigger
+            # press (a held-key auto-repeat is suppressed by the repeat leg and
+            # never restarts) -> running task interrupted, new task scheduled
+            raw_release(kb, VK_I, 1150)
             raw_press(kb, VK_I, 1200)
             assert kb._listener.suppress_event.call_count == 2
-            handle = kb.macro_thread_dict['m2']
-            assert handle is not None
+            new_handle = kb.macro_thread_dict['m2']
+            assert new_handle is not first_handle
         finally:
             release.set()
+        # the observed interrupt/restart outcome: the first task is done
+        # (cancelled or finished) and the new task ran the write lane
+        assert wait_for(lambda: len(typed) >= 2), f"typed={typed}"
+        assert first_handle.done()
+        assert wait_for(lambda: new_handle.done())
 
 
 class TestRebindSuppression:
-    """Rebind class: FST's injected replacement event must not re-run the real
-    leg (no re-fire, no state clobber) - it belongs to the simulated leg."""
+    """Rebind class: FST's injected replacement event runs the simulated leg
+    (no re-fire, no real-state clobber)."""
 
     def test_injected_replacement_lands_in_simulated_leg(
             self, kb_env_ns, offload_mode):
@@ -171,7 +197,7 @@ class TestRebindSuppression:
         raw_press(kb, VK_A, 1000)                 # a -> b, source suppressed
         assert kb._listener.suppress_event.call_count == 1
         assert kb_env_ns.kb_mock.press.call_count == 1   # replacement sent
-        # FST's injected 'b' press re-enters the hook as INJECTED
+        # FST's injected 'b' press re-enters the hook as INJECTED (0x10)
         raw_press(kb, VK_B, 1100, flags=LLKHF_INJECTED)
         # no re-fire through the real leg: the send count stays at 1
         assert kb_env_ns.kb_mock.press.call_count == 1
@@ -182,8 +208,8 @@ class TestRebindSuppression:
 
 
 class TestTapGroupSuppression:
-    """Tap-group class: the injected snap send must not feed the tap state a
-    second time (no send churn, real press state untouched)."""
+    """Tap-group class: the injected snap send feeds the simulated book-
+    keeping only - the tap state is fed by the real event stream."""
 
     def test_injected_snap_send_does_not_double_update(
             self, kb_env_ns, offload_mode):
@@ -193,13 +219,13 @@ class TestTapGroupSuppression:
         raw_press(kb, VK_W, 1000)     # snap tap: real w suppressed, w sent
         assert kb._listener.suppress_event.call_count == 1
         n_calls = len(kb_env_ns.kb_mock.method_calls)
-        # FST's injected w press re-enters the hook as INJECTED
+        # FST's injected w press re-enters the hook as INJECTED (0x10)
         raw_press(kb, VK_W, 1100, flags=LLKHF_INJECTED)
         # tap state is fed by the event stream ONLY through real events
         assert len(kb_env_ns.kb_mock.method_calls) == n_calls
         assert kb.state_manager.get_simulated_key_press_state(VK_W) is True
-        # the PHYSICAL w is still held: the injected events must not clear the
-        # real press state (the repeat-suppression window of the tap trigger)
+        # the PHYSICAL w is still held: the injected events must not clear
+        # the real press state (the repeat-suppression window of the tap key)
         assert kb.state_manager.get_real_key_press_state(VK_W) is True
 
 
