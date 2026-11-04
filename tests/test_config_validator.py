@@ -644,6 +644,91 @@ class TestValidatorReuseContract:
         assert v.suppressed_scopes == {'Other'}
 
 
+class TestGuiBranchWiring:
+    """U355 edge 3 (U330 reviewer P2): the GUI branch of free_snap_tap calls
+    surface_startup_activation(fst_keyboard) right AFTER the compliance
+    result (free_snap_tap.py:217/:221) - the startup pass was pinned only
+    through the helper, the branch CALL SITE was unpinned. This pin execs
+    the __main__ block in a fully stubbed globals namespace (no Qt event
+    loop, no threads, no keyboard) and records the branch invocations."""
+
+    def _exec_main_block(self, source_path, kb, order, passed):
+        import textwrap
+        from unittest.mock import MagicMock
+
+        with open(source_path, encoding='utf-8') as fh:
+            lines = fh.read().splitlines()
+        marker = 'if __name__ == "__main__":'
+        start = lines.index(marker) + 1
+        code = compile(textwrap.dedent('\n'.join(lines[start:])),
+                       source_path, 'exec')
+
+        class FakeThread:
+            def __init__(self, target=None, daemon=None):
+                self.target = target
+
+            def start(self):
+                pass  # never runs the logic thread
+
+        def fake_exit(code=0):
+            raise SystemExit(code)
+
+        def compliance(k):
+            order.append('compliance')
+            passed['compliance'] = k
+
+        def activation(k):
+            order.append('activation')
+            passed['activation'] = k
+
+        gui_stub = MagicMock()
+        import types
+        globs = {
+            '__name__': '__main__',
+            'setup_fst_logging': lambda: None,
+            'logger': MagicMock(),
+            'set_console_visibility': lambda flag: None,
+            'FST_Keyboard': lambda: kb,
+            'sys': types.SimpleNamespace(argv=['free_snap_tap.py'],
+                                         exit=fake_exit),
+            'ConfigError': ConfigError,
+            'MainLogic': lambda k: MagicMock(),
+            'sleep': lambda s: None,
+            'Thread': FakeThread,
+            'QApplication': lambda args: MagicMock(),
+            'GUI_Manager': lambda k, app: gui_stub,
+            'ToastBridge': lambda: MagicMock(),
+            'surface_startup_config_result': compliance,
+            'surface_startup_activation': activation,
+        }
+        with pytest.raises(SystemExit):
+            exec(code, globs)
+
+    def test_gui_branch_calls_the_activation_pass_after_compliance(self):
+        import importlib.util
+        from unittest.mock import MagicMock
+        spec = importlib.util.find_spec('free_snap_tap')
+        kb = MagicMock()
+        # the GUI branch condition: tray icon on, cmd window hidden,
+        # no status indicator (the headless else-branch must NOT run)
+        kb.arg_manager.TRAY_ICON = True
+        kb.arg_manager.CMD_WINDOW_HIDDEN = True
+        kb.arg_manager.STATUS_INDICATOR = False
+        order, passed = [], {}
+        self._exec_main_block(spec.origin, kb, order, passed)
+        # the branch wiring: compliance result first, activation pass right
+        # after, each exactly once, both on the startup keyboard object
+        # (RED negative control: delete the :221 call in a scratch copy of
+        # free_snap_tap.py and this order assert fails)
+        assert order == ['compliance', 'activation']
+        assert passed['compliance'] is kb
+        assert passed['activation'] is kb
+        # the bridge is wired (init_toast_offload) BEFORE both passes
+        kb.init_toast_offload.assert_called_once()
+        assert kb.init_toast_offload.call_args.args[0] is not None
+        kb.update_args_and_groups.assert_called_once_with(startup=True)
+
+
 class TestScopedWarningReport:
     """U330 ask 4 (maintainer 2026-11-03): a focus-group change shows only
     THAT group's warnings (plus the default section, part of every activated

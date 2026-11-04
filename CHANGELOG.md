@@ -21,6 +21,9 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 - `Config_Validator` keeps ONE live silent-section set (the private twin and
   its end-of-validate mirror are gone): a reused validator instance always
   reports the current load's silent scopes, never a stale mirror (U330 review).
+- The GUI-branch call site of the startup activation pass (right after the
+  startup compliance toast) is now pinned by a main-block wiring test
+  (test-only: the branch invocation and its order are observed).
 
 ## [1.3.0] - 2026-10-29
 
