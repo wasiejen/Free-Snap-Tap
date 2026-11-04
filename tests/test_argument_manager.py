@@ -312,7 +312,12 @@ class TestDashedStartArgNames:
     '=' stays verbatim (dashes inside values survive); truly-unknown args
     still warn, echoing the original spelling."""
 
-    def test_dashed_flags_match_underscore_twins(self, am_env, caplog):
+    def test_dashed_flags_match_underscore_twins(self, am_env, caplog,
+                                                  monkeypatch, tmp_path):
+        # -drop-watch would open fst_drop.log in the suite cwd (repo
+        # convention: monkeypatch DROP_LOG_FILE, test_drop_watch.py:119)
+        monkeypatch.setattr(fst_manager, 'DROP_LOG_FILE',
+                            str(tmp_path / 'fst_drop.log'))
         am_env.am.apply_start_arguments([
             '-always-active', '-debug-numpad', '-exec-one-macro',
             '-tray-icon', '-hide-cmd-window', '-status-indicator',
