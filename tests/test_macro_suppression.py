@@ -21,10 +21,11 @@ pre-change code). What remains pinnable at unit level is the CONTRACT this
 file locks for all three action classes - all previously untested for
 suppression - plus the pump contract: a macro task stalled in its write lane
 (loop thread) and a saturated toast offload queue never block the suppression
-on the hook pump. The leak itself is the LL-hook removal class (the pump
-blocked past LowLevelHooksTimeout passes events unfiltered wholesale):
-wall-time/live lane, the drop-watch is the designed diagnostic, the live A/B
-is the maintainer's.
+on the hook pump. The leak itself is not unit-reproducible: the leading
+hypothesis is the LL-hook removal class (the pump blocked past
+LowLevelHooksTimeout passes events unfiltered wholesale) - wall-time/live
+lane, the drop-watch is the designed diagnostic, the live A/B is the
+maintainer's.
 
 A/B: CONSTANTS.TOAST_OFFLOAD (-no_toast_offload switch) - the suppression lane
 is mode-independent, so every test runs in both modes.

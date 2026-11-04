@@ -24,10 +24,11 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   classes (macros, rebinding, tap groups) — the suppression at macro start, the
   injected-event lane, and the pump contract (a macro task stalled in its write
   lane plus a saturated toast offload queue never block suppression on the hook
-  pump) — in both toast-offload modes. The reported leak itself is the LL-hook
-  removal class (the hook pump blocked past `LowLevelHooksTimeout` drops events
-  unfiltered): live A/B on the maintainer's hardware (`-drop_watch`,
-  `-no_toast_offload`, `-flow` window) is the arbiter.
+  pump) — in both toast-offload modes. The reported leak itself is not
+  reproducible at unit level: the leading hypothesis is the LL-hook removal
+  class (the hook pump blocked past `LowLevelHooksTimeout` drops events
+  unfiltered), pending the live A/B on the maintainer's hardware
+  (`-drop_watch`, `-no_toast_offload`, `-flow` window) as the arbiter.
 - WIKI suffix-constraint syntax now matches the runtime: state constraints are
   documented parenthesized (`ke1|(-ke2)`); bare suffix segments parse as delay
   numbers, so the old bare `ke1|-ke2` example raised at config load.
