@@ -46,8 +46,12 @@ class TestKeyboardWin32EventFilter:
     def test_llkhf_injected_flag_marks_event_simulated(self, kb_env_mouse, monkeypatch):
         kb = kb_env_mouse
         self.patch_filter(kb, monkeypatch)
-        kb.keyboard_win32_event_filter(256, kb_msg_data(flags=0x10))
-        kb._win32_event_filter.assert_called_once_with(VK_A, 1234, True, 16)
+        # U359 repin: KBDLLHOOKSTRUCT LLKHF_INJECTED = 0x04 (0x10 = ALTDOWN);
+        # the test's INTENT (the injected flag marks the event simulated) is the
+        # pin, repinned to the documented win32 constant - the old 0x10/16 pair
+        # pinned the pre-fix decode in place
+        kb.keyboard_win32_event_filter(256, kb_msg_data(flags=0x04))
+        kb._win32_event_filter.assert_called_once_with(VK_A, 1234, True, 4)
 
 
 class TestSimulatedContradiction:

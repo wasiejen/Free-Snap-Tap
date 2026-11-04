@@ -14,6 +14,18 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   (test-only: the branch invocation and its order are observed).
 
 ### Fixed
+- Macro/rebind/tap-group suppression over the hook pump restored: the keyboard
+  filter decoded `is_simulated` from the ALTDOWN bit (`0x10`) instead of
+  `LLKHF_INJECTED` (`0x04`), so every FST-injected keyboard event ran the REAL
+  leg — the macro write lane's `release_modifier()` ctrl release flipped the
+  real press state of the physically held ctrl to released, closing the
+  ctrl+trigger suppression window mid-macro: the next trigger press was no
+  longer recognized and landed unsuppressed in the focused app (the trigger
+  key leaked into the typed output; the app fired its own shortcut). Synthetic
+  raw-hook-event coverage added for all three action classes (macros,
+  rebinding, tap groups) plus the pump contract (a macro task stalled in its
+  write lane and a saturated toast queue never block suppression), both
+  toast-offload modes.
 - WIKI suffix-constraint syntax now matches the runtime: state constraints are
   documented parenthesized (`ke1|(-ke2)`); bare suffix segments parse as delay
   numbers, so the old bare `ke1|-ke2` example raised at config load.
