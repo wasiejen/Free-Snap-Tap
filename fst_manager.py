@@ -1599,13 +1599,18 @@ class Config_Manager():
                    extra_focus_names = focus_group_names[1:]
 
                 # U330 (reviewer P1): the validator scopes this section by
-                # its first cleaned name (Config_Validator._focus_scope_of)
-                # - map every name of the section to that scope
+                # its first cleaned name (Config_Validator._focus_scope_of:
+                # split(',')[0].strip()) - map every name of the section to
+                # that scope. U355 edge 1: take the scope from the FIRST
+                # name (a blank first name '<focus> ,Alpha' scopes the
+                # section to '' - the default scope - exactly as the
+                # validator does), NOT from the first non-blank name
                 section_names = [name.strip() for name in focus_group_names
                                   if name.strip()]
                 if section_names:
+                    section_scope = focus_group_names[0].strip()
                     for name in section_names:
-                        focus_scopes[name] = section_names[0]
+                        focus_scopes[name] = section_scope
 
                 multi_focus_dict[focus_name] = copy.deepcopy([[], []])
 

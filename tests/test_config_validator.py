@@ -559,6 +559,21 @@ class TestSilentFocusGroup:
         assert kb.is_silent_focus_group('AlphaB') is True
         assert kb.is_silent_focus_group('AlphaC') is True
 
+    def test_blank_first_name_section_maps_to_the_validator_scope(self, kb_env_ns,
+                                                                  tmp_path):
+        # U355 edge 1 (U330 reviewer P2): '<focus> ,Alpha' - the validator
+        # scopes the section by the FIRST cleaned name: '' (split(',')[0]),
+        # so -no_warnings lands on scope '' (the default scope). The load
+        # must map 'Alpha' to that SAME scope, not to 'Alpha' itself, so
+        # the silent section skips the activation announce for every name
+        kb = kb_env_ns.kb
+        kb.config_manager.file_name = write_config(
+            tmp_path, '<focus> ,Alpha\n<arg>-no_warnings\n')
+        kb.update_focus_groups()
+        assert kb.config_manager.config_suppressed_scopes == {''}
+        assert kb.config_manager.config_focus_scopes == {'Alpha': ''}
+        assert kb.is_silent_focus_group('Alpha') is True
+
 
 class TestScopedWarningReport:
     """U330 ask 4 (maintainer 2026-11-03): a focus-group change shows only

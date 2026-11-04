@@ -12,6 +12,9 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 - WIKI suffix-constraint syntax now matches the runtime: state constraints are
   documented parenthesized (`ke1|(-ke2)`); bare suffix segments parse as delay
   numbers, so the old bare `ke1|-ke2` example raised at config load.
+- A multi-name section with a blank first name (`<focus> ,Alpha`) is now scoped
+  as the validator scopes it (default scope `''`), so its `-no_warnings`
+  silences the activation announce for every name of the section (U330 review).
 
 ## [1.3.0] - 2026-10-29
 
