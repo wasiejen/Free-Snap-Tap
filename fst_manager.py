@@ -1027,7 +1027,7 @@ class Config_Validator():
         self._current_scope = ''
         # the SILENT sections (U330 ask 3): scopes whose warnings are
         # suppressed - the activation toast skips them. U355 edge 4: ONE
-        # live set, public so the load stores it directly
+        # live set, public so the load copies it
         # (Config_Manager.config_suppressed_scopes) - the private
         # _suppress_scopes twin and its end-of-validate mirror are gone,
         # a reused instance cannot report stale silent scopes

@@ -8,22 +8,27 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 
 ## [Unreleased]
 
+### Added
+- The GUI-branch call site of the startup activation pass (right after the
+  startup compliance toast) is now pinned by a main-block wiring test
+  (test-only: the branch invocation and its order are observed).
+
 ### Fixed
 - WIKI suffix-constraint syntax now matches the runtime: state constraints are
   documented parenthesized (`ke1|(-ke2)`); bare suffix segments parse as delay
   numbers, so the old bare `ke1|-ke2` example raised at config load.
 - A multi-name section with a blank first name (`<focus> ,Alpha`) is now scoped
-  as the validator scopes it (default scope `''`), so its `-no_warnings`
-  silences the activation announce for every name of the section (U330 review).
+  exactly as the validator scopes it — into the default scope `''` — so its
+  `-no_warnings` silences the activation announce for every name of the
+  section and, as in the validator's own report, the default section's
+  warnings too (U330 review).
 - A rejected config load now refreshes the focus name→scope map together with
   the warnings and silent-section scopes — no stale map survives from the
-  previously loaded config (U330 review).
+  previously loaded config; as with the warning report, the announced groups
+  can be silenced by the rejected file's flags (U330 review).
 - `Config_Validator` keeps ONE live silent-section set (the private twin and
   its end-of-validate mirror are gone): a reused validator instance always
   reports the current load's silent scopes, never a stale mirror (U330 review).
-- The GUI-branch call site of the startup activation pass (right after the
-  startup compliance toast) is now pinned by a main-block wiring test
-  (test-only: the branch invocation and its order are observed).
 
 ## [1.3.0] - 2026-10-29
 
