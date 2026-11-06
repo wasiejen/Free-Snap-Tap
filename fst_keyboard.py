@@ -1040,6 +1040,11 @@ class FST_Keyboard():
                             self._output_manager.send_keys_for_tap_group(tap_group)
                             #XXX 260428-2341
                             #self.loop.create_task(self._output_manager.send_keys_for_tap_group(tap_group))
+                            # U364/#360: the CONTROLLER sends now run on the loop
+                            # lane inside send_keys_for_tap_group (pump_lane) - the
+                            # CALL stays on the pump because tap-group state
+                            # (set_last_key_send) must stay synchronous for the
+                            # hold-repeat decision below (260428-2341).
                             # to allow repeated keys from hold, key_to_send is a vk_code
                             if tap_group.get_active_key() != vk_code or not trigger_key_repeated:
                                 to_be_suppressed = True
@@ -1055,7 +1060,15 @@ class FST_Keyboard():
                         except Exception as e:
                             logger_flow.error(f"Error occurred while calling async execute_keys_event in mouse_key to mouse_key rebind: {e}")
                     else:
-                        self._output_manager.send_key_event(current_ke)
+                        # U364/#360: same lane rule as the mouse leg above -
+                        # the replacement send runs on the loop lane, the
+                        # hook pump never waits on SendInput (FIFO within
+                        # the lane; inline fallback when no loop is wired).
+                        # Suppression of the source event below stays
+                        # synchronous on the pump.
+                        self._output_manager.pump_lane(
+                            lambda ke=current_ke: self._output_manager.send_key_event(ke),
+                            'rebind_send')
 
                     to_be_suppressed = True
 
