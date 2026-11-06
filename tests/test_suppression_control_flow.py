@@ -206,8 +206,6 @@ class TestRebindAndMouseLegs:
 
 MSG_MOUSE_UNMAPPED = 518  # not MOVE(512), not in DOWN/UP/SCROLL sets -> get_mouse_vk_code() None
 
-WM_MOUSE_MIDDLE_DOWN = 519
-
 
 class TestRebindRepeatLetThroughAtEntry:
     # U372 #367 pin (1): the repeated-REBIND let-through (2026-09-15 ruling,
@@ -242,9 +240,11 @@ class TestRebindRepeatLetThroughAtEntry:
         assert all('vk=79 press' in l and 'SuppressException' in l for l in lines)
 
     def test_control_guarded_repeat_does_not_refire(self, live_listener, caplog, monkeypatch):
-        # live control (green both sides, not the RED leg): with the let-through
-        # function stubbed False the repeat dies at the STOP-REPEATED guard - the
-        # re-fire assert above demonstrably rides _rebind_repeat_let_through.
+        # live-tree control (green on the live tree with AND without the stub -
+        # the stub axis is what it varies): with the let-through function stubbed
+        # False the repeat dies at the STOP-REPEATED guard, so the re-fire assert
+        # above demonstrably rides _rebind_repeat_let_through. NOT green on the
+        # pre-U365 RED lane (the shared _seq needs the entry arms' raise).
         kb = live_listener.kb
         monkeypatch.setattr(kb, '_rebind_repeat_let_through', lambda ke: False)
         presses = self._seq(kb, live_listener.kb_mock, caplog)
