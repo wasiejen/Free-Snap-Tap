@@ -18,6 +18,16 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   (test-only: the branch invocation and its order are observed).
 
 ### Fixed
+- Suppression control flow restored at both LL-hook pump entries (#364, #365):
+  the U345 entry catch (d5c43ba) swallowed pynput's `SystemHook.SuppressException`
+  — the ONLY mechanism by which pynput 1.8.2 consumes a hook event — so every
+  event FST decided to suppress still reached the app while the sim replacement
+  fired: tap-group keys double-sent (`a,dd` -> `aa`), held macro triggers
+  printed their auto-repeats after the write, and the leaked ctrl+trigger chord
+  fired the app's own shortcut mid-burst (cut-at-"2026-11"). `SuppressException`
+  is now REPORTED (drop-watch keeps counting) AND re-raised; genuine leg
+  exceptions stay swallowed (U345 H1 contract). 8 control-flow pins in
+  `test_suppression_control_flow.py` (U365, RED 7/7 pre-change).
 - The LL-hook pump no longer blocks on the SendInput/file/clipboard-WRITE legs
   of the three hot lanes (#360): tap-group sends, rebind replacement sends and
   the constraint-string action legs (type/write, clipboard copy, file/backup,

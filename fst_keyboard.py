@@ -7,6 +7,7 @@ import asyncio
 from collections import deque
 
 from pynput import keyboard, mouse
+from pynput._util.win32 import SystemHook  # U365: suppression control-flow class
 from time import time # sleep(0.005) = 5 ms
 from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_dict.py
 from os import startfile
@@ -767,11 +768,18 @@ class FST_Keyboard():
             if vk_code is not None:
                 # U345 H1 drop-watch: ring tuple + entry-level catch (the
                 # pynput _handler swallows filter exceptions - a mouse
-                # release that dies mid-leg leaks unfiltered, H1 class)
+                # release that dies mid-leg leaks unfiltered, H1 class).
+                # U365 #364/#365: SuppressException (the suppression control
+                # flow) is reported AND re-raised here too - same rule as
+                # the keyboard pump entry below.
                 self._drop_ring.append(
                     (vk_code, is_keydown, bool(is_simulated), True))
                 try:
                     self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event)
+                except SystemHook.SuppressException as exc:
+                    self.report_event_drop('mouse', vk_code, is_keydown,
+                                           is_simulated, True, exc)
+                    raise
                 except Exception as exc:
                     self.report_event_drop('mouse', vk_code, is_keydown,
                                            is_simulated, True, exc)
@@ -806,9 +814,21 @@ class FST_Keyboard():
         self._drop_ring.append((vk_code, is_keydown, bool(is_simulated), False))
         # U345 H1: catch a leg exception AT the entry: pynput's _handler
         # would swallow it and pass the event UNFILTERED (dropped-release
-        # stuck class); the named drop line makes the death visible
+        # stuck class); the named drop line makes the death visible.
+        # U365 #364/#365: SuppressException is NOT a leg death - it is
+        # pynput's suppression control flow (suppress_event raises it; only
+        # SystemHook._handler seeing it returns 1 = consume). Swallowing it
+        # here let every "suppressed" event pass UNFILTERED while the sim
+        # replacement still fired (tap-group double-send, held-trigger
+        # repeat leak, app-shortcut fire from the leaked combo press).
+        # Report it (drop-watch keeps counting) AND re-raise; only genuine
+        # leg exceptions stay swallowed.
         try:
             self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated)
+        except SystemHook.SuppressException as exc:
+            self.report_event_drop('key', vk_code, is_keydown,
+                                   is_simulated, False, exc)
+            raise
         except Exception as exc:
             self.report_event_drop('key', vk_code, is_keydown,
                                    is_simulated, False, exc)
