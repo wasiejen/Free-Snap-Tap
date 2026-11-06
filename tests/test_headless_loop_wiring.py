@@ -123,9 +123,11 @@ def drive_headless_run(logic, seen):
 
 
 class TestLeg1HeadlessLoopNone:
-    """Pre-wiring state pins - these document what the B1 claim ACTUALLY
-    is on HEAD; Leg 2 rewires (loop owned in __init__) and this class
-    keeps the loop-None safety-net legs that stay valid after the fix."""
+    """Leg 1 characterization pins. Measured green on HEAD e711cdf before
+    any wiring change (commit 0689418): the honest verdict file for B1.
+    After the Leg-2 fix the loop-None pins stay as the SAFETY-NET contract
+    (the fallback path's behavior when a loop is ever unwired); pin (a) was
+    converted to the wired invariant at wiring time. See each docstring."""
 
     def test_run_coroutine_threadsafe_on_none_raises_attribute_error(self):
         """Probe pin of the B1 crash class (matches the explorer probe
@@ -138,22 +140,24 @@ class TestLeg1HeadlessLoopNone:
         with pytest.raises(AttributeError):
             asyncio.run_coroutine_threadsafe(coro(), None)
 
-    def test_headless_run_calls_set_loop_with_none(self):
-        """Claim part (a) CONFIRMED: on the pre-wiring headless path
-        MainLogic.loop is None, so MainLogic.run() hands None to
-        FST_Keyboard.set_loop while a real event loop IS running - the
-        running loop is simply never assigned to self.loop."""
+    def test_headless_run_wires_the_running_loop(self):
+        """Claim part (a) verdict: CONFIRMED pre-wiring (measured green on
+        e711cdf: MainLogic.loop was None and run() handed None to
+        set_loop while a foreign asyncio.run loop ran - the pin asserted
+        `seen['set_loop'] is None` at commit 0689418). Post-wiring the
+        drive-level invariant replaces it: FST_Keyboard.loop must be the
+        loop that actually runs MainLogic.run() - whatever loop the
+        headless branch drives is the loop that gets wired."""
         from free_snap_tap import MainLogic
 
         kb, seen = make_run_stub_keyboard()
         logic = MainLogic(kb)
-        assert logic.loop is None  # claim part (a): created nowhere
+        assert logic.loop is not None  # owned from __init__ since U375
         loop = drive_headless_run(logic, seen)
         # run() reached listener start ON the driven live loop ...
         assert seen['running_loop'] is loop
-        # ... but set_loop still got None (the wiring gap)
-        assert seen['set_loop'] is None
-        assert logic.loop is None
+        # ... and set_loop got exactly that loop (the fixed wiring)
+        assert seen['set_loop'] is logic.loop
 
     def test_headless_run_wires_toast_pump_task(self):
         """Counter-claim check (honest scope): the headless path is not
