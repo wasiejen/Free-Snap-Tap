@@ -4,7 +4,7 @@
 pynput 1.8.2 suppresses the hook event EXCLUSIVELY via exception control
 flow: the filter calls ``listener.suppress_event()`` which raises
 ``SystemHook.SuppressException``; it must reach the hook proc
-(``SystemHook._handler``, win32.py:304-308) where ``return 1`` consumes the
+(``SystemHook._handler``, win32.py:305-308) where ``return 1`` consumes the
 event. Any catch-all that swallows it ("except Exception") makes the hook
 return CallNextHookEx -> the "suppressed" event passes UNFILTERED while the
 sim replacement still fires: tap-group keys arrive twice (a,dd -> aa /
