@@ -18,6 +18,11 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   (test-only: the branch invocation and its order are observed).
 
 ### Fixed
+- An empty argv element no longer crashes startup (#362): `apply_start_arguments`
+  raised `IndexError` at the loop head (`arg[0]` on `''`); an empty element now
+  takes the same path as an unknown argument — one `unknown start argument: `
+  warning (empty echo), later arguments still apply, startup continues
+  (U366, ruling A 2026-11-06; 3 pins in `test_argument_manager.py`, RED-before).
 - Suppression control flow restored at both LL-hook pump entries (#364, #365):
   the U345 entry catch (d5c43ba) swallowed pynput's `SystemHook.SuppressException`
   — the ONLY mechanism by which pynput 1.8.2 consumes a hook event — so every

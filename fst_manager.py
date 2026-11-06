@@ -2137,7 +2137,10 @@ class Argument_Manager():
 
         for arg in argv:
             # if commented out do nothing
-            if arg[0] in (':', '#'):
+            # U366 (TODO #362 ruling A 2026-11-06): arg[:1] not arg[0] - an
+            # empty argv element must not raise IndexError; it falls through
+            # the branch chain to the unknown-argument warning below
+            if arg[:1] in (':', '#'):
                 continue
             logger_config.debug(f"start argument: {arg}")
             # U361 (TODO #356, ruling A 2026-11-04): dashed spellings are
