@@ -283,6 +283,28 @@ class TestRemainingStartArguments:
         assert am_env.am.CMD_WINDOW_HIDDEN is True
 
 
+class TestEmptyArgvElement:
+    """U366 (TODO #362, ruling A 2026-11-06): an empty argv element used to
+    raise IndexError at the loop head (arg[0] on ''); it now takes the SAME
+    path as an unknown argument - exactly one 'unknown start argument: '
+    warning with the empty element echoed, startup continues."""
+
+    def test_empty_element_warns_exactly_like_unknown_argument(self, am_env, caplog):
+        am_env.am.apply_start_arguments([''])  # must not raise
+        warns = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert warns == ['unknown start argument: ']
+
+    def test_empty_element_does_not_block_later_arguments(self, am_env, caplog):
+        am_env.am.apply_start_arguments(['', '-nomenu'])
+        assert am_env.am.MENU_ENABLED is False
+        assert 'unknown start argument: ' in caplog.text
+
+    def test_control_nonempty_unknown_argument_behaviour_unchanged(self, am_env, caplog):
+        am_env.am.apply_start_arguments(['-no_such_argument'])
+        warns = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert warns == ['unknown start argument: -no_such_argument']
+
+
 class TestSysStartArgsProperty:
     def test_getter_and_setter(self, am_env):
         assert am_env.am.sys_start_args == []
