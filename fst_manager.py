@@ -510,14 +510,21 @@ class Output_Manager():
             return True
 
         def release_all_keys():
-            self._fst.release_all_currently_pressed_simulated_keys()
-            logger_eval.debug("-- Eval: released all keys")
-            return True
+            def _work():
+                self._fst.release_all_currently_pressed_simulated_keys()
+                logger_eval.debug("-- Eval: released all keys")
+                return True
+            # U364/#360: SendInput leg off the pump -> loop lane
+            return self.pump_lane(_work, 'release_all_keys')
 
         def type(key_string):
-            release_modifier()
-            self._keyboard_controller.type(key_string)
-            return True
+            def _work():
+                release_modifier()
+                self._keyboard_controller.type(key_string)
+                return True
+            # U364/#360: SendInput typing leg off the pump -> loop lane;
+            # the macro-playback caller is ON the loop lane and runs inline
+            return self.pump_lane(_work, 'type')
 
         def write(key_string):
             return type(key_string)
@@ -611,45 +618,72 @@ class Output_Manager():
             return current_time
 
         def release_modifier():
-            self._fst.state_manager.release_all_modifier_keys()
+            def _work():
+                self._fst.state_manager.release_all_modifier_keys()
+                return True
+            # U364/#360: SendInput leg off the pump -> loop lane; returns
+            # True on BOTH paths (was None inline - eval treated it as
+            # not-a-bool and logged a bogus "constraint is not valid"
+            # warning, reviewer P2-6)
+            return self.pump_lane(_work, 'release_modifier')
 
         def make_backup(save_dir=self._fst.arg_manager.SAVE_DIR, backup_root_dir=self._fst.arg_manager.BACKUP_ROOT_DIR):
-            backup_path, backup_name = mb(save_dir, backup_root_dir)
-            print(f"Made backup to {backup_path}")
-            show_message(f"Made backup to {backup_name}", d=5., ts=10, bgc="rgba(40, 150, 40, 200)")
-            logger.info(f"made backup to {backup_path}")
-            return True
+            def _work():
+                backup_path, backup_name = mb(save_dir, backup_root_dir)
+                print(f"Made backup to {backup_path}")
+                show_message(f"Made backup to {backup_name}", d=5., ts=10, bgc="rgba(40, 150, 40, 200)")
+                logger.info(f"made backup to {backup_path}")
+                return True
+            # U364/#360: file I/O leg off the pump -> loop lane
+            return self.pump_lane(_work, 'make_backup')
 
         def restore_backup(save_dir=self._fst.arg_manager.SAVE_DIR, backup_root_dir=self._fst.arg_manager.BACKUP_ROOT_DIR):
-            restored_path, restored_name = rb(save_dir, backup_root_dir)
-            print(f"Restored backup from {restored_path}")
-            show_message(f"Restored backup from {restored_name}", d=5., ts=10, bgc="rgba(150, 40, 40, 200)")
-            logger.info(f"restored backup from {restored_path}")
-            return True
+            def _work():
+                restored_path, restored_name = rb(save_dir, backup_root_dir)
+                print(f"Restored backup from {restored_path}")
+                show_message(f"Restored backup from {restored_name}", d=5., ts=10, bgc="rgba(150, 40, 40, 200)")
+                logger.info(f"restored backup from {restored_path}")
+                return True
+            # U364/#360: file I/O leg off the pump -> loop lane
+            return self.pump_lane(_work, 'restore_backup')
 
+        # U364/#360: the mouse-send legs below (scroll_*, mouse_move*) are
+        # SendInput legs -> pump_lane (loop lane off-pump, inline on-loop/legacy)
         def scroll_up(value):
-            self._mouse_controller.scroll(0, value)
-            return True
+            def _work():
+                self._mouse_controller.scroll(0, value)
+                return True
+            return self.pump_lane(_work, 'scroll_up')
 
         def scroll_down(value):
-            self._mouse_controller.scroll(0, -value)
-            return True
+            def _work():
+                self._mouse_controller.scroll(0, -value)
+                return True
+            return self.pump_lane(_work, 'scroll_down')
 
         def scroll_right(value):
-            self._mouse_controller.scroll(value, 0)
-            return True
+            def _work():
+                self._mouse_controller.scroll(value, 0)
+                return True
+            return self.pump_lane(_work, 'scroll_right')
 
         def scroll_left(value):
-            self._mouse_controller.scroll(-value, 0)
-            return True
+            def _work():
+                self._mouse_controller.scroll(-value, 0)
+                return True
+            return self.pump_lane(_work, 'scroll_left')
 
         def mouse_move_abs(dx, dy):
-            self._mouse_controller.position = (dx, dy)
-            return True
+            def _work():
+                self._mouse_controller.position = (dx, dy)
+                return True
+            return self.pump_lane(_work, 'mouse_move_abs')
 
         def mouse_move(dx, dy):
-            self._mouse_controller.move(dx, dy)
-            return True
+            def _work():
+                self._mouse_controller.move(dx, dy)
+                return True
+            return self.pump_lane(_work, 'mouse_move')
 
         def mouse_get_pos():
             position = self._mouse_controller.position
@@ -663,18 +697,25 @@ class Output_Manager():
             return True
 
         def mouse_move_to_var(key_string):
-            try:
-                position = self.variables[key_string]
-                if isinstance(position, tuple) and len(position) == 2:
-                    self._mouse_controller.position = position
-                    print(f'mouse moved to position {position} from variable {key_string}')
-                    return True
-                else:
-                    print(f'variable {key_string} does not contain a valid position')
+            def _work():
+                try:
+                    position = self.variables[key_string]
+                    if isinstance(position, tuple) and len(position) == 2:
+                        self._mouse_controller.position = position
+                        print(f'mouse moved to position {position} from variable {key_string}')
+                        return True
+                    else:
+                        print(f'variable {key_string} does not contain a valid position')
+                        return False
+                except KeyError:
+                    print(f'variable {key_string} not found')
                     return False
-            except KeyError:
-                print(f'variable {key_string} not found')
-                return False
+            # U364/#360: the position SET is a SendInput leg -> pump_lane
+            # (reviewer P1-1: the sibling of mouse_move/mouse_move_abs).
+            # On the lane path the caller gets True at SCHEDULE time (the
+            # outcome is not known to the pump - same semantics as every
+            # other action leg); the inline path keeps the old False returns.
+            return self.pump_lane(_work, 'mouse_move_to_var')
 
         # show_message(*text*, *duration in s*, *text_size in px*, *background_color*, *text_color*)
         def show_message(text, d=3., ts=12, bgc="rgba(40, 150, 40, 200)", tc="white"):
@@ -708,28 +749,42 @@ class Output_Manager():
                 return self.variables[key_string]
 
         def copy_to_clipboard(key_string):
-            pyperclip.copy(key_string)
-            show_message(f'"{key_string}" copied to clipboard')
-            return True
+            def _work():
+                pyperclip.copy(key_string)
+                show_message(f'"{key_string}" copied to clipboard')
+                return True
+            # U364/#360: clipboard write leg off the pump -> loop lane
+            return self.pump_lane(_work, 'copy_to_clipboard')
 
         def paste():
+            # sync data leg (U364/#360): the eval caller needs the pasted
+            # VALUE back, so this clipboard READ stays on the calling thread
+            # (no flow-log evidence of a paste stall; a value-passing lane
+            # would be a redesign - see handover_u364)
             pasted_text = pyperclip.paste()
             print(f'"{pasted_text}" pasted from clipboard')
             return pasted_text
 
         def save_into_file(text, time_stamp=get_time(), mode='w', file_path='output.txt'):
-            with open(file_path, mode) as file:
-                file.write(f"{time_stamp}: {text}\n")
-            print(f'"{time_stamp}: {text}" saved into {file_path}')
-            return True
+            def _work():
+                with open(file_path, mode) as file:
+                    file.write(f"{time_stamp}: {text}\n")
+                print(f'"{time_stamp}: {text}" saved into {file_path}')
+                return True
+            # U364/#360: file I/O leg off the pump -> loop lane (the
+            # time_stamp default still stamps at CALL time on the caller)
+            return self.pump_lane(_work, 'save_into_file')
 
         def append_to_file(text, time_stamp=get_time(), file_path='output.txt'):
             return save_into_file(text, time_stamp, mode='a', file_path=file_path)
 
         def empty_file(file_path='output.txt'):
-            open(file_path, 'w').close()
-            print(f'{file_path} has been emptied')
-            return True
+            def _work():
+                open(file_path, 'w').close()
+                print(f'{file_path} has been emptied')
+                return True
+            # U364/#360: file I/O leg off the pump -> loop lane
+            return self.pump_lane(_work, 'empty_file')
 
         def print_all_variables():
             if self.variables:
@@ -741,11 +796,14 @@ class Output_Manager():
             return True
 
         def clear_console():
-            if sys.platform.startswith('win'):
-                system('cls')
-            else:
-                system('clear')
-            return True
+            def _work():
+                if sys.platform.startswith('win'):
+                    system('cls')
+                else:
+                    system('clear')
+                return True
+            # U364/#360: shell spawn leg off the pump -> loop lane
+            return self.pump_lane(_work, 'clear_console')
 
 
         # ---------------------------
@@ -814,6 +872,37 @@ class Output_Manager():
     def check_for_mouse_vk_code(self, vk_code):
         return vk_code in self._mouse_vk_codes
 
+    # U364/#360: lane routing for blocking legs. A LL-hook pump that blocks
+    # past LowLevelHooksTimeout gets the hook silently removed -> events pass
+    # UNFILTERED (suppression dies mid-macro; maintainer fst_flow.log
+    # evidence 2026-11-04). pump_lane schedules the blocking work on the
+    # asyncio loop lane (FIFO = loop ready queue) and the pump caller returns
+    # True immediately; it runs work() INLINE when the caller is already on
+    # the loop thread (macro playback lane) or when no loop is wired
+    # (headless/legacy/tests = old synchronous behavior, contract locked in
+    # tests/test_pump_async_lane.py::TestFallbackContract). Every routed leg
+    # is an action leg whose success value is True, so the pump-side True is
+    # the same value the inline path returns.
+    def pump_lane(self, work, leg_name='leg'):
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            loop = getattr(self._fst, 'loop', None)
+            if loop is not None:
+                async def _run_on_lane():
+                    work()
+                try:
+                    _handle = asyncio.run_coroutine_threadsafe(_run_on_lane(), loop)
+                    # repo convention (start_macro_playback/start_repeat): a
+                    # raising lane leg surfaces through check_result - never a
+                    # silent "scheduled = success" (reviewer P1-3)
+                    _handle.add_done_callback(self._fst.check_result)
+                    return True
+                except Exception as error:
+                    logger_flow.error(f"pump lane scheduling failed for {leg_name}: {error}")
+                    return False
+        return work()
+
     def send_key_event(self, key_event):
         vk_code, is_press, _ = key_event.get_all()
         is_mouse_key = self.check_for_mouse_vk_code(vk_code)
@@ -834,6 +923,11 @@ class Output_Manager():
                 self._controller_dict[is_mouse_key].release(key_code)
 
     # 260429-1441 - added crossover and delay for tap groups as async coroutines - everything else runs without async directly in the listener thread
+    # U364/#360: the sync legs go through pump_lane (loop lane FIFO when a
+    # loop is wired, inline fallback when not); tap-group state
+    # (set_last_key_send) STAYS on the caller thread so hold-repeat
+    # decisions (260428-2341) never read delayed state, and the lane keeps
+    # the send step order FIFO (tests/test_pump_async_lane.py).
     def send_keys_for_tap_group(self, tap_group):
         """
         Send the specified key and release the last key if necessary.
@@ -870,22 +964,31 @@ class Output_Manager():
 
         # only send if key to send is not the same as last key send
         if key_to_send != last_key_send:
+            def _release_last_key():
+                self._keyboard_controller.release(key_code_last_key_send)
+
+            def _press_new_key():
+                self._keyboard_controller.press(key_code_to_send)
+
+            def _switch_keys():
+                self._keyboard_controller.release(key_code_last_key_send)
+                self._keyboard_controller.press(key_code_to_send)
+
             if key_to_send is None:
                 if last_key_send is not None:
-                    self._keyboard_controller.release(key_code_last_key_send)
+                    self.pump_lane(_release_last_key, 'tap_release')
                 tap_group.set_last_key_send(None)
             else:
                 if last_key_send is not None:
                     if not self._fst.arg_manager.ACT_DELAY and not self._fst.arg_manager.ACT_CROSSOVER:
-                        self._keyboard_controller.release(key_code_last_key_send)
-                        self._keyboard_controller.press(key_code_to_send)
+                        self.pump_lane(_switch_keys, 'tap_switch')
                     else:
                         try:
                             asyncio.run_coroutine_threadsafe(send_async(key_to_send, last_key_send, key_code_to_send, key_code_last_key_send), self._fst.loop)
                         except Exception as e:
                             logger_flow.error(f"Error occurred while calling send_keys_with_delay: {e}")
                 else:
-                    self._keyboard_controller.press(key_code_to_send)
+                    self.pump_lane(_press_new_key, 'tap_press')
                 tap_group.set_last_key_send(key_to_send)
 
     def clear_all_variables(self):
