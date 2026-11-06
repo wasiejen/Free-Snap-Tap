@@ -202,3 +202,82 @@ class TestRebindAndMouseLegs:
         lines = [r.getMessage() for r in caplog.records if 'event drop' in r.getMessage()]
         assert len(lines) == 1
         assert "RuntimeError('boom')" in lines[0]
+
+
+MSG_MOUSE_UNMAPPED = 518  # not MOVE(512), not in DOWN/UP/SCROLL sets -> get_mouse_vk_code() None
+
+WM_MOUSE_MIDDLE_DOWN = 519
+
+
+class TestRebindRepeatLetThroughAtEntry:
+    # U372 #367 pin (1): the repeated-REBIND let-through (2026-09-15 ruling,
+    # _rebind_repeat_let_through) driven through the PUMP ENTRY, not the inner
+    # _win32_event_filter (the pre-existing pins call the inner filter directly -
+    # kb_helpers.down/up). Pins the let-through / no-early-exception interaction
+    # against the U365 entry arms: the repeat passes the STOP-REPEATED guard
+    # WITHOUT raising, re-fires the replacement exactly once, and the only
+    # SuppressException the entry arms see is the source-consumption raise
+    # (report once + re-raise). RED-before: the pre-U365 entry (git show
+    # eccad5f^1:fst_keyboard.py, plain swallow) returns 'PASSED' at the first
+    # drive - the class fails there.
+
+    def _seq(self, kb, kb_mock, caplog):
+        build(kb, rebinds=[['(r)', [['o'], 'b']]])
+        kb_mock.press.reset_mock()
+        with caplog.at_level(logging.DEBUG, logger='fst.drop'):
+            assert drive(kb, WM_KEYDOWN, VK_O, 1000) == 'SUPPRESSED'  # first press: consumed, replacement fires
+            assert drive(kb, WM_KEYDOWN, VK_O, 1100) == 'SUPPRESSED'  # repeat while held: let through, re-fires, source consumed
+        return kb_mock.press.call_count
+
+    def test_repeat_let_through_refires_replacement_once_at_entry(self, live_listener, caplog):
+        kb = live_listener.kb
+        presses = self._seq(kb, live_listener.kb_mock, caplog)
+        assert presses == 2  # first replacement + exactly one re-fire from the let-through repeat
+
+    def test_repeat_let_through_reports_exactly_one_drop_per_drive(self, live_listener, caplog):
+        kb = live_listener.kb
+        self._seq(kb, live_listener.kb_mock, caplog)
+        lines = [r.getMessage() for r in caplog.records if 'event drop' in r.getMessage()]
+        assert len(lines) == 2  # ONE raise per drive (no double-report; the entry arms see only the source-consumption raise)
+        assert all('vk=79 press' in l and 'SuppressException' in l for l in lines)
+
+    def test_control_guarded_repeat_does_not_refire(self, live_listener, caplog, monkeypatch):
+        # live control (green both sides, not the RED leg): with the let-through
+        # function stubbed False the repeat dies at the STOP-REPEATED guard - the
+        # re-fire assert above demonstrably rides _rebind_repeat_let_through.
+        kb = live_listener.kb
+        monkeypatch.setattr(kb, '_rebind_repeat_let_through', lambda ke: False)
+        presses = self._seq(kb, live_listener.kb_mock, caplog)
+        assert presses == 1  # no re-fire: the repeat was swallowed by the guard
+        lines = [r.getMessage() for r in caplog.records if 'event drop' in r.getMessage()]
+        assert len(lines) == 2
+
+
+class TestMousePumpNoneVkSuppression:
+    # U372 #367 pin (2): the mouse pump's `vk_code is None` leg (fst_keyboard.py
+    # ~L788) sits OUTSIDE the U365 try: - suppress_event() on an unmapped mouse
+    # message, no inner filter call, no drop report (nothing to report: there is
+    # no vk_code). Pinned AS-IS (tested+reported): a refactor moving the leg
+    # inside the try would emit an 'event drop' with vk=None (or swallow the
+    # raise) and must trip these pins. RED-before: a scratch copy with the else
+    # branch moved into the try makes the propagate-test report ('event drop'
+    # line appears) and the recorder-test ... the entry arm reports vk None
+    # instead of the clean raise.
+
+    def test_none_vk_calls_suppress_event_without_inner_filter(self, kb_env_mouse):
+        kb = kb_env_mouse
+        kb._win32_event_filter = MagicMock()
+        kb.mouse_win32_event_filter(MSG_MOUSE_UNMAPPED, mouse_data())
+        assert kb._mouse_listener.suppress_event.call_count == 1
+        assert kb._win32_event_filter.call_count == 0
+
+    def test_none_vk_raise_propagates_unreported(self, kb_env_mouse, caplog):
+        kb = kb_env_mouse
+        kb._mouse_listener.suppress_event.side_effect = SystemHook.SuppressException
+        kb._win32_event_filter = MagicMock()
+        with caplog.at_level(logging.DEBUG, logger='fst.drop'):
+            with pytest.raises(SystemHook.SuppressException):  # pynput consumes it (hook proc return 1)
+                kb.mouse_win32_event_filter(MSG_MOUSE_UNMAPPED, mouse_data())
+        lines = [r.getMessage() for r in caplog.records if 'event drop' in r.getMessage()]
+        assert len(lines) == 0  # as-is: outside the try, NOTHING is reported on this leg
+        assert kb._win32_event_filter.call_count == 0
