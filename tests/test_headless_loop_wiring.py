@@ -10,8 +10,10 @@ wires no loop: MainLogic.loop stays None (free_snap_tap.py:66; the loop is
 created only in start_async_thread :73 which the headless branch never
 calls - it runs asyncio.run(logic.run()) :242 on a FOREIGN loop), so
 MainLogic.run() calls set_loop(None) (:109) and every DIRECT
-run_coroutine_threadsafe site (macro start fst_keyboard.py:1193,
-start_repeat fst_manager.py:441, tap delay/crossover fst_manager.py:987,
+run_coroutine_threadsafe site (all line refs in this docstring are as of
+the baseline commit e711cdf: macro start fst_keyboard.py:1193,
+start_repeat fst_manager.py:441,
+tap delay/crossover fst_manager.py:987,
 mouse->mouse rebind fst_keyboard.py:1079) raises AttributeError. The
 pump-entry catch-all (fst_keyboard.py:832) swallows the macro-leg error
 AFTER alias_fired but BEFORE the suppression landing -> trigger leaks
@@ -51,6 +53,21 @@ VK_CTRL = 162  # left_control, per tests/test_macro_suppression.py
 WM_KEYDOWN = 256
 
 
+def cancel_and_close(loop):
+    """Teardown helper (reviewer P2-5): cancel pending lane tasks BEFORE
+    closing, else loop.close() logs ERROR 'Task was destroyed but it is
+    pending' for the parked keep-alive/macro tasks."""
+    if loop.is_closed():
+        return
+    for t in asyncio.all_tasks(loop):
+        t.cancel()
+    pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+    if pending:
+        loop.run_until_complete(asyncio.gather(*pending,
+                                               return_exceptions=True))
+    loop.close()
+
+
 # ---------------------------------------------------------------------------
 # Leg 1 - characterization of the PRE-WIRING headless state (honest verdict)
 # ---------------------------------------------------------------------------
@@ -86,8 +103,12 @@ def make_run_stub_keyboard():
         seen['set_loop'] = loop
 
     def fake_start_listener():
+        # NOTE (reviewer P2-4): setting arg_manager.STOPPED here would NOT
+        # end run() - the keep-alive `while True: await asyncio.sleep(3600)`
+        # never re-checks STOPPED; only cancelling or stopping the loop
+        # ends run() (drive_headless_run / Runner close / loop.stop).
         seen['running_loop'] = asyncio.get_running_loop()
-        kb.arg_manager.STOPPED = True  # end the outer while at next check
+        seen['listener_thread'] = threading.current_thread().name
 
     async def fake_toast_pump():
         await asyncio.sleep(0.05)
@@ -114,11 +135,7 @@ def drive_headless_run(logic, seen):
                     return
         loop.run_until_complete(spin())
     finally:
-        for t in asyncio.all_tasks(loop):
-            t.cancel()
-        loop.run_until_complete(asyncio.gather(
-            *[t for t in asyncio.all_tasks(loop)], return_exceptions=True))
-        loop.close()
+        cancel_and_close(loop)
     return loop
 
 
@@ -136,9 +153,10 @@ class TestLeg1HeadlessLoopNone:
         AttributeError inside asyncio."""
         async def coro():
             pass
-
+        co = coro()
         with pytest.raises(AttributeError):
-            asyncio.run_coroutine_threadsafe(coro(), None)
+            asyncio.run_coroutine_threadsafe(co, None)
+        co.close()  # the loop never consumed it - close, no GC warning
 
     def test_headless_run_wires_the_running_loop(self):
         """Claim part (a) verdict: CONFIRMED pre-wiring (measured green on
@@ -163,7 +181,9 @@ class TestLeg1HeadlessLoopNone:
         """Counter-claim check (honest scope): the headless path is not
         dead - MainLogic.run() creates the toast pump task on the running
         loop (U345 H2), so the legs that go through pump_lane/get_running
-        _loop work; only the sites that read self.loop see None."""
+        _loop worked even pre-wiring; only the sites reading the
+        self.loop attribute saw None (the wiring gap, now fixed - the
+        wired invariant is pinned in TestLeg2LoopWiring)."""
         from free_snap_tap import MainLogic
 
         kb, seen = make_run_stub_keyboard()
@@ -182,8 +202,22 @@ class TestLeg1HeadlessLoopNone:
         it, and the wrapper returns None = pynput passes the real key
         UNFILTERED to the app while the macro plays nothing."""
         kb = kb_env_ns.kb
-        assert kb.loop is None  # FST_Keyboard default, the headless state
+        # the UNWIRED fallback/safety-net state: post-wiring the product
+        # never leaves the loop None (MainLogic owns it, U375) - this pin
+        # locks the pump-entry contract IF a loop is ever unwired again
+        assert kb.loop is None
         build(kb, macros=[['(m1)', [['-o', '-ctrl'], ['-o', '+ctrl']]]])
+        # capture the never-consumed macro_task coroutine (the scheduling
+        # crash drops it - closing it keeps the warning ledger clean)
+        leaked = []
+        real_macro_task = kb.macro_task
+
+        def spy_macro_task(*a, **k):
+            co = real_macro_task(*a, **k)
+            leaked.append(co)
+            return co
+
+        kb.macro_task = spy_macro_task
         drops = []
         monkeypatch.setattr(
             kb, 'report_event_drop',
@@ -202,6 +236,8 @@ class TestLeg1HeadlessLoopNone:
         # the death is recorded once as an AttributeError drop
         assert len(drops) == 1
         assert isinstance(drops[0], AttributeError)
+        for co in leaked:
+            co.close()  # never scheduled - close it, no GC warning
 
     def test_tap_switch_delay_leg_loop_none_loses_send(self, kb_env_ns):
         """Claim part (c) CONFIRMED with nuance (tap-delay class): the
@@ -260,6 +296,7 @@ class TestLeg2LoopWiring:
         logic = MainLogic(kb)
         assert logic.loop is not None
         assert isinstance(logic.loop, asyncio.AbstractEventLoop)
+        logic.loop.close()  # never run in this pin - close, no resource leak
 
     def test_headless_branch_runs_owned_loop_and_wires_keyboard(self):
         """The headless startup must run on the OWNED MainLogic.loop (RED
@@ -297,11 +334,62 @@ class TestLeg2LoopWiring:
         kb, seen = make_run_stub_keyboard()
         logic = MainLogic(kb)
         logic.loop.call_later(0.2, logic.loop.stop)
-        with pytest.raises(RuntimeError):
-            logic.run_headless()
-        assert seen['set_loop'] is logic.loop
-        assert seen['running_loop'] is logic.loop
+        try:
+            with pytest.raises(RuntimeError):
+                logic.run_headless()
+        finally:
+            # the wiring facts hold on EVERY exit route, so a pass/fail of
+            # the raises guard can never skip them (reviewer P2-3)
+            assert seen['set_loop'] is logic.loop
+            assert seen['running_loop'] is logic.loop
+            assert logic.loop.is_closed()
+
+    def test_run_headless_handles_keyboard_interrupt(self):
+        """Ctrl+C parity pin (reviewer P2-3): the KeyboardInterrupt the
+        real console raises INTO the running loop must be caught and
+        logged by run_headless (not propagated), and the owned loop still
+        gets Runner.close (cancel-all + close). The loop is closed here by
+        the normal exit path, so this pin covers the except branch."""
+        from free_snap_tap import MainLogic
+
+        kb = MagicMock()
+        logic = MainLogic(kb)
+
+        async def stub_run():
+            raise KeyboardInterrupt  # the loop-thread interrupt surface
+
+        logic.run = stub_run
+        logic.run_headless()  # must NOT raise
         assert logic.loop.is_closed()
+
+    def test_start_async_thread_runs_owned_loop_on_real_thread(self):
+        """P1 cure (reviewer): the maintainer's PRIMARY mode - the GUI
+        branch spawns start_async_thread on a real thread; with loop
+        creation moved to __init__ this thread boundary must be EXECUTED,
+        not just read. The thread run_forevers the owned loop; the test
+        stops the loop (product GUI never calls stop_forever - the
+        pre-existing `finally: self.cleanup` no-op is separately
+        filed)."""
+        from free_snap_tap import MainLogic
+
+        kb, seen = make_run_stub_keyboard()
+        logic = MainLogic(kb)
+        th = threading.Thread(target=logic.start_async_thread, daemon=True)
+        th.start()
+        t_end = time.monotonic() + 2.0
+        while 'running_loop' not in seen and time.monotonic() < t_end:
+            time.sleep(0.005)
+        try:
+            assert seen['running_loop'] is logic.loop
+            assert seen['set_loop'] is logic.loop
+            # the logic ran ON the spawned thread (the boundary that moved)
+            assert seen['listener_thread'] == th.name
+        finally:
+            logic.loop.call_soon_threadsafe(logic.loop.stop)
+            th.join(2)
+            assert not th.is_alive()
+            assert not logic.loop.is_running()
+            cancel_and_close(logic.loop)
 
     def test_wired_macro_trigger_schedules_on_lane(self, kb_env_ns):
         """The fix at the lane level: with FST_Keyboard.loop wired to a
@@ -334,7 +422,9 @@ class TestLeg2LoopWiring:
         finally:
             loop.call_soon_threadsafe(loop.stop)
             th.join(2)
-            loop.close()
+            # P2-5 cure: cancel the macro/keep-alive tasks BEFORE close,
+            # else close logs ERROR Task-was-destroyed-but-pending
+            cancel_and_close(loop)
 
     def test_main_block_headless_branch_uses_run_headless(self):
         """Entry-shape pin (RED pre-wiring: the branch still calls
@@ -437,6 +527,62 @@ class TestLeg2LoopWiring:
             tray=False, indicator=True, logic_factory=None)
         gui_stub.tray_icon.show.assert_not_called()
         gui_stub.overlay.show.assert_called_once()
+
+    def test_composed_headless_entry_real_keyboard_macro_suppresses(
+            self, kb_env_ns):
+        """P2-10 cure (reviewer), SAFETY-ADJUSTED: composes the full
+        chain - run_headless() + a REAL FST_Keyboard (kb_env_ns, mocked
+        pynput CONTROLLERS) + the real pump wrapper - a macro trigger
+        suppresses on the pump and plays on the lane. SAFETY: init_listener
+        / start_listener / focus task start are stubbed on the instance so
+        NO real LL hook is ever installed (the reviewer's literal cure
+        would have called the real start_listener -> a live keyboard hook
+        in the test process - refused, AGENTS Safety Limits)."""
+        from free_snap_tap import MainLogic
+
+        kb = kb_env_ns.kb
+        kb.init_listener = MagicMock()
+        kb.start_listener = MagicMock()
+        kb.focus_manager.init_focus_task = MagicMock(return_value=False)
+        kb.update_args_and_groups = MagicMock()  # no config-file re-read
+        # cli_menu is a read-only property - stub its run() touch-points
+        kb.cli_menu.update_group_display = MagicMock()
+        kb.cli_menu.display_focus_names = MagicMock()
+        # the -no_menu entry shape: MENU_ENABLED defaults True on the real
+        # keyboard (CLI menu = blocking input() on the loop - the B2 item);
+        # this pin drives the menu-free startup path
+        kb.arg_manager.MENU_ENABLED = False
+        logic = MainLogic(kb)
+
+        def drive():
+            try:
+                logic.run_headless()
+            except RuntimeError:
+                pass  # test-side Ctrl+C via loop.stop() below
+
+        th = threading.Thread(target=drive, daemon=True)
+        th.start()
+        try:
+            t_end = time.monotonic() + 2.0
+            while kb.loop is None and time.monotonic() < t_end:
+                time.sleep(0.005)
+            assert kb.loop is logic.loop  # the entry wired the owned loop
+            build(kb, macros=[['(m1)', [['-o', '-ctrl'], ['-o', '+ctrl']]]])
+            press_seen = []
+            kb_env_ns.kb_mock.press.side_effect = \
+                lambda kc: press_seen.append(threading.current_thread().name)
+            kb.keyboard_win32_event_filter(WM_KEYDOWN, key_data(VK_CTRL, 1000))
+            kb.keyboard_win32_event_filter(WM_KEYDOWN, key_data(VK_O, 1100))
+            t_end = time.monotonic() + 2.0
+            while not press_seen and time.monotonic() < t_end:
+                time.sleep(0.005)
+            assert kb._listener.suppress_event.call_count == 1  # no leak
+            assert press_seen, 'macro never played on the lane'
+            assert press_seen[0] != threading.current_thread().name
+        finally:
+            logic.loop.call_soon_threadsafe(logic.loop.stop)
+            th.join(2)
+            cancel_and_close(logic.loop)
 
 
 # ---------------------------------------------------------------------------

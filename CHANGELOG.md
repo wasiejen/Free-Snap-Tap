@@ -24,12 +24,14 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   the exact `asyncio.run` close/cancel semantics, kept on the owned loop),
   so `set_loop` wires a live loop in every mode. Headless before this left
   `FST_Keyboard.loop` None: the DIRECT `run_coroutine_threadsafe` sites
-  (macro start, `start_repeat`, tap delay/crossover switch, mouse->mouse
-  rebind) raised `AttributeError` into the pump-entry catch-all - macro
-  triggers leaked un-suppressed while playing nothing, and the tap switch
-  leg lost its replacement send silently (U375; verify-first verdict pins +
-  RED-before wiring pins + the headless/tray-only/indicator-only/both mode
-  matrix in `tests/test_headless_loop_wiring.py`).
+  raised `AttributeError` - macro start and `start_repeat` reached the
+  pump-entry catch-all, so macro triggers leaked un-suppressed while
+  playing nothing; the tap delay/crossover switch and the mouse->mouse
+  rebind leg are caught at their own call sites, so the trigger stayed
+  suppressed and the replacement send was lost silently (U375;
+  verify-first verdict pins + RED-before wiring pins + the
+  headless/tray-only/indicator-only/both mode matrix in
+  `tests/test_headless_loop_wiring.py`).
 - An empty argv element no longer crashes startup (#362): `apply_start_arguments`
   raised `IndexError` at the loop head (`arg[0]` on `''`); an empty element now
   takes the same path as an unknown argument — one `unknown start argument: `
