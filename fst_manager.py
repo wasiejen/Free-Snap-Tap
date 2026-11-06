@@ -620,8 +620,11 @@ class Output_Manager():
         def release_modifier():
             def _work():
                 self._fst.state_manager.release_all_modifier_keys()
-            # U364/#360: SendInput leg off the pump -> loop lane
-            # (inline = old None return; scheduled = True, both eval-truthy)
+                return True
+            # U364/#360: SendInput leg off the pump -> loop lane; returns
+            # True on BOTH paths (was None inline - eval treated it as
+            # not-a-bool and logged a bogus "constraint is not valid"
+            # warning, reviewer P2-6)
             return self.pump_lane(_work, 'release_modifier')
 
         def make_backup(save_dir=self._fst.arg_manager.SAVE_DIR, backup_root_dir=self._fst.arg_manager.BACKUP_ROOT_DIR):
@@ -694,18 +697,25 @@ class Output_Manager():
             return True
 
         def mouse_move_to_var(key_string):
-            try:
-                position = self.variables[key_string]
-                if isinstance(position, tuple) and len(position) == 2:
-                    self._mouse_controller.position = position
-                    print(f'mouse moved to position {position} from variable {key_string}')
-                    return True
-                else:
-                    print(f'variable {key_string} does not contain a valid position')
+            def _work():
+                try:
+                    position = self.variables[key_string]
+                    if isinstance(position, tuple) and len(position) == 2:
+                        self._mouse_controller.position = position
+                        print(f'mouse moved to position {position} from variable {key_string}')
+                        return True
+                    else:
+                        print(f'variable {key_string} does not contain a valid position')
+                        return False
+                except KeyError:
+                    print(f'variable {key_string} not found')
                     return False
-            except KeyError:
-                print(f'variable {key_string} not found')
-                return False
+            # U364/#360: the position SET is a SendInput leg -> pump_lane
+            # (reviewer P1-1: the sibling of mouse_move/mouse_move_abs).
+            # On the lane path the caller gets True at SCHEDULE time (the
+            # outcome is not known to the pump - same semantics as every
+            # other action leg); the inline path keeps the old False returns.
+            return self.pump_lane(_work, 'mouse_move_to_var')
 
         # show_message(*text*, *duration in s*, *text_size in px*, *background_color*, *text_color*)
         def show_message(text, d=3., ts=12, bgc="rgba(40, 150, 40, 200)", tc="white"):
@@ -882,7 +892,11 @@ class Output_Manager():
                 async def _run_on_lane():
                     work()
                 try:
-                    asyncio.run_coroutine_threadsafe(_run_on_lane(), loop)
+                    _handle = asyncio.run_coroutine_threadsafe(_run_on_lane(), loop)
+                    # repo convention (start_macro_playback/start_repeat): a
+                    # raising lane leg surfaces through check_result - never a
+                    # silent "scheduled = success" (reviewer P1-3)
+                    _handle.add_done_callback(self._fst.check_result)
                     return True
                 except Exception as error:
                     logger_flow.error(f"pump lane scheduling failed for {leg_name}: {error}")

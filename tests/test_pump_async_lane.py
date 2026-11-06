@@ -233,6 +233,41 @@ class TestConstraintLegLane:
         assert wait_until(lambda: len(seen) >= 1, timeout=2.0)
         assert seen[0][0] != pump_thread_name()
 
+    def test_mouse_move_to_var_leg_routed(self, om_env, loop_thread):
+        """Reviewer P1-1 cure: the position SET inside mouse_move_to_var is
+        a SendInput leg (sibling of mouse_move/mouse_move_abs) - the pump
+        caller returns while the SET waits gated on the lane."""
+        om_env.fst.loop = loop_thread
+        gate = threading.Event()
+        seen = []
+
+        class GateMouse:
+            def __init__(self):
+                self._pos = (0, 0)
+            @property
+            def position(self):
+                return self._pos
+            @position.setter
+            def position(self, value):
+                gate.wait(2)
+                seen.append(value)
+                self._pos = value
+
+        gate_mouse = GateMouse()
+        om_env.om._mouse_controller = gate_mouse
+        om_env.om.variables['v'] = (7, 9)
+
+        t0 = time.monotonic()
+        result = om_env.om.constraint_evaluation(
+            "mouse_move_to_var('v')", SimpleNamespace(vk_code=VK_A, is_press=True))
+        dur_ms = (time.monotonic() - t0) * 1000
+        assert result is True
+        assert dur_ms < FAST_MS, f"constraint leg took {dur_ms:.0f} ms"
+        assert seen == []  # SET not applied on the caller thread
+        gate.set()
+        assert wait_until(lambda: len(seen) == 1, timeout=2.0)
+        assert seen == [(7, 9)] and gate_mouse.position == (7, 9)
+
     def test_pump_lane_inline_on_loop_thread(self, om_env):
         """Macro-playback lane: ON the loop thread the leg runs inline -
         a macro sequence never races its own queued copy."""

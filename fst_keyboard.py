@@ -1066,9 +1066,15 @@ class FST_Keyboard():
                         # the lane; inline fallback when no loop is wired).
                         # Suppression of the source event below stays
                         # synchronous on the pump.
-                        self._output_manager.pump_lane(
-                            lambda ke=current_ke: self._output_manager.send_key_event(ke),
-                            'rebind_send')
+                        if self._output_manager.pump_lane(
+                                lambda ke=current_ke: self._output_manager.send_key_event(ke),
+                                'rebind_send') is False:
+                            # pump_lane returns False ONLY when scheduling failed
+                            # (loop gone); inline runs return the send's None ->
+                            # send inline here so the replacement is never lost
+                            # behind the synchronous suppression below
+                            # (reviewer P1-4: a key LOST on a dead loop was new)
+                            self._output_manager.send_key_event(current_ke)
 
                     to_be_suppressed = True
 
