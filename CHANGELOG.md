@@ -18,6 +18,19 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   (test-only: the branch invocation and its order are observed).
 
 ### Fixed
+- The LL-hook pump never waits on SendInput/clipboard/file legs again (#360):
+  tap-group sends, rebind replacement sends and the constraint-string action
+  legs (type/write, clipboard, file/backup, mouse move/scroll, modifier and
+  simulated-key releases, clear_console) route through the asyncio loop lane
+  via a new `Output_Manager.pump_lane` — off-loop callers (the hook pumps)
+  return immediately; a pump blocked past `LowLevelHooksTimeout` silently
+  removed the LL hook, so suppression died mid-macro (leaked trigger key +
+  app-default shortcut, maintainer `fst_flow.log` evidence 2026-11-04).
+  Send order stays FIFO within the lane; the hold-repeat behavior
+  (260428-2341) survives because tap-group state updates stay synchronous on
+  the caller; without a wired loop the legs run inline (old sync behavior).
+  New `tests/test_pump_async_lane.py`: 7 lane/timing pins (RED pre-change,
+  measured callback 250 ms -> fast return) + 2 fallback contract locks.
 - U359 macro-suppression regression hunt: the win32 injected-flag decode of the
   keyboard filter was audited against the documented `KBDLLHOOKSTRUCT` contract
   (`LLKHF_INJECTED = 0x10`, `ALTDOWN = 0x20`, `UP = 0x80`) and confirmed CORRECT;
