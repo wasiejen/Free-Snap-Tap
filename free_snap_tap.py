@@ -63,14 +63,25 @@ app = None
 class MainLogic:
     def __init__(self, fst_keyboard):
         self.fst_keyboard = fst_keyboard
-        self.loop = None
+        # U375 (B1): the asyncio loop is OWNED here, in EVERY startup mode
+        # (was: created inside start_async_thread only, so the headless
+        # branch ran asyncio.run on a foreign loop, MainLogic.loop stayed
+        # None, set_loop(None) wired None, and the direct
+        # run_coroutine_threadsafe sites (macro start, start_repeat, tap
+        # delay/crossover, mouse->mouse rebind) raised AttributeError into
+        # the pump-entry catch-all -> macro triggers leaked un-suppressed).
+        # One loop for all modes: the GUI thread run_forevers it, the
+        # headless branch runs it through run_headless(); set_loop(self.loop)
+        # in run() then hands FST_Keyboard the loop that actually runs.
+        self.loop = asyncio.new_event_loop()
 
     def on_press(self, key):
         """Handle key press events."""
 
     # 1. Define the thread's target
     def start_async_thread(self):
-        self.loop = asyncio.new_event_loop()
+        # U375: the loop is owned from __init__ (all modes share it); this
+        # thread only makes it the running loop of the logic thread
         asyncio.set_event_loop(self.loop)
         # We run the logic inside the loop
         self.loop.create_task(self.run())
@@ -78,6 +89,19 @@ class MainLogic:
             self.loop.run_forever()
         finally:
             self.cleanup
+
+    def run_headless(self):
+        '''U375 (B1): headless startup runs MainLogic.run() on the OWNED
+        loop. asyncio.Runner(loop_factory) gives the exact asyncio.run
+        semantics (KeyboardInterrupt -> cancel pending tasks + close) but
+        on OUR loop, so set_loop(self.loop) in run() wires the real
+        running loop into FST_Keyboard and the direct
+        run_coroutine_threadsafe sites schedule instead of raising.'''
+        try:
+            with asyncio.Runner(loop_factory=lambda: self.loop) as runner:
+                runner.run(self.run())
+        except KeyboardInterrupt:
+            logger.info("Keyboard interrupt received.")
 
     def cleanup(self):
         """Clean up resources on shutdown."""
@@ -94,7 +118,8 @@ class MainLogic:
         # U345 H2: toast offload pump task on the asyncio loop (runs in
         # both GUI and headless mode) - drains the toast queue into the
         # bridge; the drain thread is this loop, never a hook pump.
-        # get_running_loop: MainLogic.loop is not set on the headless path.
+        # get_running_loop: == self.loop since U375 (both paths run the
+        # owned loop; was a foreign asyncio.run loop on the headless path).
         # Keep the task reference (GC-unsafe pattern, asyncio docs).
         self.toast_pump_task = asyncio.get_running_loop().create_task(
             self.fst_keyboard.toast_pump())
@@ -238,9 +263,6 @@ if __name__ == "__main__":
         # legacy toast_callback=None TypeError landmine on the headless
         # product path (constraint show_message / repeat overlay)
         fst_keyboard.init_toast_offload(None)
-        try:
-            asyncio.run(logic.run())
-        except KeyboardInterrupt:
-            logger.info("Keyboard interrupt received.")
+        logic.run_headless()
 
     sys.exit(1)  # Exit the script after main function completes

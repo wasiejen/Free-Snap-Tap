@@ -880,7 +880,9 @@ class Output_Manager():
     # True immediately; it runs work() INLINE when the caller is already on
     # the loop thread (macro playback lane) or when no loop is wired
     # (headless/legacy/tests = old synchronous behavior, contract locked in
-    # tests/test_pump_async_lane.py::TestFallbackContract). Every routed leg
+    # tests/test_pump_async_lane.py::TestFallbackContract; since U375 the
+    # headless mode runs the owned MainLogic.loop too, so the inline path
+    # there is the safety net only). Every routed leg
     # is an action leg whose success value is True, so the pump-side True is
     # the same value the inline path returns.
     def pump_lane(self, work, leg_name='leg'):
