@@ -8,6 +8,8 @@ import pygetwindow as gw
 import re #regular expression
 
 import logging
+
+from fst_data_types import FOCUS_NAME_ILLEGAL
 # the macro-area logger of the FST logger tree (same cached instance as
 # fst_manager's logger_macro - no circular import, fst_manager imports us)
 logger_macro = logging.getLogger('fst.macro')
@@ -83,8 +85,12 @@ class Focus_Task:
             if active_window != last_active_window or manually_paused:
                 if active_window != last_active_window:
                     last_active_window = active_window
-                # #only allow letters, numbers and spaces in active window name
-                active_window = re.sub(r'[^a-zA-Z0-9_. ]', '', active_window)
+                # sanitize the window title with the SAME rule the config side
+                # uses (fst_data_types.FOCUS_NAME_ILLEGAL, #399): matching is
+                # cleaned_title.find(config_name), so a different pattern here
+                # silently disables every focus group whose name keeps a legal
+                # char this strip would remove
+                active_window = re.sub(FOCUS_NAME_ILLEGAL, '', active_window)
                 # if not one of my own spawned windows
                 if active_window not in ["FST Status Indicator", "FST Crosshair", "FST_Overlay"]:
                     if not self.FOCUS_THREAD_PAUSED and not self._fst.arg_manager.MANUAL_PAUSED:

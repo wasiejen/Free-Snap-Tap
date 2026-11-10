@@ -14,10 +14,18 @@ What could break, and is pinned here as unaffected:
 - name-based lookup: the name -> scope map (config_focus_scopes),
   apply_start_args_by_focus_name and apply_focus_groups all resolve the CLEANED
   name as an opaque string.
+- THE HIDDEN COUPLING (reviewer P0/P1, 2026-11-10): the active-window TITLE is
+  sanitized SEPARATELY in fst_tasks.py, and matching is
+  `cleaned_title.find(config_name)`. If the two patterns differ, widening only
+  the name side silently breaks activation for every name containing the
+  newly-allowed char - no warning, no ConfigError, the filter just never
+  activates. So the sanitizer rule is ONE constant shared by both sides, pinned
+  through Focus_Task below.
 """
+import pytest
+
 from fst_manager import Config_Manager, Config_Validator
-from kb_helpers import build  # noqa: F401  (keeps the fixture convention visible)
-from vk_codes import vk_codes_dict  # noqa: F401
+from vk_codes import vk_codes_dict
 
 
 def violations_of(content):
@@ -112,7 +120,44 @@ class TestFacadeNameLookup:
         kb.update_focus_groups()
         kb.apply_start_args_by_focus_name('Half-Life:2-beta')
         kb.apply_focus_groups('Half-Life:2-beta')
-        # a Key->Key rebind builds a press AND a release trigger, both on 'q'
+        # a Key->Key rebind builds a press AND a release trigger, both on 'q',
+        # and the replacement key is 'e'
         assert len(kb._rebind_triggers) == 2
         assert all(t.get_trigger().vk_code == vk_codes_dict['q']
                    for t in kb._rebind_triggers)
+        # the replacement key of each rebind is 'e' (Key_Event.get_all()[0])
+        assert all(r.replacement.get_all()[0] == vk_codes_dict['e']
+                   for r in kb._rebinds)
+
+
+class TestWindowTitleMatching:
+    """The P0 leg (reviewer, 2026-11-10): the config name and the active-window
+    TITLE must be sanitized by the SAME pattern, or a name that keeps ':' and
+    '-' can never be found in a title that had them stripped."""
+
+    @pytest.mark.asyncio
+    async def test_title_and_name_with_colon_and_dash_activate(self, monkeypatch):
+        from test_focus_task import driving_sleep, fake_windows, make_fst
+        from fst_tasks import Focus_Task
+        fst = make_fst(focus_names=['Half-Life:2-beta'])
+        fake_windows(monkeypatch, ['Half-Life:2-beta - Steam'])
+        task = Focus_Task(fst)
+        driving_sleep(monkeypatch, task, ticks=2)
+
+        await task.run()
+
+        assert fst.focus_manager.FOCUS_APP_NAME == 'Half-Life:2-beta'
+
+    @pytest.mark.asyncio
+    async def test_plain_hyphenated_title_still_activates(self, monkeypatch):
+        # the pre-existing case that must not regress: 'Half-Life' configs
+        from test_focus_task import driving_sleep, fake_windows, make_fst
+        from fst_tasks import Focus_Task
+        fst = make_fst(focus_names=['Half-Life'])
+        fake_windows(monkeypatch, ['Half-Life 2'])
+        task = Focus_Task(fst)
+        driving_sleep(monkeypatch, task, ticks=2)
+
+        await task.run()
+
+        assert fst.focus_manager.FOCUS_APP_NAME == 'Half-Life'

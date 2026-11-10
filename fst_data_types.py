@@ -225,6 +225,16 @@ class Key_Group(object):
         return len(self._key_events)
 
 
+# focus-name sanitizer rule: letters, numbers, spaces, "_", ".", ",", ":" and
+# "-" keep, everything else is stripped. ONE pattern for BOTH sides of the
+# focus match: the config side (Config_Manager strip + the validator mirror, so
+# the warning can name the removed chars) and the active-window TITLE side
+# (Focus_Task) - matching is cleaned_title.find(config_name), so the two sides
+# must strip identically or a legal name never matches (FST #399, reviewer P0).
+# Lives here (neutral module) because fst_manager imports fst_tasks.
+FOCUS_NAME_ILLEGAL = r'[^a-zA-Z0-9,_. \-:]'
+
+
 class Rebind(object):
 
     def __init__(self, trigger_group, replacement):
