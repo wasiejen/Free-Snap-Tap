@@ -4,6 +4,7 @@ last updated: 250724-1435
 '''
 
 import asyncio
+import threading
 from threading import Thread
 import sys
 from time import sleep
@@ -74,6 +75,13 @@ class MainLogic:
         # headless branch runs it through run_headless(); set_loop(self.loop)
         # in run() then hands FST_Keyboard the loop that actually runs.
         self.loop = asyncio.new_event_loop()
+        # U384 (#384): cleanup must run EXACTLY ONCE on every shutdown path.
+        # The flag guards the resource legs; the thread reference lets
+        # shutdown() stop + join the loop thread from the GUI main thread
+        # (loop.close() raises RuntimeError on a loop running on another
+        # thread, so the GUI thread cannot close it directly).
+        self._cleaned_up = False
+        self._logic_thread = None
 
     def on_press(self, key):
         """Handle key press events."""
@@ -83,12 +91,21 @@ class MainLogic:
         # U375: the loop is owned from __init__ (all modes share it); this
         # thread only makes it the running loop of the logic thread
         asyncio.set_event_loop(self.loop)
+        # U384 (#384): shutdown() joins THIS thread for the orderly GUI
+        # stop, so the loop thread is recorded when it enters
+        self._logic_thread = threading.current_thread()
         # We run the logic inside the loop
         self.loop.create_task(self.run())
         try:
             self.loop.run_forever()
         finally:
-            self.cleanup
+            # U384 (#384): was `self.cleanup` - a bare bound-method
+            # reference, a latent no-op. run_forever returns when the loop
+            # is stopped (GUI shutdown() or a test-side stop), so this
+            # finally is the loop-thread cleanup leg; the guard inside
+            # cleanup() keeps it single even when the GUI thread already
+            # carried the legs.
+            self.cleanup()
 
     def run_headless(self):
         '''U375 (B1): headless startup runs MainLogic.run() on the OWNED
@@ -102,14 +119,66 @@ class MainLogic:
                 runner.run(self.run())
         except KeyboardInterrupt:
             logger.info("Keyboard interrupt received.")
+        finally:
+            # U384 (#384): the headless shutdown leg - Ctrl+C
+            # (KeyboardInterrupt) or a loop stop both land here. Runner
+            # has already cancelled the tasks and closed the loop, so the
+            # close leg inside cleanup() no-ops; the resource legs
+            # (listener stop, input-buffer flush) never ran before this
+            # fix.
+            self.cleanup()
+
+    def shutdown(self):
+        '''U384 (#384): the GUI-side shutdown entry, called by __main__
+        after the Qt event loop ends. The tray Exit path (GUI_Manager.
+        exit_program: control_exit_program -> app.quit() -> sys.exit(0))
+        reaches the caller's finally either as a propagating SystemExit
+        or as a normal return after quit() unwinds exec - both land here.
+        Orderly hand to the loop thread: stop its run_forever so its
+        finally runs cleanup FIRST (the guard keeps it single), join with
+        a bounded timeout, then run the guarded cleanup on this thread
+        too - this thread carries the legs when the logic thread was
+        never started or is already gone.'''
+        thread = self._logic_thread
+        if thread is not None and thread.is_alive():
+            try:
+                self.loop.call_soon_threadsafe(self.loop.stop)
+            except RuntimeError:
+                pass  # loop already closed - the cleanup legs still run
+            thread.join(timeout=3.0)
+        self.cleanup()
 
     def cleanup(self):
-        """Clean up resources on shutdown."""
+        """Clean up resources on shutdown. U384 (#384): runs EXACTLY ONCE
+        regardless of caller - the loop-thread finally, the headless
+        finally and the GUI shutdown() all call it, the first caller
+        carries the legs and the rest no-op."""
+        if self._cleaned_up:
+            return
+        self._cleaned_up = True
         print("Cleaning up resources...")
+        logger.info("cleanup: stopping listeners + flushing input")
         self.fst_keyboard.stop_listener()
         #self.fst_keyboard.focus_manager.stop_focus_thread()
         self.fst_keyboard.cli_menu.flush_the_input_buffer()
-        self.loop.close()
+        if self.loop is not None and not self.loop.is_closed():
+            if not self.loop.is_running():
+                # cancel the pending keep-alive/pump tasks BEFORE close
+                # (the U375 tests' cancel_and_close pattern - a close
+                # over pending tasks logs 'Task was destroyed but it is
+                # pending'); only valid here because run_forever has
+                # already returned on the owner thread (is_running False)
+                for task in asyncio.all_tasks(self.loop):
+                    task.cancel()
+                pending = [t for t in asyncio.all_tasks(self.loop)
+                           if not t.done()]
+                if pending:
+                    self.loop.run_until_complete(
+                        asyncio.gather(*pending, return_exceptions=True))
+                self.loop.close()
+            # is_running True = the loop still runs on its own thread
+            # (a join timeout): leave the close to it - closing a running
+            # loop raises RuntimeError
         print("Secondary thread fully exited.")
 
 
@@ -253,7 +322,16 @@ if __name__ == "__main__":
             gui_manager.overlay.show()
 
         # gui_manager.start_update_timer()  # Start the periodic update timer
-        gui_manager.start()  # Start the Qt event loop
+        try:
+            gui_manager.start()  # Start the Qt event loop
+        finally:
+            # U384 (#384): GUI shutdown - the Qt loop has ended (tray Exit
+            # arrives here either as a propagating SystemExit from
+            # exit_program's sys.exit(0) or as a normal return after
+            # app.quit() unwinds exec). Stop + join the logic thread and
+            # run MainLogic.cleanup exactly once before the script-exit
+            # line; the finally covers BOTH exit shapes.
+            logic.shutdown()
     else:
         # if no tray icon or status indicator, just run the main function
         # HEADLESS MODE: Run logic in the current (__main__) thread

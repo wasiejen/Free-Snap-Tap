@@ -367,9 +367,9 @@ class TestLeg2LoopWiring:
         branch spawns start_async_thread on a real thread; with loop
         creation moved to __init__ this thread boundary must be EXECUTED,
         not just read. The thread run_forevers the owned loop; the test
-        stops the loop (product GUI never calls stop_forever - the
-        pre-existing `finally: self.cleanup` no-op is separately
-        filed)."""
+        stops the loop directly; #384 gave the product GUI its own stop
+        leg - main-block logic.shutdown() -> call_soon_threadsafe(stop) -
+        this pin keeps driving the stop itself to stay harness-free."""
         from free_snap_tap import MainLogic
 
         kb, seen = make_run_stub_keyboard()
@@ -548,6 +548,11 @@ class TestLeg2LoopWiring:
         # cli_menu is a read-only property - stub its run() touch-points
         kb.cli_menu.update_group_display = MagicMock()
         kb.cli_menu.display_focus_names = MagicMock()
+        # U384 (#384) touch-points: run_headless now ends in cleanup() -
+        # stop_listener would hit the never-initialized None listener
+        # (init_listener is stubbed above), so stub the cleanup legs too
+        kb.stop_listener = MagicMock()
+        kb.cli_menu.flush_the_input_buffer = MagicMock()
         # the -no_menu entry shape: MENU_ENABLED defaults True on the real
         # keyboard (CLI menu = blocking input() on the loop - the B2 item);
         # this pin drives the menu-free startup path

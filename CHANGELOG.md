@@ -18,6 +18,14 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   (test-only: the branch invocation and its order are observed).
 
 ### Fixed
+- Shutdown now runs `MainLogic.cleanup` EXACTLY ONCE on every exit path
+  (#384): the GUI-mode loop thread's `finally: self.cleanup` was a
+  bare bound-method reference (latent no-op), no GUI-path caller ever
+  invoked loop shutdown, and `cleanup` was unguarded. `MainLogic` gained
+  a guarded `cleanup()`, a headless `finally` leg, and a GUI-side
+  `shutdown()` (stop + join the loop thread, then cleanup) wired in a
+  `finally` around `gui_manager.start()` - tray Exit (SystemExit or
+  normal return) and Ctrl+C headless all land on it.
 - Headless mode now runs the SAME asyncio loop as the GUI modes (#373, B1):
   `MainLogic` owns the loop from construction and the headless branch runs
   it through `MainLogic.run_headless()` (`asyncio.Runner(loop_factory)` =
