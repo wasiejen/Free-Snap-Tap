@@ -1843,6 +1843,25 @@ class Config_Manager():
             #     # TODO: to adapt to save key sequences - necessary - mainly used to create new file if none found
             #     file.write(' :: '.join([', '.join(macro[0]),', '.join(macro[1])]))
 
+    def alias_definition_lines(self, lines):
+        '''FST-403 (#403): the default lines a focus section still needs when
+        -default_off drops the default GROUP LINES - the alias DEFINITION
+        entries. A collected group line is a [line_name, line] pair
+        (_parse_lines_for_focus_manager), and an alias definition carries its
+        name token in line_name ('<world>'); presort_lines routes those into
+        the alias dict, and a focus-section macro/rebind resolves '<name>'
+        through that dict AT BUILD TIME, so dropping them aborts the whole
+        group build (KeyError 'Alias <x> is not known' -> bare Exception).
+        Tap groups, rebinds, macros and macro sequences are group lines and
+        stay dropped (approved proposal 2026-10-31, ruling b).'''
+        kept = []
+        for item in lines:
+            line_name = item[0] if isinstance(item, (list, tuple)) and item else ''
+            if line_name.startswith('<') and line_name.endswith('>') \
+                    and line_name not in ('<arg>', '<focus>'):
+                kept.append(item)
+        return kept
+
     def presort_lines(self, lines):
         '''
         saves cleaned lines according to formatting in different containers;

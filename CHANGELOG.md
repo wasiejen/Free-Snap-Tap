@@ -9,6 +9,13 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 ## [Unreleased]
 
 ### Added
+- New config argument `<arg>-default_off` (dashed twin `-default-off`): the
+  focus section it is set in builds from its OWN group lines only - the default
+  section's tap groups, rebinds, macros and macro sequences are not merged in
+  (TODO #403, proposal 2026-10-31_fst-default-focus-group-deactivation, ruling
+  b: default START ARGUMENTS stay merged; `-always_active` focus-loss behavior
+  unchanged). Default-section alias definitions (`<name> ...`) are kept, because
+  a focus-section line can resolve through them at build time.
 - Start arguments accept dashed spellings of underscore args: '-' and '_' are
   interchangeable in the arg NAME (`-always-active` == `-always_active`; names
   without an underscore, like `-tapdelay`, have no dashed twin); the value after

@@ -110,6 +110,49 @@ class TestDefaultOffBehavior:
         assert kb.arg_manager.DEFAULT_OFF is False
 
 
+    def test_default_off_keeps_default_alias_definitions_referable(self, kb_env_ns, tmp_path):
+        # reviewer P1: dropping ALL default lines also dropped the alias
+        # definitions a focus line resolves THROUGH at build time -> the whole
+        # group build aborted (bare Exception 'Alias <world> is not known',
+        # 0 rebinds / 0 macros / 0 tap groups left, and the GUI/CLI reload
+        # catches only ConfigError). Aliases are DEFINITIONS, not group lines.
+        kb = kb_env_ns.kb
+        content = ('<world> m, n\n'
+                   'm : n\n'
+                   '<focus>Game\n'
+                   '<arg>-default_off\n'
+                   '(mm) q :: <world>\n')
+        load_and_activate(kb, tmp_path, content, 'Game')
+        # the build survived: the focus macro is there, the default rebind is gone
+        assert len(kb._macros) == 1
+        assert kb._rebinds == []
+        assert kb._tap_groups == []
+
+    def test_default_off_drops_default_macro_sequence_definition(self, kb_env_ns, tmp_path):
+        # chosen semantics (ruling b): a default SEQUENCE is a group line - it is
+        # dropped, and the build still succeeds (a dropped sequence is resolved
+        # at trigger time, not at build time, so no abort class like aliases)
+        kb = kb_env_ns.kb
+        content = ('(seq) -y :: m : n\n'
+                   '<focus>Game\n'
+                   '<arg>-default_off\n'
+                   'q : e\n')
+        load_and_activate(kb, tmp_path, content, 'Game')
+        assert kb._macros_alias_dict == {}
+        assert trigger_vks(kb) == {VK_Q}
+
+    def test_default_off_still_drops_default_tap_groups(self, kb_env_ns, tmp_path):
+        # ruling (b) stays: the default GROUP lines themselves are gone
+        kb = kb_env_ns.kb
+        content = ('a, d\n'
+                   '<focus>Game\n'
+                   '<arg>-default_off\n'
+                   'q : e\n')
+        load_and_activate(kb, tmp_path, content, 'Game')
+        assert kb._tap_groups == []
+        assert trigger_vks(kb) == {VK_Q}
+
+
 class TestDefaultOffRegistration:
     def test_underscore_spelling_has_no_validator_warning(self):
         cm = Config_Manager()
