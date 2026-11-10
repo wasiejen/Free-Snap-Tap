@@ -4,6 +4,7 @@ last updated: 250724-1435
 '''
 
 import asyncio
+import threading
 from threading import Thread
 import sys
 from time import sleep
@@ -74,6 +75,14 @@ class MainLogic:
         # headless branch runs it through run_headless(); set_loop(self.loop)
         # in run() then hands FST_Keyboard the loop that actually runs.
         self.loop = asyncio.new_event_loop()
+        # U384 (#384): cleanup must run EXACTLY ONCE on every shutdown path.
+        # The flag guards the resource legs; the thread reference lets
+        # shutdown() stop + join the loop thread from the GUI main thread
+        # (loop.close() raises RuntimeError on a loop running on another
+        # thread, so the GUI thread cannot close it directly).
+        self._cleaned_up = False
+        self._cleanup_lock = threading.Lock()
+        self._logic_thread = None
 
     def on_press(self, key):
         """Handle key press events."""
@@ -83,12 +92,21 @@ class MainLogic:
         # U375: the loop is owned from __init__ (all modes share it); this
         # thread only makes it the running loop of the logic thread
         asyncio.set_event_loop(self.loop)
+        # U384 (#384): shutdown() joins THIS thread for the orderly GUI
+        # stop, so the loop thread is recorded when it enters
+        self._logic_thread = threading.current_thread()
         # We run the logic inside the loop
         self.loop.create_task(self.run())
         try:
             self.loop.run_forever()
         finally:
-            self.cleanup
+            # U384 (#384): was `self.cleanup` - a bare bound-method
+            # reference, a latent no-op. run_forever returns when the loop
+            # is stopped (GUI shutdown() or a test-side stop), so this
+            # finally is the loop-thread cleanup leg; the guard inside
+            # cleanup() keeps it single even when the GUI thread already
+            # carried the legs.
+            self.cleanup()
 
     def run_headless(self):
         '''U375 (B1): headless startup runs MainLogic.run() on the OWNED
@@ -102,15 +120,91 @@ class MainLogic:
                 runner.run(self.run())
         except KeyboardInterrupt:
             logger.info("Keyboard interrupt received.")
+        finally:
+            # U384 (#384): the headless shutdown leg - Ctrl+C
+            # (KeyboardInterrupt) or a loop stop both land here. Runner
+            # has already cancelled the tasks and closed the loop, so the
+            # close leg inside cleanup() no-ops; the resource legs
+            # (listener stop, input-buffer flush) never ran before this
+            # fix.
+            self.cleanup()
+
+    def shutdown(self):
+        '''U384 (#384): the GUI-side shutdown entry, called by __main__
+        after the Qt event loop ends. The tray Exit path (GUI_Manager.
+        exit_program: control_exit_program -> app.quit() -> sys.exit(0))
+        reaches the caller's finally either as a propagating SystemExit
+        or as a normal return after quit() unwinds exec - both land here.
+        Orderly hand to the loop thread: stop its run_forever so its
+        finally runs cleanup FIRST (the guard keeps it single), join with
+        a bounded timeout, then run the guarded cleanup on this thread
+        too - this thread carries the legs when the logic thread was
+        never started or is already gone.'''
+        thread = self._logic_thread
+        if thread is not None and thread.is_alive():
+            try:
+                self.loop.call_soon_threadsafe(self.loop.stop)
+            except RuntimeError:
+                pass  # loop already closed - the cleanup legs still run
+            thread.join(timeout=3.0)
+        self.cleanup()
 
     def cleanup(self):
-        """Clean up resources on shutdown."""
+        """Clean up resources on shutdown. U384 (#384): runs EXACTLY ONCE
+        regardless of caller - the loop-thread finally, the headless
+        finally and the GUI shutdown() all call it; the lock makes the
+        check-and-set atomic (reviewer P2-2: the join-timeout shape can
+        otherwise land both threads in cleanup at once) and every leg is
+        isolated (reviewer P1: Ctrl+C before run() reaches init_listener
+        makes stop_listener raise on the never-initialized None listener
+        - the flush and close legs must still run and the guard must
+        still hold afterwards)."""
+        with self._cleanup_lock:
+            if self._cleaned_up:
+                return
+            self._cleaned_up = True
         print("Cleaning up resources...")
-        self.fst_keyboard.stop_listener()
+        logger.info("cleanup: stopping listeners + flushing input")
+        try:
+            self.fst_keyboard.stop_listener()
+        except Exception as error:  # last-exit leg - never abort the rest
+            logger.warning(f"cleanup: stop_listener failed: {error!r}")
         #self.fst_keyboard.focus_manager.stop_focus_thread()
-        self.fst_keyboard.cli_menu.flush_the_input_buffer()
-        self.loop.close()
-        print("Secondary thread fully exited.")
+        try:
+            self.fst_keyboard.cli_menu.flush_the_input_buffer()
+        except Exception as error:
+            logger.warning(f"cleanup: input flush failed: {error!r}")
+        loop_left_running = False
+        if self.loop is not None and not self.loop.is_closed():
+            if self.loop.is_running():
+                # the loop still runs on its own thread (join timeout):
+                # leave the close to it - closing a running loop raises
+                # RuntimeError; the exit print below must not claim the
+                # thread exited here (reviewer P2-4)
+                loop_left_running = True
+            else:
+                # cancel the pending keep-alive/pump tasks BEFORE close
+                # (the U375 tests' cancel_and_close pattern - a close
+                # over pending tasks logs 'Task was destroyed but it is
+                # pending'). Reached only with the loop stopped: either
+                # this is the loop's own thread after run_forever
+                # returned, or the logic thread never ran the loop - the
+                # drain below assumes the current thread holds the
+                # stopped loop exclusively; is_running False alone does
+                # not prove ownership (reviewer P2-3, latent)
+                for task in asyncio.all_tasks(self.loop):
+                    task.cancel()
+                pending = [t for t in asyncio.all_tasks(self.loop)
+                           if not t.done()]
+                if pending:
+                    self.loop.run_until_complete(
+                        asyncio.gather(*pending, return_exceptions=True))
+                self.loop.close()
+        if loop_left_running:
+            logger.warning("cleanup: logic loop still running "
+                           "(join timeout) - close left to its thread")
+        else:
+            print("Secondary thread fully exited.")
 
 
     async def run(self):
@@ -218,42 +312,55 @@ if __name__ == "__main__":
         logic_thread = Thread(target=logic.start_async_thread, daemon=True)
         logic_thread.start()
 
-        app = QApplication([])
-        gui_manager = GUI_Manager(fst_keyboard, app)
+        # U384 (#384, reviewer P2-5): the try covers the WHOLE Qt wiring,
+        # not just the event loop - a crash in QApplication/GUI_Manager/
+        # bridge setup used to exit with the logic thread still running
+        # and no cleanup. The finally carries logic.shutdown() for every
+        # GUI-mode exit: the tray Exit path arrives either as a
+        # propagating SystemExit from exit_program's sys.exit(0) or as a
+        # normal return after app.quit() unwinds exec.
+        try:
+            app = QApplication([])
+            gui_manager = GUI_Manager(fst_keyboard, app)
 
-        bridge = ToastBridge()
+            bridge = ToastBridge()
 
-        # Connect bridge signals to GUI manager slots
-        bridge.signal_show_toast.connect(gui_manager.toast_manager.add_toast)
-        bridge.signal_show_timer.connect(gui_manager.toast_manager.add_timer)
-        bridge.signal_remove_toast.connect(gui_manager.toast_manager.remove_toast)
-        bridge.signal_remove_all_toasts.connect(gui_manager.toast_manager.remove_all_toasts)
-        # Inject the bridge methods into the keyboard logic for thread-safe
-        # calls (U345 H2: through the toast offload queue - poster threads
-        # (hook pumps) do one deque.append; the asyncio pump task drains
-        # into the bridge, so the emit never runs on a poster thread.
-        # -no_toast_offload restores the direct emit path)
-        fst_keyboard.init_toast_offload(bridge)
+            # Connect bridge signals to GUI manager slots
+            bridge.signal_show_toast.connect(gui_manager.toast_manager.add_toast)
+            bridge.signal_show_timer.connect(gui_manager.toast_manager.add_timer)
+            bridge.signal_remove_toast.connect(gui_manager.toast_manager.remove_toast)
+            bridge.signal_remove_all_toasts.connect(gui_manager.toast_manager.remove_all_toasts)
+            # Inject the bridge methods into the keyboard logic for thread-safe
+            # calls (U345 H2: through the toast offload queue - poster threads
+            # (hook pumps) do one deque.append; the asyncio pump task drains
+            # into the bridge, so the emit never runs on a poster thread.
+            # -no_toast_offload restores the direct emit path)
+            fst_keyboard.init_toast_offload(bridge)
 
-        # startup compliance result (U290T): the validator ran at the startup
-        # load, BEFORE this bridge existed - warnings were console-only there
-        # (U290R); they re-surface as the report toast now, a clean pass gets
-        # the single green OK toast
-        surface_startup_config_result(fst_keyboard)
+            # startup compliance result (U290T): the validator ran at the startup
+            # load, BEFORE this bridge existed - warnings were console-only there
+            # (U290R); they re-surface as the report toast now, a clean pass gets
+            # the single green OK toast
+            surface_startup_config_result(fst_keyboard)
 
-        # startup activation pass, post-load (U330 ask 2): the scope the
-        # startup load activated announces itself once ('auto activated')
-        surface_startup_activation(fst_keyboard)
+            # startup activation pass, post-load (U330 ask 2): the scope the
+            # startup load activated announces itself once ('auto activated')
+            surface_startup_activation(fst_keyboard)
 
-        if fst_keyboard.arg_manager.TRAY_ICON:
-            gui_manager.tray_icon.show()
+            if fst_keyboard.arg_manager.TRAY_ICON:
+                gui_manager.tray_icon.show()
 
-        # start QT overlay
-        if fst_keyboard.arg_manager.STATUS_INDICATOR:
-            gui_manager.overlay.show()
+            # start QT overlay
+            if fst_keyboard.arg_manager.STATUS_INDICATOR:
+                gui_manager.overlay.show()
 
-        # gui_manager.start_update_timer()  # Start the periodic update timer
-        gui_manager.start()  # Start the Qt event loop
+            # gui_manager.start_update_timer()  # Start the periodic update timer
+            gui_manager.start()  # Start the Qt event loop
+        finally:
+            # U384 (#384): stop + join the logic thread and run
+            # MainLogic.cleanup exactly once before the script-exit
+            # line; the finally covers both exit shapes.
+            logic.shutdown()
     else:
         # if no tray icon or status indicator, just run the main function
         # HEADLESS MODE: Run logic in the current (__main__) thread
