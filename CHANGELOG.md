@@ -18,6 +18,21 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   (test-only: the branch invocation and its order are observed).
 
 ### Fixed
+- Screen resolution change now REPOSITIONS the status overlay and,
+  while shown, the crosshair (#388, priority item 1): `GUI_Manager`
+  connects `QScreen.geometryChanged` for every screen (+ `screenAdded`)
+  before entering the Qt event loop; the handler re-derives the overlay
+  box (DPR-correct sizes) and re-anchors it at the CURRENT screen's
+  top-right (the startup anchor), re-centers a visible crosshair and
+  re-anchors a visible toast row, in that order, exactly once per
+  event.
+- The cycle (colored status dot) can no longer clip at the bottom
+  right after a resolution/DPI change: `StatusOverlay.paintEvent` now
+  draws from `_cycle_rect()`, a rect whose CENTER is derived from the
+  REAL widget size, so any box-size drift (e.g. a Qt DPI re-scale)
+  re-centers the cycle; appearance is unchanged while the box matches
+  its size vars (`(x_size - s)//2 == p`), and the Leg-1 recompute
+  re-derives the cycle extent itself.
 - Shutdown now runs `MainLogic.cleanup` EXACTLY ONCE on every exit path
   (#384): the GUI-mode loop thread's `finally: self.cleanup` was a
   bare bound-method reference (latent no-op), no GUI-path caller ever

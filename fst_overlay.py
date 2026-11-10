@@ -7,7 +7,7 @@ import sys
 import os
 import re
 from PySide6.QtWidgets import QWidget, QApplication, QMenu, QSystemTrayIcon, QLabel, QVBoxLayout, QFrame
-from PySide6.QtCore import QObject, Qt, qInstallMessageHandler, Signal, QTimer, QFileSystemWatcher
+from PySide6.QtCore import QObject, Qt, qInstallMessageHandler, Signal, QTimer, QFileSystemWatcher, QRect
 from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont, QFontMetrics
 
 import ctypes
@@ -183,6 +183,9 @@ class GUI_Manager(QWidget):
 
     def start(self):
         self.start_update_timer()  # Start the periodic update timer
+        # U388 (#388, priority item 1): screen watch wired right before
+        # entering the Qt event loop (see _watch_screen_geometry)
+        self._watch_screen_geometry()
         self._app.exec()  # Start the Qt event loop
         
     def start_update_timer(self):
@@ -345,7 +348,46 @@ class GUI_Manager(QWidget):
             # overlay.hide_indicator()
         else:
             self._fst.arg_manager.CROSSHAIR_ENABLED = True
-        
+
+    # --- Screen geometry watch (U388, #388 - resolution change) ---
+    def _connect_screen_geometry(self, screen):
+        # U388: one connect per screen; QScreen.geometryChanged(QRect)
+        # fires when that screen's resolution changes (also on a scale
+        # change that alters the logical geometry). Delivered on the
+        # GUI thread = the widget-owning thread, no hop.
+        screen.geometryChanged.connect(self.on_screen_geometry_changed)
+
+    def _watch_screen_geometry(self):
+        # U388: wire every present screen + late monitors (screenAdded).
+        # Called from start() right before app.exec(). Stubbed test apps
+        # (MagicMock screens() -> empty iterable) keep this inert.
+        for screen in self._app.screens():
+            self._connect_screen_geometry(screen)
+        self._app.screenAdded.connect(self._connect_screen_geometry)
+
+    def on_screen_geometry_changed(self, *_):
+        '''U388 (#388): display-change handler - one call per changed
+        screen (single-monitor case = exactly once per event). After a
+        resolution change the overlay box state (user_size, paddings,
+        x_size) and its top-right anchor are STALE - the root cause of
+        the cycle clipping bottom-right (protocol Leg 0). Order:
+        1. overlay recompute FIRST: set_window_size_and_position(
+           init=True) re-derives the DPR sizes and re-anchors to the
+           CURRENT screen top-right (the startup anchor - Leg 0
+           reviewer ruling: the product's own anchor, not center).
+           Unconditional: a hidden indicator must be correct when the
+           next show_indicator lands it.
+        2. crosshair re-center ONLY while visible (a hidden one
+           already recomputes at show_crosshair - "if enabled").
+        3. toast manager re-anchor AFTER the overlay (it anchors to the
+           overlay geometry - protocol reviewer P2-4).'''
+        if self.overlay is not None:
+            self.overlay.set_window_size_and_position(init=True)
+        if self.crosshair is not None and self.crosshair.isVisible():
+            self.crosshair.update_position()
+        if self.toast_manager is not None and self.toast_manager.isVisible():
+            self.toast_manager.update_position()
+
             
     # def add_toast(self, text, **kwargs):
     #     self.toast_manager.add_toast(text, **kwargs)
@@ -616,14 +658,35 @@ class StatusOverlay(QWidget):
         
         self.update()  # Trigger repaint
         
+    def _cycle_rect(self):
+        '''U388 (#388 Leg 2): the widget-local rect the colored cycle
+        (status dot) is drawn into - cycle extent s = user_size (the
+        DPR-correct size, recomputed by set_window_size_and_position in
+        the Leg-1 resolution-change handler), CENTER derived from the
+        REAL widget size:
+            x = (width() - s) // 2  (same for y)
+        The old math anchored at the stored box vars
+        (drawEllipse(x_size - p - s, p, s, s)) - symmetric margins ONLY
+        while those vars match the real box; a display change drifts
+        the box (Qt DPI re-scale) and the cycle clipped bottom-right
+        (maintainer report). Appearance-parity while the vars match:
+        x_size = 2p+s -> (x_size - s)//2 == p == x_size - p - s, so
+        this is not a look change - a look-preservation proof is pinned
+        in tests/test_cycle_clip.py.'''
+        s = self.user_size
+        return QRect((self.width() - s) // 2,
+                     (self.height() - s) // 2,
+                     s, s)
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setBrush(self.color)
         painter.setPen(Qt.NoPen)
-        p = self.user_padding
-        s = self.user_size
-        painter.drawEllipse(self.x_size - p - s, p, s, s)
+        # U388 (#388 Leg 2): draw from the derived rect (real-size
+        # center) - no bottom-right clip after a box drift / resolution
+        # change
+        painter.drawEllipse(self._cycle_rect())
         #print(f"Painting overlay at: {self.geometry()} with size ({self.x_size}, {self.y_size}) and padding {p}")      
 
     # --- Mouse drag and menu events ---
