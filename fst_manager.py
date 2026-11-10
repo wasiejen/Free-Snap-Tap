@@ -1141,6 +1141,10 @@ class Config_Validator():
     def validate(self, numbered_lines):
         '''numbered_lines: list of (line_number, cleaned_line) tuples'''
         self._collect_alias_definitions(numbered_lines)
+        # FST-404 (#404) D1: vk -> (line, item) of the FIRST tap group that
+        # declares it, per effective scope (a focus section also runs the
+        # default-section groups, so its index starts as a copy of the default)
+        self._tap_vk_index = {'': {}}
         scope = ''
         aliases_by_scope = self._aliases_by_scope
         self.suppressed_scopes = set()
@@ -1154,6 +1158,7 @@ class Config_Validator():
                 # section no longer leaks them)
                 scope = self._focus_scope_of(line)
                 self._current_scope = scope
+                self._tap_vk_index.setdefault(scope, dict(self._tap_vk_index['']))
                 self._check_focus_line(line_number, line)
                 continue
             self._current_scope = scope
@@ -1360,6 +1365,7 @@ class Config_Validator():
                 self._warn(line_number, item, 'arity',
                            'tap group needs 2 or more keys')
             self._check_key_group(line_number, item, groups[0], aliases, 'tap')
+            self._check_tap_group_ownership(line_number, item, groups[0])
         elif len(groups) == 2:
             item = alias or f'(REB_{self._count_rebind})'
             self._count_rebind += 1
@@ -1396,6 +1402,39 @@ class Config_Validator():
             self._error(line_number, alias or '(unnamed)', 'dropped',
                         'line dropped - ":" after a "::" group needs an empty '
                         'middle group (use "a :: b : c" for a macro sequence)')
+
+    def _check_tap_group_ownership(self, line_number, item, group_text):
+        '''FST-404 (#404), ruling protocol D1: one vk may be owned by only ONE
+        tap group per effective scope. The runtime hands a vk event to the
+        FIRST group declaring it (owner registry, FST_Keyboard.
+        _tap_owner_by_vk), so a second declaration is dead config -> WARNING.
+        An ERROR would reject existing user configs (maintainer's included) =
+        observable behavior change, so it stays a warning.'''
+        if not group_text or group_text.count('(') != group_text.count(')'):
+            return
+        index = self._tap_vk_index.setdefault(self._current_scope, {})
+        for key_string in split_key_group(group_text):
+            base = key_string.split('|')[0].strip()
+            vk = self._tap_vk_of(base)
+            if vk is None:
+                continue
+            first = index.get(vk)
+            if first is not None and first[0] != line_number:
+                self._warn(line_number, item, 'tap-dup',
+                           f"key '{base}' is already in tap group {first[1]} "
+                           f"(line {first[0]}) - only the first group owns it")
+                continue
+            index[vk] = (line_number, item)
+
+    @staticmethod
+    def _tap_vk_of(base):
+        if base in vk_codes_dict:
+            return vk_codes_dict[base]
+        try:
+            vk = int(base)
+        except ValueError:
+            return None
+        return vk if 0 <= vk < 256 else None
 
     def _check_key_group(self, line_number, item, group_text, aliases, kind):
         '''one key group: unbalanced brackets drop it in presort_lines'''

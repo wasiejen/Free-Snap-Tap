@@ -40,6 +40,7 @@ call `suppress_event()` for it.
 """
 import pytest
 from collections import Counter
+from unittest.mock import MagicMock
 
 from kb_helpers import build
 from vk_codes import vk_codes_dict
@@ -48,6 +49,8 @@ VK_A = vk_codes_dict['a']
 VK_D = vk_codes_dict['d']
 VK_W = vk_codes_dict['w']
 VK_S = vk_codes_dict['s']
+VK_Q = vk_codes_dict['q']
+VK_E = vk_codes_dict['e']
 
 TWO_GROUPS = [['(TAP_1)', ['a', 'd']], ['(TAP_2)', ['w', 's']]]
 
@@ -117,16 +120,10 @@ class TestSweepOwnership:
     """L1-1/L1-2/L1-3(legs): the sweep must release tap holds through the
     owner and must not forget a hold it could not release."""
 
-    @pytest.mark.xfail(strict=True, reason="FST-404 Leg-1 RED (reviewer D3 "
-                                           "L1-1): the global sweep's release "
-                                           "of a tap-held key is eaten by the "
-                                           "owning group's active_key veto "
-                                           "(fst_keyboard.py:1107-1129) while "
-                                           "reset_states_dicts() still clears "
-                                           "the global record - release-all is "
-                                           "a silent no-op for tap keys. "
-                                           "Fix lands in Leg 2.")
     def test_sweep_releases_tap_holds_in_both_groups(self, kb_env_ns):
+        # RED in Leg 1 (commit 3b3a806, app_down stayed 1 for both keys):
+        # the fix makes the owner release its hold first, then emits
+        # synchronously so the veto leg cannot eat it
         kb, kb_mock = kb_env_ns.kb, kb_env_ns.kb_mock
         build(kb, taps=TWO_GROUPS)
         m = TapModel(kb, kb_mock)
@@ -145,14 +142,9 @@ class TestSweepOwnership:
         # and the owner must record that it no longer holds anything
         assert _groups_last_send(kb) == [None, None]
 
-    @pytest.mark.xfail(strict=True, reason="FST-404 Leg-1 RED (reviewer D3 "
-                                           "L1-2, invariant I1): after the "
-                                           "sweep the global record and the "
-                                           "owning group disagree about a tap "
-                                           "vk (global released, group still "
-                                           "holds, app still holds). Fix lands "
-                                           "in Leg 2.")
     def test_owner_and_global_record_agree_after_sweep(self, kb_env_ns):
+        # RED in Leg 1 (commit 3b3a806, vk 'a': global claim False vs group
+        # claim True): after the fix the owner clears its claim as it releases
         kb, kb_mock = kb_env_ns.kb, kb_env_ns.kb_mock
         build(kb, taps=TWO_GROUPS)
         m = TapModel(kb, kb_mock)
@@ -200,12 +192,17 @@ class TestRebuildOwnership:
     Leg-2 release-before-drop cannot regress them."""
 
     def test_release_after_group_rebuild_leaves_no_app_hold(self, kb_env_ns):
+        # group-swap entry point (apply_focus_groups -> initialize_groups...):
+        # the SAME tap groups are rebuilt, so a new owner exists when the
+        # physical release arrives and the tap leg suppresses the duplicate
         kb, kb_mock = kb_env_ns.kb, kb_env_ns.kb_mock
         build(kb, taps=TWO_GROUPS)
         m = TapModel(kb, kb_mock)
         m.press(VK_S)
-        kb.apply_focus_groups('')       # fresh Tap_Group objects
-        m.release(VK_S)
+        m.act(lambda: kb.initialize_groups_from_presorted_lines())
+        assert m.app_down(VK_S) == 0
+        assert _groups_last_send(kb) == [None, None]
+        m.release(VK_S)                            # suppressed by the new owner
         assert m.app_down(VK_S) == 0
 
 
@@ -217,13 +214,29 @@ class TestDuplicateGroupKeyCharacterization:
     Characterization pin; the Leg-2 commit adds a WARNING (D1) and this pin
     flips deliberately."""
 
-    def test_duplicate_vk_in_two_tap_groups_loads_with_no_message(self):
+    def test_duplicate_vk_in_two_tap_groups_warns(self):
+        # Leg-1 characterization (commit 3b3a806): no message at all.
+        # Leg-2 ruling D1: WARNING + runtime single-owner guard (an ERROR
+        # would reject existing user configs = maintainer approval gate).
         from fst_manager import Config_Manager, Config_Validator
         cm = Config_Manager()
         numbered = cm._combine_multilines_numbered(
             cm._clean_comments_numbered('a, d\na, s\n'.splitlines(keepends=True)))
         violations = Config_Validator().validate(numbered)
-        assert violations == []
+        errors = [v for v in violations if v.severity == Config_Validator.ERROR]
+        warnings = [v for v in violations if v.severity == Config_Validator.WARNING]
+        assert errors == []
+        assert len(warnings) == 1
+        assert warnings[0].rule == 'tap-dup'
+        assert warnings[0].line == 2
+        assert '(TAP_1)' in warnings[0].message and 'line 1' in warnings[0].message
+
+    def test_disjoint_tap_groups_stay_message_free(self):
+        from fst_manager import Config_Manager, Config_Validator
+        cm = Config_Manager()
+        numbered = cm._combine_multilines_numbered(
+            cm._clean_comments_numbered('a, d\nw, s\n'.splitlines(keepends=True)))
+        assert Config_Validator().validate(numbered) == []
 
     def test_duplicate_vk_still_creates_two_groups_today(self, kb_env_ns):
         kb = kb_env_ns.kb
@@ -231,3 +244,54 @@ class TestDuplicateGroupKeyCharacterization:
         assert len(kb._tap_groups) == 2
         assert kb._tap_groups[0].get_vk_codes() == [vk_codes_dict['a'], vk_codes_dict['d']]
         assert kb._tap_groups[1].get_vk_codes() == [vk_codes_dict['a'], vk_codes_dict['s']]
+
+    def test_first_group_owns_a_duplicate_vk(self, kb_env_ns):
+        # D1 guard: a non-owner group stays inert - the owner accounts the vk
+        # and releases it, the duplicate group never double-accounts it
+        kb, kb_mock = kb_env_ns.kb, kb_env_ns.kb_mock
+        build(kb, taps=[['(TAP_1)', ['a', 'd']], ['(TAP_2)', ['a', 's']]])
+        m = TapModel(kb, kb_mock)
+        m.press(VK_A)
+        m.release(VK_A)
+        assert m.net() == {}
+        assert _groups_last_send(kb) == [None, None]
+        assert kb._tap_owner_by_vk[VK_A] is kb._tap_groups[0]
+
+
+class TestSweepPerGroupCount:
+    """D4: with N active groups each holding one tap key, the sweep must
+    release all N holds app-visible and clear all N bookkeeping records."""
+
+    @pytest.mark.parametrize("groups,holds", [
+        ([['(TAP_1)', ['w', 's']]], [VK_S]),
+        (TWO_GROUPS, [VK_A, VK_S]),
+        ([['(TAP_1)', ['a', 'd']], ['(TAP_2)', ['w', 's']],
+          ['(TAP_3)', ['q', 'e']]], [VK_A, VK_S, VK_Q]),
+    ], ids=["1group", "2groups", "3groups"])
+    def test_sweep_releases_every_group_hold(self, kb_env_ns, groups, holds):
+        kb, kb_mock = kb_env_ns.kb, kb_env_ns.kb_mock
+        build(kb, taps=groups)
+        m = TapModel(kb, kb_mock)
+        for vk in holds:
+            m.press(vk)
+        m.act(lambda: kb.release_all_currently_pressed_simulated_keys())
+        assert m.net() == {}
+        assert _groups_last_send(kb) == [None] * len(groups)
+
+
+class TestQuitPathOwnership:
+    """D2(b): the quit paths stop the listeners right after the sweep, so the
+    tap releases must be emitted synchronously BEFORE the listener stops."""
+
+    def test_exit_program_releases_tap_hold_before_listener_stop(self, kb_env_ns):
+        kb, kb_mock = kb_env_ns.kb, kb_env_ns.kb_mock
+        kb._mouse_listener = MagicMock()
+        build(kb, taps=TWO_GROUPS)
+        m = TapModel(kb, kb_mock)
+        m.press(VK_S)
+        emitted_at_stop = []
+        kb._listener.stop.side_effect = lambda: emitted_at_stop.append(
+            [(c[0], c.args[0].vk) for c in kb_mock.method_calls])
+        kb.control_exit_program('pin')
+        assert emitted_at_stop, "listener never stopped - pin fixture wrong"
+        assert ('release', VK_S) in emitted_at_stop[0]
