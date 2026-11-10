@@ -155,6 +155,12 @@ class FST_Keyboard():
         # Key Groups define which key1 will be replaced by key2
         # if a Key Group has more than 2 keys if will be handled als alias
         self._tap_groups = []    # [Tap_Groups]
+        # FST-404 (#404): single-owner registry for tap-group keys - vk_code ->
+        # owning Tap_Group (first group wins, mirroring the tap-section break in
+        # _win32_event_filter). Without it a vk declared in two tap groups had
+        # the tap section hand it to the first group while the simulated-key
+        # veto leg let EVERY group containing it veto (two owners / no owner).
+        self._tap_owner_by_vk = {}
         self._rebinds_dict = {}       # Key_Event : Key_Event
         self._rebind_triggers = []
         self._macros_dict = {}        # [Key_Group : Key_Group]  # triggers are the Keys to the Item Makro
@@ -373,7 +379,14 @@ class FST_Keyboard():
         key_group are a list of Key_Event, Keys
         macros are Key_Group : key_Groups
         '''
+        # FST-404 (#404): release-before-drop. A group swap (focus change,
+        # config reload, pause-resume) drops the Tap_Group objects that own the
+        # app-level holds; without this the app keeps a pressed key no record
+        # claims anymore. At startup / on a clean config this emits nothing
+        # (no group holds anything).
+        self._release_tap_group_holds()
         self._tap_groups = []
+        self._tap_owner_by_vk = {}
         self._rebinds_dict = {}
         self._rebind_triggers = []
         self._macros_dict = {}
@@ -491,7 +504,12 @@ class FST_Keyboard():
                 for key_string in group:
                     key = self.convert_to_vk_code(key_string)
                     keys.append(Key(key, key_string=key_string))
-                self._tap_groups.append(Tap_Group(keys))
+                self._tap_groups.append(group_obj := Tap_Group(keys))
+                # FST-404 (#404): first group containing a vk owns it (the tap
+                # section hands a vk event to the FIRST match, so a later group
+                # stays inert for that vk instead of vetoing it)
+                for key in keys:
+                    self._tap_owner_by_vk.setdefault(key.vk_code, group_obj)
         except ConfigError as error:
             logger_config.error(f"{error} -> in Tap Group: {group}")
             raise
@@ -1050,6 +1068,8 @@ class FST_Keyboard():
                     vk_code, is_keydown, _ = current_ke.get_all()
                     logger_flow.debug("tap group #0")
                     for tap_group in self._tap_groups:
+                        if self._tap_owner_by_vk.get(vk_code) is not tap_group:
+                            continue  # FST-404: only the owner accounts a vk
                         if vk_code in tap_group.get_vk_codes():
                             logger_flow.debug(f"tap group {vk_code}")
                             if key_replaced is True:
@@ -1109,6 +1129,8 @@ class FST_Keyboard():
 
             key_is_in_tap_groups = False
             for tap_group in self._tap_groups:
+                if self._tap_owner_by_vk.get(vk_code) is not tap_group:
+                    continue  # FST-404: only the owner may veto a vk
                 vk_codes = tap_group.get_vk_codes()
                 if vk_code in vk_codes:
                     key_is_in_tap_groups = True
@@ -1383,7 +1405,29 @@ class FST_Keyboard():
     def set_sys_start_arguments(self, sys_args):
         self._arg_manager.sys_start_args = sys_args
 
+    def _release_tap_group_holds(self):
+        '''FST-404 (#404): release the app-level hold each tap group owns.
+
+        Order matters. Tap_Group.release_hold() clears states/active_key/
+        last_key_send FIRST, so the group's own injected release is not eaten
+        by the simulated-key veto leg (which suppresses a release of the key a
+        group still has active - that veto made the old global sweep a silent
+        no-op for tap keys while it cleared the global record anyway). The
+        release is emitted SYNCHRONOUSLY in the caller context: the quit paths
+        (control_return_to_menu / control_exit_program) stop the listeners
+        right after this call, so a pump_lane hop would lose the release. The
+        global simulated-key record is cleared here too, so the
+        Input_State_Manager sweep cannot re-emit a release for a vk the owner
+        already released (hook-thread timing cannot be relied on).'''
+        for tap_group in self._tap_groups:
+            vk_code = tap_group.release_hold()
+            if vk_code is None:
+                continue
+            self._output_manager.send_key_event(Key_Event(vk_code, False))
+            self._state_manager.set_simulated_key_press_state(vk_code, False)
+
     def release_all_currently_pressed_simulated_keys(self):
+        self._release_tap_group_holds()
         self._state_manager.release_all_currently_pressed_simulated_keys()
         self._output_manager.clear_all_variables()
 

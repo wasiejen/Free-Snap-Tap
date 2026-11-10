@@ -382,6 +382,25 @@ class Tap_Group(object):
             self.states[vk_code] = 0
         self.active_key = self.get_key_to_send()
 
+    def release_hold(self):
+        """
+        Drop this group's hold bookkeeping and return the vk code it held down
+        in the app (None when it held nothing).
+
+        FST-404 (#404): the group is the single owner of its app-level hold
+        (`last_key_send`). The CALLER emits the release - and must do so only
+        AFTER this method ran: the simulated-key leg of the win32 filter
+        suppresses any injected release of a vk that is still the group's
+        `active_key`, so a release emitted before the bookkeeping is cleared
+        is eaten by the owner's own veto.
+        """
+        held = self.last_key_send
+        for code in self.states:
+            self.states[code] = 0
+        self.active_key = None
+        self.last_key_send = None
+        return held
+
     def get_vk_codes(self):
         return [key.vk_code for key in self.keys]
 
