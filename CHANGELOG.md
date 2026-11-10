@@ -130,6 +130,15 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   its end-of-validate mirror are gone): a reused validator instance always
   reports the current load's silent scopes, never a stale mirror (U330 review).
 
+### Documentation
+- README now states the trigger precedence rule (TODO #402, maintainer ruling
+  2026-11-10): a rebind outranks a macro on the same trigger regardless of
+  definition order and regardless of default-group vs focus-group placement;
+  the macro still fires only for triggers no rebind claims. Pinned by
+  `tests/test_trigger_precedence.py` (both merged-line orders at presort and
+  end-to-end focus-merge level; the tree already behaved this way - this unit
+  closes the pin gap the maintainer report exposed).
+
 ## [1.3.0] - 2026-10-29
 
 ### Added
