@@ -10,7 +10,8 @@ import sys # to get start arguments
 import msvcrt # to flush input stream
 from random import randint # randint(3, 9))
 from time import time # sleep(0.005) = 5 ms
-from fst_data_types import Key_Event, type_check, ConfigError
+from fst_data_types import (Key_Event, type_check, ConfigError,
+                            FOCUS_NAME_ILLEGAL)
 from fst_tasks import Focus_Task, Macro_Repeat_Task
 import datetime
 import re #regular expression
@@ -1072,14 +1073,10 @@ ALIAS_ARG_FUNCTIONS = ('start_repeat', 'stop_repeat', 'toggle_repeat',
 # key-string prefixes carrying a press/release/toggle meaning
 KEY_MODIFIER_PREFIXES = '-+!^'
 
-# focus-name sanitizer rule: letters, numbers, spaces, "_", ".", ",", ":" and
-# "-" keep, everything else is stripped - one pattern for the runtime strip
-# (Config_Manager) and the validator mirror, so the warning can name them.
-# ':' and '-' allowed per maintainer request (#399, 2026-11-03 inbox) for names
-# like "Half-Life:2-beta"; a focus HEADER line is detected by its '<focus>'
-# prefix before any ':' split, so ':' in a name never reads as the rebind
-# separator.
-FOCUS_NAME_ILLEGAL = r'[^a-zA-Z0-9,_. \-:]'
+# focus-name sanitizer rule: ONE pattern, defined in fst_data_types (neutral
+# module - fst_tasks needs it too and fst_manager imports fst_tasks) and
+# imported above, so the config strip, the validator mirror and the
+# active-window TITLE strip in Focus_Task can never drift apart (#399).
 
 # start arguments: valueless switches and value-taking arguments
 START_ARG_FLAGS = frozenset({

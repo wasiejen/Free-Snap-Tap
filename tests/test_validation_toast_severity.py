@@ -57,8 +57,8 @@ class TestSeverityColors:
         kb.surface_config_warning_report(Config_Validator.format_report(warnings))
         text, bg, fg = toast_of(kb)
         assert 'warning' in text.lower()
+        # the color IS the not-red statement - no redundant second assert
         assert bg == YELLOW
-        assert bg != RED, 'a warnings-only pass must never use the error color'
 
     def test_clean_leg_toast_is_green(self, kb_env_ns):
         kb = kb_env_ns.kb
@@ -70,19 +70,22 @@ class TestSeverityColors:
         assert bg == GREEN
 
     def test_the_three_severity_colors_are_distinct(self, kb_env_ns):
-        # one color per state: a copy-paste of any one call's color into another
-        # breaks this pin
+        # one color per state, all three fed through the SAME report builder a
+        # reload uses - a copy-paste of any one color into another breaks here
         kb = kb_env_ns.kb
+        mixed = violations_of('b : c, d\n<focus>Bad*Name\n')
         colors = {}
         for name, action in (
-                ('error', lambda: kb.surface_config_error(ConfigError('e', 'x'))),
-                ('warning', lambda: kb.surface_config_warning_report('w report')),
+                ('error', lambda: kb.surface_config_error(
+                    ConfigError(Config_Validator.format_report(mixed), 'cfg'))),
+                ('warning', lambda: kb.surface_config_warning_report(
+                    Config_Validator.format_report(
+                        [v for v in mixed if v.severity == Config_Validator.WARNING]))),
                 ('clean', kb.surface_config_ok)):
             kb.toast_callback = MagicMock()
             action()
             colors[name] = toast_of(kb)[1]
         assert colors == {'error': RED, 'warning': YELLOW, 'clean': GREEN}
-        assert len(set(colors.values())) == 3
 
 
 class TestValidatorDrivenSeverity:
@@ -101,10 +104,13 @@ class TestValidatorDrivenSeverity:
             raised = error
         assert raised is not None
         kb.surface_config_error(raised)
-        _text, bg, _fg = toast_of(kb)
+        text, bg, _fg = toast_of(kb)
         assert bg == RED
+        # the red report still lists the warning line alongside the error
+        # (fst_manager.format_report carries both severities)
+        assert 'arity' in text and 'focus' in text and 'warning' in text
 
-    def test_validator_warnings_only_report_never_rasises(self, kb_env_ns, tmp_path):
+    def test_validator_warnings_only_never_raises(self, kb_env_ns, tmp_path):
         path = tmp_path / 'config.txt'
         path.write_text('<focus>Bad*Name\na, d\n')
         cm = Config_Manager(str(path))
