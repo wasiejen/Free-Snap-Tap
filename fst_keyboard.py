@@ -637,7 +637,7 @@ class FST_Keyboard():
                 # and the focus-loss branch (focus_name '') never hits here,
                 # so -always_active behavior is unchanged (ruling c).
                 logger_config.debug(f"default group lines deactivated for focus group '{focus_name}' (-default_off)")
-                default_lines = []
+                default_lines = self._config_manager.alias_definition_lines(default_lines)
         else:
             _, focus_group_lines = [],[]
         self._config_manager.presort_lines(default_lines + focus_group_lines)
