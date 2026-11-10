@@ -135,9 +135,10 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   2026-11-10): a rebind outranks a macro on the same trigger regardless of
   definition order and regardless of default-group vs focus-group placement;
   the macro still fires only for triggers no rebind claims. Pinned by
-  `tests/test_trigger_precedence.py` (both merged-line orders at presort and
-  end-to-end focus-merge level; the tree already behaved this way - this unit
-  closes the pin gap the maintainer report exposed).
+  `tests/test_trigger_precedence.py` (both merged-line orders for the
+  both-registries case at presort level, both section placements
+  end-to-end; the tree already behaved this way - this unit closes the
+  pin gap the maintainer report exposed).
 
 ## [1.3.0] - 2026-10-29
 
