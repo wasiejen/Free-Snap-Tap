@@ -1083,7 +1083,7 @@ START_ARG_FLAGS = frozenset({
     '-flow', '-debug_numpad', '-nomenu', '-nocontrols', '-delay', '-crossover',
     '-nodelay', '-exec_one_macro', '-status_indicator', '-crosshair',
     '-always_active', '-tray_icon', '-hide_cmd_window',
-    '-no_warnings', '-default_always_active',
+    '-no_warnings', '-default_always_active', '-default_off',
     '-drop_watch', '-no_toast_offload',
 })
 START_ARG_VALUES = frozenset({
@@ -2097,6 +2097,10 @@ class Argument_Manager():
     EXEC_ONLY_ONE_TRIGGERED_MACRO = False
 
     ALWAYS_ACTIVE = False
+    # (#403) approved proposal 2026-10-31_fst-default-focus-group-deactivation
+    # (maintainer comments a+b): a focus section can drop the default GROUP
+    # LINES with -default_off; start arguments stay merged
+    DEFAULT_OFF = False
     CMD_WINDOW_HIDDEN = False
 
     # AntiCheat testing (ACT)
@@ -2146,6 +2150,7 @@ class Argument_Manager():
         self.CROSSHAIR_DELTA_X = Argument_Manager.CROSSHAIR_DELTA_X
         self.CROSSHAIR_DELTA_Y = Argument_Manager.CROSSHAIR_DELTA_Y
         self.ALWAYS_ACTIVE = Argument_Manager.ALWAYS_ACTIVE
+        self.DEFAULT_OFF = Argument_Manager.DEFAULT_OFF
         self.SAVE_DIR = Argument_Manager.SAVE_DIR
         self.BACKUP_ROOT_DIR = Argument_Manager.BACKUP_ROOT_DIR
 
@@ -2299,6 +2304,14 @@ class Argument_Manager():
                 # consumed by the config validator (per-scope warning
                 # suppression, U290T) - nothing to do at runtime
                 pass
+            elif arg == "-default_off":
+                # (#403) approved proposal 2026-10-31 part (b): drop the default
+                # GROUP LINES for the applied focus group only - start arguments
+                # stay merged and -always_active (focus-loss behavior) is
+                # untouched; DEFAULT_OFF resets on every focus change like
+                # ALWAYS_ACTIVE (reset_global_variable_changes)
+                self.DEFAULT_OFF = True
+                print(f"set default group lines off for this focus group: {self.DEFAULT_OFF}")
             elif arg == "-default_always_active":
                 # focus-section arg: the default groups stay active whenever
                 # this group's args are applied (ALWAYS_ACTIVE resets on
