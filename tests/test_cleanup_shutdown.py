@@ -166,9 +166,6 @@ class TestGuiMainBlockShutdown:
             def start(self):
                 pass  # never runs the logic thread
 
-            def is_alive(self):
-                return True  # real-shape; shutdown() is mocked here
-
         logic = MagicMock()
         logic.shutdown.side_effect = lambda *a: order.append('shutdown')
 
@@ -239,19 +236,48 @@ class TestGuiMainBlockShutdown:
 
 
 class TestCleanupGuard:
-    def test_cleanup_runs_exactly_once_on_double_call(self):
+    def test_cleanup_runs_exactly_once_on_double_call(self, capsys):
         """The guard itself: two cleanup() calls (the loop-thread finally
         AND a main-thread caller can both reach it) run the resource legs
-        ONCE. RED before: cleanup is unguarded -> call_count 2 each."""
+        ONCE. RED before: cleanup is unguarded -> call_count 2 each.
+        The capsys pins keep the two shutdown prints on the normal path
+        and pin the second call silent (reviewer P2-4: the degraded
+        join-timeout path must not claim the thread exited)."""
         from free_snap_tap import MainLogic
 
         kb = MagicMock()
+        logic = MainLogic(kb)
         logic = MainLogic(kb)
         logic.cleanup()
         logic.cleanup()
         assert kb.stop_listener.call_count == 1
         assert kb.cli_menu.flush_the_input_buffer.call_count == 1
         assert logic.loop.is_closed()
+        out = capsys.readouterr().out
+        assert 'Cleaning up resources...' in out
+        assert 'Secondary thread fully exited.' in out
+        # the second, guarded call printed nothing more
+        assert out.count('Cleaning up resources...') == 1
+
+    def test_cleanup_leg_failure_does_not_block_remaining_legs(self):
+        """U384 reviewer P1 cure (RED against branch tip 8034889 before
+        the cure): Ctrl+C headless BEFORE run() reaches init_listener ->
+        stop_listener hits the never-initialized None listener and
+        raises. The flag was set before the legs, so the flush leg never
+        ran, the loop stayed open, and a second cleanup() no-oped
+        forever. Isolated legs: a raising listener leg must still let
+        flush + loop close run, and the exactly-once guard still holds
+        afterwards (second call no-ops)."""
+        from free_snap_tap import MainLogic
+
+        kb = MagicMock()
+        kb.stop_listener.side_effect = RuntimeError('listener not started')
+        logic = MainLogic(kb)
+        logic.cleanup()  # must NOT raise out of the shutdown finally
+        assert kb.cli_menu.flush_the_input_buffer.call_count == 1
+        assert logic.loop.is_closed()
+        logic.cleanup()
+        assert kb.cli_menu.flush_the_input_buffer.call_count == 1
 
     def test_headless_path_then_shutdown_cleanup_still_once(self):
         """Cross-path composition: the headless finally already ran

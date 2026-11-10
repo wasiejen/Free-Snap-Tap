@@ -25,7 +25,10 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   a guarded `cleanup()`, a headless `finally` leg, and a GUI-side
   `shutdown()` (stop + join the loop thread, then cleanup) wired in a
   `finally` around `gui_manager.start()` - tray Exit (SystemExit or
-  normal return) and Ctrl+C headless all land on it.
+  normal return) and Ctrl+C headless all land on it. The `finally`
+  covers the whole Qt wiring, and the cleanup legs are isolated: a
+  failing listener leg (e.g. Ctrl+C before the listener exists) can no
+  longer abort the flush/close legs.
 - Headless mode now runs the SAME asyncio loop as the GUI modes (#373, B1):
   `MainLogic` owns the loop from construction and the headless branch runs
   it through `MainLogic.run_headless()` (`asyncio.Runner(loop_factory)` =
