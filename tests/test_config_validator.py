@@ -144,12 +144,12 @@ class TestFocusRule:
         assert violations[0].rule == 'focus'
 
     def test_stripped_focus_characters_are_warning(self):
-        violations = warnings_of('<focus>Half-Life\n')
+        violations = warnings_of('<focus>Counter*Strike\n')
         assert len(violations) == 1
         assert violations[0].rule == 'focus'
-        assert 'Half-Life' in violations[0].message
+        assert 'Counter*Strike' in violations[0].message
         # the warning names the removed character
-        assert "(removed: '-')" in violations[0].message
+        assert "(removed: '*')" in violations[0].message
         multi = warnings_of('<focus>Foo*Bar?Baz\n')
         assert "(removed: '*?')" in multi[0].message
 
@@ -255,7 +255,7 @@ class TestConsolidatedReport:
 a, no_such_key
 q
 b : c, d
-<focus>Half-Life
+<focus>Counter*Strike
 """
         path = write_config(tmp_path, content)
         with pytest.raises(ConfigError) as excinfo:
@@ -267,10 +267,10 @@ b : c, d
         assert 'vk' in report and 'arity' in report and 'focus' in report
 
     def test_warnings_only_config_loads_and_stores_warnings(self, tmp_path):
-        path = write_config(tmp_path, '<focus>Half-Life\n')
+        path = write_config(tmp_path, '<focus>Counter*Strike\n')
         cm = Config_Manager(path)
         multi_focus, _, _ = cm.load_config()
-        assert 'HalfLife' in multi_focus
+        assert 'CounterStrike' in multi_focus
         assert len(cm.config_warnings) == 1
 
 
@@ -284,7 +284,7 @@ class TestReloadWiring:
     def test_reload_surfaces_warnings_on_console(self, kb_env_ns, tmp_path, capsys):
         kb = kb_env_ns.kb
         assert kb.toast_callback is None
-        kb.config_manager.file_name = write_config(tmp_path, '<focus>Half-Life\n')
+        kb.config_manager.file_name = write_config(tmp_path, '<focus>Counter*Strike\n')
         kb.reload_from_file()
         out = capsys.readouterr().out
         # a warnings-only report is NOT a config error - the console leg
@@ -297,7 +297,7 @@ class TestReloadWiring:
         from unittest.mock import MagicMock
         kb = kb_env_ns.kb
         kb.toast_callback = MagicMock()
-        kb.config_manager.file_name = write_config(tmp_path, '<focus>Half-Life\n')
+        kb.config_manager.file_name = write_config(tmp_path, '<focus>Counter*Strike\n')
         kb.reload_from_file()
         kb.toast_callback.assert_called_once()
         assert 'warning' in kb.toast_callback.call_args.args[0]
@@ -329,7 +329,7 @@ class TestComplianceResultToast:
         from unittest.mock import MagicMock
         kb = kb_env_ns.kb
         kb.toast_callback = MagicMock()
-        kb.config_manager.file_name = write_config(tmp_path, '<focus>Half-Life\n')
+        kb.config_manager.file_name = write_config(tmp_path, '<focus>Counter*Strike\n')
         kb.reload_from_file()
         # the warning report toast is THE result toast - no OK on warnings
         kb.toast_callback.assert_called_once()
@@ -341,7 +341,7 @@ class TestComplianceResultToast:
         from unittest.mock import MagicMock
         kb = kb_env_ns.kb
         kb.toast_callback = MagicMock()
-        kb.config_manager.file_name = write_config(tmp_path, '<focus>Half-Life\n')
+        kb.config_manager.file_name = write_config(tmp_path, '<focus>Counter*Strike\n')
         kb.reload_from_file()
         kb.toast_callback.assert_called_once()
         text, duration, size, bg, fg = kb.toast_callback.call_args.args
@@ -354,7 +354,7 @@ class TestComplianceResultToast:
         # report on the console, never an 'FST config error' line
         kb = kb_env_ns.kb
         assert kb.toast_callback is None
-        kb.config_manager.file_name = write_config(tmp_path, '<focus>Half-Life\n')
+        kb.config_manager.file_name = write_config(tmp_path, '<focus>Counter*Strike\n')
         kb.reload_from_file()
         out = capsys.readouterr().out
         assert 'config warning report' in out
@@ -367,7 +367,7 @@ class TestComplianceResultToast:
         from unittest.mock import MagicMock
         import free_snap_tap
         kb = kb_env_ns.kb
-        kb.config_manager.file_name = write_config(tmp_path, '<focus>Half-Life\n')
+        kb.config_manager.file_name = write_config(tmp_path, '<focus>Counter*Strike\n')
         kb.reload_from_file()  # no bridge yet: console leg, warnings stored
         kb.toast_callback = MagicMock()  # the bridge, wired after the load
         free_snap_tap.surface_startup_config_result(kb)
@@ -469,18 +469,18 @@ class TestCheckSuppressionAndDefaultAlwaysActiveArgs:
         assert warnings_of(content) == []
 
     def test_suppresses_warnings_in_its_section(self):
-        content = '<focus>Game-S\n<arg>-no_warnings\n'
+        content = '<focus>Game*S\n<arg>-no_warnings\n'
         assert warnings_of(content) == []
 
     def test_other_sections_keep_their_warnings(self):
         # ruling A: each non-suppressed section keeps its OWN header
         # warning; the suppressed section's flag drops its own header
         # warning - so 2 warnings, in the header line's own scopes
-        content = ('<focus>Half-Life\n<focus>Game\n<arg>-no_warnings\n'
-                   '<focus>Other-S\n')
+        content = ('<focus>Counter*Strike\n<focus>Game\n<arg>-no_warnings\n'
+                   '<focus>Other*S\n')
         warnings = warnings_of(content)
         assert len(warnings) == 2
-        assert {w.scope for w in warnings} == {'HalfLife', 'OtherS'}
+        assert {w.scope for w in warnings} == {'CounterStrike', 'OtherS'}
 
     def test_errors_in_suppressed_section_stay(self):
         content = '<focus>Game\n<arg>-no_warnings\na, no_such_key\n'
@@ -553,7 +553,7 @@ class TestSilentFocusGroup:
         # the section by its first name; the load stores the name->scope map)
         kb = kb_env_ns.kb
         kb.config_manager.file_name = write_config(
-            tmp_path, '<focus>Alpha-B,AlphaC\n<arg>-no_warnings\n')
+            tmp_path, '<focus>Alpha*B,AlphaC\n<arg>-no_warnings\n')
         kb.update_focus_groups()  # loads, fills the map + suppressed scopes
         assert kb.config_manager.config_suppressed_scopes == {'AlphaB'}
         assert kb.is_silent_focus_group('AlphaB') is True
@@ -740,7 +740,7 @@ class TestScopedWarningReport:
         kb = kb_env_ns.kb
         kb.toast_callback = MagicMock()
         kb.config_manager.file_name = write_config(
-            tmp_path, '<focus>Game-A\n<focus>GameB!\n')
+            tmp_path, '<focus>Game*A\n<focus>GameB!\n')
         kb.focus_manager.FOCUS_APP_NAME = 'GameB'
         kb.update_args_and_groups('GameB', startup=False)  # the focus-change leg
         kb.toast_callback.assert_called_once()
@@ -766,7 +766,7 @@ class TestScopedWarningReport:
         kb = kb_env_ns.kb
         kb.toast_callback = MagicMock()
         kb.config_manager.file_name = write_config(
-            tmp_path, '<focus>Game-A\n<focus>GameB\nb, c\n')
+            tmp_path, '<focus>Game*A\n<focus>GameB\nb, c\n')
         kb.focus_manager.FOCUS_APP_NAME = 'GameB'
         kb.update_args_and_groups('GameB', startup=False)
         # the only warning is the OTHER section's: scoped set empty, nothing
@@ -778,11 +778,11 @@ class TestScopedWarningReport:
         kb = kb_env_ns.kb
         kb.toast_callback = MagicMock()
         kb.config_manager.file_name = write_config(
-            tmp_path, '<focus>Game-A\n<focus>GameB!\n')
+            tmp_path, '<focus>Game*A\n<focus>GameB!\n')
         kb.focus_manager.FOCUS_APP_NAME = 'GameB'
         kb.reload_from_file()  # the watcher flush of a live editor save
         text = kb.toast_callback.call_args.args[0]
-        assert 'Game-A' in text  # every section: the full output on save
+        assert 'Game*A' in text  # every section: the full output on save
         assert 'GameB' in text
 
     def test_multi_name_section_scopes_by_its_first_name(self, kb_env_ns, tmp_path):
@@ -794,7 +794,7 @@ class TestScopedWarningReport:
         kb = kb_env_ns.kb
         kb.toast_callback = MagicMock()
         kb.config_manager.file_name = write_config(
-            tmp_path, '<focus>Alpha-B,AlphaC\n')
+            tmp_path, '<focus>Alpha*B,AlphaC\n')
         kb.focus_manager.FOCUS_APP_NAME = 'AlphaC'
         kb.update_args_and_groups('AlphaC', startup=False)
         kb.toast_callback.assert_called_once()
@@ -805,7 +805,7 @@ class TestScopedWarningReport:
     def test_load_stores_the_focus_name_scope_map(self, tmp_path):
         # the map every name of a multi-name section to the section scope
         path = write_config(tmp_path,
-                            '<focus>Alpha-B,AlphaC\n<focus>GameX\n')
+                            '<focus>Alpha*B,AlphaC\n<focus>GameX\n')
         cm = Config_Manager(path)
         cm.load_config()
         assert cm.config_focus_scopes == {'AlphaB': 'AlphaB',
@@ -848,7 +848,7 @@ class TestDashedStartArgNames:
         assert violations_of('<arg>-status-indicator\n') == []
 
     def test_dashed_no_warnings_suppresses_its_section(self):
-        content = '<focus>Game\n<arg>-no-warnings\n<focus>Other-S\n'
+        content = '<focus>Game\n<arg>-no-warnings\n<focus>Other*S\n'
         warnings = warnings_of(content)
         assert len(warnings) == 1
         assert {w.scope for w in warnings} == {'OtherS'}

@@ -1072,10 +1072,14 @@ ALIAS_ARG_FUNCTIONS = ('start_repeat', 'stop_repeat', 'toggle_repeat',
 # key-string prefixes carrying a press/release/toggle meaning
 KEY_MODIFIER_PREFIXES = '-+!^'
 
-# focus-name sanitizer rule: letters, numbers, spaces, "_", "." and "," keep,
-# everything else is stripped - one pattern for the runtime strip
-# (Config_Manager) and the validator mirror, so the warning can name them
-FOCUS_NAME_ILLEGAL = r'[^a-zA-Z0-9,_. ]'
+# focus-name sanitizer rule: letters, numbers, spaces, "_", ".", ",", ":" and
+# "-" keep, everything else is stripped - one pattern for the runtime strip
+# (Config_Manager) and the validator mirror, so the warning can name them.
+# ':' and '-' allowed per maintainer request (#399, 2026-11-03 inbox) for names
+# like "Half-Life:2-beta"; a focus HEADER line is detected by its '<focus>'
+# prefix before any ':' split, so ':' in a name never reads as the rebind
+# separator.
+FOCUS_NAME_ILLEGAL = r'[^a-zA-Z0-9,_. \-:]'
 
 # start arguments: valueless switches and value-taking arguments
 START_ARG_FLAGS = frozenset({
