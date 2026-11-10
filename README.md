@@ -17,6 +17,7 @@ For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
     - delays for simulanious key events are applied on default
 2.  **[Rebinds]** `trigger_group : replacement key_event or  Key`: when a trigger_group is activated the key_event / Key will be played instead of trigger
     - The important destinctions from Macros are that Rebinds only support a single Key or key_event as the played part (output part) and that this resulting output (key_event) will be able to trigger macros
+    - Trigger precedence: when one trigger has BOTH a rebind and a macro (same trigger, any definition order, default group or focus group), the rebind wins - its replacement is played instead and the macro does not fire; a macro only fires for triggers no rebind claims
 3.  **[Macros]** `trigger_group :: key_group`: the key_group will be played when the trigger_group is activated; trigger will be suppressed
     - delay per key setable
     - interrupts itself on replay
