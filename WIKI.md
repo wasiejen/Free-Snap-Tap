@@ -449,6 +449,7 @@ Everything else should be put in the config file and then can be applied on a pe
 - `<arg>-drop_watch`: enable the drop-watch lane (U345, #291 H1) - filter legs that die mid-event land named drop lines in `fst_drop.log` + `fst.log`; `ALT + NUM6` toggles it at runtime
 - `<arg>-no_toast_offload`: restore the direct toast bridge emit (default is the offload queue + asyncio pump, U345 H2 - A/B switch for the stuck-key hunt)
 - `<arg>-always_active`: if no focus app matches, the default groups stay active instead of the filter being paused - the status indicator shows blue while in this default-active state
+- `<arg>-default_off` (`-default-off`): deactivate the default group LINES for that focus group - the group builds from its own lines only, so global default conveniences (tap keys, status rebinds) cannot collide inside a game profile. Default START ARGUMENTS are still merged (overwrite the ones you need in the focus section); the focus-loss behavior of `-always_active` is unaffected. Set it in the default section to switch every focus group off (TODO #403, proposal 2026-10-31)
 - `<arg>-tray_icon`: start the GUI loop with a tray icon (with or without status indicator) - the tray menu offers Open config / Reload / Toggle Pause / Return to Menu / Toggle Indicator / Toggle Crosshair / Toggle Console / Exit
 - `<arg>-hide_cmd_window`: keep the console window hidden after start-up - it can be re-shown via the tray menu "Toggle Console"
 - `<arg>-save_dir=*dir*`: the save dir used by the `make_backup` / `restore_backup` invocations

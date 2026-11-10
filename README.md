@@ -48,6 +48,7 @@ For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
     - `-drop_watch`: drop-watch lane (#291 H1) - filter legs that die mid-event land named drop lines in `fst_drop.log`/`fst.log`, `ALT+NUM6` toggles at runtime
     - `-no_toast_offload`: restores the direct toast bridge emit (default = toast offload queue + asyncio pump, #291 H2)
     - `-always_active`: the default groups stay active when no focus app matches
+    - `-default_off` / `-default-off`: the focus section (or the default section) runs ONLY its own group lines - the default group's GROUP LINES are not merged into that focus group. Default START ARGUMENTS stay merged; `-always_active` behavior is unchanged (proposal 2026-10-31, TODO #403)
     - `-tray_icon` / `-hide_cmd_window`: start the GUI loop with a tray icon / keep the console window hidden after start-up
     - `-save_dir=*dir*` / `-backup_root_dir=*dir*`: the directories used by the `make_backup` / `restore_backup` invocations
     - **deprecated:** `-focusapp=` prints a warning and exits with error code 1 (use `<focus>` in the config file instead)

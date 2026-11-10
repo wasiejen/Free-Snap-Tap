@@ -630,6 +630,14 @@ class FST_Keyboard():
             if focus_name not in self._focus_manager.multi_focus_dict:
                 raise ConfigError(f"focus group '{focus_name}' not found - renamed or removed in config?", focus_name)
             _, focus_group_lines = self._focus_manager.multi_focus_dict[focus_name]
+            if self._arg_manager.DEFAULT_OFF:
+                # (#403) approved proposal 2026-10-31: this focus group runs
+                # ONLY its own group lines - the default group lines are not
+                # merged in. Default START ARGUMENTS stay merged (ruling b),
+                # and the focus-loss branch (focus_name '') never hits here,
+                # so -always_active behavior is unchanged (ruling c).
+                logger_config.debug(f"default group lines deactivated for focus group '{focus_name}' (-default_off)")
+                default_lines = []
         else:
             _, focus_group_lines = [],[]
         self._config_manager.presort_lines(default_lines + focus_group_lines)
