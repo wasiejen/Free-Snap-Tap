@@ -2,9 +2,9 @@
 
 Maintainer request (inbox 2026-11-03_13-14_fst.md, curated to TODO #399): add
 ':' and '-' to the allowed characters in a focus group name. The single gate is
-FOCUS_NAME_ILLEGAL (fst_manager.py:1078) - the validator warning leg, the scope
-derivation, and the runtime name cleaning all share it, so the allowlist is the
-one place that changes.
+FOCUS_NAME_ILLEGAL (fst_data_types.py) - the validator warning leg, the scope
+derivation, the runtime name cleaning AND the active-window title strip all
+share it, so the allowlist is the one place that changes.
 
 What could break, and is pinned here as unaffected:
 - the ':' config separator. A focus HEADER line is detected by startswith
