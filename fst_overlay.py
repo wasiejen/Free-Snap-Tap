@@ -7,7 +7,7 @@ import sys
 import os
 import re
 from PySide6.QtWidgets import QWidget, QApplication, QMenu, QSystemTrayIcon, QLabel, QVBoxLayout, QFrame
-from PySide6.QtCore import QObject, Qt, qInstallMessageHandler, Signal, QTimer, QFileSystemWatcher
+from PySide6.QtCore import QObject, Qt, qInstallMessageHandler, Signal, QTimer, QFileSystemWatcher, QRect
 from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont, QFontMetrics
 
 import ctypes
@@ -658,14 +658,35 @@ class StatusOverlay(QWidget):
         
         self.update()  # Trigger repaint
         
+    def _cycle_rect(self):
+        '''U388 (#388 Leg 2): the widget-local rect the colored cycle
+        (status dot) is drawn into - cycle extent s = user_size (the
+        DPR-correct size, recomputed by set_window_size_and_position in
+        the Leg-1 resolution-change handler), CENTER derived from the
+        REAL widget size:
+            x = (width() - s) // 2  (same for y)
+        The old math anchored at the stored box vars
+        (drawEllipse(x_size - p - s, p, s, s)) - symmetric margins ONLY
+        while those vars match the real box; a display change drifts
+        the box (Qt DPI re-scale) and the cycle clipped bottom-right
+        (maintainer report). Appearance-parity while the vars match:
+        x_size = 2p+s -> (x_size - s)//2 == p == x_size - p - s, so
+        this is not a look change - a look-preservation proof is pinned
+        in tests/test_cycle_clip.py.'''
+        s = self.user_size
+        return QRect((self.width() - s) // 2,
+                     (self.height() - s) // 2,
+                     s, s)
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setBrush(self.color)
         painter.setPen(Qt.NoPen)
-        p = self.user_padding
-        s = self.user_size
-        painter.drawEllipse(self.x_size - p - s, p, s, s)
+        # U388 (#388 Leg 2): draw from the derived rect (real-size
+        # center) - no bottom-right clip after a box drift / resolution
+        # change
+        painter.drawEllipse(self._cycle_rect())
         #print(f"Painting overlay at: {self.geometry()} with size ({self.x_size}, {self.y_size}) and padding {p}")      
 
     # --- Mouse drag and menu events ---
