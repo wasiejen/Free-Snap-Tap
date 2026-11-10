@@ -97,8 +97,10 @@ def manager(qtbot, overlay_fst):
 
 
 def mock_subwidgets(m):
-    """Swap the positioning-relevant children for MagicMocks; return
-    them for pinning."""
+    """Stub the positioning-relevant children of the REAL manager
+    (reviewer P2-2: no SimpleNamespace-self - product __init__ always
+    sets these, the pins should exercise the real attribute paths);
+    return the stubs for pinning."""
     overlay = MagicMock()
     overlay.user_padding = 5
     overlay.geometry.return_value = QRect(0, 0, 20, 20)
@@ -268,6 +270,25 @@ class TestLeg1RealWidgets:
             manager, QRect(0, 0, 1920, 1080))
 
         assert crosshair.geometry() == before
+
+    def test_hidden_toast_untouched_by_handler(
+            self, qtbot, overlay_fst, on_new_screen):
+        """Reviewer P2-1 (symmetry with the hidden-crosshair pin): a
+        hidden toast manager must keep its geometry - only the mock
+        pin killed the gate-drop mutant before; the real widget now
+        kills it too."""
+        m = GUI_Manager(overlay_fst, MagicMock())
+        qtbot.addWidget(m)
+        m.toast_manager.show()  # park it somewhere distinct first
+        m.toast_manager.move(123, 456)
+        m.toast_manager.hide()
+        qtbot.wait(0)
+        assert not m.toast_manager.isVisible()
+        before = m.toast_manager.geometry()
+
+        m.on_screen_geometry_changed(QRect(0, 0, 1920, 1080))
+
+        assert m.toast_manager.geometry() == before
 
     def test_toast_lands_on_the_recomputed_overlay_geometry(
             self, qtbot, overlay_fst, on_new_screen):
