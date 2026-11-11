@@ -1255,18 +1255,6 @@ class Config_Validator():
         # ('-always-active' == '-always_active'); the value stays verbatim
         # and the messages below echo the original spelling
         match_name = '-' + name[1:].replace('-', '_')
-        if match_name == '-default_on':
-            # (#423) retired the same day it shipped (U418/321a893): settled
-            # model (maintainer 2026-11-11, TODO #418 resolution) - the
-            # default group IS merged into every focus group; -default_off
-            # is the ONLY opt-out, so -default_on has no valid function.
-            # WARNING (suppressible with the section's -no_warnings) - the
-            # flag does nothing at runtime anymore. Dashed twin included
-            # (U361 normalization above).
-            self._warn(line_number, '(arg)', 'arg',
-                       '-default_on is retired - the default group is always '
-                       'added to every focus group; use -default_off to opt out')
-            return
         if match_name == '-no_warnings':
             # check-suppression arg (maintainer observation 1): warnings of
             # this section are dropped from the report; the section carries
@@ -1274,6 +1262,21 @@ class Config_Validator():
             # suppresses the default group's warnings
             self.suppressed_scopes.add(scope)
         has_value = value != ''
+        if match_name == '-default_on' and not has_value:
+            # (#423) retired the same day it shipped (U418/321a893): settled
+            # model (maintainer 2026-11-11, TODO #418 resolution) - the
+            # default group IS merged into every focus group; -default_off
+            # is the ONLY opt-out, so -default_on has no valid function.
+            # WARNING (suppressible with the section's -no_warnings) - the
+            # flag does nothing at runtime anymore. Dashed twin included
+            # (U361 normalization above). The VALUE form falls through to
+            # the generic unknown-argument warning - the parser branch
+            # (exact '-default_on' match) reports it unknown too, so both
+            # lanes stay consistent (U423 review P2-4)
+            self._warn(line_number, '(arg)', 'arg',
+                       '-default_on is retired - the default group is always '
+                       'added to every focus group; use -default_off to opt out')
+            return
         if has_value:
             if match_name in START_ARG_VALUES:
                 self._check_arg_value(line_number, match_name, value)

@@ -9,18 +9,28 @@ Retirement: `-default_on` / `-default-on` present -> WARNING naming the
 settled model (validator for config sections, print for start args);
 the flag changes NOTHING at runtime (no merge lane).
 
-RED-before on the current tree (321a893): the flag is a SILENT KNOWN
-argument (no warning) and it toggles the merge (the U418 S5 lane) - the
-warning pins and the merge-stays-suppressed pin fail there.
+RED-before on the current tree (321a893, log
+$TMP/opencode/fst423/red.log): 6 of 10 pins FAIL there - the flag is a
+SILENT KNOWN argument (all four warning-lane pins RED) and it toggles
+the merge (the U418 S5 lane: test_retired_flag_does_not_reenable_the_merge
+AND test_retired_flag_alongside_off_still_suppresses are both
+discriminating, not controls). The two -no_warnings suppression pins
+pass VACUOUSLY pre-fix (the flag was known and silent, so the config had
+zero violations to silence) - the warning EXISTENCE pins are the
+non-vacuous ones. Controls green before AND after: global-off
+plain-group suppression, no-flag silent config, ALWAYS_ACTIVE still
+applies.
 
-DELETED pins (they no longer describe the model, listed per spec #423):
-the S5 re-enable merge pins, the S2 silent-redundant pin, the S7
-off-wins pins (runtime order pairs + validator warning), the parser
-pass-precedence lane, the S10 sys-args re-enable pin, the S7/S8
-interaction-warning suppressibility pins, the dashed-twin sets-the-flag
-pin, the S8 always_active pair warning. Kept (settled-model boundary):
-global-off plain-group suppression, both-flags-still-suppresses,
-ALWAYS_ACTIVE still applies, no-flag configs stay silent.
+DELETED pins (they no longer describe the model, listed per spec #423;
+15 tests at 321a893 -> 10 now): the S5 re-enable merge pins, the S2
+silent-redundant merge pin, the S7 off-wins pins (runtime order pairs +
+validator warning), the parser pass-precedence lane (both tests), the
+S10 sys-args re-enable pin, the S7/S8 interaction-warning
+suppressibility pins, the dashed-twin sets-the-flag pin, the dashed
+no-warning pin, the S8 always_active pair warning, and the
+S1 plain-group merge control (its coverage lives on at
+test_default_off_arg.py TestDefaultOffBehavior::
+test_without_default_off_default_lines_stay_merged).
 """
 from fst_manager import Config_Manager, Config_Validator
 from vk_codes import vk_codes_dict
@@ -113,8 +123,27 @@ class TestRetiredFlagWarns:
     def test_config_without_the_flag_stays_silent(self):
         assert validate(CONFIG_GLOBAL_OFF) == []
 
+    def test_value_form_stays_unknown_in_both_lanes(self):
+        # reviewer P2-4: '-default_on=1' must not get a different verdict
+        # per lane - validator reports it unknown (like the parser does),
+        # NOT the retirement WARNING
+        content = CONFIG_GROUP_ON_PLAIN.replace('-default_on', '-default_on=1')
+        violations = validate(content)
+        assert retired_warnings(violations) == []
+        assert any(v.severity == Config_Validator.WARNING
+                   and 'unknown start argument' in v.message
+                   for v in violations)
+
 
 class TestRetiredFlagInert:
+    def test_merge_still_happens_with_the_flag_present(self, kb_env_ns, tmp_path):
+        # spec #423 positive leg (reviewer P1): retired flag does not
+        # suppress - the default merge happens as in the settled model
+        kb = kb_env_ns.kb
+        load_and_activate(kb, tmp_path, CONFIG_GROUP_ON_PLAIN, 'Game')
+        assert trigger_vks(kb) == {VK_M, VK_Q}
+        assert kb.arg_manager.DEFAULT_OFF is False
+
     def test_global_off_still_suppresses_plain_group(self, kb_env_ns, tmp_path):
         # settled-model control (green before AND after)
         kb = kb_env_ns.kb
@@ -129,7 +158,8 @@ class TestRetiredFlagInert:
         assert kb.arg_manager.DEFAULT_OFF is True
 
     def test_retired_flag_alongside_off_still_suppresses(self, kb_env_ns, tmp_path):
-        # settled-model boundary (green before AND after)
+        # discriminating pre-fix (RED there): U418 applied -default_off then
+        # the group's last-pass -default_on -> merged; retired, suppression stands
         content = CONFIG_OFF_GROUP_ON.replace(
             '<arg>-default_off', '<arg>-default_off\n<arg>-default_on')
         kb = kb_env_ns.kb
