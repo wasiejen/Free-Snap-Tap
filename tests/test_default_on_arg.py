@@ -11,11 +11,17 @@ both flags -> SUPPRESS, off wins, WARNING) and S8 (-default_on +
 -default_always_active effective in the group -> WARNING that names the
 two different semantics; ALWAYS_ACTIVE behavior UNTOUCHED).
 
-RED-before: every NEW-behavior pin below fails on the pre-U418 tree
-(-default_on is an unknown argument -> validator warning and the merge
-stays suppressed for S5/S7; the interaction warnings do not exist).
-The shipped-behavior control pins (S1, S4) are green before AND after -
-they guard the ruling's no-flip boundary.
+RED-before (re-captured against the pre-U418 tree via `git archive 0ee5daa`
+into scratch - $TMP/opencode/fst418/red2.log): 9 new-behavior pins FAIL on
+the pre-U418 tree (-default_on is an unknown argument -> validator warning
+and the merge stays suppressed; the interaction warnings do not exist).
+The shipped-behavior controls (S1, S4), the two S7 merge-outcomes (the
+group's own -default_off suppresses even pre-fix), the ALWAYS_ACTIVE
+control and the parser same-pass pin are green before AND after - they
+guard the ruling's no-flip boundary. The two -no_warnings suppression pins
+are vacuous pre-fix (the warning they suppress did not exist; the
+unknown-arg warning they carry is itself suppressed by the same flag) -
+the warning EXISTENCE pins are the s7/s8 warn pins.
 """
 from fst_manager import Config_Manager, Config_Validator
 from vk_codes import vk_codes_dict
@@ -194,3 +200,30 @@ class TestDefaultOnParserPrecedence:
         kb.arg_manager.apply_start_arguments(['-default_on'])
         assert kb.arg_manager.DEFAULT_OFF is False
         kb.arg_manager.reset_global_variable_changes()
+
+    def test_s10_command_line_default_off_group_on_reenables(self, kb_env_ns, tmp_path):
+        # precedence chain sys-args < default-section < focus-section:
+        # a command-line -default_off is a global like the default section's
+        kb = kb_env_ns.kb
+        kb.set_sys_start_arguments(['-default_off'])
+        try:
+            load_and_activate(kb, tmp_path, CONFIG_GROUP_ON_DEFAULT_ON, 'Game')
+            assert trigger_vks(kb) == {VK_M, VK_Q}
+        finally:
+            kb.set_sys_start_arguments([])
+
+
+class TestInteractionWarningSuppressibility:
+    """#418 warnings are WARNING severity -> a section's -no_warnings
+    silences them (U290T/U330 machinery; reviewer P2-5 pin)."""
+
+    def test_no_warnings_silences_s7_off_wins_warning(self):
+        content = CONFIG_GROUP_ON_AND_OFF.replace('<arg>-default_on',
+                                                  '<arg>-no_warnings\n<arg>-default_on')
+        assert validate(content) == []
+
+    def test_no_warnings_silences_s8_always_active_warning(self):
+        content = CONFIG_GROUP_ON_ALWAYS_ACTIVE.replace(
+            '<arg>-default_always_active',
+            '<arg>-no_warnings\n<arg>-default_always_active')
+        assert validate(content) == []
