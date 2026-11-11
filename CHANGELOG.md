@@ -9,6 +9,16 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 ## [Unreleased]
 
 ### Added
+- New config argument `<arg>-default_on` (dashed twin `-default-on`), the
+  mirror of `-default_off` (TODO #418, maintainer ruling 2026-11-11): set it
+  in a focus section to RE-ENABLE the default group-line merge FOR THAT
+  group against a global (default-section) `-default_off`. A section's own
+  `-default_off` always outranks its `-default_on` (WARNING, off wins).
+  WARNING when `-default_on` is combined with `-default_always_active` -
+  ALWAYS_ACTIVE is the focus-loss flag (keeps default groups active when no
+  focus app matches), NOT a merge switch; its behavior is untouched. The
+  default section's start args and a group's own args now apply as separate
+  passes - that split is the override boundary.
 - New config argument `<arg>-default_off` (dashed twin `-default-off`): the
   focus section it is set in builds from its OWN group lines only - the default
   section's tap groups, rebinds, macros and macro sequences are not merged in

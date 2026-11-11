@@ -1408,7 +1408,13 @@ class FST_Keyboard():
             focus_start_arguments, _ = self._focus_manager.multi_focus_dict[focus_name]
         else:
             focus_start_arguments, _ = [],[]
-        self._arg_manager.apply_start_arguments(self._focus_manager.default_start_arguments + focus_start_arguments)
+        # (#418) two separate passes: the default section's args first, the
+        # group's own args second. That split is the S5 boundary - a group
+        # -default_on re-enables against a GLOBAL (default-section)
+        # -default_off - while within either single list -default_off still
+        # wins over a same-section -default_on (S7, Argument_Manager pass claim)
+        self._arg_manager.apply_start_arguments(self._focus_manager.default_start_arguments)
+        self._arg_manager.apply_start_arguments(focus_start_arguments)
 
     def set_sys_start_arguments(self, sys_args):
         self._arg_manager.sys_start_args = sys_args

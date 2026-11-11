@@ -1083,7 +1083,7 @@ START_ARG_FLAGS = frozenset({
     '-flow', '-debug_numpad', '-nomenu', '-nocontrols', '-delay', '-crossover',
     '-nodelay', '-exec_one_macro', '-status_indicator', '-crosshair',
     '-always_active', '-tray_icon', '-hide_cmd_window',
-    '-no_warnings', '-default_always_active', '-default_off',
+    '-no_warnings', '-default_always_active', '-default_off', '-default_on',
     '-drop_watch', '-no_toast_offload',
 })
 START_ARG_VALUES = frozenset({
@@ -1146,6 +1146,9 @@ class Config_Validator():
         # declares it, per effective scope (a focus section also runs the
         # default-section groups, so its index starts as a copy of the default)
         self._tap_vk_index = {'': {}}
+        # (#418) the default-interaction args seen per section (own lines
+        # only), arg name -> first line; checked after the main loop
+        self._default_args = {'': {}}
         scope = ''
         aliases_by_scope = self._aliases_by_scope
         self.suppressed_scopes = set()
@@ -1160,6 +1163,7 @@ class Config_Validator():
                 scope = self._focus_scope_of(line)
                 self._current_scope = scope
                 self._tap_vk_index.setdefault(scope, dict(self._tap_vk_index['']))
+                self._default_args.setdefault(scope, {})
                 self._check_focus_line(line_number, line)
                 continue
             self._current_scope = scope
@@ -1168,6 +1172,9 @@ class Config_Validator():
                 continue
             self._check_group_line(line_number, line, scope,
                                    aliases_by_scope.get(scope, set()))
+        # (#418) -default_on interaction warnings (WARNING severity, so a
+        # section's -no_warnings can silence them)
+        self._check_default_arg_interactions()
         # check-suppression (-no_warnings): drop WARNING violations of the
         # suppressed sections (the default scope '' counts as a section);
         # ERROR severity is never suppressed
@@ -1255,6 +1262,9 @@ class Config_Validator():
         # ('-always-active' == '-always_active'); the value stays verbatim
         # and the messages below echo the original spelling
         match_name = '-' + name[1:].replace('-', '_')
+        if match_name in ('-default_off', '-default_on', '-default_always_active'):
+            # (#418) remember the section's own default-interaction arg
+            self._default_args.setdefault(scope, {}).setdefault(match_name, line_number)
         if match_name == '-no_warnings':
             # check-suppression arg (maintainer observation 1): warnings of
             # this section are dropped from the report; the section carries
@@ -1426,6 +1436,43 @@ class Config_Validator():
                            f"(line {first[0]}) - only the first group owns it")
                 continue
             index[vk] = (line_number, item)
+
+    def _check_default_arg_interactions(self):
+        '''(#418) same-section interactions of -default_on (ruling
+        2026-11-11, TODO #418):
+        - -default_on + -default_off in ONE section: -default_off wins at
+          runtime (Argument_Manager pass claim); WARNING names it (S7).
+        - -default_on together with -default_always_active EFFECTIVE for a
+          section (own or default scope): WARNING naming the difference -
+          ALWAYS_ACTIVE is the focus-loss flag (shipped bfde688), it does
+          NOT merge default lines (#418 part 2; ruling: -default_on is
+          usable only when -default_always_active is NOT set).
+        The DESIGNED pair (global -default_off + group -default_on, S5)
+        is cross-scope and stays silent.'''
+        by_scope = self._default_args
+        default_args = by_scope.get('', {})
+        warned_pairs = set()
+        for scope, own in by_scope.items():
+            self._current_scope = scope
+            if '-default_on' in own and '-default_off' in own:
+                self._warn(own['-default_on'], '(arg)', 'arg',
+                           "-default_on ignored in this section - "
+                           "-default_off (line %d) wins for it"
+                           % own['-default_off'])
+            on_line = own.get('-default_on', default_args.get('-default_on'))
+            active_line = own.get('-default_always_active',
+                                  default_args.get('-default_always_active'))
+            if on_line is None or active_line is None:
+                continue
+            pair = (on_line, active_line)
+            if pair in warned_pairs:
+                continue
+            warned_pairs.add(pair)
+            self._warn(on_line, '(arg)', 'arg',
+                       "-default_on is not intended together with "
+                       "-default_always_active: ALWAYS_ACTIVE keeps default "
+                       "groups active on focus LOSS - it does not merge "
+                       "default lines (#418)")
 
     @staticmethod
     def _tap_vk_of(base):
@@ -2142,6 +2189,11 @@ class Argument_Manager():
         self.STATUS_INDICATOR = Argument_Manager.STATUS_INDICATOR
         self.STATUS_INDICATOR_SIZE = Argument_Manager.STATUS_INDICATOR_SIZE
 
+        # (#418) per-pass claim of -default_off: within ONE
+        # apply_start_arguments pass -default_off outranks -default_on
+        # regardless of order (S7); the claim resets at each pass start
+        self._default_off_claimed = False
+
         # getting sys arguments and saving them
         self._sys_start_args = []
         self.reset_global_variable_changes()
@@ -2176,6 +2228,10 @@ class Argument_Manager():
     'start argument handling'
     def apply_start_arguments(self, argv):
         print(f"apply arguments: {argv}")
+        # (#418 S7) a fresh pass forgets any -default_off claim of the
+        # previous list: the focus section's args pass runs after the
+        # default section's args pass, and THAT is the S5 override path
+        self._default_off_claimed = False
 
         def extract_delays(arg):
             '''returns (min, max) delay in ms or None if no valid delay was given'''
@@ -2330,7 +2386,26 @@ class Argument_Manager():
                 # untouched; DEFAULT_OFF resets on every focus change like
                 # ALWAYS_ACTIVE (reset_global_variable_changes)
                 self.DEFAULT_OFF = True
+                # (#418 S7) claim the suppression for THIS pass so a
+                # -default_on in the same list cannot undo it (off wins)
+                self._default_off_claimed = True
                 print(f"set default group lines off for this focus group: {self.DEFAULT_OFF}")
+            elif arg == "-default_on":
+                # (#418) ruling 2026-11-11: mirror of -default_off - re-enables
+                # the default-group line merge FOR the applied focus group
+                # against a global/section -default_off (the S5 override;
+                # default-section args and focus-section args are separate
+                # apply passes - see FST_Keyboard.apply_start_args_by_focus_name).
+                # Within ONE section -default_off wins regardless of order (S7,
+                # via the pass claim). Separate concern: -default_always_active
+                # is the focus-loss ALWAYS_ACTIVE flag, NOT a merge switch
+                # (Config_Validator warns on the combo; ALWAYS_ACTIVE behavior
+                # here is untouched)
+                if self._default_off_claimed:
+                    print("-default_on ignored - -default_off wins in the same pass")
+                else:
+                    self.DEFAULT_OFF = False
+                    print(f"set default group lines on for this focus group: {self.DEFAULT_OFF}")
             elif arg == "-default_always_active":
                 # focus-section arg: the default groups stay active whenever
                 # this group's args are applied (ALWAYS_ACTIVE resets on
