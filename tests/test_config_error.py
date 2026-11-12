@@ -120,7 +120,10 @@ class TestGuiHandlersConfigError:
         self_._fst.surface_config_error.assert_called_once_with(self_.err)
         self_._fst.toast_callback.assert_called_once()
         args = self_._fst.toast_callback.call_args.args
-        assert 'FST config error' in args[0]
+        # exact text (reviewer P1-1 cure): the facade prefixes "[FST] " to
+        # str(error), so these legs now read "[FST] FST config error: ..." -
+        # the doubled brand is pinned deliberately (wording note on TODO #417)
+        assert args[0] == f"[FST] {self_.err}"
         assert args[3] == "rgba(200, 40, 40, 200)"  # red arrives via the facade
 
     def test_gui_manager_reload_toasts_and_does_not_raise(self):

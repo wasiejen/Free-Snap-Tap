@@ -21,15 +21,15 @@ from fst_manager import (logger, logger_flow, logger_state, logger_macro,
 from fst_manager import toggle_debug_level, toggle_flow, toggle_drop_watch
 from fst_manager import is_drop_watch_enabled
 
-# FST-417 (#417): the toast palette, ONE owner for every toast color. The
-# facade surface_config_* methods below are the only color decisions; the
-# GUI layer (fst_overlay.py) imports these instead of repeating a literal
-# (tests/test_validation_toast_severity.py::TestPaletteOwnership scans the
-# overlay source - no rgba literal may live outside this file).
-# RED   = serious ConfigError report
-# YELLOW = warnings-only report (U330 ask 1)
-# GREEN  = OK / activation toast (U290T / activation)
-# NEUTRAL = default ToastWidget background (also manual-remove DELETE styling)
+# FST-417 (#417): the toast palette. The facade surface_config_* methods
+# below and the GUI layer (fst_overlay.py, imports these) are the only toast
+# color owners that the scan test guards - no rgba string constant may live
+# in fst_overlay.py (tests/test_validation_toast_severity.py
+# ::TestPaletteOwnership; other modules' literals are out of #417's scope).
+# RED     = serious ConfigError report (also the manual-remove DELETE styling)
+# YELLOW  = warnings-only report (U330 ask 1)
+# GREEN   = OK / activation toast (U290T / activation)
+# NEUTRAL = default ToastWidget background
 TOAST_RED = "rgba(200, 40, 40, 200)"
 TOAST_YELLOW = "rgba(200, 180, 0, 200)"
 TOAST_GREEN = "rgba(40, 150, 40, 200)"

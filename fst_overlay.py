@@ -304,9 +304,11 @@ class GUI_Manager(QWidget):
             # reloads through the arm-on-create hook
             logger.warning("config file deleted - reload skipped "
                            "(no default-template rewrite)")
-            # the red report goes through the palette owner (FST-417)
+            # the red report goes through the palette owner (FST-417); the
+            # context names the deleted config path (reviewer P1-2 cure)
             self._fst.surface_config_error(
-                ConfigError("config file deleted - reload skipped", "config file"))
+                ConfigError("config file deleted - reload skipped",
+                            self._fst.config_manager.file_name))
             return
         self.reload_from_file()
 

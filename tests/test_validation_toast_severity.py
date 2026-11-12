@@ -122,10 +122,16 @@ class TestValidatorDrivenSeverity:
 
 
 class TestPaletteOwnership:
-    """FST-417 (#417): the toast palette has ONE owner - every rgba literal
-    lives in fst_keyboard.py (the facade + its palette constants). A color
-    copy-pasted back into the overlay fails this source scan for good."""
+    """FST-417 (#417): the overlay renders the palette of fst_keyboard.py -
+    no rgba string CONSTANT may live in fst_overlay.py (other modules'
+    literals are out of #417's scope). The scan reads STRING CONSTANTS via
+    the AST, so a comment naming 'rgba(' cannot trip the gate for the wrong
+    reason; a color copy-pasted back into the overlay fails it for good."""
 
     def test_fst_overlay_holds_no_color_literal(self):
-        src = Path(fst_overlay.__file__).read_text(encoding='utf-8')
-        assert 'rgba(' not in src
+        import ast
+        tree = ast.parse(Path(fst_overlay.__file__).read_text(encoding='utf-8'))
+        offenders = [node.value for node in ast.walk(tree)
+                     if isinstance(node, ast.Constant)
+                     and isinstance(node.value, str) and 'rgba(' in node.value]
+        assert offenders == []

@@ -331,11 +331,15 @@ class TestPauseResumeCycleOwnership:
     def test_pause_resume_cycle_keeps_ownership_invariant(self, kb_env_ns, monkeypatch):
         kb, kb_mock = kb_env_ns.kb, kb_env_ns.kb_mock
         build(kb, taps=TWO_GROUPS)
-        # the resume leg reloads the config for real - feed the SAME groups
-        # back through the parse/validate/presort/rebuild path; clear_cli's
-        # system('cls||clear') is stubbed (test_control_actions pattern)
+        # the resume leg reloads the config for real - feed the groups back
+        # through the parse/validate/presort/rebuild path, PLUS a third group
+        # the fixture never built: a resume that skipped apply_focus_groups
+        # would keep 2 groups and fail the post-resume len assert (P2-3 cure,
+        # reviewer-verified discriminating); clear_cli's system('cls||clear')
+        # is stubbed (test_control_actions pattern)
         monkeypatch.setattr(kb.config_manager, '_open_config_file',
-                            lambda: ['(TAP_1) a, d\n', '(TAP_2) w, s\n'])
+                            lambda: ['(TAP_1) a, d\n', '(TAP_2) w, s\n',
+                                     '(TAP_3) q, e\n'])
         monkeypatch.setattr(fst_manager, 'system', MagicMock())
         m = TapModel(kb, kb_mock)
         m.press(VK_A)
@@ -348,13 +352,14 @@ class TestPauseResumeCycleOwnership:
         assert m.net() == {}
         assert _groups_last_send(kb) == [None, None]
 
-        # resume branch: groups rebuilt from the reloaded config, bookkeeping
-        # clean, and the rebuilt owner owns the vk again
+        # resume branch: groups rebuilt from the reloaded config (2 -> 3:
+        # TAP_3 exists only in the reloaded lines), bookkeeping clean, and
+        # the rebuilt owner owns the vk again
         m.act(lambda: kb.control_toggle_pause())
         assert kb.arg_manager.WIN32_FILTER_PAUSED is False
         assert m.net() == {}
-        assert _groups_last_send(kb) == [None, None]
-        assert len(kb._tap_groups) == 2
+        assert len(kb._tap_groups) == 3
+        assert _groups_last_send(kb) == [None, None, None]
         assert kb._tap_owner_by_vk[VK_S] is _group_of(kb, VK_S)
 
         # the cycle after resume is still single-owner: one release path,

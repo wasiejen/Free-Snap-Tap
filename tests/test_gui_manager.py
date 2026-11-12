@@ -370,8 +370,11 @@ class TestEvalOnSaveWatcher:
         assert not cfg.exists()  # no default-template rewrite
         # the event surfaces visibly - via the palette owner (FST-417)
         fst.surface_config_error.assert_called_once()
+        fst.toast_callback.assert_called_once()  # exactly one toast (P2-7)
         toast_args = fst.toast_callback.call_args.args
         assert 'config file deleted' in toast_args[0]
+        # the synthesized ConfigError names the deleted path as context (P1-2)
+        assert str(cfg) in toast_args[0]
         assert toast_args[3] == 'rgba(200, 40, 40, 200)'  # red arrives via the facade
         # (the watcher engine's own drop of the deleted path is live-event
         # platform timing - the re-arm attempt above is a no-op while gone)
