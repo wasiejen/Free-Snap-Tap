@@ -9,6 +9,7 @@ from pynput import keyboard as pynput_keyboard
 
 import fst_manager
 from fst_data_types import ConfigError, Key_Event
+from fst_keyboard import FST_Keyboard
 from fst_manager import CLI_menu, Output_Manager
 from fst_overlay import GUI_Manager, StatusOverlay
 
@@ -102,35 +103,45 @@ class TestCliMenuReloadConfigError:
 
 
 class TestGuiHandlersConfigError:
+    """FST-417 (#417): the catch legs delegate to the palette owner
+    (FST_Keyboard.surface_config_error) - the surface_config_error delegation
+    is the pinned contract; the real facade body is wired onto the stand-in so
+    the toast-bridge leg (text + red) stays exercised end to end."""
+
     def _fst(self, raising_method):
         fst = MagicMock()
-        setattr(fst, raising_method, MagicMock(side_effect=ConfigError(
-            "focus group 'x' not found - renamed or removed in config?", 'x')))
-        return SimpleNamespace(_fst=fst)
+        err = ConfigError("focus group 'x' not found - renamed or removed in config?", 'x')
+        setattr(fst, raising_method, MagicMock(side_effect=err))
+        fst.surface_config_error = MagicMock(
+            side_effect=lambda error: FST_Keyboard.surface_config_error(fst, error))
+        return SimpleNamespace(_fst=fst, err=err)
+
+    def _assert_red_delegation(self, self_):
+        self_._fst.surface_config_error.assert_called_once_with(self_.err)
+        self_._fst.toast_callback.assert_called_once()
+        args = self_._fst.toast_callback.call_args.args
+        assert 'FST config error' in args[0]
+        assert args[3] == "rgba(200, 40, 40, 200)"  # red arrives via the facade
 
     def test_gui_manager_reload_toasts_and_does_not_raise(self):
         self_ = self._fst('reload_from_file')
         GUI_Manager.reload_from_file(self_)
-        self_._fst.toast_callback.assert_called_once()
-        assert 'FST config error' in self_._fst.toast_callback.call_args.args[0]
+        self._assert_red_delegation(self_)
 
     def test_gui_manager_toggle_pause_toasts_and_does_not_raise(self):
         self_ = self._fst('control_toggle_pause')
         GUI_Manager.toggle_pause(self_)
-        self_._fst.toast_callback.assert_called_once()
-        assert 'FST config error' in self_._fst.toast_callback.call_args.args[0]
+        self._assert_red_delegation(self_)
 
     def test_status_overlay_toggle_pause_toasts_and_does_not_raise(self):
         self_ = self._fst('control_toggle_pause')
         StatusOverlay.toggle_pause(self_)
-        self_._fst.toast_callback.assert_called_once()
-        assert 'FST config error' in self_._fst.toast_callback.call_args.args[0]
+        self._assert_red_delegation(self_)
 
     def test_status_overlay_reload_toasts_and_does_not_raise(self):
         self_ = self._fst('reload_from_file')
         StatusOverlay.reload_from_file(self_)
-        self_._fst.toast_callback.assert_called_once()
-        assert 'FST config error' in self_._fst.toast_callback.call_args.args[0]
+        self._assert_red_delegation(self_)
 
 
 class TestCheckForCombinationConfigError:

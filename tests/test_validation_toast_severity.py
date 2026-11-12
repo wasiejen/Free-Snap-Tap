@@ -14,8 +14,10 @@ The yellow leg landed with U330 ask 1; this file pins the full severity trio
 with a mocked toast bridge, so a future change to any one color fails loudly
 and the warnings-only path can never regress to the error color.
 """
+from pathlib import Path
 from unittest.mock import MagicMock
 
+import fst_overlay
 from fst_data_types import ConfigError
 from fst_manager import Config_Manager, Config_Validator
 
@@ -117,3 +119,13 @@ class TestValidatorDrivenSeverity:
         cm.load_config()  # no raise
         assert cm.config_warnings and not any(
             v.severity == Config_Validator.ERROR for v in cm.config_warnings)
+
+
+class TestPaletteOwnership:
+    """FST-417 (#417): the toast palette has ONE owner - every rgba literal
+    lives in fst_keyboard.py (the facade + its palette constants). A color
+    copy-pasted back into the overlay fails this source scan for good."""
+
+    def test_fst_overlay_holds_no_color_literal(self):
+        src = Path(fst_overlay.__file__).read_text(encoding='utf-8')
+        assert 'rgba(' not in src

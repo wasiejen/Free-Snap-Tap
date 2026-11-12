@@ -13,6 +13,9 @@ from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont
 import ctypes
 
 from fst_data_types import ConfigError
+# FST-417 (#417): one palette owner - the overlay renders the colors defined
+# in fst_keyboard.py and never names an rgba literal itself
+from fst_keyboard import TOAST_NEUTRAL, TOAST_RED
 
 import logging
 # Use __name__ to automatically label logs with the filename
@@ -255,7 +258,7 @@ class GUI_Manager(QWidget):
         try:
             self._fst.reload_from_file()
         except ConfigError as error:
-            self._fst.toast_callback(str(error), 5, 12, "rgba(200, 40, 40, 200)", "white")
+            self._fst.surface_config_error(error)
 
     def watch_config_file(self):
         '''(re-)arm the file watch on the config file; a not-yet-existing
@@ -301,8 +304,9 @@ class GUI_Manager(QWidget):
             # reloads through the arm-on-create hook
             logger.warning("config file deleted - reload skipped "
                            "(no default-template rewrite)")
-            self._fst.toast_callback("[FST] config file deleted - reload skipped",
-                                     5, 12, "rgba(200, 40, 40, 200)", "white")
+            # the red report goes through the palette owner (FST-417)
+            self._fst.surface_config_error(
+                ConfigError("config file deleted - reload skipped", "config file"))
             return
         self.reload_from_file()
 
@@ -310,7 +314,7 @@ class GUI_Manager(QWidget):
         try:
             self._fst.control_toggle_pause()
         except ConfigError as error:
-            self._fst.toast_callback(str(error), 5, 12, "rgba(200, 40, 40, 200)", "white")
+            self._fst.surface_config_error(error)
 
     def return_to_menu(self):
         self._fst.control_return_to_menu()
@@ -755,7 +759,7 @@ class StatusOverlay(QWidget):
         try:
             self._fst.control_toggle_pause()
         except ConfigError as error:
-            self._fst.toast_callback(str(error), 5, 12, "rgba(200, 40, 40, 200)", "white")
+            self._fst.surface_config_error(error)
 
     def return_to_menu(self):
         self._fst.control_return_to_menu()
@@ -774,7 +778,7 @@ class StatusOverlay(QWidget):
         try:
             self._fst.reload_from_file()
         except ConfigError as error:
-            self._fst.toast_callback(str(error), 5, 12, "rgba(200, 40, 40, 200)", "white")
+            self._fst.surface_config_error(error)
 
     def close_overlay(self):
         self.close()
@@ -906,7 +910,7 @@ def wrap_toast_text(text, max_width, font_metrics):
 
 
 class ToastWidget(QFrame):
-    def __init__(self, text, duration=3.0, text_size=12, bg_color="rgba(40, 40, 40, 200)", text_color="white", timer=0, parent=None):
+    def __init__(self, text, duration=3.0, text_size=12, bg_color=TOAST_NEUTRAL, text_color="white", timer=0, parent=None):
         super().__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.ToolTip | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -993,7 +997,7 @@ class ToastWidget(QFrame):
             self.label.setText(f" {self.base_text} | DELETE ")
             self.setStyleSheet(f"""
                 QFrame {{
-                    background-color: rgba(200, 40, 40, 200);
+                    background-color: {TOAST_RED};
                     color: {self.text_color};
                     border-radius: 8px;
                     padding: 0px;
