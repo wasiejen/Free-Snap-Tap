@@ -21,6 +21,20 @@ from fst_manager import (logger, logger_flow, logger_state, logger_macro,
 from fst_manager import toggle_debug_level, toggle_flow, toggle_drop_watch
 from fst_manager import is_drop_watch_enabled
 
+# FST-417 (#417): the toast palette. The facade surface_config_* methods
+# below and the GUI layer (fst_overlay.py, imports these) are the only toast
+# color owners that the scan test guards - no rgba string constant may live
+# in fst_overlay.py (tests/test_validation_toast_severity.py
+# ::TestPaletteOwnership; other modules' literals are out of #417's scope).
+# RED     = serious ConfigError report (also the manual-remove DELETE styling)
+# YELLOW  = warnings-only report (U330 ask 1)
+# GREEN   = OK / activation toast (U290T / activation)
+# NEUTRAL = default ToastWidget background
+TOAST_RED = "rgba(200, 40, 40, 200)"
+TOAST_YELLOW = "rgba(200, 180, 0, 200)"
+TOAST_GREEN = "rgba(40, 150, 40, 200)"
+TOAST_NEUTRAL = "rgba(40, 40, 40, 200)"
+
 
 class Toast_Offload:
     '''U345 H2 fix: move the toast bridge post OFF the LL hook pump.
@@ -296,7 +310,7 @@ class FST_Keyboard():
         GUI mode (toast bridge wired) -> P08 error toast; headless -> console print
         '''
         if self.toast_callback is not None:
-            self.toast_callback(f"[FST] {error}", 5, 12, "rgba(200, 40, 40, 200)", "white")
+            self.toast_callback(f"[FST] {error}", 5, 12, TOAST_RED, "white")
         else:
             print(f"[FST] {error}")
 
@@ -307,7 +321,7 @@ class FST_Keyboard():
         in headless mode names it a warning report, not a config error'''
         if self.toast_callback is not None:
             self.toast_callback(f"[FST] {report_text}", 5, 12,
-                                "rgba(200, 180, 0, 200)", "white")
+                                TOAST_YELLOW, "white")
         else:
             print(f"[FST] config warning report\n{report_text}")
 
@@ -316,7 +330,7 @@ class FST_Keyboard():
         console line in headless mode (compliance toast, U290T)'''
         if self.toast_callback is not None:
             self.toast_callback("[FST] config OK - reload valid", 3, 12,
-                                "rgba(40, 150, 40, 200)", "white")
+                                TOAST_GREEN, "white")
         else:
             print("[FST] config OK - reload valid")
 
@@ -326,7 +340,7 @@ class FST_Keyboard():
         flow already prints through the CLI menu displays'''
         if self.toast_callback is not None:
             self.toast_callback(f"[FST] focus group active: {group_name}",
-                                3, 12, "rgba(40, 150, 40, 200)", "white")
+                                3, 12, TOAST_GREEN, "white")
 
     def toast_startup_activation(self):
         '''startup activation pass, post-load (U330 ask 2): the startup load

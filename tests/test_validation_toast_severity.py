@@ -14,8 +14,10 @@ The yellow leg landed with U330 ask 1; this file pins the full severity trio
 with a mocked toast bridge, so a future change to any one color fails loudly
 and the warnings-only path can never regress to the error color.
 """
+from pathlib import Path
 from unittest.mock import MagicMock
 
+import fst_overlay
 from fst_data_types import ConfigError
 from fst_manager import Config_Manager, Config_Validator
 
@@ -117,3 +119,19 @@ class TestValidatorDrivenSeverity:
         cm.load_config()  # no raise
         assert cm.config_warnings and not any(
             v.severity == Config_Validator.ERROR for v in cm.config_warnings)
+
+
+class TestPaletteOwnership:
+    """FST-417 (#417): the overlay renders the palette of fst_keyboard.py -
+    no rgba string CONSTANT may live in fst_overlay.py (other modules'
+    literals are out of #417's scope). The scan reads STRING CONSTANTS via
+    the AST, so a comment naming 'rgba(' cannot trip the gate for the wrong
+    reason; a color copy-pasted back into the overlay fails it for good."""
+
+    def test_fst_overlay_holds_no_color_literal(self):
+        import ast
+        tree = ast.parse(Path(fst_overlay.__file__).read_text(encoding='utf-8'))
+        offenders = [node.value for node in ast.walk(tree)
+                     if isinstance(node, ast.Constant)
+                     and isinstance(node.value, str) and 'rgba(' in node.value]
+        assert offenders == []

@@ -42,6 +42,7 @@ import pytest
 from collections import Counter
 from unittest.mock import MagicMock
 
+import fst_manager
 from kb_helpers import build
 from vk_codes import vk_codes_dict
 
@@ -295,3 +296,76 @@ class TestQuitPathOwnership:
         kb.control_exit_program('pin')
         assert emitted_at_stop, "listener never stopped - pin fixture wrong"
         assert ('release', VK_S) in emitted_at_stop[0]
+
+    def test_return_to_menu_releases_tap_hold_before_listener_stop(self, kb_env_ns):
+        # #416 twin of the exit_program pin: control_return_to_menu stops
+        # BOTH listeners right after the sweep (fst_keyboard.py), so the
+        # owner's release must be emitted synchronously before _listener.stop.
+        # EMISSION ALONE is not enough (unlike the exit pin, this twin must be
+        # RED-relevant to the U404 invariant): the old global sweep DID emit
+        # the controller release - the veto leg then ate the hook feedback, so
+        # the app stayed holding the key. The app-visible leg below is what
+        # fails against pre-U404 code.
+        kb, kb_mock = kb_env_ns.kb, kb_env_ns.kb_mock
+        kb._mouse_listener = MagicMock()
+        build(kb, taps=TWO_GROUPS)
+        m = TapModel(kb, kb_mock)
+        m.press(VK_S)
+        emitted_at_stop = []
+        kb._listener.stop.side_effect = lambda: emitted_at_stop.append(
+            [(c[0], c.args[0].vk) for c in kb_mock.method_calls])
+        m.act(lambda: kb.control_return_to_menu())
+        assert emitted_at_stop, "listener never stopped - pin fixture wrong"
+        assert ('release', VK_S) in emitted_at_stop[0]
+        # the emitted release must pass the veto leg - post-U404 the owner
+        # cleared its claim FIRST, so the app sees the release and holds nothing
+        assert m.app_down(VK_S) == 0
+
+
+class TestPauseResumeCycleOwnership:
+    """#416: cycle-level ownership through control_toggle_pause (both
+    branches). The pause branch runs the same sweep the quit paths use; the
+    resume branch rebuilds the groups through the real config-load path, so
+    the new owners must account the next tap cycle net-zero."""
+
+    def test_pause_resume_cycle_keeps_ownership_invariant(self, kb_env_ns, monkeypatch):
+        kb, kb_mock = kb_env_ns.kb, kb_env_ns.kb_mock
+        build(kb, taps=TWO_GROUPS)
+        # the resume leg reloads the config for real - feed the groups back
+        # through the parse/validate/presort/rebuild path, PLUS a third group
+        # the fixture never built: a resume that skipped apply_focus_groups
+        # would keep 2 groups and fail the post-resume len assert (P2-3 cure,
+        # reviewer-verified discriminating); clear_cli's system('cls||clear')
+        # is stubbed (test_control_actions pattern)
+        monkeypatch.setattr(kb.config_manager, '_open_config_file',
+                            lambda: ['(TAP_1) a, d\n', '(TAP_2) w, s\n',
+                                     '(TAP_3) q, e\n'])
+        monkeypatch.setattr(fst_manager, 'system', MagicMock())
+        m = TapModel(kb, kb_mock)
+        m.press(VK_A)
+        m.press(VK_S)
+        assert m.app_down(VK_A) == 1 and m.app_down(VK_S) == 1
+
+        # pause branch: both groups' holds reach the app as releases
+        m.act(lambda: kb.control_toggle_pause())
+        assert kb.arg_manager.WIN32_FILTER_PAUSED is True
+        assert m.net() == {}
+        assert _groups_last_send(kb) == [None, None]
+
+        # resume branch: groups rebuilt from the reloaded config (2 -> 3:
+        # TAP_3 exists only in the reloaded lines), bookkeeping clean, and
+        # the rebuilt owner owns the vk again
+        m.act(lambda: kb.control_toggle_pause())
+        assert kb.arg_manager.WIN32_FILTER_PAUSED is False
+        assert m.net() == {}
+        assert len(kb._tap_groups) == 3
+        assert _groups_last_send(kb) == [None, None, None]
+        assert kb._tap_owner_by_vk[VK_S] is _group_of(kb, VK_S)
+
+        # the cycle after resume is still single-owner: one release path,
+        # net-zero, owner records the clear
+        m.press(VK_S)
+        assert m.app_down(VK_S) == 1
+        m.release(VK_S)
+        assert m.app_down(VK_S) == 0
+        assert _group_of(kb, VK_S).get_last_key_send() is None

@@ -12,12 +12,13 @@ from unittest.mock import MagicMock
 import pytest
 
 import fst_overlay
+from fst_keyboard import FST_Keyboard
 from fst_overlay import CrosshairOverlay, GUI_Manager, StatusOverlay, ToastManager, Tray_Icon
 
 
 @pytest.fixture
 def fst():
-    return SimpleNamespace(
+    ns = SimpleNamespace(
         arg_manager=SimpleNamespace(
             MANUAL_PAUSED=False,
             WIN32_FILTER_PAUSED=False,
@@ -37,6 +38,12 @@ def fst():
         display_internal_repr_groups=MagicMock(),
         toast_callback=MagicMock(),
     )
+    # FST-417 (#417): the config-error toast legs delegate to the palette
+    # owner - wire the REAL facade body onto the stand-in (call-tracked) so
+    # the bridge leg stays exercised rather than a copy of the toast call
+    ns.surface_config_error = MagicMock(
+        side_effect=lambda error: FST_Keyboard.surface_config_error(ns, error))
+    return ns
 
 
 @pytest.fixture
@@ -361,8 +368,14 @@ class TestEvalOnSaveWatcher:
 
         m.reload_from_file.assert_not_called()
         assert not cfg.exists()  # no default-template rewrite
-        fst.toast_callback.assert_called_once()  # the event surfaces visibly
-        assert 'config file deleted' in fst.toast_callback.call_args.args[0]
+        # the event surfaces visibly - via the palette owner (FST-417)
+        fst.surface_config_error.assert_called_once()
+        fst.toast_callback.assert_called_once()  # exactly one toast (P2-7)
+        toast_args = fst.toast_callback.call_args.args
+        assert 'config file deleted' in toast_args[0]
+        # the synthesized ConfigError names the deleted path as context (P1-2)
+        assert str(cfg) in toast_args[0]
+        assert toast_args[3] == 'rgba(200, 40, 40, 200)'  # red arrives via the facade
         # (the watcher engine's own drop of the deleted path is live-event
         # platform timing - the re-arm attempt above is a no-op while gone)
 
