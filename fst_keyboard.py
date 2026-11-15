@@ -801,8 +801,9 @@ class FST_Keyboard():
         # this line only NAMES the debt of the generation being retired, so the
         # shadow phase can see whether the bookkeeping matches reality. It
         # decides nothing.
-        if isinstance(self._ledger, Ticket_Ledger):
-            self._ledger.audit('snapshot_retire', gen_id=self._runtime.gen_id)
+        ledger = self._ticket_store()
+        if ledger is not None:
+            ledger.audit('snapshot_retire', gen_id=self._runtime.gen_id)
         self._runtime = rt
 
     def apply_focus_groups(self, focus_name = ''):
@@ -1812,13 +1813,32 @@ class FST_Keyboard():
     def begin_drain(self, drain_id):
         '''Name the drain leg the per-emission tickets attribute to; returns the
         previous label for end_drain. A single attribute store, read only by
-        ticket bookkeeping - so it can mislabel, never change behavior.'''
+        ticket bookkeeping - so it can mislabel, never change behavior.
+
+        KNOWN LIMITATION (F-A6 reviewer P2-4, shadow phase): the label is one
+        instance attribute. Nested legs restore correctly (save/restore), but if
+        two legs run on different threads at once (a hook-thread pause racing a
+        loop-thread exit), the tickets of the second leg can carry the first
+        leg's label and vice versa. That mislabels METADATA only - no release,
+        order or count depends on it - and threading the label through the
+        call chain is blocked for now by the pinned facade signature
+        (`release_all_currently_pressed_simulated_keys()` is asserted
+        call-without-args in tests/test_output_manager.py), so the correct fix
+        is a Phase-B threading decision (named in the handover/inbox).'''
         previous = self._drain_id
         self._drain_id = drain_id
         return previous
 
     def end_drain(self, previous):
         self._drain_id = previous
+
+    def _ticket_store(self):
+        '''The ledger, or None when the object has no real one (a partially
+        built stand-in): the guard is a getattr so a missing attribute can never
+        turn bookkeeping into an AttributeError on a send path
+        (F-A6 reviewer P2-2).'''
+        ledger = getattr(self, '_ledger', None)
+        return ledger if isinstance(ledger, Ticket_Ledger) else None
 
     def open_release_ticket(self, vk_code, source_kind=SOURCE_DRAIN,
                             source_id=None, is_mouse=False):
@@ -1830,11 +1850,11 @@ class FST_Keyboard():
         A ticket that is left open because its send RAISED is left open on
         purpose: the release is still owed, and naming that debt is the whole
         point of the ledger (the phantom-debt risk is R1+/R3 compaction work).'''
-        ledger = self._ledger
-        if not isinstance(ledger, Ticket_Ledger):
+        ledger = self._ticket_store()
+        if ledger is None:
             return None
         label = self._drain_id
-        source = self._drain_id if source_id is None else source_id
+        source = label if source_id is None else source_id
         if label and label != 'unset' and source != label:
             # keep BOTH halves of the answer in the id: which leg asked for the
             # drain and which sweep emitted the release (pause_toggle.
@@ -1849,18 +1869,19 @@ class FST_Keyboard():
         '''Close a ticket once its physical event actually left (one store).'''
         if ticket is None:
             return None
-        ledger = self._ledger
-        if not isinstance(ledger, Ticket_Ledger):
+        ledger = self._ticket_store()
+        if ledger is None:
             return None
         return ledger.close(ticket)
 
     def ledger_open_count(self, gen_id=None):
-        '''The invariant query for tests and teardown audits: how many tickets
-        are still open (optionally of one generation).'''
-        ledger = self._ledger
-        if not isinstance(ledger, Ticket_Ledger):
+        '''A PURE query for tests and teardown audits: how many tickets are
+        still open (optionally of one generation). No logging, no side effect -
+        `Ticket_Ledger.audit` is the version that names them.'''
+        ledger = self._ticket_store()
+        if ledger is None:
             return 0
-        return ledger.audit('ledger_open_count', gen_id=gen_id)
+        return len(ledger.open_tickets(gen_id=gen_id))
 
     def _release_tap_group_holds(self):
         '''FST-404 (#404): release the app-level hold each tap group owns.

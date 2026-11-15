@@ -111,7 +111,8 @@ class Ticket_Ledger():
     and write it back - that compound is a torn read for the pump (design
     report, TOP-3 risk 1). The store therefore exposes no such path: readers
     return NEW snapshot lists, transitions are `open` / `mark` / `close`, and
-    compaction rebinds ONE dict key instead of editing a live list in place.
+    compaction prunes IN PLACE (completed tickets from the front only) so the
+    list object a concurrent writer holds is never the discarded one.
     Pinned in tests/test_ticket_ledger_pins.py.
 
     Logging goes through a callable handed in at construction (the flow-lane
@@ -119,7 +120,7 @@ class Ticket_Ledger():
     callable is called with lazy %s args, so a disabled flow lane pays nothing
     for formatting.'''
 
-    __slots__ = ('_by_vk', '_seq_source', 'log', 'MAX_PER_VK')
+    __slots__ = ('_by_vk', '_seq_source', '_high', 'log', 'MAX_PER_VK')
 
     def __init__(self, log=None, max_per_vk=64):
         # itertools.count().__next__() is a single C-level call: monotonic and
@@ -127,6 +128,10 @@ class Ticket_Ledger():
         from itertools import count
         self._by_vk = {}
         self._seq_source = count(1)
+        # the highest seq ISSUED (tracked at open - not derived from the
+        # counter's private state, F-A6 reviewer P2-5): this is what a status
+        # dump reports as the high-water mark
+        self._high = 0
         self.log = log
         self.MAX_PER_VK = max_per_vk
 
@@ -147,14 +152,18 @@ class Ticket_Ledger():
                         next(self._seq_source), state, is_mouse)
         bucket = self._by_vk.get(vk)
         if bucket is None:
-            # one dict store creates the bucket (never dict[key] = list + edit)
+            # the dict entry for a vk is created ONCE and its list object is
+            # then never rebound (see _prune) - a writer that grabbed the list
+            # mid-flight can never append into a discarded list
             bucket = [ticket]
             self._by_vk[vk] = bucket
         else:
             bucket.append(ticket)
+        if ticket.seq > self._high:
+            self._high = ticket.seq
         self._log('open', ticket)
         if len(bucket) > self.MAX_PER_VK:
-            self._compact(vk)
+            self._prune(vk, bucket)
         return ticket
 
     def mark(self, ticket, state):
@@ -173,10 +182,13 @@ class Ticket_Ledger():
     # -- reads (snapshots, never live containers) --------------------------
 
     def tickets(self, vk=None, gen_id=None, kind=None, state=None):
-        '''A NEW list of matching tickets. Every bucket is copied first, so a
-        caller iterating this result is never affected by a concurrent append
-        or by a compaction rebind (the repo's existing list(...) snapshot
-        pattern).'''
+        '''A NEW list of matching tickets, in ONE scan. `state` may be one
+        state or a tuple of states. Every bucket is copied first, so a caller
+        iterating this result is never affected by a concurrent append or prune
+        (the repo's existing list(...) snapshot pattern).'''
+        states = None
+        if state is not None:
+            states = state if isinstance(state, tuple) else (state,)
         buckets = ([self._by_vk.get(vk)] if vk is not None
                    else list(self._by_vk.values()))
         found = []
@@ -188,14 +200,17 @@ class Ticket_Ledger():
                     continue
                 if kind is not None and ticket.kind != kind:
                     continue
-                if state is not None and ticket.state != state:
+                if states is not None and ticket.state not in states:
                     continue
                 found.append(ticket)
         return found
 
     def open_tickets(self, gen_id=None, kind=None):
-        return (self.tickets(gen_id=gen_id, kind=kind, state=TICKET_SCHEDULED)
-                + self.tickets(gen_id=gen_id, kind=kind, state=TICKET_INJECTED))
+        # ONE scan, not one per open state: two scans could return the same
+        # ticket twice if its state flipped between them (F-A6 reviewer P2-3),
+        # and this is the exact query the R2+ invariant asserts on.
+        return self.tickets(gen_id=gen_id, kind=kind,
+                            state=(TICKET_SCHEDULED, TICKET_INJECTED))
 
     def open_presses(self):
         '''The invariant's query: presses FST still owes (design contract (C)).'''
@@ -210,7 +225,8 @@ class Ticket_Ledger():
         return tally
 
     def high_seq(self):
-        return self._seq_source.__reduce__()[1][0]
+        '''The highest ticket seq ISSUED so far (0 when none).'''
+        return self._high
 
     def audit(self, context, gen_id=None):
         '''Debug-only invariant line: name the tickets still open when a
@@ -225,19 +241,27 @@ class Ticket_Ledger():
 
     # -- internals ---------------------------------------------------------
 
-    def _compact(self, vk):
+    def _prune(self, vk, bucket):
         '''Bound the per-vk history (design report TOP-3 risk 3: an unbounded
-        list is phantom debt). Keep EVERY open ticket plus the most recent
-        MAX_PER_VK closed ones, then rebind the dict key ONCE - readers holding
-        the old list keep iterating it.'''
-        bucket = self._by_vk.get(vk) or []
-        open_now = [t for t in bucket if t.state != TICKET_COMPLETED]
+        list is phantom debt).
+
+        It drops only COMPLETED tickets - the oldest ones, keeping the most
+        recent MAX_PER_VK of them and EVERY open ticket, in original order -
+        and it commits the result with ONE in-place store (`bucket[:] = keep`)
+        so the list object stays the one every writer appended to. A
+        rebind-based prune lost a concurrently opened ticket exactly this way
+        (F-A6 reviewer P1-1). A reader iterating a list(...) copy is unaffected
+        either way.'''
         closed = [t for t in bucket if t.state == TICKET_COMPLETED]
-        keep = open_now + closed[-self.MAX_PER_VK:]
-        self._by_vk[vk] = keep
-        if self.log and len(keep) < len(bucket):
-            self.log("TICKET compact vk=%s kept=%d dropped=%d",
-                     vk, len(keep), len(bucket) - len(keep))
+        keep_closed = {id(t) for t in closed[-self.MAX_PER_VK:]}
+        keep = [t for t in bucket
+                if t.state != TICKET_COMPLETED or id(t) in keep_closed]
+        dropped = len(bucket) - len(keep)
+        if dropped > 0:
+            bucket[:] = keep
+            if self.log:
+                self.log("TICKET compact vk=%s dropped=%d kept=%d",
+                         vk, dropped, len(keep))
 
     def _log(self, action, ticket):
         if self.log:

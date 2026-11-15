@@ -24,7 +24,7 @@ from vk_codes import vk_codes_dict
 
 from fst_data_types import (SOURCE_DRAIN, SOURCE_TOGGLE, TICKET_COMPLETED,
                             TICKET_INJECTED, TICKET_RELEASE, TICKET_SCHEDULED,
-                            Ticket_Ledger)
+                            Ticket, Ticket_Ledger)
 from kb_helpers import build, down
 
 VK_A = vk_codes_dict['a']
@@ -361,6 +361,52 @@ class TestR0ShadowMode:
                     'a decision path consumed or closed the probe ticket - the '
                     'ledger is no longer shadow-only')
         assert results[0] == results[1] == results[2], results
+
+    def test_high_seq_reports_the_highest_issued_seq(self, kb_env_ns):
+        """The status-dump high-water is a tracked value, not the counter's
+        private next-value (F-A6 reviewer P2-5)."""
+        ledger = kb_env_ns.kb._ledger
+        first = ledger.open(VK_A, SOURCE_DRAIN, 'pin_seq', TICKET_RELEASE, 1)
+        second = ledger.open(VK_D, SOURCE_DRAIN, 'pin_seq', TICKET_RELEASE, 1)
+        assert ledger.high_seq() == second.seq == first.seq + 1
+
+    def test_a_bucket_is_never_rebound_so_a_second_writer_cannot_lose_a_ticket(
+            self, kb_env_ns):
+        """The F-A6 reviewer P1-1 contract: compaction prunes IN PLACE, so the
+        list object a writer holds mid-flight is always the live one, and open
+        debt is never the thing that gets dropped."""
+        ledger = Ticket_Ledger(max_per_vk=3)
+        held = ledger.open(VK_A, SOURCE_DRAIN, 'pin_hold', TICKET_RELEASE, 1)
+        bucket_ref = ledger._by_vk[VK_A]
+        for _ in range(30):
+            ledger.close(ledger.open(VK_A, SOURCE_DRAIN, 'pin_cycle',
+                                     TICKET_RELEASE, 1))
+        assert ledger._by_vk[VK_A] is bucket_ref, 'the bucket was rebound'
+        # a writer that grabbed the list before the 30 prunes still lands its
+        # ticket in the live history (that is exactly what the rebind-based
+        # prune used to lose):
+        late = Ticket(0, SOURCE_DRAIN, 'pin_late_writer', 1, TICKET_RELEASE,
+                      99999, TICKET_SCHEDULED, False)
+        bucket_ref.append(late)
+        assert any(t.source_id == 'pin_late_writer'
+                   for t in ledger.tickets(vk=VK_A)), 'the late append was lost'
+        assert any(t.seq == held.seq for t in ledger.open_tickets())
+
+    def test_nested_drain_legs_restore_the_outer_label(self, kb_env_plain):
+        """The label is save/restore, so a leg that runs inside another leg's
+        label returns to the outer one afterwards (the cross-thread case stays
+        a documented limitation in begin_drain)."""
+        kb = kb_env_plain
+        outer = kb.begin_drain('outer_leg')
+        try:
+            inner = kb.begin_drain('inner_leg')
+            kb.end_drain(inner)
+            ticket = kb.open_release_ticket(VK_A, SOURCE_DRAIN, 'probe_sweep')
+            assert ticket.source_id == 'outer_leg.probe_sweep', ticket
+        finally:
+            kb.end_drain(outer)
+        assert kb.open_release_ticket(VK_D, SOURCE_DRAIN,
+                                     'probe_bare').source_id == 'probe_bare'
 
     def test_the_store_exposes_no_read_modify_write_path(self, kb_env_ns):
         """The single-store discipline, asserted: the public API is only
