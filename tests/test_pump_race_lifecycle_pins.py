@@ -1134,6 +1134,21 @@ class TestP6LifecycleWiring:
         assert machine.state is Lifecycle_State.PAUSED, machine.state
         assert kb.arg_manager.WIN32_FILTER_PAUSED is True
 
+    def test_stopping_is_terminal_for_a_late_request(self, kb_env_plain):
+        """STOPPING is terminal (F-A5 recheck P2): a resume/menu request that
+        was already in flight when the stop landed must not flip the machine
+        back, because the audit line is what an operator reads while the loop
+        thread is on its way out."""
+        from fst_data_types import Lifecycle_State
+        kb = kb_env_plain
+        machine = self._machine(kb)
+        kb.control_exit_program('unit')
+        assert machine.state is Lifecycle_State.STOPPING, machine.state
+        for late in (Lifecycle_State.RUNNING, Lifecycle_State.MENU,
+                     Lifecycle_State.PAUSED):
+            kb.post_lifecycle(late, f'late {late.value} request')
+            assert machine.state is Lifecycle_State.STOPPING, late
+
     def test_machine_requests_from_another_thread_land_on_the_loop_thread(
             self, kb_env_ns):
         """The routing contract of Lifecycle_Machine.post_transition (the same

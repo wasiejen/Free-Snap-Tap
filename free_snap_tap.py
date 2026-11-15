@@ -125,6 +125,14 @@ class Lifecycle_Machine:
         if state is old:
             # the state can have moved between a request and its landing
             return
+        if old is Lifecycle_State.STOPPING:
+            # STOPPING is TERMINAL (F-A5 reviewer P2 of the recheck): a resume
+            # leg or a menu post that was already in flight when the stop
+            # landed must not flip the audit trail back to running - the loop
+            # thread is on its way out. The request is ignored and named.
+            logger.info(f"[Lifecycle] STOPPING is terminal - ignored late "
+                        f"{state.value} request ({reason})")
+            return
         self.state = state
         who = f" from {source}" if source else ''
         logger.info(f"[Lifecycle] {old.value} -> {state.value} "
