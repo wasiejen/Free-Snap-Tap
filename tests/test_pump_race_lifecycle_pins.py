@@ -1170,3 +1170,154 @@ class TestP6LifecycleWiring:
 
         assert applied and all(ident != poster for ident in applied), applied
         assert machine.state is Lifecycle_State.STOPPING
+
+
+# ===========================================================================
+# P7 - the menu's stop request survives the menu tail (F-A5 reviewer P0)
+# ===========================================================================
+
+class TestP7MenuStopWins:
+    """Menu choice 4 ("End the program") returns NORMALLY from display_menu
+    after posting STOPPING. The listening pass must then NOT start the
+    listeners and must NOT post RUNNING over the stop (F-A5 reviewer P0 found
+    exactly that clobber: the menu tail's unconditional RUNNING post restarted
+    the listeners and run() parked forever, and every mock in the suite hid it
+    because no test wired a real machine to a real menu outcome)."""
+
+    def _menu_outcome_run(self, monkeypatch, outcome, posts_stop):
+        from free_snap_tap import Lifecycle_Machine, MainLogic
+        from fst_data_types import Lifecycle_State
+        kb, seen = _make_run_stub_keyboard()
+        logic = MainLogic(kb)
+        machine = Lifecycle_Machine()
+        kb.set_lifecycle(machine)
+        kb.arg_manager.MENU_ENABLED = True   # the startup asks for the menu
+        # the stub leaves WIN32_FILTER_PAUSED as an unset MagicMock attribute,
+        # which is truthy; _observe_state reconciles that flag, so the pin sets
+        # the value the product would have (a bool)
+        kb.arg_manager.WIN32_FILTER_PAUSED = False
+
+        def menu():
+            if posts_stop:
+                # what CLI_menu.display_menu does on choice 4 (fst_manager.py)
+                kb.arg_manager.STOPPED = True
+                machine.post_transition(Lifecycle_State.STOPPING,
+                                        'menu choice 4 - End the program')
+            return outcome
+
+        kb.cli_menu.display_menu.side_effect = menu
+
+        parks = []
+
+        async def counting_park(self, observed):
+            parks.append(observed)
+            if len(parks) > 1:
+                raise _SecondPark()
+
+        monkeypatch.setattr(MainLogic, '_park', counting_park)
+        try:
+            logic.loop.run_until_complete(logic.loop.create_task(logic.run()))
+            parked_again = False
+        except _SecondPark:
+            parked_again = True
+        finally:
+            cancel_and_close(logic.loop)
+        return kb, machine, parked_again, seen
+
+    def test_menu_choice_four_stop_survives_the_menu_tail(self, monkeypatch,
+                                                          capsys):
+        """The stop wins: no listener start, no 'started' print, the machine
+        ends STOPPING and run() returns instead of parking again."""
+        from fst_data_types import Lifecycle_State
+        kb, machine, parked_again, _ = self._menu_outcome_run(
+            monkeypatch, 'stop', posts_stop=True)
+
+        assert not parked_again, (
+            "run() parked after the menu asked to stop: the menu tail posted "
+            "RUNNING over the STOPPING (F-A5 reviewer P0).")
+        assert machine.state is Lifecycle_State.STOPPING, machine.state
+        assert kb.start_listener.call_count == 0, (
+            "the listeners started although the menu asked to end the program")
+        assert 'Free Snap Tap started' not in capsys.readouterr().out
+
+    def test_menu_start_still_launches_the_listeners(self, monkeypatch, capsys):
+        """The other menu outcome keeps working (anti-vacuity for the pin
+        above): a start choice launches the listeners, prints the started line,
+        and the machine moves back to RUNNING."""
+        from fst_data_types import Lifecycle_State
+        kb, machine, parked_again, _ = self._menu_outcome_run(
+            monkeypatch, 'start', posts_stop=False)
+
+        assert parked_again, (
+            "a menu start must reach the park - run() ended early, so the pin "
+            "above could pass for the wrong reason")
+        assert machine.state is Lifecycle_State.RUNNING, machine.state
+        assert kb.start_listener.call_count == 1
+        assert 'Free Snap Tap started' in capsys.readouterr().out
+
+
+# ===========================================================================
+# P8 - the REAL wake path of the park (F-A5 reviewer P2-3)
+# ===========================================================================
+
+class TestP8ParkWakePath:
+    """The pins above replace MainLogic._park to observe the loop's DECISION;
+    these drive the real park coroutine, because the clear-then-compare
+    handshake (no lost wake-up) is F-A5's core mechanism and must not be
+    simulated away."""
+
+    def test_the_park_wakes_on_a_transition_posted_while_it_waits(self):
+        from fst_data_types import Lifecycle_State
+        kb, _ = _make_run_stub_keyboard()
+        logic = _logic_with_attached_park(kb)
+        machine = logic.lifecycle
+
+        async def drive():
+            task = logic.loop.create_task(
+                logic._park(Lifecycle_State.RUNNING))
+            await asyncio.sleep(0)          # let the park clear + start waiting
+            assert not task.done(), (
+                "the park returned without waiting - it saw a state change that "
+                "never happened")
+            machine.post_transition(Lifecycle_State.STOPPING, 'test wake')
+            await asyncio.wait_for(task, timeout=SEAM_WAIT_SECONDS)
+
+        try:
+            logic.loop.run_until_complete(drive())
+        finally:
+            cancel_and_close(logic.loop)
+
+        assert machine.state is Lifecycle_State.STOPPING
+
+    def test_the_park_does_not_wait_when_a_transition_landed_before_it(self):
+        """The clear-then-compare leg: a request that arrived between the loop
+        body and the park must not be lost in the clear - the park returns
+        immediately instead of sleeping the heartbeat out."""
+        from fst_data_types import Lifecycle_State
+        kb, _ = _make_run_stub_keyboard()
+        logic = _logic_with_attached_park(kb)
+        logic.lifecycle.post_transition(Lifecycle_State.STOPPING, 'before the park')
+
+        async def drive():
+            await asyncio.wait_for(
+                logic._park(Lifecycle_State.RUNNING), timeout=SEAM_WAIT_SECONDS)
+
+        try:
+            logic.loop.run_until_complete(drive())
+        finally:
+            cancel_and_close(logic.loop)
+
+        assert logic.lifecycle.state is Lifecycle_State.STOPPING
+
+
+def _logic_with_attached_park(kb):
+    """MainLogic with its park armed: the wake event is created on the loop
+    thread inside run(); these pins drive _park directly, so they attach the
+    pair themselves."""
+    from free_snap_tap import MainLogic
+    import asyncio as _asyncio
+
+    logic = MainLogic(kb)
+    logic._wake = _asyncio.Event()
+    logic.lifecycle.attach(logic.loop, logic._wake)
+    return logic

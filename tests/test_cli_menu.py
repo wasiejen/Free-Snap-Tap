@@ -125,9 +125,11 @@ class TestDisplayMenu:
         fst = make_menu_fst()
 
         script(['4'])
-        CLI_menu(fst).display_menu()   # must RETURN, not raise
+        outcome = CLI_menu(fst).display_menu()   # must RETURN, not raise
 
         from fst_data_types import Lifecycle_State
+        assert outcome == 'stop'
+        assert fst.arg_manager.STOPPED is True
         assert fst.post_lifecycle.call_count == 1, fst.post_lifecycle.call_args_list
         state, reason = fst.post_lifecycle.call_args.args
         assert state is Lifecycle_State.STOPPING

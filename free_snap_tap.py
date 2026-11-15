@@ -111,7 +111,11 @@ class Lifecycle_Machine:
             loop.call_soon_threadsafe(self._apply, state, reason, source)
         except RuntimeError as error:
             # the loop is gone (a quit race): apply inline so the request is
-            # never silently dropped
+            # never silently dropped. This is the ONE writer path that can run
+            # off the loop thread (F-A5 reviewer P2-2) and it is deliberate:
+            # a closed loop has no park left to wake and no run() left to
+            # observe, so there is nothing to race against - the caller's own
+            # shutdown leg is what still needs the state to land.
             logger.info(f"[Lifecycle] loop unavailable for {state.value}: "
                         f"{error!r} - applying inline")
             self._apply(state, reason, source)
@@ -376,13 +380,26 @@ class MainLogic:
     def _start_listening(self, focus_active, from_menu):
         '''The entry legs of a listening pass, in the exact order and with the
         exact console output run() used before F-A5 - the startup flow and the
-        return-to-menu re-entry share this one implementation.'''
+        return-to-menu re-entry share this one implementation.
+
+        Returns False when the menu asked for a stop (choice 4): the listeners
+        are NOT started and nothing claims the program started, so run()
+        observes the STOPPING the menu posted and shuts down. Returning True
+        means this pass is listening.'''
         self.fst_keyboard.set_loop(self.loop)
         self.fst_keyboard.init_listener()
 
         if from_menu:
             self.fst_keyboard.focus_manager.pause_focus_task()
-            self.fst_keyboard.cli_menu.display_menu()
+            outcome = self.fst_keyboard.cli_menu.display_menu()
+            if outcome == 'stop':
+                # F-A5 reviewer P0: choice 4 posted STOPPING and the menu
+                # RETURNS NORMALLY, so a RUNNING post here used to clobber the
+                # stop and restart the listeners. The menu's outcome is the
+                # authority for what this pass does next.
+                logger.info("[Lifecycle] menu asked to stop - no listeners "
+                            "started, run() will observe STOPPING")
+                return False
         else:
             self.fst_keyboard.config_manager.display_groups()
 
@@ -405,10 +422,11 @@ class MainLogic:
         self.fst_keyboard.focus_manager.start_focus_task()
 
         if from_menu:
-            # the menu returned = a start was chosen; choice 4 posts STOPPING
-            # and never reaches this line
+            # the menu returned with a start choice (choice 4 returned 'stop'
+            # above and never reaches this line)
             self.lifecycle.post_transition(Lifecycle_State.RUNNING,
                                            'menu closed - start chosen')
+        return True
 
     async def _park(self, observed):
         '''The waitable keep-alive (replaces 'while True: await
