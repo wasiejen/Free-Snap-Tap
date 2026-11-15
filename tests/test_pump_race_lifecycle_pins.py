@@ -62,6 +62,8 @@ VK_B = 0x42
 VK_C = 0x43
 
 WM_KEYDOWN = 256
+WM_KEYUP = 257
+LLKHF_INJECTED = 0x10  # the win32 injected/simulated flag bit (U359 contract)
 
 # bounded waits for POSITIVE markers only (thread entered the seam / joined)
 SEAM_WAIT_SECONDS = 2.0
@@ -593,6 +595,42 @@ class TestP2PumpThreadIo:
             " - the reload lane either does not coalesce or latches off")
         assert kb.arg_manager.WIN32_FILTER_PAUSED is False
 
+    def test_a_failed_schedule_does_not_latch_the_reload_lane_off(
+            self, kb_env_ns):
+        """GREEN (Item 2 / F-A4, reviewer P1-2): one refused callback must not
+        coalesce every later request away. If the loop rejects
+        call_soon_threadsafe, the pending flag goes back to False, so the next
+        alt+delete schedules a reload instead of being silently swallowed."""
+        kb = kb_env_ns.kb
+        kb.arg_manager.WIN32_FILTER_PAUSED = True
+        kb.arg_manager.MANUAL_PAUSED = True
+
+        attempts = []
+
+        class _RefusingLoop:
+            '''not an asyncio loop: it only refuses scheduling, so no reload can
+            run and no real I/O happens (the lane never receives a callback).'''
+
+            def call_soon_threadsafe(self, callback, *args, **kwargs):
+                attempts.append(callback)
+                raise ValueError('simulated scheduling refusal')
+
+        kb.set_loop(_RefusingLoop())
+        try:
+            kb.control_toggle_pause()
+            assert kb._reload_pending is False, (
+                "a refused schedule left the pending flag set: the reload lane "
+                "is latched off for every later request (Item 2 / F-A4).")
+            # the lane is still reachable: the next request schedules again
+            kb.control_toggle_pause()
+        finally:
+            kb.set_loop(None)
+
+        assert len(attempts) == 2, attempts
+        # nothing ran, so the pump-side state is untouched
+        assert kb.arg_manager.WIN32_FILTER_PAUSED is True
+        assert kb.arg_manager.MANUAL_PAUSED is True
+
 
 # ===========================================================================
 # P3 - lifecycle flags are write-only: nothing re-checks them (Item 3 / F-A5)
@@ -994,3 +1032,42 @@ class TestP5HoldReleaseGeneration:
         # and the pump still filters against the new generation: no leg died
         drops = _fire_pump_press(kb, VK_A, 9000)
         assert drops == [], drops
+
+    def test_the_cleared_owner_does_not_veto_the_injected_release(self,
+                                                                 kb_env_ns):
+        """The contract release_hold() exists for (FST-404): the owner's
+        bookkeeping is cleared BEFORE the caller emits the release, so the
+        simulated-key veto leg lets that injected release reach the app.
+
+        Pinned as a pair so the first half cannot pass vacuously: with the hold
+        still armed the SAME injected release IS suppressed (the veto is live),
+        after the clear it is not. The residual re-arm window F-A4 documents in
+        _release_tap_group_holds (a pump leg re-arming active_key between the
+        clear and the send re-applies the veto) is pre-existing, ruled open in
+        todo_inbox.md, and deliberately NOT closed by this unit."""
+        kb = kb_env_ns.kb
+        build(kb, taps=TAP_ONLY)
+        group = kb._tap_groups[0]
+        group.update_tap_states(VK_A, True)
+        group.set_last_key_send(VK_A)
+
+        def fire_simulated_release():
+            kb_env_ns.kb_mock.reset_mock()
+            kb._listener.suppress_event.reset_mock()
+            drops = []
+            kb.report_event_drop = lambda source, vk_code, is_press, \
+                is_simulated, is_mouse, exc: drops.append(exc)
+            kb.keyboard_win32_event_filter(
+                WM_KEYUP, key_data(VK_A, 7000, LLKHF_INJECTED))
+            return kb._listener.suppress_event.call_count, drops
+
+        # armed hold: the veto leg is live and eats the injected release
+        assert group.get_active_key() == VK_A
+        suppressed, drops = fire_simulated_release()
+        assert suppressed == 1 and drops == [], (suppressed, drops)
+
+        # cleared owner: the same event passes through to the app
+        group.release_hold()
+        assert group.get_active_key() is None
+        suppressed, drops = fire_simulated_release()
+        assert suppressed == 0 and drops == [], (suppressed, drops)

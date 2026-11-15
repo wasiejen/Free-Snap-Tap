@@ -1566,7 +1566,18 @@ class FST_Keyboard():
                 logger_flow.debug("reload already pending - request coalesced")
                 return
             self._reload_pending = True
-        self._run_on_loop_or_inline(self._reload_lane, 'resume_reload')
+        try:
+            self._run_on_loop_or_inline(self._reload_lane, 'resume_reload')
+        except Exception as error:
+            # A scheduling failure must not latch the lane off (F-A4 reviewer
+            # P1-2): with the flag left True every later request would be
+            # coalesced away and the config would never reload again. The flag
+            # goes back to False and the failure is named; the next request
+            # tries again. Swallowed on purpose: this leg runs on the hook pump
+            # and must not push an exception into the filter's drop arm.
+            with self._reload_lock:
+                self._reload_pending = False
+            logger_flow.error(f"reload scheduling failed: {ascii(error)}")
 
     def _reload_lane(self):
         with self._reload_lock:
@@ -1699,17 +1710,25 @@ class FST_Keyboard():
         snapshot is not bound yet and its groups hold nothing, so "release the
         new generation instead" is not a meaningful route. What remains is the
         mutation of old-generation Tap_Group objects while a pump event may be
-        mid-decision on them, and that is SAFE by state legality, not by luck:
-        release_hold() clears active_key FIRST, and every tap-group decision in
-        _win32_event_filter treats an unheld group as a legal state - active_key
-        None means "no veto, allow simulated keys" (the documented meaning) and
-        update_tap_states() on a cleared group simply starts a fresh press
-        cycle. An event straddling the sweep therefore reads one of two legal
-        states of the same object, never a half-built generation, and the
-        bounded consequence (one event of a released key treated as a new press
-        instead of a continuation) IS what releasing that key means. Pinned in
+        mid-decision on them. That mutation is state-legal, not lucky:
+        release_hold() clears active_key/last_key_send/states with single
+        attribute stores (atomic under the GIL) and never unbinds the owner
+        registry, so a concurrent pump leg sees either the held or the cleared
+        state of the SAME object - never a half-built generation.
+        HONEST LIMIT of that argument (F-A4 reviewer P1-1): it does not cover the
+        window between release_hold() returning and the caller's send below. A
+        real pump event on the same thread can re-arm active_key in that window
+        (update_tap_states sets it), and the veto leg then suppresses the very
+        injected release this method emitted - the app keeps the key pressed. The
+        window is pre-existing (identical before F-A3/F-A4), it needs a rebuild
+        running on a non-pump thread (focus change, tray toggle) plus a real pump
+        event on the held vk inside it, and closing it means changing the
+        FST-404 release ordering - a maintainer-ruled area this unit must not
+        move unilaterally. Ruled-open item recorded in todo_inbox.md (candidate:
+        emit the releases AFTER the snapshot bind, so the veto resolves against
+        the new, unheld generation). Pinned as-is in
         tests/test_pump_race_lifecycle_pins.py::TestP5HoldReleaseGeneration.'''
-        for tap_group in self._tap_groups:
+        for tap_group in self.runtime.tap_groups:
             vk_code = tap_group.release_hold()
             if vk_code is None:
                 continue
