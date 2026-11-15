@@ -1,6 +1,13 @@
 import os
 import shutil
+import time
 from datetime import datetime
+
+# Windows open-handle quirk: renaming the live save dir can transiently fail
+# (ERROR_SHARING_VIOLATION) while a game holds a handle inside it, so the
+# renames of the restore swap are retried a bounded number of times.
+_RENAME_ATTEMPTS = 3
+_RENAME_RETRY_DELAY = 0.05
 
 # BASE_DIR = os.path.abspath(".")
 # save_dir = os.path.join(BASE_DIR, "save")
@@ -43,6 +50,39 @@ def make_backup(save_dir, backup_root_dir) -> tuple:
     return backup_path, backup_name
 
 
+def _rename_with_retry(src: str, dst: str) -> None:
+    """os.rename with bounded retry, to bounce over transient Windows locks."""
+    last_err = None
+    for attempt in range(_RENAME_ATTEMPTS):
+        try:
+            os.rename(src, dst)
+            return
+        except OSError as err:
+            last_err = err
+            if attempt < _RENAME_ATTEMPTS - 1:
+                time.sleep(_RENAME_RETRY_DELAY)
+    raise last_err
+
+
+def _rmtree_with_retry(path: str) -> bool:
+    """shutil.rmtree with bounded retry; False when the tree stays locked."""
+    for attempt in range(_RENAME_ATTEMPTS):
+        try:
+            shutil.rmtree(path)
+            return True
+        except OSError:
+            if attempt < _RENAME_ATTEMPTS - 1:
+                time.sleep(_RENAME_RETRY_DELAY)
+    return False
+
+
+def _is_empty_dir(path: str) -> bool:
+    try:
+        return not os.listdir(path)
+    except OSError:
+        return False
+
+
 def restore_backup(save_dir,backup_root_dir) -> tuple:
     """Restore the most recent backup into ./save (overwriting current save). Returns (latest_path, latest_name)."""
     if not os.path.isdir(backup_root_dir):
@@ -61,11 +101,60 @@ def restore_backup(save_dir,backup_root_dir) -> tuple:
     latest_name = max(candidates)
     latest_path = os.path.join(backup_root_dir, latest_name)
 
-    # Remove existing save folder (if any), then restore from latest backup
-    if os.path.exists(save_dir):
-        shutil.rmtree(save_dir)  # remove existing tree safely before restore[web:21][web:25]
+    # Atomic swap (review Item 7): rename the live dir aside, copy the backup
+    # in, then drop the tmp. A failure at any point leaves the live state
+    # untouched or renamed back, so a failed restore never loses both states.
+    tmp_dir = os.fspath(save_dir) + '-restoring-tmp'
 
-    shutil.copytree(latest_path, save_dir)  # restore backup into save[web:16][web:21]
+    if os.path.exists(tmp_dir):
+        # residue of an interrupted restore or of a drop that stayed locked
+        if not os.path.exists(save_dir):
+            # the old live state was renamed aside but the swap never finished:
+            # rename it back first, so it stays protected by the swap below
+            try:
+                _rename_with_retry(tmp_dir, save_dir)
+            except OSError as err:
+                raise RuntimeError(
+                    f"stale restore residue {tmp_dir} could not be renamed back to "
+                    f"{save_dir}; its contents are preserved there, resolve the lock manually"
+                ) from err
+        elif _is_empty_dir(tmp_dir) and _rmtree_with_retry(tmp_dir):
+            # empty residue is provably junk from a locked post-restore drop:
+            # a live save state always carries at least one file
+            pass
+        else:
+            raise RuntimeError(
+                f"restore aborted: live save dir {save_dir} and restore residue "
+                f"{tmp_dir} both exist; remove the residue or rename it back manually"
+            )
+
+    renamed = False
+    if os.path.exists(save_dir):
+        _rename_with_retry(save_dir, tmp_dir)
+        renamed = True
+
+    try:
+        shutil.copytree(latest_path, save_dir)
+    except BaseException as copy_err:  # Ctrl-C too: the old live state comes back
+        if not renamed:
+            raise
+        shutil.rmtree(save_dir, ignore_errors=True)  # drop the partial copy
+        try:
+            _rename_with_retry(tmp_dir, save_dir)
+        except OSError:
+            blocked = (f"; the partial copy at {save_dir} blocks the rename-back"
+                       if os.path.exists(save_dir) else "")
+            raise RuntimeError(
+                f"restore failed ({copy_err}) and the live state could not be "
+                f"renamed back; it is preserved at {tmp_dir}{blocked}"
+            ) from copy_err
+        raise
+
+    if renamed:
+        # the old state is junk now (restore succeeded); if it stays locked
+        # even after the retry, the next run auto-clears it when empty or
+        # refuses it loudly when it still holds files
+        _rmtree_with_retry(tmp_dir)
     return latest_path, latest_name
 
 
