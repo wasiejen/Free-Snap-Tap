@@ -15,6 +15,8 @@ from os import startfile
 
 from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro, ConfigError
 from fst_data_types import Lifecycle_State
+from fst_data_types import Ticket_Ledger, SOURCE_DRAIN, TICKET_RELEASE
+from itertools import count
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
 from fst_manager import Input_State_Manager, Config_Manager, Config_Validator
@@ -151,7 +153,7 @@ class Runtime_Snapshot():
                  'rebind_triggers', 'macros_dict', 'macro_triggers',
                  'all_trigger_events', 'rebinds', 'macros',
                  'macros_alias_dict', 'macro_sequence_alias_list',
-                 'key_group_by_alias')
+                 'key_group_by_alias', 'gen_id')
 
     def __init__(self):
         # Tap groups define which keys are mutually exclusive
@@ -176,6 +178,13 @@ class Runtime_Snapshot():
         self.macros_alias_dict = {}
         self.macro_sequence_alias_list = []
         self.key_group_by_alias = {}
+
+        # F-A6 (ticket ledger, design contract (C)): which generation this is.
+        # Stamped once at build time by FST_Keyboard._gen_ids and never mutated
+        # afterwards, so a ticket's gen_id always names the generation that was
+        # live when the physical event was owed - the ledger itself is
+        # generation-independent and survives every swap.
+        self.gen_id = 0
 
 
 class FST_Keyboard():
@@ -238,6 +247,23 @@ class FST_Keyboard():
         # container set; the legacy per-container accessors below stay as
         # read-only views of the live generation (display, diagnostics, tests).
         self._runtime = Runtime_Snapshot()
+
+        # F-A6 (ladder R0): the ticket ledger. A SIBLING of _runtime, not part
+        # of it: the runtime owns it for the process lifetime, the ledger NEVER
+        # rebuilds, and a snapshot swap must not touch this reference (design
+        # contract (C) - debt is what does not die with a generation). Shadow
+        # mode in this unit: the drain legs write it, NO decision reads it.
+        # The log callable is the flow lane (lazy %s args: a disabled lane pays
+        # nothing for formatting); fst_data_types must not import fst_manager,
+        # so the lane is injected here.
+        self._ledger = Ticket_Ledger(log=logger_flow.debug)
+        # monotonic generation ids (itertools.count: one C-level call, so
+        # race-free across the pump / lane / Qt rebuild triggers)
+        self._gen_ids = count(1)
+        # which drain leg the per-emission tickets attribute to (F-A6). A single
+        # attribute store, read ONLY by ticket bookkeeping - no decision path
+        # consults it, so a mislabel can only mislabel, never change behavior.
+        self._drain_id = 'unset'
 
         # macro playback bookkeeping is NOT a generation: tasks survive a
         # rebuild and are cancelled/reset explicitly (U375/U384)
@@ -533,6 +559,10 @@ class FST_Keyboard():
         # are mid-event keep walking the old snapshot - a complete, consistent
         # view - and it drops naturally when they are done.
         rt = Runtime_Snapshot()
+        # F-A6 (R0): stamp the generation id from the runtime's monotonic
+        # counter. Tickets carry it, so debt owed under this generation stays
+        # nameable after it retires. Nothing else about the build changed.
+        rt.gen_id = next(self._gen_ids)
 
         def extract_data_from_key(key_string):
             #separate delay info from string
@@ -765,6 +795,15 @@ class FST_Keyboard():
         # why the swap is per generation rather than per container. The
         # generation this replaces keeps serving every event that bound it
         # before the bind, then drops naturally with the last reference.
+        # F-A6 (R0 invariant check, debug-only): a generation must not die
+        # OWNING open tickets. The ledger is generation-INDEPENDENT and the
+        # swap never touches a ledger reference (pin (b) proves the identity);
+        # this line only NAMES the debt of the generation being retired, so the
+        # shadow phase can see whether the bookkeeping matches reality. It
+        # decides nothing.
+        ledger = self._ticket_store()
+        if ledger is not None:
+            ledger.audit('snapshot_retire', gen_id=self._runtime.gen_id)
         self._runtime = rt
 
     def apply_focus_groups(self, focus_name = ''):
@@ -1650,8 +1689,14 @@ class FST_Keyboard():
         print('--- Stopping - Return to menu ---')
         logger.info("return to menu")
         logger_state.debug(f"return to menu with pressed keys: {self._state_manager._real_key_press_states_dict}")
-        self.release_all_currently_pressed_simulated_keys()
-        self._state_manager.stop_all_repeating_keys()
+        # F-A6: the drain leg is NAMED for the ledger's tickets (the lifecycle
+        # teardown drain). Releases, order and count unchanged.
+        saved_drain = self.begin_drain('return_to_menu')
+        try:
+            self.release_all_currently_pressed_simulated_keys()
+            self._state_manager.stop_all_repeating_keys()
+        finally:
+            self.end_drain(saved_drain)
         self._stop_listeners_on_lane()
         # F-A5: the MENU request is POSTED last, so the loop thread re-enters
         # the menu only after the release sweeps ran and the listener stops were
@@ -1662,12 +1707,18 @@ class FST_Keyboard():
 
     def control_exit_program(self, source = ""):
         print('--- Stopping execution --- ' + source)
-        self.release_all_currently_pressed_simulated_keys()
-        self._state_manager.stop_all_repeating_keys()
         # F-A4: stops on the lane, releases synchronous (see
         # _stop_listeners_on_lane); STOPPED stays the LAST statement so a
         # reader of the flag never sees it set before the shutdown was ordered.
-        self._stop_listeners_on_lane()
+        # F-A6: the STOPPING teardown drain is named for the ledger's tickets
+        # (one drain leg - the releases/stops themselves are unchanged).
+        saved_drain = self.begin_drain('exit_program')
+        try:
+            self.release_all_currently_pressed_simulated_keys()
+            self._state_manager.stop_all_repeating_keys()
+            self._stop_listeners_on_lane()
+        finally:
+            self.end_drain(saved_drain)
         self._arg_manager.STOPPED = True
         # F-A5 (Item 3, and no direct sys.exit from the hook pump): alt+END
         # POSTS the stop. The loop thread observes it, returns from run(), and
@@ -1694,8 +1745,16 @@ class FST_Keyboard():
             # with paused_lock:
             self._arg_manager.WIN32_FILTER_PAUSED = True
             self._arg_manager.MANUAL_PAUSED = True
-            self.release_all_currently_pressed_simulated_keys()
-            self._state_manager.stop_all_repeating_keys()
+            # F-A6: the pause leg's release drain is named for the ledger.
+            # NOTE (shadow-mode honesty): the F-A4 RELOAD lane itself
+            # (_reload_now) emits no releases at all, so it opens no tickets -
+            # this pause leg is the alt+DELETE drain path.
+            saved_drain = self.begin_drain('pause_toggle')
+            try:
+                self.release_all_currently_pressed_simulated_keys()
+                self._state_manager.stop_all_repeating_keys()
+            finally:
+                self.end_drain(saved_drain)
             # F-A5: the loop records the pause (the listeners stay live - a
             # paused filter still answers events, it just lets them through)
             self.post_lifecycle(Lifecycle_State.PAUSED, 'alt+DELETE pause')
@@ -1737,6 +1796,92 @@ class FST_Keyboard():
 
     def set_sys_start_arguments(self, sys_args):
         self._arg_manager.sys_start_args = sys_args
+
+    # -- ticket ledger helpers (F-A6 ladder R0/R1: SHADOW RECORDING ONLY) --
+    # No decision path reads the ledger in this unit: the veto/owner legs touch
+    # nothing new. Design contract: estate research 2026-11-16_fst-ticket-ledger
+    # (C). Transitions are single stores (see Ticket_Ledger's discipline rule);
+    # the `injected` state is deliberately unused here - it belongs to the R3
+    # rebind pairing, where a ticket opens at SCHEDULE time on the pump and
+    # completes on the loop thread.
+
+    def current_gen_id(self):
+        '''The live generation's id (one attribute read). Tickets carry it so
+        debt owed by a retired generation is nameable.'''
+        return self._runtime.gen_id
+
+    def begin_drain(self, drain_id):
+        '''Name the drain leg the per-emission tickets attribute to; returns the
+        previous label for end_drain. A single attribute store, read only by
+        ticket bookkeeping - so it can mislabel, never change behavior.
+
+        KNOWN LIMITATION (F-A6 reviewer P2-4, shadow phase): the label is one
+        instance attribute. Nested legs restore correctly (save/restore), but if
+        two legs run on different threads at once (a hook-thread pause racing a
+        loop-thread exit), the tickets of the second leg can carry the first
+        leg's label and vice versa. That mislabels METADATA only - no release,
+        order or count depends on it - and threading the label through the
+        call chain is blocked for now by the pinned facade signature
+        (`release_all_currently_pressed_simulated_keys()` is asserted
+        call-without-args in tests/test_output_manager.py), so the correct fix
+        is a Phase-B threading decision (named in the handover/inbox).'''
+        previous = self._drain_id
+        self._drain_id = drain_id
+        return previous
+
+    def end_drain(self, previous):
+        self._drain_id = previous
+
+    def _ticket_store(self):
+        '''The ledger, or None when the object has no real one (a partially
+        built stand-in): the guard is a getattr so a missing attribute can never
+        turn bookkeeping into an AttributeError on a send path
+        (F-A6 reviewer P2-2).'''
+        ledger = getattr(self, '_ledger', None)
+        return ledger if isinstance(ledger, Ticket_Ledger) else None
+
+    def open_release_ticket(self, vk_code, source_kind=SOURCE_DRAIN,
+                            source_id=None, is_mouse=False):
+        '''Open a ticket for a release the calling leg is about to emit.
+        Returns the Ticket, or None when no real ledger is wired (a stand-in
+        keyboard in a test) - every caller must tolerate None, because shadow
+        bookkeeping must never block or alter a send.
+
+        A ticket that is left open because its send RAISED is left open on
+        purpose: the release is still owed, and naming that debt is the whole
+        point of the ledger (the phantom-debt risk is R1+/R3 compaction work).'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        label = self._drain_id
+        source = label if source_id is None else source_id
+        if label and label != 'unset' and source != label:
+            # keep BOTH halves of the answer in the id: which leg asked for the
+            # drain and which sweep emitted the release (pause_toggle.
+            # simulated_sweep). The reserved field is a free-form id, so this is
+            # the documented composition, not a new field.
+            source = f"{label}.{source}"
+        return ledger.open(vk_code, source_kind, source,
+                           TICKET_RELEASE, self.current_gen_id(),
+                           is_mouse=is_mouse)
+
+    def close_ticket(self, ticket):
+        '''Close a ticket once its physical event actually left (one store).'''
+        if ticket is None:
+            return None
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        return ledger.close(ticket)
+
+    def ledger_open_count(self, gen_id=None):
+        '''A PURE query for tests and teardown audits: how many tickets are
+        still open (optionally of one generation). No logging, no side effect -
+        `Ticket_Ledger.audit` is the version that names them.'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return 0
+        return len(ledger.open_tickets(gen_id=gen_id))
 
     def _release_tap_group_holds(self):
         '''FST-404 (#404): release the app-level hold each tap group owns.
@@ -1781,7 +1926,13 @@ class FST_Keyboard():
             vk_code = tap_group.release_hold()
             if vk_code is None:
                 continue
+            # F-A6 (R1 as scoped for this unit): shadow-record the release this
+            # drain emits. Order and count of the sends are unchanged; a send
+            # that raises leaves the ticket OPEN (the release is still owed).
+            ticket = self.open_release_ticket(vk_code, SOURCE_DRAIN,
+                                              'tap_group_holds')
             self._output_manager.send_key_event(Key_Event(vk_code, False))
+            self.close_ticket(ticket)
             self._state_manager.set_simulated_key_press_state(vk_code, False)
 
     def release_all_currently_pressed_simulated_keys(self):

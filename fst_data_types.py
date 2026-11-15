@@ -31,6 +31,246 @@ class Lifecycle_State(Enum):
     STOPPING = 'stopping'
 
 
+# --- ticket ledger (F-A6, ladder R0) -------------------------------------
+# Design contract: estate projects/estate/research/2026-11-16_fst-ticket-ledger.md
+# section (C). The ledger answers ONE question: "which physical events does FST
+# owe, who emitted them, from which generation". It is evidence plus a debt
+# registry - it never decides (suppression policy stays filter-local).
+
+TICKET_SCHEDULED = 'scheduled'
+TICKET_INJECTED = 'injected'
+TICKET_COMPLETED = 'completed'
+TICKET_STATES = (TICKET_SCHEDULED, TICKET_INJECTED, TICKET_COMPLETED)
+
+TICKET_PRESS = 'press'
+TICKET_RELEASE = 'release'
+TICKET_KINDS = (TICKET_PRESS, TICKET_RELEASE)
+
+SOURCE_TAP = 'tap'
+SOURCE_REBIND = 'rebind'
+SOURCE_MACRO = 'macro'
+SOURCE_TOGGLE = 'toggle'
+SOURCE_DRAIN = 'drain'
+TICKET_SOURCE_KINDS = (SOURCE_TAP, SOURCE_REBIND, SOURCE_MACRO, SOURCE_TOGGLE,
+                       SOURCE_DRAIN)
+
+
+class Ticket():
+    '''One physical event FST emitted or owes. Plain data, __slots__, NO
+    behavior (the store owns the transitions; see Ticket_Ledger).
+
+    The six RESERVED fields of the design contract:
+      vk          the int virtual-key code the event targets
+      source_kind which emitter class produced it (tap|rebind|macro|toggle|drain)
+      source_id   which emitter instance/leg (tap-group alias, macro alias,
+                  lane name, or the drain name for a drain leg)
+      gen_id      the snapshot generation that was live when the ticket opened -
+                  the ledger is generation-INDEPENDENT, so cross-generation debt
+                  is nameable instead of orphaned
+      kind        press | release
+      seq         globally monotonic, also the drop-ring cross-reference key
+    plus the two operational reservations:
+      state       scheduled | injected | completed - flipped by ONE attribute
+                  store only (never read-modify-write from another thread)
+      is_mouse    the mouse legs share the same send path but a different veto
+
+    The growth slots the contract reserves but this unit does NOT implement:
+    reason_code (suppression annotation) and created_at (compaction TTL).'''
+    __slots__ = ('vk', 'source_kind', 'source_id', 'gen_id', 'kind', 'seq',
+                 'state', 'is_mouse')
+
+    def __init__(self, vk, source_kind, source_id, gen_id, kind, seq,
+                 state=TICKET_SCHEDULED, is_mouse=False):
+        self.vk = vk
+        self.source_kind = source_kind
+        self.source_id = source_id
+        self.gen_id = gen_id
+        self.kind = kind
+        self.seq = seq
+        self.state = state
+        self.is_mouse = is_mouse
+
+    def __repr__(self):
+        return (f"Ticket(seq={self.seq}, vk={self.vk}, kind={self.kind}, "
+                f"state={self.state}, src={self.source_kind}/{self.source_id}, "
+                f"gen={self.gen_id}, mouse={self.is_mouse})")
+
+
+class Ticket_Ledger():
+    '''The store behind FST_Keyboard._ledger: {vk_code: [Ticket, ...]}.
+
+    Ownership rule (design contract (C), for THREADING.md later): the RUNTIME
+    owns the ledger for the process lifetime. Generations come and go, the
+    ledger NEVER rebuilds, and a snapshot swap MUST NOT touch any ledger
+    reference - debt is precisely what does not die with a generation.
+
+    SINGLE-STORE DISCIPLINE (the rule that keeps hot-path reads lock-free, and
+    the reason this store exists at all): a ticket's fields are written either
+    at construction or by exactly ONE attribute store afterwards (a state flip).
+    A thread that is not the opener must NEVER read a ticket, mutate two fields,
+    and write it back - that compound is a torn read for the pump (design
+    report, TOP-3 risk 1). The store therefore exposes no such path: readers
+    return NEW snapshot lists, transitions are `open` / `mark` / `close`, and
+    compaction prunes IN PLACE (completed tickets from the front only) so the
+    list object a concurrent writer holds is never the discarded one.
+    Pinned in tests/test_ticket_ledger_pins.py.
+
+    Logging goes through a callable handed in at construction (the flow-lane
+    debug method), because this module must not import fst_manager (cycle). The
+    callable is called with lazy %s args, so a disabled flow lane pays nothing
+    for formatting.'''
+
+    __slots__ = ('_by_vk', '_seq_source', '_high', 'log', 'MAX_PER_VK')
+
+    def __init__(self, log=None, max_per_vk=64):
+        # itertools.count().__next__() is a single C-level call: monotonic and
+        # race-free under the GIL across the pump, the lanes and the drains.
+        from itertools import count
+        self._by_vk = {}
+        self._seq_source = count(1)
+        # the highest seq ISSUED (tracked at open - not derived from the
+        # counter's private state, F-A6 reviewer P2-5): this is what a status
+        # dump reports as the high-water mark
+        self._high = 0
+        self.log = log
+        self.MAX_PER_VK = max_per_vk
+
+    # -- transitions -------------------------------------------------------
+
+    def open(self, vk, source_kind, source_id, kind, gen_id,
+             state=TICKET_SCHEDULED, is_mouse=False):
+        '''Record that `vk` is owed/emitted. Appends to the per-vk list
+        (list.append is safe under the GIL and the read path tolerates a
+        concurrent append); a missing bucket is created with ONE dict store.'''
+        if source_kind not in TICKET_SOURCE_KINDS:
+            raise ValueError(f"unknown ticket source_kind {source_kind!r}")
+        if kind not in TICKET_KINDS:
+            raise ValueError(f"unknown ticket kind {kind!r}")
+        if state not in TICKET_STATES:
+            raise ValueError(f"unknown ticket state {state!r}")
+        ticket = Ticket(vk, source_kind, source_id, gen_id, kind,
+                        next(self._seq_source), state, is_mouse)
+        bucket = self._by_vk.get(vk)
+        if bucket is None:
+            # the dict entry for a vk is created ONCE and its list object is
+            # then never rebound (see _prune) - a writer that grabbed the list
+            # mid-flight can never append into a discarded list
+            bucket = [ticket]
+            self._by_vk[vk] = bucket
+        else:
+            bucket.append(ticket)
+        if ticket.seq > self._high:
+            self._high = ticket.seq
+        self._log('open', ticket)
+        if len(bucket) > self.MAX_PER_VK:
+            self._prune(vk, bucket)
+        return ticket
+
+    def mark(self, ticket, state):
+        '''Flip ONE attribute (the GIL-atomic single store the lock-free read
+        path relies on). Never call this with a compound update of two fields.'''
+        if state not in TICKET_STATES:
+            raise ValueError(f"unknown ticket state {state!r}")
+        ticket.state = state
+        self._log('mark', ticket)
+        return ticket
+
+    def close(self, ticket):
+        '''The one transition a drain path uses when its release left: completed.'''
+        return self.mark(ticket, TICKET_COMPLETED)
+
+    # -- reads (snapshots, never live containers) --------------------------
+
+    def tickets(self, vk=None, gen_id=None, kind=None, state=None):
+        '''A NEW list of matching tickets, in ONE scan. `state` may be one
+        state or a tuple of states. Every bucket is copied first, so a caller
+        iterating this result is never affected by a concurrent append or prune
+        (the repo's existing list(...) snapshot pattern).'''
+        states = None
+        if state is not None:
+            states = state if isinstance(state, tuple) else (state,)
+        buckets = ([self._by_vk.get(vk)] if vk is not None
+                   else list(self._by_vk.values()))
+        found = []
+        for bucket in buckets:
+            if not bucket:
+                continue
+            for ticket in list(bucket):
+                if gen_id is not None and ticket.gen_id != gen_id:
+                    continue
+                if kind is not None and ticket.kind != kind:
+                    continue
+                if states is not None and ticket.state not in states:
+                    continue
+                found.append(ticket)
+        return found
+
+    def open_tickets(self, gen_id=None, kind=None):
+        # ONE scan, not one per open state: two scans could return the same
+        # ticket twice if its state flipped between them (F-A6 reviewer P2-3),
+        # and this is the exact query the R2+ invariant asserts on.
+        return self.tickets(gen_id=gen_id, kind=kind,
+                            state=(TICKET_SCHEDULED, TICKET_INJECTED))
+
+    def open_presses(self):
+        '''The invariant's query: presses FST still owes (design contract (C)).'''
+        return self.open_tickets(kind=TICKET_PRESS)
+
+    def counts(self):
+        '''state -> count over every bucket (the future F-B4 status-dump shape).'''
+        tally = {state: 0 for state in TICKET_STATES}
+        for bucket in list(self._by_vk.values()):
+            for ticket in list(bucket):
+                tally[ticket.state] = tally.get(ticket.state, 0) + 1
+        return tally
+
+    def high_seq(self):
+        '''The highest ticket seq ISSUED so far (0 when none).'''
+        return self._high
+
+    def audit(self, context, gen_id=None):
+        '''Debug-only invariant line: name the tickets still open when a
+        generation retires or the program tears down. Returns the count; it
+        changes NOTHING (shadow mode - R2+ is where a drain reacts).'''
+        open_now = self.open_tickets(gen_id=gen_id)
+        if open_now and self.log:
+            self.log("TICKET audit context=%s gen=%s open=%d seqs=%s",
+                     context, gen_id, len(open_now),
+                     ",".join(str(t.seq) for t in open_now))
+        return len(open_now)
+
+    # -- internals ---------------------------------------------------------
+
+    def _prune(self, vk, bucket):
+        '''Bound the per-vk history (design report TOP-3 risk 3: an unbounded
+        list is phantom debt).
+
+        It drops only COMPLETED tickets - the oldest ones, keeping the most
+        recent MAX_PER_VK of them and EVERY open ticket, in original order -
+        and it commits the result with ONE in-place store (`bucket[:] = keep`)
+        so the list object stays the one every writer appended to. A
+        rebind-based prune lost a concurrently opened ticket exactly this way
+        (F-A6 reviewer P1-1). A reader iterating a list(...) copy is unaffected
+        either way.'''
+        closed = [t for t in bucket if t.state == TICKET_COMPLETED]
+        keep_closed = {id(t) for t in closed[-self.MAX_PER_VK:]}
+        keep = [t for t in bucket
+                if t.state != TICKET_COMPLETED or id(t) in keep_closed]
+        dropped = len(bucket) - len(keep)
+        if dropped > 0:
+            bucket[:] = keep
+            if self.log:
+                self.log("TICKET compact vk=%s dropped=%d kept=%d",
+                         vk, dropped, len(keep))
+
+    def _log(self, action, ticket):
+        if self.log:
+            self.log("TICKET %s vk=%s kind=%s state=%s src=%s/%s gen=%s seq=%s"
+                     " mouse=%s", action, ticket.vk, ticket.kind, ticket.state,
+                     ticket.source_kind, ticket.source_id, ticket.gen_id,
+                     ticket.seq, ticket.is_mouse)
+
+
 # decorator data type_check
 def type_check(expected_type):
     def decorator(func):
