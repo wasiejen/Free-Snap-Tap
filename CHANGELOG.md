@@ -8,6 +8,8 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-15 (release tag pending)
+
 ### Removed
 - `<arg>-default_on` / `-default-on` RETIRED the same day it shipped (TODO
   #423, maintainer resolution of #418 2026-11-11): in the settled model the
@@ -18,6 +20,11 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   pass split are removed with it). Zero migration cost - no config uses it.
 
 ### Added
+- Every lifecycle transition now logs exactly one `[Lifecycle] <old> -> <new>
+  (<reason>)` line (improvement plan 2026-11-15, Phase A unit F-A5): startup,
+  pause, reload, menu re-entry and shutdown all pass an explicit lifecycle
+  state machine, so what the program was doing at any moment is answerable
+  from the log alone.
 - New config argument `<arg>-default_off` (dashed twin `-default-off`): the
   focus section it is set in builds from its OWN group lines only - the default
   section's tap groups, rebinds, macros and macro sequences are not merged in
@@ -34,6 +41,30 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   (test-only: the branch invocation and its order are observed).
 
 ### Fixed
+- A failed `restore_backup` can no longer lose your save state (improvement
+  plan 2026-11-15, Phase A unit F-A1): the swap of the live save dir with the
+  newest backup is atomic - the live dir is renamed aside, the backup is
+  copied in, then the temp copy is dropped. If any step fails, the current
+  save state is left intact or renamed back, and residue of an interrupted
+  restore is detected and recovered on the next attempt.
+- Keystroke races during config reload and focus change are closed
+  (improvement plan 2026-11-15, Phase A units F-A2/F-A3): the focus-group
+  trigger maps and the related runtime state are rebuilt as a snapshot and
+  swapped in atomically, and read without locks. The bug class where a
+  keystroke landing during an alt+delete reload or a focus switch leaked an
+  unsuppressed key or saw a half-rebuilt config is structurally gone.
+- alt+delete pause/reload no longer runs any part of the reload on the
+  keyboard hook thread (improvement plan 2026-11-15, Phase A unit F-A4): the
+  reload lane and the listener stop/start legs moved onto the application's
+  asyncio loop, and overlapping reload requests are coalesced into one pass.
+  A slow disk or a locked save file can no longer stall the low-level hook
+  past the Windows hook timeout, so a reload can no longer make suppression
+  die mid-typing.
+- The control exits and the menu now do what they promise (improvement plan
+  2026-11-15, Phase A unit F-A5): alt+END really quits the process (exit
+  code 0, no half-dead instance left behind), alt+PAGE_DOWN really re-shows
+  the menu in a running session, and console menu choice 4 shuts down
+  through the same clean lifecycle path.
 - Screen resolution change now REPOSITIONS the status overlay and,
   while shown, the crosshair (#388, priority item 1): `GUI_Manager`
   connects `QScreen.geometryChanged` for every screen (+ `screenAdded`)

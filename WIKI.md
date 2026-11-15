@@ -1,7 +1,7 @@
 
 
 
-# Function documentation (Version 1.2.0):
+# Function documentation (Version 1.4.0):
 
 ## General overview
 
@@ -365,7 +365,7 @@ The functions of the following sections are resolved by the same suffix evaluati
 - `|(get_time())`: evaluates to the current time as an int of milliseconds since the epoch
 - `|(make_backup(*save dir*, *backup root dir*))` and `|(restore_backup(*save dir*, *backup root dir*))`:
   - `make_backup` copies the save dir into a timestamped backup folder named `save-YYMMDD-HHMMSS` (a counter is appended when a backup of the same second already exists)
-  - `restore_backup` replaces the save dir with the newest backup
+  - `restore_backup` replaces the save dir with the newest backup; the swap is atomic - if the restore cannot finish, the current save dir is left intact or renamed back, never lost
   - both print to the console and show a toast (so they need GUI mode for the toast part)
   - the default directories are the `-save_dir=` / `-backup_root_dir=` start arguments - without them the call fails with a FileNotFoundError
 - `|(clear_console())`: clear the console window
