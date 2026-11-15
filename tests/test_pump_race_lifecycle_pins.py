@@ -11,7 +11,8 @@ Lanes: P1 reload race + P4 concurrent rebuilds (F-A3, landed green), P2
 pump-thread I/O + the reload lane's asynchrony and coalescing (F-A4, landed
 green), P5 which generation a hold release runs against (the P2 seam F-A3
 handed to F-A4 - a parity pin, documented in _release_tap_group_holds), P3
-lifecycle no-ops (F-A5, still strict xfail).
+lifecycle termination / menu re-show / clean exit code (F-A5, landed green), P6
+the lifecycle request channels (F-A5). No strict xfails remain in this file.
 
 Flavors (the estate plan file carries the name/target/flavor table):
   GREEN contract / invariant - the requirement pin itself, now green: F-A3
@@ -633,34 +634,37 @@ class TestP2PumpThreadIo:
 
 
 # ===========================================================================
-# P3 - lifecycle flags are write-only: nothing re-checks them (Item 3 / F-A5)
+# P3 - lifecycle: the loop observes stop / menu / exit requests (Item 3 / F-A5)
 # ===========================================================================
 
 class _SecondPark(Exception):
-    """Raised by the test-side keep-alive sleep when MainLogic.run() parks a
-    SECOND time after the lifecycle flag was set: the flag was never re-read."""
+    """Raised by the test-side park seam when MainLogic.run() parks a SECOND
+    time after the lifecycle event was delivered: the request was never
+    observed by the loop."""
 
 
-def _patch_keep_alive(monkeypatch, on_first_park):
-    """Replace the asyncio sleep for the duration of one test so the product's
-    keep-alive park (free_snap_tap.py:256-257, 'await asyncio.sleep(3600)')
-    becomes a deterministic observation point: the first park delivers the
-    lifecycle event (the hotkey handler's flag write), the second park proves
-    the flag was not observed. Short delays (the toast pump) delegate to the
-    real sleep."""
+def _patch_park(monkeypatch, on_first_park):
+    """Seam on MainLogic's waitable park (MainLogic._park): the first park
+    delivers the lifecycle event (what the hotkey leg does), the second park
+    proves the loop re-entered its park WITHOUT observing that request.
+
+    Pre-F-A5 this seam replaced asyncio.sleep to catch the unwaitable
+    'while True: await asyncio.sleep(3600)' keep-alive. F-A5 replaced that park
+    with a wakeable one, so the seam targets the park coroutine itself - the
+    observation point is the same, the product no longer needs a 3600 s sleep
+    to be observable."""
+    from free_snap_tap import MainLogic
+
     parks = []
-    real_sleep = asyncio.sleep
 
-    async def fake_sleep(delay, *args, **kwargs):
-        if delay >= 3600:
-            parks.append(delay)
-            if len(parks) == 1:
-                on_first_park()
-                return None
-            raise _SecondPark()
-        return await real_sleep(delay, *args, **kwargs)
+    async def fake_park(self, observed):
+        parks.append(observed)
+        if len(parks) == 1:
+            on_first_park()
+            return None
+        raise _SecondPark()
 
-    monkeypatch.setattr(asyncio, 'sleep', fake_sleep)
+    monkeypatch.setattr(MainLogic, '_park', fake_park)
     return parks
 
 
@@ -702,21 +706,22 @@ class _MainGlobals(dict):
 
 
 class TestP3LifecycleNoOps:
+    """Name kept from F-A2, where these were the red-before pins of the then
+    write-only lifecycle flags. After F-A5 they are green contract pins of the
+    lifecycle machine; the class and test names stay so the estate plan table
+    remains traceable."""
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="F-A5 (Item 3): setting arg_manager.STOPPED (what alt+END's "
-               "control_exit_program does) does not terminate MainLogic.run() - "
-               "measured 2026-11-15 on 047be73: run() re-enters "
-               "'while True: await asyncio.sleep(3600)' and parks again, so the "
-               "headless process keeps running until Ctrl+C")
     def test_stopped_terminates_the_loop_thread_run(self, monkeypatch):
-        """RED (Item 3 / F-A5). The keep-alive sits INSIDE 'while not
-        STOPPED' (free_snap_tap.py:226-257) but nothing re-reads the flag after
-        startup, so the stop request that alt+END writes is never observed by
-        the loop thread - the half-dead process Item 3 reports. F-A5 moves the
-        flags into a RUNNING/PAUSED/MENU/STOPPING machine that the loop thread
-        re-checks, so run() returns on its own."""
+        """GREEN contract pin (Item 3 / F-A5 landed; the F-A2 RED pin of this
+        lane, un-marked). The stop request that alt+END writes - STOPPED plus a
+        posted STOPPING transition - must terminate MainLogic.run() on its own:
+        the loop re-reads its lifecycle state between parks, and the park is
+        wakeable.
+
+        F-A2 measured the pre-fix state on 047be73: run() re-entered 'while
+        True: await asyncio.sleep(3600)' and parked again with STOPPED already
+        set, so the headless process kept running until Ctrl+C (the half-dead
+        process Item 3 reports)."""
         from free_snap_tap import MainLogic
 
         kb, seen = _make_run_stub_keyboard()
@@ -725,7 +730,7 @@ class TestP3LifecycleNoOps:
         def hotkey_exit():
             kb.arg_manager.STOPPED = True
 
-        _patch_keep_alive(monkeypatch, hotkey_exit)
+        _patch_park(monkeypatch, hotkey_exit)
         try:
             task = logic.loop.create_task(logic.run())
             exited = True
@@ -747,20 +752,20 @@ class TestP3LifecycleNoOps:
             "run() parked a second time with STOPPED already set - the loop "
             "thread never observes the stop flag (Item 3 / F-A5).")
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="F-A5 (Item 3): arg_manager.MENU_ENABLED (what alt+PAGE_DOWN's "
-               "control_return_to_menu writes) does not re-show the menu - "
-               "measured 2026-11-15 on 047be73: cli_menu.display_menu call "
-               "count stays 0 and no listener restart happens, the process "
-               "sleeps with both listeners stopped")
     def test_menu_flag_reshows_the_menu_on_the_loop_thread(self, monkeypatch):
-        """RED (Item 3 / F-A5). control_return_to_menu stops both listeners,
-        sets MENU_ENABLED and pauses the filter (fst_keyboard.py:1352-1361);
-        the startup menu leg already passed and the loop is parked in the
-        keep-alive, so the menu is never displayed again and the process keeps
-        running with nothing listening. F-A5's machine re-enters the MENU state
-        on that flag: display_menu again, listeners restarted on re-entry."""
+        """GREEN contract pin (Item 3 / F-A5 landed; the F-A2 RED pin of this
+        lane, un-marked). A return-to-menu request that lands while the loop
+        thread is parked must re-enter the MENU state on the loop thread:
+        cli_menu.display_menu runs again and the listeners restart on the way
+        out of the menu (the SAME startup flow, not a second implementation).
+
+        F-A2 measured the pre-fix state on 047be73: the display_menu call count
+        stayed 0 and no listener restart happened - the process slept with both
+        listeners stopped. Note what the fix means for the flag: MENU_ENABLED is
+        already True after the startup menu, so the real request channel is the
+        MENU transition control_return_to_menu posts; the flag edge here still
+        carries the startup wish, and _observe_state reconciles it (edge, not
+        level, or the menu would re-show on every wake)."""
         from free_snap_tap import MainLogic
 
         kb, seen = _make_run_stub_keyboard()
@@ -771,7 +776,7 @@ class TestP3LifecycleNoOps:
             kb.arg_manager.MENU_ENABLED = True
             kb.arg_manager.WIN32_FILTER_PAUSED = True
 
-        _patch_keep_alive(monkeypatch, hotkey_return_to_menu)
+        _patch_park(monkeypatch, hotkey_return_to_menu)
         try:
             task = logic.loop.create_task(logic.run())
             parked_twice = False
@@ -797,19 +802,18 @@ class TestP3LifecycleNoOps:
             "menu was never re-displayed and no listener restart followed "
             "(Item 3 / F-A5).")
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="F-A5 (Item 3): the headless entry exits with code 1 after a "
-               "clean stop - measured 2026-11-15 on 047be73: SystemExit code 1 "
-               "from the unconditional 'sys.exit(1)' at the end of the "
-               "__main__ block (free_snap_tap.py:375), so a clean alt+END stop "
-               "is indistinguishable from a crash for a caller or a supervisor")
     def test_headless_clean_stop_exits_with_code_zero(self):
-        """RED (Item 3 / F-A5). Exec harness of the __main__ block (shape of
+        """GREEN contract pin (Item 3 / F-A5 landed; the F-A2 RED pin of this
+        lane, un-marked). Exec harness of the __main__ block (shape of
         tests/test_headless_loop_wiring.py::TestLeg2LoopWiring): the headless
         branch runs run_headless(); when that returns CLEANLY (the product's
-        orderly stop, no exception) the script must exit 0. Today the block ends
-        in an unconditional sys.exit(1) for every shape of exit."""
+        orderly stop, no exception) the script exits 0.
+
+        F-A2 measured the pre-fix state on 047be73: the block ended in an
+        unconditional sys.exit(1) for EVERY exit shape, so a clean alt+END stop
+        was indistinguishable from a crash for a caller or a supervisor. A
+        startup ConfigError still exits 1, and an uncaught error still exits 1
+        through the interpreter - only the clean path changed."""
         logic_mock = MagicMock()
 
         def clean_stop():
@@ -1071,3 +1075,264 @@ class TestP5HoldReleaseGeneration:
         assert group.get_active_key() is None
         suppressed, drops = fire_simulated_release()
         assert suppressed == 0 and drops == [], (suppressed, drops)
+
+
+# ===========================================================================
+# P6 - the request channels F-A5 added (pump legs -> lifecycle machine)
+# ===========================================================================
+
+class TestP6LifecycleWiring:
+    """F-A5 (Item 3): the legs that run off the loop thread no longer write
+    lifecycle flags and hope - they POST a transition into the loop's machine
+    and return. A machine with no loop wired (these pins, and every unwired
+    caller in the suite) applies requests inline, which is what makes the
+    request observable without a running loop."""
+
+    def _machine(self, kb):
+        from free_snap_tap import Lifecycle_Machine
+        machine = Lifecycle_Machine()
+        kb.set_lifecycle(machine)
+        return machine
+
+    def test_alt_end_posts_stopping_and_never_exits_from_the_caller(self,
+                                                                   kb_env_plain):
+        """alt+END (control_exit_program) must not exit the process from the
+        hook pump: no bare exit()/sys.exit on the calling thread, only a
+        STOPPING request plus the legacy STOPPED flag for the filter."""
+        from fst_data_types import Lifecycle_State
+        kb = kb_env_plain
+        machine = self._machine(kb)
+        try:
+            kb.control_exit_program('unit')
+        except SystemExit as error:
+            raise AssertionError(
+                "control_exit_program raised SystemExit on the calling thread - "
+                "the pump must post STOPPING and let the loop thread shut the "
+                f"program down (Item 3 / F-A5): {error!r}")
+        assert machine.state is Lifecycle_State.STOPPING, machine.state
+        assert kb.arg_manager.STOPPED is True
+
+    def test_alt_page_down_and_alt_delete_post_menu_and_pause(self, kb_env_plain):
+        """alt+PAGE_DOWN posts MENU (the request the MENU_ENABLED flag could
+        never carry, because it is already True after the startup menu) and
+        alt+delete's pause leg posts PAUSED. The resume leg's RUNNING post lives
+        inside the lane reload body (_reload_now), which the F-A4 pins of the
+        P2 lane drive."""
+        from fst_data_types import Lifecycle_State
+        kb = kb_env_plain
+        machine = self._machine(kb)
+
+        kb.control_return_to_menu()
+        assert machine.state is Lifecycle_State.MENU, machine.state
+        assert kb.arg_manager.MENU_ENABLED is True
+
+        # control_return_to_menu paused the filter, so a bare toggle from here
+        # would take the RESUME leg; the pause leg is what this assert measures
+        kb.arg_manager.WIN32_FILTER_PAUSED = False
+        kb.arg_manager.MANUAL_PAUSED = False
+        kb.control_toggle_pause()      # from unpaused -> the pause branch
+        assert machine.state is Lifecycle_State.PAUSED, machine.state
+        assert kb.arg_manager.WIN32_FILTER_PAUSED is True
+
+    def test_stopping_is_terminal_for_a_late_request(self, kb_env_plain):
+        """STOPPING is terminal (F-A5 recheck P2): a resume/menu request that
+        was already in flight when the stop landed must not flip the machine
+        back, because the audit line is what an operator reads while the loop
+        thread is on its way out."""
+        from fst_data_types import Lifecycle_State
+        kb = kb_env_plain
+        machine = self._machine(kb)
+        kb.control_exit_program('unit')
+        assert machine.state is Lifecycle_State.STOPPING, machine.state
+        for late in (Lifecycle_State.RUNNING, Lifecycle_State.MENU,
+                     Lifecycle_State.PAUSED):
+            kb.post_lifecycle(late, f'late {late.value} request')
+            assert machine.state is Lifecycle_State.STOPPING, late
+
+    def test_machine_requests_from_another_thread_land_on_the_loop_thread(
+            self, kb_env_ns):
+        """The routing contract of Lifecycle_Machine.post_transition (the same
+        shape F-A4 defined for the reload lane): a request from a foreign thread
+        is applied on the loop thread, not on the poster - and the poster does
+        not wait for it."""
+        from free_snap_tap import Lifecycle_Machine
+        from fst_data_types import Lifecycle_State
+        kb = kb_env_ns.kb
+        machine = Lifecycle_Machine()
+        kb.set_lifecycle(machine)
+
+        loop = asyncio.new_event_loop()
+        machine.attach(loop, asyncio.Event())
+        pump = threading.Thread(target=loop.run_forever,
+                                name='fst-loop-standin', daemon=True)
+        pump.start()
+        try:
+            applied = []
+            real_apply = machine._apply
+
+            def spy(state, reason, source):
+                applied.append(threading.get_ident())
+                real_apply(state, reason, source)
+
+            machine._apply = spy
+            poster = threading.get_ident()
+            kb.post_lifecycle(Lifecycle_State.STOPPING, 'test request')
+            _drain_lane(loop)
+        finally:
+            loop.call_soon_threadsafe(loop.stop)
+            pump.join(SEAM_WAIT_SECONDS)
+            cancel_and_close(loop)
+
+        assert applied and all(ident != poster for ident in applied), applied
+        assert machine.state is Lifecycle_State.STOPPING
+
+
+# ===========================================================================
+# P7 - the menu's stop request survives the menu tail (F-A5 reviewer P0)
+# ===========================================================================
+
+class TestP7MenuStopWins:
+    """Menu choice 4 ("End the program") returns NORMALLY from display_menu
+    after posting STOPPING. The listening pass must then NOT start the
+    listeners and must NOT post RUNNING over the stop (F-A5 reviewer P0 found
+    exactly that clobber: the menu tail's unconditional RUNNING post restarted
+    the listeners and run() parked forever, and every mock in the suite hid it
+    because no test wired a real machine to a real menu outcome)."""
+
+    def _menu_outcome_run(self, monkeypatch, outcome, posts_stop):
+        from free_snap_tap import Lifecycle_Machine, MainLogic
+        from fst_data_types import Lifecycle_State
+        kb, seen = _make_run_stub_keyboard()
+        logic = MainLogic(kb)
+        machine = Lifecycle_Machine()
+        kb.set_lifecycle(machine)
+        kb.arg_manager.MENU_ENABLED = True   # the startup asks for the menu
+        # the stub leaves WIN32_FILTER_PAUSED as an unset MagicMock attribute,
+        # which is truthy; _observe_state reconciles that flag, so the pin sets
+        # the value the product would have (a bool)
+        kb.arg_manager.WIN32_FILTER_PAUSED = False
+
+        def menu():
+            if posts_stop:
+                # what CLI_menu.display_menu does on choice 4 (fst_manager.py)
+                kb.arg_manager.STOPPED = True
+                machine.post_transition(Lifecycle_State.STOPPING,
+                                        'menu choice 4 - End the program')
+            return outcome
+
+        kb.cli_menu.display_menu.side_effect = menu
+
+        parks = []
+
+        async def counting_park(self, observed):
+            parks.append(observed)
+            if len(parks) > 1:
+                raise _SecondPark()
+
+        monkeypatch.setattr(MainLogic, '_park', counting_park)
+        try:
+            logic.loop.run_until_complete(logic.loop.create_task(logic.run()))
+            parked_again = False
+        except _SecondPark:
+            parked_again = True
+        finally:
+            cancel_and_close(logic.loop)
+        return kb, machine, parked_again, seen
+
+    def test_menu_choice_four_stop_survives_the_menu_tail(self, monkeypatch,
+                                                          capsys):
+        """The stop wins: no listener start, no 'started' print, the machine
+        ends STOPPING and run() returns instead of parking again."""
+        from fst_data_types import Lifecycle_State
+        kb, machine, parked_again, _ = self._menu_outcome_run(
+            monkeypatch, 'stop', posts_stop=True)
+
+        assert not parked_again, (
+            "run() parked after the menu asked to stop: the menu tail posted "
+            "RUNNING over the STOPPING (F-A5 reviewer P0).")
+        assert machine.state is Lifecycle_State.STOPPING, machine.state
+        assert kb.start_listener.call_count == 0, (
+            "the listeners started although the menu asked to end the program")
+        assert 'Free Snap Tap started' not in capsys.readouterr().out
+
+    def test_menu_start_still_launches_the_listeners(self, monkeypatch, capsys):
+        """The other menu outcome keeps working (anti-vacuity for the pin
+        above): a start choice launches the listeners, prints the started line,
+        and the machine moves back to RUNNING."""
+        from fst_data_types import Lifecycle_State
+        kb, machine, parked_again, _ = self._menu_outcome_run(
+            monkeypatch, 'start', posts_stop=False)
+
+        assert parked_again, (
+            "a menu start must reach the park - run() ended early, so the pin "
+            "above could pass for the wrong reason")
+        assert machine.state is Lifecycle_State.RUNNING, machine.state
+        assert kb.start_listener.call_count == 1
+        assert 'Free Snap Tap started' in capsys.readouterr().out
+
+
+# ===========================================================================
+# P8 - the REAL wake path of the park (F-A5 reviewer P2-3)
+# ===========================================================================
+
+class TestP8ParkWakePath:
+    """The pins above replace MainLogic._park to observe the loop's DECISION;
+    these drive the real park coroutine, because the clear-then-compare
+    handshake (no lost wake-up) is F-A5's core mechanism and must not be
+    simulated away."""
+
+    def test_the_park_wakes_on_a_transition_posted_while_it_waits(self):
+        from fst_data_types import Lifecycle_State
+        kb, _ = _make_run_stub_keyboard()
+        logic = _logic_with_attached_park(kb)
+        machine = logic.lifecycle
+
+        async def drive():
+            task = logic.loop.create_task(
+                logic._park(Lifecycle_State.RUNNING))
+            await asyncio.sleep(0)          # let the park clear + start waiting
+            assert not task.done(), (
+                "the park returned without waiting - it saw a state change that "
+                "never happened")
+            machine.post_transition(Lifecycle_State.STOPPING, 'test wake')
+            await asyncio.wait_for(task, timeout=SEAM_WAIT_SECONDS)
+
+        try:
+            logic.loop.run_until_complete(drive())
+        finally:
+            cancel_and_close(logic.loop)
+
+        assert machine.state is Lifecycle_State.STOPPING
+
+    def test_the_park_does_not_wait_when_a_transition_landed_before_it(self):
+        """The clear-then-compare leg: a request that arrived between the loop
+        body and the park must not be lost in the clear - the park returns
+        immediately instead of sleeping the heartbeat out."""
+        from fst_data_types import Lifecycle_State
+        kb, _ = _make_run_stub_keyboard()
+        logic = _logic_with_attached_park(kb)
+        logic.lifecycle.post_transition(Lifecycle_State.STOPPING, 'before the park')
+
+        async def drive():
+            await asyncio.wait_for(
+                logic._park(Lifecycle_State.RUNNING), timeout=SEAM_WAIT_SECONDS)
+
+        try:
+            logic.loop.run_until_complete(drive())
+        finally:
+            cancel_and_close(logic.loop)
+
+        assert logic.lifecycle.state is Lifecycle_State.STOPPING
+
+
+def _logic_with_attached_park(kb):
+    """MainLogic with its park armed: the wake event is created on the loop
+    thread inside run(); these pins drive _park directly, so they attach the
+    pair themselves."""
+    from free_snap_tap import MainLogic
+    import asyncio as _asyncio
+
+    logic = MainLogic(kb)
+    logic._wake = _asyncio.Event()
+    logic.lifecycle.attach(logic.loop, logic._wake)
+    return logic

@@ -14,6 +14,7 @@ from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_d
 from os import startfile
 
 from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro, ConfigError
+from fst_data_types import Lifecycle_State
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
 from fst_manager import Input_State_Manager, Config_Manager, Config_Validator
@@ -243,6 +244,9 @@ class FST_Keyboard():
         self._macro_task_dict = {}
 
         self.loop = None
+        # F-A5: the loop's lifecycle machine (set by MainLogic.run()); None
+        # until then - see set_lifecycle / post_lifecycle
+        self._lifecycle = None
         self._mouse_listener = None
         self._listener = None
 
@@ -826,6 +830,32 @@ class FST_Keyboard():
 
     def set_loop(self, loop):
         self.loop = loop
+
+    def set_lifecycle(self, machine):
+        '''F-A5 (review Item 3): handle of the loop's Lifecycle_Machine, wired
+        by MainLogic.run() on the loop thread. Legs that run on other threads
+        (the hook pump, the Qt thread, the CLI menu) POST a request into it and
+        return; they never write lifecycle state themselves.
+
+        None (unwired - tests, or a direct call before the loop runs) means
+        "flags only", which is exactly the pre-F-A5 behavior, so every existing
+        caller keeps working.'''
+        self._lifecycle = machine
+
+    def post_lifecycle(self, state, reason):
+        '''Post a lifecycle request; True when a machine was wired to receive
+        it. Never blocks and never raises into a pump leg: the machine applies
+        the change on the loop thread (or inline when no loop is wired). The
+        requesting thread is named in the transition log line, because these
+        requests arrive from the hook pump, Qt and the menu alike.'''
+        machine = getattr(self, '_lifecycle', None)
+        if machine is None:
+            logger.debug(f"[Lifecycle] no machine wired - request {state.value} "
+                         f"({reason}) stayed a flag write")
+            return False
+        machine.post_transition(state, reason,
+                                source=f"thread '{threading.current_thread().name}'")
+        return True
 
     # def mouse_task(self, msg, data):
     #     '''
@@ -1609,6 +1639,10 @@ class FST_Keyboard():
         # with paused_lock:
         self._arg_manager.WIN32_FILTER_PAUSED = False
         self._arg_manager.MANUAL_PAUSED = False
+        # F-A5: the resume completes on the lane, so the RUNNING request is
+        # posted here (once the new generation is bound and the filter is live
+        # again), not from the pump at keypress time.
+        self.post_lifecycle(Lifecycle_State.RUNNING, 'alt+DELETE resume reloaded')
 
     def control_return_to_menu(self):
         self._arg_manager.MENU_ENABLED = True
@@ -1619,6 +1653,12 @@ class FST_Keyboard():
         self.release_all_currently_pressed_simulated_keys()
         self._state_manager.stop_all_repeating_keys()
         self._stop_listeners_on_lane()
+        # F-A5: the MENU request is POSTED last, so the loop thread re-enters
+        # the menu only after the release sweeps ran and the listener stops were
+        # ordered. This is what actually reaches the loop now: MENU_ENABLED alone
+        # never did (it is already True after the startup menu - the Item 3
+        # write-only-flag defect).
+        self.post_lifecycle(Lifecycle_State.MENU, 'alt+PAGE_DOWN return to menu')
 
     def control_exit_program(self, source = ""):
         print('--- Stopping execution --- ' + source)
@@ -1629,6 +1669,12 @@ class FST_Keyboard():
         # reader of the flag never sees it set before the shutdown was ordered.
         self._stop_listeners_on_lane()
         self._arg_manager.STOPPED = True
+        # F-A5 (Item 3, and no direct sys.exit from the hook pump): alt+END
+        # POSTS the stop. The loop thread observes it, returns from run(), and
+        # the ONE cleanup path (MainLogic.cleanup, exactly-once guard) tears
+        # down - headless then exits 0, GUI unwinds through logic.shutdown().
+        self.post_lifecycle(Lifecycle_State.STOPPING,
+                            'alt+END exit request' + (f' ({source})' if source else ''))
         # if source != "icon":
         #     exit()
 
@@ -1650,6 +1696,9 @@ class FST_Keyboard():
             self._arg_manager.MANUAL_PAUSED = True
             self.release_all_currently_pressed_simulated_keys()
             self._state_manager.stop_all_repeating_keys()
+            # F-A5: the loop records the pause (the listeners stay live - a
+            # paused filter still answers events, it just lets them through)
+            self.post_lifecycle(Lifecycle_State.PAUSED, 'alt+DELETE pause')
 
 
     def reset_macro_sequence_by_name(self, alias_name, current_ke = ''):

@@ -12,7 +12,7 @@ import datetime
 
 from fst_keyboard import FST_Keyboard
 from fst_manager import CONSTANTS, setup_fst_logging
-from fst_data_types import ConfigError
+from fst_data_types import ConfigError, Lifecycle_State
 from fst_overlay import GUI_Manager, set_console_visibility, ToastBridge
 from PySide6.QtWidgets import QApplication
 
@@ -61,6 +61,86 @@ CONSTANTS.MENU_Combination = ["alt", "page_down"]
 
 app = None
 
+class Lifecycle_Machine:
+    '''F-A5 (review Item 3): who the logic loop is in, and how other threads
+    ask it to change.
+
+    ONE writer: the state attribute is written only by _apply, which runs on
+    the loop thread. Threads that want a change - the hook pump (alt+END,
+    alt+PAGE_DOWN, alt+delete), the Qt thread, the CLI menu - call
+    post_transition and return immediately; the request is applied on the loop
+    thread via call_soon_threadsafe, the same routing contract F-A4 established
+    for the reload lane (fst_keyboard._run_on_loop_or_inline): INLINE when no
+    loop is wired (tests, legacy/headless before wiring) and INLINE when the
+    caller already is the loop thread, so a posted request never deadlocks and
+    a leg is never lost.
+
+    Every applied transition wakes the loop's park (the asyncio.Event handed in
+    attach) and logs exactly one '[Lifecycle] <old> -> <new> (<reason>)' line -
+    that log line is the audit trail the old write-only flags never had.'''
+
+    def __init__(self):
+        self.state = Lifecycle_State.RUNNING
+        self._loop = None
+        self._wake = None
+
+    def attach(self, loop, wake):
+        '''called by MainLogic.run() ON the loop thread: from here on, requests
+        are marshaled and the park is wakeable.'''
+        self._loop = loop
+        self._wake = wake
+
+    def post_transition(self, state, reason='', source=''):
+        old = self.state
+        if state is old:
+            logger.debug(f"[Lifecycle] {old.value} requested ({reason}) - "
+                         "already there, no transition")
+            return
+        loop = self._loop
+        if loop is None:
+            self._apply(state, reason, source)
+            return
+        try:
+            on_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            on_loop = None
+        if on_loop is loop:
+            self._apply(state, reason, source)
+            return
+        try:
+            loop.call_soon_threadsafe(self._apply, state, reason, source)
+        except RuntimeError as error:
+            # the loop is gone (a quit race): apply inline so the request is
+            # never silently dropped. This is the ONE writer path that can run
+            # off the loop thread (F-A5 reviewer P2-2) and it is deliberate:
+            # a closed loop has no park left to wake and no run() left to
+            # observe, so there is nothing to race against - the caller's own
+            # shutdown leg is what still needs the state to land.
+            logger.info(f"[Lifecycle] loop unavailable for {state.value}: "
+                        f"{error!r} - applying inline")
+            self._apply(state, reason, source)
+
+    def _apply(self, state, reason, source):
+        old = self.state
+        if state is old:
+            # the state can have moved between a request and its landing
+            return
+        if old is Lifecycle_State.STOPPING:
+            # STOPPING is TERMINAL (F-A5 reviewer P2 of the recheck): a resume
+            # leg or a menu post that was already in flight when the stop
+            # landed must not flip the audit trail back to running - the loop
+            # thread is on its way out. The request is ignored and named.
+            logger.info(f"[Lifecycle] STOPPING is terminal - ignored late "
+                        f"{state.value} request ({reason})")
+            return
+        self.state = state
+        who = f" from {source}" if source else ''
+        logger.info(f"[Lifecycle] {old.value} -> {state.value} "
+                    f"({reason}){who}")
+        if self._wake is not None:
+            self._wake.set()
+
+
 class MainLogic:
     def __init__(self, fst_keyboard):
         self.fst_keyboard = fst_keyboard
@@ -83,6 +163,17 @@ class MainLogic:
         self._cleaned_up = False
         self._cleanup_lock = threading.Lock()
         self._logic_thread = None
+
+        # F-A5 (review Item 3): the lifecycle machine this loop owns. run()
+        # attaches the loop and its wake event; the pump / Qt / CLI legs post
+        # requests into it (FST_Keyboard.set_lifecycle hands them the handle).
+        # KEEP_ALIVE_SECONDS is only the park's HEARTBEAT (a safety net against
+        # a lost wake-up), not a poll interval: a posted transition wakes the
+        # park immediately.
+        self.lifecycle = Lifecycle_Machine()
+        self._wake = None
+        # the MENU_ENABLED edge tracker _observe_state needs (see its docstring)
+        self._menu_flag_observed = False
 
     def on_press(self, key):
         """Handle key press events."""
@@ -207,6 +298,8 @@ class MainLogic:
             print("Secondary thread fully exited.")
 
 
+    KEEP_ALIVE_SECONDS = 3600  # park heartbeat, see __init__
+
     async def run(self):
 
         # U345 H2: toast offload pump task on the asyncio loop (runs in
@@ -223,38 +316,145 @@ class MainLogic:
 
         focus_active = self.fst_keyboard.focus_manager.init_focus_task()
 
-        while not self.fst_keyboard.arg_manager.STOPPED:
+        # F-A5 (review Item 3): the park is wakeable and the loop re-reads its
+        # lifecycle state, so alt+END / alt+PAGE_DOWN / menu choice 4 land
+        # without the old unwaitable sleep(3600) blind spot. The keyboard legs
+        # get the machine handle so they POST requests instead of writing
+        # flags the loop never re-read.
+        self._wake = asyncio.Event()
+        self.lifecycle.attach(self.loop, self._wake)
+        self.fst_keyboard.set_lifecycle(self.lifecycle)
 
-            self.fst_keyboard.set_loop(self.loop)
-            self.fst_keyboard.init_listener()
+        first_pass = True
+        while True:
+            state = self._observe_state()
+            if state is Lifecycle_State.STOPPING:
+                break
 
-            if self.fst_keyboard.arg_manager.MENU_ENABLED:
-                self.fst_keyboard.focus_manager.pause_focus_task()
-                self.fst_keyboard.cli_menu.display_menu()
-            else:
-                self.fst_keyboard.config_manager.display_groups()
+            if state is Lifecycle_State.MENU:
+                # the SAME startup menu flow, re-entered: display_menu blocks
+                # until a start is chosen (choice 4 posts STOPPING, it no
+                # longer raises bare exit() inside this task), then the
+                # listeners start on the way out - no second menu
+                # implementation
+                self._start_listening(focus_active, from_menu=True)
+            elif first_pass:
+                self._start_listening(focus_active, from_menu=False)
+            # PAUSED / RUNNING churn needs no loop action: the pump legs did
+            # the work inline or on the lane (F-A4) and the listeners stay
+            # live, so re-running the entry legs would restart them.
+            first_pass = False
 
-            if focus_active:
-                self.fst_keyboard.focus_manager.restart_focus_task()
+            await self._park(state)
 
-            # start keyboard and mouse listener
-            self.fst_keyboard.start_listener()
+        logger.info(f"[Lifecycle] run() returning in state "
+                    f"{self.lifecycle.state.value} - the loop thread ends")
 
-            # if no focus app is given in config file, then start default as always active
-            if not focus_active:
-                self.fst_keyboard.update_args_and_groups()
-                self.fst_keyboard.cli_menu.update_group_display()
-                self.fst_keyboard.arg_manager.WIN32_FILTER_PAUSED = False
+    def _observe_state(self):
+        '''Reconcile the legacy arg_manager flags into the machine at the top of
+        every pass (this runs on the loop thread only, so it is a safe reader).
 
-            print('--- Free Snap Tap started ---')
+        The flags stay what the FILTER reads, and a leg that has no machine
+        handle wired (a test, a direct call) still steers the loop through this
+        reconciliation - the machine is the loop's authority, not a second
+        source the legs can forget.
 
-            if focus_active:
-                self.fst_keyboard.cli_menu.display_focus_names()
-            self.fst_keyboard.focus_manager.start_focus_task()
+        MENU is edge-derived on purpose: arg_manager.MENU_ENABLED stays True
+        once the startup menu ran (only -no_menu clears it), so a level read
+        would re-show the menu on every wake. A return-to-menu request therefore
+        arrives as a POSTED transition from control_return_to_menu, and the flag
+        edge only carries the startup wish. STOPPED is level-derived: the stop
+        request sets it once and nothing clears it.'''
+        am = self.fst_keyboard.arg_manager
+        menu_flag = bool(getattr(am, 'MENU_ENABLED', False))
+        menu_edge = menu_flag and not self._menu_flag_observed
+        self._menu_flag_observed = menu_flag
 
-            # Keep the loop alive indefinitely
-            while True:
-                await asyncio.sleep(3600)
+        if getattr(am, 'STOPPED', False):
+            self.lifecycle.post_transition(Lifecycle_State.STOPPING,
+                                           'arg_manager.STOPPED observed')
+        elif menu_edge:
+            self.lifecycle.post_transition(Lifecycle_State.MENU,
+                                           'startup menu requested (-menu)')
+        elif getattr(am, 'WIN32_FILTER_PAUSED', False):
+            self.lifecycle.post_transition(Lifecycle_State.PAUSED,
+                                           'filter paused')
+        elif self.lifecycle.state in (Lifecycle_State.PAUSED,
+                                      Lifecycle_State.MENU):
+            self.lifecycle.post_transition(Lifecycle_State.RUNNING,
+                                           'filter resumed')
+        return self.lifecycle.state
+
+    def _start_listening(self, focus_active, from_menu):
+        '''The entry legs of a listening pass, in the exact order and with the
+        exact console output run() used before F-A5 - the startup flow and the
+        return-to-menu re-entry share this one implementation.
+
+        Returns False when the menu asked for a stop (choice 4): the listeners
+        are NOT started and nothing claims the program started, so run()
+        observes the STOPPING the menu posted and shuts down. Returning True
+        means this pass is listening.'''
+        self.fst_keyboard.set_loop(self.loop)
+        self.fst_keyboard.init_listener()
+
+        if from_menu:
+            self.fst_keyboard.focus_manager.pause_focus_task()
+            outcome = self.fst_keyboard.cli_menu.display_menu()
+            if outcome == 'stop':
+                # F-A5 reviewer P0: choice 4 posted STOPPING and the menu
+                # RETURNS NORMALLY, so a RUNNING post here used to clobber the
+                # stop and restart the listeners. The menu's outcome is the
+                # authority for what this pass does next.
+                logger.info("[Lifecycle] menu asked to stop - no listeners "
+                            "started, run() will observe STOPPING")
+                return False
+        else:
+            self.fst_keyboard.config_manager.display_groups()
+
+        if focus_active:
+            self.fst_keyboard.focus_manager.restart_focus_task()
+
+        # start keyboard and mouse listener
+        self.fst_keyboard.start_listener()
+
+        # if no focus app is given in config file, then start default as always active
+        if not focus_active:
+            self.fst_keyboard.update_args_and_groups()
+            self.fst_keyboard.cli_menu.update_group_display()
+            self.fst_keyboard.arg_manager.WIN32_FILTER_PAUSED = False
+
+        print('--- Free Snap Tap started ---')
+
+        if focus_active:
+            self.fst_keyboard.cli_menu.display_focus_names()
+        self.fst_keyboard.focus_manager.start_focus_task()
+
+        if from_menu:
+            # the menu returned with a start choice (choice 4 returned 'stop'
+            # above and never reaches this line)
+            self.lifecycle.post_transition(Lifecycle_State.RUNNING,
+                                           'menu closed - start chosen')
+        return True
+
+    async def _park(self, observed):
+        '''The waitable keep-alive (replaces 'while True: await
+        asyncio.sleep(3600)').
+
+        Clear-then-compare: a transition that landed between the loop body and
+        this clear still shows up in the re-read below, so a wake-up can never
+        be lost between check and wait. The bounded timeout is only a heartbeat
+        (a safety net for a wake that never arrives), not how long a request
+        waits: post_transition sets the event, so a stop or a menu request
+        wakes this park immediately.'''
+        if self._wake is not None:
+            self._wake.clear()
+        if self.lifecycle.state is not observed:
+            return
+        try:
+            await asyncio.wait_for(self._wake.wait(),
+                                   timeout=self.KEEP_ALIVE_SECONDS)
+        except asyncio.TimeoutError:
+            pass  # heartbeat: fall through and re-read the state
 
 
 def surface_startup_config_result(fst_keyboard):
@@ -372,4 +572,11 @@ if __name__ == "__main__":
         fst_keyboard.init_toast_offload(None)
         logic.run_headless()
 
-    sys.exit(1)  # Exit the script after main function completes
+    # F-A5 (review Item 3): the script reaches this line only after a CLEAN
+    # shutdown in either mode (headless run_headless() returned / GUI Qt loop
+    # ended and the finally ran logic.shutdown() exactly once), so it reports
+    # success. A clean alt+END stop used to exit with code 1 and was
+    # indistinguishable from a crash for a caller or a supervisor. A startup
+    # ConfigError still exits 1 above it, and an uncaught error still exits 1
+    # via the interpreter.
+    sys.exit(0)

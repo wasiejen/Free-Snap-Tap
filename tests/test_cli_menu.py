@@ -113,13 +113,27 @@ class TestDisplayMenu:
         assert 'Error: Invalid input.' in capsys.readouterr().out
         assert fst_manager.system.call_count == 2  # looped once for the retry
 
-    def test_choice_four_exits_program(self, scripted_menu):
+    def test_choice_four_posts_the_stop_instead_of_exiting(self, scripted_menu):
+        """F-A5 (Item 3) DELIBERATE ASSERTION UPDATE (was:
+        test_choice_four_exits_program asserting pytest.raises(SystemExit)):
+        menu choice 4 must not raise a bare exit() inside the asyncio loop task
+        (that unwound the task without cleanup - the half-dead process of Item
+        3). It now POSTS the STOPPING request into the loop's lifecycle machine
+        and returns, so run() ends and the one cleanup path shuts the program
+        down."""
         script = scripted_menu
         fst = make_menu_fst()
 
         script(['4'])
-        with pytest.raises(SystemExit):
-            CLI_menu(fst).display_menu()
+        outcome = CLI_menu(fst).display_menu()   # must RETURN, not raise
+
+        from fst_data_types import Lifecycle_State
+        assert outcome == 'stop'
+        assert fst.arg_manager.STOPPED is True
+        assert fst.post_lifecycle.call_count == 1, fst.post_lifecycle.call_args_list
+        state, reason = fst.post_lifecycle.call_args.args
+        assert state is Lifecycle_State.STOPPING
+        assert 'choice 4' in reason
 
 
 class TestDisplayMethods:
