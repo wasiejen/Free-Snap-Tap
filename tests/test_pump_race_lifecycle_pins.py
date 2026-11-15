@@ -7,6 +7,11 @@ This file changes NO product behavior: every lane states a requirement its fix
 unit has not met yet, so the fix lands on a pin that already names the contract.
 
 Flavors (the estate plan file carries the name/target/flavor table):
+  GREEN contract / invariant - the requirement pin itself, now green: F-A3
+         (Item 1, atomic Runtime_Snapshot swap) landed on 2026-11-15, so both
+         P1 lanes and both P4 lanes are normal green pins again. Each docstring
+         keeps the F-A2 measurement it was written against (047be73), so the
+         pin still states what it prevents.
   RED  - strict xfail marker naming the fix unit. The requirement assert fails
          on today's code. When the fix lands the test XPASSes, and strict=True
          turns that XPASS into a gate failure - that is the alarm that forces
@@ -41,6 +46,7 @@ import pytest
 from pynput import keyboard as pynput_keyboard
 
 import fst_manager
+from fst_data_types import ConfigError
 from kb_helpers import build
 
 VK_A = 0x41
@@ -80,18 +86,34 @@ def press_count(kb_mock, vk):
                if c[0] == 'press' and c[1] and c[1][0] == target)
 
 
+# the containers one Runtime_Snapshot generation owns (F-A3): identity of
+# these objects is what tells "the live generation was swapped" apart from
+# "the live generation was cleared and refilled in place"
+SNAPSHOT_CONTAINERS = ('tap_groups', 'tap_owner_by_vk', 'rebinds_dict',
+                       'rebind_triggers', 'macros_dict', 'macro_triggers',
+                       'all_trigger_events', 'rebinds', 'macros',
+                       'macros_alias_dict', 'macro_sequence_alias_list',
+                       'key_group_by_alias')
+
+
+def _snapshot_ids(kb):
+    """Object identity of every container of the live generation."""
+    rt = kb.runtime
+    return {name: id(getattr(rt, name)) for name in SNAPSHOT_CONTAINERS}
+
+
 # ---------------------------------------------------------------------------
 # seam harness: park a rebuild between its container clear and its refill
 # ---------------------------------------------------------------------------
 
 class RebuildSeam:
-    """Test seam that stops a rebuild mid-flight, after the clear of
-    FST_Keyboard.initialize_groups_from_presorted_lines (fst_keyboard.py:401-414)
-    and before the refill of the runtime containers.
+    """Test seam that stops a rebuild mid-flight: after it has released the old
+    generation's app-level holds and finished its first key parse, before it has
+    built and swapped its new Runtime_Snapshot.
 
     No product change: the seam wraps the keyboard instance's
-    convert_to_vk_code, which the rebuild calls for every key string it parses
-    (fst_keyboard.py:461, :519) but the filter hot path does not call for
+    convert_to_vk_code, which initialize_groups_from_presorted_lines calls for
+    every key string it parses, but the filter hot path does not call for
     numeric vk events. Only calls from the parked rebuild thread are gated, so
     the pump-thread event the test fires is never blocked by the seam.
     """
@@ -161,26 +183,20 @@ def _fire_pump_press(kb, vk, t):
 
 class TestP1ReloadRace:
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="F-A3 (Item 1): a keydown landing while "
-               "initialize_groups_from_presorted_lines has cleared the runtime "
-               "containers but not refilled them is neither filtered by the old "
-               "generation nor by the new one - measured 2026-11-15 on 047be73: "
-               "replacement presses = 0, suppress_event = 0 (the event reaches "
-               "the app unfiltered) instead of 1/1")
     def test_event_during_rebuild_is_filtered_by_a_complete_generation(self,
                                                                       kb_env_ns):
-        """RED (Item 1 / F-A3). Old generation = new generation (same config,
-        one reload): the pump event must behave exactly as it does with the
-        config loaded, which is what "old-or-new but never neither" means when
-        the two generations agree.
+        """GREEN contract pin (Item 1 / F-A3 landed). It is the F-A2 RED pin of
+        this lane, un-marked: while a rebuild is in flight the pump event must
+        behave exactly as it does with the config loaded, which is what
+        "old-or-new but never neither" means when the two generations agree
+        (here they are the same config, reloaded).
 
-        Today the pump sees the CLEARED containers: no rebind trigger, so the
-        trigger key passes unfiltered and its replacement is never sent - a
-        state that belongs to no generation at all. F-A3 swaps a fully built
-        snapshot in one assignment, so the pump can only ever hold a complete
-        old or a complete new reference."""
+        F-A3 satisfies it: initialize_groups_from_presorted_lines builds a
+        complete Runtime_Snapshot off to the side and binds it in ONE
+        assignment, so a rebuild parked mid-parse leaves the pump on the old
+        generation: 1 replacement press + 1 suppression. F-A2 measured the
+        pre-fix state on 047be73 as (0, 0) - the trigger reached the app
+        unfiltered - and the strict xfail flipped this pin to green."""
         kb = kb_env_ns.kb
         vk_replacement = _load_rebind_generation(kb)
 
@@ -198,9 +214,9 @@ class TestP1ReloadRace:
         finally:
             seam.release.set()
 
-        # harness facts, true before and after the fix: the seam really parked
-        # the rebuild, the rebuild completed to a consistent generation, and the
-        # mid-rebuild event died no leg (a silent pass-through, not a crash).
+        # harness facts: the seam really parked the rebuild, the rebuild
+        # completed to a consistent generation, and the mid-rebuild event died
+        # no leg (no silent leg death hiding behind the pass).
         assert seam.parsed[:1] == ['a'], seam.parsed
         assert len(kb._rebind_triggers) == 1 and len(kb._rebinds_dict) == 1
         assert drops == [], drops
@@ -210,19 +226,59 @@ class TestP1ReloadRace:
             f"replacement presses/suppressions = {observed}, expected (1, 1) "
             "as in the fully loaded config (Item 1 / F-A3).")
 
-    def test_rebuild_tears_down_the_live_generation_before_refilling_it(self,
-                                                                       kb_env_ns):
-        """CHAR (red-for-the-fix, Item 1 / F-A3): characterizes the window the
-        RED lane above refuses to accept. Documented, not approved: while the
-        rebuild is parked between the clear (fst_keyboard.py:401-414) and the
-        refill (:516-526), the LIVE containers the pump dereferences per event
-        are empty, so the filter behaves as if no config were loaded at all.
+    def test_a_failed_build_leaves_the_old_generation_live(self, kb_env_ns):
+        """GREEN invariant (Item 1 / F-A3, reviewer P2-1 of the F-A3 fire): the
+        swap makes a failed build HARMLESS to the pump. When a leg of
+        initialize_groups_from_presorted_lines raises (a key name that does not
+        resolve - the ConfigError arm of every leg), the bind never happens, so
+        the live generation stays the previous COMPLETE one and the filter keeps
+        filtering. Pre-F-A3 the same failure left the live containers cleared
+        or half-refilled - every later event ran against a broken config.
 
-        Flips RED when F-A3 lands (build-then-swap keeps the old snapshot live
-        until the new one is complete) - rewrite it then as the swap invariant:
-        mid-rebuild the pump must still see the old generation."""
+        The F-A4/F-A5 units may not silently regress this: the assertion is on
+        container identity plus the live filter decision, not on log text."""
         kb = kb_env_ns.kb
         _load_rebind_generation(kb)
+        before = _snapshot_ids(kb)
+
+        # a bad tap-group line: the key name resolves to no vk code, so the tap
+        # leg's ConfigError arm re-raises out of the build
+        cm = kb.config_manager
+        cm._tap_groups_hr = [['(BAD)', ['nosuchkey_zebra']]]
+        with pytest.raises(ConfigError):
+            kb.initialize_groups_from_presorted_lines()
+
+        # the live generation is still the good one, object for object
+        assert _snapshot_ids(kb) == before, (
+            "a failed rebuild changed the live generation: the bind must only "
+            "happen for a completely built snapshot (Item 1 / F-A3).")
+        assert len(kb._rebind_triggers) == 1 and len(kb._rebinds_dict) == 1
+
+        # and the pump still filters against it
+        kb_env_ns.kb_mock.reset_mock()
+        kb._listener.suppress_event.reset_mock()
+        drops = _fire_pump_press(kb, VK_A, 6000)
+        assert (press_count(kb_env_ns.kb_mock, VK_B),
+                kb._listener.suppress_event.call_count) == (1, 1)
+        assert drops == [], drops
+
+    def test_live_generation_stays_whole_while_a_rebuild_is_in_flight(self,
+                                                                     kb_env_ns):
+        """GREEN invariant (Item 1 / F-A3), rewritten from the F-A2
+        characterization pin exactly as that pin's docstring directed. F-A2
+        documented that the live containers were emptied between the clear and
+        the refill; F-A3 forbids that, so this pin now holds the swap
+        invariant: while the rebuild is parked mid-parse the LIVE generation is
+        (a) still complete, (b) built of the very same container objects it had
+        before the rebuild started (no clear, no refill, no rebind of the live
+        set), and (c) still filters the pump event.
+
+        Anti-vacuity: the last block requires the parked rebuild to actually
+        SWAP a new generation in when released - otherwise a pin that never
+        rebuilds anything would pass for the wrong reason."""
+        kb = kb_env_ns.kb
+        _load_rebind_generation(kb)
+        before = _snapshot_ids(kb)
 
         seam = RebuildSeam(kb)
         try:
@@ -234,6 +290,7 @@ class TestP1ReloadRace:
                 'rebinds': len(kb._rebinds_dict),
                 'trigger_events': len(kb._all_trigger_events),
             }
+            mid_rebuild = _snapshot_ids(kb)
             kb_env_ns.kb_mock.reset_mock()
             kb._listener.suppress_event.reset_mock()
             drops = _fire_pump_press(kb, VK_A, 5000)
@@ -244,11 +301,21 @@ class TestP1ReloadRace:
         finally:
             seam.release.set()
 
-        assert live == {'tap_groups': 0, 'rebind_triggers': 0,
-                        'rebinds': 0, 'trigger_events': 0}, live
-        assert observed == (0, 0), observed
+        # the live generation mid-rebuild: the loaded config, untouched
+        assert live == {'tap_groups': 0, 'rebind_triggers': 1,
+                        'rebinds': 1, 'trigger_events': 1}, live
+        assert mid_rebuild == before, (
+            "the live generation's container objects changed while a rebuild "
+            "was parked mid-parse: the rebuild mutates the live generation "
+            "instead of a private snapshot (Item 1 / F-A3).")
+        # and the pump still filters, i.e. it reads that untouched generation
+        assert observed == (1, 1), observed
         assert drops == [], drops
-        assert len(kb._rebind_triggers) == 1, "the released rebuild never refilled"
+        # the released rebuild really swapped a NEW generation in
+        assert len(kb._rebind_triggers) == 1, "the released rebuild never completed"
+        assert _snapshot_ids(kb) != before, (
+            "the completed rebuild did not swap in a new generation: this pin "
+            "would also pass if rebuilding did nothing at all")
 
 
 # ===========================================================================
@@ -621,28 +688,21 @@ def _load_tap_generation(kb):
 
 class TestP4ConcurrentRebuilds:
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="F-A3 (Item 1): two rebuild triggers (focus change on the loop "
-               "thread + alt+delete reload on the pump, or two focus switches) "
-               "run initialize_groups_from_presorted_lines concurrently with no "
-               "snapshot boundary - measured 2026-11-15 on 047be73: the "
-               "interleaving leaves 2 Tap_Group objects in _tap_groups for a "
-               "config that declares 1, and _tap_owner_by_vk points the vks at "
-               "the other generation's object, so one group owns nothing and "
-               "the other is never consulted")
     def test_two_concurrent_rebuilds_leave_one_complete_generation(self,
                                                                   kb_env_ns):
-        """RED (Item 1 / F-A3). Both rebuilds come from the SAME presorted
-        lines, so every legal end state is exactly one generation: one tap
-        group object, both vks owned by it. Deterministic interleaving: rebuild
-        A is parked at the seam (already past its clear), rebuild B runs to
-        completion on the main thread, then A is released and appends into the
-        same list objects.
+        """GREEN contract pin (Item 1 / F-A3 landed; the F-A2 RED pin of this
+        lane, un-marked). Both rebuilds come from the SAME presorted lines, so
+        every legal end state is exactly one generation: one tap group object,
+        both vks owned by it. Deterministic interleaving: rebuild A is parked at
+        the seam inside its parse, rebuild B runs to completion on the main
+        thread, then A is released. F-A2 measured the pre-fix interleaving on
+        047be73 as 2 Tap_Group objects for a config that declares 1, with the
+        FST-404 owner registry pointing both vks at the other generation's
+        object (one group owned nothing, the other never consulted).
 
         F-A3's build-new-then-single-assignment swap makes the outcome legal by
         construction: each rebuild fills its own private containers, so the last
-        swap wins as a complete snapshot and the pump only ever holds complete
+        bind wins as a complete snapshot and the pump only ever holds complete
         references."""
         kb = kb_env_ns.kb
         _load_tap_generation(kb)
@@ -679,18 +739,19 @@ class TestP4ConcurrentRebuilds:
             "(Item 1 / F-A3).")
         assert all(owner is kb._tap_groups[0] for owner in owned.values()), owned
 
-    def test_concurrent_rebuilds_share_one_mutable_generation(self, kb_env_ns):
-        """CHAR (red-for-the-fix, Item 1 / F-A3): characterizes today's
-        interleaving so the fix cannot silently change it unobserved. The two
-        rebuilds mutate the SAME list/dict objects (fst_keyboard.py:402-408
-        clears, :521-526 appends), so the result is a mixed generation: the
-        config declares one tap group, the live filter holds two, and the
-        single-owner registry (FST-404) resolves both vks to the FIRST appended
-        object, leaving the second group appended-but-never-consulted.
+    def test_last_rebuild_wins_as_one_whole_generation(self, kb_env_ns):
+        """GREEN invariant (Item 1 / F-A3), rewritten from the F-A2
+        characterization pin exactly as that pin's docstring directed. F-A2
+        documented the shared-mutation outcome (one live list holding two mixed
+        generations); F-A3 forbids it, so this pin holds the ordering invariant
+        instead: with rebuild B completed mid-flight and the parked rebuild A
+        binding last, the live view is A's WHOLE snapshot - one group, both vks
+        owned by that same group, and B's generation gone from the live view
+        (last writer wins by REPLACEMENT, never by merge or partial overwrite).
 
-        Flips RED when F-A3 lands (each rebuild fills private containers and one
-        assignment swaps them in) - rewrite it then as the last-writer-wins
-        snapshot invariant."""
+        Anti-vacuity: B's generation must have been live and complete first
+        (asserted inside the try), so "the live view no longer contains it" can
+        only be the second bind, not a failed first one."""
         kb = kb_env_ns.kb
         _load_tap_generation(kb)
 
@@ -698,24 +759,27 @@ class TestP4ConcurrentRebuilds:
         try:
             seam.start_rebuild()
             kb.initialize_groups_from_presorted_lines()
-            # the generation rebuild B completed on its own: the one the filter
-            # would consider correct if rebuild A had never been scheduled
+            # the generation rebuild B completed on its own: the live view
+            # until the parked rebuild A binds its own snapshot
             gen_b = kb._tap_groups[0]
+            groups_b = kb._tap_groups
             assert kb._tap_owner_by_vk[VK_A] is gen_b
             seam.finish()
-            foreign = [g for g in kb._tap_groups if g is not gen_b]
         finally:
             seam.release.set()
 
-        assert len(kb._tap_groups) == 2, (
-            "the shared-mutation interleaving did not reproduce: the fix this "
-            "characterization documents may have landed - rewrite the pin")
-        assert len(foreign) == 1
-        # the single-owner registry (FST-404) resolves every vk to the first
-        # appended object, so the appended-but-unowned group is never consulted
+        assert len(kb._tap_groups) == 1, (
+            f"two concurrent rebuilds left {len(kb._tap_groups)} live tap "
+            "groups: the second rebuild merged into the live generation "
+            "instead of replacing it (Item 1 / F-A3).")
+        assert kb._tap_groups is not groups_b, (
+            "the released rebuild did not swap a new generation in - the live "
+            "container objects are still rebuild B's")
+        live_group = kb._tap_groups[0]
+        assert live_group is not gen_b
+        # the single-owner registry (FST-404) and the group list belong to ONE
+        # generation: every vk resolves to the very group the live list holds
         # (identity math: Tap_Group.__eq__ is value-based, so two generations
         # of the same config line compare equal - only 'is' tells them apart)
-        assert kb._tap_owner_by_vk[VK_A] is gen_b
-        assert kb._tap_owner_by_vk[VK_B] is gen_b
-        assert all(owner is not foreign[0]
-                   for owner in kb._tap_owner_by_vk.values())
+        assert kb._tap_owner_by_vk[VK_A] is live_group
+        assert kb._tap_owner_by_vk[VK_B] is live_group

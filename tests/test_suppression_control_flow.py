@@ -246,7 +246,11 @@ class TestRebindRepeatLetThroughAtEntry:
         # above demonstrably rides _rebind_repeat_let_through. NOT green on the
         # pre-U365 RED lane (the shared _seq needs the entry arms' raise).
         kb = live_listener.kb
-        monkeypatch.setattr(kb, '_rebind_repeat_let_through', lambda ke: False)
+        # F-A3: the filter now hands the event's generation to the let-through
+        # helper, so the stub takes it too (the stubbed AXIS is the return
+        # value False, never the arity)
+        monkeypatch.setattr(kb, '_rebind_repeat_let_through',
+                            lambda ke, rt=None: False)
         presses = self._seq(kb, live_listener.kb_mock, caplog)
         assert presses == 1  # no re-fire: the repeat was swallowed by the guard
         lines = [r.getMessage() for r in caplog.records if 'event drop' in r.getMessage()]
