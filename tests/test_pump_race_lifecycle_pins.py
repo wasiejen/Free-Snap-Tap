@@ -46,6 +46,7 @@ import pytest
 from pynput import keyboard as pynput_keyboard
 
 import fst_manager
+from fst_data_types import ConfigError
 from kb_helpers import build
 
 VK_A = 0x41
@@ -224,6 +225,42 @@ class TestP1ReloadRace:
             "the event fired inside the rebuild saw neither generation: "
             f"replacement presses/suppressions = {observed}, expected (1, 1) "
             "as in the fully loaded config (Item 1 / F-A3).")
+
+    def test_a_failed_build_leaves_the_old_generation_live(self, kb_env_ns):
+        """GREEN invariant (Item 1 / F-A3, reviewer P2-1 of the F-A3 fire): the
+        swap makes a failed build HARMLESS to the pump. When a leg of
+        initialize_groups_from_presorted_lines raises (a key name that does not
+        resolve - the ConfigError arm of every leg), the bind never happens, so
+        the live generation stays the previous COMPLETE one and the filter keeps
+        filtering. Pre-F-A3 the same failure left the live containers cleared
+        or half-refilled - every later event ran against a broken config.
+
+        The F-A4/F-A5 units may not silently regress this: the assertion is on
+        container identity plus the live filter decision, not on log text."""
+        kb = kb_env_ns.kb
+        _load_rebind_generation(kb)
+        before = _snapshot_ids(kb)
+
+        # a bad tap-group line: the key name resolves to no vk code, so the tap
+        # leg's ConfigError arm re-raises out of the build
+        cm = kb.config_manager
+        cm._tap_groups_hr = [['(BAD)', ['nosuchkey_zebra']]]
+        with pytest.raises(ConfigError):
+            kb.initialize_groups_from_presorted_lines()
+
+        # the live generation is still the good one, object for object
+        assert _snapshot_ids(kb) == before, (
+            "a failed rebuild changed the live generation: the bind must only "
+            "happen for a completely built snapshot (Item 1 / F-A3).")
+        assert len(kb._rebind_triggers) == 1 and len(kb._rebinds_dict) == 1
+
+        # and the pump still filters against it
+        kb_env_ns.kb_mock.reset_mock()
+        kb._listener.suppress_event.reset_mock()
+        drops = _fire_pump_press(kb, VK_A, 6000)
+        assert (press_count(kb_env_ns.kb_mock, VK_B),
+                kb._listener.suppress_event.call_count) == (1, 1)
+        assert drops == [], drops
 
     def test_live_generation_stays_whole_while_a_rebuild_is_in_flight(self,
                                                                      kb_env_ns):
