@@ -302,7 +302,10 @@ class TestP2PumpThreadIo:
                "on 047be73: 1 builtins.open (the config file) plus 1 os.system "
                "('cls||clear', a cmd spawn) on the caller - so one slow disk or "
                "editor state can cost the LowLevelHooksTimeout budget and the "
-               "hook itself (fst_manager.py:876-888)")
+               "hook itself; the consequence is documented at "
+               "fst_manager.py:876-888 - the inline leg is "
+               "fst_keyboard.py:1373-1386, the file read is fst_manager.py:1643, "
+               "the shell spawn is fst_manager.py:2729)")
     def test_resume_leg_touches_no_file_or_process_on_the_calling_thread(
             self, kb_env_ns, monkeypatch, tmp_path):
         """RED (Item 2 / F-A4). The pump-thread contract: alt+delete's resume
@@ -314,7 +317,13 @@ class TestP2PumpThreadIo:
         The leg runs for real against a tmp config file (no load_config stub:
         stubbing the file read would erase exactly what the probe measures), and
         a live loop thread is wired so the marshaled shape the fix introduces
-        has somewhere to land - without it the pin could never go green."""
+        has somewhere to land - without it the pin could never go green.
+
+        Scope note (reviewer P2-2): an open counts as product I/O only when it
+        targets THIS test's config file; the recorder is process-global, so an
+        unrelated framework open on this thread must never read as pump-thread
+        config I/O - that would keep the pin red after F-A4 and hide its XPASS.
+        Shell and process calls always count, whatever their argument."""
         monkeypatch.chdir(tmp_path)
         config_path = tmp_path / 'FSTconfig.txt'
         config_path.write_text('# Tap Groups\na, d\n')
@@ -339,17 +348,23 @@ class TestP2PumpThreadIo:
 
             kb.control_toggle_pause()
 
-            on_caller = recorder.by_thread(caller_ident)
+            on_caller = [c for c in recorder.by_thread(caller_ident)
+                         if c[1] != 'open' or c[2].endswith(config_path.name)]
+            reload_ran = any(c[1] == 'open' and c[2].endswith(config_path.name)
+                             for c in recorder.calls)
         finally:
             loop.call_soon_threadsafe(loop.stop)
             pump.join(SEAM_WAIT_SECONDS)
             cancel_and_close(loop)
 
-        # harness facts, true before and after the fix
+        # harness facts, true before and after the fix (reviewer P2-1: the
+        # reload is proven by its OUTCOME - the groups rebuilt from the config
+        # file - not by which thread the read ran on, because after F-A4 the
+        # read moves off this thread and may land after this leg returns)
         assert kb.arg_manager.WIN32_FILTER_PAUSED is False
         assert kb.arg_manager.MANUAL_PAUSED is False
-        assert any(c[1] == 'open' for c in recorder.calls), (
-            "the resume leg performed no file read at all: the reload path this "
+        assert reload_ran or kb._tap_groups, (
+            "the resume leg performed no config reload at all: the path this "
             "probe measures was not exercised")
         assert not pump.is_alive()
 
@@ -413,6 +428,22 @@ def _make_run_stub_keyboard():
     return kb, seen
 
 
+class _MainGlobals(dict):
+    """Globals for the __main__-block exec harness (reviewer P2-5): any name a
+    future unit introduces into the block resolves to a named MagicMock instead
+    of raising NameError, so a harness gap can never masquerade as this pin's
+    expected red. The names the block MUST behave a certain way are all stubbed
+    explicitly below."""
+
+    def __missing__(self, key):
+        # exec() resolves every name through __getitem__, so __missing__ sits
+        # in front of the builtins fallback: hand back the real builtin when the
+        # name is one (len, print, ...), a mock only for a product name.
+        if hasattr(builtins, key):
+            return getattr(builtins, key)
+        return MagicMock(name=key)
+
+
 class TestP3LifecycleNoOps:
 
     @pytest.mark.xfail(
@@ -449,7 +480,9 @@ class TestP3LifecycleNoOps:
             cancel_and_close(logic.loop)
 
         # harness facts, true before and after the fix
-        assert seen['listener_thread'] == threading.current_thread().name
+        # (reviewer P2-4: only THAT the listener leg ran, never which thread
+        # answered it - F-A5 may restart the listeners off the loop thread)
+        assert seen.get('listener_thread') is not None
         assert kb.arg_manager.STOPPED is True
         assert kb.start_listener.call_count >= 1
 
@@ -497,7 +530,9 @@ class TestP3LifecycleNoOps:
         # and the run task is still alive (return-to-menu is not a stop).
         assert parked_twice, "run() exited on its own: this lane measured nothing"
         assert kb.arg_manager.MENU_ENABLED is True
-        assert seen['listener_thread'] == threading.current_thread().name
+        # (reviewer P2-4: only THAT the listener leg ran, never which thread
+        # answered it - F-A5 may restart the listeners off the loop thread)
+        assert seen.get('listener_thread') is not None
         assert kb.start_listener.call_count >= 1
 
         assert kb.cli_menu.display_menu.call_count >= 1, (
@@ -538,7 +573,7 @@ class TestP3LifecycleNoOps:
                           lines[lines.index(marker) + 1:])),
                        spec.origin, 'exec')
 
-        globs = {
+        globs = _MainGlobals({
             '__name__': '__main__',
             'setup_fst_logging': lambda: None,
             'logger': MagicMock(),
@@ -556,7 +591,7 @@ class TestP3LifecycleNoOps:
             'ToastBridge': lambda: MagicMock(),
             'surface_startup_config_result': lambda keyboard: None,
             'surface_startup_activation': lambda keyboard: None,
-        }
+        })
         with pytest.raises(SystemExit) as stop:
             exec(code, globs)
 
