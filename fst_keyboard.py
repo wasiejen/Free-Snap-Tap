@@ -4,6 +4,7 @@ last updated: 241023-1056
 '''
 
 import asyncio
+import threading
 from collections import deque
 
 from pynput import keyboard, mouse
@@ -244,6 +245,13 @@ class FST_Keyboard():
         self.loop = None
         self._mouse_listener = None
         self._listener = None
+
+        # F-A4 (review Item 2): coalescing guard of the reload lane - one
+        # PENDING reload request max. The lock is held only for a flag
+        # test-and-set (microseconds, never across I/O) and is NOT on the
+        # filter read path: the pump keeps its lock-free reads (F-A3).
+        self._reload_lock = threading.Lock()
+        self._reload_pending = False
 
 
     def init_listener(self):
@@ -1477,6 +1485,120 @@ class FST_Keyboard():
         if self.check_for_combination(['alt','num8']):
             logger_state.debug(f"all_key_state: {self._state_manager._all_key_press_states_dict}")
 
+    # ------------------------------------------------------------------
+    # F-A4 (review Item 2): the loop lane for legs that are NOT suppression
+    # decisions. A LL-hook pump that blocks past LowLevelHooksTimeout loses the
+    # hook silently, so everything that is not an immediate filter answer (config
+    # file I/O, the group rebuild, the CLI redraw, pynput listener stops) moves
+    # to the asyncio loop thread; the pump returns in microseconds and the
+    # result is eventually consistent on the ms scale.
+    # ------------------------------------------------------------------
+    def _run_on_loop_or_inline(self, work, leg_name='lane leg'):
+        '''Route a blocking, non-suppressing leg to the loop thread.
+
+        Same routing shape as Output_Manager.pump_lane (the U364/#360 contract
+        documented at fst_manager.py:876-888): FIFO on the loop ready queue,
+        INLINE when the caller already IS the loop thread, INLINE when no loop
+        is wired (legacy/headless/tests keep the old synchronous behavior).
+
+        Why not pump_lane itself: pump_lane is the ACTION-leg router of the
+        suppression contract - its return value is the pump-side True that tells
+        pynput the event was handled, and it schedules a coroutine. The reload
+        lane answers no event and its work blocks (file read + rebuild), so it
+        belongs in a plain callback via loop.call_soon_threadsafe, not in a
+        coroutine that would sit on the loop. Failure reporting follows the same
+        rule as pump_lane's check_result: a failed leg is named in the log, it
+        is never a silent "scheduled = success".'''
+        loop = self.loop
+        if loop is None:
+            work()
+            return True
+        try:
+            on_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            on_loop = None
+        if on_loop is loop:
+            # already on the lane (macro playback / GUI / loop-thread callers)
+            work()
+            return True
+        try:
+            loop.call_soon_threadsafe(self._run_lane_leg, work, leg_name)
+            return True
+        except RuntimeError as error:
+            # the loop is gone (quit race): run inline so the leg is never lost
+            logger_flow.error(f"loop lane unavailable for {leg_name}: {error} "
+                              "- running inline")
+            work()
+            return False
+
+    def _run_lane_leg(self, work, leg_name):
+        '''loop-thread wrapper: a raising leg names itself in the log instead of
+        dying inside the loop's exception handler.'''
+        try:
+            work()
+        except Exception as error:
+            logger_flow.error(f"loop lane leg failed: {leg_name}: {ascii(error)}")
+
+    def _stop_listeners_on_lane(self):
+        '''F-A4: the pynput listener stops are marshaled to the loop thread.
+        The release sweeps that PRECEDE them stay synchronous on the caller -
+        the FST-404 ruling: the quit paths must not hop a release behind a
+        lane boundary or the app keeps a pressed key.'''
+        self._run_on_loop_or_inline(self._stop_listeners, 'listener_stop')
+
+    def _stop_listeners(self):
+        self._mouse_listener.stop()
+        self._listener.stop()
+
+    def _schedule_reload(self):
+        '''Coalescing reload lane (F-A4): ONE pending request max.
+
+        While a reload is scheduled, further requests (alt+delete on the pump,
+        a focus change on the loop thread, a tray toggle on the Qt thread)
+        collapse into it: a reload always re-reads the current config file and
+        the current focus app, so a coalesced request loses nothing - it would
+        repeat identical work. The pending flag clears when the work STARTS, so
+        a request arriving during a long reload schedules one further pass
+        instead of being dropped: bounded to one pass in flight plus one
+        queued, and the final state always matches the config on disk.'''
+        with self._reload_lock:
+            if self._reload_pending:
+                logger_flow.debug("reload already pending - request coalesced")
+                return
+            self._reload_pending = True
+        self._run_on_loop_or_inline(self._reload_lane, 'resume_reload')
+
+    def _reload_lane(self):
+        with self._reload_lock:
+            self._reload_pending = False
+        try:
+            self._reload_now()
+        except ConfigError as error:
+            # check_control_actions' except arm cannot see this exception any
+            # more (the leg no longer runs on the pump), so the recovery it used
+            # to run is reproduced here in the same order and values.
+            self.surface_config_error(error)
+            self.update_args_and_groups('')
+            self._arg_manager.WIN32_FILTER_PAUSED = False
+            self._arg_manager.MANUAL_PAUSED = False
+
+    def _reload_now(self):
+        '''The reload body: byte-identical to the pre-F-A4 resume leg of
+        control_toggle_pause (same calls, same print text and order), only no
+        longer executed on the hook pump.'''
+        self._arg_manager.reset_global_variable_changes()
+        self.apply_start_args_by_focus_name(self._focus_manager.FOCUS_APP_NAME)
+        self.apply_focus_groups(self._focus_manager.FOCUS_APP_NAME)
+        self._cli_menu.clear_cli()
+        self._config_manager.display_groups()
+        print("\n--- reloaded sucessfully ---")
+        print('--- manuelly resumed ---\n')
+        if self._arg_manager.CONTROLS_ENABLED:
+            self._cli_menu.display_control_text()
+        # with paused_lock:
+        self._arg_manager.WIN32_FILTER_PAUSED = False
+        self._arg_manager.MANUAL_PAUSED = False
+
     def control_return_to_menu(self):
         self._arg_manager.MENU_ENABLED = True
         self._arg_manager.WIN32_FILTER_PAUSED = True
@@ -1485,33 +1607,30 @@ class FST_Keyboard():
         logger_state.debug(f"return to menu with pressed keys: {self._state_manager._real_key_press_states_dict}")
         self.release_all_currently_pressed_simulated_keys()
         self._state_manager.stop_all_repeating_keys()
-        self._mouse_listener.stop()
-        self._listener.stop()
+        self._stop_listeners_on_lane()
 
     def control_exit_program(self, source = ""):
         print('--- Stopping execution --- ' + source)
         self.release_all_currently_pressed_simulated_keys()
         self._state_manager.stop_all_repeating_keys()
-        self._mouse_listener.stop()
-        self._listener.stop()
+        # F-A4: stops on the lane, releases synchronous (see
+        # _stop_listeners_on_lane); STOPPED stays the LAST statement so a
+        # reader of the flag never sees it set before the shutdown was ordered.
+        self._stop_listeners_on_lane()
         self._arg_manager.STOPPED = True
         # if source != "icon":
         #     exit()
 
     def control_toggle_pause(self):
         if self._arg_manager.WIN32_FILTER_PAUSED:
-            self._arg_manager.reset_global_variable_changes()
-            self.apply_start_args_by_focus_name(self._focus_manager.FOCUS_APP_NAME)
-            self.apply_focus_groups(self._focus_manager.FOCUS_APP_NAME)
-            self._cli_menu.clear_cli()
-            self._config_manager.display_groups()
-            print("\n--- reloaded sucessfully ---")
-            print('--- manuelly resumed ---\n')
-            if self._arg_manager.CONTROLS_ENABLED:
-                self._cli_menu.display_control_text()
-            # with paused_lock:
-            self._arg_manager.WIN32_FILTER_PAUSED = False
-            self._arg_manager.MANUAL_PAUSED = False
+            # F-A4 (review Item 2): the resume leg IS the reload lane - config
+            # file read + clean/validate + the snapshot rebuild + the CLI
+            # redraw (system('cls||clear')). All of it moves to the loop thread
+            # (coalescing, see _schedule_reload), so alt+delete answers the hook
+            # immediately. The un-pause flags flip inside that lane work, i.e.
+            # exactly when the new generation is in place - the pump keeps
+            # filtering with the previous complete generation until then (F-A3).
+            self._schedule_reload()
 
         else:
             print('--- manually paused ---')
@@ -1572,7 +1691,24 @@ class FST_Keyboard():
         right after this call, so a pump_lane hop would lose the release. The
         global simulated-key record is cleared here too, so the
         Input_State_Manager sweep cannot re-emit a release for a vk the owner
-        already released (hook-thread timing cannot be relied on).'''
+        already released (hook-thread timing cannot be relied on).
+
+        F-A4 (the generation question F-A3 handed over): this sweep runs against
+        the CURRENT generation (it binds self._runtime's tap_groups at call
+        time), and in a rebuild that current generation is the OLD one - the new
+        snapshot is not bound yet and its groups hold nothing, so "release the
+        new generation instead" is not a meaningful route. What remains is the
+        mutation of old-generation Tap_Group objects while a pump event may be
+        mid-decision on them, and that is SAFE by state legality, not by luck:
+        release_hold() clears active_key FIRST, and every tap-group decision in
+        _win32_event_filter treats an unheld group as a legal state - active_key
+        None means "no veto, allow simulated keys" (the documented meaning) and
+        update_tap_states() on a cleared group simply starts a fresh press
+        cycle. An event straddling the sweep therefore reads one of two legal
+        states of the same object, never a half-built generation, and the
+        bounded consequence (one event of a released key treated as a new press
+        instead of a continuation) IS what releasing that key means. Pinned in
+        tests/test_pump_race_lifecycle_pins.py::TestP5HoldReleaseGeneration.'''
         for tap_group in self._tap_groups:
             vk_code = tap_group.release_hold()
             if vk_code is None:

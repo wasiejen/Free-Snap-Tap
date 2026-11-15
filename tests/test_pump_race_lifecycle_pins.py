@@ -1,28 +1,36 @@
-"""F-A2 red-before pins: pump-thread races and lifecycle no-ops (PINS ONLY).
+"""Pump-thread race, reload-lane and lifecycle pins (F-A2 pins / F-A3 / F-A4).
 
 Scope: proposals/2026-11-14_fst-architecture-review.md Items 1/2/3, scheduled
 by proposals/2026-11-15_fst-improvement-plan.md Phase A (fix units F-A3 atomic
 snapshot swap, F-A4 reload/control marshaling, F-A5 lifecycle state machine).
-This file changes NO product behavior: every lane states a requirement its fix
-unit has not met yet, so the fix lands on a pin that already names the contract.
+This file changes NO product behavior of its own: each lane states a
+requirement, and the pins of a unit flip from strict xfail to green when that
+unit lands (the estate plan file carries the per-pin status table).
+
+Lanes: P1 reload race + P4 concurrent rebuilds (F-A3, landed green), P2
+pump-thread I/O + the reload lane's asynchrony and coalescing (F-A4, landed
+green), P5 which generation a hold release runs against (the P2 seam F-A3
+handed to F-A4 - a parity pin, documented in _release_tap_group_holds), P3
+lifecycle no-ops (F-A5, still strict xfail).
 
 Flavors (the estate plan file carries the name/target/flavor table):
   GREEN contract / invariant - the requirement pin itself, now green: F-A3
-         (Item 1, atomic Runtime_Snapshot swap) landed on 2026-11-15, so both
-         P1 lanes and both P4 lanes are normal green pins again. Each docstring
-         keeps the F-A2 measurement it was written against (047be73), so the
-         pin still states what it prevents.
+          (Item 1) and F-A4 (Item 2) landed on 2026-11-15. Each docstring keeps
+          the F-A2 measurement it was written against (047be73), so the pin
+          still states what it prevents.
   RED  - strict xfail marker naming the fix unit. The requirement assert fails
-         on today's code. When the fix lands the test XPASSes, and strict=True
-         turns that XPASS into a gate failure - that is the alarm that forces
-         the move into a normal test file (repo_testgate.md xfail doctrine).
-         A strict marker is chosen over an imperative pytest.xfail call exactly
-         for that alarm: a red-before pin whose fix silently turns it green
-         without demanding a review is a lost pin.
+         on today's code (P3 x3 remain: F-A5). When the fix lands the test
+         XPASSes, and strict=True turns that XPASS into a gate failure - that is
+         the alarm that forces the move into a normal test file
+         (repo_testgate.md xfail doctrine). A strict marker is chosen over an
+         imperative pytest.xfail call exactly for that alarm: a red-before pin
+         whose fix silently turns it green without demanding a review is a lost
+         pin.
   CHAR - green characterization pin of TODAY's interleaving. It states no
          approval of the behavior; it documents the window a fix must close.
          It flips RED when the fix lands (red-for-the-fix) and must then be
-         rewritten against the fixed contract.
+         rewritten against the fixed contract (both F-A2 CHAR pins were
+         rewritten by F-A3 exactly that way).
 
 Harness rules: no real LL hooks (the conftest kb_env_* fixtures mock the pynput
 controllers and the listener; this file never calls start_listener), no real
@@ -40,7 +48,7 @@ import subprocess
 import textwrap
 import threading
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, call
 
 import pytest
 from pynput import keyboard as pynput_keyboard
@@ -360,37 +368,54 @@ class _IoRecorder:
         return [c for c in self.calls if c[0] == ident]
 
 
+def _drain_lane(loop):
+    """Bounded FIFO sync point with the loop thread.
+
+    run_coroutine_threadsafe schedules through call_soon_threadsafe, so the
+    sentinel coroutine lands on the ready queue AFTER every callback submitted
+    before it; resolving its future therefore proves those callbacks ran. No
+    sleeps, no polling, no wall-clock assumption."""
+    async def _sentinel():
+        return True
+
+    return asyncio.run_coroutine_threadsafe(
+        _sentinel(), loop).result(SEAM_WAIT_SECONDS)
+
+
+def _loop_thread_ident(loop):
+    """The ident of the thread that runs `loop`, asked THROUGH the loop (the
+    same FIFO guarantee as _drain_lane makes the answer well-defined)."""
+    async def _ask():
+        return threading.get_ident()
+
+    return asyncio.run_coroutine_threadsafe(
+        _ask(), loop).result(SEAM_WAIT_SECONDS)
+
+
 class TestP2PumpThreadIo:
 
-    @pytest.mark.xfail(
-        strict=True,
-        reason="F-A4 (Item 2): control_toggle_pause runs its resume leg "
-               "inline on the calling (hook pump) thread - measured 2026-11-15 "
-               "on 047be73: 1 builtins.open (the config file) plus 1 os.system "
-               "('cls||clear', a cmd spawn) on the caller - so one slow disk or "
-               "editor state can cost the LowLevelHooksTimeout budget and the "
-               "hook itself; the consequence is documented at "
-               "fst_manager.py:876-888 - the inline leg is "
-               "fst_keyboard.py:1373-1386, the file read is fst_manager.py:1643, "
-               "the shell spawn is fst_manager.py:2729)")
     def test_resume_leg_touches_no_file_or_process_on_the_calling_thread(
             self, kb_env_ns, monkeypatch, tmp_path):
-        """RED (Item 2 / F-A4). The pump-thread contract: alt+delete's resume
-        leg must not open files, must not clear the console through a shell
-        spawn, and must not reach a process at all on the thread that answers
-        the hook - F-A4 marshals config I/O, the group rebuild and the CLI
-        redraw through loop.call_soon_threadsafe instead.
+        """GREEN contract pin (Item 2 / F-A4 landed; the F-A2 RED pin of this
+        lane, un-marked). alt+delete's resume leg must not open the config file,
+        must not clear the console through a shell spawn, and must not reach a
+        process at all on the thread that answers the hook; the work belongs on
+        the asyncio loop lane.
+
+        F-A2 measured the pre-fix state on 047be73: 1 open (the config file)
+        plus 1 system('cls||clear', a cmd spawn) ON THE CALLER. Now the same
+        I/O runs on the loop thread - so this pin asserts BOTH sides: nothing on
+        the caller, and the file read really happening on the other thread (a
+        reload that silently vanished would also satisfy an empty caller list).
 
         The leg runs for real against a tmp config file (no load_config stub:
         stubbing the file read would erase exactly what the probe measures), and
-        a live loop thread is wired so the marshaled shape the fix introduces
-        has somewhere to land - without it the pin could never go green.
+        a live loop thread is wired so the marshaled work has somewhere to land.
 
-        Scope note (reviewer P2-2): an open counts as product I/O only when it
-        targets THIS test's config file; the recorder is process-global, so an
-        unrelated framework open on this thread must never read as pump-thread
-        config I/O - that would keep the pin red after F-A4 and hide its XPASS.
-        Shell and process calls always count, whatever their argument."""
+        Scope note (reviewer P2-2 of the F-A2 fire): an open counts as product
+        I/O only when it targets THIS test's config file; the recorder is
+        process-global, so an unrelated framework open on this thread must never
+        read as pump-thread config I/O. Shell and process calls always count."""
         monkeypatch.chdir(tmp_path)
         config_path = tmp_path / 'FSTconfig.txt'
         config_path.write_text('# Tap Groups\na, d\n')
@@ -409,37 +434,164 @@ class TestP2PumpThreadIo:
             # pre-state: the leg really reloads (harness fact, both sides true)
             assert kb._rebinds_dict == {} and kb._tap_groups == []
 
+            loop_ident = _loop_thread_ident(loop)
+
             recorder = _IoRecorder(monkeypatch)
             caller_ident = threading.get_ident()
             recorder.calls.clear()
 
             kb.control_toggle_pause()
 
+            # bounded FIFO sync point: the sentinel lands on the loop ready
+            # queue AFTER the reload callback, so when it resolves the lane
+            # work has run (no sleeps, no polling)
+            _drain_lane(loop)
+
             on_caller = [c for c in recorder.by_thread(caller_ident)
                          if c[1] != 'open' or c[2].endswith(config_path.name)]
-            reload_ran = any(c[1] == 'open' and c[2].endswith(config_path.name)
-                             for c in recorder.calls)
+            config_reads = [c for c in recorder.calls
+                            if c[1] == 'open' and c[2].endswith(config_path.name)]
         finally:
             loop.call_soon_threadsafe(loop.stop)
             pump.join(SEAM_WAIT_SECONDS)
             cancel_and_close(loop)
 
-        # harness facts, true before and after the fix (reviewer P2-1: the
-        # reload is proven by its OUTCOME - the groups rebuilt from the config
-        # file - not by which thread the read ran on, because after F-A4 the
-        # read moves off this thread and may land after this leg returns)
+        # harness facts: the reload really happened (the config file was read
+        # and the groups rebuilt from it), and the un-pause flags flipped
         assert kb.arg_manager.WIN32_FILTER_PAUSED is False
         assert kb.arg_manager.MANUAL_PAUSED is False
-        assert reload_ran or kb._tap_groups, (
+        assert kb._tap_groups, (
             "the resume leg performed no config reload at all: the path this "
             "probe measures was not exercised")
+        assert config_reads, (
+            "no read of the config file was recorded anywhere: the reload lane "
+            "did not run, so an empty caller list would be vacuous")
         assert not pump.is_alive()
+
+        # the positive half of the contract: the file read ran on the LOOP
+        # thread, i.e. the work moved instead of vanishing
+        assert all(c[0] == loop_ident for c in config_reads), (config_reads,
+                                                               loop_ident)
 
         kinds = sorted({c[1] for c in on_caller})
         assert on_caller == [], (
             f"the resume leg performed {kinds} work on the calling (pump) "
             f"thread: {on_caller} - config I/O and console/CLI redraw belong on "
             "the loop lane (Item 2 / F-A4).")
+
+    def test_resume_call_returns_before_the_reload_lands(self, kb_env_ns,
+                                                        monkeypatch, tmp_path):
+        """GREEN (Item 2 / F-A4), the pump-side half of the contract: the hook
+        pump must be answered BEFORE the reload work has finished, because that
+        is the whole point (LowLevelHooksTimeout, fst_manager.py:876-888).
+
+        Deterministic, not racy: the lane work is gated inside its first step
+        (load_config), so while it waits there the pump-side state is provably
+        still paused; releasing the gate and draining the lane then proves the
+        same call completes the reload."""
+        monkeypatch.chdir(tmp_path)
+        config_path = tmp_path / 'FSTconfig.txt'
+        config_path.write_text('# Tap Groups\na, d\n')
+
+        kb = kb_env_ns.kb
+        kb.config_manager.file_name = str(config_path)
+        kb.arg_manager.WIN32_FILTER_PAUSED = True
+        kb.arg_manager.MANUAL_PAUSED = True
+
+        inside = threading.Event()
+        gate = threading.Event()
+        real_load = kb.config_manager.load_config
+
+        def gated_load():
+            inside.set()
+            assert gate.wait(SEAM_WAIT_SECONDS), 'the reload lane never started'
+            return real_load()
+
+        monkeypatch.setattr(kb.config_manager, 'load_config', gated_load)
+
+        loop = asyncio.new_event_loop()
+        pump = threading.Thread(target=loop.run_forever,
+                                name='fst-loop-standin', daemon=True)
+        pump.start()
+        kb.set_loop(loop)
+        try:
+            kb.control_toggle_pause()
+
+            # the caller is back while the lane is still inside the reload
+            assert inside.wait(SEAM_WAIT_SECONDS), (
+                "the reload never ran on the loop lane: the caller executed it "
+                "inline (Item 2 / F-A4).")
+            assert kb.arg_manager.WIN32_FILTER_PAUSED is True, (
+                "the un-pause flags flipped on the caller: the pump flips them "
+                "only when the new generation is in place (Item 2 / F-A4).")
+
+            gate.set()
+            _drain_lane(loop)
+        finally:
+            gate.set()
+            loop.call_soon_threadsafe(loop.stop)
+            pump.join(SEAM_WAIT_SECONDS)
+            cancel_and_close(loop)
+
+        assert kb.arg_manager.WIN32_FILTER_PAUSED is False
+        assert kb.arg_manager.MANUAL_PAUSED is False
+        assert kb._tap_groups, "the lane reload never completed"
+
+    def test_overlapping_resume_requests_coalesce_into_one_reload(
+            self, kb_env_ns, monkeypatch, tmp_path):
+        """GREEN (Item 2 / F-A4): the documented coalescing guard - one PENDING
+        reload request max. Two alt+delete requests that arrive before the lane
+        started its pass produce exactly ONE reload (a reload re-reads the
+        current config and focus app, so a coalesced request loses nothing).
+
+        Deterministic: the loop is wired but not yet running, so both callbacks
+        are submitted while the first request is still pending; the lane is
+        started afterwards and drained."""
+        monkeypatch.chdir(tmp_path)
+        config_path = tmp_path / 'FSTconfig.txt'
+        config_path.write_text('# Tap Groups\na, d\n')
+
+        kb = kb_env_ns.kb
+        kb.config_manager.file_name = str(config_path)
+        kb.arg_manager.WIN32_FILTER_PAUSED = True
+        kb.arg_manager.MANUAL_PAUSED = True
+
+        reloads = []
+        real_load = kb.config_manager.load_config
+
+        def counting_load():
+            reloads.append(threading.get_ident())
+            return real_load()
+
+        monkeypatch.setattr(kb.config_manager, 'load_config', counting_load)
+
+        loop = asyncio.new_event_loop()
+        kb.set_loop(loop)  # not running yet: both requests are PENDING
+        try:
+            kb.control_toggle_pause()
+            kb.control_toggle_pause()
+            assert kb._reload_pending is True
+
+            pump = threading.Thread(target=loop.run_forever,
+                                    name='fst-loop-standin', daemon=True)
+            pump.start()
+            _drain_lane(loop)
+            # a request AFTER the pass completed must still reload (the guard
+            # coalesces PENDING requests, it never latches the lane off): the
+            # first pass un-paused, so ask for a pause + resume again
+            kb.arg_manager.WIN32_FILTER_PAUSED = True
+            kb.arg_manager.MANUAL_PAUSED = True
+            kb.control_toggle_pause()
+            _drain_lane(loop)
+            loop.call_soon_threadsafe(loop.stop)
+            pump.join(SEAM_WAIT_SECONDS)
+        finally:
+            cancel_and_close(loop)
+
+        assert len(reloads) == 2, (
+            f"expected one coalesced pass plus one later pass, got {len(reloads)}"
+            " - the reload lane either does not coalesce or latches off")
+        assert kb.arg_manager.WIN32_FILTER_PAUSED is False
 
 
 # ===========================================================================
@@ -783,3 +935,62 @@ class TestP4ConcurrentRebuilds:
         # of the same config line compare equal - only 'is' tells them apart)
         assert kb._tap_owner_by_vk[VK_A] is live_group
         assert kb._tap_owner_by_vk[VK_B] is live_group
+
+
+# ===========================================================================
+# P5 - which generation a hold release runs against (F-A3 handed this to F-A4)
+# ===========================================================================
+
+class TestP5HoldReleaseGeneration:
+    """The generation question F-A3 handed to F-A4 (reviewer P2-2 of the F-A3
+    fire): `_release_tap_group_holds` mutates Tap_Group objects of the generation
+    that is live at call time - during a rebuild that is the OLD one, because
+    the new snapshot is not bound yet and its groups hold nothing.
+
+    F-A4 chose DOCUMENT + PIN over rerouting: "release the new generation" is
+    not a meaningful route (nothing to release there), and the mutation race is
+    state-legal - release_hold() clears active_key FIRST and every tap decision
+    in the filter treats an unheld group as legal (active_key None = no veto).
+    The full argument lives in
+    FST_Keyboard._release_tap_group_holds.__doc__; these pins hold the
+    observable contract so a later lane change cannot silently move the release
+    off the caller (FST-404's ruling) or lose it."""
+
+    def test_a_rebuild_releases_the_old_generation_hold_on_the_caller(
+            self, kb_env_ns):
+        """The release sweep stays SYNCHRONOUS on the calling thread even though
+        F-A4 moved everything else about a reload to the loop lane: the held key
+        must reach the app before the rebuild continues, or the app keeps a
+        pressed key no record claims (FST-404)."""
+        kb = kb_env_ns.kb
+        build(kb, taps=TAP_ONLY)
+        old_group = kb._tap_groups[0]
+        old_id = id(old_group)
+        old_group.update_tap_states(VK_A, True)
+        old_group.set_last_key_send(VK_A)
+
+        kb_env_ns.kb_mock.reset_mock()
+        before = _snapshot_ids(kb)
+        # the rebuild leg itself (kb_helpers.build preset the presorted lines;
+        # apply_focus_groups would re-read the focus manager, which build() does
+        # not populate)
+        kb.initialize_groups_from_presorted_lines()
+
+        # one synchronous release of the held vk on the controller, emitted on
+        # THIS thread (the mock controller records it inline)
+        assert kb_env_ns.kb_mock.release.call_args_list == [
+            call(pynput_keyboard.KeyCode.from_vk(VK_A))], \
+            kb_env_ns.kb_mock.release.call_args_list
+        # it ran against the OLD generation object, and that group is unheld now
+        assert old_group.get_last_key_send() is None
+
+        # the live generation is the new complete one, and its group starts clean
+        assert _snapshot_ids(kb) != before, "the rebuild never swapped a generation"
+        new_group = kb._tap_groups[0]
+        assert id(new_group) != old_id
+        assert new_group.get_last_key_send() is None
+        assert kb._tap_owner_by_vk[VK_A] is new_group
+
+        # and the pump still filters against the new generation: no leg died
+        drops = _fire_pump_press(kb, VK_A, 9000)
+        assert drops == [], drops
