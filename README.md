@@ -55,7 +55,7 @@ For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
     - `-save_dir=*dir*` / `-backup_root_dir=*dir*`: the directories used by the `make_backup` / `restore_backup` invocations
     - **deprecated:** `-focusapp=` prints a warning and exits with error code 1 (use `<focus>` in the config file instead)
    
-Function Documentation V1.2.0 now in the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
+Function Documentation V1.4.0 now in the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
 
 ## Example for a config file:
 
