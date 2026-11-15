@@ -11,7 +11,7 @@ import msvcrt # to flush input stream
 from random import randint # randint(3, 9))
 from time import time # sleep(0.005) = 5 ms
 from fst_data_types import (Key_Event, type_check, ConfigError,
-                            FOCUS_NAME_ILLEGAL)
+                            FOCUS_NAME_ILLEGAL, Lifecycle_State)
 from fst_tasks import Focus_Task, Macro_Repeat_Task
 import datetime
 import re #regular expression
@@ -2773,7 +2773,15 @@ class CLI_menu():
                 self._fst.arg_manager.PRINT_VK_CODES = True
                 break
             elif choice == '4':
-                exit()
+                # F-A5 (Item 3): no bare exit() inside the loop task. A
+                # SystemExit raised here was swallowed by no one and unwound
+                # the asyncio task weirdly (the half-dead process of Item 3);
+                # the menu now POSTS the stop and returns, so the machine shuts
+                # the program down through the one cleanup path and the script
+                # reports exit code 0.
+                self._fst.post_lifecycle(Lifecycle_State.STOPPING,
+                                         'menu choice 4 - End the program')
+                break
             elif choice == '':
                 break
             else:

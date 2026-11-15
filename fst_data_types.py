@@ -4,6 +4,32 @@ last updated: 241015-1041
 '''
 
 from abc import ABC, abstractmethod
+from enum import Enum
+
+
+class Lifecycle_State(Enum):
+    '''F-A5 (review Item 3): the lifecycle states the asyncio logic loop owns.
+
+    Only the lifecycle machine writes them (free_snap_tap.Lifecycle_Machine).
+    Legs that run on other threads - the hook pump (alt+END / alt+PAGE_DOWN /
+    alt+delete), the Qt thread, the CLI menu - never write state: they POST a
+    request with Lifecycle_Machine.post_transition and return.
+
+    RUNNING   listeners live, filter active
+    PAUSED    listeners live, filter paused (what alt+delete asks for)
+    MENU      listeners stopped, the CLI menu owns the console
+    STOPPING  shutdown requested: run() returns, cleanup runs, exit code 0
+
+    The arg_manager flags (STOPPED / MENU_ENABLED / WIN32_FILTER_PAUSED) stay
+    what the FILTER reads (the whole suite and the pump legs depend on them);
+    this state is what the LOOP reads to decide whether to park, re-show the
+    menu or exit. Item 3's defect was that those flags were write-only with
+    respect to the loop - nothing re-read them after startup.'''
+    RUNNING = 'running'
+    PAUSED = 'paused'
+    MENU = 'menu'
+    STOPPING = 'stopping'
+
 
 # decorator data type_check
 def type_check(expected_type):
