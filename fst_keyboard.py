@@ -112,6 +112,70 @@ class Toast_Offload:
         self._post(self.REMOVE_ALL, (immediately,))
 
 
+class Runtime_Snapshot():
+    '''One COMPLETE generation of the filter's runtime state (F-A3, review
+    Item 1: atomic runtime-snapshot swap).
+
+    initialize_groups_from_presorted_lines builds a fresh snapshot OFF TO THE
+    SIDE and FST_Keyboard then binds it with ONE attribute assignment
+    (self._runtime = snapshot). The hook pump therefore only ever reads a
+    generation that is fully old or fully new - never a set of containers that
+    was cleared and is half refilled (the unfiltered-event / suppression-dies-
+    mid-event class this repo hunted in U345/U364/U365/FST-404).
+
+    Swap granularity = the WHOLE generation (all 12 rebuilt containers at
+    once), not one swap per container: the filter reads them as one unit per
+    event (repeat suppression via all_trigger_events, then the rebind lookup
+    rebind_triggers+rebinds_dict, then the macro lookup macros_dict+
+    macro_triggers, then the tap veto tap_groups+tap_owner_by_vk), and a
+    per-container swap could pair NEW tap groups with the OLD owner registry -
+    the torn pairing FST-404's single-owner veto cannot survive.
+
+    Thread safety WITHOUT a read-path lock: the reader binds self._runtime once
+    per event into a local and then touches only that object; the writer never
+    mutates a live container, it only rebinds the attribute. CPython performs
+    an attribute bind as one step under the GIL, so a reader sees either the
+    old or the new snapshot, never a half-bound one, and an event that already
+    bound the old snapshot finishes against a complete view while that object
+    stays referenced (it drops naturally afterwards).
+
+    Rebuilds are NOT serialized with each other: two triggers (focus change on
+    the loop thread, alt+delete on the pump, a tray toggle on the Qt thread)
+    may both build a snapshot and the last bind wins as a complete generation.
+    Marshaling/serializing the rebuild WRITERS is F-A4's work; this unit makes
+    the READS safe only.'''
+
+    __slots__ = ('tap_groups', 'tap_owner_by_vk', 'rebinds_dict',
+                 'rebind_triggers', 'macros_dict', 'macro_triggers',
+                 'all_trigger_events', 'rebinds', 'macros',
+                 'macros_alias_dict', 'macro_sequence_alias_list',
+                 'key_group_by_alias')
+
+    def __init__(self):
+        # Tap groups define which keys are mutually exclusive
+        # Key Groups define which key1 will be replaced by key2
+        # if a Key Group has more than 2 keys if will be handled als alias
+        self.tap_groups = []              # [Tap_Groups]
+        # FST-404 (#404): single-owner registry for tap-group keys - vk_code ->
+        # owning Tap_Group (first group wins, mirroring the tap-section break in
+        # _win32_event_filter). Without it a vk declared in two tap groups had
+        # the tap section hand it to the first group while the simulated-key
+        # veto leg let EVERY group containing it veto (two owners / no owner).
+        self.tap_owner_by_vk = {}
+        self.rebinds_dict = {}            # Key_Event : Key_Event
+        self.rebind_triggers = []
+        self.macros_dict = {}             # [Key_Group : Key_Group]
+        self.macro_triggers = []
+        self.all_trigger_events = []
+
+        # collector of all rebinds and macros, for display purposes only
+        self.rebinds = []
+        self.macros = []
+        self.macros_alias_dict = {}
+        self.macro_sequence_alias_list = []
+        self.key_group_by_alias = {}
+
+
 class FST_Keyboard():
     '''
     Main class to handle keyboard and mouse input and output
@@ -165,30 +229,17 @@ class FST_Keyboard():
         self._drop_ring = deque(maxlen=DROP_RING_MAXLEN)
         self._drop_count = 0
 
-        # Tap groups define which keys are mutually exclusive
-        # Key Groups define which key1 will be replaced by key2
-        # if a Key Group has more than 2 keys if will be handled als alias
-        self._tap_groups = []    # [Tap_Groups]
-        # FST-404 (#404): single-owner registry for tap-group keys - vk_code ->
-        # owning Tap_Group (first group wins, mirroring the tap-section break in
-        # _win32_event_filter). Without it a vk declared in two tap groups had
-        # the tap section hand it to the first group while the simulated-key
-        # veto leg let EVERY group containing it veto (two owners / no owner).
-        self._tap_owner_by_vk = {}
-        self._rebinds_dict = {}       # Key_Event : Key_Event
-        self._rebind_triggers = []
-        self._macros_dict = {}        # [Key_Group : Key_Group]  # triggers are the Keys to the Item Makro
-        self._macro_triggers = []
-        self._all_trigger_events = []
+        # F-A3 (review Item 1): ALL rebuilt runtime state lives in ONE
+        # Runtime_Snapshot that initialize_groups_from_presorted_lines replaces
+        # with a fully built new generation in a single bind. The pump binds
+        # self._runtime once per event, so it never sees a cleared/half-refilled
+        # container set; the legacy per-container accessors below stay as
+        # read-only views of the live generation (display, diagnostics, tests).
+        self._runtime = Runtime_Snapshot()
 
+        # macro playback bookkeeping is NOT a generation: tasks survive a
+        # rebuild and are cancelled/reset explicitly (U375/U384)
         self._macro_task_dict = {}
-
-        # colletor of all rebinds and macros, not used for anything yet 241011-1117
-        self._rebinds = []
-        self._macros = []
-        self._macros_alias_dict = {}
-        self._macro_sequence_alias_list = []
-        self._key_group_by_alias = {}
 
         self.loop = None
         self._mouse_listener = None
@@ -285,7 +336,68 @@ class FST_Keyboard():
         return self._macro_sequence_alias_list
     @property
     def key_group_by_alias(self):
-        return self._key_group_by_alias
+        return self._runtime.key_group_by_alias
+
+    # F-A3: read-only views of the LIVE generation. These names are what the
+    # display/diagnostic legs, the startup log line in free_snap_tap and the
+    # test suite read; the filter hot path binds self._runtime directly instead
+    # (one bind per event, so a mid-event swap cannot tear one event's view).
+    # There is deliberately NO setter: the only way to change the live
+    # generation is a complete snapshot bind in
+    # initialize_groups_from_presorted_lines.
+    @property
+    def runtime(self):
+        '''the live generation; bind it locally before walking more than one
+        container (rt = kb.runtime) so the walk is one consistent view'''
+        return self._runtime
+
+    @property
+    def _tap_groups(self):
+        return self._runtime.tap_groups
+
+    @property
+    def _tap_owner_by_vk(self):
+        return self._runtime.tap_owner_by_vk
+
+    @property
+    def _rebinds_dict(self):
+        return self._runtime.rebinds_dict
+
+    @property
+    def _rebind_triggers(self):
+        return self._runtime.rebind_triggers
+
+    @property
+    def _macros_dict(self):
+        return self._runtime.macros_dict
+
+    @property
+    def _macro_triggers(self):
+        return self._runtime.macro_triggers
+
+    @property
+    def _all_trigger_events(self):
+        return self._runtime.all_trigger_events
+
+    @property
+    def _rebinds(self):
+        return self._runtime.rebinds
+
+    @property
+    def _macros(self):
+        return self._runtime.macros
+
+    @property
+    def _macros_alias_dict(self):
+        return self._runtime.macros_alias_dict
+
+    @property
+    def _macro_sequence_alias_list(self):
+        return self._runtime.macro_sequence_alias_list
+
+    @property
+    def _key_group_by_alias(self):
+        return self._runtime.key_group_by_alias
 
     def convert_to_vk_code(self, key):
         '''
@@ -397,21 +509,18 @@ class FST_Keyboard():
         # config reload, pause-resume) drops the Tap_Group objects that own the
         # app-level holds; without this the app keeps a pressed key no record
         # claims anymore. At startup / on a clean config this emits nothing
-        # (no group holds anything).
+        # (no group holds anything). It runs FIRST and against the LIVE (old)
+        # generation, exactly as before F-A3, so the synchronous release sends
+        # keep the values and timing they had.
         self._release_tap_group_holds()
-        self._tap_groups = []
-        self._tap_owner_by_vk = {}
-        self._rebinds_dict = {}
-        self._rebind_triggers = []
-        self._macros_dict = {}
-        self._macro_triggers = []
-        self._all_trigger_events = []
 
-        self._key_group_by_alias = {}
-
-        # only for display purposes
-        self._rebinds = []
-        self._macros = []
+        # F-A3 (review Item 1): the new generation is built OFF TO THE SIDE.
+        # Nothing below touches the containers the pump is dereferencing per
+        # event; the live generation is replaced once, at the end of this
+        # method, by this complete object (single attribute bind). Readers that
+        # are mid-event keep walking the old snapshot - a complete, consistent
+        # view - and it drops naturally when they are done.
+        rt = Runtime_Snapshot()
 
         def extract_data_from_key(key_string):
             #separate delay info from string
@@ -480,7 +589,7 @@ class FST_Keyboard():
             for key_string in list_of_strings:
                 if key_string.startswith('<'):
                     try:
-                        key_group = key_group + self._key_group_by_alias[key_string]
+                        key_group = key_group + rt.key_group_by_alias[key_string]
                     except KeyError:
                         raise KeyError(f"Alias {key_string} is not known")
                 else:
@@ -502,7 +611,7 @@ class FST_Keyboard():
 
         try:
             for alias, group in self._config_manager.alias_hr:
-                self._key_group_by_alias[alias] = convert_key_string_group(group)
+                rt.key_group_by_alias[alias] = convert_key_string_group(group)
 
         except ConfigError as error:
             logger_config.error(f"{error} -> in Alias: {group}")
@@ -518,12 +627,12 @@ class FST_Keyboard():
                 for key_string in group:
                     key = self.convert_to_vk_code(key_string)
                     keys.append(Key(key, key_string=key_string))
-                self._tap_groups.append(group_obj := Tap_Group(keys))
+                rt.tap_groups.append(group_obj := Tap_Group(keys))
                 # FST-404 (#404): first group containing a vk owns it (the tap
                 # section hands a vk event to the FIRST match, so a later group
                 # stays inert for that vk instead of vetoing it)
                 for key in keys:
-                    self._tap_owner_by_vk.setdefault(key.vk_code, group_obj)
+                    rt.tap_owner_by_vk.setdefault(key.vk_code, group_obj)
         except ConfigError as error:
             logger_config.error(f"{error} -> in Tap Group: {group}")
             raise
@@ -562,9 +671,9 @@ class FST_Keyboard():
                     new_rebind = Rebind(trigger_group, replacement_key)
 
                     #260426-1931
-                    if trigger_group not in self._rebinds_dict.keys():
-                        self._rebind_triggers.append(trigger_group)
-                    self._rebinds_dict[trigger_group] = new_rebind
+                    if trigger_group not in rt.rebinds_dict.keys():
+                        rt.rebind_triggers.append(trigger_group)
+                    rt.rebinds_dict[trigger_group] = new_rebind
 
                 # if both are Keys then create 2 Key_Event: Key_Event rebind sinstead
                 else:
@@ -575,16 +684,16 @@ class FST_Keyboard():
                         new_rebind = Rebind(trigger_group, replacement_events[index])
 
                         #260426-1931
-                        # if a trigger is already existing do not add another trigger in self._rebind_triggers
+                        # if a trigger is already existing do not add another trigger in rt.rebind_triggers
                         # maybe better to replace with check if trigger_group in self._rebind_dict.keys()?
-                        if new_rebind.trigger_group not in self._rebinds_dict.keys():
-                            self._rebind_triggers.append(new_rebind.trigger_group)
-                        self._rebinds_dict[new_rebind.trigger_group] = new_rebind
+                        if new_rebind.trigger_group not in rt.rebinds_dict.keys():
+                            rt.rebind_triggers.append(new_rebind.trigger_group)
+                        rt.rebinds_dict[new_rebind.trigger_group] = new_rebind
 
 
-            # 260426-1920: collect self._rebinds for printout after loop to prevent multiple cases of the same trigger before being able to be recognised in loop
-            for rebind in self._rebinds_dict.values():
-                self._rebinds.append(rebind)
+            # 260426-1920: collect rt.rebinds for printout after loop to prevent multiple cases of the same trigger before being able to be recognised in loop
+            for rebind in rt.rebinds_dict.values():
+                rt.rebinds.append(rebind)
 
         except ConfigError as error:
             logger_config.error(f"{error} -> in Rebind: {rebind}")
@@ -609,16 +718,16 @@ class FST_Keyboard():
                 new_macro.alias = alias[1:-1]
 
                 if new_macro.num_sequences > 1:
-                    self._macros_alias_dict[new_macro.alias] = new_macro
+                    rt.macros_alias_dict[new_macro.alias] = new_macro
 
-                #self._macros.append(new_macro)
-                if new_macro.trigger_group not in self._macros_dict.keys():
-                    self._macro_triggers.append(new_macro.trigger_group)
-                self._macros_dict[new_macro.trigger_group] = new_macro
+                #rt.macros.append(new_macro)
+                if new_macro.trigger_group not in rt.macros_dict.keys():
+                    rt.macro_triggers.append(new_macro.trigger_group)
+                rt.macros_dict[new_macro.trigger_group] = new_macro
 
-            #260426-1935 collect self._macros for printout after loop to prevent multiple cases of the same trigger before being able to be recognised in loop
-            for macro in self._macros_dict.values():
-                self._macros.append(macro)
+            #260426-1935 collect rt.macros for printout after loop to prevent multiple cases of the same trigger before being able to be recognised in loop
+            for macro in rt.macros_dict.values():
+                rt.macros.append(macro)
 
         except ConfigError as error:
             logger_config.error(f"{error} -> in Macro: {macro}")
@@ -627,16 +736,24 @@ class FST_Keyboard():
             logger_config.error(f"{error} -> in Macro: {macro}")
             raise Exception(error)
 
-        logger_config.debug(f"config loaded: {len(self._tap_groups)} tap groups, "
-                            f"{len(self._rebinds)} rebinds, {len(self._macros)} macros, "
-                            f"{len(self._macros_alias_dict)} macro sequences")
+        logger_config.debug(f"config loaded: {len(rt.tap_groups)} tap groups, "
+                            f"{len(rt.rebinds)} rebinds, {len(rt.macros)} macros, "
+                            f"{len(rt.macros_alias_dict)} macro sequences")
 
         # extract all triggers for suppression of repeated keys: test V1.0.2.1 Bugfix
-        all_triggers = self._rebind_triggers + self._macro_triggers
+        all_triggers = rt.rebind_triggers + rt.macro_triggers
         for trigger_group in all_triggers:
-            self._all_trigger_events.append(trigger_group.get_trigger())#
+            rt.all_trigger_events.append(trigger_group.get_trigger())#
 
-        self._macro_sequence_alias_list = self._macros_alias_dict.keys()
+        rt.macro_sequence_alias_list = rt.macros_alias_dict.keys()
+
+        # F-A3: the ONLY mutation of the live generation - ONE attribute bind
+        # of a fully built snapshot. Runtime_Snapshot.__doc__ states why this
+        # granularity is race-free for the pump without a read-path lock, and
+        # why the swap is per generation rather than per container. The
+        # generation this replaces keeps serving every event that bound it
+        # before the bind, then drops naturally with the last reference.
+        self._runtime = rt
 
     def apply_focus_groups(self, focus_name = ''):
         default_lines = self._focus_manager.default_group_lines
@@ -879,18 +996,22 @@ class FST_Keyboard():
     # no tap group. Macro/toggle triggers and tap-group keys stay suppressed.
     # Base only: constraints are decided by the rebind loop in
     # _win32_event_filter, exactly as for the first press.
-    def _rebind_repeat_let_through(self, current_ke):
-        for trigger_group in self._rebind_triggers:
+    def _rebind_repeat_let_through(self, current_ke, rt=None):
+        '''rt: the generation the CALLING event bound (F-A3) - one event must
+        never mix two generations. Falls back to the live snapshot for callers
+        outside the filter.'''
+        rt = rt if rt is not None else self._runtime
+        for trigger_group in rt.rebind_triggers:
             trigger = trigger_group.get_trigger()
             if current_ke.vk_code != trigger.vk_code or current_ke.is_press != trigger.is_press:
                 continue
-            if any(current_ke.vk_code in tg.get_vk_codes() for tg in self._tap_groups):
+            if any(current_ke.vk_code in tg.get_vk_codes() for tg in rt.tap_groups):
                 return False
             try:
-                replacement_vk = self._rebinds_dict[trigger_group].replacement.vk_code
+                replacement_vk = rt.rebinds_dict[trigger_group].replacement.vk_code
             except KeyError:
                 return False  # conservative: no replacement known -> suppress
-            if any(replacement_vk in tg.get_vk_codes() for tg in self._tap_groups):
+            if any(replacement_vk in tg.get_vk_codes() for tg in rt.tap_groups):
                 return False
             return True
         return False
@@ -932,6 +1053,13 @@ class FST_Keyboard():
         real_input_repeated = False
         to_be_suppressed = False
 
+        # F-A3: bind the live generation ONCE per event. Every runtime
+        # container read below goes through this local, so a rebuild swapping
+        # in a new snapshot on another thread (focus change, tray toggle) can
+        # never split one event across two generations - the event finishes
+        # against the complete view it started on (see Runtime_Snapshot).
+        rt = self._runtime
+
         current_ke = Key_Event(vk_code, is_keydown)
 
         # get the time difference from system time to the key_event_time
@@ -960,14 +1088,14 @@ class FST_Keyboard():
                     # compare base only: runtime events carry no key_string/constraints
                     if any(current_ke.vk_code == trigger.vk_code
                            and current_ke.is_press == trigger.is_press
-                           for trigger in self._all_trigger_events):
+                           for trigger in rt.all_trigger_events):
                         # repeated REBIND triggers not in a tap group are let
                         # through so they re-fire their replacement below: macro
                         # and toggle repeats stay suppressed (the 'STOP REPEATED
                         # KEYS FROM HERE' guard), and a replacement that the tap
                         # section would consume keeps the suppression (not
                         # covered by the proposal - conservative)
-                        if not self._rebind_repeat_let_through(current_ke):
+                        if not self._rebind_repeat_let_through(current_ke, rt):
                             logger_flow.debug(f"repeated key suppressed: {current_ke}")
                             to_be_suppressed = True
                         else:
@@ -1002,18 +1130,18 @@ class FST_Keyboard():
                 if not to_be_suppressed:
                     'REBINDS HANDLING'
                     # check for rebinds and replace current key event with replacement key event
-                    for trigger_group in self._rebind_triggers:
+                    for trigger_group in rt.rebind_triggers:
 
                         if is_trigger_activated(current_ke, trigger_group):
                             try:
-                                rebind = self._rebinds_dict[trigger_group]
+                                rebind = rt.rebinds_dict[trigger_group]
                                 replacement_ke = rebind.replacement
                                 old_ke = current_ke
                                 current_ke = replacement_ke
                                 key_replaced = True
                             except KeyError as error:
                                 logger_flow.warning(f"rebind not found: {error}")
-                                logger_flow.debug(f"rebinds dict: {self._rebinds_dict}")
+                                logger_flow.debug(f"rebinds dict: {rt.rebinds_dict}")
 
                             if key_replaced:
                                 # if key is supressed
@@ -1058,12 +1186,12 @@ class FST_Keyboard():
                             self._state_manager.set_toggle_state_to_curr_ke(current_ke)
 
                         'MACROS HERE'
-                        for trigger_group in self._macro_triggers:
+                        for trigger_group in rt.macro_triggers:
                             if is_trigger_activated(current_ke, trigger_group):
                                 alias_fired = True
 
                                 # macro sequence handling is internal in class Macro
-                                macro = self._macros_dict[trigger_group]
+                                macro = rt.macros_dict[trigger_group]
                                 key_sequence = macro.get_key_events_of_current_sequence()
 
                                 'MACRO playback'
@@ -1089,8 +1217,8 @@ class FST_Keyboard():
                 if not self._arg_manager.WIN32_FILTER_PAUSED and not self._arg_manager.PRINT_VK_CODES:
                     vk_code, is_keydown, _ = current_ke.get_all()
                     logger_flow.debug("tap group #0")
-                    for tap_group in self._tap_groups:
-                        if self._tap_owner_by_vk.get(vk_code) is not tap_group:
+                    for tap_group in rt.tap_groups:
+                        if rt.tap_owner_by_vk.get(vk_code) is not tap_group:
                             continue  # FST-404: only the owner accounts a vk
                         if vk_code in tap_group.get_vk_codes():
                             logger_flow.debug(f"tap group {vk_code}")
@@ -1150,8 +1278,8 @@ class FST_Keyboard():
             vk_code, is_keydown, _ = current_ke.get_all()
 
             key_is_in_tap_groups = False
-            for tap_group in self._tap_groups:
-                if self._tap_owner_by_vk.get(vk_code) is not tap_group:
+            for tap_group in rt.tap_groups:
+                if rt.tap_owner_by_vk.get(vk_code) is not tap_group:
                     continue  # FST-404: only the owner may veto a vk
                 vk_codes = tap_group.get_vk_codes()
                 if vk_code in vk_codes:
@@ -1402,15 +1530,16 @@ class FST_Keyboard():
         ###self.interrupt_macro_by_name(alias_name)
 
         ### +
+        rt = self._runtime  # bind once: two property reads could straddle a swap
         try:
-            macro_to_reset = self._macros_alias_dict[alias_name]
+            macro_to_reset = rt.macros_alias_dict[alias_name]
             ###XXX 241014-1952 only reset if not already resetted or unused
             if macro_to_reset.get_sequence_counter() > 0:
                 macro_to_reset.reset_sequence_counter()
                 logger_macro.debug(f"-- Macro ({alias_name}) reseted successfully by {current_ke}")
         except KeyError:
             logger_macro.warning(f"no macro sequence with name {alias_name} - reset failed "
-                                f"(all sequence names: {list(self._macros_alias_dict.keys())})")
+                                f"(all sequence names: {list(rt.macros_alias_dict.keys())})")
 
     def apply_start_args_by_focus_name(self, focus_name = '', scoped=False):
         self._arg_manager.apply_start_arguments(self._arg_manager._sys_start_args)
@@ -1458,20 +1587,21 @@ class FST_Keyboard():
 
     def display_internal_repr_groups(self):
 
+        rt = self._runtime  # bind once: the dump is one consistent generation
         print("Aliases")
-        for alias, group in self._key_group_by_alias.items():
+        for alias, group in rt.key_group_by_alias.items():
             print(f"{alias} {group}")
         print("\n# Tap Groups")
-        for group in self._tap_groups:
+        for group in rt.tap_groups:
             print(f"{group}")
         print("\n# Rebinds")
-        for rebind in self._rebinds:
+        for rebind in rt.rebinds:
             print(f"{rebind}")
         print("\n# Macros")
-        for macro in self._macros:
+        for macro in rt.macros:
             print(f"{macro}")
         print("\n# Macro Sequences")
-        for alias, group in self._macros_alias_dict.items():
+        for alias, group in rt.macros_alias_dict.items():
             print(f"{group}")
 
     def open_config_file(self):
