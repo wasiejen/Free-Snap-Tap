@@ -11,7 +11,8 @@ import msvcrt # to flush input stream
 from random import randint # randint(3, 9))
 from time import time # sleep(0.005) = 5 ms
 from fst_data_types import (Key_Event, type_check, ConfigError,
-                            FOCUS_NAME_ILLEGAL, Lifecycle_State)
+                            FOCUS_NAME_ILLEGAL, Lifecycle_State,
+                            SOURCE_DRAIN, SOURCE_TOGGLE)
 from fst_tasks import Focus_Task, Macro_Repeat_Task
 import datetime
 import re #regular expression
@@ -2622,7 +2623,13 @@ class Input_State_Manager():
 
     def release_all_toggles(self):
         for vk_code in self._toggle_states_dict_keys:
+            # F-A6: the toggle latch drain gets its own ticket (source_kind
+            # 'toggle') so the ledger can name a latched-DOWN vk as owed
+            # debt; the release itself is unchanged.
+            ticket = self._open_release_ticket(vk_code, SOURCE_TOGGLE,
+                                               'toggle_sweep')
             self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
+            self._close_ticket(ticket)
             self.set_toggle_state(vk_code, False)
 
     def reset_all_lists(self):
@@ -2637,6 +2644,24 @@ class Input_State_Manager():
 
 
 ###XXX 241014-1926 changed
+
+    def _open_release_ticket(self, vk_code, source_kind, source_id):
+        '''F-A6 shadow bookkeeping: the keyboard owns the one ledger
+        (FST_Keyboard._ledger), so the drain legs delegate there. A stand-in
+        keyboard without the helper (tests) returns None and the release
+        proceeds exactly as before - bookkeeping must never alter a send.'''
+        opener = getattr(self._fst, 'open_release_ticket', None)
+        if opener is None:
+            return None
+        return opener(vk_code, source_kind, source_id)
+
+    def _close_ticket(self, ticket):
+        if ticket is None:
+            return None
+        closer = getattr(self._fst, 'close_ticket', None)
+        if closer is None:
+            return None
+        return closer(ticket)
 
     def release_all_currently_pressed_simulated_keys(self):
         # print(f"pressed keys on release: {self._pressed_keys}")
@@ -2655,7 +2680,14 @@ class Input_State_Manager():
             if is_press:
                 # only reset simulated keys
                 logger_state.debug(f"released key: {vk_code}")
+                # F-A6 (R1 as scoped for this unit): shadow-record the release
+                # this brute sweep emits. Same sends, same order, same count -
+                # the sweep semantics are unchanged (R2+ is where a drain asks
+                # the ledger for the list instead of inferring it).
+                ticket = self._open_release_ticket(vk_code, SOURCE_DRAIN,
+                                                   'simulated_sweep')
                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
+                self._close_ticket(ticket)
 
         # self.release_all_modifier_keys()
 
