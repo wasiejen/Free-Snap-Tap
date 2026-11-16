@@ -8,7 +8,7 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 
 ## [Unreleased]
 
-### Changed
+### Fixed
 - A key held by a tap group is now reliably released even when a real press
   of the same key races a config reload / focus change (F-A9, ticket-ledger
   veto consult, ladder R4): previously the rebuild's own release could be

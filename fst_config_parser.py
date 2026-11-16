@@ -26,6 +26,15 @@ Owned here:
 Layering: this module imports only "re" and fst_data_types. fst_manager.py
 imports this module, never the reverse - no import cycle.
 
+NOT OWNED YET, DEFERRED ON PURPOSE - the <alias>/(name) PREFIX STRIP still has
+three live copies (Config_Validator._collect_alias_definitions records the
+token; Config_Validator._check_group_line cuts it with a SLICE;
+Config_Manager._parse_lines_for_focus_manager cuts it with replace(), which
+removes EVERY occurrence of the token in the line). Those are not the same
+rule for a line that repeats its own alias text, so merging them is a behavior
+change, not a move - it needs its own decision and its own pins. F-C2 left it
+out and says so here rather than letting the claim below read as complete.
+
 KNOWN DRIFT, PRESERVED ON PURPOSE (unifying either bound changes which configs
 work, which is a maintainer call, not a refactor side effect):
   - delay 0: the validator accepts it (DELAY_RANGE -> 0 <= delay <= 1000) while
@@ -224,8 +233,11 @@ def classify_groups(body):
       'a : b'                 -> REBIND
       'a :: b, c'             -> MACRO
       'a :: b : c'            -> MACRO_SEQUENCE
-      anything else (':' in a '::' group with a non-empty middle group, or a
-      lone ':')               -> DROPPED (the validator reports it, presort
+      ':' alone               -> REBIND with two empty groups (the validator's
+                                 'shape' rule is the one that reports the
+                                 missing trigger - a SHAPE decision stays here)
+      anything else (':' in a '::' group with a non-empty middle group)
+                              -> DROPPED (the validator reports it, presort
                                  drops it - both unchanged behaviors)
     groups are stripped; no key validation happens here (that is a validator
     rule, and the runtime resolves keys later).'''
