@@ -373,3 +373,31 @@ def gc_disabled_latch():
         'Qt event windows and abort the suite natively; see the F-B8 section '
         'in tests/conftest.py')
     yield
+
+
+# --- F-C1 contract lane (2026-11-16) -----------------------------------------
+#
+# The lane API `run_contract(config_text, stimulus_events) ->
+# InjectedEventStream` (full machinery in tests/contract_lane.py, goldens in
+# tests/test_contract_lane.py): CONFIG TEXT in, INJECTED SEQUENCE out. It
+# drives the real pipeline end to end (load_config clean+validate -> focus
+# dicts -> presort_lines -> Runtime_Snapshot build -> keyboard_win32_event_filter
+# with synthetic msg/data objects) and captures the emit-leg's injected events
+# through recorder pynput controllers - no OS input, so the F-B7 tripwire
+# above stays armed and green over every lane run. The lane wires the asyncio
+# loop lane and pumps it to quiescence per stimulus (deterministic FIFO send
+# order, U364/#360), and collapses the random delays to zero (clock seam).
+# Stimulus builders (down/up/tap/combo/focus/focus_lost) import from
+# tests.contract_lane like the kb_helpers shorthands.
+
+
+@pytest.fixture
+def contract(monkeypatch, tmp_path):
+    """F-C1 contract lane fixture - see the section comment above."""
+    # imported in the fixture body: the tests/ dir is on sys.path only after
+    # collection (same non-package import mechanism kb_helpers relies on)
+    from contract_lane import Contract_Lane
+    lane = Contract_Lane(monkeypatch, tmp_path)
+    yield lane
+    lane.close()
+
