@@ -246,6 +246,99 @@ class TestL2MacroTaskDebt:
 
         assert ticket.state == TICKET_COMPLETED
         assert kb.ledger_open_count(expected_source_kinds=(SOURCE_TOGGLE,)) == 0
+    def test_a_second_drain_of_the_same_alias_is_harmless(self, kb_env_plain):
+        """The F-A7 reviewer P1 crash class: two drains racing one alias (a
+        macro-cancel drain on the loop thread and a quit/pause drain on the
+        pump) must not raise. The drain CLAIMS the alias dict with one pop, so
+        the loser simply finds nothing."""
+        from unittest.mock import MagicMock
+        kb = kb_env_plain
+        stub_handle = MagicMock()
+        stub_handle.done.return_value = False   # playback still running
+        kb._macro_task_dict['al'] = stub_handle
+        ticket = kb.open_press_ticket(VK_A, SOURCE_MACRO, 'al')
+        kb._macro_held['al'] = {VK_A: ticket}
+
+        first = kb.drain_macro_debt(alias='al')
+        second = kb.drain_macro_debt(alias='al')
+
+        assert first == [VK_A] and second == [], (first, second)
+        assert ticket.state == TICKET_COMPLETED
+        assert kb._macro_held == {}
+
+    def test_a_press_recorded_after_a_claim_stays_tracked(self, kb_env_plain):
+        """The other half of the same race: a playback that records a press
+        while a drain is claiming the alias must not have its new debt dropped
+        (the pre-fix version popped entries in place and could orphan them)."""
+        from fst_data_types import Key_Event
+        from unittest.mock import MagicMock
+        kb = kb_env_plain
+        stub_handle = MagicMock()
+        stub_handle.done.return_value = False   # playback still running
+        kb._macro_task_dict['al'] = stub_handle
+        kb._macro_held['al'] = {VK_A: kb.open_press_ticket(VK_A, SOURCE_MACRO, 'al')}
+
+        kb.drain_macro_debt(alias='al')                       # claims
+        kb._macro_press_recorded('al', Key_Event(VK_D, True))  # concurrent leg
+        assert 'al' in kb._macro_held and list(kb._macro_held['al']) == [VK_D]
+
+        assert kb.drain_macro_debt(alias='al') == [VK_D]
+        assert kb.ledger_open_count() == 0
+
+    def test_the_quit_drain_cancels_the_playback_it_drains(self, kb_env_plain):
+        """Reviewer P2-2: `send_key_event` has no release veto, so a playback
+        left running could add its own release after the drain's. The drain
+        interrupts the playback first."""
+        from unittest.mock import MagicMock
+        kb = kb_env_plain
+        handle = MagicMock()
+        handle.done.return_value = False   # the playback is still running
+        kb._macro_task_dict['al'] = handle
+        ticket = kb.open_press_ticket(VK_D, SOURCE_MACRO, 'al')
+        kb._macro_held['al'] = {VK_D: ticket}
+
+        kb.control_exit_program('pin')
+
+        assert handle.cancel.called
+        assert ticket.state == TICKET_COMPLETED
+
+    def test_a_drain_that_re_enters_during_a_send_does_not_raise(
+            self, kb_env_plain):
+        """The reviewer's P1 class, made deterministic without threads: a second
+        drain for the same alias runs while the first one is inside its release
+        send (the loop-thread cancel drain and a pump-thread quit drain look
+        exactly like this). Under the pre-cure code the second drain popped the
+        shared inner dict from under the first one -> KeyError, which escaped
+        macro_task's CancelledError handler (the task ended NOT-cancelled) and
+        aborted control_exit_program before STOPPED. The claim-then-iterate
+        design cannot hit it."""
+        from unittest.mock import MagicMock
+        kb = kb_env_plain
+        handle = MagicMock()
+        handle.done.return_value = False   # playback still running
+        kb._macro_task_dict['al'] = handle
+        ticket = kb.open_press_ticket(VK_A, SOURCE_MACRO, 'al')
+        kb._macro_held['al'] = {VK_A: ticket,
+                                VK_D: kb.open_press_ticket(VK_D, SOURCE_MACRO, 'al')}
+        real_send = kb._output_manager.send_key_event
+        state = {'done': False}
+
+        def seam(key_event):
+            if not state['done']:
+                state['done'] = True
+                kb.drain_macro_debt(alias='al')   # the racing drain, mid-send
+            real_send(key_event)
+
+        kb._output_manager.send_key_event = seam
+
+        released = kb.drain_macro_debt(alias='al')
+
+        # the outer drain keeps its own claimed view and finishes both releases;
+        # under the pre-cure code the inner drain had already popped VK_D out of
+        # the shared dict and the outer's `held.pop(VK_D)` raised KeyError
+        assert released == [VK_A, VK_D], released
+        assert ticket.state == TICKET_COMPLETED
+        assert kb._macro_held == {}, 'the re-entrant drain left the index dirty'
 
 
 class _RepeatStub:
@@ -263,6 +356,8 @@ class _DoneStub:
 
 async def _noop_coro():
     return None
+
+
 
 
 # ===========================================================================
@@ -319,6 +414,23 @@ class TestL2ToggleOwnership:
         assert ledger.open_tickets() == [], ledger.open_tickets()
         ids = sorted({t.source_id for t in _new_tickets(ledger, seen)})
         assert ids == ['exit_program.toggle_sweep', f'toggle:{VK_S}'], ids
+
+    def test_the_toggle_sweep_inherits_the_label_of_the_facade_call(self,
+                                                                    kb_env_plain):
+        """Reviewer P2-3: the quit leg reaches the toggle sweep THROUGH the
+        simulated-key facade, so the leg label must be threaded the whole way
+        (F-A6 composed these ids; a lost label is an attribution regression)."""
+        kb = kb_env_plain
+        ledger = kb._ledger
+        self._engage(kb, VK_S)
+        kb.state_manager._toggle_states_dict_keys = [VK_S]
+
+        kb.release_all_currently_pressed_simulated_keys('exit_program')
+
+        ids = {t.source_id for t in ledger.tickets()
+               if t.source_kind == SOURCE_TOGGLE
+               and t.kind == TICKET_RELEASE}
+        assert ids == {'exit_program.toggle_sweep'}, ids
 
     def test_clean_exit_closes_toggle_debt_too(self, kb_env_plain):
         kb = kb_env_plain

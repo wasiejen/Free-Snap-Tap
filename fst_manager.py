@@ -2715,7 +2715,7 @@ class Input_State_Manager():
 
         # self.release_all_modifier_keys()
 
-        self.release_all_toggles()
+        self.release_all_toggles(drain_id)
         self.reset_states_dicts()
 
     def release_all_modifier_keys(self):
