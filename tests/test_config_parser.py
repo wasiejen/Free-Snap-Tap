@@ -12,6 +12,8 @@ import pytest
 from fst_config_parser import (DELAY_RANGE, RUNTIME_DELAY_RANGE, classify_groups,
                                clean_comment_lines, combine_multiline_continuations,
                                LineNamer, normalize_start_arg_name, parse_int_list,
+                               arg_value, prefix_matches, split_item_prefix,
+                               START_ARG_FLAGS, START_ARG_VALUES,
                                KIND_TAP, KIND_REBIND, KIND_MACRO, KIND_SEQUENCE,
                                KIND_DROPPED)
 from fst_manager import Config_Validator
@@ -144,6 +146,91 @@ class TestStartArgumentSpelling:
         assert parse_int_list('1, 2') == [1, 2]
         assert parse_int_list('1,x') is None
         assert parse_int_list('') is None
+
+
+class TestArgGrammar:
+    '''F-C3 (review Item 4 inventory): the '-name=value' shape and the name
+    matching are the parser's; the two entry worlds keep their own policy'''
+
+    @pytest.mark.parametrize('arg,name,expected', [
+        ('-log=debug', '-log', 'debug'),
+        ('-file=C:/x/my config.cfg', '-file', 'C:/x/my config.cfg'),
+        ('-tapdelay=1,2', '-tapdelay', '1,2'),
+        ('-backup_root_dir=D:/bak', '-backup_root_dir', 'D:/bak'),
+        ('-log=', '-log', None),          # empty value is not a value arg
+        ('-loglevel=debug', '-log', None),
+        ('-log', '-log', None),
+        ('-log=debug', '-file', None),
+    ])
+    def test_value_part_of_an_argument(self, arg, name, expected):
+        # CONTRACT: '-name=' with a non-empty tail yields that tail verbatim
+        # (spaces kept); anything else - including the same name as a longer
+        # word - yields None. The CLI chain used to spell this with a
+        # hand-counted slice per argument (11 copies).
+        assert arg_value(arg, name) == expected
+
+    def test_the_command_line_world_is_lenient_where_the_config_world_is_not(self, fake_fst):
+        # CONTRACT (entry worlds stay distinct): '-tray_iconX' works as a
+        # START argument (the chain matches the name as a prefix) while the
+        # same text in a config '<arg>' line reports 'unknown start argument'.
+        # F-C3 kept that difference on purpose and pinned it - unifying it
+        # would change which spellings load (decision filed).
+        assert prefix_matches('-tray_iconX', '-tray_icon')
+        assert not prefix_matches('-tray', '-tray_icon')
+        from fst_manager import Argument_Manager
+        fake_fst.config_manager = type('NS', (), {'file_name': ''})()
+        manager = Argument_Manager(fake_fst)
+        manager.apply_start_arguments(['-tray_iconX'])
+        assert manager.TRAY_ICON is True
+        violations = Config_Validator().validate([(1, '<arg>-tray_iconX')])
+        assert [(v.rule, v.severity) for v in violations] == [('arg', 'warning')]
+
+    def test_the_two_tables_are_the_single_vocabulary(self):
+        # CONTRACT: one flag/value vocabulary for both worlds; '-crossover'
+        # is legitimately in both (bare flag '-crossover' AND '-crossover=50')
+        assert '-flow' in START_ARG_FLAGS and '-log' in START_ARG_VALUES
+        assert '-crossover' in START_ARG_FLAGS and '-crossover' in START_ARG_VALUES
+        assert '-no_such_flag' not in START_ARG_FLAGS | START_ARG_VALUES
+
+
+class TestItemPrefix:
+    '''F-C3: the declared-name prefix rule (alias '<x>' / group '(name)')'''
+
+    @pytest.mark.parametrize('line,expected', [
+        ('<world> a, d', ('<world>', 'a, d', True)),
+        ('(*keep*) x : y', ('(*keep*)', 'x : y', False)),
+        ('(REB_1) a, d', ('(REB_1)', 'a, d', False)),
+        ('a, d', ('', 'a, d', False)),
+        ('<>x', ('', '<>x', False)),           # bracket at index 1 is text
+        ('() x : y', ('', '() x : y', False)),
+        ('<world>', ('<world>', '', True)),
+    ])
+    def test_prefix_split_is_a_slice_and_a_shape_rule(self, line, expected):
+        # CONTRACT: a prefix counts only when its closing bracket sits past
+        # index 1; the body is the remainder stripped; only '<...>' is an
+        # alias definition. Both validator walks use THIS rule.
+        assert split_item_prefix(line) == expected
+
+    def test_the_runtime_section_walk_still_cuts_with_replace_all(self):
+        # CONTRACT (characterization of a KNOWN divergence, decision filed):
+        # the section walk removes EVERY occurrence of the declared token, so
+        # an alias line that repeats its own token loses that member - the
+        # container holds ['a', '', 'd'] while the validator reported the line
+        # clean. F-C3 did not merge the two rules: merging would change which
+        # keys a real config feeds the containers.
+        from fst_manager import Config_Manager
+        cm = Config_Manager()
+        cm._file_name = ''
+        _, _, lines = cm._parse_lines_for_focus_manager(['<w> a, <w>, d\n'])
+        cm.presort_lines(lines)          # presort fills the containers in place
+        assert cm._alias_hr == [['<w>', ['a', '', 'd']]]
+        # ...and the validator lane reports that same line CLEAN (measured):
+        # its walk cuts the FIRST token only and '<w>' resolves as a known
+        # alias - so nothing warns about the member the containers lost.
+        cleaner = Config_Manager()
+        numbered = cleaner._combine_multilines_numbered(
+            cleaner._clean_comments_numbered(['<w> a, <w>, d\n']))
+        assert Config_Validator().validate(numbered) == []
 
 
 class TestDelayBoundDrift:
