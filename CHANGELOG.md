@@ -8,6 +8,16 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 
 ## [Unreleased]
 
+### Fixed
+- A key held by a tap group is now reliably released even when a real press
+  of the same key races a config reload / focus change (F-A9, ticket-ledger
+  veto consult, ladder R4): previously the rebuild's own release could be
+  swallowed by the simulated-key veto leg when the real press re-armed the
+  hold in between, and the app kept the key pressed (the FST-404 stuck-key
+  class). The release ordering is unchanged; the veto leg now consults the
+  ledger first - while FST owes the release, the injected release is
+  delivered (never suppressed) and the debt closes at delivery.
+
 ### Changed
 - The focus poll's active-window query is timeout-tolerant (F-B5, review
   Item 14 documented decision): a transient Win32/ctypes failure at the
