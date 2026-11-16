@@ -1005,8 +1005,8 @@ class Output_Manager():
 # ---------------------------------------------------------------------------
 # Config validation (U69, proposal 2026-10-31_fst-config-validator a,b,c,d)
 #
-# ONE pass over the CLEANED config lines (after _clean_comments /
-# _combine_multilines) that collects ALL violations before any group is
+# ONE pass over the CLEANED config lines (after _clean_comments_numbered /
+# _combine_multilines_numbered) that collects ALL violations before any group is
 # built; nothing is evaluated and eval() is untouched. Each violation is a
 # (line number, item alias, rule, message, severity) record.
 #

@@ -55,7 +55,7 @@
 
 ### Macro Sequences (README #4; WIKI `[Macros/Macro_Sequences]`)
 - Parse (`::` + repeated `:` groups, default names `SEQ_n`): `fst_manager.py:1120-1127`;
-  multiline continuation (`: c` on indented lines) joined by `_combine_multilines`
+  multiline continuation (`: c` on indented lines) joined by `_combine_multilines_numbered`
   `fst_manager.py:859-869`.
 - Cycling + auto-reset after the last group: `fst_data_types.py:294-304`
   (`_get_key_group`, wrap at 300-301); counter accessors 309-312.
