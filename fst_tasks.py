@@ -30,7 +30,6 @@ class Macro_Repeat_Task:
 
     async def run(self):
         logger_macro.debug(f"Macro_Repeat_Task started for {self.alias_name} with repeat time {self.repeat_time} ms")
-        print(f"START REPEAT: {self.alias_name} with interval of {self.repeat_time} ms")
 
         while not self.stop_event.is_set():
             if self.with_overlay:
@@ -42,7 +41,7 @@ class Macro_Repeat_Task:
             except asyncio.TimeoutError:
                 pass
             if self.reset_event.is_set():
-                print(f"Resetting repeat task for {self.alias_name}")
+                logger_macro.debug(f"Resetting repeat task for {self.alias_name}")
                 self.reset_event.clear()
 
     def cancel_playback(self):
