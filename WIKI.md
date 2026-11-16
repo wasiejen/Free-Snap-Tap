@@ -457,6 +457,12 @@ Everything else should be put in the config file and then can be applied on a pe
 - `<arg>-backup_root_dir=*dir*`: the backup root dir used by the `make_backup` / `restore_backup` invocations
 - `<arg>-focusapp=*name*`: **DEPRECATED** - prints a warning and exits the program with error code 1 (the focus app is defined in the config file via `<focus>` instead)
 
+- `--elevate`: **start argument only** (do not put it in the config as `<arg>`). Self-elevation at startup: if the run is not elevated yet, FST relaunches the same exe through one Windows "run as administrator" prompt, passing along ALL other start arguments (the `--elevate` flag itself is stripped in the relaunched child, so no relaunch loop can happen), and the first process exits 0. If the run is already elevated, FST logs one `[Elevation] running elevated` line and starts normally. Running from python.exe (dev mode) never attempts a relaunch - it prints `[Elevation] dev mode - relaunch the exe manually or use scheduled task` and starts normally.
+
+**Prompt-free elevated autostart (scheduled task):** run this ONCE from an elevated shell:
+`schtasks /Create /TN "FreeSnapTap" /TR "C:\path\free_snap_tap.exe" /SC ONLOGON /RL HIGHEST`
+(or in Task Scheduler UI check "Run with highest privileges"). The task starts FST elevated at every logon with no UAC prompt - registration is the only elevation moment, and the exe needs no `--elevate` flag there (`/RL HIGHEST` alone carries the elevation; the flag is for manual/relaunch use). Background and posture notes: estate research `agent/research/2026-11-13_elevated-input.md` section 5.
+
 **(deprecated)**
 Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_tap.exe)
  - use the start Arguments without \<arg>

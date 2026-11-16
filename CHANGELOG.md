@@ -20,6 +20,14 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   pass split are removed with it). Zero migration cost - no config uses it.
 
 ### Added
+- New start flag `--elevate` (maintainer decision 2026-11-16; elevation
+  posture approved): a not-elevated run relaunches the same exe through one
+  UAC `runas` prompt, passing every other start argument with the flag
+  stripped (loop guard), and exits 0; an already-elevated run logs one
+  `[Elevation] running elevated` line and starts normally; under
+  python.exe (dev mode) no relaunch is attempted - a hint prints and the
+  run continues. The prompt-free route stays the scheduled task with
+  `/RL HIGHEST` (WIKI [Start Arguments]).
 - Every lifecycle transition now logs exactly one `[Lifecycle] <old> -> <new>
   (<reason>)` line (improvement plan 2026-11-15, Phase A unit F-A5): startup,
   pause, reload, menu re-entry and shutdown all pass an explicit lifecycle
