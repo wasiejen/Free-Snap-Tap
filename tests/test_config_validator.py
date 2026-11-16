@@ -688,6 +688,7 @@ class TestGuiBranchWiring:
             'setup_fst_logging': lambda: None,
             'logger': MagicMock(),
             'set_console_visibility': lambda flag: None,
+            'handle_elevate_flag': lambda args: args,
             'FST_Keyboard': lambda: kb,
             'sys': types.SimpleNamespace(argv=['free_snap_tap.py'],
                                          exit=fake_exit),
