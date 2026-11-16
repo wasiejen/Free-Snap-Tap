@@ -11,7 +11,9 @@ treated as not elevated), no-flag zero-behavior-change, and the __main__
 wiring (lane runs before any UI/hook init and its filtered args feed
 set_sys_start_arguments). The cross-product polish unit (2026-11-16) adds
 the raw-seam pins (restype c_void_p set before the call, NULL -> 0) and the
-SE_ERR_* label table."""
+SE_ERR_* label table. The pair-approved alias unit (2026-11-16) adds the
+'-elevated' startup-alias pins (both spellings trigger the lane, the strip
+strips whichever spelling the parent was given)."""
 import ctypes
 import logging
 import os
@@ -88,6 +90,51 @@ class TestParseLane:
         start-arg parser still warns about truly-unknown args itself)'''
         for other in ('-elevate', '--ELEVATE', '--elevate=1',
                       '-file=--elevate'):
+            assert handle_elevate_flag([other]) == [other]
+        assert seams.admin_calls == 0
+        assert seams.runas_calls == []
+
+
+class TestElevatedAlias:
+    '''pair-approved 2026-11-16 (WTD cross-product vocabulary parity):
+    '-elevated' is an accepted alias of the canonical '--elevate' in the
+    STARTUP lane. Docs and messages keep the canonical spelling.'''
+
+    @pytest.mark.parametrize('spelling', [ELEVATE_FLAG, '-elevated'])
+    def test_both_spellings_trigger_the_lane(self, seams, spelling):
+        '''either spelling runs the lane (mocked IsUserAnAdmin called
+        once) and the flag comes back stripped'''
+        seams.admin_result = True
+        rest = handle_elevate_flag(['-nomenu', spelling, '-flow'])
+        assert rest == ['-nomenu', '-flow']
+        assert seams.admin_calls == 1
+        assert seams.runas_calls == []
+
+    @pytest.mark.parametrize('spelling', [ELEVATE_FLAG, '-elevated'])
+    def test_relaunch_strips_whichever_spelling_was_used(self, seams,
+                                                         spelling):
+        '''loop guard per spelling: the relaunched child gets the other
+        args, never the elevation flag the parent was given'''
+        seams.admin_result = False
+        with pytest.raises(SystemExit) as caught:
+            handle_elevate_flag([spelling, '-file=my config.txt'])
+        assert caught.value.code == 0
+        assert seams.runas_calls == [
+            (FAKE_EXE, '"-file=my config.txt"', os.getcwd())]
+
+    def test_both_spellings_together_strip_both(self, seams):
+        '''an argv carrying both spellings at once leaves the child with
+        neither'''
+        seams.admin_result = True
+        assert handle_elevate_flag(
+            [ELEVATE_FLAG, '-elevated', '-flow']) == ['-flow']
+
+    def test_alias_is_exact_token_and_case_sensitive(self, seams):
+        '''the alias matches exactly like the canonical flag: single-dash
+        past tense only - '-elevate', '-ELEVATED', an attached value and
+        an embedded occurrence stay on the untouched legacy path'''
+        for other in ('-elevate', '-ELEVATED', '-elevated=1',
+                      '-file=-elevated'):
             assert handle_elevate_flag([other]) == [other]
         assert seams.admin_calls == 0
         assert seams.runas_calls == []
