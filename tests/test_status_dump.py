@@ -223,8 +223,12 @@ class TestTriggers:
         reasons = []
         kb.request_status_dump.side_effect = lambda reason='startup': reasons.append(reason)
 
+        parks = []
+
         async def fake_park(self, observed):
-            if len(reasons) >= 1:
+            # bounded: a lost call site lands a named red, never a hang
+            parks.append(observed)
+            if reasons or len(parks) >= 3:
                 raise _AfterFirstPark()
 
         monkeypatch.setattr(MainLogic, '_park', fake_park)
@@ -304,7 +308,7 @@ class TestLedgerSection:
 
         write_dump(kb, reason='pin', now=ticket.created_at + 1.0)
         text = artifact_text()
-        row = f"  {ticket.seq} {VK_A} press scheduled tap TAP_1 "
+        row = f"  {ticket.seq} {VK_A} press scheduled tap 'TAP_1' "
 
         assert any(line.startswith(row) for line in text.splitlines()), (
             f'no table row for the open ticket: {ticket!r}')
@@ -365,7 +369,7 @@ class TestLedgerSection:
 
         assert '[StuckKeyWatch]' not in text
         assert '[StuckKeyWatch]' not in caplog.text
-        assert f"  {ticket.seq} {VK_A} press scheduled macro m1 " in text
+        assert f"  {ticket.seq} {VK_A} press scheduled macro 'm1' " in text
 
     def test_threshold_is_configurable(self, kb_env_plain, monkeypatch):
         """CONSTANTS.STUCK_TICKET_MS is the knob (the suite's autouse
@@ -482,6 +486,84 @@ class TestThreadContract:
         text = artifact_text()
         assert "thread='fst-loop-under-test'" in text
         assert "reason='thread_pin'" in text
+
+
+class TestArtifactValues:
+    """The artifact's VALUES, not only its markers: a report that reads
+    the wrong value is worse than no report at all."""
+
+    def test_every_reported_arg_resolves_on_a_real_argument_manager(
+            self, kb_env_plain):
+        """STATUS_ARG_NAMES is the artifact's public surface: a name that
+        no longer exists would silently report '=None' and teach the
+        reporter the wrong thing."""
+        kb = kb_env_plain
+
+        write_dump(kb, reason='pin')
+        text = artifact_text()
+
+        assert fst_manager.STATUS_ARG_NAMES, 'the arg surface is empty'
+        for name in fst_manager.STATUS_ARG_NAMES:
+            key = name.lower() + '='
+            assert key in text, f'arg missing from the artifact: {name}'
+            assert key + 'None' not in text, (
+                f'{name} does not resolve on a real Argument_Manager')
+
+    def test_lifecycle_and_group_counts_are_the_live_values(self, kb_env_plain):
+        """The lifecycle line reads the machine, the count lines read the
+        live generation - both are pinned against the objects, not literals."""
+        from fst_data_types import Lifecycle_State
+        from types import SimpleNamespace
+
+        kb = kb_env_plain
+        kb._lifecycle = SimpleNamespace(state=Lifecycle_State.PAUSED)
+        build(kb, taps=[TAP_A_B])
+        rt = kb._runtime
+
+        write_dump(kb, reason='pin')
+        text = artifact_text()
+
+        assert 'state=paused' in text
+        assert f'gen_id={rt.gen_id}' in text
+        assert f'tap_groups={len(rt.tap_groups)}' in text
+        assert 'tap_groups=1' in text and 'rebinds=0' in text
+        assert f'tap_owned_vks={len(rt.tap_owner_by_vk)}' in text
+
+    def test_the_startup_leg_writes_the_real_artifact(self, kb_env_plain,
+                                                     monkeypatch, tmp_path):
+        """End to end on the real objects: MainLogic._start_listening (the
+        startup leg, off the pump, on the loop thread) is what produces the
+        file a reporter attaches - not only the dump object called direct."""
+        from free_snap_tap import MainLogic
+
+        class _AfterFirstPark(Exception):
+            pass
+
+        kb = kb_env_plain
+        kb.arg_manager.WIN32_FILTER_PAUSED = False
+        kb.arg_manager.MENU_ENABLED = False  # the -nomenu shape: straight to listening
+        kb.config_manager.file_name = _write_config(tmp_path, 'a, b\n')
+        monkeypatch.setattr(kb, 'init_listener', lambda: None)
+        monkeypatch.setattr(kb, 'start_listener', lambda: None)
+        build(kb, taps=[TAP_A_B])
+
+        async def fake_park(self, observed):
+            raise _AfterFirstPark()
+
+        monkeypatch.setattr(MainLogic, '_park', fake_park)
+        logic = MainLogic(kb)
+        loop = logic.loop
+        try:
+            with pytest.raises(_AfterFirstPark):
+                loop.run_until_complete(loop.create_task(logic.run()))
+        finally:
+            _cancel_and_close(loop)
+
+        text = artifact_text()
+        assert "reason='startup'" in text
+        assert 'state=running' in text
+        assert 'tap_groups=1' in text
+        assert f"pid={fst_manager.os.getpid()}" in text
 
 
 # --- harness -----------------------------------------------------------------

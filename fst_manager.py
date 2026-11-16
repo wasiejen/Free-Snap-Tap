@@ -12,7 +12,8 @@ from random import randint # randint(3, 9))
 from time import time, monotonic # sleep(0.005) = 5 ms; monotonic = F-B4 age anchor
 from fst_data_types import (Key_Event, type_check, ConfigError,
                             FOCUS_NAME_ILLEGAL, Lifecycle_State,
-                            SOURCE_DRAIN, SOURCE_TOGGLE)
+                            SOURCE_DRAIN, SOURCE_TOGGLE,
+                            TICKET_COMPLETED, TICKET_STATES)
 from fst_tasks import Focus_Task, Macro_Repeat_Task
 import datetime
 import re #regular expression
@@ -2925,10 +2926,11 @@ STATUS_ARG_NAMES = (
 
 
 def _status_text(value):
-    '''User text for the artifact: ASCII-escaped (the file must survive a copy
-    into an issue tracker or a console), None collapsed to '-', everything
-    stringified through ascii() so a non-ASCII config name can never mangle a
-    reporter\'s paste.'''
+    '''A name or user-text field for the artifact: ASCII-escaped (a non-ASCII
+    focus name or source id must not mangle a reporter\'s paste), None
+    collapsed to '-', everything stringified through ascii(). Numeric fields
+    and the path lines render raw on purpose - a path has to stay copy-paste
+    able, and a vk or seq has to stay greppable.'''
     if value is None:
         return '-'
     return ascii(str(value))
@@ -2978,7 +2980,9 @@ class Status_Dump():
     # -- the two entry points ------------------------------------------------
 
     def render(self, reason='startup', now=None):
-        '''The whole artifact as one string. No file I/O. `now` is the
+        '''The whole artifact as one string - no ARTIFACT file I/O (the
+        aging detector below does log, so a re-render re-emits a live
+        warning; only `write` touches fst_status.log). `now` is the
         monotonic anchor the ledger ages are measured against - pass it in a
         test to fake the clock (no sleeps in the suite); None reads the
         clock once, so every ticket in this render ages from ONE instant.'''
@@ -3127,16 +3131,24 @@ class Status_Dump():
         held = dict(getattr(self._fst, '_macro_held', None) or {})
         lines.append(f"macro_holds={len(held)}")
         for alias in sorted(str(a) for a in held):
-            lines.append(f"macro_hold alias={_status_text(alias)} "
-                         f"vks={','.join(str(vk) for vk in sorted(held[alias], key=str))}")
+            # the inner dict is live too (the READ RULE): copy before sorting
+            vks = ','.join(str(vk) for vk in sorted(dict(held[alias]), key=str))
+            lines.append(f"macro_hold alias={_status_text(alias)} vks={vks}")
         return lines
 
     def _ledger_lines(self, now):
         ledger = getattr(self._fst, '_ledger', None)
         if ledger is None:
             return ['ledger: none']
-        open_now = ledger.open_tickets()
-        counts = ledger.counts()
+        # ONE snapshot scan serves every number in this section: open_tickets()
+        # plus counts() would be two scans, and a ticket whose state flipped in
+        # between could make open=, counts_state= and the rows disagree - the
+        # exact one-scan rule open_tickets documents (F-A6 reviewer P2-3 family)
+        scanned = ledger.tickets()
+        counts = {state: 0 for state in TICKET_STATES}
+        for ticket in scanned:
+            counts[ticket.state] = counts.get(ticket.state, 0) + 1
+        open_now = [t for t in scanned if t.state != TICKET_COMPLETED]
         threshold = CONSTANTS.STUCK_TICKET_MS
         by_source = {}
         for ticket in open_now:
@@ -3144,7 +3156,7 @@ class Status_Dump():
                                                           0) + 1
         lines = [
             f"high_seq={ledger.high_seq()}",
-            f"total={sum(counts.values())}",
+            f"total={len(scanned)}",
             f"open={len(open_now)}",
             'counts_state=' + ' '.join(f"{state}={counts.get(state, 0)}"
                                        for state in sorted(counts)),
@@ -3157,7 +3169,7 @@ class Status_Dump():
             age_ms = int((now - ticket.created_at) * 1000)
             lines.append(f"  {ticket.seq} {ticket.vk} {ticket.kind} "
                          f"{ticket.state} {ticket.source_kind} "
-                         f"{ticket.source_id} {ticket.gen_id} "
+                         f"{_status_text(ticket.source_id)} {ticket.gen_id} "
                          f"{int(bool(ticket.is_mouse))} {age_ms}")
             if age_ms > threshold:
                 stuck.append((ticket, age_ms))

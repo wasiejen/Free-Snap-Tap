@@ -76,7 +76,9 @@ class Ticket():
                   store only (never read-modify-write from another thread)
       is_mouse    the mouse legs share the same send path but a different veto
       created_at  monotonic seconds at construction - the F-B4 status dump's
-                  ticket-aging watch reads it; stamped once, never rewritten
+                  ticket-aging watch ages from it; stamped from the clock here
+                  (never injected: one clock for every age in the artifact),
+                  written once, never rewritten
 
     The growth slot the contract reserves but this unit does NOT implement:
     reason_code (suppression annotation). created_at (compaction TTL) is the
@@ -86,7 +88,7 @@ class Ticket():
                  'state', 'is_mouse', 'created_at')
 
     def __init__(self, vk, source_kind, source_id, gen_id, kind, seq,
-                 state=TICKET_SCHEDULED, is_mouse=False, created_at=None):
+                 state=TICKET_SCHEDULED, is_mouse=False):
         self.vk = vk
         self.source_kind = source_kind
         self.source_id = source_id
@@ -98,7 +100,7 @@ class Ticket():
         # one monotonic read at construction, before the ticket is published:
         # a concurrent reader either sees the ticket (with its age anchor) or
         # does not see it, never a half-filled record
-        self.created_at = monotonic() if created_at is None else created_at
+        self.created_at = monotonic()
 
     def __repr__(self):
         return (f"Ticket(seq={self.seq}, vk={self.vk}, kind={self.kind}, "
