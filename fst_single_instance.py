@@ -64,13 +64,16 @@ def _kernel32_create_mutexw(name):
     as the elevation lane's ShellExecuteW restype, cross-product polish
     2026-11-16): the return is a HANDLE (pointer-sized), so ctypes'
     default c_int truncates the high dword on x64 and a healthy handle
-    could read as a failure'''
-    kernel32 = ctypes.windll.kernel32
+    could read as a failure. The library opens with use_last_error=True
+    and the code arrives via ctypes.get_last_error() (reviewer P2
+    2026-11-16: ctypes.GetLastError() on the shared windll handle could
+    in theory pick up a clobbered code and turn a refusal into 'first')'''
+    kernel32 = ctypes.WinDLL('kernel32', use_last_error=True)
     kernel32.CreateMutexW.restype = ctypes.c_void_p
     kernel32.CreateMutexW.argtypes = [ctypes.c_void_p, ctypes.c_int,
                                       ctypes.c_wchar_p]
     handle = kernel32.CreateMutexW(None, False, name)
-    return handle, ctypes.GetLastError()
+    return handle, ctypes.get_last_error()
 
 
 def acquire_single_instance_guard(mutex_name=MUTEX_NAME):
