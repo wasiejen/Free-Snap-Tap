@@ -20,6 +20,8 @@ from fst_keyboard import TOAST_NEUTRAL, TOAST_RED
 import logging
 # Use __name__ to automatically label logs with the filename
 logger = logging.getLogger(__name__)
+# GUI diagnostics ride the existing FST area tree (fst.state - no new channel)
+logger_state = logging.getLogger('fst.state')
 
 # suppress warnings about setGeometry when changing screens and drawn geometry gets out of bound
 def customMessageHandler(mode, context, message):
@@ -526,16 +528,16 @@ class CrosshairOverlay(QWidget):
         # size_multiplier = calc_size_multiplier(screen)
         size_multiplier =  1 / get_device_pixel_ratio(screen)
         
-        print(f"Screen geometry: {screen.size()}, Device Pixel Ratio: {get_device_pixel_ratio(screen)}, Size multiplier: {size_multiplier}")
+        logger_state.debug(f"Screen geometry: {screen.size()}, Device Pixel Ratio: {get_device_pixel_ratio(screen)}, Size multiplier: {size_multiplier}")
         
         
         self.size_multiplier = size_multiplier  # Store for later use in paintEvent
         self.crosshair_size = int(self._crosshair_size * size_multiplier)  # Span of the crosshair overlay
         self.thickness = int(self._thickness * size_multiplier)
         
-        print(f"Crosshair size: {self.crosshair_size}, Thickness: {self.thickness}")
+        logger_state.debug(f"Crosshair size: {self.crosshair_size}, Thickness: {self.thickness}")
         
-        print(f"Crosshair added: Device Pixel Ratio: {get_device_pixel_ratio(screen)}, Size multiplier: {size_multiplier}")
+        logger_state.debug(f"Crosshair added: Device Pixel Ratio: {get_device_pixel_ratio(screen)}, Size multiplier: {size_multiplier}")
         dx = getattr(self._fst.arg_manager, "CROSSHAIR_DELTA_X", 0)
         dy = getattr(self._fst.arg_manager, "CROSSHAIR_DELTA_Y", 0)
         x = screen_center.x() + int(dx * size_multiplier) - self.crosshair_size//2
@@ -733,7 +735,7 @@ class StatusOverlay(QWidget):
             if self.screen_changed:
                 if self.counter == 0:
                     self.set_window_size_and_position()
-                    print(f"Overlay moved to screen: {self._current_screen_name}")
+                    logger_state.debug(f"Overlay moved to screen: {self._current_screen_name}")
                     self.screen_changed = False
                 else:
                     self.counter -= 1   
@@ -746,7 +748,7 @@ class StatusOverlay(QWidget):
             # Only now, resize/recenter if needed — this avoids feedback loops!
             if self.screen_changed:
                 self.set_window_size_and_position()  # Resize and recenter
-                print(f"Overlay moved to screen: {self._current_screen_name}")
+                logger_state.debug(f"Overlay moved to screen: {self._current_screen_name}")
                 self.screen_changed = False
                 
         event.accept()
