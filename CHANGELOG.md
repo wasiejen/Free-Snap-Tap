@@ -19,6 +19,20 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   delivered (never suppressed) and the debt closes at delivery.
 
 ### Changed
+- The config grammar has ONE implementation (F-C2, review Item 4): the comment
+  cleaning, the ':' continuation join, the bracket-aware comma split, the item
+  classification (tap group / rebind / macro / macro sequence / dropped), the
+  default `(TAP_n)`/`(REB_n)`/`(MAC_n)`/`(SEQ_n)` naming, the dashed
+  start-argument spelling rule, the `<focus>` name sanitizing and the delay
+  value parse moved into a new `fst_config_parser` module that both
+  `Config_Validator` and `Config_Manager.presort_lines` now consume. Before
+  this, the validator and the runtime each carried their own copy of those
+  rules and only comments kept them in sync. No behavior change: every
+  message, every container and both known drift pairs (the validator accepts
+  delay 0 while the runtime keeps `0 < delay <= 1000`; the report and the
+  runtime containers count default names differently) are preserved as they
+  are and pinned - unifying either pair is a separate decision, not a side
+  effect of this refactor.
 - The elevation start argument accepts `-elevated` as an alias of `--elevate`
   (WTD cross-product vocabulary parity, pair-approved 2026-11-16); `--elevate`
   stays canonical. An elevation spelling used as a config `<arg>` line
