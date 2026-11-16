@@ -838,6 +838,7 @@ class TestP3LifecycleNoOps:
             '__name__': '__main__',
             'setup_fst_logging': lambda: None,
             'handle_elevate_flag': lambda args: args,
+            'handle_single_instance_guard': lambda: None,
             'logger': MagicMock(),
             'set_console_visibility': lambda flag: None,
             'FST_Keyboard': lambda: kb,

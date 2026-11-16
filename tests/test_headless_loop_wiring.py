@@ -492,6 +492,7 @@ class TestLeg2LoopWiring:
             'logger': MagicMock(),
             'set_console_visibility': lambda flag: None,
             'handle_elevate_flag': lambda args: args,
+            'handle_single_instance_guard': lambda: None,
             'FST_Keyboard': lambda: kb,
             'sys': types.SimpleNamespace(argv=['free_snap_tap.py'],
                                          exit=lambda code=0: (_ for _ in ()).throw(SystemExit(code))),

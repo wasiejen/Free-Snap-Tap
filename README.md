@@ -7,6 +7,8 @@ A minimalistic Python-based Snap Tapping program compatible with all keyboards a
 ## General (very short) overview of functionalities
 For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
 
+FST runs one instance at a time - starting a second one exits with a notice.
+
 <img src="https://github.com/user-attachments/assets/c730d4ed-d16c-43ca-8368-409fb661b399" alt="crosshair" width="200"/>
 <img src="https://github.com/user-attachments/assets/abbed088-8271-4160-98b6-ca770d12757c" alt="crosshair" width="250"/>
 

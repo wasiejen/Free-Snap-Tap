@@ -57,6 +57,13 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   python.exe (dev mode) no relaunch is attempted - a hint prints and the
   run continues. The prompt-free route stays the scheduled task with
   `/RL HIGHEST` (WIKI [Start Arguments]).
+- Single-instance guard: one FST instance at a time (maintainer decision
+  2026-11-16 - a double start doubled the input streams). A second start
+  logs one `[SingleInstance] another FST is already running - exiting`
+  line and exits with code 1 (no traceback). The guard runs after the
+  `--elevate` lane and before any UI/hook init, on a `Global\` named
+  mutex (visible across all sessions, session-0 included); a mutex API
+  failure fails OPEN - a warning names it and the start continues.
 - Every lifecycle transition now logs exactly one `[Lifecycle] <old> -> <new>
   (<reason>)` line (improvement plan 2026-11-15, Phase A unit F-A5): startup,
   pause, reload, menu re-entry and shutdown all pass an explicit lifecycle

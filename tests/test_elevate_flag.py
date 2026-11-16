@@ -370,6 +370,7 @@ class TestMainBlockWiring:
             'logger': MagicMock(),
             'set_console_visibility': console,
             'handle_elevate_flag': lane,
+            'handle_single_instance_guard': lambda: None,
             'FST_Keyboard': keyboard,
             'sys': types.SimpleNamespace(
                 argv=['free_snap_tap.py', '-nomenu', ELEVATE_FLAG, '-flow'],
