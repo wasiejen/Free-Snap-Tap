@@ -10,6 +10,7 @@ exit), wrapped admin check (win32 failure = treated as not elevated),
 no-flag zero-behavior-change, and the __main__ wiring (lane runs before
 any UI/hook init and its filtered args feed set_sys_start_arguments)."""
 import logging
+import os
 import sys
 
 import pytest
@@ -19,7 +20,12 @@ from fst_manager import (ELEVATE_FLAG, ELEVATE_DEV_MESSAGE,
                          handle_elevate_flag)
 
 ELEVATED_LINE = '[Elevation] running elevated'
+# byte literal on purpose (reviewer P2 2026-11-16): the WIKI documents this
+# exact hint; pinning the literal keeps code and docs byte-locked
+DEV_HINT = ('[Elevation] dev mode - relaunch the exe manually or use '
+            'scheduled task')
 FAKE_EXE = 'C:/build/free_snap_tap_nuitka_.exe'
+BS = chr(92)
 
 
 @pytest.fixture()
@@ -32,6 +38,7 @@ def seams(monkeypatch):
             self.admin_result = True
             self.admin_raises = None
             self.runas_calls = []
+            self.runas_result = 42  # any HINSTANCE > 32 = success
 
         def fake_admin(self):
             self.admin_calls += 1
@@ -39,9 +46,9 @@ def seams(monkeypatch):
                 raise self.admin_raises
             return self.admin_result
 
-        def fake_runas(self, exe_path, parameters):
-            self.runas_calls.append((exe_path, parameters))
-            return 42  # any HINSTANCE - the return is unused
+        def fake_runas(self, exe_path, parameters, work_dir):
+            self.runas_calls.append((exe_path, parameters, work_dir))
+            return self.runas_result
 
     seams = Seams()
     monkeypatch.setattr(fst_manager, '_shell32_is_user_an_admin',
@@ -107,14 +114,30 @@ class TestRelaunch:
                 ['-nomenu', ELEVATE_FLAG, '-file=my config.txt'])
         assert caught.value.code == 0
         assert seams.runas_calls == [
-            (FAKE_EXE, '-nomenu "-file=my config.txt"')]
+            (FAKE_EXE, '-nomenu "-file=my config.txt"', os.getcwd())]
+
+    def test_trailing_backslash_arg_quoting_is_crt_safe(self, seams):
+        '''reviewer P1 (2026-11-16): a spaced dir value with a TRAILING
+        BACKSLASH (-save_dir=/-backup_root_dir= users write this) must go
+        through the MSVC quoting rules (list2cmdline) - hand-rolled
+        space-quoting reaches the child corrupted; byte-exact pin of the
+        lpParameters build'''
+        seams.admin_result = False
+        spaced_dir = '-backup_root_dir=C:' + BS + 'My Backups' + BS
+        with pytest.raises(SystemExit) as caught:
+            handle_elevate_flag([ELEVATE_FLAG, spaced_dir])
+        assert caught.value.code == 0
+        assert seams.runas_calls == [
+            (FAKE_EXE,
+             '"-backup_root_dir=C:' + BS + 'My Backups' + BS + BS + '"',
+             os.getcwd())]
 
     def test_flag_only_argv_relaunches_with_empty_parameters(self, seams):
         seams.admin_result = False
         with pytest.raises(SystemExit) as caught:
             handle_elevate_flag([ELEVATE_FLAG])
         assert caught.value.code == 0
-        assert seams.runas_calls == [(FAKE_EXE, '')]
+        assert seams.runas_calls == [(FAKE_EXE, '', os.getcwd())]
 
     def test_admin_check_failure_treated_as_not_elevated(self, seams,
                                                          caplog):
@@ -131,6 +154,18 @@ class TestRelaunch:
         assert 'IsUserAnAdmin failed' in caplog.text
         assert len(seams.runas_calls) == 1
 
+    def test_declined_uac_warns_but_still_exits_0(self, seams, caplog):
+        '''reviewer P2 (2026-11-16): ShellExecuteW <= 32 (5 = the declined
+        prompt) must log a named warning line - the exit code stays 0 per
+        spec, but the log keeps the failure distinguishable'''
+        seams.admin_result = False
+        seams.runas_result = 5  # SE_ERR_ACCESSDENIED
+        with caplog.at_level(logging.WARNING, logger='fst'):
+            with pytest.raises(SystemExit) as caught:
+                handle_elevate_flag([ELEVATE_FLAG])
+        assert caught.value.code == 0
+        assert 'runas relaunch returned 5' in caplog.text
+
 
 class TestDevMode:
     def test_dev_mode_prints_hint_and_continues(self, seams, capsys,
@@ -144,7 +179,9 @@ class TestDevMode:
         assert rest == ['-flow']
         assert seams.admin_calls == 1
         assert seams.runas_calls == []
-        assert ELEVATE_DEV_MESSAGE in capsys.readouterr().out
+        # byte literal pin (not the module constant) + identity lock
+        assert ELEVATE_DEV_MESSAGE == DEV_HINT
+        assert DEV_HINT in capsys.readouterr().out
 
     def test_dev_mode_already_elevated_wins_the_elevated_lane(
             self, seams, caplog, monkeypatch, capsys):
@@ -185,10 +222,23 @@ class TestMainBlockWiring:
         kb.arg_manager.STATUS_INDICATOR = False
         kb.arg_manager.CMD_WINDOW_HIDDEN = True
         seen = {}
+        init_state = {'console': False, 'keyboard': False}
 
         def lane(argv):
             seen['lane_argv'] = list(argv)
+            # ORDER pin (reviewer P2 2026-11-16): when the lane runs, the
+            # console toggle and the keyboard/UI construction must not have
+            # happened yet (the dev-mode hint would land in a hidden console)
+            seen['console_at_lane'] = init_state['console']
+            seen['keyboard_at_lane'] = init_state['keyboard']
             return [arg for arg in argv if arg != ELEVATE_FLAG]
+
+        def console(flag):
+            init_state['console'] = True
+
+        def keyboard():
+            init_state['keyboard'] = True
+            return kb
 
         class FakeThread:
             def __init__(self, target=None, daemon=None):
@@ -202,9 +252,9 @@ class TestMainBlockWiring:
             '__name__': '__main__',
             'setup_fst_logging': lambda: None,
             'logger': MagicMock(),
-            'set_console_visibility': lambda flag: None,
+            'set_console_visibility': console,
             'handle_elevate_flag': lane,
-            'FST_Keyboard': lambda: kb,
+            'FST_Keyboard': keyboard,
             'sys': types.SimpleNamespace(
                 argv=['free_snap_tap.py', '-nomenu', ELEVATE_FLAG, '-flow'],
                 exit=lambda code=0: (_ for _ in ()).throw(SystemExit(code))),
@@ -221,5 +271,7 @@ class TestMainBlockWiring:
         with pytest.raises(SystemExit):
             exec(code, globs)
         assert seen['lane_argv'] == ['-nomenu', ELEVATE_FLAG, '-flow']
+        assert seen['console_at_lane'] is False
+        assert seen['keyboard_at_lane'] is False
         kb.set_sys_start_arguments.assert_called_once_with(
             ['-nomenu', '-flow'])

@@ -461,7 +461,7 @@ Everything else should be put in the config file and then can be applied on a pe
 
 **Prompt-free elevated autostart (scheduled task):** run this ONCE from an elevated shell:
 `schtasks /Create /TN "FreeSnapTap" /TR "C:\path\free_snap_tap.exe" /SC ONLOGON /RL HIGHEST`
-(or in Task Scheduler UI check "Run with highest privileges"). The task starts FST elevated at every logon with no UAC prompt - registration is the only elevation moment, and the exe needs no `--elevate` flag there (`/RL HIGHEST` alone carries the elevation; the flag is for manual/relaunch use). Background and posture notes: estate research `agent/research/2026-11-13_elevated-input.md` section 5.
+(or in Task Scheduler UI check "Run with highest privileges"). The task starts FST elevated at every logon with no UAC prompt - registration is the only elevation moment, and the exe needs no `--elevate` flag there (`/RL HIGHEST` alone carries the elevation; the flag is for manual/relaunch use). (Background and security posture of elevated input: internal research note `agent/research/2026-11-13_elevated-input.md` section 5 - agent repo, not shipped with this one.)
 
 **(deprecated)**
 Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_tap.exe)

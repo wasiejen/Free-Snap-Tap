@@ -25,6 +25,7 @@ import asyncio
 import copy
 import os # --elevate lane: basename of sys.executable (dev-mode detection)
 import ctypes # --elevate lane: shell32 IsUserAnAdmin + ShellExecuteW runas
+import subprocess # --elevate lane: list2cmdline argv quoting for lpParameters
 
 import logging
 # FST area-logger tree (design 2026-10-01_fst-logging-design.md §3):
@@ -2129,13 +2130,15 @@ def _shell32_is_user_an_admin():
     return bool(ctypes.windll.shell32.IsUserAnAdmin())
 
 
-def _shell32_runas_relaunch(exe_path, parameters):
+def _shell32_runas_relaunch(exe_path, parameters, work_dir):
     '''the bare ctypes seam for ShellExecuteW(NULL, "runas", ...) (tests
-    patch this); the SE result is read but unused: a declined UAC prompt
-    lands as a <=32 HINSTANCE and the user simply re-runs the exe (per
-    spec the parent exits 0 either way - no retry, no loop)'''
+    patch this); returns the HINSTANCE int (<= 32 = SE_ERR_* failure).
+    work_dir pins the child's CWD to the parent's so relative -save_dir= /
+    -backup_root_dir= / -file= values resolve on the same footing as they
+    would without the relaunch (reviewer P2 2026-11-16: lpDirectory was
+    left NULL and the child CWD unpinned)'''
     return int(ctypes.windll.shell32.ShellExecuteW(None, 'runas', exe_path,
-                                                   parameters, None, 1))
+                                                   parameters, work_dir, 1))
 
 
 def _is_process_elevated():
@@ -2159,9 +2162,11 @@ def _is_dev_python():
 
 def _build_runas_parameters(args):
     '''join the flag-free argv into the ONE lpParameters string ShellExecuteW
-    wants; args containing a space are quoted so the child's argv parser
-    hands them back as single args (order preserved)'''
-    return ' '.join(f'"{arg}"' if ' ' in arg else arg for arg in args)
+    wants. list2cmdline applies the exact MSVC argv-quoting rules the child's
+    C runtime reverses (reviewer P1 2026-11-16: hand-rolled space-quoting
+    corrupts spaced args with trailing backslashes or embedded quotes);
+    order preserved'''
+    return subprocess.list2cmdline(args)
 
 
 def handle_elevate_flag(argv):
@@ -2186,7 +2191,16 @@ def handle_elevate_flag(argv):
         print(ELEVATE_DEV_MESSAGE)
         return rest
     logger.info('[Elevation] relaunching elevated via runas')
-    _shell32_runas_relaunch(sys.executable, _build_runas_parameters(rest))
+    se_result = _shell32_runas_relaunch(sys.executable,
+                                        _build_runas_parameters(rest),
+                                        os.getcwd())
+    if se_result <= 32:
+        # SE_ERR_* (5 = the declined UAC prompt): the exit code stays 0 per
+        # spec, but the failure gets a named warning line - a silent exit
+        # would leave the log indistinguishable from a successful relaunch
+        logger.warning(f'[Elevation] runas relaunch returned {se_result} - '
+                       'no elevated instance started; launch the exe as '
+                       'administrator manually if none appeared')
     sys.exit(0)
 
 
