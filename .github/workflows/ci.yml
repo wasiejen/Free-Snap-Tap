@@ -25,8 +25,8 @@ jobs:
         # tests/conftest.py pins QT_QPA_PLATFORM=offscreen - no display server needed
         run: python -m pytest -q
 
-      # informational only - baseline has 6 pre-existing ruff F findings
-      # (TODO.md #2); switch to a hard check once they are fixed
-      - name: Lint (informational)
-        continue-on-error: true
+      # hard gate (F-B2): the 6 pre-existing F findings are cleared (TODO.md #2),
+      # so the F gate now fails the build - do not re-add continue-on-error
+      # (pinned by tests/test_ci_ruff_gate.py)
+      - name: Lint (ruff F gate)
         run: python -m ruff check --select F .
