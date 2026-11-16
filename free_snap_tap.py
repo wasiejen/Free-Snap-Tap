@@ -11,7 +11,7 @@ from time import sleep
 import datetime
 
 from fst_keyboard import FST_Keyboard
-from fst_manager import CONSTANTS, setup_fst_logging
+from fst_manager import CONSTANTS, setup_fst_logging, handle_elevate_flag
 from fst_data_types import ConfigError, Lifecycle_State
 from fst_overlay import GUI_Manager, set_console_visibility, ToastBridge
 from PySide6.QtWidgets import QApplication
@@ -481,11 +481,19 @@ if __name__ == "__main__":
     setup_fst_logging()
     logger.info("--- FST startet ---")
 
+    # --elevate startup lane (maintainer decision 2026-11-16): runs BEFORE
+    # any UI/hook init and BEFORE the start-arg pipeline reads argv. It
+    # returns the args to continue with (flag stripped); a not-elevated
+    # frozen run relaunches the exe elevated via runas and exits 0 inside
+    # the lane (so nothing below it runs). No flag = argv returned untouched.
+    sys_start_args = handle_elevate_flag(
+        sys.argv[1:] if len(sys.argv) > 1 else [])
+
     set_console_visibility(False)  # Hide console window at startup
 
     try:
         fst_keyboard = FST_Keyboard()
-        fst_keyboard.set_sys_start_arguments(sys.argv[1:] if len(sys.argv) > 1 else [])
+        fst_keyboard.set_sys_start_arguments(sys_start_args)
         fst_keyboard.update_args_and_groups(startup=True)
     except ConfigError as error:
         print(f"[FST] {error}")

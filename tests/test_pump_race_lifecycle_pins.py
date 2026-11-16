@@ -837,6 +837,7 @@ class TestP3LifecycleNoOps:
         globs = _MainGlobals({
             '__name__': '__main__',
             'setup_fst_logging': lambda: None,
+            'handle_elevate_flag': lambda args: args,
             'logger': MagicMock(),
             'set_console_visibility': lambda flag: None,
             'FST_Keyboard': lambda: kb,

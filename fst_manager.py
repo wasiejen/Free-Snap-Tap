@@ -23,6 +23,9 @@ from fst_save_file_handler import make_backup as mb, restore_backup as rb
 import pyperclip # to copy mouse position to clipboard for easier pasting
 import asyncio
 import copy
+import os # --elevate lane: basename of sys.executable (dev-mode detection)
+import ctypes # --elevate lane: shell32 IsUserAnAdmin + ShellExecuteW runas
+import subprocess # --elevate lane: list2cmdline argv quoting for lpParameters
 
 import logging
 # FST area-logger tree (design 2026-10-01_fst-logging-design.md §3):
@@ -2104,6 +2107,102 @@ class Config_Manager():
         self.add_group(['a','d'], self._tap_groups_hr)
         self.add_group(['w','s'], self._tap_groups_hr)
         self._write_out_new_file()
+
+# ---------------------------------------------------------------------------
+# --elevate startup lane (maintainer decision 2026-11-16 item 2; posture
+# approved item 3; route = research estate 2026-11-13_elevated-input.md
+# section 5 lane 1): a frozen exe given --elevate self-elevates through ONE
+# runas relaunch of itself, strips the flag from the child's args (loop
+# guard) and exits 0. free_snap_tap.py __main__ calls handle_elevate_flag
+# BEFORE any UI/hook init and feeds the returned args into the start-arg
+# pipeline - the flag never reaches apply_start_arguments, so existing
+# parsing/validation is undisturbed (see tests/test_elevate_flag.py).
+# ---------------------------------------------------------------------------
+
+ELEVATE_FLAG = '--elevate'
+
+ELEVATE_DEV_MESSAGE = ('[Elevation] dev mode - relaunch the exe manually '
+                       'or use scheduled task')
+
+
+def _shell32_is_user_an_admin():
+    '''the bare ctypes seam for IsUserAnAdmin (tests patch this)'''
+    return bool(ctypes.windll.shell32.IsUserAnAdmin())
+
+
+def _shell32_runas_relaunch(exe_path, parameters, work_dir):
+    '''the bare ctypes seam for ShellExecuteW(NULL, "runas", ...) (tests
+    patch this); returns the HINSTANCE int (<= 32 = SE_ERR_* failure).
+    work_dir pins the child's CWD to the parent's so relative -save_dir= /
+    -backup_root_dir= / -file= values resolve on the same footing as they
+    would without the relaunch (reviewer P2 2026-11-16: lpDirectory was
+    left NULL and the child CWD unpinned)'''
+    return int(ctypes.windll.shell32.ShellExecuteW(None, 'runas', exe_path,
+                                                   parameters, work_dir, 1))
+
+
+def _is_process_elevated():
+    '''wrapped admin-state check: True = high IL already. A win32 failure
+    is named in a warning and treated as NOT elevated - the honest runas
+    prompt beats a false '[Elevation] running elevated' claim'''
+    try:
+        return _shell32_is_user_an_admin()
+    except Exception as error:
+        logger.warning(f"[Elevation] IsUserAnAdmin failed: {error!r} - "
+                       "treating the process as not elevated")
+        return False
+
+
+def _is_dev_python():
+    '''dev-mode detection via sys.executable NAME: a source/pytest run
+    lives under python.exe; a frozen build (Nuitka/PyInstaller) runs its
+    own exe, so its basename never starts with 'python' (spec 2026-11-16)'''
+    return os.path.basename(sys.executable).lower().startswith('python')
+
+
+def _build_runas_parameters(args):
+    '''join the flag-free argv into the ONE lpParameters string ShellExecuteW
+    wants. list2cmdline applies the exact MSVC argv-quoting rules the child's
+    C runtime reverses (reviewer P1 2026-11-16: hand-rolled space-quoting
+    corrupts spaced args with trailing backslashes or embedded quotes);
+    order preserved'''
+    return subprocess.list2cmdline(args)
+
+
+def handle_elevate_flag(argv):
+    '''the --elevate startup lane - returns the args to continue with.
+
+    no flag: argv comes back untouched (zero behavior change, no win32
+    call at all).
+    already elevated: ONE '[Elevation] running elevated' log line, the
+    run continues with the flag stripped.
+    not elevated + dev run (python.exe): print ELEVATE_DEV_MESSAGE and
+    continue - no ShellExecute attempt, so no prompt and no loop.
+    not elevated + frozen exe: ONE runas relaunch of sys.executable with
+    the original args WITHOUT the flag (the child never sees it = loop
+    guard), then exit 0 via SystemExit.'''
+    if ELEVATE_FLAG not in argv:
+        return argv
+    rest = [arg for arg in argv if arg != ELEVATE_FLAG]
+    if _is_process_elevated():
+        logger.info('[Elevation] running elevated')
+        return rest
+    if _is_dev_python():
+        print(ELEVATE_DEV_MESSAGE)
+        return rest
+    logger.info('[Elevation] relaunching elevated via runas')
+    se_result = _shell32_runas_relaunch(sys.executable,
+                                        _build_runas_parameters(rest),
+                                        os.getcwd())
+    if se_result <= 32:
+        # SE_ERR_* (5 = the declined UAC prompt): the exit code stays 0 per
+        # spec, but the failure gets a named warning line - a silent exit
+        # would leave the log indistinguishable from a successful relaunch
+        logger.warning(f'[Elevation] runas relaunch returned {se_result} - '
+                       'no elevated instance started; launch the exe as '
+                       'administrator manually if none appeared')
+    sys.exit(0)
+
 
 class Argument_Manager():
     '''
