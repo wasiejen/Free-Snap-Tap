@@ -5,13 +5,18 @@ self-elevation relaunch pins.
 Pinned lanes: parse lane (flag accepted at any position, exact-token match
 only), strip-before-relaunch (original args kept, flag gone = loop guard),
 already-elevated (ONE log line, no relaunch), not-elevated frozen exe
-(relaunch once + SystemExit 0), dev mode (hint printed, no relaunch, no
-exit), wrapped admin check (win32 failure = treated as not elevated),
-no-flag zero-behavior-change, and the __main__ wiring (lane runs before
-any UI/hook init and its filtered args feed set_sys_start_arguments)."""
+(relaunch once + SystemExit 0), dev mode (hint logged at WARNING = console
++ fst.log, no relaunch, no exit), wrapped admin check (win32 failure =
+treated as not elevated), no-flag zero-behavior-change, and the __main__
+wiring (lane runs before any UI/hook init and its filtered args feed
+set_sys_start_arguments). The cross-product polish unit (2026-11-16) adds
+the raw-seam pins (restype c_void_p set before the call, NULL -> 0) and the
+SE_ERR_* label table."""
+import ctypes
 import logging
 import os
 import sys
+from types import SimpleNamespace
 
 import pytest
 
@@ -157,7 +162,9 @@ class TestRelaunch:
     def test_declined_uac_warns_but_still_exits_0(self, seams, caplog):
         '''reviewer P2 (2026-11-16): ShellExecuteW <= 32 (5 = the declined
         prompt) must log a named warning line - the exit code stays 0 per
-        spec, but the log keeps the failure distinguishable'''
+        spec, but the log keeps the failure distinguishable. The polish unit
+        adds the SE_ERR_* NAME so the log says which failure it was; the
+        numeric phrase stays pinned as shipped'''
         seams.admin_result = False
         seams.runas_result = 5  # SE_ERR_ACCESSDENIED
         with caplog.at_level(logging.WARNING, logger='fst'):
@@ -165,28 +172,42 @@ class TestRelaunch:
                 handle_elevate_flag([ELEVATE_FLAG])
         assert caught.value.code == 0
         assert 'runas relaunch returned 5' in caplog.text
+        # failure-mapping pin: the readable diagnostic names the code
+        assert '(SE_ERR_ACCESSDENIED)' in caplog.text
 
 
 class TestDevMode:
-    def test_dev_mode_prints_hint_and_continues(self, seams, capsys,
-                                                monkeypatch):
+    def test_dev_mode_logs_hint_at_warning_and_continues(self, seams, capsys,
+                                                        caplog, monkeypatch):
         '''python.exe (sys.executable name) + not elevated: no ShellExecute
-        attempt, no exit - the hint prints and the run continues with the
-        flag stripped'''
+        attempt, no exit - the hint is logged and the run continues with the
+        flag stripped. Polish unit P2 (2026-11-16): the hint routes through
+        the 'fst' area logger (so it mirrors to fst.log and survives
+        pythonw.exe) at WARNING - the level the product's console handler
+        passes, which is what keeps the user-facing line console-visible'''
         seams.admin_result = False
         monkeypatch.setattr(sys, 'executable', 'C:/Python312/python.exe')
-        rest = handle_elevate_flag([ELEVATE_FLAG, '-flow'])
+        with caplog.at_level(logging.WARNING, logger='fst'):
+            rest = handle_elevate_flag([ELEVATE_FLAG, '-flow'])
         assert rest == ['-flow']
         assert seams.admin_calls == 1
         assert seams.runas_calls == []
         # byte literal pin (not the module constant) + identity lock
         assert ELEVATE_DEV_MESSAGE == DEV_HINT
-        assert DEV_HINT in capsys.readouterr().out
+        hints = [record for record in caplog.records
+                 if record.getMessage() == DEV_HINT]
+        assert len(hints) == 1
+        # WARNING = the 'fst' console handler's floor (setup_fst_logging):
+        # at this level the line reaches console AND fst.log, print reached
+        # the console only
+        assert hints[0].levelno == logging.WARNING
+        assert hints[0].name == 'fst'
+        assert capsys.readouterr().out == ''
 
     def test_dev_mode_already_elevated_wins_the_elevated_lane(
-            self, seams, caplog, monkeypatch, capsys):
+            self, seams, caplog, monkeypatch):
         '''elevated-state check runs BEFORE the dev-mode branch: an
-        elevated python.exe logs the elevated line, prints no hint'''
+        elevated python.exe logs the elevated line, logs no hint'''
         seams.admin_result = True
         monkeypatch.setattr(sys, 'executable', 'C:/Python313/python.EXE')
         with caplog.at_level(logging.INFO, logger='fst'):
@@ -194,7 +215,55 @@ class TestDevMode:
         assert rest == []
         assert seams.runas_calls == []
         assert ELEVATED_LINE in caplog.text
-        assert ELEVATE_DEV_MESSAGE not in capsys.readouterr().out
+        assert ELEVATE_DEV_MESSAGE not in caplog.text
+
+
+class TestShell32Seam:
+    '''the raw ctypes seam (the lane pins patch it away, so these drive it
+    directly against a fake windll: no real shell32 call happens and the
+    F-B7 tripwire is never reached)'''
+
+    def test_relaunch_seam_sets_void_pointer_restype_before_the_call(
+            self, monkeypatch):
+        '''polish P2 (2026-11-16): ShellExecuteW returns an HINSTANCE-cast
+        INT_PTR, so ctypes' default c_int truncates the x64 high dword and a
+        healthy relaunch could read <= 32 (a false 'no elevated instance
+        started' warning after a good relaunch). The seam pins restype =
+        c_void_p BEFORE the call and maps a NULL (None) return to 0 = the
+        failure band.
+        Discriminator: the shipped seam never touches restype, so the fake
+        records 'ctypes-default' there = RED before the fix.'''
+        recorded = {}
+
+        class FakeShellExecute:
+            restype = 'ctypes-default'
+
+            def __call__(self, *args):
+                recorded['restype_at_call'] = self.restype
+                recorded['args'] = args
+                return None  # NULL HINSTANCE -> the seam maps it to 0
+
+        fake_shell32 = SimpleNamespace(ShellExecuteW=FakeShellExecute())
+        monkeypatch.setattr(ctypes, 'windll',
+                            SimpleNamespace(shell32=fake_shell32),
+                            raising=False)
+
+        assert fst_manager._shell32_runas_relaunch(
+            FAKE_EXE, '-flow', 'C:/wd') == 0
+        assert recorded['restype_at_call'] is ctypes.c_void_p
+        assert recorded['args'] == (None, 'runas', FAKE_EXE, '-flow',
+                                    'C:/wd', 1)
+
+    def test_se_err_name_labels_the_sdk_table_and_falls_back_honestly(self):
+        '''the failure diagnostic reads the SDK table (SE_ERR_* from
+        shellapi.h, ERROR_BAD_FORMAT from winerror.h); a code outside it
+        keeps its number instead of inventing a symbol'''
+        assert fst_manager._se_err_name(5) == 'SE_ERR_ACCESSDENIED'
+        assert fst_manager._se_err_name(2) == 'SE_ERR_FNF'
+        assert fst_manager._se_err_name(11) == 'ERROR_BAD_FORMAT'
+        assert fst_manager._se_err_name(32) == 'SE_ERR_DLLNOTFOUND'
+        assert fst_manager._se_err_name(0) == 'code 0'
+        assert fst_manager._se_err_name(17) == 'code 17'
 
 
 class TestMainBlockWiring:
