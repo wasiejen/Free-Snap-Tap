@@ -151,10 +151,19 @@ def combine_multiline_continuations(numbered_lines):
     return multiline_cleaned_lines
 
 
+def sanitize_focus_text(text):
+    '''the ONE focus-name sanitizer (fst_data_types.FOCUS_NAME_ILLEGAL): config
+    headers, the runtime focus map, and the polled window title all pass
+    through this same rule, because matching is done by
+    cleaned_title.find(config_name) - a different pattern on either side
+    silently disables a section (#399)'''
+    return re.sub(FOCUS_NAME_ILLEGAL, '', text)
+
+
 def clean_focus_header(line):
     '''the cleaned text behind <focus> (illegal focus characters removed);
     the ONE place the focus-name sanitizing regex runs on a config header'''
-    return re.sub(FOCUS_NAME_ILLEGAL, '', line.replace(FOCUS_HEADER, ''))
+    return sanitize_focus_text(line.replace(FOCUS_HEADER, ''))
 
 
 def focus_scope_of(line):

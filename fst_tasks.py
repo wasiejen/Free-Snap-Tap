@@ -5,11 +5,13 @@ last updated: 241105-2004
 
 import asyncio
 import pygetwindow as gw
-import re #regular expression
+# F-C2 (review Item 4): re/FOCUS_NAME_ILLEGAL left this file with the focus
+# sanitizer - the window title now goes through the parser's
+# sanitize_focus_text, the ONE rule the config side uses too (#399)
 
 import logging
 
-from fst_data_types import FOCUS_NAME_ILLEGAL
+from fst_config_parser import sanitize_focus_text
 # the macro-area logger of the FST logger tree (same cached instance as
 # fst_manager's logger_macro - no circular import, fst_manager imports us)
 logger_macro = logging.getLogger('fst.macro')
@@ -151,11 +153,12 @@ class Focus_Task:
                 if active_window != last_active_window:
                     last_active_window = active_window
                 # sanitize the window title with the SAME rule the config side
-                # uses (fst_data_types.FOCUS_NAME_ILLEGAL, #399): matching is
+                # uses (fst_config_parser.sanitize_focus_text -> FST's
+                # FOCUS_NAME_ILLEGAL, #399): matching is
                 # cleaned_title.find(config_name), so a different pattern here
                 # silently disables every focus group whose name keeps a legal
                 # char this strip would remove
-                active_window = re.sub(FOCUS_NAME_ILLEGAL, '', active_window)
+                active_window = sanitize_focus_text(active_window)
                 # if not one of my own spawned windows
                 if active_window not in ["FST Status Indicator", "FST Crosshair", "FST_Overlay"]:
                     if not self.FOCUS_THREAD_PAUSED and not self._fst.arg_manager.MANUAL_PAUSED:

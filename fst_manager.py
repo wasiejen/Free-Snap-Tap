@@ -1309,7 +1309,7 @@ class Config_Validator():
 
     def _check_focus_line(self, line_number, line):
         name = line.replace('<focus>', '')
-        stripped = re.sub(FOCUS_NAME_ILLEGAL, '', name)
+        stripped = clean_focus_header(line)
         if not stripped.strip(', ').strip():
             self._error(line_number, '(focus)', 'focus',
                         'empty focus name - add the window name after <focus>')
@@ -1805,9 +1805,9 @@ class Config_Manager():
 
         for line in group_lines:
             if line.startswith('<focus>'):
-                focus_name = line.replace('<focus>', '')
                 # #only allow letters, numbers and spaces in focus_name
-                focus_name = re.sub(FOCUS_NAME_ILLEGAL, '', focus_name)
+                # (F-C2: the SAME cleaning the validator scopes with)
+                focus_name = clean_focus_header(line)
 
                 ##260426-1851 allow multiple focus groups seperated by comma
                 focus_group_names = focus_name.split(',')
