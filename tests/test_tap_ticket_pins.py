@@ -197,7 +197,9 @@ class TestWindowTable:
             kb.set_loop(None)
 
         # F-A10: the dead-lane switch still owed and emitted the UP of 'a'
-        assert _release_count(kb_env_ns.kb_mock, VK_A) >= 1, (
+        # exactly once (the inline resend runs at most once: pump_lane returns
+        # False only when its schedule-failed arm ran no work()).
+        assert _release_count(kb_env_ns.kb_mock, VK_A) == 1, (
             'the dead-lane tap switch dropped the owed UP(a) without emitting it '
             '- the W3 permanent-stuck window is open')
         owed = [t for t in ledger.open_tickets(kind=TICKET_RELEASE)
