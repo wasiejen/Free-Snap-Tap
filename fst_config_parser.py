@@ -207,6 +207,80 @@ def parse_int_list(value):
         return None
 
 
+# --- the start-argument vocabulary (F-C3, review Item 4 inventory) ----------
+#
+# ONE vocabulary for the two entry worlds. The config world ('<arg>-flag'
+# lines) checks a name against these sets and reports what it does not know;
+# the command-line world (Argument_Manager.apply_start_arguments) dispatches
+# on its own branch chain and is LENIENT where the config world is strict:
+# '-tray_iconX' works there (branch prefix match) while the config validator
+# warns 'unknown start argument'. The difference is deliberate today and
+# pinned (tests/test_config_parser.py) - the vocabulary itself is one list.
+START_ARG_FLAGS = frozenset({
+    '-flow', '-debug_numpad', '-nomenu', '-nocontrols', '-delay', '-crossover',
+    '-nodelay', '-exec_one_macro', '-status_indicator', '-crosshair',
+    '-always_active', '-tray_icon', '-hide_cmd_window',
+    '-no_warnings', '-default_always_active', '-default_off',
+    '-drop_watch', '-no_toast_offload',
+})
+START_ARG_VALUES = frozenset({
+    '-log', '-file', '-tapdelay', '-aliasdelay', '-macrodelay', '-crossover',
+    '-focusapp', '-status_indicator', '-crosshair', '-save_dir',
+    '-backup_root_dir',
+})
+
+
+def arg_value(arg, name):
+    '''the value part of a '-name=value' start argument, or None when the
+    argument is not that name or carries no value.
+
+    This is the ONE '-name=' shape rule: the command-line chain spelled it
+    'arg[:N] == "-name=" and len(arg) > N' eleven times, with N hand-counted
+    per site (the classic off-by-one class); the config validator matches the
+    name from the '<arg>' line against the tables above.'''
+    prefix = name + '='
+    if arg.startswith(prefix) and len(arg) > len(prefix):
+        return arg[len(prefix):]
+    return None
+
+
+def prefix_matches(arg, name):
+    '''the command-line world's lenient name test: '-tray_iconX' matches
+    '-tray_icon'. Kept as a NAMED rule so the leniency is one documented fact
+    instead of three slice accidents (the config validator has no such
+    leniency - that pair is pinned)'''
+    return arg[:len(name)] == name
+
+
+def split_item_prefix(line):
+    '''split a group line's declared-name prefix from its body:
+    returns (declared_name, body, is_alias_definition).
+
+      '<world> a, d'  -> ('<world>', 'a, d', True)   alias definition
+      '(*n*) x : y'   -> ('(*n*)', 'x : y', False)   named group
+      'a, d'          -> ('', 'a, d', False)
+
+    A prefix is only recognized when its closing bracket sits past index 1
+    ('<x>' IS a definition (bracket at index 2); '<>x', '()' or a bare '(' are
+    ordinary text).
+    The body is what remains, stripped. This SLICE rule is the validator's;
+    Config_Manager._parse_lines_for_focus_manager still cuts with replace(),
+    which also removes a LATER repetition of the same token in the line
+    ('<w> a, <w>, d' loses its second member) - measured, documented, and NOT
+    merged here: making the runtime match the validator would change which
+    keys a real config feeds the containers (decision filed, see the module
+    docstring).'''
+    if line.startswith('<'):
+        alias_end = line.find('>')
+        if alias_end > 1:
+            return line[:alias_end + 1], line[alias_end + 1:].strip(), True
+    elif line.startswith('('):
+        name_end = line.find(')')
+        if name_end > 1:
+            return line[:name_end + 1], line[name_end + 1:].strip(), False
+    return '', line, False
+
+
 # --- item types: the ':' classification (F-C2, review Item 4) ---------------
 #
 # One classification for both lanes. Before this, Config_Validator.

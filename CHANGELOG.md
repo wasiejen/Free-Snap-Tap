@@ -19,6 +19,21 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   delivered (never suppressed) and the debt closes at delivery.
 
 ### Changed
+- The start-argument and declared-name grammar now has ONE home too (F-C3,
+  review Item 4 follow-up): `fst_config_parser` gained `arg_value` (the
+  '-name=value' shape, which `apply_start_arguments` spelled with a
+  hand-counted string slice eleven times), `prefix_matches` (the command-line
+  world's lenient name test, now a named rule instead of three slice
+  accidents), `split_item_prefix` (the `<alias>` / `(name)` prefix rule both
+  validator walks re-implemented) and the `START_ARG_FLAGS`/`START_ARG_VALUES`
+  vocabulary. The two entry worlds stay distinguishable: the command line keeps
+  its branch dispatch (and still accepts `-tray_iconX` where a config `<arg>`
+  line reports it unknown - pinned as it behaves today), the config validator
+  keeps its table checks and every message unchanged. No behavior change; the
+  runtime's section walk still cuts a declared name with `replace()` (it
+  removes a repeated token later in the same line) - measured, pinned and left
+  for a decision, because merging it would change which keys a real config
+  feeds the containers.
 - The config grammar has ONE implementation (F-C2, review Item 4): the comment
   cleaning, the ':' continuation join, the bracket-aware comma split, the item
   classification (tap group / rebind / macro / macro sequence / dropped), the
