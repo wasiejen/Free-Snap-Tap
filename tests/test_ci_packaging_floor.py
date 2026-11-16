@@ -11,13 +11,15 @@ Improvement plan F-B3 / architecture review Item 12 / ruling D2:
   their own exe.
 
 If a pyproject.toml is ever added, its requires-python must state the same
-3.12 floor as the README (consistency guard, inert while no pyproject).
+3.12 floor as the README (consistency guard, skipped while no pyproject).
 
 Plain-text pin on purpose: PyYAML is not a dev dependency (same rationale
 as test_ci_ruff_gate.py), and both files are small fixed-shape documents.
 """
 
 from pathlib import Path
+
+import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 README = REPO / "README.md"
@@ -99,13 +101,26 @@ def test_tag_build_workflow_is_build_only():
         assert "upload-artifact" in text, (
             f"{name}: the tag build job must upload the exe as a build artifact")
         offenders = [line.strip() for line in text.splitlines()
-                     if "pytest" in line and not line.strip().startswith("#")]
+                     if any(word in line for word in ("pytest", "unittest"))
+                     and not line.strip().startswith("#")]
         assert not offenders, (
             f"{name}: the tag build job must NOT re-run the test suite "
             f"(ci.yml already runs it); found: {offenders}")
 
 
-def test_both_build_scripts_stay_tracked():
+def test_tag_build_uses_canonical_exclude_flag():
+    # "--exclude=" works on pyinstaller only via argparse prefix-matching of
+    # --exclude-module; a future --exclude-* option would make it ambiguous.
+    for name, text in _tag_build_workflow(_workflow_texts()).items():
+        assert "--exclude-module" in text, (
+            f"{name}: use the canonical --exclude-module flag")
+        assert "--exclude=" not in text, (
+            f"{name}: the abbreviated --exclude= flag is prefix-matching only")
+
+
+def test_both_build_scripts_exist():
+    # Presence pin (files, not git-tracking): ruling D2 keeps both build
+    # paths maintained.
     for name in ("built_nuitka.bat", "built_pyinstaller.bat"):
         assert (REPO / name).is_file(), (
             f"ruling D2 keeps both build paths: {name} must exist")
@@ -115,8 +130,8 @@ def test_pyproject_requires_python_matches_floor_if_added():
     pyproject = REPO / "pyproject.toml"
     if not pyproject.is_file():
         # No packaging metadata file exists; the floor lives in README +
-        # workflow pins (pinned above). Guard only fires once one is added.
-        return
+        # workflow pins (pinned above). Skip - guard fires once one is added.
+        pytest.skip("no pyproject.toml - floor declared in README + CI pins")
     text = pyproject.read_text(encoding="utf-8")
     assert f'requires-python = ">={FLOOR}"' in text, (
         f"pyproject.toml requires-python must state the {FLOOR} floor "

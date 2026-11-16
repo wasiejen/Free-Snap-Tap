@@ -11,13 +11,16 @@ name: Release build
 # this job verifies the simpler PyInstaller backup path instead.
 #
 # The workflow never creates or pushes a tag - tagging stays the
-# maintainer's action - so this runs on his next tag, changing nothing until
-# then. Pinned by tests/test_ci_packaging_floor.py.
+# maintainer's action. workflow_dispatch exists to smoke-test this job
+# without minting a real tag (the exe then gets the branch name in its file
+# name). The trigger shape, the build-only nature and the python pin are
+# pinned by tests/test_ci_packaging_floor.py; other steps are not pinned.
 
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 jobs:
   build-windows:
@@ -31,23 +34,31 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install build requirements
+      # Runtime deps MUST be installed too: built_pyinstaller.bat builds in
+      # the fully-populated local .venv (runtime + build), and PyInstaller
+      # exits 0 with warnings when the app's imports are missing - a
+      # build-requirements-only venv would upload a non-runnable exe.
+      - name: Install runtime and build requirements
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -r requirements-build.txt
+          python -m pip install -r requirements.txt -r requirements-build.txt
 
-      # Same command shape as built_pyinstaller.bat; --noconfirm keeps the
-      # build non-interactive on CI. The repo .spec is gitignored, so CI
-      # builds from the CLI flags like the bat does.
+      # Same command shape as built_pyinstaller.bat; --exclude-module is the
+      # canonical flag (the bat's "--exclude" works only via argparse
+      # prefix-matching), --noconfirm keeps the build non-interactive on CI.
+      # The repo .spec is gitignored, so CI builds from the CLI flags like
+      # the bat does.
       - name: Build the executable with PyInstaller
         run: >
           pyinstaller --noconfirm --onefile --windowed
-          --exclude=PyQt5 --icon=./icons/keyboard.ico free_snap_tap.py
+          --exclude-module=PyQt5 --icon=./icons/keyboard.ico free_snap_tap.py
 
+      # Paths quoted: github.ref_name is interpolated into this script, so
+      # quotes keep shell metacharacters in a tag name inert.
       - name: Name the executable for the tag
         shell: bash
         run: |
-          cp dist/free_snap_tap.exe dist/free_snap_tap_${{ github.ref_name }}_win64.exe
+          cp "dist/free_snap_tap.exe" "dist/free_snap_tap_${{ github.ref_name }}_win64.exe"
 
       - name: Upload the executable as a build artifact
         uses: actions/upload-artifact@v4
