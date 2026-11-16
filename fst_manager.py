@@ -1199,7 +1199,7 @@ class Config_Validator():
         # is the parser's LineNamer with the validator's documented policy -
         # every line of a type advances the counter, declared name or not
         # (presort_lines runs the same class with the other policy)
-        self._namer = LineNamer(count_named=True)
+        self._namer = LineNamer()
         # scope of the line currently checked (violations record it)
         self._current_scope = ''
         # the SILENT sections (U330 ask 3): scopes whose warnings are
@@ -1435,6 +1435,17 @@ class Config_Validator():
         # collection walk applies below, so the two validator walks cannot
         # disagree about where a name ends and the body starts
         alias, body, is_alias_line = split_item_prefix(line)
+        # F-C4 (the prefix-cut hole filed in F-C3): a declared name that shows
+        # up AGAIN inside its own line is a hole, not a key. The runtime cuts
+        # the prefix with replace() (every occurrence), so the second copy
+        # would silently become an EMPTY component in the container - measured
+        # on '<w> a, <w>, d': the container held ['a', '', 'd']. Rejected here,
+        # where the user sees it; the runtime keeps a belt (see
+        # Config_Manager._key_parts).
+        if alias and alias in body:
+            self._error(line_number, alias, 'hole',
+                        f'{alias} repeats inside its own line - the name cut '
+                        'leaves an empty key where the repeat stood')
         if is_alias_line and not re.fullmatch(r'<[A-Za-z0-9_]+>', alias):
             self._error(line_number, alias, 'alias',
                         f'invalid alias name {alias} - letters, numbers and "_" only')
@@ -1451,14 +1462,14 @@ class Config_Validator():
         kind, groups = classify_groups(body)
 
         if kind == KIND_TAP:
-            item = self._namer.name_for(kind, alias)
+            item = self._namer.report_label(kind, alias)
             if groups[0].count('(') == groups[0].count(')') and len(split_key_group(groups[0])) < 2:
                 self._warn(line_number, item, 'arity',
                            'tap group needs 2 or more keys')
             self._check_key_group(line_number, item, groups[0], aliases, 'tap')
             self._check_tap_group_ownership(line_number, item, groups[0])
         elif kind == KIND_REBIND:
-            item = self._namer.name_for(kind, alias)
+            item = self._namer.report_label(kind, alias)
             key_group = split_key_group(groups[1])
             if not any(k for k in split_key_group(groups[0])):
                 self._error(line_number, item, 'shape',
@@ -1471,13 +1482,13 @@ class Config_Validator():
             self._check_key_group(line_number, item, groups[1], aliases, 'group')
         elif kind in (KIND_MACRO, KIND_SEQUENCE):
             if kind == KIND_SEQUENCE:
-                item = self._namer.name_for(kind, alias)
+                item = self._namer.report_label(kind, alias)
                 key_groups = groups[2:]
                 if len(key_groups) < 2:
                     self._error(line_number, item, 'arity',
                                 'macro sequence needs 2 or more key groups')
             else:
-                item = self._namer.name_for(kind, alias)
+                item = self._namer.report_label(kind, alias)
                 key_groups = [groups[2]]
             if not any(k for k in split_key_group(groups[0])):
                 self._error(line_number, item, 'shape',
@@ -1533,6 +1544,11 @@ class Config_Validator():
                         f'unbalanced parentheses in "{group_text}" - group dropped')
             return
         for key_string in split_key_group(group_text):
+            # the EMPTY-component class is refused where it is produced -
+            # a declared name that repeats inside its own line (see
+            # _check_group_line's 'hole' rule); a plain stray comma is
+            # normalized away by the line cleaner and stays accepted,
+            # because FSTconfig_test.txt relies on that today
             self._check_key_string(line_number, item, key_string, aliases, kind)
 
     # -- key strings and constraint expressions ------------------------------
@@ -1893,6 +1909,21 @@ class Config_Manager():
                 kept.append(item)
         return kept
 
+    def _key_parts(self, group_text, what):
+        '''F-C4 belt: a container never holds an empty key component.
+        Config_Validator refuses such a line (rule 'hole') before this
+        point is ever reached, so an empty part here means a path that
+        skipped validation - drop the empty part and log it as a
+        violation-classified line instead of handing a phantom member
+        to the runtime'''
+        parts = split_key_group(group_text)
+        kept = [part for part in parts if part]
+        if len(kept) != len(parts):
+            logger_config.error(
+                f'[hole] empty key component in "{group_text}" ({what}) '
+                '- dropped, this config bypassed the validator')
+        return kept
+
     def presort_lines(self, lines):
         '''
         saves cleaned lines according to formatting in different containers;
@@ -1913,24 +1944,25 @@ class Config_Manager():
         self._macros_hr = []
         self._alias_hr = []
 
-        namer = LineNamer(count_named=False)
+        namer = LineNamer()
         # sort the lines into their categories for later initialization
         for line in lines:
 
             alias, line = line
             if alias.startswith('<'):
-                self._alias_hr.append([alias, split_key_group(line)])
+                self._alias_hr.append([alias, self._key_parts(line, 'alias')])
             else:
                 kind, groups = classify_groups(line)
                 # tap groups
                 if kind == KIND_TAP:
                     # generate default names for Tap Groups
                     alias = namer.name_for(kind, alias)
-                    self._tap_groups_hr.append([alias, split_key_group(groups[0])])
+                    self._tap_groups_hr.append(
+                        [alias, self._key_parts(groups[0], 'tap group')])
                 # rebinds
                 elif kind == KIND_REBIND:
-                    trigger_group = split_key_group(groups[0])
-                    key_group = split_key_group(groups[1])
+                    trigger_group = self._key_parts(groups[0], 'rebind trigger')
+                    key_group = self._key_parts(groups[1], 'rebind key')
                     # generate default names for Rebinds
                     alias = namer.name_for(kind, alias)
                     if len(key_group) == 1:
@@ -1939,16 +1971,17 @@ class Config_Manager():
                     # (rule "arity") before this point is ever reached
                     # macro
                 elif kind in (KIND_MACRO, KIND_SEQUENCE):
-                    trigger_group = split_key_group(groups[0])
+                    trigger_group = self._key_parts(groups[0], 'macro trigger')
                     if kind == KIND_SEQUENCE:
                         # generate default names for Macro Sequences
                         alias = namer.name_for(kind, alias)
-                        key_groups = [split_key_group(group) for group in groups[2:]]
+                        key_groups = [self._key_parts(group, 'macro sequence')
+                                    for group in groups[2:]]
                         self._macros_hr.append([alias, [trigger_group] + key_groups])
                     else:
                         # generate default names for Macros
                         alias = namer.name_for(kind, alias)
-                        key_group = split_key_group(groups[2])
+                        key_group = self._key_parts(groups[2], 'macro')
                         self._macros_hr.append([alias, [trigger_group, key_group]])
                 # KIND_DROPPED: no container - the validator named it already
 
@@ -2281,18 +2314,17 @@ class Argument_Manager():
                 delays = delays[:2] # keep only first 2 numbers
             valid_delays = []
             for delay in delays:
-                # F-C2 (review Item 4): the runtime bound is the parser's
-                # RUNTIME_DELAY_RANGE, INCLUSIVE both ends - (1, 1000) is the
-                # historical '0 < delay <= 1000' written as a named range. It
-                # is DELIBERATELY not the validator's DELAY_RANGE (0, 1000)
-                # checked '0 <= delay <= 1000': the pair is the delay-0 drift
-                # Item 4 names, now visible in ONE place and pinned in
-                # tests/test_config_parser.py. Unifying the two bounds changes
-                # which configs work - a maintainer decision, not a refactor.
+                # F-C4 (decision 9a=a): ONE bound for both worlds - the
+                # parser's DELAY_RANGE, inclusive: 0 <= delay <= 1000. The
+                # runtime used to keep 0 < delay <= 1000 and SILENTLY rewrote
+                # '-tapdelay=0,10' to (10, 10); that rewrite is gone - a value
+                # that is in range lands as written (delay 0 means 0 ms, and
+                # (0, 0) genuinely means no delay at all). Only values outside
+                # the range are dropped, and that still says so here.
                 if RUNTIME_DELAY_RANGE[0] <= delay <= RUNTIME_DELAY_RANGE[1]:
                     valid_delays.append(delay)
                 else:
-                    print("delay not in range 0<delay<=1000 ms")
+                    print("delay not in range 0<=delay<=1000 ms")
             valid_delays = sorted(valid_delays)
             if len(valid_delays) == 1:
                 # single delay value applies to min and max

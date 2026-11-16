@@ -35,18 +35,20 @@ rule for a line that repeats its own alias text, so merging them is a behavior
 change, not a move - it needs its own decision and its own pins. F-C2 left it
 out and says so here rather than letting the claim below read as complete.
 
-KNOWN DRIFT, PRESERVED ON PURPOSE (unifying either bound changes which configs
-work, which is a maintainer call, not a refactor side effect):
-  - delay 0: the validator accepts it (DELAY_RANGE -> 0 <= delay <= 1000) while
-    the runtime keeps only 0 < delay <= 1000 (RUNTIME_DELAY_RANGE), so
-    '-tapdelay=0,10' passes validation and silently becomes (10, 10) with a
-    console line. Both bounds live here as named constants so the pair is
-    visible in one place; tests/test_config_parser.py pins both.
-  - default item names: the validator counts EVERY line of a kind while
-    presort_lines counts only the unnamed ones, so an aliased tap line shifts
-    the validator's (TAP_n) numbering away from the runtime's. LineNamer
-    carries both policies explicitly (count_named=True/False) instead of two
-    hand-written counter pairs; the violation-report text stays the validator's.
+CLOSED DRIFT PAIRS (F-C4, maintainer decision 9 of 2026-11-16 - both unified,
+each pinned in tests/test_config_parser.py and tests/test_f_rulings.py):
+  - delay 0 (9a=a): ONE acceptance bound, DELAY_RANGE (0 <= delay <= 1000),
+    used by the validator AND the runtime - RUNTIME_DELAY_RANGE is that same
+    tuple, kept as a name so the runtime reads naturally. The runtime used to
+    keep 0 < delay <= 1000 and silently rewrite '-tapdelay=0,10' to (10, 10);
+    a value in range now lands as written, and (0, 0) means genuinely no delay
+    (the draw is randint(0, 0) = 0, the sleep is asyncio.sleep(0.0)).
+  - default item names (9b): ONE numbering - LineNamer gives every line of a
+    kind a number, declared name or not, so the violation report, the runtime
+    containers, the menu and the status dump show the same number for the same
+    line. LineNamer.name_for() is what a line is KNOWN by, report_label() is
+    what a violation line SHOWS ('(TAP_1, "*keep*")' when the line declared
+    '(*keep*)').
 '''
 import re
 
@@ -56,16 +58,16 @@ from fst_data_types import FOCUS_NAME_ILLEGAL
 FOCUS_HEADER = '<focus>'
 ARG_HEADER = '<arg>'
 
-# validator delay acceptance bound: DELAY_RANGE[0] <= delay <= DELAY_RANGE[1]
+# the ONE delay acceptance bound, inclusive both ends:
+# DELAY_RANGE[0] <= delay <= DELAY_RANGE[1]. The config validator checks a
+# '<arg>-tapdelay=' value against it; apply_start_arguments.filter_delays keeps
+# a value that is in range and drops one that is not.
 DELAY_RANGE = (0, 1000)
-# runtime delay acceptance bound, INCLUSIVE both ends: RUNTIME_DELAY_RANGE[0]
-# <= delay <= RUNTIME_DELAY_RANGE[1] - (1, 1000) is the historical
-# '0 < delay <= 1000' of apply_start_arguments.extract_delays written as a
-# named range. NOT the same rule as DELAY_RANGE (the validator accepts 0, the
-# runtime does not) - see the module docstring (the delay-0 drift Item 4
-# names); preserved byte-for-byte, both bounds pinned in
-# tests/test_config_parser.py.
-RUNTIME_DELAY_RANGE = (1, 1000)
+# the runtime's name for that same bound (F-C4, decision 9a=a - it used to be
+# its own stricter (1, 1000) that silently rewrote a delay 0). It IS
+# DELAY_RANGE, not a copy, so the two worlds cannot drift again by editing one
+# of the two names.
+RUNTIME_DELAY_RANGE = DELAY_RANGE
 
 
 def split_key_group(group):
@@ -330,32 +332,47 @@ def classify_groups(body):
 
 
 class LineNamer():
-    '''the default (TAP_1)/(REB_2)/(MAC_1)/(SEQ_1) numbering of unnamed lines,
-    in walk order - one algorithm, two documented policies (F-C2):
+    '''the (TAP_1)/(REB_2)/(MAC_1)/(SEQ_1) numbering of group lines, in walk
+    order - ONE policy (F-C4, decision 9b): every line of a kind consumes a
+    number, declared name or not, so the violation report, the runtime
+    containers, the menu and the status dump all show the SAME number for the
+    same line (before this ruling the report counted every line and the
+    containers counted only the unnamed ones, so `(*x*) a, d` above a short
+    group made the report say (TAP_2) while the menu showed (TAP_1)).
 
-    count_named=True   the validator policy: EVERY line of a type advances the
-                       counter, declared name or not, because the violation
-                       report numbers the lines of the file as the user reads
-                       them.
-    count_named=False  the presort_lines policy: only UNNAMED lines advance it,
-                       so the runtime containers keep their own numbering.
+    Two labels, one counter:
+      name_for()      what the line is KNOWN by: its declared name when it has
+                      one, else '(TAP_n)' - the container key, the menu entry,
+                      the status dump.
+      report_label()  what a violation line shows: '(TAP_n)' always, plus the
+                      declared text when the line carries one,
+                      '(TAP_1, "*keep*")' - the number keeps the walk
+                      consistent and the text is what the user can find again
+                      in the config.'''
 
-    The two policies differ as soon as one line carries a declared name - that
-    is a known drift (the report may say (TAP_2) where the container says
-    (TAP_1)); it is carried as a named policy here instead of two hand-written
-    counter pairs so it is visible in one place.'''
-
-    def __init__(self, count_named):
-        self._count_named = bool(count_named)
+    def __init__(self):
         self._counts = {kind: 1 for kind in DEFAULT_NAME_LABELS}
+
+    def _next_number(self, kind):
+        number = self._counts[kind]
+        self._counts[kind] += 1
+        return number
 
     def name_for(self, kind, declared_name):
         '''the name this line is known by: its declared name when it has one,
-        else the next default of its type'''
+        else the next default of its type (both consume the number)'''
+        number = self._next_number(kind)
         if declared_name:
-            if self._count_named:
-                self._counts[kind] += 1
             return declared_name
-        number = self._counts[kind]
-        self._counts[kind] += 1
         return f'({DEFAULT_NAME_LABELS[kind]}_{number})'
+
+    def report_label(self, kind, declared_name):
+        '''the report display of this line: the type number, plus the declared
+        text in quotes when the line has a name (brackets stripped - the text
+        the user typed inside them and can search the config for)'''
+        number = self._next_number(kind)
+        label = f'({DEFAULT_NAME_LABELS[kind]}_{number})'
+        inner = declared_name[1:-1] if declared_name else ''
+        if inner:
+            return f'{label[:-1]}, "{inner}")'
+        return label

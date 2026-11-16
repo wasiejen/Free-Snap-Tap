@@ -106,21 +106,37 @@ class TestClassification:
         assert 'shape' in [v.rule for v in violations]
 
 
-class TestDefaultNamePolicies:
-    def test_validator_numbers_every_line_named_or_not(self):
-        # CONTRACT (policy pair 1/2): the violation report numbers every line
-        # of a type, so a declared name still consumes its (TAP_n) number
-        namer = LineNamer(count_named=True)
+class TestDefaultNumbering:
+    '''F-C4 (decision 9b): ONE numbering - this class replaced the F-C2
+    policy-pair class, which pinned two different counters (the report counted
+    every line, the containers only the unnamed ones)'''
+
+    def test_every_line_of_a_kind_consumes_its_number(self):
+        # CONTRACT: a declared name consumes its number too, and the line is
+        # still KNOWN by the name it declared (that is the container key, the
+        # menu entry and the status dump)
+        namer = LineNamer()
         assert namer.name_for(KIND_TAP, '(*named*)') == '(*named*)'
         assert namer.name_for(KIND_TAP, '') == '(TAP_2)'
 
-    def test_containers_number_only_the_unnamed_lines(self):
-        # CONTRACT (policy pair 2/2): the runtime containers number only the
-        # lines that carry no name, so their (TAP_1) can differ from the
-        # report's (TAP_2) for the same line - a known drift, pinned as intent
-        namer = LineNamer(count_named=False)
-        assert namer.name_for(KIND_TAP, '(*named*)') == '(*named*)'
-        assert namer.name_for(KIND_TAP, '') == '(TAP_1)'
+    def test_the_report_shows_the_number_and_the_declared_name(self):
+        # CONTRACT: a violation line names its line by type number, and adds
+        # the declared text when there is one - the user can find the number in
+        # the menu and the text in the config
+        namer = LineNamer()
+        assert namer.report_label(KIND_TAP, '(*keep*)') == '(TAP_1, "*keep*")'
+        assert namer.report_label(KIND_TAP, '') == '(TAP_2)'
+
+    def test_both_labels_come_from_the_same_counter(self):
+        # CONTRACT: one walk, one sequence - the label a line is known by and
+        # the label the report shows for it never disagree about the number
+        namer = LineNamer()
+        assert namer.name_for(KIND_REBIND, '') == '(REB_1)'
+        assert namer.report_label(KIND_REBIND, '(*x*)') == '(REB_2, "*x*")'
+        # a named line consumes its number too (decision 9b), so the next
+        # unnamed line is (REB_4) and not (REB_3)
+        assert namer.name_for(KIND_REBIND, '(*y*)') == '(*y*)'
+        assert namer.report_label(KIND_REBIND, '') == '(REB_4)'
 
 
 class TestStartArgumentSpelling:
@@ -216,43 +232,33 @@ class TestItemPrefix:
         # alias definition. Both validator walks use THIS rule.
         assert split_item_prefix(line) == expected
 
-    def test_the_runtime_section_walk_still_cuts_with_replace_all(self):
-        # CONTRACT (characterization of a KNOWN divergence, decision filed):
-        # the section walk removes EVERY occurrence of the declared token, so
-        # an alias line that repeats its own token loses that member - the
-        # container holds ['a', '', 'd'] while the validator reported the line
-        # clean. F-C3 did not merge the two rules: merging would change which
-        # keys a real config feeds the containers.
-        from fst_manager import Config_Manager
-        cm = Config_Manager()
-        cm._file_name = ''
-        _, _, lines = cm._parse_lines_for_focus_manager(['<w> a, <w>, d\n'])
-        cm.presort_lines(lines)          # presort fills the containers in place
-        assert cm._alias_hr == [['<w>', ['a', '', 'd']]]
-        # ...and the validator lane reports that same line CLEAN (measured):
-        # its walk cuts the FIRST token only and '<w>' resolves as a known
-        # alias - so nothing warns about the member the containers lost.
-        cleaner = Config_Manager()
-        numbered = cleaner._combine_multilines_numbered(
-            cleaner._clean_comments_numbered(['<w> a, <w>, d\n']))
-        assert Config_Validator().validate(numbered) == []
+    # F-C4 moved the end-to-end case of this shape to
+    # tests/test_f_rulings.py::TestEmptyComponentIsRejected (the validator now
+    # refuses the line, so it never reaches the section walk - the belt is
+    # pinned there against a direct presort call instead)
 
 
-class TestDelayBoundDrift:
+class TestDelayBound:
+    '''F-C4 (decision 9a=a): ONE bound - this class replaced the F-C2
+    drift-pair class, which pinned the validator accepting delay 0 while the
+    runtime silently dropped it'''
+
     def test_the_validator_accepts_delay_zero(self):
-        # CONTRACT (drift pair 1/2): '<arg>-tapdelay=0,10' raises no violation,
-        # because the validator's bound is DELAY_RANGE checked inclusively
+        # CONTRACT: '<arg>-tapdelay=0,10' is a valid line - 0 is in range
         violations = Config_Validator().validate([(1, '<arg>-tapdelay=0,10')])
         assert violations == []
 
-    def test_the_runtime_still_drops_delay_zero(self, fake_fst):
-        # CONTRACT (drift pair 2/2): the same argument at runtime keeps only
-        # RUNTIME_DELAY_RANGE values, so '-tapdelay=0,10' ends up (10, 10) -
-        # the delay-0 drift Item 4 names. Unifying the bounds is a maintainer
-        # decision; until then the pair above/below locks both halves.
+    def test_the_runtime_keeps_the_value_as_written(self, fake_fst):
+        # CONTRACT: the runtime applies the SAME bound, so the value lands as
+        # written - no silent rewrite to (10, 10) any more, and only a console
+        # line when a value is genuinely out of range
         from fst_manager import Argument_Manager
         fake_fst.config_manager = type('NS', (), {'file_name': ''})()
         manager = Argument_Manager(fake_fst)
         manager.apply_start_arguments(['-tapdelay=0,10'])
-        assert (manager.ACT_MIN_DELAY_IN_MS, manager.ACT_MAX_DELAY_IN_MS) == (10, 10)
-        assert RUNTIME_DELAY_RANGE[0] == 1 and DELAY_RANGE[0] == 0
+        assert (manager.ACT_MIN_DELAY_IN_MS, manager.ACT_MAX_DELAY_IN_MS) == (0, 10)
+        # one bound for both worlds, not two copies that can drift again
+        assert RUNTIME_DELAY_RANGE is DELAY_RANGE == (0, 1000)
+
+    # the out-of-range legs (a dropped value, a line of only rejected values)
+    # are pinned in tests/test_f_rulings.py::TestDelayValuesLandAsWritten
