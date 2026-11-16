@@ -22,6 +22,8 @@ from fst_config_parser import (split_key_group, clean_comment_lines,
                                clean_focus_header, focus_scope_of,
                                normalize_start_arg_name, parse_int_list,
                                classify_groups, LineNamer,
+                               arg_value, prefix_matches, split_item_prefix,
+                               START_ARG_FLAGS, START_ARG_VALUES,
                                KIND_TAP, KIND_REBIND, KIND_MACRO, KIND_SEQUENCE,
                                DELAY_RANGE, RUNTIME_DELAY_RANGE)
 import datetime
@@ -1161,17 +1163,10 @@ KEY_MODIFIER_PREFIXES = '-+!^'
 # active-window TITLE strip in Focus_Task can never drift apart (#399).
 
 # start arguments: valueless switches and value-taking arguments
-START_ARG_FLAGS = frozenset({
-    '-flow', '-debug_numpad', '-nomenu', '-nocontrols', '-delay', '-crossover',
-    '-nodelay', '-exec_one_macro', '-status_indicator', '-crosshair',
-    '-always_active', '-tray_icon', '-hide_cmd_window',
-    '-no_warnings', '-default_always_active', '-default_off',
-    '-drop_watch', '-no_toast_offload',
-})
-START_ARG_VALUES = frozenset({
-    '-log', '-file', '-tapdelay', '-aliasdelay', '-macrodelay', '-crossover',
-    '-focusapp', '-status_indicator', '-crosshair', '-save_dir', '-backup_root_dir',
-})
+# F-C3 (review Item 4 inventory): the start-argument vocabulary lives in
+# fst_config_parser (START_ARG_FLAGS / START_ARG_VALUES) and is imported at
+# the top of this file - the config validator below is its only consumer;
+# the command-line chain in Argument_Manager keeps its own (lenient) matching
 
 # elevation names in a config <arg> line (pair-approved 2026-11-16, after
 # the maintainer's live confusion): the elevation flag is a START argument
@@ -1291,11 +1286,14 @@ class Config_Validator():
                 if scope not in self._aliases_by_scope:
                     self._aliases_by_scope[scope] = set(
                         self._aliases_by_scope.get('', set()))
-            elif line.startswith('<'):
-                alias_end = line.find('>')
-                if alias_end > 1:
+            else:
+                # F-C3: same split_item_prefix rule as _check_group_line;
+                # only an '<...>' prefix is an alias DEFINITION here (a
+                # '(*name*)' prefix names a group, it defines no alias)
+                declared, _, _ = split_item_prefix(line)
+                if declared.startswith('<'):
                     self._aliases_by_scope.setdefault(scope, set()).add(
-                        line[:alias_end + 1])
+                        declared)
 
     @staticmethod
     def _focus_scope_of(line):
@@ -1432,24 +1430,14 @@ class Config_Validator():
     # -- group lines: arity per item type ------------------------------------
 
     def _check_group_line(self, line_number, line, scope, aliases):
-        alias = ''
-        body = line
-        is_alias_line = False
-
-        if body.startswith('<'):
-            alias_end = body.find('>')
-            if alias_end > 1:
-                alias = body[:alias_end + 1]
-                body = body[alias_end + 1:].strip()
-                is_alias_line = True
-                if not re.fullmatch(r'<[A-Za-z0-9_]+>', alias):
-                    self._error(line_number, alias, 'alias',
-                                f'invalid alias name {alias} - letters, numbers and "_" only')
-        elif body.startswith('('):
-            name_end = body.find(')')
-            if name_end > 1:
-                alias = body[:name_end + 1]
-                body = body[name_end + 1:].strip()
+        # F-C3 (review Item 4 inventory): the declared-name prefix rule is
+        # fst_config_parser.split_item_prefix - the same rule the alias
+        # collection walk applies below, so the two validator walks cannot
+        # disagree about where a name ends and the body starts
+        alias, body, is_alias_line = split_item_prefix(line)
+        if is_alias_line and not re.fullmatch(r'<[A-Za-z0-9_]+>', alias):
+            self._error(line_number, alias, 'alias',
+                        f'invalid alias name {alias} - letters, numbers and "_" only')
 
         if is_alias_line:
             if not body:
@@ -2332,12 +2320,12 @@ class Argument_Manager():
             original_arg = arg
             arg = normalize_start_arg_name(arg)
             # log level control: -log=debug/info/warning/error
-            if arg[:5] == '-log=' and len(arg) > 5:
-                level = arg[5:].lower()
+            if arg_value(arg, '-log') is not None:
+                level = arg_value(arg, '-log').lower()
                 if level in LOG_LEVELS:
                     set_area_log_level(LOG_LEVELS[level])
                 else:
-                    logger_config.warning(f"invalid log level: {arg[5:]} - use debug, info, warning or error")
+                    logger_config.warning(f"invalid log level: {arg_value(arg, '-log')} - use debug, info, warning or error")
             # enable the per-key flow stream -> fst_flow.log
             elif arg == "-flow":
                 set_flow_enabled(True)
@@ -2353,8 +2341,8 @@ class Argument_Manager():
             elif arg == "-nomenu":
                 self.MENU_ENABLED = False
             # use custom tap groups file for loading and saving
-            elif arg[:6] == '-file=' and len(arg) > 6:
-                file_name = arg[6:]
+            elif arg_value(arg, '-file') is not None:
+                file_name = arg_value(arg, '-file')
                 logger_config.info(f"config file set to: {file_name}")
                 self._fst.config_manager.file_name = file_name
             # Start with controls disabled
@@ -2362,25 +2350,25 @@ class Argument_Manager():
                 self.CONTROLS_ENABLED = False
             elif arg == "-delay":
                 self.ACT_DELAY = True
-            elif arg[:10] == "-tapdelay=" and len(arg) > 10:
+            elif arg_value(arg, '-tapdelay') is not None:
                 self.ACT_DELAY = True
-                delays = extract_delays(arg[10:])
+                delays = extract_delays(arg_value(arg, '-tapdelay'))
                 if delays is not None:
                     self.ACT_MIN_DELAY_IN_MS, self.ACT_MAX_DELAY_IN_MS = delays
                     print(f"Tap delays set to: min:{self.ACT_MIN_DELAY_IN_MS}, max:{self.ACT_MAX_DELAY_IN_MS}")
                 else:
                     print("no valid tap delay - delay range unchanged")
-            elif arg[:12] == "-aliasdelay=" and len(arg) > 12:
+            elif arg_value(arg, '-aliasdelay') is not None:
                 self.ACT_DELAY = True
-                delays = extract_delays(arg[12:])
+                delays = extract_delays(arg_value(arg, '-aliasdelay'))
                 if delays is not None:
                     self.MACRO_MIN_DELAY_IN_MS, self.MACRO_MAX_DELAY_IN_MS = delays
                     print(f"Macro delays set to: min:{self.MACRO_MIN_DELAY_IN_MS}, max:{self.MACRO_MAX_DELAY_IN_MS}")
                 else:
                     print("no valid alias delay - delay range unchanged")
-            elif arg[:12] == "-macrodelay=" and len(arg) > 12:
+            elif arg_value(arg, '-macrodelay') is not None:
                 self.ACT_DELAY = True
-                delays = extract_delays(arg[12:])
+                delays = extract_delays(arg_value(arg, '-macrodelay'))
                 if delays is not None:
                     self.MACRO_MIN_DELAY_IN_MS, self.MACRO_MAX_DELAY_IN_MS = delays
                     print(f"Macro delays set to: min:{self.MACRO_MIN_DELAY_IN_MS}, max:{self.MACRO_MAX_DELAY_IN_MS}")
@@ -2388,11 +2376,11 @@ class Argument_Manager():
                     print("no valid macro delay - delay range unchanged")
             elif arg == "-crossover":
                 self.ACT_CROSSOVER = True
-            elif arg[:11] == "-crossover=" and len(arg) > 11:
+            elif arg_value(arg, '-crossover') is not None:
                 self.ACT_CROSSOVER = True
                 probability = None
                 try:
-                    probability = int(arg[11:])
+                    probability = int(arg_value(arg, '-crossover'))
                 except Exception:
                     print("invalid probability - needs to be a number")
                 if probability is not None and 0 <= probability <= 100:
@@ -2403,7 +2391,7 @@ class Argument_Manager():
                 self.ACT_DELAY = False
                 self.ACT_CROSSOVER = False
                 print("delay+crossover deactivated")
-            elif arg[:10] == "-focusapp="  and len(arg) > 10:
+            elif arg_value(arg, '-focusapp') is not None:
                 #FOCUS_APP_NAME = arg[10:]
                 #print(f"focusapp active: looking for: {FOCUS_APP_NAME}")
                 print("Do not use the -focusapp start argument with V1.0.0+, use instead <focus>*name* directly in config!")
@@ -2413,22 +2401,22 @@ class Argument_Manager():
             elif arg == "-status_indicator":
                 self.STATUS_INDICATOR = True
                 print(f"set indicator to: {self.STATUS_INDICATOR}")
-            elif arg[:18] == "-status_indicator="  and len(arg) > 18:
+            elif arg_value(arg, '-status_indicator') is not None:
                 self.STATUS_INDICATOR = True
-                self.STATUS_INDICATOR_SIZE = int(arg[18:])
+                self.STATUS_INDICATOR_SIZE = int(arg_value(arg, '-status_indicator'))
                 print(f"set indicator size to: {self.STATUS_INDICATOR_SIZE}")
             elif arg == "-crosshair":
                 self.CROSSHAIR_ENABLED = True
                 print(f"set crosshair to: {self.CROSSHAIR_ENABLED}")
-            elif arg[:11] == "-crosshair="  and len(arg) > 11:
+            elif arg_value(arg, '-crosshair') is not None:
                 self.CROSSHAIR_ENABLED = True
                 try:
-                    x, y = arg[11:].strip().replace(' ', '').split(',')
+                    x, y = arg_value(arg, '-crosshair').strip().replace(' ', '').split(',')
                     self.CROSSHAIR_DELTA_X, self.CROSSHAIR_DELTA_Y = int(x), int(y)
                     print(f"set crosshair delta is set to: {self.CROSSHAIR_DELTA_X}, {self.CROSSHAIR_DELTA_Y}")
                 except Exception:
                     print("invalid crosshair delta - needs to be two numbers, e.g. -crosshair=5,-10")
-            elif arg[:14] == "-always_active":
+            elif prefix_matches(arg, '-always_active'):
                 self.ALWAYS_ACTIVE = True
             elif arg == "-no_warnings":
                 # consumed by the config validator (per-scope warning
@@ -2457,15 +2445,15 @@ class Argument_Manager():
                 # every focus change, reset_global_variable_changes)
                 self.ALWAYS_ACTIVE = True
                 print(f"set default always active to: {self.ALWAYS_ACTIVE}")
-            elif arg[:10] == "-tray_icon":
+            elif prefix_matches(arg, '-tray_icon'):
                 self.TRAY_ICON = True
-            elif arg[:16] == "-hide_cmd_window":
+            elif prefix_matches(arg, '-hide_cmd_window'):
                 self.CMD_WINDOW_HIDDEN = True
-            elif arg[:10] == "-save_dir=" and len(arg) > 10:
-                self.SAVE_DIR = arg[10:].strip()
+            elif arg_value(arg, '-save_dir') is not None:
+                self.SAVE_DIR = arg_value(arg, '-save_dir').strip()
                 print(f"set save directory to: {self.SAVE_DIR}")
-            elif arg[:17] == "-backup_root_dir=" and len(arg) > 17:
-                self.BACKUP_ROOT_DIR = arg[17:].strip()
+            elif arg_value(arg, '-backup_root_dir') is not None:
+                self.BACKUP_ROOT_DIR = arg_value(arg, '-backup_root_dir').strip()
                 print(f"set backup root directory to: {self.BACKUP_ROOT_DIR}")
             else:
                 logger_config.warning(f"unknown start argument: {original_arg}")
