@@ -318,7 +318,7 @@ class Trigger_Key():
     FST_Keyboard Runtime_Snapshot indices), so a fired keystroke hashes ints
     and bools instead of building repr strings.'''
     vk_code: int
-    is_press: bool
+    is_press: bool | None
     constraints: tuple = ()
 
 
@@ -812,7 +812,9 @@ class Tap_Group(object):
         return held
 
     def get_vk_codes(self):
-        return [key.vk_code for key in self.keys]
+        # F-B1 (reviewer P2-3): same member contract as the states init in
+        # __init__ - Key objects yield vk_code, plain labels pass through
+        return [getattr(key, 'vk_code', key) for key in self.keys]
 
     def get_states(self):
         return self.states
@@ -852,18 +854,20 @@ class Tap_Group(object):
     #         key_strings.append(repr(key))
     #     return "Tap_Group(" + ','.join(key_strings) + ")"
 
+    @property
     def _identity(self):
         # F-B1: value identity over the declared keys (the members compare
-        # and hash by their own typed values now)
+        # and hash by their own typed values now); a property like
+        # Rebind/Macro._identity (reviewer P2-4: one name, one kind)
         return tuple(self.keys)
 
     def __eq__(self, other) -> bool:
         if isinstance(other, Tap_Group):
-            return self._identity() == other._identity()
+            return self._identity == other._identity
         return NotImplemented
 
     def __hash__(self):
-        return hash(self._identity())
+        return hash(self._identity)
 
     def __repr__(self):
         key_strings = []
