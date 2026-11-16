@@ -54,6 +54,11 @@ For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
     - `-tray_icon` / `-hide_cmd_window`: start the GUI loop with a tray icon / keep the console window hidden after start-up
     - `-save_dir=*dir*` / `-backup_root_dir=*dir*`: the directories used by the `make_backup` / `restore_backup` invocations
     - **deprecated:** `-focusapp=` prints a warning and exits with error code 1 (use `<focus>` in the config file instead)
+
+15. **[Status dump - THE bug-report artifact]** `fst_status.log`
+    - written at every start-up and on every successful config reload (there is deliberately no hotkey for it): the effective start arguments, the lifecycle state, the active focus scope, the group counts, the tap / hold / toggle states, the open ticket ledger, and the path of every log file
+    - overwritten atomically in the program's working directory, right next to `fst.log` - attach the file to a bug report and the moment is captured
+    - a ticket that stays open longer than `CONSTANTS.STUCK_TICKET_MS` (default 5000 ms, `fst_manager.py`) is named by a `[StuckKeyWatch]` line in the artifact and in `fst.log`
    
 Function Documentation V1.4.0 now in the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
 

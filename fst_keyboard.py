@@ -22,6 +22,7 @@ from itertools import count
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
 from fst_manager import Input_State_Manager, Config_Manager, Config_Validator
+from fst_manager import Status_Dump
 from fst_manager import (logger, logger_flow, logger_state, logger_macro,
                          logger_config, logger_drop, DROP_RING_MAXLEN)
 from fst_manager import toggle_debug_level, toggle_flow, toggle_drop_watch
@@ -237,6 +238,10 @@ class FST_Keyboard():
         self._output_manager = Output_Manager(self)
         self._state_manager = Input_State_Manager(self)
         self._cli_menu = CLI_menu(self)
+        # F-B4 (review Item 13): the one-shot status artifact writer. Render +
+        # overwrite only - it holds no state and never runs on the hook pump
+        # (request_status_dump routes it to the loop lane).
+        self._status_dump = Status_Dump(self)
 
         self._warned_config_errors = set()
 
@@ -1898,6 +1903,9 @@ class FST_Keyboard():
         # posted here (once the new generation is bound and the filter is live
         # again), not from the pump at keypress time.
         self.post_lifecycle(Lifecycle_State.RUNNING, 'alt+DELETE resume reloaded')
+        # F-B4: the artifact refreshes with the NEW generation it just bound -
+        # already on the lane, so this stays inline (no re-post).
+        self.request_status_dump('reload')
 
     def control_return_to_menu(self):
         self._arg_manager.MENU_ENABLED = True
@@ -2252,6 +2260,50 @@ class FST_Keyboard():
         for alias, group in rt.macros_alias_dict.items():
             print(f"{group}")
 
+    # ------------------------------------------------------------------
+    # F-B4 (review Item 13): the one-shot status dump - THE bug-report
+    # artifact. Item 13 asked for ONE supported snapshot surface instead of
+    # the ad-hoc repr dumps above; there is deliberately NO hotkey and NO
+    # numpad trigger for it (a product ruling, and the F-A4 rule: a dump is
+    # file I/O, the LL-hook pump never does file I/O).
+    # ------------------------------------------------------------------
+    def request_status_dump(self, reason='startup'):
+        '''Write fst_status.log - effective args, lifecycle state (F-A5),
+        focus scope, group counts, tap/hold/toggle states, the ticket ledger
+        with its [StuckKeyWatch] aging lines, and the paths to attach.
+
+        THREADING: the render reads live containers, so it runs on the asyncio
+        loop thread through the F-A4 lane helper (_run_on_loop_or_inline -
+        posted from any other thread, inline only where the F-A4 contract
+        already says inline: no loop wired, or the caller IS the loop thread).
+        The hook pump has no path here at all.
+
+        FAIL-SAFE: a diagnostic artifact never breaks the leg that asked for
+        it. A render or write failure is named at WARNING (the F-A4 leg rule:
+        a failed leg is named, never a silent scheduled-ok); the previous
+        artifact is left intact by the atomic write. Returns the absolute path
+        written, or None when the leg failed or is still queued on the lane
+        (a queued leg reports nothing - the [StatusDump] log line names it).'''
+        result = {}
+
+        def leg():
+            try:
+                result['path'] = self._status_dump.write(reason=reason)
+            except Exception as error:
+                logger.warning(f"[StatusDump] dump failed reason={reason}: "
+                               f"{type(error).__name__}: {ascii(str(error))}")
+                logger.debug("[StatusDump] dump failure detail",
+                             exc_info=True)
+
+        self._run_on_loop_or_inline(leg, 'status_dump')
+        return result.get('path')
+
+    def render_status_dump(self, reason='startup', now=None):
+        '''The artifact text WITHOUT the file write - the seam a test or a
+        future menu uses. Same thread contract as request_status_dump when
+        called on the lane; `now` fakes the age anchor (see Status_Dump.render).'''
+        return self._status_dump.render(reason=reason, now=now)
+
     def open_config_file(self):
         startfile(self._config_manager.file_name)
 
@@ -2265,3 +2317,7 @@ class FST_Keyboard():
         # gets the single green OK toast (errors raised before this point)
         if not self._config_manager.config_warnings:
             self.surface_config_ok()
+        # F-B4: this is the tray/menu "Reload from file" leg - it runs on the
+        # Qt thread, so request_status_dump posts the dump to the loop lane
+        # (never writes from the caller's thread).
+        self.request_status_dump('reload_from_file')

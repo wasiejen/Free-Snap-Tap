@@ -434,6 +434,14 @@ class MainLogic:
             # above and never reaches this line)
             self.lifecycle.post_transition(Lifecycle_State.RUNNING,
                                            'menu closed - start chosen')
+        # F-B4 (review Item 13): THE bug-report artifact, written on every
+        # startup (and on a menu re-entry, which starts a new listening pass).
+        # This leg already runs ON the loop thread with the lifecycle machine
+        # attached and the new generation bound, so the dump reports the state
+        # the listeners are actually running in; _run_on_loop_or_inline keeps
+        # it inline here and never touches the hook pump.
+        self.fst_keyboard.request_status_dump(
+            'menu_restart' if from_menu else 'startup')
         return True
 
     async def _park(self, observed):
