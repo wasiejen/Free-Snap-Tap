@@ -218,10 +218,15 @@ class TestEmptyComponentIsRejected:
         # phantom key
         cm = Config_Manager()
         cm._file_name = ''
-        with caplog.at_level(logging.ERROR):
+        with caplog.at_level(logging.WARNING):
             cm.presort_lines([['<w>', 'a,,d']])
         assert cm._alias_hr == [['<w>', ['a', 'd']]]
         assert '[hole] empty key component' in caplog.text
+        # the accepted stray-comma shape must not be logged as an error or
+        # blame the validator - the maintainer's own config uses that shape
+        assert 'bypassed' not in caplog.text
+        assert not [r for r in caplog.records if r.levelno >= logging.ERROR], \
+            caplog.text
 
     def test_a_clean_group_is_still_accepted(self):
         # CONTRACT: the rule targets empty components only - normal groups,

@@ -60,8 +60,9 @@ ARG_HEADER = '<arg>'
 
 # the ONE delay acceptance bound, inclusive both ends:
 # DELAY_RANGE[0] <= delay <= DELAY_RANGE[1]. The config validator checks a
-# '<arg>-tapdelay=' value against it; apply_start_arguments.filter_delays keeps
-# a value that is in range and drops one that is not.
+# '<arg>-tapdelay=' value against it; the runtime's extract_delays (in
+# Argument_Manager.apply_start_arguments) keeps a value in range and drops
+# one that is not.
 DELAY_RANGE = (0, 1000)
 # the runtime's name for that same bound (F-C4, decision 9a=a - it used to be
 # its own stricter (1, 1000) that silently rewrote a delay 0). It IS
@@ -339,6 +340,16 @@ class LineNamer():
     same line (before this ruling the report counted every line and the
     containers counted only the unnamed ones, so `(*x*) a, d` above a short
     group made the report say (TAP_2) while the menu showed (TAP_1)).
+
+    SCOPE OF THE AGREEMENT (measured, F-C4 review): one walk per config
+    section. The validator numbers the whole file in one pass, while
+    presort_lines runs per section over the default lines plus that
+    section's own lines, so in a MULTI-FOCUS file a section's line can
+    still get a different number from the report than from that section's
+    containers (measured: report (TAP_4) vs section container (TAP_3),
+    identical in b0b1054 - filed for a ruling of its own). Within one
+    section, and in a single-section file (what decision 9 reproved), the
+    numbers agree.
 
     Two labels, one counter:
       name_for()      what the line is KNOWN by: its declared name when it has

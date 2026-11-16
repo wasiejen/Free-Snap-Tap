@@ -1195,10 +1195,12 @@ class Config_Validator():
 
     def __init__(self):
         self.violations = []
-        # F-C2 (review Item 4): the (TAP_n)/(REB_n)/(MAC_n)/(SEQ_n) numbering
-        # is the parser's LineNamer with the validator's documented policy -
-        # every line of a type advances the counter, declared name or not
-        # (presort_lines runs the same class with the other policy)
+        # F-C4 (decision 9b): ONE numbering - every line of a type
+        # advances the counter, declared name or not, and presort_lines
+        # builds the containers with the same policy, so the number this
+        # report shows for a line is the number its container is keyed by
+        # (within one config section - a '<focus>' section is presorted
+        # from the default lines plus its own, see the LineNamer docstring)
         self._namer = LineNamer()
         # scope of the line currently checked (violations record it)
         self._current_scope = ''
@@ -1402,7 +1404,7 @@ class Config_Validator():
             for delay in delays:
                 if not DELAY_RANGE[0] <= delay <= DELAY_RANGE[1]:
                     self._error(line_number, '(arg)', 'arg',
-                                f'delay {delay} not in range {DELAY_RANGE[0]}<delay<={DELAY_RANGE[1]} ms')
+                                f'delay {delay} not in range {DELAY_RANGE[0]}<=delay<={DELAY_RANGE[1]} ms')
         elif name == '-crossover':
             crossover = parse_int_list(value)
             if crossover is None or len(crossover) != 1:
@@ -1919,9 +1921,14 @@ class Config_Manager():
         parts = split_key_group(group_text)
         kept = [part for part in parts if part]
         if len(kept) != len(parts):
-            logger_config.error(
+            # a plain stray comma reaches this point legitimately (the
+            # line cleaner accepts 'a,,d' shapes and FSTconfig_test.txt
+            # uses them), so this is a WARNING naming the dropped part -
+            # only a repeated declared name is refused upstream (rule
+            # 'hole'), and nothing here accuses the validator
+            logger_config.warning(
                 f'[hole] empty key component in "{group_text}" ({what}) '
-                '- dropped, this config bypassed the validator')
+                '- the empty part is dropped')
         return kept
 
     def presort_lines(self, lines):
@@ -1936,8 +1943,8 @@ class Config_Manager():
         F-C2 (review Item 4): the item TYPE comes from
         fst_config_parser.classify_groups - the SAME rule the validator applies
         when it reports that line, so the two lanes cannot disagree about what
-        a line is; the default names come from LineNamer with this method's own
-        counter policy (only unnamed lines advance it).
+        a line is; the default names come from the parser's LineNamer - the
+        same one numbering policy the violation report uses (F-C4).
         '''
         self._tap_groups_hr = []
         self._rebinds_hr = []

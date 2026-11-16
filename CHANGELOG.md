@@ -68,6 +68,37 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 
 ## [1.4.0] - 2026-11-15 (release tag pending)
 
+### Changed (F-C4, maintainer rulings of 2026-11-16)
+
+- `delay` values now use ONE range everywhere, 0 to 1000 ms: the config side
+  and the runtime used to disagree, so `-tapdelay=0,10` "passed" validation and
+  the runtime quietly turned it into (10, 10) with a console line. A value in
+  range is now applied as written, and `delay 0` means 0 ms - a delay of
+  (0, 0) really waits 0 between the keys of a tap group or macro (the draw is
+  0, no minimum is applied). Values outside 0..1000 are still dropped and the
+  console line still says so. `-nodelay` keeps its meaning: the delay leg is
+  switched off for the tap-group delay and the configured range is left
+  alone (a macro or key event that carries its own delay still waits -
+  unchanged behavior).
+- Config item numbers now agree between the violation report and the item's
+  own entry in the menu and status dump (within one config section - in a
+  multi-focus file a section's line can still be numbered differently by the
+  report, which walks the whole file, and by that section's own list). A report line used
+  to say `line 2 (TAP_2)` for a group the menu and status dump called `(TAP_1)`,
+  because a named line consumed a number in one place and not the other; now
+  every line of a kind consumes its number in both. Every report line carries
+  its line number, and a line that declared a name shows it too:
+  `line 1 (TAP_1, "*keep*") [arity] warning: ...`. The menu and the status dump
+  still show a declared name instead of a number - only the numbering changed.
+- A config line that repeats its own alias or name is now rejected: the runtime
+  cuts the declared name out of the line, so a second copy of it used to leave
+  an empty key inside the group (a line like `<w> a, <w>, d` inserted `a` then
+  nothing then `d`). The config now reports `line 1 <w> [hole] error: <w>
+  repeats inside its own line - the name cut leaves an empty key where the
+  repeat stood` and does not load. A stray comma in a plain group (a line like
+  `a,,d`) is still cleaned and accepted as before - only the name-cut case is
+  refused.
+
 ### Removed
 - `<arg>-default_on` / `-default-on` RETIRED the same day it shipped (TODO
   #423, maintainer resolution of #418 2026-11-11): in the settled model the
