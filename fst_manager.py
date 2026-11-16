@@ -1702,10 +1702,6 @@ class Config_Manager():
 
         return comments_cleaned_lines
 
-    def _combine_multilines(self, cleaned_lines):
-        return [cleaned for _, cleaned in
-                self._combine_multilines_numbered([(0, cleaned) for cleaned in cleaned_lines])]
-
     def _combine_multilines_numbered(self, numbered_lines):
         # clean multiline macro sequences and joins them together;
         # the line number of the sequence head is kept for the validator
@@ -1742,9 +1738,6 @@ class Config_Manager():
             for name in names:
                 focus_scopes[name] = scope
         return focus_scopes
-
-    def parse_line(self, line):
-        pass
 
     def _parse_lines_for_focus_manager(self, file_lines):
         '''
@@ -1890,83 +1883,6 @@ class Config_Manager():
         Config_Validator reports it as rule "dropped" before load_config
         returns, so it is never silently lost anymore
         '''
-
-        def split_ignore_brackets2(group):
-            '''
-            splits the group but ignoring the commas that are in brackets
-            used for evaluations that use commas to deliver 2 or more parameters
-            '''
-            # when no open bracket in group, then just use default split
-            if group.find('(') == -1:
-                return group.split(',')
-
-            key_string = group
-            valid_commas = []
-            start_pos = 0
-
-            open_count = 0
-
-            next_comma = key_string.find(',', start_pos)
-            next_open = key_string.find('(', start_pos)
-            next_close = key_string.find(')', start_pos)
-
-            # next_by_symbol = {',': next_comma, '(': next_open, ')': next_close}
-
-            while True:
-                if open_count == 0:
-                    if next_comma == -1:
-                        valid_commas.append(len(key_string))
-                        break
-                    elif next_open == -1:
-                        first = next_comma
-                        valid_commas.append(next_comma)
-                    else:
-                        first = min(next_comma, next_open)
-                        if first == next_comma:
-                            valid_commas.append(next_comma)
-                            # next comma
-                            symbol = ','
-                        else:
-                            open_count += 1
-                            # next open
-                            symbol = '('
-                elif open_count > 0:
-                    if next_open == -1:
-                        first = next_close
-                        open_count -= 1
-                        # next close
-                        symbol = ')'
-                    else:
-                        first = min(next_open, next_close)
-                        if first == next_close:
-                            open_count -= 1
-                            #next close
-                            symbol = ')'
-                        else:
-                            open_count += 1
-                            #next open
-                            symbol = '('
-                # print(f"count: {open_count} , start_pos: {start_pos} , first: {first}")
-                # print(f"valid commas: {valid_commas}")
-                start_pos = first+1
-
-                if symbol == ',':
-                    next_comma = key_string.find(',', start_pos)
-                if symbol == '(':
-                    next_open = key_string.find('(', start_pos)
-                else:
-                    next_close = key_string.find(')', start_pos)
-                    if open_count == 0:
-                        next_comma = key_string.find(',', start_pos)
-
-
-            split_group = []
-            start = 0
-            for comma in valid_commas:
-                split_group.append(key_string[start:comma])
-                start = comma+1
-
-            return split_group
 
         def split_ignore_brackets(group):
             return split_key_group(group)
@@ -2788,11 +2704,6 @@ class Input_State_Manager():
 
     def release_all_currently_pressed_simulated_keys(self, drain_id=None):
         # print(f"pressed keys on release: {self._pressed_keys}")
-        active_keys = []
-        for key, item in self._simulated_key_press_states_dict.items():
-            if item is True:
-             active_keys.append(key)
-        # print(f"pressed simulated keys on release: {active_keys}")
 
         ###XXX 241009-1049 do not release real keys, 241009-1100 now again release all keys - works better
         logger_state.debug("releasing all keys")
