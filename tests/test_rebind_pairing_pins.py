@@ -6,7 +6,10 @@ only from the scheduling event's locals ("is this replacement in flight?" was
 hand-carried and died with the event). R3 moves that answer to the ledger: a
 receipt (source_kind=rebind, kind per event) opens at INJECT-SCHEDULE time on
 the pump, the lane/inject leg flips ONE state attribute, and the delivery
-classification at the tail of the simulated leg closes it.
+classification at filter ENTRY closes it - but ONLY once that attribute reads
+INJECTED: nothing of ours is delivered before one of our inject legs ran
+(reviewer P1-1/P1-2 cure: an unrelated injected arrival can never settle a
+send that has not left).
 
 Single-store protocol (the PARTIAL row in (B)): open is the pump's dict store,
 the inject leg is ONE attribute flip, the close is ONE attribute flip - the two
@@ -154,9 +157,13 @@ class TestCloseAtDeliveryClassification:
         assert len(_rebinds(ledger, VK_SHIFT, TICKET_PRESS)) == 1, \
             'one send -> one receipt, a delivery never invents a second one'
 
-    def test_delivery_closes_a_receipt_still_scheduled(self, kb_env_ns):
-        # protocol: close accepts either open state - the hook classification
-        # may legitimately arrive while the lane leg has not run its flip yet
+    def test_classification_never_closes_a_not_yet_injected_receipt(
+            self, kb_env_ns):
+        # reviewer P1-1 cure: nothing of ours is "delivered" before one of
+        # our inject legs ran - an unrelated injected arrival (another
+        # process, a tap/macro/drain sim send of the same vk) must leave a
+        # SCHEDULED receipt open, or the scheduled-but-lost class R3 names
+        # would be silently erased
         kb = kb_env_ns.kb
         build(kb)
         ledger = kb._ledger
@@ -164,19 +171,44 @@ class TestCloseAtDeliveryClassification:
         assert t.state == TICKET_SCHEDULED
 
         _sim_down(kb, VK_B, 2000)
+        assert t.state == TICKET_SCHEDULED, 'no inject of ours -> not delivered'
 
+        kb.mark_rebind_injected(t)
+        _sim_down(kb, VK_B, 3000)
         assert t.state == TICKET_COMPLETED
         assert _open_rebinds(ledger) == []
+
+    def test_a_suppressed_delivery_still_closes_the_receipt(self, kb_env_ns):
+        # the entry-placement decision pinned (reviewer P2-5): a replacement
+        # the filter later SUPPRESSES was still physically delivered (the
+        # hook saw it), so the close rides the classification at entry, not
+        # the tail. Setup: an INJECTED rebind release receipt whose simulated
+        # release the tap-owner veto leg then swallows (active-key release).
+        kb = kb_env_ns.kb
+        build(kb, taps=[['(TAP_1)', ['a', 'd']]])
+        group = kb._tap_owner_by_vk[VK_A]
+        group.update_tap_states(VK_A, True)
+        t = kb.open_rebind_ticket(VK_A, False, 'p')
+        kb.mark_rebind_injected(t)
+
+        _sim_up(kb, VK_A, 2000)  # the veto leg suppresses this sim release
+
+        assert t.state == TICKET_COMPLETED, \
+            'delivered is delivered: the entry classification closed it'
+        assert kb._listener.suppress_event.call_count >= 1, \
+            'the veto leg ran on the same event and stayed untouched (R4)'
 
     def test_two_scheduled_sends_close_fifo_one_per_delivery(self, kb_env_ns):
         kb = kb_env_ns.kb
         ledger = kb._ledger
         first = kb.open_rebind_ticket(VK_B, True, 'pin-1')
         second = kb.open_rebind_ticket(VK_B, True, 'pin-2')
+        kb.mark_rebind_injected(first)
+        kb.mark_rebind_injected(second)
 
         _sim_down(kb, VK_B, 2000)
         assert first.state == TICKET_COMPLETED
-        assert second.state == TICKET_SCHEDULED
+        assert second.state == TICKET_INJECTED
 
         _sim_down(kb, VK_B, 3000)
         assert second.state == TICKET_COMPLETED
@@ -381,6 +413,10 @@ class TestRetireAuditRebindExtension:
 
         # rebind is NOT in the expected classes at the retire site: an open
         # receipt is violation-class debt, named by its seq in the audit line
+        # (delegated R3 behavior; DISPOSITION on reviewer P2-4: a rebuild
+        # landing inside the normal lane-queued window classifies the
+        # in-flight send the same way - accepted, the retire line is
+        # debug-only, changes nothing, and the window is milliseconds)
         assert ledger.audit('pin', gen_id=gen,
                             expected_source_kinds=(SOURCE_TOGGLE,
                                                    SOURCE_MACRO)) == 1
@@ -416,9 +452,13 @@ class TestMouseLegReceipt:
         assert len(receipts) == 1, receipts
         assert receipts[0].is_mouse is True
         assert receipts[0].state == TICKET_SCHEDULED, \
-            ('the coroutine hand-off carries no inject mark (execute_key_event '
-             'is shared with the macro lane) - the receipt waits open, which '
-             'is exactly the scheduled-but-lost debt class the ladder names')
+            'open at schedule: the coroutine hand-off has not started yet'
+
+        for _ in range(5):
+            await asyncio.sleep(0)  # let the lane take the hand-off
+        assert receipts[0].state == TICKET_INJECTED, \
+            ('the wrapper marks on the loop thread as the send starts '
+             '(reviewer P1-1: only an INJECTED receipt is closeable)')
 
         kb._win32_event_filter(VK_SCROLL_V, 1200, True, True, True)  # delivery
         assert receipts[0].state == TICKET_COMPLETED
