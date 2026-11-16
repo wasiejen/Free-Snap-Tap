@@ -67,9 +67,10 @@ def test_toast_font_mirrors_the_stylesheet_chain(qtbot):
     assert toast_font(12).families() == list(TOAST_FONT_FAMILIES)
     assert toast_font(12).pixelSize() == 12
     # F-B8: this was the file's first widget-building test without qtbot -
-    # with no QApplication yet, Qt aborts the process silently (the
-    # fst_overlay message handler swallows Qt's fatal line). qtbot supplies
-    # the session QApplication; addWidget closes the widget deterministically.
+    # with no QApplication yet, Qt aborts the process (the fatal message
+    # goes to the debugger and the abort bypasses buffered output, so the
+    # run dies with no message). qtbot supplies the session QApplication;
+    # addWidget closes the widget deterministically.
     toast = ToastWidget('hi', 3, 12, 'rgba(40, 40, 40, 200)', 'white')
     qtbot.addWidget(toast)
     # the stylesheet chain is single-sourced from the metrics chain
