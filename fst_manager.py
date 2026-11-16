@@ -9,7 +9,7 @@ from os import system, startfile # to use clearing of CLI for better menu usage 
 import sys # to get start arguments
 import msvcrt # to flush input stream
 from random import randint # randint(3, 9))
-from time import time # sleep(0.005) = 5 ms
+from time import time, monotonic # sleep(0.005) = 5 ms; monotonic = F-B4 age anchor
 from fst_data_types import (Key_Event, type_check, ConfigError,
                             FOCUS_NAME_ILLEGAL, Lifecycle_State,
                             SOURCE_DRAIN, SOURCE_TOGGLE)
@@ -24,6 +24,7 @@ import pyperclip # to copy mouse position to clipboard for easier pasting
 import asyncio
 import copy
 import os # --elevate lane: basename of sys.executable (dev-mode detection)
+import threading # F-B4: the status dump names the thread that wrote it
 import ctypes # --elevate lane: shell32 IsUserAnAdmin + ShellExecuteW runas
 import subprocess # --elevate lane: list2cmdline argv quoting for lpParameters
 
@@ -53,6 +54,10 @@ DROP_LOG_FILE = 'fst_drop.log'
 # bounded raw-event ring (U345 H1): filter entries append a raw tuple
 # (no format, no I/O); flush writes only when a drop happens (rare)
 DROP_RING_MAXLEN = 200
+# F-B4 (review Item 13): THE bug-report artifact - one-shot status dump,
+# same directory convention as the other FST files (CWD-relative, like the
+# log files above); overwritten atomically at startup and at every reload
+STATUS_FILE = 'fst_status.log'
 
 # -log=LEVEL start argument values -> logging levels
 LOG_LEVELS = {'debug': logging.DEBUG, 'info': logging.INFO,
@@ -188,6 +193,12 @@ class CONSTANTS():
     # on drop lines (-drop_watch start arg / alt+num6 numpad toggle); the
     # ring recording itself is always on (raw tuples, no format, no I/O).
     DROP_WATCH = False
+
+    # F-B4 (review Item 13): the ticket-aging warning threshold of the status
+    # dump's LEDGER section (design report TOP-3 risk 3: a ticket open longer
+    # than this is debt worth naming). An open ticket older than this many ms
+    # gets a [StuckKeyWatch] line in the dump and in the log at WARNING.
+    STUCK_TICKET_MS = 5000
 
     # Define File name for saving of everything, can be any filetype
     # But .txt or .cfg recommended for easier editing
@@ -2890,3 +2901,298 @@ class CLI_menu():
         # Try to flush the buffer
         while msvcrt.kbhit():
             msvcrt.getch()
+
+# ---------------------------------------------------------------------------
+# F-B4 (review Item 13): the one-shot status dump - THE bug-report artifact.
+# ---------------------------------------------------------------------------
+
+# The effective start arguments the artifact reports, in render order: the
+# post-validation values the pump actually runs on (Argument_Manager instance
+# attributes, class-attribute fallback via getattr). A bug report must say what
+# the filter was told to do, so the list is fixed (a stable public surface of
+# the artifact - review Item 13's "small public surface to keep stable").
+STATUS_ARG_NAMES = (
+    'WIN32_FILTER_PAUSED', 'MANUAL_PAUSED', 'STOPPED', 'MENU_ENABLED',
+    'CONTROLS_ENABLED', 'PRINT_VK_CODES', 'EXEC_ONLY_ONE_TRIGGERED_MACRO',
+    'ALWAYS_ACTIVE', 'DEFAULT_OFF', 'CMD_WINDOW_HIDDEN',
+    'TRAY_ICON', 'STATUS_INDICATOR', 'STATUS_INDICATOR_SIZE',
+    'CROSSHAIR_ENABLED', 'CROSSHAIR_DELTA_X', 'CROSSHAIR_DELTA_Y',
+    'ACT_DELAY', 'ACT_MIN_DELAY_IN_MS', 'ACT_MAX_DELAY_IN_MS',
+    'ACT_CROSSOVER', 'ACT_CROSSOVER_PROPABILITY_IN_PERCENT',
+    'MACRO_MIN_DELAY_IN_MS', 'MACRO_MAX_DELAY_IN_MS',
+    'SAVE_DIR', 'BACKUP_ROOT_DIR',
+)
+
+
+def _status_text(value):
+    '''User text for the artifact: ASCII-escaped (the file must survive a copy
+    into an issue tracker or a console), None collapsed to '-', everything
+    stringified through ascii() so a non-ASCII config name can never mangle a
+    reporter\'s paste.'''
+    if value is None:
+        return '-'
+    return ascii(str(value))
+
+
+def _status_num(value):
+    '''An int-or-None field (a vk code): '-' instead of Python\'s None.'''
+    return '-' if value is None else value
+
+
+class Status_Dump():
+    '''F-B4 (review Item 13): render + write one whole snapshot of what the
+    filter is IN right now - the single artifact a bug report attaches.
+
+    Sections, in order: effective args (post-validation) | lifecycle state
+    (F-A5) | focus scope | group counts | tap / hold / toggle states (read
+    from the F-B1 typed values, never from an object repr) | the ticket
+    ledger (F-A6/A7/A8) with the [StuckKeyWatch] aging detector | paths.
+
+    The file (fst_status.log, same CWD-relative directory convention as
+    fst.log) is OVERWRITTEN, atomically: render into a temp sibling, then one
+    os.replace. A reporter therefore never attaches a half-written file, and
+    a failed overwrite never destroys the artifact of the last good moment.
+
+    THREAD RULE (Item 13's named downside, answered by F-A4/F-A5): the render
+    reads live containers, so it runs on the asyncio loop thread - the lane
+    F-A4 built for the reload leg (FST_Keyboard.request_status_dump routes
+    through _run_on_loop_or_inline). The hook pump has NO dump trigger and no
+    dump path: a dump is file I/O, and a LL-hook pump that blocks past
+    LowLevelHooksTimeout loses the hook silently.
+
+    READ RULE (F-A3 discipline): bind the generation once, copy every live
+    container with list()/dict() before iterating, mutate nothing. The reads
+    tolerate a concurrent swap or append exactly like the pump\'s own reads.
+
+    A section that raises renders `unavailable: <Type>: <message>` and the
+    rest still lands: the artifact exists for the broken case most of all.
+    Only the write itself is allowed to raise - the caller names it (the F-A4
+    leg failure rule: a failed leg is named, never a silent scheduled-ok).'''
+
+    HEADER = '# FST status dump v1'
+    FOOTER = '# end of FST status dump v1'
+
+    def __init__(self, fst_keyboard):
+        self._fst = fst_keyboard
+
+    # -- the two entry points ------------------------------------------------
+
+    def render(self, reason='startup', now=None):
+        '''The whole artifact as one string. No file I/O. `now` is the
+        monotonic anchor the ledger ages are measured against - pass it in a
+        test to fake the clock (no sleeps in the suite); None reads the
+        clock once, so every ticket in this render ages from ONE instant.'''
+        now = monotonic() if now is None else now
+        lines = [self.HEADER]
+        lines += self._header_lines(reason)
+        lines += self._section('Effective args (post-validation)',
+                               self._args_lines)
+        lines += self._section('Lifecycle', self._lifecycle_lines)
+        lines += self._section('Focus scope', self._focus_lines)
+        lines += self._section('Group counts', self._count_lines)
+        lines += self._section('Tap hold toggle', self._tap_lines)
+        lines += self._section('Ledger', lambda: self._ledger_lines(now))
+        lines += self._section('Paths', self._path_lines)
+        lines.append(self.FOOTER)
+        return '\n'.join(lines) + '\n'
+
+    def write(self, reason='startup', now=None):
+        '''Render, then overwrite the artifact atomically. Returns the
+        absolute path written. Raises OSError when the file could not be
+        replaced (a locked or unwritable directory) - after the previous
+        artifact was left intact, which is the point of the temp + replace.'''
+        text = self.render(reason=reason, now=now)
+        target = STATUS_FILE
+        tmp = f'{target}.tmp-{os.getpid()}'
+        try:
+            with open(tmp, 'w', encoding='utf-8', newline='\n') as handle:
+                handle.write(text)
+            os.replace(tmp, target)
+        except OSError:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass  # nothing else to do with a temp we cannot delete
+            raise
+        path = os.path.abspath(target)
+        logger.info(f"[StatusDump] wrote={path} reason={reason} "
+                    f"pid={os.getpid()}")
+        return path
+
+    # -- header / section plumbing ------------------------------------------
+
+    def _header_lines(self, reason):
+        # timestamp + pid identify WHICH run wrote the file; the thread names
+        # which leg wrote it - the F-B4 thread contract (loop thread, never
+        # the pump) is then visible in the artifact itself
+        return [
+            f"written={datetime.datetime.now().isoformat(timespec='microseconds')}",
+            f"pid={os.getpid()}",
+            f"thread={ascii(threading.current_thread().name)}",
+            f"reason={_status_text(reason)}",
+        ]
+
+    def _section(self, header, builder):
+        lines = ['', f'## {header}']
+        try:
+            lines += builder()
+        except Exception as error:
+            # named, not silent: an artifact that hides a broken section
+            # teaches the reporter the wrong thing
+            lines.append(f"unavailable: {type(error).__name__}: "
+                         f"{ascii(str(error))}")
+        return lines
+
+    # -- sections -------------------------------------------------------------
+
+    def _args_lines(self):
+        am = self._fst.arg_manager
+        lines = [f"{name.lower()}={getattr(am, name, None)}"
+                 for name in STATUS_ARG_NAMES]
+        lines.append(f"sys_start_args={ascii(list(am.sys_start_args))}")
+        # the observability state belongs in the artifact too: a report must
+        # say whether the flow log / drop watch were even on, and which level
+        # the root logger actually answers at (an unconfigured tree answers at
+        # the effective level, NOT at the unset level 0)
+        lines.append("log_root_level="
+                     f"{logging.getLevelName(logger.getEffectiveLevel())}")
+        lines.append(f"flow_enabled={is_flow_enabled()}")
+        lines.append(f"drop_watch_enabled={is_drop_watch_enabled()}")
+        lines.append(f"debug_numpad={CONSTANTS.DEBUG_NUMPAD}")
+        return lines
+
+    def _lifecycle_lines(self):
+        machine = getattr(self._fst, '_lifecycle', None)
+        state = getattr(machine, 'state', None)
+        value = getattr(state, 'value', None)
+        return [f"state={value if value is not None else 'not-attached'}"]
+
+    def _focus_lines(self):
+        fm = self._fst.focus_manager
+        declared = sorted(str(name)
+                          for name in list(fm.multi_focus_dict_keys))
+        active = str(fm.FOCUS_APP_NAME)
+        scope = (self._fst._scope_of_focus_name(active) if active else '-')
+        return [
+            f"focus_active={bool(fm.focus_active)}",
+            f"focus_app_name={_status_text(active or None)}",
+            f"scope={_status_text(scope)}",
+            f"declared_scopes={len(declared)}",
+            f"declared_scope_names={ascii(declared)}",
+        ]
+
+    def _count_lines(self):
+        rt = self._runtime()
+        return [
+            f"gen_id={rt.gen_id}",
+            f"tap_groups={len(rt.tap_groups)}",
+            f"rebinds={len(rt.rebinds)}",
+            f"macros={len(rt.macros)}",
+            f"macro_sequences={len(rt.macro_sequence_alias_list)}",
+            f"key_groups={len(rt.key_group_by_alias)}",
+            f"triggers={len(rt.all_trigger_events)}",
+            f"rebind_triggers={len(rt.rebind_triggers)}",
+            f"macro_triggers={len(rt.macro_triggers)}",
+            f"tap_owned_vks={len(rt.tap_owner_by_vk)}",
+        ]
+
+    def _tap_lines(self):
+        # F-B1 typed values only: vk codes and latched bools. No object repr
+        # ever reaches this artifact - Item 13 filed the alt+num5 repr dump
+        # as the thing a bug report must not have to read.
+        rt = self._runtime()
+        lines = []
+        for index, group in enumerate(list(rt.tap_groups)):
+            states = dict(getattr(group, 'states', None) or {})
+            # str-keyed sort: a synthetic group may carry label members (F-B1
+            # allows any hashable), and the artifact must render, not raise
+            states_text = ','.join(f"{vk}:{int(bool(state))}"
+                                   for vk, state
+                                   in sorted(states.items(),
+                                             key=lambda kv: str(kv[0])))
+            lines.append(
+                f"tap[{index}] alias={_status_text(getattr(group, 'alias', '') or None)} "
+                f"keys={','.join(str(vk) for vk in group.get_vk_codes())} "
+                f"states={states_text or '-'} "
+                f"last_pressed={_status_num(getattr(group, 'last_key_pressed', None))} "
+                f"hold_send={_status_num(getattr(group, 'last_key_send', None))} "
+                f"active_key={_status_num(getattr(group, 'active_key', None))}")
+        if not lines:
+            lines.append('tap_groups: none')
+        sm = self._fst.state_manager
+        toggles = dict(getattr(sm, '_toggle_states_dict', None) or {})
+        latched = sorted((vk for vk, on in toggles.items() if on), key=str)
+        lines.append(f"toggle_tracked={len(toggles)}")
+        lines.append(f"toggle_latched={','.join(str(vk) for vk in latched) or '-'}")
+        held = dict(getattr(self._fst, '_macro_held', None) or {})
+        lines.append(f"macro_holds={len(held)}")
+        for alias in sorted(str(a) for a in held):
+            lines.append(f"macro_hold alias={_status_text(alias)} "
+                         f"vks={','.join(str(vk) for vk in sorted(held[alias], key=str))}")
+        return lines
+
+    def _ledger_lines(self, now):
+        ledger = getattr(self._fst, '_ledger', None)
+        if ledger is None:
+            return ['ledger: none']
+        open_now = ledger.open_tickets()
+        counts = ledger.counts()
+        threshold = CONSTANTS.STUCK_TICKET_MS
+        by_source = {}
+        for ticket in open_now:
+            by_source[ticket.source_kind] = by_source.get(ticket.source_kind,
+                                                          0) + 1
+        lines = [
+            f"high_seq={ledger.high_seq()}",
+            f"total={sum(counts.values())}",
+            f"open={len(open_now)}",
+            'counts_state=' + ' '.join(f"{state}={counts.get(state, 0)}"
+                                       for state in sorted(counts)),
+            'counts_open_by_source=' + ' '.join(
+                f"{kind}={by_source[kind]}" for kind in sorted(by_source)),
+            'open_tickets seq vk kind state source_kind source_id gen mouse age_ms',
+        ]
+        stuck = []
+        for ticket in sorted(open_now, key=lambda t: t.seq):
+            age_ms = int((now - ticket.created_at) * 1000)
+            lines.append(f"  {ticket.seq} {ticket.vk} {ticket.kind} "
+                         f"{ticket.state} {ticket.source_kind} "
+                         f"{ticket.source_id} {ticket.gen_id} "
+                         f"{int(bool(ticket.is_mouse))} {age_ms}")
+            if age_ms > threshold:
+                stuck.append((ticket, age_ms))
+        if len(open_now) == 0:
+            lines.append('  none')
+        # the named aging detector of the design report (TOP-3 risk 3): debt
+        # that never closes must be nameable without reading the table by eye
+        for ticket, age_ms in stuck:
+            line = (f"[StuckKeyWatch] seq={ticket.seq} vk={ticket.vk} "
+                    f"kind={ticket.kind} state={ticket.state} "
+                    f"source_kind={ticket.source_kind} "
+                    f"source_id={_status_text(ticket.source_id)} "
+                    f"gen={ticket.gen_id} age_ms={age_ms} "
+                    f"threshold_ms={threshold}")
+            lines.append(line)
+            logger.warning(line)
+        return lines
+
+    def _path_lines(self):
+        lines = [
+            f"status_file={os.path.abspath(STATUS_FILE)}",
+            f"log_file={os.path.abspath(MAIN_LOG_FILE)}",
+            f"flow_log={os.path.abspath(FLOW_LOG_FILE)}",
+            f"flow_enabled={is_flow_enabled()}",
+            f"drop_log={os.path.abspath(DROP_LOG_FILE)}",
+            f"drop_watch_enabled={is_drop_watch_enabled()}",
+            f"config_file={os.path.abspath(self._fst.config_manager.file_name)}",
+            f"cwd={ascii(os.getcwd())}",
+        ]
+        return lines
+
+    # -- internals -----------------------------------------------------------
+
+    def _runtime(self):
+        '''ONE bind of the live generation (F-A3): the whole artifact is
+        consistent to a single generation, never a torn pair of them.'''
+        return self._fst._runtime
+

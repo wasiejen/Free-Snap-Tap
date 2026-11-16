@@ -6,6 +6,7 @@ last updated: 241015-1041
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+from time import monotonic
 
 
 class Lifecycle_State(Enum):
@@ -74,14 +75,18 @@ class Ticket():
       state       scheduled | injected | completed - flipped by ONE attribute
                   store only (never read-modify-write from another thread)
       is_mouse    the mouse legs share the same send path but a different veto
+      created_at  monotonic seconds at construction - the F-B4 status dump's
+                  ticket-aging watch reads it; stamped once, never rewritten
 
-    The growth slots the contract reserves but this unit does NOT implement:
-    reason_code (suppression annotation) and created_at (compaction TTL).'''
+    The growth slot the contract reserves but this unit does NOT implement:
+    reason_code (suppression annotation). created_at (compaction TTL) is the
+    slot the F-B4 dump now uses for aging; the compaction TTL itself has not
+    landed.'''
     __slots__ = ('vk', 'source_kind', 'source_id', 'gen_id', 'kind', 'seq',
-                 'state', 'is_mouse')
+                 'state', 'is_mouse', 'created_at')
 
     def __init__(self, vk, source_kind, source_id, gen_id, kind, seq,
-                 state=TICKET_SCHEDULED, is_mouse=False):
+                 state=TICKET_SCHEDULED, is_mouse=False, created_at=None):
         self.vk = vk
         self.source_kind = source_kind
         self.source_id = source_id
@@ -90,6 +95,10 @@ class Ticket():
         self.seq = seq
         self.state = state
         self.is_mouse = is_mouse
+        # one monotonic read at construction, before the ticket is published:
+        # a concurrent reader either sees the ticket (with its age anchor) or
+        # does not see it, never a half-filled record
+        self.created_at = monotonic() if created_at is None else created_at
 
     def __repr__(self):
         return (f"Ticket(seq={self.seq}, vk={self.vk}, kind={self.kind}, "

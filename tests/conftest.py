@@ -15,6 +15,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import fst_manager  # noqa: E402
 from fst_data_types import ConfigError  # noqa: E402
 from fst_keyboard import FST_Keyboard  # noqa: E402
 from fst_manager import CONSTANTS  # noqa: E402
@@ -80,8 +81,19 @@ class FakeFST(SimpleNamespace):
 
 
 @pytest.fixture(autouse=True)
+def redirect_status_file(monkeypatch, tmp_path):
+    """F-B4: the status dump (product default: CWD-relative fst_status.log,
+    same convention as fst.log) is redirected to tmp_path for EVERY test -
+    a suite run never leaves an artifact in the repo root. A test that reads
+    the artifact reads fst_manager.STATUS_FILE or patches its own path."""
+    monkeypatch.setattr(fst_manager, 'STATUS_FILE',
+                        str(tmp_path / 'fst_status.log'))
+
+
+@pytest.fixture(autouse=True)
 def restore_constants():
     attrs = ['DEBUG_NUMPAD', 'TOAST_OFFLOAD', 'DROP_WATCH', 'FILE_NAME',
+             'STUCK_TICKET_MS',
              'EXIT_Combination', 'TOGGLE_ON_OFF_Combination', 'MENU_Combination']
     saved = {attr: getattr(CONSTANTS, attr) for attr in attrs}
     yield
