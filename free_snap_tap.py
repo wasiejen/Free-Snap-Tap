@@ -12,6 +12,7 @@ import datetime
 
 from fst_keyboard import FST_Keyboard
 from fst_manager import CONSTANTS, setup_fst_logging, handle_elevate_flag
+from fst_single_instance import handle_single_instance_guard
 from fst_data_types import ConfigError, Lifecycle_State
 from fst_overlay import GUI_Manager, set_console_visibility, ToastBridge
 from PySide6.QtWidgets import QApplication
@@ -496,6 +497,14 @@ if __name__ == "__main__":
     # the lane (so nothing below it runs). No flag = argv returned untouched.
     sys_start_args = handle_elevate_flag(
         sys.argv[1:] if len(sys.argv) > 1 else [])
+
+    # single-instance guard (maintainer decision 2026-11-16, X-SINGLE): runs
+    # right AFTER the --elevate lane and BEFORE the console hide and any
+    # UI/hook init. Order is race-free: the elevation relaunch exits 0
+    # before the mutex is ever acquired (launcher never holds it), so the
+    # worker process is the acquire site - see fst_single_instance.py. A
+    # second start logs one '[SingleInstance]' notice and exits 1.
+    handle_single_instance_guard()
 
     set_console_visibility(False)  # Hide console window at startup
 
