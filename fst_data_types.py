@@ -228,16 +228,28 @@ class Ticket_Ledger():
         '''The highest ticket seq ISSUED so far (0 when none).'''
         return self._high
 
-    def audit(self, context, gen_id=None):
-        '''Debug-only invariant line: name the tickets still open when a
-        generation retires or the program tears down. Returns the count; it
-        changes NOTHING (shadow mode - R2+ is where a drain reacts).'''
+    def audit(self, context, gen_id=None, expected_source_kinds=()):
+        '''Debug-only invariant line (R2: it CLASSIFIES the debt it finds).
+        Open tickets whose source_kind is in `expected_source_kinds` are
+        expected-until-exit (a latched toggle, a macro that legally ends with a
+        key held); the rest are violations - a generation or task that died
+        owing something it should have drained. Returns the VIOLATION count (0 =
+        invariant holds), logs both classes when anything is open, and changes
+        NOTHING (shadow - reacting to debt is R3+/R4 work).'''
         open_now = self.open_tickets(gen_id=gen_id)
-        if open_now and self.log:
-            self.log("TICKET audit context=%s gen=%s open=%d seqs=%s",
-                     context, gen_id, len(open_now),
-                     ",".join(str(t.seq) for t in open_now))
-        return len(open_now)
+        if not open_now:
+            return 0
+        expected = tuple(expected_source_kinds)
+        violations = [t for t in open_now if t.source_kind not in expected]
+        if self.log:
+            self.log("TICKET audit context=%s gen=%s open=%d violations=%d "
+                     "expected=%d seqs_bad=%s seqs_ok=%s",
+                     context, gen_id, len(open_now), len(violations),
+                     len(open_now) - len(violations),
+                     ",".join(str(t.seq) for t in violations) or '-',
+                     ",".join(str(t.seq) for t in open_now
+                              if t.source_kind in expected) or '-')
+        return len(violations)
 
     # -- internals ---------------------------------------------------------
 
