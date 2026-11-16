@@ -857,10 +857,16 @@ class FST_Keyboard():
             # generation retire never owns a task or a latch - macro playbacks
             # and toggle latches survive a rebuild by design (U375/U384), so
             # their debt is expected at this point and must not be reported as
-            # a retirement violation. A DRAIN or tap ticket still open here IS
-            # one (it belonged to the emission the generation just finished).
-            ledger.audit('snapshot_retire', gen_id=self._runtime.gen_id,
-                         expected_source_kinds=(SOURCE_TOGGLE, SOURCE_MACRO))
+             # a retirement violation. Since F-A9 (R4) a DRAIN release ticket
+             # open here is EXPECTED too: the hold drain emits under the old
+             # generation and its ticket closes at DELIVERY, which lands on the
+             # pump after this audit - the [StuckKeyWatch] aging lane owns the
+             # undelivered case (the filed drain-side compaction). A tap ticket
+             # still open here IS a violation (it belonged to an emission the
+             # generation just finished).
+             ledger.audit('snapshot_retire', gen_id=self._runtime.gen_id,
+                          expected_source_kinds=(SOURCE_TOGGLE, SOURCE_MACRO,
+                                                 SOURCE_DRAIN))
         self._runtime = rt
 
     def apply_focus_groups(self, focus_name = ''):
@@ -1482,7 +1488,7 @@ class FST_Keyboard():
             # byte-identical to the pre-R4 leg (third-party/echo handling).
             # The consult returns the closed ticket or None.
             owed_release = None
-            if not is_keydown and not is_mouse_event:
+            if not is_keydown and not is_mouse_event and vk_code > 0:
                 owed_release = self.take_owed_release_ticket(vk_code)
 
             key_is_in_tap_groups = False
@@ -1507,8 +1513,14 @@ class FST_Keyboard():
                                 # owe (e.g. a drain's held-key release while a
                                 # real pump event re-armed active_key mid-drain
                                 # - the F-A4 P1-1 window, closed here): DELIVER,
-                                # never suppress. The consult closed the ticket
-                                # at delivery, one arrival one ticket (FIFO).
+                                # never suppress. The consult closed its ticket
+                                # at delivery (FIFO, oldest-first, this leg).
+                                # Cross-leg note: an arrival settles at most one
+                                # ticket PER leg (the R3 entry leg has its own);
+                                # with (vk,kind) granularity only, a simultaneous
+                                # double debt settles BOTH on one arrival - the
+                                # accepted dwExtraInfo attribution residual,
+                                # pinned in tests/test_veto_ledger_pins.py.
                         # not the active key -> only release allowed
                         else:
                             if is_keydown:
@@ -2035,10 +2047,12 @@ class FST_Keyboard():
     def set_sys_start_arguments(self, sys_args):
         self._arg_manager.sys_start_args = sys_args
 
-    # -- ticket ledger helpers (ladder R0/R1/R2 recording + R3 rebind pairing) --
-    # R3 (F-A8) lands the ONE ledger consult the pairing needs: the delivery
-    # classification of a simulated leg closes that event's rebind receipt. The
-    # veto/owner legs still touch nothing new (R4 pending, maintainer-gated).
+    # -- ticket ledger helpers (ladder R0/R1/R2 recording + R3 rebind pairing
+    #    + R4 veto consult) ------------------------------------------------
+    # R3 (F-A8) lands the pairing's delivery classification: the entry leg of a
+    # simulated event closes that event's rebind receipt. R4 (F-A9) adds the
+    # veto leg's owed-release consult (take_owed_release_ticket) - the ladder's
+    # last rung, maintainer-ruled 2026-11-16. Owner legs read nothing new.
     # Design contract: estate research 2026-11-16_fst-ticket-ledger (C)/(B).
     # Transitions are single stores (see Ticket_Ledger's discipline rule); the
     # `injected` state belongs to the R3 rebind pairing: a ticket opens at
@@ -2131,7 +2145,11 @@ class FST_Keyboard():
         demands. Accepted (vk, kind)-granularity residual, sibling of the F-A8
         one: a FOREIGN injected release of the same vk, arriving while our
         release is owed, settles OUR ticket (identity attribution needs the
-        dwExtraInfo leg - future rung, filed).'''
+        dwExtraInfo leg - future rung, filed). Cross-leg form of the same
+        residual: one arrival can settle a rebind receipt (R3 entry leg) AND an
+        owed release ticket (this leg) - at most one ticket per leg, both on the
+        first evidence; pinned as the collision contract in
+        tests/test_veto_ledger_pins.py.'''
         ledger = self._ticket_store()
         if ledger is None:
             return None
@@ -2140,6 +2158,9 @@ class FST_Keyboard():
                                             TICKET_INJECTED)):
             if ticket.source_kind == SOURCE_REBIND:
                 continue
+            if ticket.is_mouse:
+                continue  # this consult serves the KEYBOARD veto (mouse gate
+                          # at the call site; mouse tickets are never eligible)
             return ledger.close(ticket)
         return None
 
@@ -2289,7 +2310,11 @@ class FST_Keyboard():
             # pump (the quit legs stop the listeners right after this call),
             # the ticket stays open as named scheduled debt and the F-B4
             # [StuckKeyWatch] ages it - debt that cannot close must stay
-            # nameable, it must never silently vanish.
+            # nameable, it must never silently vanish. A leaked ticket is also
+            # a one-shot delivery credit: the next release of that vk (after a
+            # menu resume restarts the listeners, a foreign injected event)
+            # settles it at the veto - bounded, named, superseded by the filed
+            # compaction.
             self._output_manager.send_key_event(Key_Event(vk_code, False))
             self._state_manager.set_simulated_key_press_state(vk_code, False)
 

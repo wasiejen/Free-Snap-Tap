@@ -260,7 +260,8 @@ class TestR0LedgerSurvivesSwap:
         assert all(t.gen_id == kb._runtime.gen_id
                    or t.state == TICKET_COMPLETED
                    or (t.kind == TICKET_RELEASE
-                       and t.source_kind == SOURCE_DRAIN)
+                       and t.source_id.endswith('tap_group_holds')
+                       and t.state == TICKET_SCHEDULED)
                    for t in new), new
 
     def test_the_ledger_is_a_sibling_not_part_of_a_generation(self, kb_env_ns):

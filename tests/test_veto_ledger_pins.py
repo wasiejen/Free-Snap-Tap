@@ -23,8 +23,9 @@ import inspect
 import threading
 from types import SimpleNamespace
 
-from fst_data_types import (SOURCE_MACRO, TICKET_COMPLETED, TICKET_RELEASE,
-                            TICKET_SCHEDULED)
+from fst_data_types import (SOURCE_DRAIN, SOURCE_MACRO, TICKET_COMPLETED,
+                            TICKET_INJECTED, TICKET_RELEASE, TICKET_SCHEDULED,
+                            Ticket_Ledger)
 from fst_keyboard import FST_Keyboard
 from fst_manager import CONSTANTS
 from kb_helpers import build, down
@@ -198,6 +199,42 @@ class TestR4DeliveryAndExclusion:
         assert suppressed == 1 and drops == [], (suppressed, drops)
         assert receipt.state == TICKET_SCHEDULED, receipt
 
+    def test_one_arrival_settles_at_most_one_ticket_per_leg_cross_leg_double(
+            self, kb_env_ns):
+        """The pinned cross-leg residual (F-A9 reviewer P1): the R3 entry leg
+        and the R4 veto consult are separate legs, each keyed on (vk, kind),
+        each closing at most ONE ticket per arrival - so one arrival with a
+        SIMULTANEOUS double debt (an injected rebind receipt of (vk, release)
+        plus an owed drain release of the same vk) settles BOTH on the first
+        evidence, and the second arrival finds nothing owed and takes the
+        plain no-ticket veto. This is the accepted (vk, kind)-granularity
+        dwExtraInfo attribution residual (filed, F-A8 sibling) - pinned as
+        contract, NOT wishful: the double-settle and the bounded consequence
+        (no suppression worse than pre-R4 on the second arrival) both assert."""
+        kb = kb_env_ns.kb
+        build(kb, taps=TAP_ONLY)
+        group = _arm_hold(kb, VK_A)
+        ledger = kb._ledger
+        receipt = kb.open_rebind_ticket(VK_A, is_press=False,
+                                        source_id='pin_collision')
+        kb.mark_rebind_injected(receipt)
+        owed = kb.open_release_ticket(VK_A, SOURCE_DRAIN, 'pin_collision_drain')
+        assert receipt.state == TICKET_INJECTED
+        assert owed.state == TICKET_SCHEDULED
+
+        suppressed, drops = fire_injected_release(kb, kb_env_ns.kb_mock, VK_A)
+        assert suppressed == 0 and drops == [], (suppressed, drops)
+        # one per leg, both on the first arrival (the residual):
+        assert receipt.state == TICKET_COMPLETED, receipt
+        assert owed.state == TICKET_COMPLETED, owed
+        assert ledger.open_tickets() == [], ledger.open_tickets()
+
+        # second arrival: nothing owed -> the plain no-ticket veto (the pre-R4
+        # decision, so the residual never suppresses MORE than before)
+        group.update_tap_states(VK_A, True)
+        suppressed, drops = fire_injected_release(kb, kb_env_ns.kb_mock, VK_A)
+        assert suppressed == 1 and drops == [], (suppressed, drops)
+
     def test_delivery_closes_oldest_first_count_exact(self, kb_env_ns):
         """Two drains, one vk, no delivery between: two open tickets. Each
         arriving simulated release closes exactly the OLDEST one (FIFO,
@@ -264,6 +301,13 @@ class TestR4HotPathShape:
     get over the bounded per-vk bucket. No new lock may ever enter it."""
 
     def test_the_consult_uses_no_lock_and_no_threading_primitives(self):
-        src = inspect.getsource(FST_Keyboard.take_owed_release_ticket)
-        for banned in ('Lock', 'acquire', 'threading', 'RLock'):
-            assert banned not in src, f'{banned} entered the hot-path consult'
+        """Lexical tripwire (it cannot measure the bucket-copy cost - that
+        shape is the docstring contract): no lock vocabulary may enter the
+        consult or the store's read/close path, per the single-store rule."""
+        for fn in (FST_Keyboard.take_owed_release_ticket,
+                   Ticket_Ledger.tickets, Ticket_Ledger.close,
+                   Ticket_Ledger.mark):
+            src = inspect.getsource(fn)
+            for banned in ('Lock', 'acquire', 'threading', 'RLock'):
+                assert banned not in src, \
+                    f'{banned} entered {fn.__qualname__}'
