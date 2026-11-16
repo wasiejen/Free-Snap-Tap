@@ -17,6 +17,7 @@ Harness: the real FST_Keyboard with mocked pynput controllers (conftest
 kb_env_ns); the win32 filter is called directly, no live listeners (repo gate
 rule). No sleeps anywhere.
 """
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -58,6 +59,18 @@ def _arm_tap_holds(kb, *vks):
         kb.state_manager.set_simulated_key_press_state(vk, True)
 
 
+WM_KEYUP = 257
+LLKHF_INJECTED = 0x10  # the win32 injected/simulated flag bit (U359 contract)
+
+
+def _fire_injected_release(kb, vk):
+    """One simulated KEYUP of `vk` through the real filter: the physical
+    DELIVERY of an owed release ticket (F-A9/R4 closes at this instant)."""
+    kb.keyboard_win32_event_filter(
+        WM_KEYUP, SimpleNamespace(vkCode=vk, time=9000,
+                                  flags=LLKHF_INJECTED))
+
+
 def _arm_simulated_presses(kb, *vks):
     for vk in vks:
         kb.state_manager.set_simulated_key_press_state(vk, True)
@@ -69,8 +82,15 @@ def _arm_simulated_presses(kb, *vks):
 
 class TestR1DrainPairing:
 
-    def test_tap_hold_drain_opens_and_closes_one_ticket_per_release(self,
-                                                                    kb_env_ns):
+    def test_tap_hold_drain_opens_tickets_the_delivery_closes(self,
+                                                              kb_env_ns):
+        """Open-at-emit, close-at-DELIVERY (F-A9, ladder R4, maintainer ruling
+        GO 2026-11-16). Pre-R4 this pin asserted COMPLETED straight after the
+        drain call - the shadow-mode (R0) bookkeeping the ruling superseded:
+        the hold-drain ticket must stay OPEN across the send, that is what lets
+        the sim-release veto consult see the owed release (the named payoff,
+        closing the F-A4 P1-1 re-arm window). The arriving simulated release of
+        the vk is the ticket's completion, count-exact."""
         kb = kb_env_ns.kb
         build(kb, taps=TWO_GROUPS)
         _arm_tap_holds(kb, VK_A, VK_W)
@@ -84,12 +104,19 @@ class TestR1DrainPairing:
         new = _new_since(ledger, seen)
         releases = _released_vks(kb_mock)
         assert len(new) == len(releases) == 2, (new, releases)
-        # count-exact pairing: every ticket closed, none opened twice
-        assert [t.state for t in new] == [TICKET_COMPLETED] * 2, new
+        # open-at-emit: the owed release outlives the send until it is delivered
+        assert [t.state for t in new] == [TICKET_SCHEDULED] * 2, new
         assert sorted(t.vk for t in new) == sorted(releases) == [VK_A, VK_W]
         assert all(t.kind == TICKET_RELEASE for t in new)
         assert all(t.source_kind == SOURCE_DRAIN for t in new)
         assert all(t.source_id == 'tap_group_holds' for t in new)
+        assert len(ledger.open_tickets()) == 2, ledger.open_tickets()
+
+        # delivery is the close: each owed release re-enters the filter and the
+        # veto-leg consult settles exactly one ticket (FIFO, count-exact)
+        for vk in (VK_A, VK_W):
+            _fire_injected_release(kb, vk)
+        assert all(t.state == TICKET_COMPLETED for t in new), new
         assert ledger.open_tickets() == [], ledger.open_tickets()
 
     def test_a_group_without_a_hold_opens_no_ticket(self, kb_env_ns):
@@ -225,9 +252,15 @@ class TestR0LedgerSurvivesSwap:
         survived = [t for t in still if t.seq == owed.seq][0]
         assert survived.gen_id == gen_before, survived
         assert survived.state == TICKET_SCHEDULED
-        # the tickets the swap's own hold drain emitted are paired and new
+        # the tickets the swap's own hold drain emitted are new; since F-A9
+        # (R4) a released hold stays SCHEDULED until its delivery arrives
+        # (open-until-delivered is the R4 lifecycle - tests/
+        # test_veto_ledger_pins.py), so that class is expected-open here
         new = [t for t in _new_since(kb._ledger, seen) if t.seq != owed.seq]
-        assert all(t.gen_id == kb._runtime.gen_id or t.state == TICKET_COMPLETED
+        assert all(t.gen_id == kb._runtime.gen_id
+                   or t.state == TICKET_COMPLETED
+                   or (t.kind == TICKET_RELEASE
+                       and t.source_kind == SOURCE_DRAIN)
                    for t in new), new
 
     def test_the_ledger_is_a_sibling_not_part_of_a_generation(self, kb_env_ns):
@@ -265,11 +298,20 @@ class TestR0LedgerSurvivesSwap:
 
 class TestR1TeardownInvariant:
 
-    def test_clean_exit_program_teardown_leaves_zero_open_tickets(self,
-                                                                  kb_env_plain):
-        """The F-A6 invariant, writable for the first time: after the STOPPING
-        teardown drain, the ledger holds no open ticket at all (and therefore
-        no generation owns debt)."""
+    def test_clean_exit_program_teardown_leaves_only_undeliverable_holds(
+            self, kb_env_plain):
+        """The F-A6 invariant, restated for the R4 lifecycle (maintainer
+        ruling GO 2026-11-16): after the STOPPING teardown drain the sweep and
+        toggle tickets are all COMPLETED (they close at send, untouched by
+        R4), and the only open tickets are exactly the tap_group_holds
+        releases - under open-until-delivered their delivery never comes in
+        this harness shape (the exit stops the listeners, so no simulated
+        callback re-enters the filter). In production the delivery usually
+        still arrives before the stop lands; an undelivered one stays open as
+        NAMED, [StuckKeyWatch]-aging scheduled debt (the research TOP-3 risk-3
+        class with the filed drain-side compaction), never silently closed.
+        Pre-R4 this pin asserted zero open tickets - the close-at-send
+        bookkeeping the ruling superseded."""
         kb = kb_env_plain
         build(kb, taps=TWO_GROUPS)
         _arm_tap_holds(kb, VK_A, VK_W)
@@ -277,25 +319,33 @@ class TestR1TeardownInvariant:
 
         kb.control_exit_program('pin')
 
-        assert kb._ledger.open_tickets() == [], kb._ledger.open_tickets()
+        open_now = kb._ledger.open_tickets()
+        assert sorted(t.vk for t in open_now) == [VK_A, VK_W], open_now
+        assert all(t.source_id.endswith('tap_group_holds')
+                   and t.state == TICKET_SCHEDULED for t in open_now), open_now
         assert kb._ledger.open_presses() == []
-        assert kb.ledger_open_count() == 0
+        assert kb.ledger_open_count() == 2
         tally = kb._ledger.counts()
-        assert tally[TICKET_SCHEDULED] == 0
         assert tally[TICKET_INJECTED] == 0
-        assert tally[TICKET_COMPLETED] >= 3, tally
+        # the sweep emits only for VK_S (the hold drain cleared the simulated
+        # press states of VK_A/VK_W first, as before R4) and closes it at send
+        assert tally[TICKET_COMPLETED] == 1, tally
 
     def test_a_rebuild_retires_a_generation_that_owes_nothing(self, kb_env_ns):
         """The generation-side half of the invariant, asserted in the teardown
         shape the product actually has: a rebuild drains the holds of the
-        generation it retires, so that generation ends with zero open
-        tickets."""
+        generation it retires. Under the R4 lifecycle those hold releases stay
+        open until DELIVERED, so the pin drives the deliveries through the
+        filter and only then asks the question - once delivered, the retiring
+        generation owes nothing (F-A9, maintainer ruling 2026-11-16)."""
         kb = kb_env_ns.kb
         build(kb, taps=TWO_GROUPS)
         gen_before = kb._runtime.gen_id
         _arm_tap_holds(kb, VK_A, VK_S)
 
         build(kb, taps=TWO_GROUPS)
+        for vk in (VK_A, VK_S):
+            _fire_injected_release(kb, vk)
 
         assert kb._ledger.open_tickets(gen_id=gen_before) == [], \
             'a generation died owning open tickets'
@@ -315,39 +365,32 @@ class TestR1TeardownInvariant:
 
 
 # ===========================================================================
-# (d) shadow mode: zero behavior change, and no read-modify-write path
+# (d) the R4 veto-consult contract, and no read-modify-write path
 # ===========================================================================
 
-class TestR0ShadowMode:
+class TestR4VetoConsultContract:
 
-    def _veto_result(self, kb_env_ns, open_extra_ticket):
-        """One production-shaped veto decision: a group holds 'a', an injected
-        release of 'a' arrives; the veto leg reads the group's active_key
-        (FST-404). Returns whether the hook suppressed it."""
-        kb = kb_env_ns.kb
-        build(kb, taps=[['(TAP_1)', ['a']]])
-        down(kb, VK_A, 1000)
-        if open_extra_ticket:
-            kb._ledger.open(VK_A, SOURCE_DRAIN, 'pin_shadow_probe',
-                            TICKET_RELEASE, kb.current_gen_id())
-        before = kb._listener.suppress_event.call_count
-        kb._win32_event_filter(VK_A, 1001, False, True)
-        suppressed = kb._listener.suppress_event.call_count > before
-        probe = [t for t in kb._ledger.tickets()
-                 if t.source_id == 'pin_shadow_probe']
-        return suppressed, probe
-
-    def test_an_open_ticket_changes_no_filter_decision(self, kb_env_ns):
-        """Shadow proof at the hot path: with an extra open release ticket for
-        the very vk the veto leg decides about, the decision is identical (and
-        nothing consumed the ticket) - the veto/owner legs read NOTHING new.
-        The probe runs sandwiched between two un-probed runs so a difference in
-        either direction shows up as an inequality, not a coincidence."""
+    def test_an_open_release_ticket_flips_the_release_veto_and_is_consumed(
+            self, kb_env_ns):
+        """The R4 consult contract (F-A9, maintainer ruling GO 2026-11-16).
+        This pin RETIRES the R0 shadow proof at exactly this leg ("an open
+        ticket changes no filter decision" - the ruling's whole point was that
+        the veto's DATA SOURCE moves to the ledger, last rung, pinned). With
+        an open release ticket for the very vk the veto leg decides about, the
+        decision FLIPS (delivered, not suppressed) and the consult closes the
+        ticket - one arrival, one ticket, completed. Without the ticket the
+        decision is the pre-R4 one, so the two un-probed runs bracket the
+        flipped probe run as an inequality, not a coincidence."""
         kb = kb_env_ns.kb
         results = []
         for probe in (False, True, False):
             build(kb, taps=[['(TAP_1)', ['a']]])
             down(kb, VK_A, 1000)
+            # the rebuild above drained the PREVIOUS run's armed hold, and
+            # since R4 that release sits open until delivered - deliver it from
+            # the ledger itself so the measured decision consults exactly the
+            # ticket shape this pin states (probe or none)
+            _fire_injected_release(kb, VK_A)
             if probe:
                 kb._ledger.open(VK_A, SOURCE_DRAIN, 'pin_shadow_probe',
                                 TICKET_RELEASE, kb.current_gen_id())
@@ -355,12 +398,12 @@ class TestR0ShadowMode:
             kb._win32_event_filter(VK_A, 1001, False, True)
             results.append(kb._listener.suppress_event.call_count > before)
             if probe:
-                still_open = [t for t in kb._ledger.open_tickets()
-                              if t.source_id == 'pin_shadow_probe']
-                assert len(still_open) == 1, (
-                    'a decision path consumed or closed the probe ticket - the '
-                    'ledger is no longer shadow-only')
-        assert results[0] == results[1] == results[2], results
+                settled = [t for t in kb._ledger.tickets()
+                           if t.source_id == 'pin_shadow_probe']
+                assert len(settled) == 1, (
+                    'the delivery consult lost the probe ticket')
+                assert settled[0].state == TICKET_COMPLETED, settled[0]
+        assert results == [True, False, True], results
 
     def test_high_seq_reports_the_highest_issued_seq(self, kb_env_ns):
         """The status-dump high-water is a tracked value, not the counter's

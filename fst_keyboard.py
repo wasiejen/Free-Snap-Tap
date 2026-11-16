@@ -17,7 +17,7 @@ from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro, 
 from fst_data_types import Lifecycle_State
 from fst_data_types import (Ticket_Ledger, SOURCE_DRAIN, SOURCE_MACRO,
                             SOURCE_REBIND, SOURCE_TOGGLE, TICKET_INJECTED,
-                            TICKET_PRESS, TICKET_RELEASE)
+                            TICKET_PRESS, TICKET_RELEASE, TICKET_SCHEDULED)
 from itertools import count
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
@@ -1215,7 +1215,8 @@ class FST_Keyboard():
         # SUPPRESSES was still physically delivered (the hook saw it), and
         # its pairing must close. Ledger read only (one dict get + bounded
         # bucket scan, lock-free); this is a receipt-close leg, NOT the
-        # sim-release veto (R4, untouched).
+        # sim-release veto (R4 consults the ledger in the veto section below -
+        # a different leg with a different ticket class and its own close).
         if is_simulated and vk_code > 0:
             self.record_rebind_delivery(vk_code, is_keydown)
 
@@ -1472,6 +1473,18 @@ class FST_Keyboard():
         if is_simulated:
             vk_code, is_keydown, _ = current_ke.get_all()
 
+            # F-A9 (ladder R4, maintainer ruling 2026-11-16): the sim-release
+            # veto consults the ticket ledger FIRST. An OPEN release ticket
+            # (ledger semantics: scheduled|injected) for this vk means this
+            # arriving simulated release IS a physical release FST owes, so
+            # the veto must never eat it; the consult also CLOSES the ticket -
+            # delivery is the completion. No ticket -> every decision below is
+            # byte-identical to the pre-R4 leg (third-party/echo handling).
+            # The consult returns the closed ticket or None.
+            owed_release = None
+            if not is_keydown and not is_mouse_event:
+                owed_release = self.take_owed_release_ticket(vk_code)
+
             key_is_in_tap_groups = False
             for tap_group in rt.tap_groups:
                 if rt.tap_owner_by_vk.get(vk_code) is not tap_group:
@@ -1487,8 +1500,15 @@ class FST_Keyboard():
                         if active_key == vk_code:
                             # is active key -> only press allowed
                             if not is_keydown:
-                                to_be_suppressed = True
-                                break
+                                if owed_release is None:
+                                    to_be_suppressed = True
+                                    break
+                                # F-A9: this is the release the ledger says we
+                                # owe (e.g. a drain's held-key release while a
+                                # real pump event re-armed active_key mid-drain
+                                # - the F-A4 P1-1 window, closed here): DELIVER,
+                                # never suppress. The consult closed the ticket
+                                # at delivery, one arrival one ticket (FIFO).
                         # not the active key -> only release allowed
                         else:
                             if is_keydown:
@@ -2094,6 +2114,35 @@ class FST_Keyboard():
             return None
         return ledger.close(ticket)
 
+    def take_owed_release_ticket(self, vk_code):
+        '''F-A9 (ladder R4): the sim-release veto's consult - the OLDEST OPEN
+        release ticket for this vk (ledger semantics: scheduled|injected),
+        CLOSED by this call: the arriving simulated release is that ticket's
+        physical delivery, and delivery is the completion (FIFO - sends to one
+        vk leave in issue order, so the oldest owed is the first to arrive).
+        None when nothing is owed (or no real ledger): the veto then decides
+        exactly as it always did, byte-identical. Rebind receipts are EXCLUDED:
+        R3 owns their closes at filter ENTRY with the INJECTED-only gate (a
+        foreign arrival settling a receipt before its inject leg is the F-A8
+        reviewer P1-1 class this exclusion preserves).
+        Hot path (research (B) hard constraint, pinned): ONE dict get
+        (tickets(vk=..)) plus a copy of that vk's bounded bucket - no new lock;
+        the close is the single-attribute store the lock-free read rule
+        demands. Accepted (vk, kind)-granularity residual, sibling of the F-A8
+        one: a FOREIGN injected release of the same vk, arriving while our
+        release is owed, settles OUR ticket (identity attribution needs the
+        dwExtraInfo leg - future rung, filed).'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        for ticket in ledger.tickets(vk=vk_code, kind=TICKET_RELEASE,
+                                     state=(TICKET_SCHEDULED,
+                                            TICKET_INJECTED)):
+            if ticket.source_kind == SOURCE_REBIND:
+                continue
+            return ledger.close(ticket)
+        return None
+
     # -- R3 rebind pairing (F-A8) ------------------------------------------
     # The single-store protocol design report (B) names for the ONE PARTIAL
     # consumer that needed it: a rebind ticket's life crosses exactly two
@@ -2204,33 +2253,44 @@ class FST_Keyboard():
         attribute stores (atomic under the GIL) and never unbinds the owner
         registry, so a concurrent pump leg sees either the held or the cleared
         state of the SAME object - never a half-built generation.
-        HONEST LIMIT of that argument (F-A4 reviewer P1-1): it does not cover the
-        window between release_hold() returning and the caller's send below. A
-        real pump event on the same thread can re-arm active_key in that window
-        (update_tap_states sets it), and the veto leg then suppresses the very
-        injected release this method emitted - the app keeps the key pressed. The
-        window is pre-existing (identical before F-A3/F-A4), it needs a rebuild
-        running on a non-pump thread (focus change, tray toggle) plus a real pump
-        event on the held vk inside it, and closing it means changing the
-        FST-404 release ordering - a maintainer-ruled area this unit must not
-        move unilaterally. Ruled-open item recorded in todo_inbox.md (candidate:
-        emit the releases AFTER the snapshot bind, so the veto resolves against
-        the new, unheld generation). Pinned as-is in
-        tests/test_pump_race_lifecycle_pins.py::TestP5HoldReleaseGeneration.'''
+        HONEST LIMIT of that argument (F-A4 reviewer P1-1) was the window between
+        release_hold() returning and the caller's send below: a real pump event
+        could re-arm active_key (update_tap_states sets it) and the veto leg then
+        suppressed the very injected release this method emitted - the app kept
+        the key pressed. CLOSED BY F-A9 (ladder R4, maintainer ruling GO
+        2026-11-16): the release ticket opens BEFORE the send and stays open
+        across it, and the sim-release veto consults the ledger first, so a
+        mid-drain re-arm can no longer hide the owed release from the veto. The
+        FST-404 release ORDERING was not moved (the release is still emitted
+        synchronously in the caller context, as above) - only the veto's data
+        source gained the ledger, which is what the ruling approved. Pinned in
+        tests/test_veto_ledger_pins.py (the concurrent seam race); the older
+        TestP5HoldReleaseGeneration pair still pins the no-ticket veto.'''
         for tap_group in self.runtime.tap_groups:
             vk_code = tap_group.release_hold()
             if vk_code is None:
                 continue
             # F-A7 (L1): the drain id arrives as a parameter - attribution is
             # written once, at open, and never read from shared state, so two
-            # legs on different threads cannot swap labels. Shadow-record the
-            # release; order and count of the sends are unchanged; a send that
-            # raises leaves the ticket OPEN (the release is still owed).
-            ticket = self.open_release_ticket(vk_code, SOURCE_DRAIN,
+            # legs on different threads cannot swap labels. Order and count of
+            # the sends are unchanged; a send that raises leaves the ticket
+            # OPEN (the release is still owed).
+            self.open_release_ticket(vk_code, SOURCE_DRAIN,
                     'tap_group_holds' if drain_id is None
                     else f"{drain_id}.tap_group_holds")
+            # F-A9 (ladder R4): the ticket STAYS open across the send. The
+            # close moved from here to DELIVERY: the sim-release veto leg
+            # consults the ledger first, and this very release closing its own
+            # ticket is the completion (tests/test_veto_ledger_pins.py). The
+            # old close-at-send made the ticket invisible to that consult -
+            # shadow-mode bookkeeping (R0/R1); R4 turns the record into the
+            # veto's data source. Honest residual (research TOP-3 risk 3, the
+            # filed drain-side compaction): if this release never re-enters the
+            # pump (the quit legs stop the listeners right after this call),
+            # the ticket stays open as named scheduled debt and the F-B4
+            # [StuckKeyWatch] ages it - debt that cannot close must stay
+            # nameable, it must never silently vanish.
             self._output_manager.send_key_event(Key_Event(vk_code, False))
-            self.close_ticket(ticket)
             self._state_manager.set_simulated_key_press_state(vk_code, False)
 
     def release_all_currently_pressed_simulated_keys(self, drain_id=None):
