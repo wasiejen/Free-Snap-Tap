@@ -232,7 +232,7 @@ Snap Tapping is a feature that enhances your keyboard's responsiveness by priori
 
 ## Installation
 
-1. **Install Python:** Ensure Python 3.12 is installed on your system. You can download it from [python.org](https://www.python.org/).
+1. **Install Python:** Ensure Python 3.12 or newer is installed on your system (the code uses Python 3.12 syntax and will not start on older versions). You can download it from [python.org](https://www.python.org/).
 2. **Install `pynput and pygetwindow` Package:** Open your terminal or command prompt and run:
 
 ```bash
@@ -260,6 +260,22 @@ or navigate to the Free-Snap-Tap repo folder and type in:
 ```bash
 python ./free_snap_tap.py
 ```
+
+## Building your own executable
+
+Both build paths are maintained (ruling D2): Nuitka is the primary build path for the released exe, and PyInstaller stays as the simpler alternative for users building their own exe. Both scripts need the repo virtual environment with the build tools installed (`pip install -r requirements-build.txt`).
+
+### Nuitka (primary build path)
+
+Run `built_nuitka.bat` from the repo root. The build options live as `nuitka-project` directives at the top of `free_snap_tap.py` (standalone, onefile, LTO, PySide6 plugin, icon), so the bat only invokes `python -m nuitka free_snap_tap.py`. Output: `free_snap_tap_nuitka_<date-time>.exe` in the repo root.
+
+Note: this is a heavy build (C compilation of the bundled Qt) - it runs locally, not in CI (see `release.yml`).
+
+### PyInstaller (simpler alternative for users building their own exe)
+
+Run `built_pyinstaller.bat` from the repo root (onefile, windowed, PyQt5 excluded, keyboard icon). Output: `free_snap_tap_pyinst_<date-time>.exe` in the repo root.
+
+The tag build job in CI (`release.yml`) builds this path on every `v*` tag so the command stays verified; the exe is uploaded as a workflow artifact, not attached to the release.
 
 ## Running the tests
 
