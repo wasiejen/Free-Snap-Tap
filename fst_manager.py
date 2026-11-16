@@ -12,7 +12,7 @@ from random import randint # randint(3, 9))
 from time import time, monotonic # sleep(0.005) = 5 ms; monotonic = F-B4 age anchor
 from fst_data_types import (Key_Event, type_check, ConfigError,
                             FOCUS_NAME_ILLEGAL, Lifecycle_State,
-                            SOURCE_DRAIN, SOURCE_TOGGLE,
+                            SOURCE_DRAIN, SOURCE_TAP, SOURCE_TOGGLE,
                             TICKET_COMPLETED, TICKET_STATES)
 from fst_tasks import Focus_Task, Macro_Repeat_Task
 import datetime
@@ -941,6 +941,44 @@ class Output_Manager():
             else:
                 self._controller_dict[is_mouse_key].release(key_code)
 
+    def _tap_source_id(self, tap_group):
+        '''F-A10 attribution for a tap release ticket: the group's own key
+        strings (the group "a,d" -> "a,d"), so the flow-log TICKET line names
+        the emitting group the way the maintainer reads it. Key objects carry
+        key_string; a plain-label test member falls back to its vk code. The
+        ticket already carries the vk, so the id names the GROUP, not the key.'''
+        names = []
+        for key in getattr(tap_group, 'keys', ()):
+            key_string = getattr(key, 'key_string', None)
+            names.append(key_string if key_string
+                         else str(getattr(key, 'vk_code', key)))
+        return ','.join(names) if names else 'tap'
+
+    def _open_tap_release_ticket(self, vk_code, tap_group):
+        '''F-A10 (the stuck-'a' fix, ladder R4 sibling): open the ledger release
+        receipt for a tap-snap-send release leg the moment it is SCHEDULED on
+        the pump, before the leg leaves the thread, so the sim-release veto's
+        R4 consult (FST_Keyboard.take_owed_release_ticket) serves the tap UP
+        like every other emitter's: ticket open => deliver, never suppress.
+        Closes W1 (the ticketless-UP-eaten-by-the-veto window) by construction.
+        source_kind=SOURCE_TAP, source_id names the group, and the ledger stamps
+        the global monotonic seq (the multi-key sequence position). The ticket
+        closes at DELIVERY (the veto-leg close), exactly like the drain's
+        (F-A9) - this method only opens it and never closes it.
+
+        Only the RELEASE legs are ticketed. An arriving tap press is never
+        eaten (the veto allows presses on the active key), so a press ticket
+        would have no delivery-close path and would age as false tap debt; the
+        holders that own a long press (macro/toggle) use open_press_ticket for
+        that different hold-ownership shape. The snap tap owes an UP, not a
+        hold. None-tolerant like every ticket helper: bookkeeping must never
+        block or alter a send, and a stand-in keyboard without the helper is a
+        no-op (the send proceeds exactly as before).'''
+        opener = getattr(self._fst, 'open_release_ticket', None)
+        if opener is None:
+            return None
+        return opener(vk_code, SOURCE_TAP, self._tap_source_id(tap_group))
+
     # 260429-1441 - added crossover and delay for tap groups as async coroutines - everything else runs without async directly in the listener thread
     # U364/#360: the sync legs go through pump_lane (loop lane FIFO when a
     # loop is wired, inline fallback when not); tap-group state
@@ -995,17 +1033,36 @@ class Output_Manager():
 
             if key_to_send is None:
                 if last_key_send is not None:
-                    self.pump_lane(_release_last_key, 'tap_release')
+                    # F-A10: the settle release opens its tap release ticket at
+                    # SCHEDULE time, before the leg leaves the pump, so the R4
+                    # sim-release veto serves the tap UP (ticket open => deliver).
+                    self._open_tap_release_ticket(last_key_send, tap_group)
+                    if self.pump_lane(_release_last_key, 'tap_release') is False:
+                        # W3: the lane is gone (dead loop) - the owed UP must
+                        # still reach the app, so emit it inline (rebind-leg
+                        # sibling, F-A9 reviewer P1-4: a key LOST on a dead loop).
+                        _release_last_key()
                 tap_group.set_last_key_send(None)
             else:
                 if last_key_send is not None:
+                    # F-A10: the switch's release-of-last_key_send leg opens its
+                    # tap release ticket at SCHEDULE time (before the lane hop),
+                    # covering W1 (the re-arm race) and the crossover tail; the
+                    # ticket closes at delivery via the R4 consult.
+                    self._open_tap_release_ticket(last_key_send, tap_group)
                     if not self._fst.arg_manager.ACT_DELAY and not self._fst.arg_manager.ACT_CROSSOVER:
-                        self.pump_lane(_switch_keys, 'tap_switch')
+                        if self.pump_lane(_switch_keys, 'tap_switch') is False:
+                            # W3 dead lane: still owe the UP, so run the switch
+                            # inline (the release closes at delivery).
+                            _switch_keys()
                     else:
                         try:
                             asyncio.run_coroutine_threadsafe(send_async(key_to_send, last_key_send, key_code_to_send, key_code_last_key_send), self._fst.loop)
                         except Exception as e:
                             logger_flow.error(f"Error occurred while calling send_keys_with_delay: {e}")
+                            # W3 delay/crossover: the schedule died - still owe
+                            # the UP of the held key, so emit it inline.
+                            _release_last_key()
                 else:
                     self.pump_lane(_press_new_key, 'tap_press')
                 tap_group.set_last_key_send(key_to_send)
