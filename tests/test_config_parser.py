@@ -185,10 +185,15 @@ class TestArgGrammar:
         violations = Config_Validator().validate([(1, '<arg>-tray_iconX')])
         assert [(v.rule, v.severity) for v in violations] == [('arg', 'warning')]
 
-    def test_the_two_tables_are_the_single_vocabulary(self):
-        # CONTRACT: one flag/value vocabulary for both worlds; '-crossover'
-        # is legitimately in both (bare flag '-crossover' AND '-crossover=50')
-        assert '-flow' in START_ARG_FLAGS and '-log' in START_ARG_VALUES
+    def test_the_two_tables_are_one_object_shared_with_the_runtime(self):
+        # CONTRACT: one flag/value vocabulary for both worlds - and the
+        # runtime really reads THAT object. Identity is the point: a second
+        # START_ARG_FLAGS defined later in fst_manager would shadow the
+        # import and the two entry worlds would silently disagree again.
+        import fst_config_parser
+        import fst_manager
+        assert fst_manager.START_ARG_FLAGS is fst_config_parser.START_ARG_FLAGS
+        assert fst_manager.START_ARG_VALUES is fst_config_parser.START_ARG_VALUES
         assert '-crossover' in START_ARG_FLAGS and '-crossover' in START_ARG_VALUES
         assert '-no_such_flag' not in START_ARG_FLAGS | START_ARG_VALUES
 

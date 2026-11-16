@@ -261,7 +261,8 @@ def split_item_prefix(line):
       'a, d'          -> ('', 'a, d', False)
 
     A prefix is only recognized when its closing bracket sits past index 1
-    ('<x>' at the very start of a line, '()' or '(' alone are ordinary text).
+    ('<x>' IS a definition (bracket at index 2); '<>x', '()' or a bare '(' are
+    ordinary text).
     The body is what remains, stripped. This SLICE rule is the validator's;
     Config_Manager._parse_lines_for_focus_manager still cuts with replace(),
     which also removes a LATER repetition of the same token in the line
