@@ -1,6 +1,8 @@
+import ctypes
 import logging
 import os
 import sys
+import traceback
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -195,3 +197,102 @@ def kb_env_plain(monkeypatch):
     yield keyboard
     FST_Keyboard.TIME_DIFF = None
     FST_Keyboard.START_TIME = None
+
+
+# --- F-B7 test-isolation tripwire (2026-11-16) --------------------------------
+#
+# PREVENTIVE HARDENING (reported incident RETRACTED): a "pytest emits real
+# input into the live desktop" report was investigated; the cause turned out
+# to be the maintainer's own rotated-tablet buttons pressed under his arm
+# during WTD testing, not the suite. The tripwire still guards the hazard
+# class: a session-scoped autouse patch makes every real OS input/launch
+# primitive raise (TestIsolationViolation + call stack) instead of typing
+# into the desktop. Any offender the tripwire names must be converted to the
+# fake harness (fake_fst / kb_env_* / mock_pynput_controllers, or synthetic
+# event objects routed through the filter entry). Escape hatches:
+#   @pytest.mark.allow_real_input - tripwire off for one test (justify it);
+#   @pytest.mark.live_desktop     - skipped unless FST_RUN_LIVE_DESKTOP=1.
+
+
+class TestIsolationViolation(RuntimeError):
+    """A test reached a real OS input/launch primitive while tripwired."""
+
+    __test__ = False  # not a test class - imported by test modules
+
+
+_TRIPWIRE_ALLOW = {'allow': False}
+
+
+def _make_tripwire(label, original):
+    """Wrap one real primitive; raise unless the test opted out."""
+    def _tripwire(*args, **kwargs):
+        if _TRIPWIRE_ALLOW['allow']:
+            return original(*args, **kwargs)
+        stack = ''.join(traceback.format_stack()[:-1])
+        raise TestIsolationViolation(
+            f'F-B7 TestIsolationViolation: {label} was called by the test '
+            f'process - this path emits REAL OS input/launches. Convert it '
+            f'to the fake harness.\nCall stack:\n{stack}'
+        )
+    return _tripwire
+
+
+@pytest.fixture(scope='session', autouse=True)
+def os_input_tripwire():
+    """Patch the real OS input primitives for the whole suite run (F-B7).
+
+    Pinned sites (choke points of every real send):
+    - pynput keyboard/mouse win32 backends + pynput._util.win32 SendInput
+    - pynput.mouse win32 Controller SetCursorPos (class-bound at import)
+    - ctypes.windll.user32: SendInput/keybd_event/mouse_event/SetCursorPos/
+      SetForegroundWindow
+    - ctypes.windll.shell32.ShellExecuteW (elevate relaunch leg)
+    """
+    import pynput._util.win32 as pwu
+    import pynput.keyboard._win32 as kw
+    import pynput.mouse._win32 as mw
+
+    patches = []
+
+    def _patch(obj, attr, label):
+        original = getattr(obj, attr)
+        setattr(obj, attr, _make_tripwire(label, original))
+        patches.append((obj, attr, original))
+
+    user32 = ctypes.windll.user32
+    for _name in ('SendInput', 'keybd_event', 'mouse_event', 'SetCursorPos',
+                  'SetForegroundWindow'):
+        _patch(user32, _name, f'ctypes.windll.user32.{_name}')
+    _patch(ctypes.windll.shell32, 'ShellExecuteW',
+           'ctypes.windll.shell32.ShellExecuteW')
+    _patch(kw, 'SendInput', 'pynput.keyboard._win32.SendInput')
+    _patch(mw, 'SendInput', 'pynput.mouse._win32.SendInput')
+    _patch(pwu, 'SendInput', 'pynput._util.win32.SendInput')
+    # pynput.mouse binds SetCursorPos as a name-mangled class attr at import
+    _patch(mw.Controller, '_Controller__SetCursorPos',
+           'pynput.mouse._win32.Controller.__SetCursorPos')
+    yield
+    for _obj, _attr, _original in reversed(patches):
+        setattr(_obj, _attr, _original)
+
+
+@pytest.fixture(autouse=True)
+def tripwire_allow_list(request):
+    """Honor the allow_real_input marker for one test (F-B7)."""
+    was_allowed = _TRIPWIRE_ALLOW['allow']
+    _TRIPWIRE_ALLOW['allow'] = (
+        request.node.get_closest_marker('allow_real_input') is not None)
+    yield
+    _TRIPWIRE_ALLOW['allow'] = was_allowed
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip live_desktop tests by default (F-B7): they need real OS input."""
+    if os.environ.get('FST_RUN_LIVE_DESKTOP') == '1':
+        return
+    skip_live = pytest.mark.skip(
+        reason='live_desktop: needs real OS input on a live desktop '
+               '(set FST_RUN_LIVE_DESKTOP=1 to run)')
+    for item in items:
+        if 'live_desktop' in item.keywords:
+            item.add_marker(skip_live)
