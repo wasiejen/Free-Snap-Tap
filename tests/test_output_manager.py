@@ -193,13 +193,17 @@ class TestConstraintChaining:
         ke = Key_Event(VK_A, constraints=["p('a')", 'release_all_keys()'])
         fulfilled, _ = om_env.om.check_constraint_fulfillment(ke, get_also_delays=True)
         assert fulfilled is True
-        om_env.fst.release_all_currently_pressed_simulated_keys.assert_called_once_with()
+        # F-A7 (L1, maintainer-approved signature edit): the invocation names
+        # its drain leg, so the ticket its emissions carry is attributable
+        om_env.fst.release_all_currently_pressed_simulated_keys.assert_called_once_with('constraint_action')
 
 
 class TestInvocations:
     def test_release_all_keys(self, om_env):
         assert om_env.om.constraint_evaluation('release_all_keys()', make_ke()) is True
-        om_env.fst.release_all_currently_pressed_simulated_keys.assert_called_once_with()
+        # F-A7 (L1, maintainer-approved signature edit): the invocation names
+        # its drain leg, so the ticket its emissions carry is attributable
+        om_env.fst.release_all_currently_pressed_simulated_keys.assert_called_once_with('constraint_action')
 
     def test_sequence_name_invocation_resets_sequence(self, om_env):
         om_env.fst.macro_sequence_alias_list = ['my_seq']

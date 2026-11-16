@@ -513,7 +513,7 @@ class Output_Manager():
 
         def release_all_keys():
             def _work():
-                self._fst.release_all_currently_pressed_simulated_keys()
+                self._fst.release_all_currently_pressed_simulated_keys('constraint_action')
                 logger_eval.debug("-- Eval: released all keys")
                 return True
             # U364/#360: SendInput leg off the pump -> loop lane
@@ -2569,6 +2569,20 @@ class Input_State_Manager():
             return False
     def set_toggle_state(self, vk_code, is_press):
         self._toggle_states_dict[vk_code] = is_press
+        # F-A7 (ladder R2, shadow for toggles): the latch IS the ownership
+        # record of a latched-down key - engaged opens a long-lived press
+        # ticket, released closes it. Release BEHAVIOR is byte-identical (this
+        # adds no send); it makes toggle debt visible and countable.
+        # source_kind='toggle', source_id='toggle:<vk>' - the latch state has no
+        # alias name, the vk is the toggle key's identity.
+        if is_press:
+            opener = getattr(self._fst, 'open_press_ticket', None)
+            if opener is not None:
+                opener(vk_code, SOURCE_TOGGLE, f'toggle:{vk_code}')
+        else:
+            closer = getattr(self._fst, 'close_hold_ticket', None)
+            if closer is not None:
+                closer(vk_code, SOURCE_TOGGLE)
 
     @property
     def toggle_states_dict_keys(self):
@@ -2620,14 +2634,21 @@ class Input_State_Manager():
             if not _handle.done():
                 repeat_task.cancel_playback()
                 _handle.cancel()
+            # F-A7 (ladder R2): the repeat lane drives a macro playback of the
+            # same alias, and cancelling the repeat task does NOT cancel that
+            # playback's physical debt. Drain it here, before returning, so a
+            # repeat cancel cannot leave a key held (research (D) R2).
+            drainer = getattr(self._fst, 'drain_macro_debt', None)
+            if drainer is not None:
+                drainer(alias=repeat_task.alias_name, context='repeat_cancel')
 
-    def release_all_toggles(self):
+    def release_all_toggles(self, drain_id=None):
         for vk_code in self._toggle_states_dict_keys:
-            # F-A6: the toggle latch drain gets its own ticket (source_kind
-            # 'toggle') so the ledger can name a latched-DOWN vk as owed
-            # debt; the release itself is unchanged.
+            # F-A7: the toggle latch drain gets its own emission ticket
+            # (source_kind 'toggle'); the ownership ticket the engage opened is
+            # closed by the set_toggle_state(False) below. Sends unchanged.
             ticket = self._open_release_ticket(vk_code, SOURCE_TOGGLE,
-                                               'toggle_sweep')
+                                               drain_id, 'toggle_sweep')
             self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
             self._close_ticket(ticket)
             self.set_toggle_state(vk_code, False)
@@ -2645,15 +2666,18 @@ class Input_State_Manager():
 
 ###XXX 241014-1926 changed
 
-    def _open_release_ticket(self, vk_code, source_kind, source_id):
-        '''F-A6 shadow bookkeeping: the keyboard owns the one ledger
-        (FST_Keyboard._ledger), so the drain legs delegate there. A stand-in
-        keyboard without the helper (tests) returns None and the release
-        proceeds exactly as before - bookkeeping must never alter a send.'''
+    def _open_release_ticket(self, vk_code, source_kind, drain_id, sweep):
+        '''F-A7 (L1): build the ticket's source_id from the CALL's attribution
+        (`<drain_id>.<sweep>`, or the bare sweep when the caller has no leg
+        label) and hand it to the keyboard's ledger. The attribution arrives as
+        a parameter - nothing reads shared state, so two drain legs running on
+        different threads cannot swap labels. A stand-in keyboard without the
+        helper (tests) returns None and the release proceeds unchanged.'''
         opener = getattr(self._fst, 'open_release_ticket', None)
         if opener is None:
             return None
-        return opener(vk_code, source_kind, source_id)
+        source = sweep if not drain_id else f"{drain_id}.{sweep}"
+        return opener(vk_code, source_kind, source)
 
     def _close_ticket(self, ticket):
         if ticket is None:
@@ -2663,7 +2687,7 @@ class Input_State_Manager():
             return None
         return closer(ticket)
 
-    def release_all_currently_pressed_simulated_keys(self):
+    def release_all_currently_pressed_simulated_keys(self, drain_id=None):
         # print(f"pressed keys on release: {self._pressed_keys}")
         active_keys = []
         for key, item in self._simulated_key_press_states_dict.items():
@@ -2685,13 +2709,13 @@ class Input_State_Manager():
                 # the sweep semantics are unchanged (R2+ is where a drain asks
                 # the ledger for the list instead of inferring it).
                 ticket = self._open_release_ticket(vk_code, SOURCE_DRAIN,
-                                                   'simulated_sweep')
+                                                   drain_id, 'simulated_sweep')
                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
                 self._close_ticket(ticket)
 
         # self.release_all_modifier_keys()
 
-        self.release_all_toggles()
+        self.release_all_toggles(drain_id)
         self.reset_states_dicts()
 
     def release_all_modifier_keys(self):

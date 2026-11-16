@@ -392,21 +392,23 @@ class TestR0ShadowMode:
                    for t in ledger.tickets(vk=VK_A)), 'the late append was lost'
         assert any(t.seq == held.seq for t in ledger.open_tickets())
 
-    def test_nested_drain_legs_restore_the_outer_label(self, kb_env_plain):
-        """The label is save/restore, so a leg that runs inside another leg's
-        label returns to the outer one afterwards (the cross-thread case stays
-        a documented limitation in begin_drain)."""
+    def test_attribution_is_the_callers_parameter_not_leftover_state(
+            self, kb_env_plain):
+        """F-A7 (L1) replaced the F-A6 shared label: two consecutive legs get
+        their own ids and a leg that passes no label gets the bare sweep name -
+        so no leg can inherit another leg's attribution."""
         kb = kb_env_plain
-        outer = kb.begin_drain('outer_leg')
-        try:
-            inner = kb.begin_drain('inner_leg')
-            kb.end_drain(inner)
-            ticket = kb.open_release_ticket(VK_A, SOURCE_DRAIN, 'probe_sweep')
-            assert ticket.source_id == 'outer_leg.probe_sweep', ticket
-        finally:
-            kb.end_drain(outer)
-        assert kb.open_release_ticket(VK_D, SOURCE_DRAIN,
-                                     'probe_bare').source_id == 'probe_bare'
+        ledger = kb._ledger
+        sm = kb.state_manager
+        ids = []
+        for label in ('outer_leg', None, 'inner_leg'):
+            sm.reset_states_dicts()
+            sm.set_simulated_key_press_state(VK_A, True)
+            seen = {t.seq for t in ledger.tickets()}
+            sm.release_all_currently_pressed_simulated_keys(label)
+            ids.append([t.source_id for t in _new_since(ledger, seen)])
+        assert ids == [['outer_leg.simulated_sweep'], ['simulated_sweep'],
+                       ['inner_leg.simulated_sweep']], ids
 
     def test_the_store_exposes_no_read_modify_write_path(self, kb_env_ns):
         """The single-store discipline, asserted: the public API is only
@@ -478,12 +480,11 @@ class TestR2HandoverMacroAbort:
 
     def test_macro_abort_opens_no_tickets_because_it_emits_no_releases(
             self, kb_env_ns):
-        """Recorded honestly instead of assumed: Macro_Repeat_Task teardown and
-        interrupt_macro_by_name only CANCEL - they emit no release, so this unit
-        has no emission to wrap and the ledger stays empty. The press a
-        cancelled macro sequence may still owe is therefore invisible until the
-        R2 rung (task-debt drain) - named here so the next unit cannot miss it.
-        """
+        """SUPERSEDED BY F-A7 (ladder R2), kept as the no-debt half: a repeat
+        task whose playback handle is a stub holds nothing, so there is no debt
+        and the abort path still emits nothing (no phantom release). The real
+        case - cancelling a playback that left a key held - now drains its debt
+        and is pinned in tests/test_task_debt_pins.py::TestL2MacroTaskDebt."""
         from fst_tasks import Macro_Repeat_Task
         kb = kb_env_ns.kb
         ledger = kb._ledger

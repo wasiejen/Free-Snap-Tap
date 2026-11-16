@@ -15,7 +15,8 @@ from os import startfile
 
 from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro, ConfigError
 from fst_data_types import Lifecycle_State
-from fst_data_types import Ticket_Ledger, SOURCE_DRAIN, TICKET_RELEASE
+from fst_data_types import (Ticket_Ledger, SOURCE_DRAIN, SOURCE_MACRO,
+                            SOURCE_TOGGLE, TICKET_PRESS, TICKET_RELEASE)
 from itertools import count
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
@@ -260,14 +261,16 @@ class FST_Keyboard():
         # monotonic generation ids (itertools.count: one C-level call, so
         # race-free across the pump / lane / Qt rebuild triggers)
         self._gen_ids = count(1)
-        # which drain leg the per-emission tickets attribute to (F-A6). A single
-        # attribute store, read ONLY by ticket bookkeeping - no decision path
-        # consults it, so a mislabel can only mislabel, never change behavior.
-        self._drain_id = 'unset'
 
         # macro playback bookkeeping is NOT a generation: tasks survive a
         # rebuild and are cancelled/reset explicitly (U375/U384)
         self._macro_task_dict = {}
+        # R2 (F-A7): the physical presses a macro playback injected and has not
+        # released yet - {alias: {vk: open press Ticket}}. It is the ledger's
+        # fast index (the ledger stays the registry), lives with the task
+        # bookkeeping (NOT with a generation), and is drained by the task's own
+        # cancel/error path and by every quit/pause leg.
+        self._macro_held = {}
 
         self.loop = None
         # F-A5: the loop's lifecycle machine (set by MainLogic.run()); None
@@ -803,7 +806,14 @@ class FST_Keyboard():
         # decides nothing.
         ledger = self._ticket_store()
         if ledger is not None:
-            ledger.audit('snapshot_retire', gen_id=self._runtime.gen_id)
+            # F-A7 (reviewer P2-5): the classifier is used HERE too. A
+            # generation retire never owns a task or a latch - macro playbacks
+            # and toggle latches survive a rebuild by design (U375/U384), so
+            # their debt is expected at this point and must not be reported as
+            # a retirement violation. A DRAIN or tap ticket still open here IS
+            # one (it belonged to the emission the generation just finished).
+            ledger.audit('snapshot_retire', gen_id=self._runtime.gen_id,
+                         expected_source_kinds=(SOURCE_TOGGLE, SOURCE_MACRO))
         self._runtime = rt
 
     def apply_focus_groups(self, focus_name = ''):
@@ -1467,6 +1477,80 @@ class FST_Keyboard():
             logger_macro.debug(f"no macro task found for {alias_name} - maybe just the first start of it")
 
 
+    # -- macro task debt (F-A7, ladder R2) --------------------------------
+
+    def _macro_press_recorded(self, alias_name, key_event):
+        '''The macro lane saw a PRESS of key_event leave: remember it as owed
+        until the matching release plays or the playback is aborted. The ledger
+        owns the ticket (R2: a macro ticket is an OWNERSHIP record, kind=press,
+        source_kind=macro, source_id=the alias); `_macro_held` is only the
+        per-alias index the drain walks.'''
+        if self._ticket_store() is None:
+            return
+        held = self._macro_held.setdefault(alias_name, {})
+        previous = held.get(key_event.vk_code)
+        if previous is not None:
+            # a second press of the same vk inside one playback supersedes the
+            # older record (one physical key is held once); close it so the
+            # ledger cannot report phantom debt
+            self.close_ticket(previous)
+            logger_macro.debug(f"macro {alias_name}: press of {key_event.vk_code}"
+                               " superseded, ticket closed")
+        held[key_event.vk_code] = self.open_press_ticket(
+            key_event.vk_code, SOURCE_MACRO, str(alias_name))
+
+    def _macro_release_recorded(self, alias_name, vk_code):
+        '''The macro lane played the release: the press it owed is settled.'''
+        held = self._macro_held.get(alias_name)
+        if not held:
+            return
+        ticket = held.pop(vk_code, None)
+        if ticket is not None:
+            self.close_ticket(ticket)
+        if not held:
+            # keep the index tidy: an alias with nothing owed is not tracked
+            self._macro_held.pop(alias_name, None)
+
+    def drain_macro_debt(self, alias=None, context='macro_debt'):
+        '''R2: emit the releases a cancelled/aborted macro playback left owed,
+        one per held vk, in press order, then close the tickets. This is where
+        the ladder says the invariant first becomes TRUE instead of hopeful
+        (research (D) R2): previously a cancel emitted NOTHING and the app kept
+        the key pressed until some later sweep happened to run.
+
+        `alias=None` drains every playback (the quit / pause / menu legs).
+        The global simulated-key record is cleared with each release, exactly
+        like the FST-404 hold drain, so the Input_State_Manager sweep cannot
+        re-emit it. Runs on the caller's thread: the macro legs live on the
+        loop thread, the quit/pause legs keep their synchronous-release ruling.
+
+        Concurrency (F-A7 reviewer P1): a drain CLAIMS an alias's whole dict
+        with ONE `pop` instead of mutating it in place. A playback leg recording
+        a press concurrently then re-creates a fresh tracked dict through
+        `setdefault` - it can neither be dropped by this drain nor make this
+        drain's iteration raise, and only one drain ever sees a given entry.
+        The still-running playback is also cancelled first: `send_key_event` has
+        no release veto, so without the cancel a queued release of the playback
+        could land after the drain's release (reviewer P2-2). The cancel reuses
+        the pre-existing `interrupt_macro_by_name` pattern (the same cross-thread
+        handle.cancel the repeat lane already performs) - no new mechanism.'''
+        aliases = list(self._macro_held) if alias is None else [alias]
+        released = []
+        for name in aliases:
+            if name in self._macro_held:
+                self.interrupt_macro_by_name(name)
+            held = self._macro_held.pop(name, None)   # claim: one dict pop
+            if not held:
+                continue
+            for vk_code, ticket in held.items():
+                logger_macro.debug(f"draining macro debt {name}: release {vk_code}"
+                                   f" ({context})")
+                self._output_manager.send_key_event(Key_Event(vk_code, False))
+                self._state_manager.set_simulated_key_press_state(vk_code, False)
+                self.close_ticket(ticket)
+                released.append(vk_code)
+        return released
+
     async def macro_task(self, key_group, alias_name):
         '''execute the macro/alias - can be stopped by using cancel on the handle of the asyncio task from the outside'''
 
@@ -1480,11 +1564,40 @@ class FST_Keyboard():
 
                     if key_event.is_toggle:
                         key_event = self._state_manager.get_next_toggle_state_key_event(key_event)
+                    elif key_event.vk_code > 0:
+                        # R2 (F-A7): track what this playback owes from the
+                        # moment the event is about to leave. A cancel inside
+                        # the delay below then has something to drain (the
+                        # app-level debt research item 7 named).
+                        if key_event.is_press:
+                            self._macro_press_recorded(alias_name, key_event)
+                        else:
+                            self._macro_release_recorded(alias_name,
+                                                         key_event.vk_code)
                     # send key event and handles interruption of delay
                     await self._output_manager.execute_key_event(key_event, delay_times, with_delay=True)
 
+        except asyncio.CancelledError:
+            # R2 (ladder R2, research (D)): the cancel lands in a delay, often
+            # right after a press left. Emit the owed releases BEFORE returning
+            # - this is the semantics migration for macros: a release is emitted
+            # where previously none was. The drain must not pre-empt the
+            # cancellation contract (F-A7 reviewer P2-7): a drain failure is
+            # logged, the CancelledError still propagates.
+            try:
+                self.drain_macro_debt(alias=alias_name, context='macro_cancel')
+            except Exception as error:
+                logger_macro.exception(f"macro debt drain failed for {alias_name}:"
+                                      f" {error}")
+            raise
         except Exception as error:
             logger_macro.exception(f"Error in macro playback of {alias_name}: {key_group} | {error}")
+            # an errored playback aborted too - same debt, same drain
+            try:
+                self.drain_macro_debt(alias=alias_name, context='macro_error')
+            except Exception as drain_error:
+                logger_macro.exception(f"macro debt drain failed for {alias_name}:"
+                                      f" {drain_error}")
 
 
 
@@ -1689,14 +1802,13 @@ class FST_Keyboard():
         print('--- Stopping - Return to menu ---')
         logger.info("return to menu")
         logger_state.debug(f"return to menu with pressed keys: {self._state_manager._real_key_press_states_dict}")
-        # F-A6: the drain leg is NAMED for the ledger's tickets (the lifecycle
-        # teardown drain). Releases, order and count unchanged.
-        saved_drain = self.begin_drain('return_to_menu')
-        try:
-            self.release_all_currently_pressed_simulated_keys()
-            self._state_manager.stop_all_repeating_keys()
-        finally:
-            self.end_drain(saved_drain)
+        # F-A7 (L1 + R2): the leg NAMES its drain (attribution is a parameter,
+        # not shared state), and macro debt drains first so the sweeps below do
+        # not double-release what the macro leg owns. Release order/count for a
+        # playback that owes nothing is unchanged.
+        self.drain_macro_debt(context='return_to_menu')
+        self.release_all_currently_pressed_simulated_keys('return_to_menu')
+        self._state_manager.stop_all_repeating_keys()
         self._stop_listeners_on_lane()
         # F-A5: the MENU request is POSTED last, so the loop thread re-enters
         # the menu only after the release sweeps ran and the listener stops were
@@ -1710,15 +1822,13 @@ class FST_Keyboard():
         # F-A4: stops on the lane, releases synchronous (see
         # _stop_listeners_on_lane); STOPPED stays the LAST statement so a
         # reader of the flag never sees it set before the shutdown was ordered.
-        # F-A6: the STOPPING teardown drain is named for the ledger's tickets
-        # (one drain leg - the releases/stops themselves are unchanged).
-        saved_drain = self.begin_drain('exit_program')
-        try:
-            self.release_all_currently_pressed_simulated_keys()
-            self._state_manager.stop_all_repeating_keys()
-            self._stop_listeners_on_lane()
-        finally:
-            self.end_drain(saved_drain)
+        # F-A7 (L1 + R2): the leg NAMES its drain (a parameter, not shared
+        # state) and the macro task debt drains first, so the simulated sweep
+        # below does not double-release what the macro leg owns.
+        self.drain_macro_debt(context='exit_program')
+        self.release_all_currently_pressed_simulated_keys('exit_program')
+        self._state_manager.stop_all_repeating_keys()
+        self._stop_listeners_on_lane()
         self._arg_manager.STOPPED = True
         # F-A5 (Item 3, and no direct sys.exit from the hook pump): alt+END
         # POSTS the stop. The loop thread observes it, returns from run(), and
@@ -1745,16 +1855,13 @@ class FST_Keyboard():
             # with paused_lock:
             self._arg_manager.WIN32_FILTER_PAUSED = True
             self._arg_manager.MANUAL_PAUSED = True
-            # F-A6: the pause leg's release drain is named for the ledger.
-            # NOTE (shadow-mode honesty): the F-A4 RELOAD lane itself
-            # (_reload_now) emits no releases at all, so it opens no tickets -
+            # F-A7 (L1 + R2): named drain (parameter, not shared state); macro
+            # debt first. NOTE (honest scope): the F-A4 RELOAD lane itself
+            # (_reload_now) still emits no releases at all, so it owes nothing -
             # this pause leg is the alt+DELETE drain path.
-            saved_drain = self.begin_drain('pause_toggle')
-            try:
-                self.release_all_currently_pressed_simulated_keys()
-                self._state_manager.stop_all_repeating_keys()
-            finally:
-                self.end_drain(saved_drain)
+            self.drain_macro_debt(context='pause_toggle')
+            self.release_all_currently_pressed_simulated_keys('pause_toggle')
+            self._state_manager.stop_all_repeating_keys()
             # F-A5: the loop records the pause (the listeners stay live - a
             # paused filter still answers events, it just lets them through)
             self.post_lifecycle(Lifecycle_State.PAUSED, 'alt+DELETE pause')
@@ -1807,30 +1914,8 @@ class FST_Keyboard():
 
     def current_gen_id(self):
         '''The live generation's id (one attribute read). Tickets carry it so
-        debt owed by a retired generation is nameable.'''
+        debt owed under a retired generation is nameable.'''
         return self._runtime.gen_id
-
-    def begin_drain(self, drain_id):
-        '''Name the drain leg the per-emission tickets attribute to; returns the
-        previous label for end_drain. A single attribute store, read only by
-        ticket bookkeeping - so it can mislabel, never change behavior.
-
-        KNOWN LIMITATION (F-A6 reviewer P2-4, shadow phase): the label is one
-        instance attribute. Nested legs restore correctly (save/restore), but if
-        two legs run on different threads at once (a hook-thread pause racing a
-        loop-thread exit), the tickets of the second leg can carry the first
-        leg's label and vice versa. That mislabels METADATA only - no release,
-        order or count depends on it - and threading the label through the
-        call chain is blocked for now by the pinned facade signature
-        (`release_all_currently_pressed_simulated_keys()` is asserted
-        call-without-args in tests/test_output_manager.py), so the correct fix
-        is a Phase-B threading decision (named in the handover/inbox).'''
-        previous = self._drain_id
-        self._drain_id = drain_id
-        return previous
-
-    def end_drain(self, previous):
-        self._drain_id = previous
 
     def _ticket_store(self):
         '''The ledger, or None when the object has no real one (a partially
@@ -1843,27 +1928,50 @@ class FST_Keyboard():
     def open_release_ticket(self, vk_code, source_kind=SOURCE_DRAIN,
                             source_id=None, is_mouse=False):
         '''Open a ticket for a release the calling leg is about to emit.
-        Returns the Ticket, or None when no real ledger is wired (a stand-in
-        keyboard in a test) - every caller must tolerate None, because shadow
-        bookkeeping must never block or alter a send.
+        `source_id` is passed IN by the leg (F-A7 L1: attribution travels with
+        the call, it is not read from shared state - see `open_press_ticket`
+        for the hold flavour). Returns the Ticket, or None when no real ledger
+        is wired (a stand-in keyboard in a test) - every caller must tolerate
+        None, because bookkeeping must never block or alter a send.
 
         A ticket that is left open because its send RAISED is left open on
         purpose: the release is still owed, and naming that debt is the whole
-        point of the ledger (the phantom-debt risk is R1+/R3 compaction work).'''
+        point of the ledger.'''
         ledger = self._ticket_store()
         if ledger is None:
             return None
-        label = self._drain_id
-        source = label if source_id is None else source_id
-        if label and label != 'unset' and source != label:
-            # keep BOTH halves of the answer in the id: which leg asked for the
-            # drain and which sweep emitted the release (pause_toggle.
-            # simulated_sweep). The reserved field is a free-form id, so this is
-            # the documented composition, not a new field.
-            source = f"{label}.{source}"
-        return ledger.open(vk_code, source_kind, source,
+        return ledger.open(vk_code, source_kind,
+                           'drain' if source_id is None else source_id,
                            TICKET_RELEASE, self.current_gen_id(),
                            is_mouse=is_mouse)
+
+    def open_press_ticket(self, vk_code, source_kind, source_id):
+        '''Open a LONG-LIVED ownership ticket: FST injected a press of this vk
+        and now owes the release (R2 task debt - a macro that dies mid-press, a
+        latched toggle). Idempotent per (vk, source_kind): a latch that is
+        written True again returns the ticket already open instead of minting a
+        second owner for one physical key. Returns None without a real ledger.'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        for ticket in ledger.open_tickets(kind=TICKET_PRESS):
+            if ticket.vk == vk_code and ticket.source_kind == source_kind:
+                return ticket
+        return ledger.open(vk_code, source_kind, source_id, TICKET_PRESS,
+                           self.current_gen_id())
+
+    def close_hold_ticket(self, vk_code, source_kind):
+        '''Close the open ownership ticket this vk's release settles (the one
+        for this source_kind, newest first). No matching ticket -> no-op: the
+        release may also be the sweep of a state that was never owned here.'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        open_now = ledger.open_tickets(kind=TICKET_PRESS)
+        for ticket in reversed(open_now):
+            if ticket.vk == vk_code and ticket.source_kind == source_kind:
+                return ledger.close(ticket)
+        return None
 
     def close_ticket(self, ticket):
         '''Close a ticket once its physical event actually left (one store).'''
@@ -1874,16 +1982,20 @@ class FST_Keyboard():
             return None
         return ledger.close(ticket)
 
-    def ledger_open_count(self, gen_id=None):
-        '''A PURE query for tests and teardown audits: how many tickets are
-        still open (optionally of one generation). No logging, no side effect -
-        `Ticket_Ledger.audit` is the version that names them.'''
+    def ledger_open_count(self, gen_id=None, expected_source_kinds=()):
+        '''A PURE query for tests and teardown audits: how many open tickets are
+        VIOLATIONS (open, optionally of one generation, and not of an
+        `expected_source_kinds` class). It scans and returns a number only - no
+        logging, no mutation; `Ticket_Ledger.audit` is the version that NAMES
+        them (F-A7 reviewer P2-4).'''
         ledger = self._ticket_store()
         if ledger is None:
             return 0
-        return len(ledger.open_tickets(gen_id=gen_id))
+        expected = tuple(expected_source_kinds)
+        return len([t for t in ledger.open_tickets(gen_id=gen_id)
+                    if t.source_kind not in expected])
 
-    def _release_tap_group_holds(self):
+    def _release_tap_group_holds(self, drain_id=None):
         '''FST-404 (#404): release the app-level hold each tap group owns.
 
         Order matters. Tap_Group.release_hold() clears states/active_key/
@@ -1926,18 +2038,24 @@ class FST_Keyboard():
             vk_code = tap_group.release_hold()
             if vk_code is None:
                 continue
-            # F-A6 (R1 as scoped for this unit): shadow-record the release this
-            # drain emits. Order and count of the sends are unchanged; a send
-            # that raises leaves the ticket OPEN (the release is still owed).
+            # F-A7 (L1): the drain id arrives as a parameter - attribution is
+            # written once, at open, and never read from shared state, so two
+            # legs on different threads cannot swap labels. Shadow-record the
+            # release; order and count of the sends are unchanged; a send that
+            # raises leaves the ticket OPEN (the release is still owed).
             ticket = self.open_release_ticket(vk_code, SOURCE_DRAIN,
-                                              'tap_group_holds')
+                    'tap_group_holds' if drain_id is None
+                    else f"{drain_id}.tap_group_holds")
             self._output_manager.send_key_event(Key_Event(vk_code, False))
             self.close_ticket(ticket)
             self._state_manager.set_simulated_key_press_state(vk_code, False)
 
-    def release_all_currently_pressed_simulated_keys(self):
-        self._release_tap_group_holds()
-        self._state_manager.release_all_currently_pressed_simulated_keys()
+    def release_all_currently_pressed_simulated_keys(self, drain_id=None):
+        # F-A7 (L1): drain_id threads through - the leg that asked for the
+        # drain names the tickets its emissions create (approved signature
+        # change, tests/test_output_manager.py repinned in the same commit).
+        self._release_tap_group_holds(drain_id)
+        self._state_manager.release_all_currently_pressed_simulated_keys(drain_id)
         self._output_manager.clear_all_variables()
 
     def display_internal_repr_groups(self):
