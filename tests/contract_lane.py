@@ -256,6 +256,18 @@ class Contract_Lane:
                 handle.cancel()
             except Exception:
                 pass
+        # reviewer P2-6: repeat legs (start_repeat/toggle_repeat constraints)
+        # ride the same loop - drain their handles too so nothing outlives it
+        for repeat_task, handle in list(
+                self.kb.output_manager.repeat_thread_dict.values()):
+            try:
+                repeat_task.cancel_playback()
+            except Exception:
+                pass
+            try:
+                handle.cancel()
+            except Exception:
+                pass
         try:
             self.kb._macro_task_dict.clear()
         except Exception:
@@ -351,20 +363,32 @@ class Contract_Lane:
 
     def _focus_on(self, name):
         """Mirror of the Focus_Task activation leg (fst_tasks.py): the
-        foreground title matched section 'name'."""
+        foreground title matched section 'name'.
+
+        Reviewer P2-1 fidelity: the product rebuilds only when the matched
+        section CHANGED (focus_name_changed latch, fst_tasks.py) - a repeated
+        same-section stimulus is a no-op here too, so a future golden can
+        never pin a rebuild the product does not perform."""
+        if self.kb.focus_manager.FOCUS_APP_NAME == name:
+            self.pump()  # product: found_valid_focus_name, no change -> pass
+            return
         self.kb.focus_manager.FOCUS_APP_NAME = name
         self.kb.update_args_and_groups(name, startup=False)
         self.kb.arg_manager.WIN32_FILTER_PAUSED = False
+        self._default_active = False  # product resets the loss latch
         self.pump()
 
     def _focus_loss(self):
         """Mirror of the Focus_Task focus-loss leg (fst_tasks.py): no section
-        matched; ALWAYS_ACTIVE keeps the default groups live, otherwise the
-        filter auto-pauses (the D-era default-group ruling)."""
+        matched; ALWAYS_ACTIVE keeps the default groups live (once per loss
+        streak - reviewer P2-2 fidelity: the product's default_active latch),
+        otherwise the filter auto-pauses (the D-era default-group ruling)."""
         self.kb.focus_manager.FOCUS_APP_NAME = ''
         if self.kb.arg_manager.ALWAYS_ACTIVE:
-            self.kb.update_args_and_groups('', startup=False)
-            self.kb.arg_manager.WIN32_FILTER_PAUSED = False
+            if not getattr(self, '_default_active', False):
+                self._default_active = True
+                self.kb.update_args_and_groups('', startup=False)
+                self.kb.arg_manager.WIN32_FILTER_PAUSED = False
         elif not self.kb.arg_manager.WIN32_FILTER_PAUSED:
             self.kb.update_args_and_groups('', startup=False)
             self.kb.arg_manager.WIN32_FILTER_PAUSED = True
@@ -375,7 +399,11 @@ class Contract_Lane:
         driven event (rebind inject, tap switch, macro playback) finishes
         before the next stimulus, so the captured order is the product's FIFO
         lane order without any thread or wall-clock timing."""
+        # the iteration bound is a generous macro-size cap (reviewer P2-7): a
+        # playback longer than the budget shows up as events missing from the
+        # LATER for_stimulus() slices - failures stay loud, nothing silently
+        # reorders (the loop lane is single FIFO)
         async def _quiesce():
-            for _ in range(200):
+            for _ in range(500):
                 await asyncio.sleep(0)
         self._loop.run_until_complete(_quiesce())

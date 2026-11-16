@@ -65,6 +65,30 @@ class TestInjectedPressAndRelease:
         assert stream.for_stimulus(1) == ''
         assert stream.suppressed == ['down a']
 
+    def test_release_only_rebind_releases_the_target_and_keeps_the_press(self, contract):
+        # CONTRACT: the release-prefix forms '+a : +b' and '!a : !b' are the
+        # mirror of the press-only form: tapping a lets the real press reach
+        # the app unsuppressed and injects release b on the way out (both
+        # spellings behave identically - C2 parser grammar).
+        for spelling in ('+a : +b\n', '!a : !b\n'):
+            stream = contract.run_contract(spelling, [down('a'), up('a')])
+            assert stream.for_stimulus(0) == ''
+            assert stream.for_stimulus(1) == 'up b'
+            assert stream.suppressed == ['up a']
+
+    def test_comments_do_not_change_the_live_lines(self, contract):
+        # CONTRACT: comment grammar is presentation only: a full comment line,
+        # an inline note behind a rebind, and a commented-out tap-group member
+        # produce exactly the stream of the uncommented lines (a,d without d) -
+        # the parser may re-tokenize, this must not move (C2 parser grammar).
+        config = ('# leading comment line\n'
+                  'a : b  # inline note\n'
+                  'x, #y, z\n')
+        stream = contract.run_contract(config, [down('a'), down('x'), down('z')])
+        assert stream.for_stimulus(0) == 'down b'
+        assert stream.for_stimulus(1) == 'down x'
+        assert stream.for_stimulus(2) == 'up x | down z'
+
 
 class TestTapGroupIdealization:
     """The snap-tap core: one held member of the group at a time."""
@@ -114,6 +138,19 @@ class TestConstraintGates:
         stream = contract.run_contract('a : b|(p("shift"))\n',
                                        [down('shift'), down('a')])
         assert stream.for_stimulus(1) == 'down b'
+
+    def test_constraint_chain_needs_every_gate_open(self, contract):
+        # CONTRACT: chained evaluation suffixes on one key
+        # ('a|(p("shift"))|(p("ctrl"))') are ANDed left to right: with only
+        # shift held the a passes through unfiltered; with both held the app
+        # receives press b (F-C3 rewrites how these chains are evaluated).
+        config = 'a|(p("shift"))|(p("ctrl")) : b\n'
+        stream = contract.run_contract(config, [down('shift'), down('a')])
+        assert stream.text() == ''
+        assert stream.suppressed == []
+        stream = contract.run_contract(config,
+                                       [down('shift'), down('ctrl'), down('a')])
+        assert stream.for_stimulus(2) == 'down b'
 
 
 class TestForegroundSections:
