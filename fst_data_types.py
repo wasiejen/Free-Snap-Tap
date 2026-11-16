@@ -4,6 +4,7 @@ last updated: 241015-1041
 '''
 
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from enum import Enum
 
 
@@ -283,6 +284,44 @@ class Ticket_Ledger():
                      ticket.seq, ticket.is_mouse)
 
 
+# --- typed trigger identity (F-B1, review Item 6, D1 ruling) ----------------
+# D1 (estate proposals/2026-11-15_fst-improvement-plan.md, Decisions RULED):
+# trigger identity = (vk_code, is_press, CONSTRAINTS) as a typed hashable
+# value. Constraints are identity because multi-trigger-per-key via different
+# constraints is a product feature; the fix is the VALUE, not the evaluation
+# semantics (constraint evaluation stays filter-local, unchanged by F-B1).
+# Before F-B1 every __eq__/__hash__ in this module compared __repr__()
+# strings, so every dict get on a config object rebuilt a repr tree per
+# lookup, and the filter had to hand-compare bases to dodge that (review
+# Item 6). Trigger_Key is the honest value: real dataclass equality and hash,
+# the constraint payload frozen once as a tuple at construction time
+# (validate time - generations reuse the value, events never rebuild one).
+# key_string stays display-only (repr), never identity.
+
+@dataclass(frozen=True)
+class Trigger_Key():
+    '''The D1-ruled trigger identity value: (vk_code, is_press, constraints).
+
+    vk_code    the int virtual-key code (tests may carry a label - any
+               hashable value is compared by value)
+    is_press   the trigger polarity; None for a polarity-less Key (a Key
+               expands into both polarities, its events own the bools)
+    constraints the constraint payload frozen as a tuple ONCE at event
+               construction - compared by value, so two constraint payloads
+               that only rendered alike under the old repr (|50|0 vs |50)
+               are distinct triggers, and two equal payloads on one key are
+               the same trigger regardless of which config line spelled them
+
+    A Key_Event carries its Trigger_Key from construction; Key_Group derives
+    its identity from the tuple of its members' values. The hot path looks
+    triggers up by the (vk_code, is_press) base of this value (see
+    FST_Keyboard Runtime_Snapshot indices), so a fired keystroke hashes ints
+    and bools instead of building repr strings.'''
+    vk_code: int
+    is_press: bool | None
+    constraints: tuple = ()
+
+
 # decorator data type_check
 def type_check(expected_type):
     def decorator(func):
@@ -312,7 +351,12 @@ class Input_Event(ABC):
     '''
     #XXX
     '''
-    def __init__(self, vk_code, constraints=[0,0], key_string = ''):
+    def __init__(self, vk_code, constraints=None, key_string = ''):
+        # F-B1 (review Item 6): the old default was ONE shared [0, 0] list
+        # handed to every default-constructed event; a fresh list per
+        # instance removes the cross-object corruption class.
+        if constraints is None:
+            constraints = [0, 0]
         self._key_string = key_string
         self._vk_code = vk_code
         self._constraints = constraints
@@ -372,14 +416,25 @@ class Key_Event(Input_Event):
     '''
     #XXX
     '''
-    def __init__(self, vk_code, is_press=True, constraints=[0,0], key_string = None, is_toggle = False):
+    def __init__(self, vk_code, is_press=True, constraints=None, key_string = None, is_toggle = False):
         super().__init__(vk_code, constraints=constraints, key_string=key_string)
         self._is_press = is_press
         self._is_toggle = is_toggle
+        # F-B1 (D1): the typed trigger identity, built once HERE (a config
+        # event is constructed at validate time; the filter's per-event
+        # Key_Event is the only construction on the hot path). The
+        # constraints tuple freezes the payload for value comparison.
+        self._trigger_key = Trigger_Key(vk_code, is_press,
+                                        tuple(self._constraints))
 
     @property
     def is_press(self):
         return self._is_press
+
+    @property
+    def trigger_key(self):
+        '''The D1 typed identity value (created at construction, stable).'''
+        return self._trigger_key
 
     @property
     def is_toggle(self):
@@ -392,9 +447,8 @@ class Key_Event(Input_Event):
         return self._vk_code, self._is_press, self._constraints
 
     def __hash__(self):
-        # return hash((self._vk_code, self._state_pressed))
-        # return hash(f"{self._get_sign()}{self._vk_code}")
-        return hash(self.__repr__())
+        # F-B1: value hash on the typed identity (was hash(self.__repr__()))
+        return hash(self._trigger_key)
 
     # to be able to use complimentory to the Key class and return 2 Key_events
     def get_key_events(self):
@@ -404,7 +458,13 @@ class Key_Event(Input_Event):
         return Key_Event(self._vk_code, not self._is_press, self._constraints, self._key_string)
 
     def __eq__(self, other) -> bool:
-        return self.__repr__() == repr(other)
+        # F-B1: value equality on the typed identity (was repr-string
+        # equality); cross-type comparison falls back to False, matching the
+        # old behaviour where a sign-prefixed event repr never matched a
+        # bare Key or Key_Group repr.
+        if isinstance(other, Key_Event):
+            return self._trigger_key == other._trigger_key
+        return NotImplemented
 
     def _get_sign(self):
         return '-' if self._is_press else '+'
@@ -420,9 +480,17 @@ class Key(Input_Event):
     '''
     #XXX
     '''
-    def __init__(self, vk_code, key_string='', constraints=[0,0], is_toggle=False):
+    def __init__(self, vk_code, key_string='', constraints=None, is_toggle=False):
         super().__init__(vk_code, constraints=constraints, key_string=key_string)
         self._is_toggle = is_toggle
+        # F-B1 (D1): typed identity value for this Key. is_press is None -
+        # a Key is polarity-less (it expands into the press/release
+        # Key_Events, which carry the bools); the constraints payload is
+        # frozen once, shared by value with the events it expands into.
+        self._trigger_key = Trigger_Key(vk_code, None, tuple(self._constraints))
+        # class-level equality additionally separates the toggle latch from
+        # the plain key (the old '^' repr sign did the same)
+        self._identity = (vk_code, is_toggle, self._trigger_key.constraints)
 
         self.key_event = Key_Event(self._vk_code, is_press=True, constraints=constraints, key_string=key_string)
         if self._is_toggle:
@@ -441,13 +509,23 @@ class Key(Input_Event):
     def _get_sign(self):
         return '^' if self._is_toggle else ''
 
+    @property
+    def trigger_key(self):
+        '''The typed identity value (is_press None - see __init__).'''
+        return self._trigger_key
+
     def __hash__(self):
-        return hash(self.__repr__())
+        # F-B1: value hash (was hash(self.__repr__()))
+        return hash(self._identity)
 
     def __eq__(self, other) -> bool:
-        return self.__repr__() == repr(other)
+        # F-B1: value equality (was repr-string equality)
+        if isinstance(other, Key):
+            return self._identity == other._identity
+        return NotImplemented
 
     def __repr__(self):
+        # display only (identity is the typed value above)
         if self._key_string is None:
             return f"{self._get_sign()}{self._vk_code}"
         else:
@@ -458,7 +536,12 @@ class Key_Group(object):
     '''
     #XXX
     '''
-    def __init__(self, key_events=[]):
+    def __init__(self, key_events=None):
+        # F-B1 (review Item 6 named this default): key_events=[] handed ONE
+        # shared list to every bare Key_Group - one call away from
+        # cross-group corruption; a fresh list per instance closes it.
+        if key_events is None:
+            key_events = []
         if isinstance(key_events, Key_Event):
             key_events = [key_events]
         self._key_events = key_events
@@ -487,11 +570,23 @@ class Key_Group(object):
     def get_trigger(self):
         return self._key_events[0]
 
+    @property
+    def group_key(self):
+        '''The group identity value: the tuple of its members' typed
+        Trigger_Keys - built from the members' pre-built values, so the
+        constraint payloads stay stored-once and comparison is by value.'''
+        return tuple(key.trigger_key for key in self._key_events)
+
     def __hash__(self):
-        return hash(self.__repr__())
+        # F-B1: value hash over the members' typed identities (was
+        # hash(self.__repr__()) - a full repr-tree rebuild per dict get)
+        return hash(self.group_key)
 
     def __eq__(self, other) -> bool:
-        return self.__repr__() == repr(other)
+        # F-B1: value equality (was repr-string equality)
+        if isinstance(other, Key_Group):
+            return self.group_key == other.group_key
+        return NotImplemented
 
     def __repr__(self):
         key_strings = []
@@ -552,11 +647,21 @@ class Rebind(object):
     # def get_trigger_group(self):
     #     return self._trigger_group
 
+    @property
+    def _identity(self):
+        # F-B1: value identity (alias, trigger group, replacement) - the
+        # fields the old repr rendered; equality and hash compare these by
+        # value instead of the repr string. Alias stays part of it, as in
+        # the old repr.
+        return (self._alias, self._trigger_group, self._replacement)
+
     def __hash__(self):
-        return hash(self.__repr__())
+        return hash(self._identity)
 
     def __eq__(self, other) -> bool:
-        return self.__repr__() == repr(other)
+        if isinstance(other, Rebind):
+            return self._identity == other._identity
+        return NotImplemented
 
     def __repr__(self):
         return f"{self._alias} {self._trigger_group} : {self._replacement}"
@@ -613,11 +718,19 @@ class Macro(object):
     def get_trigger(self):
         return self._trigger_group.get_trigger()
 
+    @property
+    def _identity(self):
+        # F-B1: value identity (alias, trigger group, sequence groups) -
+        # the fields the old repr rendered, compared by value.
+        return (self._alias, self._trigger_group, tuple(self._key_groups))
+
     def __hash__(self):
-        return hash(self.__repr__())
+        return hash(self._identity)
 
     def __eq__(self, other) -> bool:
-        return self.__repr__() == repr(other)
+        if isinstance(other, Macro):
+            return self._identity == other._identity
+        return NotImplemented
 
     def __repr__(self):
         output = f"{self._alias} {self._trigger_group} :: {self._key_groups[0]}"
@@ -644,12 +757,21 @@ class Tap_Group(object):
     '''
     #XXX
     '''
-    def __init__(self, keys = []) -> None:
+    def __init__(self, keys=None) -> None:
+        # F-B1 (review Item 6): keys=[] was a shared mutable default, and
+        # states was initialized with the Key OBJECTS as keys while
+        # update_tap_states writes int vk codes into the same dict - the
+        # Key entries stayed 0 forever (dead weight the sum() tolerated).
+        # Single-key the states dict by vk code from the start: the
+        # declared keys and the event updates now address ONE entry each.
+        if keys is None:
+            keys = []
         self.keys = keys
         self.states = {}
         self.active_key = None
-        for code in self.keys:
-            self.states[code] = 0
+        for key in self.keys:
+            # Key objects carry vk_code; tests may declare plain labels
+            self.states[getattr(key, 'vk_code', key)] = 0
         self.last_key_pressed = None
         self.last_key_send = None
         self._alias = ''
@@ -690,7 +812,9 @@ class Tap_Group(object):
         return held
 
     def get_vk_codes(self):
-        return [key.vk_code for key in self.keys]
+        # F-B1 (reviewer P2-3): same member contract as the states init in
+        # __init__ - Key objects yield vk_code, plain labels pass through
+        return [getattr(key, 'vk_code', key) for key in self.keys]
 
     def get_states(self):
         return self.states
@@ -730,11 +854,20 @@ class Tap_Group(object):
     #         key_strings.append(repr(key))
     #     return "Tap_Group(" + ','.join(key_strings) + ")"
 
+    @property
+    def _identity(self):
+        # F-B1: value identity over the declared keys (the members compare
+        # and hash by their own typed values now); a property like
+        # Rebind/Macro._identity (reviewer P2-4: one name, one kind)
+        return tuple(self.keys)
+
     def __eq__(self, other) -> bool:
-        return self.__repr__() == repr(other)
+        if isinstance(other, Tap_Group):
+            return self._identity == other._identity
+        return NotImplemented
 
     def __hash__(self):
-        return hash(self.__repr__())
+        return hash(self._identity)
 
     def __repr__(self):
         key_strings = []

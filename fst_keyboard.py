@@ -154,7 +154,11 @@ class Runtime_Snapshot():
                  'rebind_triggers', 'macros_dict', 'macro_triggers',
                  'all_trigger_events', 'rebinds', 'macros',
                  'macros_alias_dict', 'macro_sequence_alias_list',
-                 'key_group_by_alias', 'gen_id')
+                 'key_group_by_alias', 'gen_id',
+                 # F-B1: hot-path lookup indices over the trigger identity
+                 # base (vk_code, is_press) - see the build site in
+                 # initialize_groups_from_presorted_lines
+                 'rebind_lookup', 'macro_lookup', 'trigger_event_set')
 
     def __init__(self):
         # Tap groups define which keys are mutually exclusive
@@ -172,6 +176,15 @@ class Runtime_Snapshot():
         self.macros_dict = {}             # [Key_Group : Key_Group]
         self.macro_triggers = []
         self.all_trigger_events = []
+        # F-B1 hot-path lookup indices (built once per generation at the
+        # end of initialize_groups_from_presorted_lines):
+        # rebind_lookup/macro_lookup: (vk_code, is_press) -> tuple of
+        # (trigger_group, payload) in trigger-list order; trigger_event_set:
+        # the same base pair set over all_trigger_events for the repeated-
+        # press suppression test.
+        self.rebind_lookup = {}
+        self.macro_lookup = {}
+        self.trigger_event_set = set()
 
         # collector of all rebinds and macros, for display purposes only
         self.rebinds = []
@@ -790,6 +803,34 @@ class FST_Keyboard():
         for trigger_group in all_triggers:
             rt.all_trigger_events.append(trigger_group.get_trigger())#
 
+        # F-B1 (review Item 6, D1): the hot-path lookup indices. Keyed by
+        # the (vk_code, is_press) BASE of the typed Trigger_Key identity -
+        # the event side knows only the base; the constraint-carrying
+        # variants live as bucket entries and their payload evaluation is
+        # the filter's existing is_trigger_activated leg (unchanged).
+        # Built ONCE per generation from the final dict+list state
+        # (validate time), so the filter replaces the old per-keystroke
+        # full-list scan + repr-hashed Key_Group dict get with one int/bool
+        # tuple dict get per lane. Bucket order is the TRIGGER-LIST order
+        # and the payload is the last-written dict entry for that trigger
+        # - byte-for-byte the candidate order and payload the old scan+get
+        # produced, which is what tests/test_identity_priority_pins.py locks.
+        def build_trigger_index(trigger_list, payload_dict):
+            index = {}
+            for trigger_group in trigger_list:
+                trigger = trigger_group.get_trigger()
+                index.setdefault((trigger.vk_code, trigger.is_press),
+                                 []).append((trigger_group,
+                                             payload_dict[trigger_group]))
+            return {base: tuple(bucket) for base, bucket in index.items()}
+
+        rt.rebind_lookup = build_trigger_index(rt.rebind_triggers,
+                                               rt.rebinds_dict)
+        rt.macro_lookup = build_trigger_index(rt.macro_triggers,
+                                              rt.macros_dict)
+        rt.trigger_event_set = {(trigger.vk_code, trigger.is_press)
+                                for trigger in rt.all_trigger_events}
+
         rt.macro_sequence_alias_list = rt.macros_alias_dict.keys()
 
         # F-A3: the ONLY mutation of the live generation - ONE attribute bind
@@ -1086,18 +1127,20 @@ class FST_Keyboard():
     def _rebind_repeat_let_through(self, current_ke, rt=None):
         '''rt: the generation the CALLING event bound (F-A3) - one event must
         never mix two generations. Falls back to the live snapshot for callers
-        outside the filter.'''
+        outside the filter.
+
+        F-B1: the scan runs over the (vk_code, is_press) bucket of the trigger
+        index instead of the full rebind_triggers list; the first bucket entry
+        is the first list-order base match the old scan hit, and the payload
+        resolves at build time from the same rebinds_dict the old per-event
+        get consulted - the conservative KeyError leg is structurally gone
+        (the index and the dict are built from one state).'''
         rt = rt if rt is not None else self._runtime
-        for trigger_group in rt.rebind_triggers:
-            trigger = trigger_group.get_trigger()
-            if current_ke.vk_code != trigger.vk_code or current_ke.is_press != trigger.is_press:
-                continue
+        for trigger_group, rebind in rt.rebind_lookup.get(
+                (current_ke.vk_code, current_ke.is_press), ()):
             if any(current_ke.vk_code in tg.get_vk_codes() for tg in rt.tap_groups):
                 return False
-            try:
-                replacement_vk = rt.rebinds_dict[trigger_group].replacement.vk_code
-            except KeyError:
-                return False  # conservative: no replacement known -> suppress
+            replacement_vk = rebind.replacement.vk_code
             if any(replacement_vk in tg.get_vk_codes() for tg in rt.tap_groups):
                 return False
             return True
@@ -1172,10 +1215,11 @@ class FST_Keyboard():
                 press_state = self._state_manager.get_real_key_press_state(vk_code)
                 if press_state == current_ke.is_press:
                     # if the key is repeated and is a trigger, it will be suppressed
-                    # compare base only: runtime events carry no key_string/constraints
-                    if any(current_ke.vk_code == trigger.vk_code
-                           and current_ke.is_press == trigger.is_press
-                           for trigger in rt.all_trigger_events):
+                    # F-B1: membership in the trigger-base set (the
+                    # (vk_code, is_press) projection of the typed identity)
+                    # replaces the old manual base-only scan over
+                    # all_trigger_events - same predicate, O(1)
+                    if (current_ke.vk_code, current_ke.is_press) in rt.trigger_event_set:
                         # repeated REBIND triggers not in a tap group are let
                         # through so they re-fire their replacement below: macro
                         # and toggle repeats stay suppressed (the 'STOP REPEATED
@@ -1217,18 +1261,19 @@ class FST_Keyboard():
                 if not to_be_suppressed:
                     'REBINDS HANDLING'
                     # check for rebinds and replace current key event with replacement key event
-                    for trigger_group in rt.rebind_triggers:
+                    # F-B1: scan the (vk_code, is_press) bucket of the
+                    # trigger index - list-order and payload identical to
+                    # the old full-list scan + repr-hashed dict get (see
+                    # the build site); the old KeyError warning leg is
+                    # structurally gone with the build-time pairing.
+                    for trigger_group, rebind in rt.rebind_lookup.get(
+                            (current_ke.vk_code, current_ke.is_press), ()):
 
                         if is_trigger_activated(current_ke, trigger_group):
-                            try:
-                                rebind = rt.rebinds_dict[trigger_group]
-                                replacement_ke = rebind.replacement
-                                old_ke = current_ke
-                                current_ke = replacement_ke
-                                key_replaced = True
-                            except KeyError as error:
-                                logger_flow.warning(f"rebind not found: {error}")
-                                logger_flow.debug(f"rebinds dict: {rt.rebinds_dict}")
+                            replacement_ke = rebind.replacement
+                            old_ke = current_ke
+                            current_ke = replacement_ke
+                            key_replaced = True
 
                             if key_replaced:
                                 # if key is supressed
@@ -1273,12 +1318,14 @@ class FST_Keyboard():
                             self._state_manager.set_toggle_state_to_curr_ke(current_ke)
 
                         'MACROS HERE'
-                        for trigger_group in rt.macro_triggers:
+                        # F-B1: bucket scan, same order and payload as the
+                        # old full-list scan + repr-hashed dict get
+                        for trigger_group, macro in rt.macro_lookup.get(
+                                (current_ke.vk_code, current_ke.is_press), ()):
                             if is_trigger_activated(current_ke, trigger_group):
                                 alias_fired = True
 
                                 # macro sequence handling is internal in class Macro
-                                macro = rt.macros_dict[trigger_group]
                                 key_sequence = macro.get_key_events_of_current_sequence()
 
                                 'MACRO playback'
