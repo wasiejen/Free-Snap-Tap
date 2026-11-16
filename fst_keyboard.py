@@ -16,7 +16,8 @@ from os import startfile
 from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro, ConfigError
 from fst_data_types import Lifecycle_State
 from fst_data_types import (Ticket_Ledger, SOURCE_DRAIN, SOURCE_MACRO,
-                            SOURCE_TOGGLE, TICKET_PRESS, TICKET_RELEASE)
+                            SOURCE_REBIND, SOURCE_TOGGLE, TICKET_INJECTED,
+                            TICKET_PRESS, TICKET_RELEASE)
 from itertools import count
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
@@ -1201,6 +1202,18 @@ class FST_Keyboard():
 
         logger_flow.debug(f"--> {'-- | ' if is_simulated else ''}IN ({key_event_time - FST_Keyboard.START_TIME}) {'sim' if is_simulated else 'real'} {current_ke}")
 
+        # F-A8 (ladder R3): the ARRIVAL of a simulated event is the delivery
+        # classification for one of our INJECTED rebind sends of (vk, kind)
+        # (a receipt still SCHEDULED is never closed here - see
+        # `record_rebind_delivery`). It closes the receipt HERE, at
+        # classification, not at the tail: a replacement the filter later
+        # SUPPRESSES was still physically delivered (the hook saw it), and
+        # its pairing must close. Ledger read only (one dict get + bounded
+        # bucket scan, lock-free); this is a receipt-close leg, NOT the
+        # sim-release veto (R4, untouched).
+        if is_simulated and vk_code > 0:
+            self.record_rebind_delivery(vk_code, is_keydown)
+
         # to help identify vk_codes on key presses
         if self._arg_manager.PRINT_VK_CODES:
         # if True:
@@ -1377,10 +1390,41 @@ class FST_Keyboard():
 
                 # if replacement happened suppress source key event
                 if key_replaced is True and not to_be_suppressed:
+                    # F-A8 (ladder R3): the replacement send opens its ledger
+                    # receipt HERE, at inject-SCHEDULE time, on the pump. The
+                    # receipt - not this event's locals - is what answers "is
+                    # this replacement in flight?" (research inventory item 10:
+                    # that answer used to die with the scheduling event). The
+                    # ticket object travels with the send as the inject leg's
+                    # fast path; it is a PROJECTION of the ledger entry, never
+                    # a parallel truth: the leg flips ONE state attribute
+                    # (`mark`), and the delivery classification at the tail of
+                    # this filter closes it (`record_rebind_delivery`). Source
+                    # suppression below stays filter-local policy - the ledger
+                    # never decides (research (D): evidence, not policy).
+                    receipt = self.open_rebind_ticket(
+                        current_ke.vk_code, current_ke.is_press,
+                        current_ke.key_string or str(current_ke.vk_code),
+                        is_mouse=(self._output_manager
+                                  .check_for_mouse_vk_code(
+                                      current_ke.vk_code)))
                     # 260907-1027: if it is a rebind from a mouse key to another mouse key starte it async to no interfere with the syncronous hook
                     if is_mouse_event and self._output_manager.check_for_mouse_vk_code(current_ke.vk_code):
+                        # The mouse leg marks its receipt injected when the
+                        # lane STARTS emitting: the wrapper's one store runs
+                        # on the loop thread immediately before the SHARED
+                        # execute_key_event coroutine (widening that
+                        # coroutine's contract for the macro lane is outside
+                        # R3). A hand-off that dies before the coroutine
+                        # starts leaves the receipt SCHEDULED - never
+                        # closable, visible as scheduled debt until the
+                        # filed drain-side compaction settles it: exactly
+                        # the scheduled-but-lost class R3 names.
+                        async def _mouse_rebind_inject(ke=current_ke, tk=receipt):
+                            self.mark_rebind_injected(tk)
+                            await self._output_manager.execute_key_event(ke, with_delay=False)
                         try:
-                            asyncio.run_coroutine_threadsafe(self._output_manager.execute_key_event(current_ke, with_delay=False), self.loop)
+                            asyncio.run_coroutine_threadsafe(_mouse_rebind_inject(), self.loop)
                         except Exception as e:
                             logger_flow.error(f"Error occurred while calling async execute_keys_event in mouse_key to mouse_key rebind: {e}")
                     else:
@@ -1390,15 +1434,27 @@ class FST_Keyboard():
                         # the lane; inline fallback when no loop is wired).
                         # Suppression of the source event below stays
                         # synchronous on the pump.
+                        def _rebind_inject(ke=current_ke, tk=receipt):
+                            # the inject leg - loop lane, or inline below:
+                            # ONE attribute store (never read-modify-write),
+                            # then the send itself
+                            self.mark_rebind_injected(tk)
+                            self._output_manager.send_key_event(ke)
                         if self._output_manager.pump_lane(
-                                lambda ke=current_ke: self._output_manager.send_key_event(ke),
-                                'rebind_send') is False:
+                                _rebind_inject, 'rebind_send') is False:
                             # pump_lane returns False ONLY when scheduling failed
                             # (loop gone); inline runs return the send's None ->
                             # send inline here so the replacement is never lost
                             # behind the synchronous suppression below
-                            # (reviewer P1-4: a key LOST on a dead loop was new)
-                            self._output_manager.send_key_event(current_ke)
+                            # (reviewer P1-4: a key LOST on a dead loop was new).
+                            # The bool is the ONE fast-path local that stays:
+                            # "scheduling accepted" cannot be read off the
+                            # receipt without a race (a SCHEDULED ticket cannot
+                            # tell "the lane will run it" from "the lane is
+                            # gone"). The resend reuses the SAME closure, so
+                            # one receipt gets exactly one inject flip - no
+                            # second send-pair truth.
+                            _rebind_inject()
 
                     to_be_suppressed = True
 
@@ -1951,13 +2007,14 @@ class FST_Keyboard():
     def set_sys_start_arguments(self, sys_args):
         self._arg_manager.sys_start_args = sys_args
 
-    # -- ticket ledger helpers (F-A6 ladder R0/R1: SHADOW RECORDING ONLY) --
-    # No decision path reads the ledger in this unit: the veto/owner legs touch
-    # nothing new. Design contract: estate research 2026-11-16_fst-ticket-ledger
-    # (C). Transitions are single stores (see Ticket_Ledger's discipline rule);
-    # the `injected` state is deliberately unused here - it belongs to the R3
-    # rebind pairing, where a ticket opens at SCHEDULE time on the pump and
-    # completes on the loop thread.
+    # -- ticket ledger helpers (ladder R0/R1/R2 recording + R3 rebind pairing) --
+    # R3 (F-A8) lands the ONE ledger consult the pairing needs: the delivery
+    # classification of a simulated leg closes that event's rebind receipt. The
+    # veto/owner legs still touch nothing new (R4 pending, maintainer-gated).
+    # Design contract: estate research 2026-11-16_fst-ticket-ledger (C)/(B).
+    # Transitions are single stores (see Ticket_Ledger's discipline rule); the
+    # `injected` state belongs to the R3 rebind pairing: a ticket opens at
+    # SCHEDULE time on the pump, the inject leg flips it on the loop lane.
 
     def current_gen_id(self):
         '''The live generation's id (one attribute read). Tickets carry it so
@@ -2028,6 +2085,77 @@ class FST_Keyboard():
         if ledger is None:
             return None
         return ledger.close(ticket)
+
+    # -- R3 rebind pairing (F-A8) ------------------------------------------
+    # The single-store protocol design report (B) names for the ONE PARTIAL
+    # consumer that needed it: a rebind ticket's life crosses exactly two
+    # threads, and every touch is a single store - `open` is the pump's dict
+    # store at inject-SCHEDULE time, `mark` is the inject leg's one attribute
+    # flip (loop lane or inline), `record_rebind_delivery` is the pump's close
+    # when the delivery classification arrives. No thread ever reads a ticket
+    # and writes back two fields. The close accepts INJECTED tickets ONLY:
+    # nothing of ours may count as delivered before an inject leg of ours ran
+    # (an unrelated injected arrival - another process, or the tap/macro/drain
+    # lane of the same vk - must never settle a send that has not left). With
+    # that gate the mark can also never resurrect a closed receipt: each
+    # receipt's inject leg runs exactly once (pump_lane's three outcomes cover
+    # schedule / inline / resend, never two), it flips BEFORE its send, so the
+    # first ticket that can ever be closed is already past its only mark.
+
+    def open_rebind_ticket(self, vk_code, is_press, source_id,
+                           is_mouse=False):
+        '''Open the ledger RECEIPT for a rebind replacement send, at the moment
+        the leg SCHEDULES the inject (design report item 10 / ladder R3: the
+        scheduled-but-lost class becomes nameable from this instant).
+        `source_id` is the rebind key name; `kind` follows the event. state
+        starts SCHEDULED. None-tolerant like every ticket helper.'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        return ledger.open(vk_code, SOURCE_REBIND, source_id,
+                           TICKET_PRESS if is_press else TICKET_RELEASE,
+                           self.current_gen_id(), is_mouse=is_mouse)
+
+    def mark_rebind_injected(self, ticket):
+        '''The inject leg's single attribute store: the replacement send is
+        leaving (loop lane, inline fallback, or dead-loop resend). None- and
+        no-ledger-tolerant; the flip is observational - completion belongs to
+        the delivery classification, never to this leg.'''
+        if ticket is None:
+            return None
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        return ledger.mark(ticket, TICKET_INJECTED)
+
+    def record_rebind_delivery(self, vk_code, is_press):
+        '''Close the oldest INJECTED rebind receipt of (vk, kind): the arriving
+        simulated event classifies as the delivery of exactly one of our
+        replacement sends, FIFO (sends to one vk leave in issue order). A
+        receipt still SCHEDULED is never closed here - nothing of ours counts
+        as delivered before one of our inject legs ran, so an unrelated
+        injected arrival (another process, or the tap/macro/drain lane's send
+        of the same vk) cannot settle a send that has not left (reviewer
+        P1-1/P1-2 cure; the drain-compaction and identity-attribution
+        follow-ups are filed to the estate todo_inbox). Residual, accepted: at
+        (vk, kind) granularity the pairing cannot tell our arrival from a
+        foreign injected event of the same key AFTER our inject - identity
+        attribution needs the dwExtraInfo leg (future rung, filed). Returns
+        the closed ticket, or None when nothing was owed (the tap/macro/drain
+        sim legs own their records elsewhere - this leg is a no-op for them).
+        Hot-path shape: one dict get (tickets(vk=..)) + a copy of that vk's
+        bounded bucket (closed tickets are kept up to MAX_PER_VK there until
+        the filed drain-side compaction lands; a vk that never held a ticket
+        pays the dict get only).'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        kind = TICKET_PRESS if is_press else TICKET_RELEASE
+        for ticket in ledger.tickets(vk=vk_code, kind=kind,
+                                     state=TICKET_INJECTED):
+            if ticket.source_kind == SOURCE_REBIND:
+                return ledger.close(ticket)
+        return None
 
     def ledger_open_count(self, gen_id=None, expected_source_kinds=()):
         '''A PURE query for tests and teardown audits: how many open tickets are
