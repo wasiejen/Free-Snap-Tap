@@ -54,6 +54,23 @@ You can change the control key combinations in the py file under # Control key c
 - `ALT + NUM7` prints the real pressed-key states
 - `ALT + NUM8` prints all pressed-key states (real and simulated)
 
+### [Status dump - THE bug-report artifact]
+
+- `fst_status.log` in the program's working directory (next to `fst.log`) is
+  the ONE supported snapshot surface - written at every start-up and on every
+  successful config reload, overwritten atomically, so it always matches the
+  moment it was asked for. Attach it to a bug report.
+- Sections: effective start arguments (post-validation) - lifecycle state -
+  focus scope - group counts - tap / hold / toggle states (typed vk codes, no
+  object reprs) - the ticket ledger - paths.
+- The ledger section lists the open tickets (`seq vk kind state source_kind
+  source_id gen mouse age_ms`) with counts by class, and names any ticket
+  older than `CONSTANTS.STUCK_TICKET_MS` (default 5000 ms) with a
+  `[StuckKeyWatch]` line - that line also lands in `fst.log` at WARNING.
+- The dump renders on the asyncio loop thread, never on the keyboard hook
+  pump, and has no hotkey of its own (the numpad combos above stay the
+  ad-hoc live inspection surface).
+
 ### [Status Indicator - simple overlay for in game control]
 
 - `<arg>-status_indicator=*size in pixel*`
