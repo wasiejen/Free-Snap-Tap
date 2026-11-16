@@ -15,6 +15,15 @@ from fst_data_types import (Key_Event, type_check, ConfigError,
                             SOURCE_DRAIN, SOURCE_TAP, SOURCE_TOGGLE,
                             TICKET_COMPLETED, TICKET_STATES)
 from fst_tasks import Focus_Task, Macro_Repeat_Task
+# F-C2 (review Item 4): the config line grammar lives in ONE module; this file
+# is a CONSUMER (validator rules + runtime containers), never a second parser
+from fst_config_parser import (split_key_group, clean_comment_lines,
+                               combine_multiline_continuations,
+                               clean_focus_header, focus_scope_of,
+                               normalize_start_arg_name, parse_int_list,
+                               classify_groups, LineNamer,
+                               KIND_TAP, KIND_REBIND, KIND_MACRO, KIND_SEQUENCE,
+                               DELAY_RANGE, RUNTIME_DELAY_RANGE)
 import datetime
 import re #regular expression
 import ast # structural constraint check (Config_Validator)
@@ -1175,26 +1184,9 @@ START_ARG_VALUES = frozenset({
 ELEVATE_CONFIG_NAMES = frozenset({'elevate', 'elevated'})
 
 # delay values accepted by Argument_Manager.extract_delays
-DELAY_RANGE = (0, 1000)
-
-
-def split_key_group(group):
-    '''split a key group on commas, ignoring commas inside parentheses;
-    same rule as the bracket-aware split of Config_Manager.presort_lines'''
-    parts = group.split(',')
-    new_group = []
-    temp = ''
-    total_open = 0
-    for part in parts:
-        if temp == '':
-            temp += part
-        else:
-            temp += ', ' + part
-        total_open += part.count('(') - part.count(')')
-        if total_open == 0:
-            new_group.append(temp)
-            temp = ''
-    return new_group
+# F-C2 (review Item 4): the bracket-aware splitter and the delay bounds moved
+# to fst_config_parser.py - the config grammar has ONE home. Both names are
+# imported at the top of this file, so every call site below is unchanged.
 
 
 class Config_Validator():
@@ -1208,10 +1200,11 @@ class Config_Validator():
 
     def __init__(self):
         self.violations = []
-        self._count_tap = 1
-        self._count_rebind = 1
-        self._count_macro = 1
-        self._count_sequence = 1
+        # F-C2 (review Item 4): the (TAP_n)/(REB_n)/(MAC_n)/(SEQ_n) numbering
+        # is the parser's LineNamer with the validator's documented policy -
+        # every line of a type advances the counter, declared name or not
+        # (presort_lines runs the same class with the other policy)
+        self._namer = LineNamer(count_named=True)
         # scope of the line currently checked (violations record it)
         self._current_scope = ''
         # the SILENT sections (U330 ask 3): scopes whose warnings are
@@ -1306,8 +1299,11 @@ class Config_Validator():
 
     @staticmethod
     def _focus_scope_of(line):
-        cleaned = line.replace('<focus>', '')
-        return re.sub(FOCUS_NAME_ILLEGAL, '', cleaned).split(',')[0].strip()
+        '''F-C2 (review Item 4): the scope rule is fst_config_parser.
+        focus_scope_of - the runtime's focus map (Config_Manager.
+        _focus_scope_map_from_lines) uses the same cleaning, so a section can
+        no longer scope differently in the report than at runtime'''
+        return focus_scope_of(line)
 
     # -- focus and argument lines --------------------------------------------
 
@@ -1346,7 +1342,7 @@ class Config_Validator():
         # accepted - normalize '-' -> '_' in the NAME part for matching
         # ('-always-active' == '-always_active'); the value stays verbatim
         # and the messages below echo the original spelling
-        match_name = '-' + name[1:].replace('-', '_')
+        match_name = normalize_start_arg_name(name)
         if match_name == '-no_warnings':
             # check-suppression arg (maintainer observation 1): warnings of
             # this section are dropped from the report; the section carries
@@ -1397,7 +1393,7 @@ class Config_Validator():
             self._error(line_number, '(arg)', 'arg',
                         '-focusapp is removed since V1.0.0 - use <focus>name in the config')
         elif name in ('-tapdelay', '-aliasdelay', '-macrodelay'):
-            delays = self._parse_int_list(value)
+            delays = parse_int_list(value)
             if delays is None:
                 self._error(line_number, '(arg)', 'arg',
                             f'invalid delay {value!r} - needs number(s) separated by comma')
@@ -1410,7 +1406,7 @@ class Config_Validator():
                     self._error(line_number, '(arg)', 'arg',
                                 f'delay {delay} not in range {DELAY_RANGE[0]}<delay<={DELAY_RANGE[1]} ms')
         elif name == '-crossover':
-            crossover = self._parse_int_list(value)
+            crossover = parse_int_list(value)
             if crossover is None or len(crossover) != 1:
                 self._error(line_number, '(arg)', 'arg',
                             f'invalid probability {value!r} - needs one number')
@@ -1418,22 +1414,20 @@ class Config_Validator():
                 self._error(line_number, '(arg)', 'arg',
                             f'probability {crossover[0]} not in range 0<=prob<=100 %')
         elif name == '-status_indicator':
-            size = self._parse_int_list(value)
+            size = parse_int_list(value)
             if size is None or len(size) != 1 or size[0] <= 0:
                 self._error(line_number, '(arg)', 'arg',
                             f'invalid indicator size {value!r} - needs one number > 0')
         elif name == '-crosshair':
-            delta = self._parse_int_list(value)
+            delta = parse_int_list(value)
             if delta is None or len(delta) != 2:
                 self._error(line_number, '(arg)', 'arg',
                             f'invalid crosshair delta {value!r} - needs two numbers, e.g. -crosshair=5,-10')
 
-    @staticmethod
-    def _parse_int_list(value):
-        try:
-            return [int(part) for part in value.replace(' ', '').split(',')]
-        except ValueError:
-            return None
+    # F-C2 (review Item 4): the int-list parse of the value arguments moved to
+    # fst_config_parser.parse_int_list - the ONE place a delay/probability/
+    # size value is turned into ints for the report (the runtime parses its
+    # own copy in extract_delays, which is a behavior decision, see there)
 
     # -- group lines: arity per item type ------------------------------------
 
@@ -1463,20 +1457,20 @@ class Config_Validator():
             self._check_key_group(line_number, alias, body, aliases, 'group')
             return
 
-        # ':' splits the item types exactly like presort_lines does
-        groups = [x.strip() for x in body.split(':')]
+        # F-C2 (review Item 4): ONE classification - fst_config_parser.
+        # classify_groups is the same rule presort_lines runs, so a line the
+        # validator calls a macro can never be a tap group at runtime
+        kind, groups = classify_groups(body)
 
-        if len(groups) == 1:
-            item = alias or f'(TAP_{self._count_tap})'
-            self._count_tap += 1
+        if kind == KIND_TAP:
+            item = self._namer.name_for(kind, alias)
             if groups[0].count('(') == groups[0].count(')') and len(split_key_group(groups[0])) < 2:
                 self._warn(line_number, item, 'arity',
                            'tap group needs 2 or more keys')
             self._check_key_group(line_number, item, groups[0], aliases, 'tap')
             self._check_tap_group_ownership(line_number, item, groups[0])
-        elif len(groups) == 2:
-            item = alias or f'(REB_{self._count_rebind})'
-            self._count_rebind += 1
+        elif kind == KIND_REBIND:
+            item = self._namer.name_for(kind, alias)
             key_group = split_key_group(groups[1])
             if not any(k for k in split_key_group(groups[0])):
                 self._error(line_number, item, 'shape',
@@ -1487,17 +1481,15 @@ class Config_Validator():
                             '- use "::" instead of ":" to declare it as a macro')
             self._check_key_group(line_number, item, groups[0], aliases, 'trigger')
             self._check_key_group(line_number, item, groups[1], aliases, 'group')
-        elif len(groups) > 2 and len(groups[1]) == 0:
-            if len(groups) > 3:
-                item = alias or f'(SEQ_{self._count_sequence})'
-                self._count_sequence += 1
+        elif kind in (KIND_MACRO, KIND_SEQUENCE):
+            if kind == KIND_SEQUENCE:
+                item = self._namer.name_for(kind, alias)
                 key_groups = groups[2:]
                 if len(key_groups) < 2:
                     self._error(line_number, item, 'arity',
                                 'macro sequence needs 2 or more key groups')
             else:
-                item = alias or f'(MAC_{self._count_macro})'
-                self._count_macro += 1
+                item = self._namer.name_for(kind, alias)
                 key_groups = [groups[2]]
             if not any(k for k in split_key_group(groups[0])):
                 self._error(line_number, item, 'shape',
@@ -1746,63 +1738,15 @@ class Config_Manager():
         return [cleaned for _, cleaned in self._clean_comments_numbered(lines)]
 
     def _clean_comments_numbered(self, lines):
-        comments_cleaned_lines = []
-        for line_number, line in enumerate(lines, start=1):
-            ###XXX 241029-0711 strip to allow whitespaces in front
-            line = line.replace('\n', '').replace('\t', '').strip()
-            if not line:
-                continue
-            if line.startswith('<focus>'):
-                cleaned_line = '<focus>'
-                ##260426-1838 multiple focus groups seperated by comma
-                focus_group_names = line[7:].split('#')[0].split(',')
-                if len(focus_group_names) > 1:
-                    # strip whitespace from focus group names and join them with comma again
-                    focus_group_names = ",".join([name.strip() for name in focus_group_names])
-                else:
-                    focus_group_names = focus_group_names[0].strip()
-                cleaned_line += focus_group_names
-                comments_cleaned_lines.append((line_number, cleaned_line))
-            elif line.startswith('<arg>'):
-                cleaned_line = '<arg>'
-                cleaned_line += line[5:].split('#')[0].strip()
-                comments_cleaned_lines.append((line_number, cleaned_line))
-            elif line[0] == '#':
-                continue
-            else:
-                ###XXX 241028-1224: commented out to make eval with spaces possible
-                # line = line.replace(" ","")
-                cleaned_group = []
-                for key in line.split(','):
-                    # ignore fully commented out keys
-                    if key.strip().startswith('#'):
-                        # if commented out key before :, add :
-                        if key.find(':') >= 0:
-                            cleaned_group.append(':')
-                    else:
-                        # ignore comments after keys
-                        cleaned_key = key.split('#')[0].strip()
-                        if cleaned_key:
-                            cleaned_group.append(cleaned_key)
-                cleaned_line = ','.join(cleaned_group)
-                if cleaned_line:
-                    comments_cleaned_lines.append((line_number, cleaned_line))
-
-        return comments_cleaned_lines
+        '''F-C2 (review Item 4): the comment/inline-comment grammar lives in
+        fst_config_parser.clean_comment_lines - the validator walks this same
+        output, so the rule has ONE home'''
+        return clean_comment_lines(lines)
 
     def _combine_multilines_numbered(self, numbered_lines):
-        # clean multiline macro sequences and joins them together;
-        # the line number of the sequence head is kept for the validator
-        multiline_cleaned_lines = []
-        for line_number, line in numbered_lines:
-            if len(line) > 1 and line[0] == ':':
-                # add multiline to last multiline sequence
-                last_number, last_line = multiline_cleaned_lines[-1]
-                multiline_cleaned_lines[-1] = (last_number, last_line + line)
-            else:
-                multiline_cleaned_lines.append((line_number, line))
-
-        return multiline_cleaned_lines
+        '''F-C2 (review Item 4): the ':' continuation join lives in
+        fst_config_parser.combine_multiline_continuations'''
+        return combine_multiline_continuations(numbered_lines)
 
     def _focus_scope_map_from_lines(self, cleaned_lines):
         '''every cleaned name of every focus section -> the validator scope
@@ -1816,8 +1760,7 @@ class Config_Manager():
         for _, line in cleaned_lines:
             if not line.startswith('<focus>'):
                 continue
-            cleaned = re.sub(FOCUS_NAME_ILLEGAL, '',
-                             line.replace('<focus>', ''))
+            cleaned = clean_focus_header(line)
             names = [name.strip() for name in cleaned.split(',')
                      if name.strip()]
             if not names:
@@ -1970,67 +1913,56 @@ class Config_Manager():
         a line with >2 groups and a non-empty middle group is dropped here;
         Config_Validator reports it as rule "dropped" before load_config
         returns, so it is never silently lost anymore
+
+        F-C2 (review Item 4): the item TYPE comes from
+        fst_config_parser.classify_groups - the SAME rule the validator applies
+        when it reports that line, so the two lanes cannot disagree about what
+        a line is; the default names come from LineNamer with this method's own
+        counter policy (only unnamed lines advance it).
         '''
-
-        def split_ignore_brackets(group):
-            return split_key_group(group)
-
-
         self._tap_groups_hr = []
         self._rebinds_hr = []
         self._macros_hr = []
         self._alias_hr = []
 
-        count_tap = 1
-        count_rebind = 1
-        count_macro = 1
-        count_macro_sequence = 1
+        namer = LineNamer(count_named=False)
         # sort the lines into their categories for later initialization
         for line in lines:
 
             alias, line = line
             if alias.startswith('<'):
-                self._alias_hr.append([alias, split_ignore_brackets(line)])
+                self._alias_hr.append([alias, split_key_group(line)])
             else:
-                ###XXX 241028-1243 added strip()
-                groups = [x.strip() for x in line.split(':')]
+                kind, groups = classify_groups(line)
                 # tap groups
-                if len(groups) == 1:
+                if kind == KIND_TAP:
                     # generate default names for Tap Groups
-                    if alias == '':
-                        alias = f"(TAP_{count_tap})"
-                        count_tap += 1
-                    self._tap_groups_hr.append([alias, split_ignore_brackets(groups[0])])
+                    alias = namer.name_for(kind, alias)
+                    self._tap_groups_hr.append([alias, split_key_group(groups[0])])
                 # rebinds
-                elif len(groups) == 2:
-                    trigger_group = split_ignore_brackets(groups[0])
-                    key_group = split_ignore_brackets(groups[1])
+                elif kind == KIND_REBIND:
+                    trigger_group = split_key_group(groups[0])
+                    key_group = split_key_group(groups[1])
                     # generate default names for Rebinds
-                    if alias == '':
-                        alias = f"(REB_{count_rebind})"
-                        count_rebind += 1
+                    alias = namer.name_for(kind, alias)
                     if len(key_group) == 1:
                         self._rebinds_hr.append([alias, [trigger_group, key_group[0]]])
                     # the multi-key replacement is reported by Config_Validator
                     # (rule "arity") before this point is ever reached
                     # macro
-                elif len(groups) > 2 and len(groups[1]) == 0:
-                    trigger_group = split_ignore_brackets(groups[0])
-                    if len(groups) > 3:
+                elif kind in (KIND_MACRO, KIND_SEQUENCE):
+                    trigger_group = split_key_group(groups[0])
+                    if kind == KIND_SEQUENCE:
                         # generate default names for Macro Sequences
-                        if alias == '':
-                            alias = f"(SEQ_{count_macro_sequence})"
-                            count_macro_sequence += 1
-
-                        key_groups = [split_ignore_brackets(group) for group in groups[2:]]
+                        alias = namer.name_for(kind, alias)
+                        key_groups = [split_key_group(group) for group in groups[2:]]
                         self._macros_hr.append([alias, [trigger_group] + key_groups])
                     else:
                         # generate default names for Macros
-                        if alias == '':
-                            alias = f"(MAC_{count_macro})"
-                            count_macro += 1
-                        key_group = split_ignore_brackets(groups[2])
+                        alias = namer.name_for(kind, alias)
+                        key_group = split_key_group(groups[2])
                         self._macros_hr.append([alias, [trigger_group, key_group]])
+                # KIND_DROPPED: no container - the validator named it already
 
     # def display_groups(self):
     #     """
@@ -2361,7 +2293,15 @@ class Argument_Manager():
                 delays = delays[:2] # keep only first 2 numbers
             valid_delays = []
             for delay in delays:
-                if 0 < delay <= 1000:
+                # F-C2 (review Item 4): the runtime bound is the parser's
+                # RUNTIME_DELAY_RANGE, INCLUSIVE both ends - (1, 1000) is the
+                # historical '0 < delay <= 1000' written as a named range. It
+                # is DELIBERATELY not the validator's DELAY_RANGE (0, 1000)
+                # checked '0 <= delay <= 1000': the pair is the delay-0 drift
+                # Item 4 names, now visible in ONE place and pinned in
+                # tests/test_config_parser.py. Unifying the two bounds changes
+                # which configs work - a maintainer decision, not a refactor.
+                if RUNTIME_DELAY_RANGE[0] <= delay <= RUNTIME_DELAY_RANGE[1]:
                     valid_delays.append(delay)
                 else:
                     print("delay not in range 0<delay<=1000 ms")
@@ -2390,9 +2330,7 @@ class Argument_Manager():
             # stay untouched (ruling scope: the validator twin rejects
             # them, parser must not rewrite them into valid args)
             original_arg = arg
-            arg_name, arg_sep, arg_value = arg.partition('=')
-            if arg_name[:1] == '-':
-                arg = '-' + arg_name[1:].replace('-', '_') + arg_sep + arg_value
+            arg = normalize_start_arg_name(arg)
             # log level control: -log=debug/info/warning/error
             if arg[:5] == '-log=' and len(arg) > 5:
                 level = arg[5:].lower()
