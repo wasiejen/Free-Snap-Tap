@@ -56,6 +56,12 @@ class Macro_Repeat_Task:
         self.reset_event.set()
         self._handle.cancel()
 
+# F-B5 (reviewer P2-2): a persistent query failure repeats at the 4 Hz poll
+# rate, so only the FIRST failure of a streak logs a WARNING (the rest stay
+# debug); the next successful query re-arms the warning.
+_query_streak_warned = False
+
+
 def _get_active_window_title(stale_title):
     '''Timeout-tolerant active-window query (F-B5, review Item 14).
 
@@ -68,19 +74,30 @@ def _get_active_window_title(stale_title):
       OSError, ...): return stale_title, or the "None" sentinel while no
       successful poll happened yet. Pre-F-B5 these exceptions escaped the
       loop and killed the focus task - tracking then stayed dead until the
-      task was restarted manually.
+      task was restarted manually. An EMPTY last-known title (UIPI-blocked
+      titles read as empty) degrades to the same sentinel - the poll loop
+      cannot tell it apart from "no successful poll yet".
     NOT covered: a hung window-owning thread blocks the win32 read itself
     (no timeout variant in this API set) - see the POLL CONTRACT in run().
     '''
+    global _query_streak_warned
     try:
-        return gw.getActiveWindow().title
+        title = gw.getActiveWindow().title
     except AttributeError:
         return "None"
     except Exception as error:
-        logger_macro.debug(
-            f"active-window query failed, keeping last title "
-            f"'{stale_title or 'None'}': {error!r}")
+        if _query_streak_warned:
+            logger_macro.debug(
+                f"active-window query still failing, keeping last title "
+                f"'{stale_title or 'None'}': {error!r}")
+        else:
+            _query_streak_warned = True
+            logger_macro.warning(
+                f"active-window query failed, keeping last title "
+                f"'{stale_title or 'None'}': {error!r}")
         return stale_title or "None"
+    _query_streak_warned = False
+    return title
 
 
 class Focus_Task:
@@ -103,7 +120,9 @@ class Focus_Task:
         Caller/frequency: Focus_Manager.start_focus_task (fst_manager.py)
         starts this coroutine on MainLogic's asyncio loop thread
         (free_snap_tap.py); each iteration runs ONE
-        _get_active_window_title() query, then asyncio.sleep(0.25).
+        _get_active_window_title() query, then asyncio.sleep(0.25)
+        (the focus-not-found leg adds one inner asyncio.sleep(0.2) before
+        flipping WIN32_FILTER_PAUSED).
         Macro and toast scheduling share this loop thread, so a slow query
         delays them too - the accepted cost of the design. The GUI-side
         500 ms timer (fst_overlay.py perform_periodic_update) only re-reads

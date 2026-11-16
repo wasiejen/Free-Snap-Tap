@@ -9,6 +9,7 @@ single production call site inside the wrapper (grep-count pin).
 gw.getActiveWindow is mocked - no Windows APIs, no real time.
 """
 import asyncio
+import logging
 from types import SimpleNamespace
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -113,6 +114,9 @@ def test_wrapper_falls_back_to_stale_title_on_oserror(monkeypatch):
 
 
 def test_wrapper_first_failure_without_stale_uses_none_sentinel(monkeypatch):
+    # documented degradation (reviewer P2-1): stale '' means EITHER "no
+    # successful poll yet" OR "last-known title was empty" (UIPI-blocked
+    # titles read as empty) - both fall back to the "None" sentinel
     def boom():
         raise RuntimeError('any other raising failure')
     monkeypatch.setattr('fst_tasks.gw.getActiveWindow', boom)
@@ -124,6 +128,30 @@ def test_wrapper_returns_title_on_normal_path(monkeypatch):
         'fst_tasks.gw.getActiveWindow',
         lambda: SimpleNamespace(title='CS2 2024'))
     assert fst_tasks._get_active_window_title('stale') == 'CS2 2024'
+
+
+def test_wrapper_warns_once_per_failure_streak(monkeypatch, caplog):
+    # reviewer P2-2: a persistent failure repeats at the 4 Hz poll rate -
+    # only the FIRST failure of a streak warns; the next success re-arms
+    calls = {'n': 0}
+
+    def fake_window():
+        calls['n'] += 1
+        if calls['n'] == 4:
+            return SimpleNamespace(title='CS2 2024')  # the re-arm success
+        raise RuntimeError('simulated query failure')
+
+    monkeypatch.setattr('fst_tasks.gw.getActiveWindow', fake_window)
+    with caplog.at_level(logging.DEBUG, logger='fst.macro'):
+        fst_tasks._query_streak_warned = False  # own the module flag (fixture)
+        fst_tasks._get_active_window_title('CS2 2024')  # fail 1 -> warning
+        fst_tasks._get_active_window_title('CS2 2024')  # fail 2 -> debug only
+        fst_tasks._get_active_window_title('CS2 2024')  # fail 3 -> debug only
+        assert fst_tasks._get_active_window_title('CS2 2024') == 'CS2 2024'
+        fst_tasks._get_active_window_title('CS2 2024')  # fail 4 -> warning again
+    warnings = [r for r in caplog.records
+                if r.name == 'fst.macro' and r.levelno == logging.WARNING]
+    assert len(warnings) == 2  # exactly the first failure of each streak
 
 
 # --- end-to-end poll pins (Focus_Task.run through the wrapper) -----------

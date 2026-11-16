@@ -188,7 +188,7 @@ Slow or unresponsive foreground apps: the title read sends a message to the wind
 What the query wrapper `_get_active_window_title` guarantees:
 
 - no foreground window -> `"None"` sentinel -> treated as focus lost (input filter pauses, or default groups take over with `-always_active`).
-- a transient raising failure (Win32/ctypes exception) -> the LAST-KNOWN title is kept, so a single bad query can neither kill the focus task (pre-F-B5 it did, and tracking stayed dead until restart) nor toggle the active focus group.
+- a transient raising failure (Win32/ctypes exception) -> the LAST-KNOWN title is kept, so a single bad query can neither kill the focus task (pre-F-B5 it did, and tracking stayed dead until restart) nor toggle the active focus group. An empty last-known title (see UIPI above) degrades to the `"None"` sentinel.
 - a true win32 stall (hung owning thread) can still block one poll cycle - bounded only by the app recovering; this is the documented, accepted limit of the design.
 
 ## Delays in general
