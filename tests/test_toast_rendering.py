@@ -60,13 +60,18 @@ def test_wrap_path_keeps_space_runs_like_fits_path():
     assert out.count('x') == 30
 
 
-def test_toast_font_mirrors_the_stylesheet_chain():
+def test_toast_font_mirrors_the_stylesheet_chain(qtbot):
     # U290R: the pre-wrap metrics used a Consolas-only QFont while the label
     # stylesheet carries a fallback chain - on a machine without Consolas the
     # measured width came from a font the text never rendered in
     assert toast_font(12).families() == list(TOAST_FONT_FAMILIES)
     assert toast_font(12).pixelSize() == 12
+    # F-B8: this was the file's first widget-building test without qtbot -
+    # with no QApplication yet, Qt aborts the process silently (the
+    # fst_overlay message handler swallows Qt's fatal line). qtbot supplies
+    # the session QApplication; addWidget closes the widget deterministically.
     toast = ToastWidget('hi', 3, 12, 'rgba(40, 40, 40, 200)', 'white')
+    qtbot.addWidget(toast)
     # the stylesheet chain is single-sourced from the metrics chain
     assert TOAST_QSS_FONT_FAMILIES in toast.styleSheet()
     assert "font-family: 'Consolas';" not in toast.styleSheet()

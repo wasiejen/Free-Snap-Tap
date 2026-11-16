@@ -1,4 +1,5 @@
 import ctypes
+import gc
 import logging
 import os
 import sys
@@ -310,3 +311,44 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if 'live_desktop' in item.keywords:
             item.add_marker(skip_live)
+
+
+# --- F-B8 suite-abort guard (2026-11-16) -------------------------------------
+#
+# ROOT CAUSE (measured, branch u-fb8-suiteabort): PySide6 6.11.2 / shiboken6
+# abort natively (SIGABRT or SIGSEGV, often with NO faulthandler dump) when a
+# Python GC sweep runs while a Qt C++ frame is on the stack - Qt forbids
+# destroying objects during event processing, Python's GC does not know.
+# pytest-qt 4.5 calls app.processEvents() around every test phase (six pumps
+# per test) and qtbot.wait() runs a nested QEventLoop, so every test after
+# the first Qt test is an event-processing window - this explains the
+# historical abort positions 23%..98% and both recorded stack signatures
+# (tray-fixture teardown exec; post-call _process_events).
+# Discriminator (deterministic on this machine, 2026-11-16): GC stress
+# (gc.set_threshold(10, 5, 5)) + full suite = 6/6 pre-guard aborts on
+# UNCHANGED trees, 3/3 clean with this guard. Isolated orphan-wrapper
+# patterns never crash - the crash needs the session-wide Qt object graph
+# (the GC-during-Qt-event hazard itself is an upstream shiboken6 class).
+# Guard: no automatic GC for the whole run; sweep each test's garbage at a
+# safe point (after ALL six pytest-qt pumps of that test, no Qt frame on the
+# stack) plus one full sweep at session finish. Pinned by
+# tests/test_suite_gc_pin.py. Related class: a widget built before any
+# QApplication also aborts silently (fst_overlay's Qt message handler
+# swallows Qt's fatal line) - fixed where it existed in
+# tests/test_toast_rendering.py (qtbot + addWidget).
+
+
+def pytest_configure(config):
+    """F-B8: no automatic GC sweep can land inside a Qt event window."""
+    gc.disable()
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_runtest_logfinish(nodeid, location):
+    """F-B8: sweep this test's abandoned wrappers at the post-test safe point."""
+    gc.collect(0)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """F-B8: last safe-point full sweep while the interpreter is fully alive."""
+    gc.collect()
