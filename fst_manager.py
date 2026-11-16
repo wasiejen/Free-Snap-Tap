@@ -1107,6 +1107,16 @@ START_ARG_VALUES = frozenset({
     '-focusapp', '-status_indicator', '-crosshair', '-save_dir', '-backup_root_dir',
 })
 
+# elevation names in a config <arg> line (pair-approved 2026-11-16, after
+# the maintainer's live confusion): the elevation flag is a START argument
+# only - the startup lane strips it from argv before the pipeline - so a
+# config line carrying any elevation spelling is always the wrong place.
+# The validator answers ALL four dash-count/tense spellings ('-elevate',
+# '--elevate', '-elevated', '--elevated') with the specific start-argument
+# hint instead of the generic unknown-arg warning (checked on the name
+# part: lowercased, leading dashes stripped)
+ELEVATE_CONFIG_NAMES = frozenset({'elevate', 'elevated'})
+
 # delay values accepted by Argument_Manager.extract_delays
 DELAY_RANGE = (0, 1000)
 
@@ -1266,6 +1276,15 @@ class Config_Validator():
                        f'start argument {arg!r} must start with "-"')
             return
         name, _, value = arg.partition('=')
+        if name.lstrip('-') in ELEVATE_CONFIG_NAMES:
+            # self-explaining rejection (pair-approved 2026-11-16): any
+            # elevation spelling here gets the specific hint, not the
+            # generic unknown-arg warning below; the echo carries the
+            # whole (already lowercased) arg like the generic warning does
+            self._warn(line_number, '(arg)', 'arg',
+                       f"'{arg}' is a start argument for elevation - "
+                       'place it on the command line, not in the config')
+            return
         # U361 (TODO #356, ruling A 2026-11-04): dashed spellings are
         # accepted - normalize '-' -> '_' in the NAME part for matching
         # ('-always-active' == '-always_active'); the value stays verbatim
@@ -2049,6 +2068,13 @@ class Config_Manager():
 
 ELEVATE_FLAG = '--elevate'
 
+# accepted startup spellings (pair-approved 2026-11-16, WTD mirror):
+# '-elevated' is WTD's spelling - cross-product vocabulary parity.
+# '--elevate' stays the canonical spelling everywhere (docs, messages,
+# pins); the alias only enters through the startup lane, where BOTH
+# spellings are stripped from the child's argv (loop guard)
+ELEVATE_START_FLAGS = (ELEVATE_FLAG, '-elevated')
+
 ELEVATE_DEV_MESSAGE = ('[Elevation] dev mode - relaunch the exe manually '
                        'or use scheduled task')
 
@@ -2143,10 +2169,13 @@ def handle_elevate_flag(argv):
     and no loop.
     not elevated + frozen exe: ONE runas relaunch of sys.executable with
     the original args WITHOUT the flag (the child never sees it = loop
-    guard), then exit 0 via SystemExit.'''
-    if ELEVATE_FLAG not in argv:
+    guard), then exit 0 via SystemExit.
+    '-elevated' is an accepted alias of '--elevate' (pair-approved
+    2026-11-16, ELEVATE_START_FLAGS): it triggers the same lane and is
+    stripped exactly like the canonical spelling.'''
+    if not any(flag in argv for flag in ELEVATE_START_FLAGS):
         return argv
-    rest = [arg for arg in argv if arg != ELEVATE_FLAG]
+    rest = [arg for arg in argv if arg not in ELEVATE_START_FLAGS]
     if _is_process_elevated():
         logger.info('[Elevation] running elevated')
         return rest

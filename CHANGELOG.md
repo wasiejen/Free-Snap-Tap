@@ -19,6 +19,13 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   delivered (never suppressed) and the debt closes at delivery.
 
 ### Changed
+- The elevation start argument accepts `-elevated` as an alias of `--elevate`
+  (WTD cross-product vocabulary parity, pair-approved 2026-11-16); `--elevate`
+  stays canonical. An elevation spelling used as a config `<arg>` line
+  (`-elevate`, `--elevate`, `-elevated` or `--elevated`) now warns with the
+  self-explaining hint "'X' is a start argument for elevation - place it on
+  the command line, not in the config" instead of the generic
+  unknown-argument warning.
 - The focus poll's active-window query is timeout-tolerant (F-B5, review
   Item 14 documented decision): a transient Win32/ctypes failure at the
   query no longer kills the focus task (tracking then stayed dead until

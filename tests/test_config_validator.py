@@ -161,6 +161,26 @@ class TestArgRule:
         assert violations[0].rule == 'arg'
         assert '-zz' in violations[0].message
 
+    @pytest.mark.parametrize('spelling', ['-elevate', '--elevate',
+                                          '-elevated', '--elevated'])
+    def test_elevation_spelling_in_config_gets_the_start_hint(self, spelling):
+        '''pair-approved 2026-11-16 (maintainer live confusion): every
+        elevation spelling in a config line warns with the self-explaining
+        start-argument hint INSTEAD of the generic unknown-arg warning'''
+        violations = warnings_of(f'<arg>{spelling}\n')
+        assert len(violations) == 1
+        assert violations[0].rule == 'arg'
+        assert violations[0].message == (
+            f"'{spelling}' is a start argument for elevation - "
+            'place it on the command line, not in the config')
+
+    def test_unrelated_unknown_argument_keeps_the_generic_warning(self):
+        '''negative control: the hint replaces only the elevation
+        spellings - everything else keeps the generic unknown warning'''
+        violations = warnings_of('<arg>-zz3\n')
+        assert len(violations) == 1
+        assert 'unknown start argument: -zz3' in violations[0].message
+
     def test_non_numeric_delay_is_error(self):
         violations = errors_of('<arg>-tapdelay=abc\n')
         assert len(violations) == 1
