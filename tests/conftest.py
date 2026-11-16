@@ -241,12 +241,19 @@ def _make_tripwire(label, original):
 def os_input_tripwire():
     """Patch the real OS input primitives for the whole suite run (F-B7).
 
-    Pinned sites (choke points of every real send):
+    Pinned sites (the choke points of every pynput/ctypes.windll send):
     - pynput keyboard/mouse win32 backends + pynput._util.win32 SendInput
     - pynput.mouse win32 Controller SetCursorPos (class-bound at import)
     - ctypes.windll.user32: SendInput/keybd_event/mouse_event/SetCursorPos/
       SetForegroundWindow
     - ctypes.windll.shell32.ShellExecuteW (elevate relaunch leg)
+
+    Accepted gaps (reviewer P2, 2026-11-16): a separate module-level
+    ctypes.WinDLL('user32') instance (fst_overlay.py) is NOT covered - it
+    only calls window-visibility APIs today; extend this list if a future
+    direct WinDLL input call lands. _TRIPWIRE_ALLOW is process-global (not
+    thread-local): an allow_real_input window also unlocks concurrent
+    background threads - accepted blast radius (armed by default, tests).
     """
     import pynput._util.win32 as pwu
     import pynput.keyboard._win32 as kw
@@ -254,9 +261,12 @@ def os_input_tripwire():
 
     patches = []
 
-    def _patch(obj, attr, label):
+    def _patch(obj, attr, label, wrap=None):
         original = getattr(obj, attr)
-        setattr(obj, attr, _make_tripwire(label, original))
+        replacement = _make_tripwire(label, original)
+        if wrap is not None:
+            replacement = wrap(replacement)
+        setattr(obj, attr, replacement)
         patches.append((obj, attr, original))
 
     user32 = ctypes.windll.user32
@@ -268,9 +278,10 @@ def os_input_tripwire():
     _patch(kw, 'SendInput', 'pynput.keyboard._win32.SendInput')
     _patch(mw, 'SendInput', 'pynput.mouse._win32.SendInput')
     _patch(pwu, 'SendInput', 'pynput._util.win32.SendInput')
-    # pynput.mouse binds SetCursorPos as a name-mangled class attr at import
+    # pynput.mouse binds SetCursorPos as a name-mangled class attr at import;
+    # the ctypes FuncPtr is not a descriptor, so keep the wrapper static
     _patch(mw.Controller, '_Controller__SetCursorPos',
-           'pynput.mouse._win32.Controller.__SetCursorPos')
+           'pynput.mouse._win32.Controller.__SetCursorPos', staticmethod)
     yield
     for _obj, _attr, _original in reversed(patches):
         setattr(_obj, _attr, _original)
@@ -287,7 +298,10 @@ def tripwire_allow_list(request):
 
 
 def pytest_collection_modifyitems(config, items):
-    """Skip live_desktop tests by default (F-B7): they need real OS input."""
+    """Skip live_desktop tests by default (F-B7): they need real OS input.
+
+    With FST_RUN_LIVE_DESKTOP=1 they run but the tripwire stays armed - a
+    live_desktop test must ALSO carry @pytest.mark.allow_real_input."""
     if os.environ.get('FST_RUN_LIVE_DESKTOP') == '1':
         return
     skip_live = pytest.mark.skip(

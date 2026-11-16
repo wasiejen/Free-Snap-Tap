@@ -6,6 +6,8 @@ Pins:
 - a REAL pynput keyboard Controller press (the Output_Manager construction
   shape, fst_manager.py creates real Controllers) raises at the pynput
   backend SendInput global - no OS event leaves the process.
+- a REAL pynput mouse Controller position set trips the class-bound
+  SetCursorPos (a class attribute, patched with a static wrapper).
 - the allow_real_input marker reaches the real primitive, proven with a
   zero-event call (SendInput(0, NULL, 0) injects nothing, returns 0).
 """
@@ -13,6 +15,7 @@ import ctypes
 
 import pytest
 from pynput import keyboard as pynput_keyboard
+from pynput import mouse as pynput_mouse
 from pynput.keyboard import KeyCode
 
 from conftest import TestIsolationViolation
@@ -35,6 +38,14 @@ def test_tripwire_fires_on_real_pynput_controller_press():
     with pytest.raises(TestIsolationViolation) as exc:
         controller.press(KeyCode.from_vk(VK_A))
     assert 'pynput.keyboard._win32.SendInput' in str(exc.value)
+
+
+def test_tripwire_fires_on_real_mouse_position_set():
+    '''A real mouse Controller position set trips the class-bound SetCursorPos.'''
+    controller = pynput_mouse.Controller()
+    with pytest.raises(TestIsolationViolation) as exc:
+        controller.position = (0, 0)
+    assert 'SetCursorPos' in str(exc.value)
 
 
 @pytest.mark.allow_real_input
