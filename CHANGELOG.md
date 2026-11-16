@@ -8,6 +8,18 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 
 ## [Unreleased]
 
+### Changed
+- The focus poll's active-window query is timeout-tolerant (F-B5, review
+  Item 14 documented decision): a transient Win32/ctypes failure at the
+  query no longer kills the focus task (tracking then stayed dead until
+  restart) - the poll keeps the last-known window title and re-checks on
+  the next 0.25 s tick. The "no foreground window" -> "None" sentinel
+  behavior is unchanged. Polling remains the design (a SetWinEventHook
+  migration was evaluated and rejected); contract and limits (a truly
+  hung window owner stalls one poll - no timeout variant exists for the
+  title read) are documented in `Focus_Task.run` and the WIKI section
+  "[Focus polling contract - designed behavior (Item 14)]".
+
 ## [1.4.0] - 2026-11-15 (release tag pending)
 
 ### Removed

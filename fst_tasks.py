@@ -56,6 +56,33 @@ class Macro_Repeat_Task:
         self.reset_event.set()
         self._handle.cancel()
 
+def _get_active_window_title(stale_title):
+    '''Timeout-tolerant active-window query (F-B5, review Item 14).
+
+    Single production call site: Focus_Task.run below. Failure-mode map:
+    - query OK -> the title string (normal path, behavior unchanged).
+    - no foreground window (GetForegroundWindow() == 0 -> getActiveWindow()
+      returns None -> AttributeError on .title): return the "None" sentinel,
+      exactly the pre-F-B5 except-AttributeError branch.
+    - any OTHER raising failure (pygetwindow.PyGetWindowException, ctypes
+      OSError, ...): return stale_title, or the "None" sentinel while no
+      successful poll happened yet. Pre-F-B5 these exceptions escaped the
+      loop and killed the focus task - tracking then stayed dead until the
+      task was restarted manually.
+    NOT covered: a hung window-owning thread blocks the win32 read itself
+    (no timeout variant in this API set) - see the POLL CONTRACT in run().
+    '''
+    try:
+        return gw.getActiveWindow().title
+    except AttributeError:
+        return "None"
+    except Exception as error:
+        logger_macro.debug(
+            f"active-window query failed, keeping last title "
+            f"'{stale_title or 'None'}': {error!r}")
+        return stale_title or "None"
+
+
 class Focus_Task:
     '''
     Async Task for observing the active window and pause toggle the evaluation of key events
@@ -68,6 +95,29 @@ class Focus_Task:
         self.FOCUS_THREAD_PAUSED = False
 
     async def run(self):
+        '''POLL CONTRACT (F-B5, review Item 14 - documented decision): the
+        0.25 s window poll is the design; an event-driven SetWinEventHook
+        migration was evaluated and rejected (thread/callback surface and a
+        new bug class for a gain under 250 ms).
+
+        Caller/frequency: Focus_Manager.start_focus_task (fst_manager.py)
+        starts this coroutine on MainLogic's asyncio loop thread
+        (free_snap_tap.py); each iteration runs ONE
+        _get_active_window_title() query, then asyncio.sleep(0.25).
+        Macro and toast scheduling share this loop thread, so a slow query
+        delays them too - the accepted cost of the design. The GUI-side
+        500 ms timer (fst_overlay.py perform_periodic_update) only re-reads
+        in-process flags and queries no windows.
+
+        Slow/unresponsive foreground apps: the title read sends a message to
+        the window's owning thread (GetWindowTextW behind pygetwindow), so a
+        hung app STALLS the query and UIPI-blocked titles read as empty;
+        this API set (GetForegroundWindow + GetWindowTextW) has no timeout
+        variant and a watchdog thread is rejected, so the poll stays
+        synchronous. _get_active_window_title bounds the RAISING failures
+        (stale-title fallback); it cannot time-bound a true win32 stall.
+        WIKI: "[Focus polling contract - designed behavior (Item 14)]".
+        '''
         last_active_window = ''
         found_valid_focus_name = False
         manually_paused = False
@@ -76,10 +126,7 @@ class Focus_Task:
         old_focus_name = "None"
         focus_name_changed = False
         while not self._stop:
-            try:
-                active_window = gw.getActiveWindow().title
-            except AttributeError:
-                active_window = "None"
+            active_window = _get_active_window_title(last_active_window)
             # when windows name changed
             if active_window != last_active_window or manually_paused:
                 if active_window != last_active_window:
