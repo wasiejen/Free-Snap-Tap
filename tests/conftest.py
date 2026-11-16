@@ -1,4 +1,5 @@
 import ctypes
+import gc
 import logging
 import os
 import sys
@@ -310,3 +311,65 @@ def pytest_collection_modifyitems(config, items):
     for item in items:
         if 'live_desktop' in item.keywords:
             item.add_marker(skip_live)
+
+
+# --- F-B8 suite-abort guard (2026-11-16) -------------------------------------
+#
+# ROOT CAUSE (measured, branch u-fb8-suiteabort): PySide6 6.11.2 / shiboken6
+# abort natively (SIGABRT or SIGSEGV, often with NO faulthandler dump) when a
+# Python GC sweep runs while a Qt C++ frame is on the stack - Qt forbids
+# destroying objects during event processing, Python's GC does not know.
+# pytest-qt 4.5 calls app.processEvents() at five sites around every test
+# phase and qtbot.wait() runs a nested QEventLoop, so every test after the
+# first Qt test is an event-processing window - this explains the historical
+# abort positions 23%..98% and both recorded stack signatures (tray-fixture
+# teardown exec; post-call _process_events).
+# Discriminator (2026-11-16): the stress harness tests/fb8_gc_stress.py +
+# full suite = 6/6 pre-guard native aborts on UNCHANGED trees, clean with
+# this guard (the post-guard stress run is inert by construction - the guard
+# disables what the harness tunes). Isolated orphan-wrapper patterns never
+# crash - the crash needs the session-wide Qt object graph. The underlying
+# GC-during-Qt-event hazard is an upstream shiboken6 class: repro recorded
+# via todo_inbox 2026-11-16 (worker F-B8); accepted side effect - suite runs
+# go blind to the class on product Qt paths.
+# Guard: no automatic GC for the run; sweep each test's fresh gen-0 garbage
+# at a safe point (after all five pytest-qt pumps of that test, no Qt frame
+# on the stack); promoted cycles wait for the session-finish sweep (measured
+# bounded: +3 percent gc objects vs automatic GC, reviewer probe). Pinned by
+# tests/test_suite_gc_pin.py and by the per-test latch below.
+# Related class (separate fix): a widget built before any QApplication also
+# aborts the process - Qt routes the fatal message to the debugger and the
+# abort bypasses buffered output, so the run dies with no message. Only
+# suite exposure: tests/test_toast_rendering.py's first widget test without
+# qtbot - fixed with qtbot + addWidget.
+
+
+def pytest_configure(config):
+    """F-B8: no automatic GC sweep can land inside a Qt event window."""
+    gc.disable()
+
+
+def pytest_unconfigure(config):
+    """F-B8: restore the collector for any in-process pytest.main() caller."""
+    gc.enable()
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_runtest_logfinish(nodeid, location):
+    """F-B8: sweep this test's fresh gen-0 garbage at the post-test safe point."""
+    gc.collect(0)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """F-B8: last safe-point full sweep while the interpreter is fully alive."""
+    gc.collect()
+
+
+@pytest.fixture(autouse=True)
+def gc_disabled_latch():
+    """F-B8 per-test latch: a later plugin cannot silently re-enable GC."""
+    assert not gc.isenabled(), (
+        'F-B8: automatic GC was re-enabled mid-run - sweeps can land inside '
+        'Qt event windows and abort the suite natively; see the F-B8 section '
+        'in tests/conftest.py')
+    yield
