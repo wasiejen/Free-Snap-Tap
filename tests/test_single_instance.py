@@ -177,8 +177,8 @@ class TestMainBlockWiring:
             'ToastBridge': lambda: MagicMock(),
             'surface_startup_config_result': lambda k: None,
             'surface_startup_activation': lambda k: None,
-# the startup freeze is a step of the entry block, so an exec harness of that block
-        # must supply it (decision 10, 2026-11-17)
+            # the startup freeze is a step of the entry block, so an exec harness of that block
+            # must supply it (decision 10, 2026-11-17)
             'freeze_startup_heap': lambda: None,
         }
         with pytest.raises(SystemExit) as exc:

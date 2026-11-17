@@ -854,8 +854,8 @@ class TestP3LifecycleNoOps:
             'ToastBridge': lambda: MagicMock(),
             'surface_startup_config_result': lambda keyboard: None,
             'surface_startup_activation': lambda keyboard: None,
-# the startup freeze is a step of the entry block, so an exec harness of that block
-        # must supply it (decision 10, 2026-11-17)
+            # the startup freeze is a step of the entry block, so an exec harness of that block
+            # must supply it (decision 10, 2026-11-17)
             'freeze_startup_heap': lambda: None,
         })
         with pytest.raises(SystemExit) as stop:
