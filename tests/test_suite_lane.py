@@ -2,10 +2,11 @@
 
 The lane is the repo's full-suite gate on this platform (the single-process run
 aborts natively - the measurement record is in tests/README.md). A gate that
-silently drops a test file is worse than an aborting one, so these pins hold
-the lane's STRUCTURE: coverage, exactly-once, determinism, bounded chunks, and
-the process-safety rule that the runner may only ever touch the children it
-spawned itself.
+silently drops a test file, passes a chunk that ran nothing, or keeps going
+after collection died is worse than an aborting run, so these pins hold the
+lane's STRUCTURE: coverage, exactly-once, determinism, the exit-code contract,
+the collection-failure path, and the process-safety rule that the runner may
+only ever touch the children it spawned itself.
 """
 import inspect
 from pathlib import Path
@@ -33,6 +34,17 @@ class TestLaneCoversTheSuite:
         assert sorted(flat) == sorted(files)
         assert len(flat) == len(set(flat))
 
+    def test_a_module_in_a_test_subdirectory_is_discovered(self, tmp_path):
+        # CONTRACT: discovery follows the testpaths=tests tree, not one flat
+        # directory - a nested module must not be silently un-gated
+        (tmp_path / 'tests' / 'sub').mkdir(parents=True)
+        (tmp_path / 'tests' / 'test_top.py').write_text('x', encoding='utf-8')
+        (tmp_path / 'tests' / 'sub' / 'test_nested.py').write_text(
+            'x', encoding='utf-8')
+        found = suite_lane.test_files(tmp_path)
+        assert 'tests/test_top.py' in found
+        assert 'tests/sub/test_nested.py' in found
+
     def test_no_chunk_is_empty(self, plan):
         # CONTRACT: an empty chunk hides a chunking bug that would drop files
         _files, chunks = plan
@@ -43,8 +55,7 @@ class TestLaneCoversTheSuite:
         # lane failure is reproducible and bisectable
         files, chunks = plan
         counts = {name: 1 for name in files}
-        again = suite_lane.build_chunks(files, counts, 12)
-        assert again == chunks
+        assert suite_lane.build_chunks(files, counts, 12) == chunks
 
     def test_files_are_discovered_in_sorted_order(self):
         # CONTRACT: the lane runs modules in a stable order (pytest's own
@@ -54,6 +65,51 @@ class TestLaneCoversTheSuite:
         assert any(name.startswith('tests/test_') for name in files)
 
 
+class TestLaneExitContract:
+    def test_only_a_green_chunk_counts_as_ok(self):
+        # CONTRACT: pytest exit 5 (nothing collected) is NOT success - a chunk
+        # that ran zero tests must fail the gate, not pass it quietly
+        assert suite_lane.chunk_is_ok(0)
+        for bad in (1, 2, 3, 4, 5, 124, 3221225477):
+            assert not suite_lane.chunk_is_ok(bad), bad
+
+    def test_a_timed_out_chunk_fails_the_lane(self, monkeypatch, capsys):
+        # CONTRACT: a wedged chunk (timeout -> 124) fails the run and is
+        # reported as FAIL, it is never treated as a pass
+        monkeypatch.setattr(suite_lane, 'run_chunk',
+                            lambda chunk, root, timeout: (124, 'wedged'))
+        assert suite_lane.main([]) == 1
+        assert 'FAIL' in capsys.readouterr().out
+
+    def test_a_dead_collection_refuses_to_plan_chunks(self, monkeypatch, capsys):
+        # CONTRACT: if collection failed, counts are meaningless - the lane
+        # must stop rather than fall back to one giant single-process chunk,
+        # which is exactly the configuration known to abort
+        monkeypatch.setattr(suite_lane, 'collect_counts',
+                            lambda root=None: ({}, 2))
+        monkeypatch.setattr(suite_lane, 'run_chunk',
+                            lambda *args, **kwargs: pytest.fail(
+                                'chunks must not run when collection failed'))
+        assert suite_lane.main([]) == 2
+        assert 'collection did not succeed' in capsys.readouterr().out
+
+
+class TestCollectionAccounting:
+    def test_module_header_lines_are_not_counted_as_tests(self):
+        # CONTRACT: the planned chunk sizes are the lane's promise about what it
+        # ran - pytest echoes a bare module path per file, and counting those
+        # headers over-plans every chunk (measured: 1159 planned vs 1096 run)
+        transcript = (
+            'tests/test_a.py::test_one\n'
+            'tests/test_a.py::Test_Two::test_three\n'
+            'tests/test_b.py::test_four\n'
+            'tests/test_b.py\n'
+            '\n'
+            '4 tests collected in 0.10s\n')
+        assert suite_lane.parse_collection(transcript) == {
+            'tests/test_a.py': 2, 'tests/test_b.py': 1}
+
+
 class TestLaneProcessSafety:
     SOURCE = inspect.getsource(suite_lane)
 
@@ -61,8 +117,8 @@ class TestLaneProcessSafety:
         # CONTRACT: only children this module spawned are ever terminated;
         # killing by image name or by an unowned PID can kill unrelated
         # processes on the machine (the reason this rule is pinned)
-        for forbidden in ('taskkill', 'psutil', 'os.kill', 'subprocess.Popen('
-                          'name', 'STARTUPINFO'):
+        for forbidden in ('taskkill', 'psutil', 'os.kill', 'os.system',
+                          'ctypes', 'signal.', 'STARTUPINFO', 'win32process'):
             assert forbidden not in self.SOURCE, forbidden
 
     def test_the_runner_only_touches_its_own_child_handle(self):
@@ -72,6 +128,12 @@ class TestLaneProcessSafety:
         assert 'child.kill()' in self.SOURCE
         assert 'TimeoutExpired' in self.SOURCE
         assert 'timeout=' in self.SOURCE
+
+    def test_collection_and_chunks_share_one_platform_environment(self):
+        # CONTRACT: collection imports Qt-importing modules too, so it must run
+        # under the same QT_QPA_PLATFORM as the chunks
+        assert self.SOURCE.count('child_env()') >= 3
+        assert "QT_QPA_PLATFORM" in self.SOURCE
 
 
 class TestFb8GuardStaysInPlace:
