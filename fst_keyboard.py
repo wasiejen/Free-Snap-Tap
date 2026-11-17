@@ -22,6 +22,7 @@ from itertools import count
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
 from fst_manager import Input_State_Manager, Config_Manager, Config_Validator
+from fst_runtime_state import Runtime_Owner
 from fst_manager import Status_Dump
 from fst_manager import (logger, logger_flow, logger_state, logger_macro,
                          logger_config, logger_drop, DROP_RING_MAXLEN)
@@ -373,6 +374,21 @@ class FST_Keyboard():
     @property
     def focus_manager(self):
         return self._focus_manager
+    @property
+    def runtime_owner(self):
+        '''F-C4 (review Item 8): the documented door to the mutable runtime
+        areas - the machine-readable ownership map (fst_runtime_state.AREAS,
+        checked by tests/test_threading_contract.py) and the one place new code
+        reaches runtime state through, so the writer rule travels with the
+        read. THREADING.md is the prose version of the same map.
+
+        Built on access, deliberately: storing it would make the owner hold the
+        keyboard and the keyboard hold the owner, i.e. a reference cycle in
+        every runtime graph (including each contract-lane graph, which is what
+        the F-B8 teardown doctrine works to avoid). It owns no state, so
+        building one is free, and it is never touched on the pump path.'''
+        return Runtime_Owner(self)
+
     @property
     def state_manager(self):
         return self._state_manager
