@@ -53,7 +53,7 @@ in `tests/test_pump_async_lane.py` (`TestFallbackContract`). The reload lane its
 
 ## The mutable areas
 
-The same eight rows are machine-readable in `fst_runtime_state.AREAS` with the
+The same nine rows are machine-readable in `fst_runtime_state.py` (`AREAS`) with the
 file and symbol each claim points at.
 
 | Area | Holder | Owner | Who writes it | Rule |
@@ -172,7 +172,7 @@ one: nothing in the suite measures allocation.
 `tests/test_threading_contract.py` asserts: every area's holder is reachable
 through `FST_Keyboard.runtime_owner` (identity with the live holder); every
 area in the map has an owner role, at least one documented writer and a rule;
-the eight documented areas are present by name; every `file + symbol` citation
+the nine documented areas are present by name; every `file + symbol` citation
 in the map still resolves in the product source; `fst_runtime_state` itself
 imports no threading and creates no lock; and the pump hot-path contract above
 holds in the filter source.

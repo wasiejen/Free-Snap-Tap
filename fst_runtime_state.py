@@ -314,7 +314,8 @@ class Runtime_Owner():
         return self._fst.arg_manager
 
     def containers(self):
-        '''the live runtime generation - ONE WRITER (area "containers").
+        '''the live runtime generation - bound on three threads, one store
+        each, never mutated in place (area "containers").
 
         Read it ONCE into a local and use that local, exactly like the hook
         pump does (rt = self._runtime); reading the attribute twice in one
@@ -323,7 +324,8 @@ class Runtime_Owner():
 
     @property
     def input_state(self):
-        '''per-key input state - pump writer, loop reset legs (area "input_state")'''
+        '''per-key input state - pump writer, loop and Qt reset legs
+        (area "input_state")'''
         return self._fst.state_manager
 
     @property
@@ -336,6 +338,12 @@ class Runtime_Owner():
         '''the toast post queue - append on any thread, drain on the loop
         (area "display_posts")'''
         return self._fst._toast_offload
+
+    @property
+    def macro_debt(self):
+        '''the press tickets a macro playback still owes - claim a ticket by
+        POPPING it, never by reading and writing it back (area "macro_debt")'''
+        return self._fst._macro_held
 
     @property
     def lifecycle(self):
