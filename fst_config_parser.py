@@ -233,6 +233,15 @@ START_ARG_VALUES = frozenset({
 })
 
 
+# Decision 12 (maintainer 2026-11-17): a macro segment delay ('key|<ms>') is
+# deliberately UNBOUNDED - a timeline can wait minutes. Above this bound the
+# validator asks the author (WARNING, value accepted). The config delay KNOBS
+# (-tapdelay/-macrodelay/-sequencedelay) keep their 0..1000 bound (decision 9a):
+# a knob sets a random default, a segment states an intentional wait.
+SEGMENT_DELAY_WARN_MS = 30000
+# The user-facing text names the knob bound; it reads DELAY_RANGE (see the no-copy
+# rule above) instead of repeating a number that could drift from it.
+
 # The elevation spellings are a START argument, never a config <arg> line
 # (pair-approved 2026-11-16 after the maintainer's live confusion): the
 # validator answers all four dash-count/tense forms with the specific hint.

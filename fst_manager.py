@@ -26,7 +26,7 @@ from fst_config_parser import (split_key_group, clean_comment_lines,
                                START_ARG_FLAGS, START_ARG_VALUES,
                                KIND_TAP, KIND_REBIND, KIND_MACRO, KIND_SEQUENCE,
                                DELAY_RANGE, RUNTIME_DELAY_RANGE,
-                               is_elevation_config_arg)
+                               is_elevation_config_arg, SEGMENT_DELAY_WARN_MS)
 import datetime
 import re #regular expression
 import ast # structural constraint check (Config_Validator)
@@ -1590,6 +1590,33 @@ class Config_Validator():
 
         for segment in segments[1:]:
             self._check_constraint_segment(line_number, item, segment, aliases)
+            self._check_segment_delay_size(line_number, item, base, segment)
+
+    def _check_segment_delay_size(self, line_number, item, base, segment):
+        '''Decision 12 (E2 authoring warning, maintainer 2026-11-17): a macro
+        segment delay (''key|<ms>'') stays UNBOUNDED by ruling - a timeline may
+        legitimately wait minutes for the app in front of it. What the ruling
+        asked for instead is that an obviously large value ASKS: one WARNING per
+        offending segment above SEGMENT_DELAY_WARN_MS, value accepted.
+
+        Scope, measured before writing this (so nothing else moved): segment
+        delays are only reachable in macro / sequence / rebind / alias groups -
+        a tap group rejects any delay suffix (''must be a plain key''), and a
+        non-numeric constraint is already an error. Negative and small values
+        were silent before and stay silent: this method only ever adds a
+        WARNING for large positive numbers, never an error, never a rewrite.
+        '''
+        try:
+            delay_ms = int(segment)
+        except ValueError:
+            return      # a constraint expression - _check_constraint_segment owns it
+        if delay_ms > SEGMENT_DELAY_WARN_MS:
+            self._warn(line_number, item, 'delay',
+                       f'very long delay ({delay_ms} ms) in {base}|{delay_ms} '
+                       '- intentional? a segment delay is unbounded on purpose '
+                       '(a macro may wait for the app to finish); the delay '
+                       f'knobs -tapdelay/-macrodelay/-sequencedelay (0-'
+                       f'{DELAY_RANGE[1]} ms) are a different thing')
 
     def _check_vk_resolvable(self, line_number, item, key):
         if key in vk_codes_dict:

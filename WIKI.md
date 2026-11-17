@@ -226,6 +226,21 @@ Every key event supports prefixes **prefix/modifier**
     - `key_event/Key|*time*` -> will result in a static delay of length *time* in ms
     - `key_event/Key|*time1*|*time2*` -> will result in a random delay of length between *time1* and *time2* ms
 
+  - **A segment delay is deliberately UNBOUNDED** (maintainer decision 12, 
+    2026-11-17): a macro may have to wait seconds or minutes for the program in
+    front of it, so no limit is imposed on *time*. The delay KNOBS (`-tapdelay`,
+    `-macrodelay`, `-sequencedelay`, bound 0..1000 ms) are a different concept -
+    they set the random delay a line gets when it states none. Two rules come
+    with the unbounded value:
+      - the config check asks about an obviously large one: above 30000 ms the
+        load reports `very long delay (45000 ms) in a|45000 - intentional?` as a
+        WARNING. It never rejects the line and never changes the value;
+      - a wait never outlives its context: when a focus-group change, a macro
+        abort, a pause (ALT+DELETE) or a config reload ends the context a
+        playback belongs to, the pending delay is dropped and a key the playback
+        still owed is released immediately - a late segment never fires into the
+        newly active program.
+
 ### [Suffix/Evaluation] updated to V1.1.3
 
 - supports evaluation as suffix
