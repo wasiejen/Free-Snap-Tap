@@ -8,51 +8,67 @@ NOW DETERMINISTIC at the tray-fixture teardown (~92 % of the run), and no
 in-repo guard removes it: the measurements are recorded in tests/README.md.
 Per-chunk runs are reliably green, because a chunk holds a smaller graph.
 
-WHAT IT DOES. Collects once, splits ``tests/test_*.py`` (in pytest's own order)
-into chunks of about ``--chunk-target`` tests, runs each chunk in its own
-pytest process, prints one line per chunk plus an aggregate, and exits nonzero
-if any chunk fails, aborts, or times out. This is the repo's gate command for
-a full-suite verification.
+WHAT IT DOES. Collects once, splits ``tests/**/test_*.py`` (in pytest's own
+order) into chunks of about ``--chunk-target`` tests, runs each chunk in its
+own pytest process, prints one line per chunk plus an aggregate, and exits
+nonzero if any chunk fails, aborts, collects nothing, or times out. This is the
+repo's gate command for a full-suite verification.
 
-PROCESS SAFETY (a rule, not a preference): this module only ever touches the
-child processes it spawned itself - ``child.terminate()`` then
-``child.kill()`` on its own handle, guarded by a timeout. It never kills by
-process name and never kills by PID it did not spawn. A stuck chunk is
-reported, not hunted.
+PROCESS SAFETY (a rule, not a preference, and pinned in
+tests/test_suite_lane.py): this module only ever touches the child processes it
+spawned itself - ``child.terminate()`` then ``child.kill()`` on its own handle,
+guarded by a timeout. It never kills by process name and never kills by a PID
+it did not spawn. A stuck chunk is reported, not hunted.
 """
 from __future__ import annotations
 
 import argparse
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent
-SUMMARY = re.compile(r'(\d+) passed|(\d+) failed|(\d+) skipped|(\d+) xfailed|'
-                     r'(\d+) error')
 
 
 def test_files(root: Path = REPO) -> list[str]:
     """every test module, in the order pytest itself would run them"""
     return sorted(path.relative_to(root).as_posix()
-                  for path in (root / 'tests').glob('test_*.py'))
+                  for path in (root / 'tests').rglob('test_*.py'))
 
 
-def collect_counts(root: Path = REPO) -> dict[str, int]:
-    """one collection pass -> {file: number of collected tests}"""
+def parse_collection(text: str) -> dict[str, int]:
+    """{module path: collected tests} from a ``-q --collect-only`` transcript.
+
+    A test is a ``file::node`` line. pytest also echoes the bare module path
+    once per file, and counting those headers inflates every chunk's planned
+    size by one test per file (measured: 1159 planned against 1096 run).
+    """
+    counts: dict[str, int] = {}
+    for line in text.splitlines():
+        if '::' not in line:
+            continue
+        name = line.split('::')[0].strip().replace('\\', '/')
+        if name.startswith('tests/') and name.endswith('.py'):
+            counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
+def collect_counts(root: Path = REPO) -> tuple[dict[str, int], int]:
+    """one collection pass -> ({file: tests collected}, pytest return code)"""
     proc = subprocess.run(
         [sys.executable, '-m', 'pytest', '-q', '--no-header', '-p',
          'no:cacheprovider', '--collect-only'],
-        cwd=root, capture_output=True, text=True, timeout=300, check=False)
-    counts: dict[str, int] = {}
-    for line in (proc.stdout + proc.stderr).splitlines():
-        match = re.match(r'\s*(tests[/\\]test_[^:]+\.py)', line.replace('\\', '/'))
-        if match:
-            key = match.group(1).replace('\\', '/')
-            counts[key] = counts.get(key, 0) + 1
-    return counts
+        cwd=root, capture_output=True, text=True, timeout=300, check=False,
+        env=child_env())
+    return parse_collection(proc.stdout + proc.stderr), proc.returncode
+
+
+def child_env() -> dict[str, str]:
+    """chunks AND collection run under the same platform - a Qt-importing
+    collection pass must not see a different environment than the tests"""
+    return {**os.environ, 'QT_QPA_PLATFORM': os.environ.get(
+        'QT_QPA_PLATFORM', 'offscreen')}
 
 
 def build_chunks(files: list[str], counts: dict[str, int],
@@ -81,14 +97,19 @@ def summarize(text: str) -> str:
     return (tail[-1][:80] if tail else 'no output')
 
 
+def chunk_is_ok(code: int) -> bool:
+    """ONLY a real green chunk counts: pytest exit 5 means the chunk collected
+    nothing, which would silently pass a chunk that never ran a single test"""
+    return code == 0
+
+
 def run_chunk(chunk: list[str], root: Path, timeout: int) -> tuple[int, str]:
     """run one chunk in ITS OWN process; only our own handle is ever touched"""
     child = subprocess.Popen(
         [sys.executable, '-m', 'pytest', '-q', '--no-header', '-p',
          'no:cacheprovider'] + chunk,
         cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-        env={**os.environ, 'QT_QPA_PLATFORM': os.environ.get(
-            'QT_QPA_PLATFORM', 'offscreen')})
+        env=child_env())
     try:
         out, _ = child.communicate(timeout=timeout)
         return child.returncode, summarize(out or '')
@@ -113,7 +134,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     files = test_files()
-    counts = collect_counts()
+    counts, code = collect_counts()
+    if not files:
+        print('lane: FAILED - no test modules found under tests/')
+        return 2
+    if not counts or code not in (0, 5):
+        print(f'lane: FAILED - collection did not succeed (pytest exit {code}, '
+              f'{len(counts)} files counted); refusing to plan chunks')
+        return 2
+
     chunks = build_chunks(files, counts, args.chunk_target)
     if args.list:
         for index, chunk in enumerate(chunks, 1):
@@ -125,10 +154,10 @@ def main(argv: list[str] | None = None) -> int:
     for index, chunk in enumerate(chunks, 1):
         total = sum(counts.get(name, 1) for name in chunk)
         code, summary = run_chunk(chunk, REPO, args.timeout)
-        flag = 'ok' if code in (0, 5) else 'FAIL'
+        flag = 'ok' if chunk_is_ok(code) else 'FAIL'
         print(f'chunk {index}/{len(chunks)} ({total} tests): exit={code} '
               f'{flag}: {summary}', flush=True)
-        if code not in (0, 5):
+        if not chunk_is_ok(code):
             failed += 1
     print(f'lane: {len(chunks)} chunks, {len(chunks) - failed} ok, {failed} failed '
           f'(single process is NOT usable on this platform - see tests/README.md)')

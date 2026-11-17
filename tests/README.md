@@ -9,14 +9,26 @@
 Exit code 0 means green. The runner collects once, splits `tests/test_*.py`
 into chunks of about 350 tests (in pytest's own order), runs each chunk in its
 own process, and prints one line per chunk plus an aggregate. Typical output
-at the 2026-11-17 tip:
+(measured 5 consecutive runs at the ABORT2 review-fix tip, all exit 0; the
+numbers move as the suite grows, and `suite_lane.py --list` prints the plan
+without running anything):
 
 ```
-chunk 1/3 (359 tests): exit=0 ok: 358 passed, 1 skipped in 1.86s
-chunk 2/3 (431 tests): exit=0 ok: 431 passed, 3 warnings in 3.81s
-chunk 3/3 (294 tests): exit=0 ok: 293 passed, 1 xfailed, 2 warnings in 2.67s
+chunk 1/3 (359 tests): exit=0 ok: 358 passed, 1 skipped in 1.55s
+chunk 2/3 (431 tests): exit=0 ok: 431 passed, 3 warnings in 3.91s
+chunk 3/3 (307 tests): exit=0 ok: 306 passed, 1 xfailed, 2 warnings in 3.10s
 lane: 3 chunks, 3 ok, 0 failed
 ```
+
+That is **1095 passed, 1 skipped, 1 xfailed**. The planned `(N tests)` figure
+comes from a real collection pass and matches what the chunk runs - pytest's
+per-file header line is never counted as a test (pinned).
+
+The lane fails the run on any chunk that fails, aborts, collects nothing
+(pytest exit 5) or times out; if the collection pass itself fails it refuses to
+plan chunks at all (exit 2), because the fallback - one chunk holding every
+file - is exactly the known-fatal single-process run. Collection runs under the
+same `QT_QPA_PLATFORM` as the chunks.
 
 A single file or a single directory works exactly as before for focused work:
 `.venv/Scripts/python.exe -m pytest tests/test_foo.py -q`.
@@ -61,12 +73,21 @@ What does NOT fix it (each measured, not reasoned):
 | that sweep narrowed to gen-0 only | 4/4 abort |
 | that sweep moved to `pytest_unconfigure` | 4/4 abort |
 
-Conclusion: the tray teardown is where the death becomes visible, not the
-cause, and the guard's sweep placement is not the cause either. The cause is
-the session-wide Qt object graph being destroyed while Qt frames are live -
-pytest-qt 4.5 pumps the event loop at five sites per test and runs nested
-loops in `wait()`, so after enough Qt tests the process is in a state where
-shiboken6 aborts. That is why smaller sessions are safe.
+Measured conclusions: the tray teardown is where the death becomes visible,
+not the cause (empty-teardown and no-pump variants still die, sometimes after
+the green summary), and the guard's session-finish sweep is not the cause
+either (removed, narrowed, and relocated all still abort).
+
+What is INFERRED, and labelled as such: the mechanism is most likely the
+session-wide Qt object graph being destroyed while Qt frames are live
+(pytest-qt 4.5 pumps the event loop at five sites per test and runs nested
+loops in `wait()`). Two levers were probed - the tray fixture and the
+session-finish sweep. Others were NOT (for example a conftest-level
+QApplication lifetime change), so "unfixable from in here" is scoped honestly
+to: not fixable through the levers measured, and not the guard's fault. What
+is measured regardless of mechanism: sessions with a smaller Qt graph do not
+die - every single module, both alphabetical halves, and all three lane chunks
+are reliably green.
 
 What DOES work, measured:
 
@@ -75,17 +96,23 @@ What DOES work, measured:
 - the lane above, 3 chunks: **5 consecutive lane runs, 5/5 exit 0**
   (1082 passed, 1 skipped, 1 xfailed each time).
 
-Minimality status (why there is no 2-file upstream repro yet): no **single**
-earlier test module plus `tests/test_tray_icon.py` reproduces the abort - 37
-pair probes were green - while modules 1..58 plus the tray module do
-(`prefix=58` green with 1056 passed, `prefix=59` aborts). So the lethal
-condition is cumulative in the Qt graph, not a pair. A ddmin shrink over the
-file set reached about 20-22 modules before the driver stalled on a wedged
-child (see the process-safety rule in `suite_lane.py`); resuming that
-minimization is the next step if an upstream report is ever filed. The
-F-B8 unit already filed the isolated GC-during-Qt-event class upstream-side
-(recorded in `tests/conftest.py`); this record covers the graph-teardown
-variant of the same family.
+Minimality status (why there is no 2-file upstream repro yet): the abort is
+NOT reproducible by any pair. Every other test module in the suite was run
+beside `tests/test_tray_icon.py`, one at a time - **63/63 probes green** (36 in
+the alphabetical range `[a-i]` first, the remaining 27 afterwards, so the sweep
+is exhaustive, not a sample). Yet run-order modules 1..58 plus the tray module
+do abort (`prefix=58` green with 1056 passed, `prefix=59` aborts). So the
+lethal condition is cumulative in the Qt graph, not a pair, and no minimal
+pair exists to report. A ddmin shrink over the file set reached about 20-22
+modules before its driver stalled on a wedged child (see the process-safety
+rule in `suite_lane.py`); resuming that minimization is the next step if an
+upstream report is ever filed.
+
+What already exists upstream-side: the F-B8 unit recorded ITS repro recipe in
+the estate inbox (`tests/conftest.py` says "repro recorded via todo_inbox
+2026-11-16") for the GC-during-Qt-event-window class. **No issue has been
+filed with PySide6 or shiboken6** - neither for that class nor for this
+graph-teardown variant, which this record covers.
 
 Reproduce it yourself:
 
