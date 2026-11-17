@@ -18,7 +18,7 @@ from fst_runtime_state import AREAS, Runtime_Owner, area
 
 REPO = Path(inspect.getfile(Output_Manager)).parent
 
-# the eight areas the contract names; a rename or a removal is a decision here
+# the nine areas the contract names; a rename or a removal is a decision here
 DOCUMENTED_AREAS = ['flags', 'containers', 'input_state', 'tickets',
                     'display_posts', 'macro_debt', 'lifecycle', 'loop',
                     'task_registry']

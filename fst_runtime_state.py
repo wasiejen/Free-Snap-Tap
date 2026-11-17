@@ -77,7 +77,8 @@ AREAS = (
                  'bind today: the reload lane and the focus coroutine on the '
                  "loop, the pump's ConfigError rebuild leg inside "
                  'check_control_actions, and the Qt tray Reload through '
-                 'reload_from_file. Each bind is one store, so a reader still '
+                 'reload_from_file (plus the startup bind on the main thread, '
+                 'before any other thread exists). Each bind is one store, so a reader still '
                  'sees only complete generations, but the binders are not '
                  'serialized with each other (last bind wins) - routing all '
                  'three behind the one reload lane is follow-up 1 in '
@@ -99,6 +100,7 @@ AREAS = (
             ('fst_keyboard.py', "self.update_args_and_groups('')"),
             ('fst_keyboard.py', 'def reload_from_file'),
             ('fst_overlay.py', 'signal_reload'),
+            ('free_snap_tap.py', 'self.fst_keyboard.update_args_and_groups'),
         ),
     },
     {
@@ -109,9 +111,12 @@ AREAS = (
         'rule': ('per-key press state, toggle state and key times. The pump is '
                  'the normal writer - the filter feeds every event in, and the '
                  'control_combo legs it runs bare (return-to-menu, exit, pause) '
-                 'reset the state on the pump too. The loop writes it from the '
-                 'reload lane; the Qt thread writes it from the tray Reload '
-                 '(reload_from_file). All of it is single store per key; do not '
+                 'reset the state on the pump too. The loop resets it when a '
+                 'focus app starts listening (update_args_and_groups from '
+                 '_start_listening) and on a reload that failed with '
+                 'ConfigError; the Qt thread resets it from the tray Reload and '
+                 'from the tray pause / return-menu / exit legs, which call the '
+                 'same control legs directly. All of it is single store per key; do not '
                  'add a multi-field read-modify-write on a key entry without '
                  'marshaling the writer threads first.'),
         'evidence': (
@@ -127,6 +132,8 @@ AREAS = (
             ('fst_keyboard.py', 'def control_exit_program'),
             ('fst_keyboard.py', 'def control_toggle_pause'),
             ('fst_keyboard.py', 'def reload_from_file'),
+            ('free_snap_tap.py', 'def _start_listening'),
+            ('fst_overlay.py', 'def toggle_pause'),
         ),
     },
     {
@@ -178,14 +185,16 @@ AREAS = (
         'name': 'macro_debt',
         'holder': 'FST_Keyboard._macro_held',
         'owner': ROLE_LOOP,
-        'writers': (ROLE_LOOP, ROLE_KEYBOARD_PUMP),
+        'writers': (ROLE_LOOP, ROLE_KEYBOARD_PUMP, ROLE_QT),
         'rule': ('the press tickets a macro playback injected and has not '
-                 "released yet: {alias: {vk: Ticket}}. The loop's macro legs "
-                 'record and pop it; a quit or pause leg claims it from the '
-                 'pump by POPPING, and the pop IS the claim - two threads can '
-                 'each get a ticket only once. It is the ledger\'s fast index, '
-                 'so the ledger stays the registry and a generation swap never '
-                 'touches it.'),
+                 'released yet: {alias: {vk: Ticket}}. The loop\'s macro legs '
+                 'record and pop it; a quit, pause or return-to-menu leg claims '
+                 'it by POPPING, and the pop IS the claim, so a ticket can be '
+                 'claimed once no matter which thread gets it - those legs run '
+                 'on the pump when a control combo triggered them and on the Qt '
+                 'thread when the tray or menu called the same control leg. It '
+                 'is the ledger\'s fast index, so the ledger stays the registry '
+                 'and a generation swap never touches it.'),
         'evidence': (
             'macro legs record and release it, the drain leg claims it by pop, '
             "the status dump only copies it - see THREADING.md 'macro_debt'",
@@ -194,6 +203,8 @@ AREAS = (
             ('fst_keyboard.py', 'self._macro_held'),
             ('fst_keyboard.py', 'def drain_macro_debt'),
             ('fst_manager.py', '_macro_held'),
+            ('fst_overlay.py', 'def toggle_pause'),
+            ('fst_overlay.py', 'def return_to_menu'),
         ),
     },
     {
