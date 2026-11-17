@@ -342,6 +342,15 @@ def pytest_collection_modifyitems(config, items):
 # abort bypasses buffered output, so the run dies with no message. Only
 # suite exposure: tests/test_toast_rendering.py's first widget test without
 # qtbot - fixed with qtbot + addWidget.
+# SCOPE (measured 2026-11-17, unit ABORT2, tip e2c9e02): this guard covers the
+# GC-during-Qt-event-window class ONLY. It does NOT prevent the second member of
+# the family - a full single-process run now aborts deterministically at ~92% in
+# pytest-qt's wait() pump during tests/test_tray_icon.py's fixture teardown
+# (graph-teardown variant, upstream). Removing, narrowing, or relocating the
+# session-finish sweep below changes nothing (4/4 aborts each), so do not "fix"
+# this abort by deleting the guard: it still earns its keep against the class it
+# was built for. The usable full-suite gate is `python suite_lane.py`; the whole
+# measurement record, including what was falsified, is in tests/README.md.
 
 
 def pytest_configure(config):
