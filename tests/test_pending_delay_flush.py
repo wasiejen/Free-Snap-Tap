@@ -25,6 +25,7 @@ so "still pending" and "the delay has now elapsed" are exact measured states wit
 no wall-clock sleeping.
 """
 import asyncio
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -248,5 +249,76 @@ class TestReloadFlushes:
             await asyncio.sleep(0)
 
         assert handle.done(), 'the pending playback must be ended'
+        assert [item for item in await _ghosts_after_the_gate_opens(kb_mock, gate)
+                if item[0] == 'press'] == []
+
+
+class TestMenuAndExitAlsoEndTheContext:
+    @pytest.mark.asyncio
+    async def test_return_to_menu_drops_a_pending_segment_injection(
+            self, kb_env_ns, monkeypatch):
+        # CONTRACT: the menu is a context end like a focus change - the user is
+        # looking at the menu, and whatever is in front must not be typed into
+        # by a timeline the menu already replaced (the reviewer measured this
+        # press before the flush was added to this leg)
+        kb = kb_env_ns.kb
+        kb_mock = kb_env_ns.kb_mock
+        kb._mouse_listener = MagicMock()   # these legs stop both listeners
+        _gate_the_delay(kb, gate := asyncio.Event())
+        handle = await _pending_playback(kb, Key_Event(VK_A, False))
+        kb_mock.reset_mock()
+
+        kb.control_return_to_menu()
+        for _ in range(8):
+            await asyncio.sleep(0)
+
+        assert handle.done(), 'the pending playback must be ended'
+        assert await _ghosts_after_the_gate_opens(kb_mock, gate) == []
+
+    @pytest.mark.asyncio
+    async def test_exit_program_drops_a_pending_segment_injection(
+            self, kb_env_ns, monkeypatch):
+        # CONTRACT: a queued segment is never the last thing the process injects
+        kb = kb_env_ns.kb
+        kb_mock = kb_env_ns.kb_mock
+        kb._mouse_listener = MagicMock()   # these legs stop both listeners
+        _gate_the_delay(kb, gate := asyncio.Event())
+        handle = await _pending_playback(kb, Key_Event(VK_A, False))
+        kb_mock.reset_mock()
+
+        kb.control_exit_program('pin')
+        for _ in range(8):
+            await asyncio.sleep(0)
+
+        assert handle.done(), 'the pending playback must be ended'
+        assert await _ghosts_after_the_gate_opens(kb_mock, gate) == []
+
+
+class TestTheListenerThreadLaneToo:
+    @pytest.mark.asyncio
+    async def test_a_playback_started_from_a_listener_thread_is_flushed(
+            self, kb_env_ns, monkeypatch):
+        # CONTRACT: the flush walks the handle registry, so it must reach the
+        # lane the hook pump actually uses - start_macro_playback, whose handle
+        # is a concurrent.futures Future, not an asyncio Task
+        kb = kb_env_ns.kb
+        kb_mock = kb_env_ns.kb_mock
+        _gate_the_delay(kb, gate := asyncio.Event())
+        kb.loop = asyncio.get_running_loop()
+        handle = kb.start_macro_playback('e_alias',
+                                         [Key_Event(VK_A, True),
+                                          Key_Event(VK_D, True)])
+        for _ in range(6):
+            await asyncio.sleep(0)
+        kb_mock.reset_mock()
+
+        kb.update_args_and_groups('', startup=False)
+        for _ in range(8):
+            await asyncio.sleep(0)
+
+        assert handle.done(), 'the pending Future-lane playback must be ended'
+        releases = [item for item in _sent(kb_mock) if item[0] == 'release']
+        assert len(releases) == 1, _sent(kb_mock)
+        assert kb._ledger.open_tickets() == [], kb._ledger.open_tickets()
         assert [item for item in await _ghosts_after_the_gate_opens(kb_mock, gate)
                 if item[0] == 'press'] == []

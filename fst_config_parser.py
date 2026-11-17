@@ -239,7 +239,8 @@ START_ARG_VALUES = frozenset({
 # (-tapdelay/-macrodelay/-sequencedelay) keep their 0..1000 bound (decision 9a):
 # a knob sets a random default, a segment states an intentional wait.
 SEGMENT_DELAY_WARN_MS = 30000
-RUNTIME_DELAY_MAX_HINT = 1000
+# The user-facing text names the knob bound; it reads DELAY_RANGE (see the no-copy
+# rule above) instead of repeating a number that could drift from it.
 
 # The elevation spellings are a START argument, never a config <arg> line
 # (pair-approved 2026-11-16 after the maintainer's live confusion): the

@@ -26,8 +26,7 @@ from fst_config_parser import (split_key_group, clean_comment_lines,
                                START_ARG_FLAGS, START_ARG_VALUES,
                                KIND_TAP, KIND_REBIND, KIND_MACRO, KIND_SEQUENCE,
                                DELAY_RANGE, RUNTIME_DELAY_RANGE,
-                               is_elevation_config_arg, SEGMENT_DELAY_WARN_MS,
-                               RUNTIME_DELAY_MAX_HINT)
+                               is_elevation_config_arg, SEGMENT_DELAY_WARN_MS)
 import datetime
 import re #regular expression
 import ast # structural constraint check (Config_Validator)
@@ -1617,7 +1616,7 @@ class Config_Validator():
                        '- intentional? a segment delay is unbounded on purpose '
                        '(a macro may wait for the app to finish); the delay '
                        f'knobs -tapdelay/-macrodelay/-sequencedelay (0-'
-                       f'{RUNTIME_DELAY_MAX_HINT} ms) are a different thing')
+                       f'{DELAY_RANGE[1]} ms) are a different thing')
 
     def _check_vk_resolvable(self, line_number, item, key):
         if key in vk_codes_dict:

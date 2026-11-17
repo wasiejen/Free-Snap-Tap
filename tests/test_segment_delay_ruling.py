@@ -108,12 +108,25 @@ class TestTheRulingIsDocumented:
         # [Suffix/Delays] section carries: unbounded on purpose, the authoring
         # warning bound, and the pending-delay flush that makes a long wait safe.
         text = WIKI.read_text(encoding='utf-8')
-        section = text[text.index('### [Suffix/Delays]'):][:1600]
-        assert 'UNBOUNDED' in section, section[:200]
-        assert str(SEGMENT_DELAY_WARN_MS) in section, section[:200]
-        assert 'intentional' in section, section[:200]
-        for sentence in re.split(r'\n', section):
-            if 'UNBOUNDED' in sentence:
-                break
-        else:
-            raise AssertionError('the ruling sentence is missing')
+        start = text.index('### [Suffix/Delays]')
+        rest = text[start + len('### [Suffix/Delays]'):]
+        cut = rest.index('\n###') if '\n###' in rest else len(rest)
+        # wrap-tolerant: the doc may re-flow, the claims must survive it
+        section = ' '.join(rest[:cut].split())
+        # every claim the ruling has, each in its own sentence, so deleting one
+        # of them fails this pin instead of silently shortening the doc
+        for claim in ('UNBOUNDED',                      # the ruling itself
+                      '0..1000',                        # the knob bound, and
+                      'KNOBS',                          # that it is NOT the segment rule
+                      str(SEGMENT_DELAY_WARN_MS),       # the authoring-warning bound
+                      'intentional',                    # it asks, it does not reject
+                      'never rejects',                  # ... and never rejects
+                      'never changes the value',        # ... and never rewrites
+                      'focus-group change',             # the four context ends,
+                      'macro abort',                    # named for the user rather
+                      'pause',                          # than as an implementation
+                      'config reload',                  # detail
+                      'pending delay is dropped',       # the flush, part 1
+                      'released immediately'):          # the flush, part 2
+            assert claim in section, (claim, section[:400])
+        assert re.search(r'UNBOUNDED.*decision 12', section, re.S), section[:400]

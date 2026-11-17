@@ -1725,8 +1725,17 @@ class FST_Keyboard():
         PENDING  every playback still registered gets cancelled, including the
                ones that owe nothing yet - a sleeping segment that fires after
                the group changed would type into the wrong app (a ghost
-               injection). The cancel lands in the delay, so `macro_task`'s own
-               CancelledError arm drains anything that was recorded in between.
+               injection).
+
+        Who closes the debt: the drain above emits the owed releases ITSELF,
+        synchronously, for every alias it can see. The `macro_task`
+        CancelledError arm is the backstop for a press recorded after that scan
+        - it runs when the loop next turns, which for a handle cancelled from
+        the hook pump or the Qt thread can be a little later (measured by the
+        ABORT2-era reviewer: the arm does not run while the loop is parked). The
+        two together leave no window where the segment fires: a cancelled
+        coroutine cannot resume, so the ghost injection is impossible the moment
+        the cancel is accepted.
 
         No new mechanism: the drain is the F-A7 (ladder R2) one, the cancel is
         the `interrupt_macro_by_name` handle pattern. Runs on the caller's
@@ -2010,6 +2019,11 @@ class FST_Keyboard():
         self.drain_macro_debt(context='return_to_menu')
         self.release_all_currently_pressed_simulated_keys('return_to_menu')
         self._state_manager.stop_all_repeating_keys()
+        # Decision 12 (E3): the menu is a context end too - the drain above only
+        # reaches playbacks that already owe, so a queued segment of a
+        # nothing-owed playback would otherwise fire into whatever is in front
+        # while the user reads the menu.
+        self.flush_pending_macro_playbacks('return_to_menu')
         self._stop_listeners_on_lane()
         # F-A5: the MENU request is POSTED last, so the loop thread re-enters
         # the menu only after the release sweeps ran and the listener stops were
@@ -2029,6 +2043,9 @@ class FST_Keyboard():
         self.drain_macro_debt(context='exit_program')
         self.release_all_currently_pressed_simulated_keys('exit_program')
         self._state_manager.stop_all_repeating_keys()
+        # Decision 12 (E3): same shape as the menu leg - a queued segment must
+        # not be the last thing the process injects (the reviewer measured it).
+        self.flush_pending_macro_playbacks('exit_program')
         self._stop_listeners_on_lane()
         self._arg_manager.STOPPED = True
         # F-A5 (Item 3, and no direct sys.exit from the hook pump): alt+END
