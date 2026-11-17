@@ -287,6 +287,14 @@ The test suite needs the repo virtual environment (system Python has no pytest):
 .venv/Scripts/python.exe -m pytest tests -q
 ```
 
+For a full-suite run use the chunked lane instead (it exits 0 only when every chunk is green):
+
+```bash
+.venv/Scripts/python.exe suite_lane.py
+```
+
+One single-process run of the whole suite aborts the Python process natively on this platform (an upstream PySide6/shiboken6 hazard that fires once the session's Qt object graph is large - the guard in `tests/conftest.py` covers one member of that family, not this one). The measurement record, the falsified fix attempts, and the repro commands are in [tests/README.md](tests/README.md).
+
 ## On Linux 
 
 Not working due to no support of selective key suppression in Linux OS.
