@@ -55,6 +55,7 @@ class TestOwnerIsTheLiveState:
         assert owner.input_state is contract.kb.state_manager
         assert owner.tickets is contract.kb._ledger
         assert owner.display_posts is contract.kb._toast_offload
+        assert owner.macro_debt is contract.kb._macro_held
         assert owner.loop is contract.kb.loop
         assert owner.lifecycle is getattr(contract.kb, '_lifecycle', None)
         assert owner.task_registry('macro') is contract.kb._macro_task_dict
@@ -75,6 +76,14 @@ class TestAreaMap:
         # CONTRACT: every shared runtime area stays named; dropping one from
         # the map has to be a decision made here, not an accident in a module
         assert [entry['name'] for entry in AREAS] == DOCUMENTED_AREAS
+
+    @pytest.mark.parametrize('name', DOCUMENTED_AREAS)
+    def test_every_documented_area_has_a_door_member(self, name):
+        # CONTRACT: the door covers the map. An area added to AREAS without a
+        # Runtime_Owner member would make THREADING.md's "every area's holder is
+        # reachable through runtime_owner" claim false again - it fails here
+        assert hasattr(Runtime_Owner, name), (
+            f'Runtime_Owner has no accessor for area {name!r}')
 
     @pytest.mark.parametrize('name', DOCUMENTED_AREAS)
     def test_each_area_names_its_owner_writers_and_rule(self, name):
