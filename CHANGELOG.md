@@ -29,10 +29,12 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 - Startup robustness (maintainer decision 10, 2026-11-17): once startup has
   finished and before any worker or interface loop starts, the program
   hands its finished startup objects to Python's permanent generation,
-  so the cyclic garbage collector never scans them again. This closes
+  so the cyclic garbage collector never scans them again. This mitigates
   the crash class the test suite suffered (a collector pass landing
-  inside Qt's C++ event handling) for the shipped app. Normal garbage
-  collection keeps running over everything created afterwards.
+  inside Qt's C++ event handling) for the shipped app: the objects
+  built during startup leave the scanner, while everything created
+  afterwards - the interface's own windows included - stays under
+  normal garbage collection.
 - The start-argument and declared-name grammar now has ONE home too (F-C3,
   review Item 4 follow-up): `fst_config_parser` gained `arg_value` (the
   '-name=value' shape, which `apply_start_arguments` spelled with a
