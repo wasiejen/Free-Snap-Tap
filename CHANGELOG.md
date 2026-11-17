@@ -9,6 +9,13 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 ## [Unreleased]
 
 ### Fixed
+- A config line with an elevation argument (`-elevate`, `--elevate`,
+  `-elevated`, `--elevated`) now gets ONE message instead of two:
+  the clear hint that it belongs on the command line stays, and the
+  extra generic `unknown start argument` line for that same config
+  entry is gone (maintainer decision 11, 2026-11-17). On the real
+  command line the generic wording still appears, because nothing
+  else would explain the typo there.
 - A key held by a tap group is now reliably released even when a real press
   of the same key races a config reload / focus change (F-A9, ticket-ledger
   veto consult, ladder R4): previously the rebuild's own release could be
@@ -19,6 +26,13 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   delivered (never suppressed) and the debt closes at delivery.
 
 ### Changed
+- Startup robustness (maintainer decision 10, 2026-11-17): once startup has
+  finished and before any worker or interface loop starts, the program
+  hands its finished startup objects to Python's permanent generation,
+  so the cyclic garbage collector never scans them again. This closes
+  the crash class the test suite suffered (a collector pass landing
+  inside Qt's C++ event handling) for the shipped app. Normal garbage
+  collection keeps running over everything created afterwards.
 - The start-argument and declared-name grammar now has ONE home too (F-C3,
   review Item 4 follow-up): `fst_config_parser` gained `arg_value` (the
   '-name=value' shape, which `apply_start_arguments` spelled with a

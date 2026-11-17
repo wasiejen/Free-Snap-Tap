@@ -233,6 +233,23 @@ START_ARG_VALUES = frozenset({
 })
 
 
+# The elevation spellings are a START argument, never a config <arg> line
+# (pair-approved 2026-11-16 after the maintainer's live confusion): the
+# validator answers all four dash-count/tense forms with the specific hint.
+# Decision 11=a (maintainer 2026-11-17) asks the same question in the runtime,
+# so the rule lives here once: both the hint and the generic-unknown suppression
+# call is_elevation_config_arg().
+ELEVATE_CONFIG_NAMES = frozenset({'elevate', 'elevated'})
+
+
+def is_elevation_config_arg(arg):
+    '''True if a start-argument token is one of the elevation spellings
+    ('-elevate', '--elevate', '-elevated', '--elevated'), with or without an
+    '=value' tail. Case-insensitive, like the validator's arg handling.'''
+    name = str(arg).strip().lower().partition('=')[0]
+    return name.lstrip('-') in ELEVATE_CONFIG_NAMES
+
+
 def arg_value(arg, name):
     '''the value part of a '-name=value' start argument, or None when the
     argument is not that name or carries no value.

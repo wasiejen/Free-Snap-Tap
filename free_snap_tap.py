@@ -9,6 +9,7 @@ from threading import Thread
 import sys
 from time import sleep
 import datetime
+import gc
 
 from fst_keyboard import FST_Keyboard
 from fst_manager import CONSTANTS, setup_fst_logging, handle_elevate_flag
@@ -486,6 +487,17 @@ def surface_startup_activation(fst_keyboard):
     fst_keyboard.toast_startup_activation()
 
 
+def freeze_startup_heap():
+    '''Decision 10 (maintainer, 2026-11-17): hand the startup object graph to the
+    permanent generation so cyclic GC never scans it again - it mitigates the
+    F-B8 / ABORT2 class (a GC sweep landing inside a Qt C++ frame, which the
+    suite hit natively) on the PRODUCT side too. gc.freeze() does NOT stop the
+    collector: normal GC keeps running over everything allocated after this
+    point, and nothing here disables it (that was not approved).
+    '''
+    gc.freeze()
+
+
 if __name__ == "__main__":
     setup_fst_logging()
     logger.info("--- FST startet ---")
@@ -520,6 +532,12 @@ if __name__ == "__main__":
     logger.info("--- logic gestartet ---")
     # waiting for the rest of the program to finish loading
     sleep(0.5)
+
+    # Decision 10 (2026-11-17): the runtime is built and NO loop or pump thread
+    # has started yet (the logic thread spawns below, the Qt loop even later), so
+    # this is the last quiet point to freeze the startup heap - the collector
+    # keeps working normally over everything allocated from here on.
+    freeze_startup_heap()
 
     # hide command window at start but inform user before
     if fst_keyboard.arg_manager.CMD_WINDOW_HIDDEN:
