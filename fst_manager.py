@@ -25,7 +25,8 @@ from fst_config_parser import (split_key_group, clean_comment_lines,
                                arg_value, prefix_matches, split_item_prefix,
                                START_ARG_FLAGS, START_ARG_VALUES,
                                KIND_TAP, KIND_REBIND, KIND_MACRO, KIND_SEQUENCE,
-                               DELAY_RANGE, RUNTIME_DELAY_RANGE)
+                               DELAY_RANGE, RUNTIME_DELAY_RANGE,
+                               is_elevation_config_arg)
 import datetime
 import re #regular expression
 import ast # structural constraint check (Config_Validator)
@@ -1176,7 +1177,9 @@ KEY_MODIFIER_PREFIXES = '-+!^'
 # '--elevate', '-elevated', '--elevated') with the specific start-argument
 # hint instead of the generic unknown-arg warning (checked on the name
 # part: lowercased, leading dashes stripped)
-ELEVATE_CONFIG_NAMES = frozenset({'elevate', 'elevated'})
+# ELEVATE_CONFIG_NAMES and the spelling test itself live in fst_config_parser
+# (decision 11=a, 2026-11-17: one grammar owner - the validator hint below and
+# the runtime suppression in apply_start_arguments ask the same question).
 
 # delay values accepted by Argument_Manager.extract_delays
 # F-C2 (review Item 4): the bracket-aware splitter and the delay bounds moved
@@ -1329,7 +1332,7 @@ class Config_Validator():
                        f'start argument {arg!r} must start with "-"')
             return
         name, _, value = arg.partition('=')
-        if name.lstrip('-') in ELEVATE_CONFIG_NAMES:
+        if is_elevation_config_arg(arg):
             # self-explaining rejection (pair-approved 2026-11-16): any
             # elevation spelling here gets the specific hint, not the
             # generic unknown-arg warning below; the echo carries the
@@ -2307,7 +2310,18 @@ class Argument_Manager():
         self.BACKUP_ROOT_DIR = Argument_Manager.BACKUP_ROOT_DIR
 
     'start argument handling'
-    def apply_start_arguments(self, argv):
+    def apply_start_arguments(self, argv, from_config=False):
+        '''Apply start-argument tokens.
+
+        ``from_config`` marks tokens that came from config ``<arg>`` lines
+        (they were already validated and reported by Config_Validator), as
+        opposed to the real command line. Decision 11=a (maintainer
+        2026-11-17) uses that difference: an elevation spelling in a config
+        line already got the specific hint there, so the generic
+        'unknown start argument' line is suppressed for it here - while the
+        same spelling on the command line keeps reporting unknown, because no
+        validator hint ever covered it.
+        '''
         print(f"apply arguments: {argv}")
 
         def extract_delays(arg):
@@ -2494,6 +2508,12 @@ class Argument_Manager():
             elif arg_value(arg, '-backup_root_dir') is not None:
                 self.BACKUP_ROOT_DIR = arg_value(arg, '-backup_root_dir').strip()
                 print(f"set backup root directory to: {self.BACKUP_ROOT_DIR}")
+            elif from_config and is_elevation_config_arg(original_arg):
+                # Decision 11=a (2026-11-17): the config validator already
+                # answered this line with the specific 'is a start argument for
+                # elevation - place it on the command line' hint, so a second
+                # generic line here would be a double message for one line.
+                pass
             else:
                 logger_config.warning(f"unknown start argument: {original_arg}")
 

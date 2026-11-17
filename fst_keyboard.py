@@ -2058,7 +2058,11 @@ class FST_Keyboard():
         # (#423) single pass restored: the default-vs-focus pass split of
         # U418 only existed for the now-retired -default_on override lane;
         # every other start argument is order-independent (U418 review)
-        self._arg_manager.apply_start_arguments(self._focus_manager.default_start_arguments + focus_start_arguments)
+        # from_config=True: these tokens come from config <arg> lines, which the
+        # validator already reported (decision 11=a, 2026-11-17)
+        self._arg_manager.apply_start_arguments(
+            self._focus_manager.default_start_arguments + focus_start_arguments,
+            from_config=True)
 
     def set_sys_start_arguments(self, sys_args):
         self._arg_manager.sys_start_args = sys_args
