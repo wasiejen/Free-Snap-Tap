@@ -935,6 +935,9 @@ class FST_Keyboard():
     def update_args_and_groups(self, focus_name = '', startup=True):
         self.release_all_currently_pressed_simulated_keys()
         self._state_manager.stop_all_repeating_keys()
+        # Decision 12 (E3): the current context just ended - a macro sleeping on
+        # an unbounded segment delay must not wake up into the new group.
+        self.flush_pending_macro_playbacks('context_switch')
         self._arg_manager.reset_global_variable_changes()
         # reset all lists to make sure nothing remains from previous focus groups
         self._state_manager.reset_all_lists()
@@ -1707,6 +1710,38 @@ class FST_Keyboard():
                 released.append(vk_code)
         return released
 
+    def flush_pending_macro_playbacks(self, context):
+        '''Decision 12 (maintainer 2026-11-17, E3): the pending-delay invariant.
+
+        Segment delays stay UNBOUNDED on purpose - a macro timeline may wait
+        minutes for the app in front of it. The ruling's price is this: when the
+        CURRENT CONTEXT ends (focus-group change, macro abort, lifecycle pause,
+        config reload), a playback that is sleeping toward its next segment must
+        not survive it. Two properties, in this order:
+
+        OWED   every release a playback already owes goes up now, on this
+               thread, through the existing drain (`drain_macro_debt`: cancel +
+               one release per held vk + close the press ticket), and
+        PENDING  every playback still registered gets cancelled, including the
+               ones that owe nothing yet - a sleeping segment that fires after
+               the group changed would type into the wrong app (a ghost
+               injection). The cancel lands in the delay, so `macro_task`'s own
+               CancelledError arm drains anything that was recorded in between.
+
+        No new mechanism: the drain is the F-A7 (ladder R2) one, the cancel is
+        the `interrupt_macro_by_name` handle pattern. Runs on the caller's
+        thread like the drain does. Measured holes this closes (probe at
+        `8a566a9`): focus change and config reload left the playback alive with
+        its press still owed; pause left a nothing-owed playback alive.'''
+        self.drain_macro_debt(context=context)
+        for name, handle in list(self._macro_task_dict.items()):
+            try:
+                if not handle.done():
+                    handle.cancel()
+            except Exception as error:
+                # a dead or foreign handle must not stop the rest of the flush
+                logger_macro.debug(f"flush {context}: cancel of {name} failed: {error}")
+
     async def macro_task(self, key_group, alias_name):
         '''execute the macro/alias - can be stopped by using cancel on the handle of the asyncio task from the outside'''
 
@@ -1934,7 +1969,14 @@ class FST_Keyboard():
     def _reload_now(self):
         '''The reload body: byte-identical to the pre-F-A4 resume leg of
         control_toggle_pause (same calls, same print text and order), only no
-        longer executed on the hook pump.'''
+        longer executed on the hook pump.
+
+        Decision 12 (E3) is the one addition: the reload replaces the generation
+        a running timeline was built for, so its playbacks and repeats are
+        flushed first - otherwise the old generation keeps typing into whatever
+        the reloaded config now activates, and a key it still owed stays down.'''
+        self._state_manager.stop_all_repeating_keys()
+        self.flush_pending_macro_playbacks('config_reload')
         self._arg_manager.reset_global_variable_changes()
         self.apply_start_args_by_focus_name(self._focus_manager.FOCUS_APP_NAME)
         self.apply_focus_groups(self._focus_manager.FOCUS_APP_NAME)
@@ -2021,6 +2063,10 @@ class FST_Keyboard():
             self.drain_macro_debt(context='pause_toggle')
             self.release_all_currently_pressed_simulated_keys('pause_toggle')
             self._state_manager.stop_all_repeating_keys()
+            # Decision 12 (E3): the drain above only reaches playbacks that
+            # already owe a release; a paused product must also drop a queued
+            # segment that owes nothing.
+            self.flush_pending_macro_playbacks('pause_toggle')
             # F-A5: the loop records the pause (the listeners stay live - a
             # paused filter still answers events, it just lets them through)
             self.post_lifecycle(Lifecycle_State.PAUSED, 'alt+DELETE pause')
