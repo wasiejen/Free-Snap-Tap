@@ -9,6 +9,12 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 ## [Unreleased]
 
 ### Fixed
+- A queued macro wait no longer outlives the context it was started in
+  (maintainer decision 12, 2026-11-17): a focus-group change, a macro
+  abort, a pause (ALT+DELETE) or a config reload now drops a pending
+  segment delay and releases a key the playback still owed at that
+  moment. Before, a long `key|50000`-style wait could wake up and type
+  into whichever program had come to the front in the meantime.
 - A config line with an elevation argument (`-elevate`, `--elevate`,
   `-elevated`, `--elevated`) now gets ONE message instead of two:
   the clear hint that it belongs on the command line stays, and the
@@ -26,6 +32,13 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   delivered (never suppressed) and the debt closes at delivery.
 
 ### Changed
+- A macro segment delay (`key|5000`) stays unbounded, and the docs now say
+  so (maintainer decision 12, 2026-11-17): a timeline may legitimately
+  wait minutes, so no limit applies to it - unlike the delay knobs
+  (`-tapdelay` / `-macrodelay` / `-sequencedelay`), which keep their
+  0-1000 ms bound. An obviously large value now gets one warning at
+  config load (`very long delay (45000 ms) in a|45000 - intentional?`)
+  above 30000 ms; the value itself is accepted as written.
 - Startup robustness (maintainer decision 10, 2026-11-17): once startup has
   finished and before any worker or interface loop starts, the program
   hands its finished startup objects to Python's permanent generation,
