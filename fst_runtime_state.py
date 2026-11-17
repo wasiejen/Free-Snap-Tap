@@ -70,10 +70,18 @@ AREAS = (
         'name': 'containers',
         'holder': 'FST_Keyboard._runtime (Runtime_Snapshot)',
         'owner': ROLE_LOOP,
-        'writers': (ROLE_LOOP,),
+        'writers': (ROLE_LOOP, ROLE_KEYBOARD_PUMP, ROLE_QT),
         'rule': ('one complete generation per swap. A writer builds a fresh '
                  'snapshot OFF TO THE SIDE and binds it with ONE attribute '
-                 'assignment; it never mutates a live container. A reader '
+                 "assignment; it never mutates a live container. THREE threads "
+                 'bind today: the reload lane and the focus coroutine on the '
+                 "loop, the pump's ConfigError rebuild leg inside "
+                 'check_control_actions, and the Qt tray Reload through '
+                 'reload_from_file. Each bind is one store, so a reader still '
+                 'sees only complete generations, but the binders are not '
+                 'serialized with each other (last bind wins) - routing all '
+                 'three behind the one reload lane is follow-up 1 in '
+                 'THREADING.md. A reader '
                  'binds self._runtime ONCE into a local (rt = self._runtime) '
                  'and reads only through that local - dict gets, no lock, no '
                  'second read of the attribute. See Runtime_Snapshot in '
@@ -88,19 +96,24 @@ AREAS = (
             ('fst_keyboard.py', 'self._runtime = rt'),
             ('fst_keyboard.py', 'class Runtime_Snapshot'),
             ('fst_keyboard.py', 'def initialize_groups_from_presorted_lines'),
+            ('fst_keyboard.py', "self.update_args_and_groups('')"),
+            ('fst_keyboard.py', 'def reload_from_file'),
+            ('fst_overlay.py', 'signal_reload'),
         ),
     },
     {
         'name': 'input_state',
         'holder': 'FST_Keyboard.state_manager (Input_State_Manager)',
         'owner': ROLE_KEYBOARD_PUMP,
-        'writers': (ROLE_KEYBOARD_PUMP, ROLE_LOOP),
+        'writers': (ROLE_KEYBOARD_PUMP, ROLE_LOOP, ROLE_QT),
         'rule': ('per-key press state, toggle state and key times. The pump is '
-                 'the normal writer (the filter feeds every event in); the loop '
-                 'also writes it from the reset legs a config reload or a '
-                 'return-to-menu triggers. Writes are single stores per key; '
-                 'do not add a multi-field read-modify-write on a key entry '
-                 'without marshaling the two writer threads first.'),
+                 'the normal writer - the filter feeds every event in, and the '
+                 'control_combo legs it runs bare (return-to-menu, exit, pause) '
+                 'reset the state on the pump too. The loop writes it from the '
+                 'reload lane; the Qt thread writes it from the tray Reload '
+                 '(reload_from_file). All of it is single store per key; do not '
+                 'add a multi-field read-modify-write on a key entry without '
+                 'marshaling the writer threads first.'),
         'evidence': (
             'the pump feeds every event in; the reload and control legs' 
             "reset it - see THREADING.md 'input_state'"
@@ -113,6 +126,7 @@ AREAS = (
             ('fst_keyboard.py', 'def control_return_to_menu'),
             ('fst_keyboard.py', 'def control_exit_program'),
             ('fst_keyboard.py', 'def control_toggle_pause'),
+            ('fst_keyboard.py', 'def reload_from_file'),
         ),
     },
     {
@@ -161,6 +175,28 @@ AREAS = (
         ),
     },
     {
+        'name': 'macro_debt',
+        'holder': 'FST_Keyboard._macro_held',
+        'owner': ROLE_LOOP,
+        'writers': (ROLE_LOOP, ROLE_KEYBOARD_PUMP),
+        'rule': ('the press tickets a macro playback injected and has not '
+                 "released yet: {alias: {vk: Ticket}}. The loop's macro legs "
+                 'record and pop it; a quit or pause leg claims it from the '
+                 'pump by POPPING, and the pop IS the claim - two threads can '
+                 'each get a ticket only once. It is the ledger\'s fast index, '
+                 'so the ledger stays the registry and a generation swap never '
+                 'touches it.'),
+        'evidence': (
+            'macro legs record and release it, the drain leg claims it by pop, '
+            "the status dump only copies it - see THREADING.md 'macro_debt'",
+        ),
+        'checks': (
+            ('fst_keyboard.py', 'self._macro_held'),
+            ('fst_keyboard.py', 'def drain_macro_debt'),
+            ('fst_manager.py', '_macro_held'),
+        ),
+    },
+    {
         'name': 'lifecycle',
         'holder': 'MainLogic.lifecycle (Lifecycle_Machine)',
         'owner': ROLE_LOOP,
@@ -189,15 +225,16 @@ AREAS = (
         'holder': 'MainLogic.loop (asyncio event loop)',
         'owner': ROLE_LOOP,
         'writers': (ROLE_LOOP,),
-        'rule': ('the logic thread creates and runs the loop; every other '
+        'rule': ('the loop is built in MainLogic.__init__, before any thread '
+                 'starts, and only the logic thread RUNS it; every other '
                  'thread schedules ONTO it (call_soon_threadsafe, '
                  'run_coroutine_threadsafe) and never runs loop code itself. '
                  'Blocking legs that the pump must not wait for are routed '
                  'through the same two routers: Output_Manager.pump_lane and '
                  'FST_Keyboard._run_on_loop_or_inline.'),
         'evidence': (
-            'the logic thread creates and runs the loop, other threads' 
-            "schedule onto it - see THREADING.md 'loop' and the two routers"
+            'built before any thread starts, run by the logic thread only, ' 
+            "scheduled onto by everyone else - see THREADING.md 'loop' and the two routers"
         ),
         'checks': (
             ('free_snap_tap.py', 'asyncio.new_event_loop()'),

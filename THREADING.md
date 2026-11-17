@@ -59,20 +59,27 @@ file and symbol each claim points at.
 | Area | Holder | Owner | Who writes it | Rule |
 |---|---|---|---|---|
 | `flags` | `FST_Keyboard.arg_manager` (`Argument_Manager`) | loop | loop, keyboard pump, Qt | single-word bool/int control flags. One attribute store is atomic under the GIL and last-writer-wins IS the semantics. A compound read-modify-write on these flags is forbidden until the writers are marshaled (open follow-up below). |
-| `containers` | `FST_Keyboard._runtime` (`Runtime_Snapshot`) | loop | loop | whole-generation swap, see the seams below. |
-| `input_state` | `FST_Keyboard.state_manager` (`Input_State_Manager`) | keyboard pump | pump, loop | per-key press/toggle state and key times. The pump feeds every event in; the loop writes the reset legs (`stop_all_repeating_keys` from the reload lane and from the control legs). Single store per key; no multi-field read-modify-write. |
+| `containers` | `FST_Keyboard._runtime` (`Runtime_Snapshot`) | loop | loop, keyboard pump, Qt | whole-generation swap, see the seams below. The loop binds it (reload lane, focus coroutine), the pump binds it from the `ConfigError` rebuild leg inside `check_control_actions`, and Qt binds it from the tray Reload (`reload_from_file`). Each bind is one store, so a reader still sees only complete generations; the binders are not serialized with each other (last bind wins) - routing them behind the one reload lane is follow-up 1. |
+| `input_state` | `FST_Keyboard.state_manager` (`Input_State_Manager`) | keyboard pump | pump, loop, Qt | per-key press/toggle state and key times. The pump feeds every event in, and the control-combo legs it runs bare (return-to-menu, exit, pause) reset the state on the pump too; the loop resets it from the reload lane, Qt from the tray Reload (`stop_all_repeating_keys` in `fst_manager.py` is the reset writer). Single store per key; no multi-field read-modify-write. |
 | `tickets` | `FST_Keyboard._ledger` (`Ticket_Ledger` in `fst_data_types.py`) | loop | pump, loop | a sibling of the generation, never part of it. Single-store discipline: a thread that did not open a ticket must not read it, mutate two fields and write it back. |
 | `display_posts` | `FST_Keyboard._toast_offload` (`Toast_Offload`) | loop | any thread | the designed seam: one `deque.append` per poster (GIL-atomic, no lock, no I/O), drain only on the loop. Overflow drops the oldest; the drop counters are diagnostics, not control flow. |
+| `macro_debt` | `FST_Keyboard._macro_held` | loop | loop, keyboard pump | the press tickets a macro playback injected and has not released yet: `{alias: {vk: Ticket}}`. The loop's macro legs record and pop it; a quit or pause leg claims it from the pump by POPPING, and the pop IS the claim, so a ticket can only be claimed once. It is the ledger's fast index, so the ledger stays the registry and a generation swap never touches it. |
 | `lifecycle` | `MainLogic.lifecycle` (`Lifecycle_Machine`) | loop | loop only | ONE writer (`_apply`); everyone else posts. `STOPPING` is terminal. |
-| `loop` | `MainLogic.loop` | loop | loop | other threads schedule onto it, never run loop code themselves. |
+| `loop` | `MainLogic.loop` | loop | loop | built in `MainLogic.__init__`, before any thread starts; only the logic thread runs it. Other threads schedule onto it and never run loop code themselves. |
 | `task_registry` | `FST_Keyboard._macro_task_dict`, `Output_Manager._repeat_thread_dict` | loop | pump, loop | live asyncio tasks and their handles: added where the leg is detected (sometimes the pump), cancelled on the loop. The name "thread_dict" is historical - they are asyncio handles, not threads. |
 
-Two more holders that are not areas of sharing:
+Three more holders that are not areas of sharing:
 
-- `FST_Keyboard.TIME_DIFF` / `START_TIME` (class attributes) are initialised by
-  the keyboard pump on the first event it sees (`_win32_event_filter`) and read
-  from there. They are module-level mutable globals owned by the pump; moving
-  them behind the owner is a follow-up below.
+- `FST_Keyboard.TIME_DIFF` / `FST_Keyboard.START_TIME` are CLASS attributes of
+  `FST_Keyboard` (`fst_keyboard.py`), initialised by the keyboard pump on the
+  first event it sees (`_win32_event_filter`) and read from there. They are
+  mutable runtime state living on the class namespace, owned by the pump;
+  moving them behind the owner is a follow-up below.
+- `FST_Keyboard._drop_ring` (a bounded `deque`) is appended by BOTH pumps, one
+  raw tuple per event, and read by the drop ring dump in
+  `report_event_drop`. It is
+  best-effort diagnostics like the toast counters: append-only, bounded, and
+  never read for control flow.
 - `MainLogic._cleaned_up` with `MainLogic._cleanup_lock` is the exactly-once
   shutdown seam: the loop-thread `finally`, the headless `finally` and the GUI
   `shutdown()` all call `cleanup()`, the lock makes the check-and-set atomic,
@@ -99,7 +106,9 @@ Two more holders that are not areas of sharing:
   always reached by at most one further pass.
 - **Toast offload (`display_posts`).** Posters append, the loop drains into the
   Qt bridge, so the bridge is never touched from a pump thread.
-  `CONSTANTS.TOAST_OFFLOAD` (default on) restores the legacy direct emit; with
+  `CONSTANTS.TOAST_OFFLOAD` is on by default, so posters take the queue; the
+  `-no_toast_offload` start argument (`fst_manager.py`) flips it back to the
+  legacy direct emit from the poster thread; with
   no bridge (headless) posts are drop-counted no-ops.
 - **Lifecycle (`lifecycle`).** The audit trail is one `[Lifecycle] old -> new
   (reason)` log line per applied transition; the pre-F-A5 write-only flags
@@ -127,10 +136,12 @@ callback. On that path:
 5. A genuine leg exception is reported through `report_event_drop` (the drop
    ring counts it) rather than escaping into pynput's handler.
 
-`tests/test_threading_contract.py` pins 1-3 structurally: the filter binds the
-generation exactly once, reads no `self._runtime` after that bind, and contains
-no lock acquisition - so adding a lock to the hot path, or re-reading the
-attribute, fails the suite instead of passing quietly.
+`tests/test_threading_contract.py` pins rules 1 and 3 structurally: the filter
+contains exactly one read of `self._runtime` (the bind, wherever it sits), and
+no lock acquisition anywhere on the pump path - so adding a lock to the hot
+path, or reading the attribute a second time, fails the suite instead of
+passing quietly. Rule 2 (dict/`get` access only) is a review rule, not a pinned
+one: nothing in the suite measures allocation.
 
 ## What this deliberately does not do
 
@@ -146,11 +157,14 @@ attribute, fails the suite instead of passing quietly.
 
 ## Named follow-ups (each needs its own unit)
 
-1. Marshal the control-flag writers (`flags`) so a compound update becomes
+1. Marshal the three generation binders (`containers`) behind the one reload
+   lane, so a rebuild is serialized instead of last-bind-wins. The binds are
+   individually safe today; the missing part is serialization between them.
+2. Marshal the control-flag writers (`flags`) so a compound update becomes
    legal; today the rule is "one store per flag" and that rule is load-bearing.
-2. Move `FST_Keyboard.TIME_DIFF` / `START_TIME` behind the owner so the class
+3. Move `FST_Keyboard.TIME_DIFF` / `START_TIME` behind the owner so the class
    namespace stops carrying mutable runtime state.
-3. Replace the GUI 500 ms flag poll with signals now that state has a named
+4. Replace the GUI 500 ms flag poll with signals now that state has a named
    owner (optional polish, per Item 8).
 
 ## Verification

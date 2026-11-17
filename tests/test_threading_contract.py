@@ -20,7 +20,8 @@ REPO = Path(inspect.getfile(Output_Manager)).parent
 
 # the eight areas the contract names; a rename or a removal is a decision here
 DOCUMENTED_AREAS = ['flags', 'containers', 'input_state', 'tickets',
-                    'display_posts', 'lifecycle', 'loop', 'task_registry']
+                    'display_posts', 'macro_debt', 'lifecycle', 'loop',
+                    'task_registry']
 
 # the code paths that run inside the OS hook callback
 PUMP_PATH = (FST_Keyboard._win32_event_filter,
@@ -114,14 +115,16 @@ class TestPumpHotPathContract:
     '''the rule the Phase A hunts bought, kept in force by the suite'''
 
     def test_the_filter_binds_the_generation_once_per_event(self):
-        # CONTRACT: the filter binds the live generation exactly once per event
-        # and then reads containers through that local only, so a rebuild on
-        # another thread can never split one event across two generations
+        # CONTRACT: the filter reads the live generation exactly ONCE per event
+        # - that read is the bind - and every container access below goes
+        # through the local, so a rebuild on another thread can never split one
+        # event across two generations (counting all reads, not just the ones
+        # after the bind, is what makes an aliased early read fail here too)
         text = inspect.getsource(FST_Keyboard._win32_event_filter)
-        binds = [line for line in text.splitlines() if 'rt = self._runtime' in line]
-        assert len(binds) == 1, binds
-        rest = text.split('rt = self._runtime', 1)[1]
-        assert 'self._runtime' not in rest, 'a second read can pair generations'
+        reads = [line.strip() for line in text.splitlines()
+                 if 'self._runtime' in line and not line.strip().startswith('#')]
+        assert len(reads) == 1, reads
+        assert 'rt = self._runtime' in reads[0], reads
 
     @pytest.mark.parametrize('leg', PUMP_PATH, ids=lambda f: f.__name__)
     def test_the_pump_path_takes_no_lock(self, leg):
