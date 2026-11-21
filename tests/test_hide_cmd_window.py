@@ -12,7 +12,7 @@ switch stays the tray menu's 'Toggle Console' (pinned in
 tests/test_gui_manager.py::test_toggle_console_on_left_click_hides_console).
 
 The pins run the real entry block (exec harness, the shape of
-tests/test_fst_d_rulings.py::TestStartupFreezePath and
+tests/test_fst_d_rulings.py::TestStartupHeapIsFrozenOnce and
 tests/test_elevate_flag.py::TestMainBlockWiring) against stubs, truncated
 right before the GUI/headless mode branch, and record the calls.
 """
@@ -36,6 +36,34 @@ def _entry_block_through_visibility():
     body = lines[start:]
     cut = next(n for n, line in enumerate(body) if MODE_BRANCH in line)
     return textwrap.dedent('\n'.join(body[:cut]))
+
+
+def _entry_block_full():
+    """The WHOLE __main__ block (the mode branch, the Qt/headless wiring and
+    the shutdown tail included) - what the structural pin below scans."""
+    spec = importlib.util.find_spec('free_snap_tap')
+    with open(spec.origin, encoding='utf-8') as handle:
+        lines = handle.read().splitlines()
+    start = lines.index('if __name__ == "__main__":') + 1
+    return textwrap.dedent('\n'.join(lines[start:]))
+
+
+def _without_comments(source):
+    """`source` with comment TEXT removed (tokenize: a '#' inside a string
+    literal stays put, a trailing comment really goes away, line structure
+    is preserved)."""
+    import io
+    import tokenize
+    lines = io.StringIO(source).readlines()
+    cuts = {}
+    for token in tokenize.generate_tokens(iter(lines).__next__):
+        if token.type == tokenize.COMMENT:
+            cuts[token.start[0]] = token.start[1]
+    kept = []
+    for number, line in enumerate(lines, start=1):
+        cut = cuts.get(number)
+        kept.append(line[:cut] if cut is not None else line)
+    return ''.join(kept)
 
 
 class StubKeyboard:
@@ -97,9 +125,13 @@ class TestStartupVisibilityRuling:
     def test_flag_on_hides_exactly_once_and_never_shows(self):
         # CONTRACT: with -hide_cmd_window the console is hidden EXACTLY ONCE
         # (one call, argument False = hide) and never re-shown at startup.
+        # The post-parse placement assert is what makes this pin discriminate
+        # too (the pre-fix path hid before the parse, so the count alone
+        # passed on the old code - reviewer P2-6 / my own disclosure).
         steps, calls = [], []
         run_entry_block(True, steps, calls)
         assert calls == [False], calls
+        assert steps.index('console') > steps.index('keyboard.startup_args')
 
     def test_no_visibility_call_before_the_config_parse_completes(self):
         # CONTRACT (ordering, the core of the ruling): the visibility call
@@ -115,13 +147,11 @@ class TestStartupVisibilityRuling:
         assert calls_off == []
         assert 'console' not in steps_off, steps_off
 
-    def test_the_startup_path_has_no_re_show_call_at_all(self):
-        # CONTRACT (structural): the startup block keeps ONE visibility call
-        # site (the flag-ON hide) and no re-show call - the dead else-branch
-        # that re-showed the window is gone and cannot come back unnoticed.
-        block = _entry_block_through_visibility()
-        code_lines = [line for line in block.splitlines()
-                      if not line.lstrip().startswith('#')]
-        code = '\n'.join(code_lines)
+    def test_the_entry_block_has_no_re_show_call_at_all(self):
+        # CONTRACT (structural): the WHOLE entry block - the startup prefix,
+        # the GUI/headless wiring and the shutdown tail - keeps exactly ONE
+        # visibility call site (the flag-ON hide) and no re-show call, so the
+        # dead else-branch cannot come back unnoticed anywhere in the block.
+        code = _without_comments(_entry_block_full())
         assert code.count('set_console_visibility(') == 1, code
         assert 'set_console_visibility(True)' not in code

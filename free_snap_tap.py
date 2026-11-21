@@ -519,12 +519,8 @@ if __name__ == "__main__":
     # second start logs one '[SingleInstance]' notice and exits 1.
     handle_single_instance_guard()
 
-    # CMDHIDE (2026-11-21): NOTHING here touches the console window any more.
-    # The old unconditional set_console_visibility(False) sat between the
-    # guard and the config parse, so a flag-OFF user whose console came back
-    # unreliably (the block below only re-showed it) was stuck with a hidden
-    # window, and a startup ConfigError printed to a hidden console. The
-    # visibility decision now happens ONCE, after the parse, below.
+    # CMDHIDE (2026-11-21): no visibility call here - the flag decides once,
+    # after the parse (see the block below and the CHANGELOG entry).
 
     try:
         fst_keyboard = FST_Keyboard()
