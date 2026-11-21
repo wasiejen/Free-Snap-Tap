@@ -205,7 +205,14 @@ def test_active_window_query_has_single_wrapper_call_site():
     # loop (measured: a 547 ms hole in a running macro's injection stream, see
     # tests/test_macro_burst_timing.py). The wrapper itself still owns the only
     # win32 query.
-    # the poll reaches it through exactly one executor hop (MACROBURST), and the
-    # old direct-call shape is gone
-    assert src.count('None, _get_active_window_title, last_active_window') == 1
+    # the poll reaches it through exactly one off-thread hop (MACROBURST), the
+    # old direct-call shape is gone, and the hop is the DAEMON worker rather than
+    # run_in_executor(None, ...) - that helper's docstring says why (a
+    # non-daemon default-executor worker would let a hung read hold the
+    # interpreter's exit)
+    assert src.count('await _query_active_window_off_thread(') == 1
+    assert src.count('def _query_active_window_off_thread') == 1
     assert src.count('active_window = _get_active_window_title(') == 0
+    # and the hop is a DAEMON worker, not the default executor (whose non-daemon
+    # workers would let a hung read hold interpreter exit - see the helper)
+    assert "name='FST-focus-query'" in src and 'daemon=True' in src

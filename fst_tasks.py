@@ -4,6 +4,8 @@ last updated: 241105-2004
 '''
 
 import asyncio
+import queue
+import threading
 import pygetwindow as gw
 # F-C2 (review Item 4): re/FOCUS_NAME_ILLEGAL left this file with the focus
 # sanitizer - the window title now goes through the parser's
@@ -62,6 +64,64 @@ class Macro_Repeat_Task:
 # rate, so only the FIRST failure of a streak logs a WARNING (the rest stay
 # debug); the next successful query re-arms the warning.
 _query_streak_warned = False
+
+
+_QUERY_WORKER = None
+_QUERY_JOB = None
+
+
+def _ensure_query_worker(loop):
+    '''One persistent DAEMON worker for the active-window read (MACROBURST).
+
+    `loop.run_in_executor(None, ...)` was the obvious shape and is what the
+    first draft used, but on this Python the default executor's workers are
+    NON-daemon and joined at interpreter exit - so a `GetWindowTextW` that
+    never returns would now hold FST's exit, a worse failure than the timing
+    hole it fixes. The thread this replaces was a daemon (free_snap_tap.py), so
+    daemon behaviour is what the product has always had: at exit, a stuck read
+    is dropped, not waited for.
+    '''
+    global _QUERY_WORKER, _QUERY_JOB
+    if _QUERY_WORKER is not None and _QUERY_WORKER.is_alive():
+        return _QUERY_JOB
+    job = queue.SimpleQueue()
+
+    def worker():
+        while True:
+            stale, fut, fut_loop = job.get()
+            try:
+                result = _get_active_window_title(stale)
+            except BaseException as error:      # a worker must never die
+                fut_loop.call_soon_threadsafe(_set_future_exception, fut, error)
+            else:
+                fut_loop.call_soon_threadsafe(_set_future_result, fut, result)
+
+    _QUERY_JOB = job
+    _QUERY_WORKER = threading.Thread(target=worker, name='FST-focus-query',
+                                     daemon=True)
+    _QUERY_WORKER.start()
+    return _QUERY_JOB
+
+
+def _set_future_result(fut, result):
+    if not fut.done():          # the poll may have been cancelled meanwhile
+        fut.set_result(result)
+
+
+def _set_future_exception(fut, error):
+    if not fut.done():
+        fut.set_exception(error)
+
+
+async def _query_active_window_off_thread(stale_title):
+    '''The active-window read, performed on the daemon worker above, awaited as
+    a future on the caller's loop. One query in flight at a time (the poll
+    awaits each before starting the next).'''
+    loop = asyncio.get_running_loop()
+    job = _ensure_query_worker(loop)
+    fut = loop.create_future()
+    job.put((stale_title, fut, loop))
+    return await fut
 
 
 def _get_active_window_title(stale_title):
@@ -129,11 +189,16 @@ class Focus_Task:
         flipping WIN32_FILTER_PAUSED).
         Macro and toast scheduling share this loop thread. The query itself
         therefore runs in a worker thread (MACROBURST, maintainer bug report
-        2026-11-21): a slow foreground app must not be able to expire every
-        pending sleep on this thread, because that turns a macro's own delays
-        into one burst at the end - the reported symptom. The poll still runs
-        ONE query at a time (the await is sequential), so the cadence and the
-        focus-detection latency are unchanged. The GUI-side
+        2026-11-21): a slow foreground app must not freeze the timeline that
+        shares this loop. Measured effect of a shared thread (41addc0): the read
+        punches ONE hole of its own length into a running macro (a 500 ms read
+        left a 531 ms gap between two injections; a 1200 ms read, 1250 ms) and
+        the sequence then continues spaced - a stalled read CANNOT re-batch a
+        single macro, because that macro has only one timer pending at a time.
+        The reported "everything at once" shape is a different cause (the small
+        default delay pair; see the MACROBURST block in the improvement plan).
+        The poll still runs ONE query at a time (the await is sequential), so
+        the cadence and the focus-detection latency are unchanged. The GUI-side
         500 ms timer (fst_overlay.py perform_periodic_update) only re-reads
         in-process flags and queries no windows.
 
@@ -157,17 +222,19 @@ class Focus_Task:
         focus_name_changed = False
         while not self._stop:
             # MACROBURST (maintainer bug report 2026-11-21): the read is awaited
-            # in a worker thread instead of on this coroutine's own thread. It is
-            # the ONE blocking win32 call in the loop's steady state, and
-            # GetWindowTextW messages the FOREGROUND app's owning thread: while
-            # it stalls, every pending asyncio.sleep on this thread expires, and
-            # a macro that was spaced by its own delays then arrives as one burst
-            # - the reported symptom ("waits the time each press and release
-            # would take, then writes everything without delay"). The executor
-            # hop keeps this loop free for the macro and toast lanes; the poll
-            # still runs ONE query at a time and the failure map is unchanged.
-            active_window = await asyncio.get_running_loop().run_in_executor(
-                None, _get_active_window_title, last_active_window)
+            # off this coroutine's own thread. GetWindowTextW messages the
+            # FOREGROUND app's owning thread, so a busy window stalls the read -
+            # and while this coroutine held the loop thread for it, a macro
+            # playing on the same loop froze for that duration (measured: a
+            # 500 ms read left a 531 ms hole mid-sequence). The hop below keeps
+            # the loop free for the macro and toast lanes; the poll still runs
+            # ONE query at a time and the failure map is unchanged.
+            # It is NOT the only blocking call this thread can make: the
+            # injections themselves call SendInput here, and pump_lane runs
+            # file-I/O legs with sleep retries. What this hop removes is the one
+            # call whose duration is decided by SOME OTHER PROGRAM's responsiveness.
+            active_window = await _query_active_window_off_thread(
+                last_active_window)
             # when windows name changed
             if active_window != last_active_window or manually_paused:
                 if active_window != last_active_window:

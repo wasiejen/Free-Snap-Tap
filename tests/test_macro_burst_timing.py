@@ -15,9 +15,12 @@ Three hypotheses were measured at `41addc0`; two died.
      between its own two sends, and `macro_task` awaits one event at a time.
   2. LOOP STARVATION - NO (for a burst). The focus poll and the macro do share
      the product loop, but a 500 ms block on that thread inserts ONE long gap
-     and the timeline then continues spaced. It cannot batch, because each
-     event's sleep only starts after the previous event left: at most one timer
-     is ever pending. What a stall DOES cost is that one stall-sized gap in the
+     and the timeline then continues spaced. A single macro cannot be re-batched
+     by it, because that macro has only one timer pending at a time (each
+     event's sleep starts after the previous event left). Across macros that is
+     NOT true - measured by the reviewer: four playbacks on one loop, one 500 ms
+     block, four injections released in the same millisecond. So the claim here
+     is per-playback, which is the shape of the report. What a stall DOES cost is that one stall-sized gap in the
      middle of a running macro - which is a real defect and is fixed and pinned
      below (the read now runs off the loop thread).
   3. A SMALL OR ZERO DELAY PAIR - YES, and this is the shape he describes.
@@ -128,7 +131,9 @@ def test_an_eight_key_macro_injects_spaced_not_batched(contract, monkeypatch):
     clock = WallClock(contract.kb._output_manager)
     contract._reset_clock()
     trigger_the_macro(contract)
-    let_the_loop_run(contract._loop, 1.2)
+    # a generous window against a measured 500..735 ms spread: the count is a
+    # hard assertion, so the window must never be what decides the verdict
+    let_the_loop_run(contract._loop, 2.0)
 
     assert len(clock.stamps) == 16, clock.stamps
     spread_ms = (clock.stamps[-1] - clock.stamps[0]) * 1000.0
@@ -220,6 +225,13 @@ def test_the_delay_pair_an_event_carries_is_the_knob_pair(contract):
              for ke in group.key_events]
     assert baked and all(pair == [60, 20] for pair in baked), baked
 
+    contract.load(DATE_MACRO + '<arg>-macrodelay=60,20\n')   # <arg> AFTER
+    late = [list(ke.constraints)
+            for macro in contract.kb._runtime.macros
+            for group in macro._key_groups
+            for ke in group.key_events]
+    assert late and all(pair == [60, 20] for pair in late), late
+
     contract.load(DATE_MACRO)          # no <arg> line at all
     defaults = [list(ke.constraints)
                 for macro in contract.kb._runtime.macros
@@ -245,7 +257,7 @@ def test_a_written_zero_stays_a_true_zero_burst(contract, monkeypatch):
     clock = WallClock(contract.kb._output_manager)
     contract._reset_clock()
     trigger_the_macro(contract)
-    let_the_loop_run(contract._loop, 0.6)
+    let_the_loop_run(contract._loop, 1.0)
 
     assert len(clock.stamps) == 16, clock.stamps
     spread_ms = (clock.stamps[-1] - clock.stamps[0]) * 1000.0
