@@ -9,7 +9,6 @@ from collections import deque
 
 from pynput import keyboard, mouse
 from pynput._util.win32 import SystemHook  # U365: suppression control-flow class
-from time import time # sleep(0.005) = 5 ms
 from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_dict.py
 from os import startfile
 
@@ -19,6 +18,9 @@ from fst_data_types import (Ticket_Ledger, SOURCE_DRAIN, SOURCE_MACRO,
                             SOURCE_REBIND, SOURCE_TOGGLE, TICKET_INJECTED,
                             TICKET_PRESS, TICKET_RELEASE, TICKET_SCHEDULED)
 from itertools import count
+import fst_manager  # 15CLOCK: the module-level wall-clock providers (the
+                    # TIME_DIFF calibration leg below reads them through the
+                    # module so a test rebinding is seen - direct attr lookup)
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
 from fst_manager import Input_State_Manager, Config_Manager, Config_Validator
@@ -1182,9 +1184,6 @@ class FST_Keyboard():
         Filter and handle keyboard and mouse events.
         """
 
-        def time_in_millisec():
-            return int(time() * 1000)
-
         def is_trigger_activated(current_ke, trigger_group):
             keys = trigger_group.get_key_events()
             # only trigger on the first key_event in trigger group
@@ -1224,8 +1223,11 @@ class FST_Keyboard():
         current_ke = Key_Event(vk_code, is_keydown)
 
         # get the time difference from system time to the key_event_time
+        # (15CLOCK: this one-time calibration read goes through the module
+        # provider - the production default is the pre-seam int(time()*1000);
+        # the contract lane pins it together with the eval-leg reads)
         if FST_Keyboard.TIME_DIFF is None:
-            FST_Keyboard.TIME_DIFF = time_in_millisec() - key_event_time
+            FST_Keyboard.TIME_DIFF = fst_manager._wall_ms() - key_event_time
             FST_Keyboard.START_TIME = key_event_time
             # set all key_times to starting time
             self._state_manager.init_all_key_times_to_starting_time(key_event_time)

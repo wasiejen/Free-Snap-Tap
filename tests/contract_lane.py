@@ -29,6 +29,14 @@ layer (tests/test_filter_simulated.py). The lane asserts the EMIT LEG.
 Deterministic clocks and seams:
   - synthetic win32 event times (+1 ms per driven event), FST_Keyboard.TIME_DIFF
     reset per run - the suite never reads wall-clock input timestamps;
+  - the 15CLOCK wall-clock seam (decision 15=a): a clock(ms) stimulus (or a
+    direct set_clock call) pins the product's wall-clock providers
+    (fst_manager.set_clock_for_tests) - the constraint legs last()/get_time()
+    (ms) and date()/date_time() (datetime) plus the pump's one-time TIME_DIFF
+    calibration - to `ms` on the synthetic event-time axis, so a clock-driven
+    stream answers what the real clock would give at `ms`; run_contract
+    restores the real-time default per run (reset_clock_for_tests), so every
+    golden that arms no clock keeps running the production clock path;
   - the zero-delay seam: Output_Manager.get_random_delay returns 0, so the
     macro/tap random delays collapse to a zero-length await (deterministic
     order, no wall-clock waits, no randint nondeterminism);
@@ -83,7 +91,8 @@ class Stimulus:
     kind: 'key'   - one keyboard event (press or release of vk_name)
           'combo' - press each key in order, release in reverse (control keys)
           'focus' - foreground window matches a config focus section
-          'focus_lost' - foreground window matches no focus section"""
+          'focus_lost' - foreground window matches no focus section
+          'clock' - pin the product wall-clock seam (15CLOCK) to ms"""
 
     def __init__(self, kind, keys=(), is_press=True, name=None):
         self.kind = kind
@@ -99,6 +108,8 @@ class Stimulus:
             return 'combo ' + ' '.join(self.keys)
         if self.kind == 'focus':
             return f"focus {self.name}"
+        if self.kind == 'clock':
+            return f"clock {self.name}"
         return 'focus lost'
 
     def __repr__(self):
@@ -136,6 +147,16 @@ def focus_lost():
     """The foreground window matches no focus section (mirrors the
     Focus_Task focus-loss leg, including the ALWAYS_ACTIVE branch)."""
     return Stimulus('focus_lost')
+
+
+def clock(ms):
+    """Pin the product's wall-clock seam (15CLOCK, decision 15=a) to `ms`
+    before the next stimulus: the constraint legs last()/get_time() (ms) and
+    date()/date_time() (datetime), and the pump's one-time TIME_DIFF
+    calibration, answer `ms` instead of wall time. Arms no OS clock; a no-op
+    for the stream itself. Arm it as the FIRST stimulus to put TIME_DIFF on
+    the same axis (arm value - 1001, the synthetic tick base)."""
+    return Stimulus('clock', name=str(int(ms)))
 
 
 class InjectedEventStream:
@@ -251,6 +272,8 @@ class Contract_Lane:
         own garbage here and sweeps explicitly (a safe point, same rule the
         per-test gc.collect(0) latch follows)."""
         import gc
+        # 15CLOCK: never leave a pinned product clock behind for the next test
+        self.reset_clock()
         for handle in list(getattr(self.kb, '_macro_task_dict', {}).values()):
             try:
                 handle.cancel()
@@ -330,6 +353,8 @@ class Contract_Lane:
                 self._focus_on(stimulus.name)
             elif stimulus.kind == 'focus_lost':
                 self._focus_loss()
+            elif stimulus.kind == 'clock':
+                self.set_clock(int(stimulus.name))
             else:
                 raise ValueError(f"unknown stimulus kind {stimulus.kind!r}")
             for kind, vk in self._events[base + len(stream.injected):]:
@@ -345,6 +370,30 @@ class Contract_Lane:
         FST_Keyboard.TIME_DIFF = None
         FST_Keyboard.START_TIME = None
         self._time_ms = 1000  # synthetic win32 tick counter
+        # 15CLOCK: restore the real-time providers - a clock pinned by an
+        # earlier run never leaks into the next (lane isolation rule)
+        self.reset_clock()
+
+    # -- 15CLOCK clock seam driver (decision 15=a) ---------------------------
+
+    def set_clock(self, ms):
+        """Pin the product's wall-clock providers (fst_manager
+        .set_clock_for_tests) to `ms`: the constraint-evaluation legs
+        last()/get_time() (ms) and date()/date_time() (datetime) plus the
+        pump's one-time TIME_DIFF calibration answer `ms` from now on, so a
+        clock-consuming stream is what the real clock would give at `ms`.
+        `ms` shares the axis of the synthetic win32 event times (the tick
+        counter starts at 1001), so a clock armed at the tick base leaves
+        TIME_DIFF at 0. No OS clock is touched. Pair every pin with the
+        real-time default by arming no clock (run_contract restores it)."""
+        import fst_manager
+        fst_manager.set_clock_for_tests(ms)
+
+    def reset_clock(self):
+        """Restore the production real-time providers (idempotent; called by
+        _reset_clock, so run_contract can never inherit a pinned clock)."""
+        import fst_manager
+        fst_manager.reset_clock_for_tests()
 
     def _next_time(self):
         self._time_ms += 1

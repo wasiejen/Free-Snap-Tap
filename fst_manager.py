@@ -81,6 +81,66 @@ LOG_LEVELS = {'debug': logging.DEBUG, 'info': logging.INFO,
 AREA_LOGGER_NAMES = ('fst', 'fst.eval', 'fst.state', 'fst.macro', 'fst.config')
 
 
+# ---------------------------------------------------------------------------
+# 15CLOCK wall-clock seam (maintainer decision 15=a, 2026-11-17: product-side
+# injectable clock). Every wall-clock read whose value can reach a constraint
+# evaluation leg goes through the two module-level providers below:
+#   - Output_Manager.constraint_evaluation (this file): last()/get_time() in
+#     ms, date()/date_time() as a datetime;
+#   - the one-time TIME_DIFF domain calibration of the first hook event
+#     (fst_keyboard.py): it maps the wall-clock axis onto the win32
+#     event-time axis last() measures, so a last()-driven stream is
+#     deterministic only when both reads share one clock.
+# The production defaults ARE the pre-seam reads, byte for byte
+# (int(time() * 1000) / datetime.datetime.now() on the module globals the
+# unit layer's freezegun pins already freeze); production code never rebinds
+# them. Tests pin and restore them with set_clock_for_tests() /
+# reset_clock_for_tests() - the contract lane's set_clock drives both
+# (tests/contract_lane.py). Call sites read the providers through a direct
+# module/global lookup: one function call, no wrapper object, no per-read
+# hop beyond the closure call the pre-seam code already performed.
+# ---------------------------------------------------------------------------
+def _real_wall_ms():
+    return int(time() * 1000)
+
+
+def _real_wall_datetime():
+    return datetime.datetime.now()
+
+
+_wall_ms = _real_wall_ms
+_wall_datetime = _real_wall_datetime
+
+
+def set_clock_for_tests(ms):
+    '''Test seam (15CLOCK, decision 15=a): pin the two providers above to the
+    instant `ms` (int ms since the epoch - the same axis the win32 event
+    times live on). The datetime provider is derived from `ms` in local time,
+    so date()/date_time() answer the pinned instant too. NEVER call from
+    production: no product lane does, the product always runs on the
+    real-time defaults.'''
+    global _wall_ms, _wall_datetime
+    pinned_ms = int(ms)
+    pinned_dt = datetime.datetime.fromtimestamp(pinned_ms / 1000)
+
+    def _pinned_ms():
+        return pinned_ms
+
+    def _pinned_datetime():
+        return pinned_dt
+
+    _wall_ms = _pinned_ms
+    _wall_datetime = _pinned_datetime
+
+
+def reset_clock_for_tests():
+    '''Test seam (15CLOCK): restore the real-time defaults (idempotent; the
+    contract lane calls it per run so a pinned clock never leaks).'''
+    global _wall_ms, _wall_datetime
+    _wall_ms = _real_wall_ms
+    _wall_datetime = _real_wall_datetime
+
+
 def setup_fst_logging():
     '''Configure the FST area-logger tree once at startup: fst.log is
     append-only (never wiped between runs), the console shows WARNING+.'''
@@ -331,8 +391,10 @@ class Output_Manager():
 
     def constraint_evaluation(self, constraint_to_evaluate, current_ke):
 
-        def time_in_millisec():
-            return int(time() * 1000)
+        # 15CLOCK: the wall reads below (last()/get_time() -> _wall_ms,
+        # date()/date_time() -> _wall_datetime) go through the module clock
+        # providers - production default is the pre-seam read itself
+        # (see the 15CLOCK seam block above the imports end)
 
         # first get vk_code and is_press
         def get_vk_code_and_press_from_keystring(key_string):
@@ -437,9 +499,9 @@ class Output_Manager():
             time_last_pressed, time_last_released, _, _ = time_list
             vk_code, is_press = get_vk_code_and_press_from_keystring(key_string)
             try:
-                logger_state.debug(f"{time_in_millisec() - self._fst.TIME_DIFF}")
+                logger_state.debug(f"{_wall_ms() - self._fst.TIME_DIFF}")
                 logger_state.debug(f"{time_last_pressed[vk_code]}")
-                current_time = time_in_millisec() - self._fst.TIME_DIFF
+                current_time = _wall_ms() - self._fst.TIME_DIFF
                 return current_time - time_last_pressed[vk_code] if is_press else current_time - time_last_released[vk_code]
             except KeyError:
                 return 0
@@ -634,16 +696,16 @@ class Output_Manager():
             return True
 
         def date():
-            current_date = datetime.datetime.now().strftime("%y%m%d")
+            current_date = _wall_datetime().strftime("%y%m%d")
             return current_date
 
         def date_time():
-            current_date_time = datetime.datetime.now().strftime("%y%m%d-%H%M")
+            current_date_time = _wall_datetime().strftime("%y%m%d-%H%M")
             return current_date_time
 
         #get current time in ms since epoch
         def get_time():
-            current_time = int(time() * 1000)
+            current_time = _wall_ms()
             return current_time
 
         def release_modifier():
