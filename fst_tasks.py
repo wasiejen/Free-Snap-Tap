@@ -81,6 +81,8 @@ def _get_active_window_title(stale_title):
       cannot tell it apart from "no successful poll yet".
     NOT covered: a hung window-owning thread blocks the win32 read itself
     (no timeout variant in this API set) - see the POLL CONTRACT in run().
+    Since MACROBURST the CALLER awaits this function in a worker thread, so
+    such a stall no longer stops the asyncio loop it is polled from.
     '''
     global _query_streak_warned
     try:
@@ -125,8 +127,13 @@ class Focus_Task:
         _get_active_window_title() query, then asyncio.sleep(0.25)
         (the focus-not-found leg adds one inner asyncio.sleep(0.2) before
         flipping WIN32_FILTER_PAUSED).
-        Macro and toast scheduling share this loop thread, so a slow query
-        delays them too - the accepted cost of the design. The GUI-side
+        Macro and toast scheduling share this loop thread. The query itself
+        therefore runs in a worker thread (MACROBURST, maintainer bug report
+        2026-11-21): a slow foreground app must not be able to expire every
+        pending sleep on this thread, because that turns a macro's own delays
+        into one burst at the end - the reported symptom. The poll still runs
+        ONE query at a time (the await is sequential), so the cadence and the
+        focus-detection latency are unchanged. The GUI-side
         500 ms timer (fst_overlay.py perform_periodic_update) only re-reads
         in-process flags and queries no windows.
 
@@ -134,9 +141,11 @@ class Focus_Task:
         the window's owning thread (GetWindowTextW behind pygetwindow), so a
         hung app STALLS the query and UIPI-blocked titles read as empty;
         this API set (GetForegroundWindow + GetWindowTextW) has no timeout
-        variant and a watchdog thread is rejected, so the poll stays
-        synchronous. _get_active_window_title bounds the RAISING failures
-        (stale-title fallback); it cannot time-bound a true win32 stall.
+        variant and a watchdog thread is rejected. What changed (MACROBURST):
+        the read is awaited off this thread, so a stall delays FOCUS DETECTION
+        only - it no longer delays the macro timeline that shares the loop.
+        _get_active_window_title bounds the RAISING failures (stale-title
+        fallback); it still cannot time-bound a true win32 stall.
         WIKI: "[Focus polling contract - designed behavior (Item 14)]".
         '''
         last_active_window = ''
@@ -147,7 +156,18 @@ class Focus_Task:
         old_focus_name = "None"
         focus_name_changed = False
         while not self._stop:
-            active_window = _get_active_window_title(last_active_window)
+            # MACROBURST (maintainer bug report 2026-11-21): the read is awaited
+            # in a worker thread instead of on this coroutine's own thread. It is
+            # the ONE blocking win32 call in the loop's steady state, and
+            # GetWindowTextW messages the FOREGROUND app's owning thread: while
+            # it stalls, every pending asyncio.sleep on this thread expires, and
+            # a macro that was spaced by its own delays then arrives as one burst
+            # - the reported symptom ("waits the time each press and release
+            # would take, then writes everything without delay"). The executor
+            # hop keeps this loop free for the macro and toast lanes; the poll
+            # still runs ONE query at a time and the failure map is unchanged.
+            active_window = await asyncio.get_running_loop().run_in_executor(
+                None, _get_active_window_title, last_active_window)
             # when windows name changed
             if active_window != last_active_window or manually_paused:
                 if active_window != last_active_window:

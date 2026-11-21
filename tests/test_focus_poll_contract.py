@@ -198,5 +198,14 @@ def test_active_window_query_has_single_wrapper_call_site():
     src = (REPO_ROOT / 'fst_tasks.py').read_text(encoding='utf-8')
     # the raw win32-backed query exists exactly once (inside the wrapper) ...
     assert src.count('gw.getActiveWindow') == 1
-    # ... and the poll loop reaches it ONLY through the wrapper
-    assert src.count('active_window = _get_active_window_title(') == 1
+    # ... and the poll loop reaches it ONLY through the wrapper - exactly one
+    # call site, and since MACROBURST (maintainer bug report 2026-11-21) that
+    # call site is an executor hop: the read messages the FOREGROUND app's own
+    # thread, and while it stalled it froze the macro timeline that shares this
+    # loop (measured: a 547 ms hole in a running macro's injection stream, see
+    # tests/test_macro_burst_timing.py). The wrapper itself still owns the only
+    # win32 query.
+    # the poll reaches it through exactly one executor hop (MACROBURST), and the
+    # old direct-call shape is gone
+    assert src.count('None, _get_active_window_title, last_active_window') == 1
+    assert src.count('active_window = _get_active_window_title(') == 0

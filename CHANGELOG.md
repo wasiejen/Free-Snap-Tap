@@ -9,6 +9,13 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 ## [Unreleased]
 
 ### Fixed
+- A running macro no longer freezes while the program in front of it is
+  slow to answer: the active-window read (the one Win32 call that
+  messages another program's thread) now runs in a worker thread
+  instead of on the thread that also plays macros, so a stalled title
+  read can no longer punch a hole of its own length into the middle of
+  a macro's key sequence (reported with a date-writing macro,
+  2026-11-21).
 - A queued macro wait no longer outlives the context it was started in
   (maintainer decision 12, 2026-11-17): a focus-group change, a macro
   abort, a pause (ALT+DELETE) or a config reload now drops a pending
