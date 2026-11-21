@@ -198,5 +198,21 @@ def test_active_window_query_has_single_wrapper_call_site():
     src = (REPO_ROOT / 'fst_tasks.py').read_text(encoding='utf-8')
     # the raw win32-backed query exists exactly once (inside the wrapper) ...
     assert src.count('gw.getActiveWindow') == 1
-    # ... and the poll loop reaches it ONLY through the wrapper
-    assert src.count('active_window = _get_active_window_title(') == 1
+    # ... and the poll loop reaches it ONLY through the wrapper - exactly one
+    # call site, and since MACROBURST (maintainer bug report 2026-11-21) that
+    # call site is an executor hop: the read messages the FOREGROUND app's own
+    # thread, and while it stalled it froze the macro timeline that shares this
+    # loop (measured: a 547 ms hole in a running macro's injection stream, see
+    # tests/test_macro_burst_timing.py). The wrapper itself still owns the only
+    # win32 query.
+    # the poll reaches it through exactly one off-thread hop (MACROBURST), the
+    # old direct-call shape is gone, and the hop is the DAEMON worker rather than
+    # run_in_executor(None, ...) - that helper's docstring says why (a
+    # non-daemon default-executor worker would let a hung read hold the
+    # interpreter's exit)
+    assert src.count('await _query_active_window_off_thread(') == 1
+    assert src.count('def _query_active_window_off_thread') == 1
+    assert src.count('active_window = _get_active_window_title(') == 0
+    # and the hop is a DAEMON worker, not the default executor (whose non-daemon
+    # workers would let a hung read hold interpreter exit - see the helper)
+    assert "name='FST-focus-query'" in src and 'daemon=True' in src
