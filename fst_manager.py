@@ -81,6 +81,91 @@ LOG_LEVELS = {'debug': logging.DEBUG, 'info': logging.INFO,
 AREA_LOGGER_NAMES = ('fst', 'fst.eval', 'fst.state', 'fst.macro', 'fst.config')
 
 
+# ---------------------------------------------------------------------------
+# 15CLOCK wall-clock seam (maintainer decision 15=a, 2026-11-17: product-side
+# injectable clock). Every wall-clock read whose value can reach a constraint
+# evaluation leg goes through the two module-level providers below:
+#   - Output_Manager.constraint_evaluation (this file): last()/get_time() in
+#     ms, date()/date_time() as a datetime;
+#   - the one-time TIME_DIFF domain calibration of the first hook event
+#     (fst_keyboard.py): it maps the wall-clock axis onto the win32
+#     event-time axis last() measures, so a last()-driven stream is
+#     deterministic only when both reads share one clock.
+# The production defaults ARE the pre-seam reads, byte for byte
+# (int(time() * 1000) / datetime.datetime.now() on the module globals the
+# unit layer's freezegun pins already freeze); production code never rebinds
+# them. Tests pin and restore them with set_clock_for_tests() /
+# reset_clock_for_tests() - the contract lane's set_clock drives both
+# (tests/contract_lane.py). Call sites read the providers through a direct
+# module/global lookup: one function call, no wrapper object, no per-read
+# hop beyond the closure call the pre-seam code already performed.
+# ---------------------------------------------------------------------------
+def _real_wall_ms():
+    return int(time() * 1000)
+
+
+def _real_wall_datetime():
+    return datetime.datetime.now()
+
+
+_wall_ms = _real_wall_ms
+_wall_datetime = _real_wall_datetime
+
+
+def _refuse_outside_tests(name):
+    '''15CLOCK guard (reviewer P1): a user config CAN reach a module global
+    through the bare eval() of a constraint (a pre-existing property of the
+    constraint sandbox), so the two seam setters below refuse to run outside
+    a test process instead of reprogramming the product clock for good. They
+    FAIL CLOSED (return True = refused, the setter does nothing, the
+    constraint gets False) rather than raise: a raising leg dies inside the
+    pump and the keystroke passes UNFILTERED (the U345/U365 dropped-stuck
+    class) - a wrong-but-safe constraint verdict is the lesser evil.'''
+    if 'pytest' in sys.modules:
+        return False
+    logger_config.warning('15CLOCK: %s is a test seam - refused outside a '
+                          'test process, the product wall clock stays real',
+                          name)
+    return True
+
+
+def set_clock_for_tests(ms):
+    '''Test seam (15CLOCK, decision 15=a): pin the two providers above to the
+    instant `ms` (int ms since the epoch - the same axis the win32 event
+    times live on). The datetime provider is derived from `ms` in local time,
+    so date()/date_time() answer the pinned instant too. NEVER call from
+    production: no product lane does, the product always runs on the
+    real-time defaults, and a config that reaches this name through eval()
+    gets the _refuse_outside_tests guard (refused, constraint fails).'''
+    global _wall_ms, _wall_datetime
+    if _refuse_outside_tests('set_clock_for_tests'):
+        return False
+    pinned_ms = int(ms)
+    pinned_dt = datetime.datetime.fromtimestamp(pinned_ms / 1000)
+
+    def _pinned_ms():
+        return pinned_ms
+
+    def _pinned_datetime():
+        return pinned_dt
+
+    _wall_ms = _pinned_ms
+    _wall_datetime = _pinned_datetime
+    return True
+
+
+def reset_clock_for_tests():
+    '''Test seam (15CLOCK): restore the real-time defaults (idempotent; the
+    contract lane calls it per run so a pinned clock never leaks). Same
+    guard as set_clock_for_tests.'''
+    global _wall_ms, _wall_datetime
+    if _refuse_outside_tests('reset_clock_for_tests'):
+        return False
+    _wall_ms = _real_wall_ms
+    _wall_datetime = _real_wall_datetime
+    return True
+
+
 def setup_fst_logging():
     '''Configure the FST area-logger tree once at startup: fst.log is
     append-only (never wiped between runs), the console shows WARNING+.'''
@@ -331,8 +416,10 @@ class Output_Manager():
 
     def constraint_evaluation(self, constraint_to_evaluate, current_ke):
 
-        def time_in_millisec():
-            return int(time() * 1000)
+        # 15CLOCK: the wall reads below (last()/get_time() -> _wall_ms,
+        # date()/date_time() -> _wall_datetime) go through the module clock
+        # providers - production default is the pre-seam read itself
+        # (see the 15CLOCK seam block above the imports end)
 
         # first get vk_code and is_press
         def get_vk_code_and_press_from_keystring(key_string):
@@ -437,9 +524,9 @@ class Output_Manager():
             time_last_pressed, time_last_released, _, _ = time_list
             vk_code, is_press = get_vk_code_and_press_from_keystring(key_string)
             try:
-                logger_state.debug(f"{time_in_millisec() - self._fst.TIME_DIFF}")
+                logger_state.debug(f"{_wall_ms() - self._fst.TIME_DIFF}")
                 logger_state.debug(f"{time_last_pressed[vk_code]}")
-                current_time = time_in_millisec() - self._fst.TIME_DIFF
+                current_time = _wall_ms() - self._fst.TIME_DIFF
                 return current_time - time_last_pressed[vk_code] if is_press else current_time - time_last_released[vk_code]
             except KeyError:
                 return 0
@@ -634,16 +721,16 @@ class Output_Manager():
             return True
 
         def date():
-            current_date = datetime.datetime.now().strftime("%y%m%d")
+            current_date = _wall_datetime().strftime("%y%m%d")
             return current_date
 
         def date_time():
-            current_date_time = datetime.datetime.now().strftime("%y%m%d-%H%M")
+            current_date_time = _wall_datetime().strftime("%y%m%d-%H%M")
             return current_date_time
 
         #get current time in ms since epoch
         def get_time():
-            current_time = int(time() * 1000)
+            current_time = _wall_ms()
             return current_time
 
         def release_modifier():
@@ -1150,6 +1237,14 @@ CONSTRAINT_BUILTINS = frozenset({
 # constraint expression (imported at the top of this module, so the module
 # globals hold them) - their attributes are NOT checked as unknown functions
 CONSTRAINT_MODULES = frozenset({'datetime'})
+
+# 15CLOCK (reviewer P1): the two test-seam names ARE module globals, so a
+# config constraint reaches them the same way it reaches any other - the
+# generic 'unknown function ... no-op' warning would be FALSE for them (they
+# rebind state), so they get their own warning naming the real behavior: the
+# product call is refused by _refuse_outside_tests and the constraint fails.
+CONSTRAINT_TEST_SEAMS = frozenset({'set_clock_for_tests',
+                                   'reset_clock_for_tests'})
 
 # invocations whose first string argument is an alias <name> reference
 ALIAS_ARG_FUNCTIONS = ('start_repeat', 'stop_repeat', 'toggle_repeat',
@@ -1690,6 +1785,11 @@ class Config_Validator():
                 if name in ALIAS_ARG_FUNCTIONS and args and isinstance(args[0], ast.Constant) \
                         and isinstance(args[0].value, str):
                     self._check_alias_argument(line_number, item, args[0].value, aliases)
+            elif name in CONSTRAINT_TEST_SEAMS:
+                self._warn(line_number, item, 'constraint',
+                           f'{name}() is the 15CLOCK test seam - a product '
+                           'call is refused and the constraint fails; it is '
+                           'not a config function')
             elif name not in CONSTRAINT_BUILTINS:
                 self._warn(line_number, item, 'constraint',
                            f'unknown function {name}() - evaluates to True (no-op)')

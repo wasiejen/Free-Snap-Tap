@@ -140,3 +140,27 @@ Never kill by image name and never kill a PID you did not create - on this
 machine that is how a maintainer's inference backend got killed during
 ABORT2's forensics. `tests/test_suite_lane.py` pins the rule for the lane
 runner.
+
+## The contract-lane clock seam (15CLOCK, decision 15=a)
+
+The wall-clock constraint legs (`last()`, `get_time()`, `date()`,
+`date_time()`, and the pump's one-time `TIME_DIFF` domain calibration) read
+their time through two module-level providers in `fst_manager.py`:
+`_wall_ms` and `_wall_datetime`. The production defaults ARE the pre-seam
+reads (`int(time() * 1000)` / `datetime.datetime.now()`), and **no production
+lane ever rebinds them** - only tests do, through
+`fst_manager.set_clock_for_tests(ms)` / `reset_clock_for_tests()`. Both
+setters refuse to run in a non-test process (fail closed, the constraint they
+were reached from fails), and the config validator names them with that
+warning - a user config cannot reprogram the product clock.
+
+Lane usage: a `clock(ms)` stimulus (or `contract.set_clock(ms)` /
+`contract.reset_clock()`) pins and restores the product clock. `ms` shares the
+axis of the synthetic win32 event times (the lane's tick counter starts at
+1001), so `clock(1001)` as the first stimulus leaves `TIME_DIFF` at 0 and
+`last("a")` answers `fake_now - stored_event_time`. `run_contract` restores
+the real-time default at every call and `Contract_Lane.close()` never leaves a
+pinned clock behind, so the F-C1 goldens keep running on the production clock
+path. The clock-driven streams are pinned in `tests/test_clock_seam_lane.py`;
+the families that read no clock (`tr`/`ts`/`ta`/`cs`/`csl`/`dc`) stay
+unit-only in `tests/test_output_manager.py::TestTimingEval`.
