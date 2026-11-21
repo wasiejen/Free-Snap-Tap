@@ -9,6 +9,16 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 ## [Unreleased]
 
 ### Fixed
+- `-hide_cmd_window` has an off switch again. The startup path decides
+  console visibility ONCE, after the config has loaded: with the flag the
+  console is hidden quietly at start (the old "attention, the window will
+  disappear" pause stays retired), and without the flag the console window
+  is never touched at all. Before, the window was hidden before the config
+  was read and only re-shown afterwards, so on a console host that does not
+  bring a hidden window back the flag-off user was left with a window they
+  could not restore - and a rejected config printed its error message into
+  a window that was already hidden. The tray menu's 'Toggle Console' is
+  unchanged as the runtime switch.
 - A running macro no longer freezes while the program in front of it is
   slow to answer: the active-window read (the one Win32 call that
   messages another program's thread) now runs in a worker thread

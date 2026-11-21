@@ -511,14 +511,20 @@ if __name__ == "__main__":
         sys.argv[1:] if len(sys.argv) > 1 else [])
 
     # single-instance guard (maintainer decision 2026-11-16, X-SINGLE): runs
-    # right AFTER the --elevate lane and BEFORE the console hide and any
-    # UI/hook init. Order is race-free: the elevation relaunch exits 0
+    # right AFTER the --elevate lane and BEFORE any UI/hook init and BEFORE
+    # the post-parse console decision (CMDHIDE 2026-11-21). Order is
+    # race-free: the elevation relaunch exits 0
     # before the mutex is ever acquired (launcher never holds it), so the
     # worker process is the acquire site - see fst_single_instance.py. A
     # second start logs one '[SingleInstance]' notice and exits 1.
     handle_single_instance_guard()
 
-    set_console_visibility(False)  # Hide console window at startup
+    # CMDHIDE (2026-11-21): NOTHING here touches the console window any more.
+    # The old unconditional set_console_visibility(False) sat between the
+    # guard and the config parse, so a flag-OFF user whose console came back
+    # unreliably (the block below only re-showed it) was stuck with a hidden
+    # window, and a startup ConfigError printed to a hidden console. The
+    # visibility decision now happens ONCE, after the parse, below.
 
     try:
         fst_keyboard = FST_Keyboard()
@@ -539,14 +545,15 @@ if __name__ == "__main__":
     # keeps working normally over everything allocated from here on.
     freeze_startup_heap()
 
-    # hide command window at start but inform user before
+    # -hide_cmd_window, decided ONCE here - AFTER the config parse (CMDHIDE
+    # ruling 2026-11-21: the OFF switch has to work). Flag ON: hide the
+    # console, exactly one call, quietly (the retired announce+sleep UX
+    # stays retired). Flag OFF: ZERO visibility calls - the console window is
+    # never touched, so there is no hide/re-show round-trip for a console
+    # host that does not reliably bring a hidden window back. The tray menu's
+    # 'Toggle Console' stays the runtime switch either way.
     if fst_keyboard.arg_manager.CMD_WINDOW_HIDDEN:
-        #print("\nATTENTION: cmd window will now be hidden, can be shown again via tray icon menu\n")
-        #sleep(3)
-        # toggle_console(False)
-        pass
-    else:
-        set_console_visibility(True)
+        set_console_visibility(False)
 
     if fst_keyboard.arg_manager.TRAY_ICON or fst_keyboard.arg_manager.STATUS_INDICATOR:
         logger.info("Starting in GUI mode with tray icon or status indicator enabled.")

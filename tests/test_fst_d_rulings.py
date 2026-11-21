@@ -138,7 +138,11 @@ class TestStartupHeapIsFrozenOnce:
             'ConfigError': ConfigError,
         }
         exec(compile(code, 'entry_prefix', 'exec'), namespace)
-        assert steps == ['logging', 'elevate', 'single_instance', 'console',
+        # CMDHIDE (2026-11-21): the visibility decision moved AFTER the config
+        # parse, so this freeze prefix must contain NO visibility call at all
+        # (a startup ConfigError prints to a console this path never touched).
+        assert 'console' not in steps, steps
+        assert steps == ['logging', 'elevate', 'single_instance',
                          'keyboard', 'keyboard.sys_args', 'keyboard.startup_args',
                          'logic', 'settle', 'freeze'], steps
 
