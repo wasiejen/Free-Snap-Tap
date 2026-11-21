@@ -22,6 +22,9 @@ Family split (measured at the tip, see the plan-file 15CLOCK STATUS block):
 """
 import datetime
 import inspect
+import os
+import subprocess
+import sys
 import time
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -73,11 +76,55 @@ class TestSeamDefaults:
         # byte, and they answer the actual wall clock.
         assert fst_manager._wall_ms is fst_manager._real_wall_ms
         assert fst_manager._wall_datetime is fst_manager._real_wall_datetime
-        assert 'int(time() * 1000)' in inspect.getsource(
-            fst_manager._real_wall_ms)
-        assert 'datetime.datetime.now()' in inspect.getsource(
-            fst_manager._real_wall_datetime)
+        # (whitespace-normalized so a reflow cannot break the expression pin)
+        src_ms = ''.join(inspect.getsource(fst_manager._real_wall_ms).split())
+        src_dt = ''.join(inspect.getsource(
+            fst_manager._real_wall_datetime).split())
+        assert 'int(time()*1000)' in src_ms
+        assert 'datetime.datetime.now()' in src_dt
         assert abs(fst_manager._wall_ms() - int(time.time() * 1000)) < 5000
+
+    def test_pump_calibration_reads_the_seam_through_the_module(self):
+        # CONTRACT (structural, reviewer P2): the pump's one-time TIME_DIFF
+        # leg reaches the provider through the module, so a rename of the
+        # seam shows up as a RED pin here, not as an AttributeError on the
+        # first live hook event.
+        import fst_keyboard
+        src = inspect.getsource(fst_keyboard.FST_Keyboard._win32_event_filter)
+        assert 'fst_manager._wall_ms()' in src
+        assert hasattr(fst_manager, '_wall_ms')
+
+    def test_seam_setters_refuse_a_non_test_process(self, tmp_path):
+        # CONTRACT (reviewer P1 guard, measured in a real non-pytest process):
+        # outside a test process the seam refuses - the providers stay the
+        # real-time reads, so a config that reaches the name through eval()
+        # can never reprogram the product clock.
+        script = (
+            'import sys; sys.path.insert(0, %r)\n'
+            'import fst_manager as m\n'
+            'before = m._wall_ms\n'
+            'r = m.set_clock_for_tests(1)\n'
+            'print(r, m._wall_ms is before, m._wall_datetime is'
+            ' m._real_wall_datetime)\n'
+            % os.path.dirname(os.path.abspath(fst_manager.__file__)))
+        script_path = tmp_path / 'seam_guard_probe.py'
+        with open(script_path, 'w', encoding='utf-8') as handle:
+            handle.write(script)
+        out = subprocess.run([sys.executable, str(script_path)],
+                             capture_output=True, text=True, timeout=60)
+        assert out.stdout.strip().endswith('False True True'), out.stdout
+
+    def test_validator_names_the_seam_instead_of_the_no_op_claim(self,
+                                                                 contract):
+        # CONTRACT (reviewer P1, validator honesty): a config constraint that
+        # calls the seam loads (a WARNING, never an error) and the warning
+        # names what actually happens (refused in production, constraint
+        # fails) - not the generic "evaluates to True (no-op)".
+        contract.load('b : c|(set_clock_for_tests(1))\n')
+        warnings = contract.kb.config_manager.config_warnings
+        seam_warnings = [w for w in warnings if 'test seam' in str(w)]
+        assert len(seam_warnings) == 1
+        assert 'set_clock_for_tests' in str(seam_warnings[0])
 
     def test_lane_restores_real_time_after_a_pinned_run(self, contract):
         # CONTRACT (lane isolation): a run that armed the fake clock restores
@@ -220,15 +267,27 @@ class TestDeterminismAcrossClockPositions:
 
     def test_same_clock_twice_gives_the_identical_stream(self, contract):
         # CONTRACT: the lane plus the pinned clock is deterministic - the same
-        # config and the same clock twice give byte-identical streams.
-        cfg = 'b : c|(get_time() > 1000 and last("-a") > 40)\n'
-        first = contract.run_contract(
-            cfg, [clock(1001), down('a'), up('a'), clock(1042), down('b')])
-        second = contract.run_contract(
-            cfg, [clock(1001), down('a'), up('a'), clock(1042), down('b')])
+        # config and the same clock twice give byte-identical streams. The
+        # gate is written so a raw wall clock CANNOT satisfy it (get_time()
+        # < 100000 is false on any real clock), which is what carries the
+        # claim (reviewer P2: the old gate passed with the legs reverted).
+        cfg = 'b : c|(get_time() < 100000 and last("-a") > 40)\n'
+        stimuli = [clock(1001), down('a'), up('a'), clock(1042), down('b')]
+        first = contract.run_contract(cfg, stimuli)
+        second = contract.run_contract(cfg, stimuli)
         assert first.text() == 'down c'
         assert first.vks() == second.vks()
         assert first.suppressed == second.suppressed
+
+    def test_late_clock_arm_raises(self, contract):
+        # CONTRACT (lane rule, reviewer P2): arming the clock after an
+        # un-armed key event raises - the pump already calibrated TIME_DIFF
+        # on the real clock, so a late arm would silently mix two time axes
+        # and pin a meaningless last().
+        with pytest.raises(ValueError, match='before the first'):
+            contract.run_contract(
+                'b : c|(last("-a") > 40)\n',
+                [down('a'), up('a'), clock(1042), down('b')])
 
 
 class TestSeamUnitLegs:

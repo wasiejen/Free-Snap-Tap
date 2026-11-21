@@ -112,14 +112,34 @@ _wall_ms = _real_wall_ms
 _wall_datetime = _real_wall_datetime
 
 
+def _refuse_outside_tests(name):
+    '''15CLOCK guard (reviewer P1): a user config CAN reach a module global
+    through the bare eval() of a constraint (a pre-existing property of the
+    constraint sandbox), so the two seam setters below refuse to run outside
+    a test process instead of reprogramming the product clock for good. They
+    FAIL CLOSED (return True = refused, the setter does nothing, the
+    constraint gets False) rather than raise: a raising leg dies inside the
+    pump and the keystroke passes UNFILTERED (the U345/U365 dropped-stuck
+    class) - a wrong-but-safe constraint verdict is the lesser evil.'''
+    if 'pytest' in sys.modules:
+        return False
+    logger_config.warning('15CLOCK: %s is a test seam - refused outside a '
+                          'test process, the product wall clock stays real',
+                          name)
+    return True
+
+
 def set_clock_for_tests(ms):
     '''Test seam (15CLOCK, decision 15=a): pin the two providers above to the
     instant `ms` (int ms since the epoch - the same axis the win32 event
     times live on). The datetime provider is derived from `ms` in local time,
     so date()/date_time() answer the pinned instant too. NEVER call from
     production: no product lane does, the product always runs on the
-    real-time defaults.'''
+    real-time defaults, and a config that reaches this name through eval()
+    gets the _refuse_outside_tests guard (refused, constraint fails).'''
     global _wall_ms, _wall_datetime
+    if _refuse_outside_tests('set_clock_for_tests'):
+        return False
     pinned_ms = int(ms)
     pinned_dt = datetime.datetime.fromtimestamp(pinned_ms / 1000)
 
@@ -131,14 +151,19 @@ def set_clock_for_tests(ms):
 
     _wall_ms = _pinned_ms
     _wall_datetime = _pinned_datetime
+    return True
 
 
 def reset_clock_for_tests():
     '''Test seam (15CLOCK): restore the real-time defaults (idempotent; the
-    contract lane calls it per run so a pinned clock never leaks).'''
+    contract lane calls it per run so a pinned clock never leaks). Same
+    guard as set_clock_for_tests.'''
     global _wall_ms, _wall_datetime
+    if _refuse_outside_tests('reset_clock_for_tests'):
+        return False
     _wall_ms = _real_wall_ms
     _wall_datetime = _real_wall_datetime
+    return True
 
 
 def setup_fst_logging():
@@ -1213,6 +1238,14 @@ CONSTRAINT_BUILTINS = frozenset({
 # globals hold them) - their attributes are NOT checked as unknown functions
 CONSTRAINT_MODULES = frozenset({'datetime'})
 
+# 15CLOCK (reviewer P1): the two test-seam names ARE module globals, so a
+# config constraint reaches them the same way it reaches any other - the
+# generic 'unknown function ... no-op' warning would be FALSE for them (they
+# rebind state), so they get their own warning naming the real behavior: the
+# product call is refused by _refuse_outside_tests and the constraint fails.
+CONSTRAINT_TEST_SEAMS = frozenset({'set_clock_for_tests',
+                                   'reset_clock_for_tests'})
+
 # invocations whose first string argument is an alias <name> reference
 ALIAS_ARG_FUNCTIONS = ('start_repeat', 'stop_repeat', 'toggle_repeat',
                        'is_repeat_active', 'reset_repeat')
@@ -1752,6 +1785,11 @@ class Config_Validator():
                 if name in ALIAS_ARG_FUNCTIONS and args and isinstance(args[0], ast.Constant) \
                         and isinstance(args[0].value, str):
                     self._check_alias_argument(line_number, item, args[0].value, aliases)
+            elif name in CONSTRAINT_TEST_SEAMS:
+                self._warn(line_number, item, 'constraint',
+                           f'{name}() is the 15CLOCK test seam - a product '
+                           'call is refused and the constraint fails; it is '
+                           'not a config function')
             elif name not in CONSTRAINT_BUILTINS:
                 self._warn(line_number, item, 'constraint',
                            f'unknown function {name}() - evaluates to True (no-op)')

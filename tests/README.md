@@ -149,7 +149,10 @@ their time through two module-level providers in `fst_manager.py`:
 `_wall_ms` and `_wall_datetime`. The production defaults ARE the pre-seam
 reads (`int(time() * 1000)` / `datetime.datetime.now()`), and **no production
 lane ever rebinds them** - only tests do, through
-`fst_manager.set_clock_for_tests(ms)` / `reset_clock_for_tests()`.
+`fst_manager.set_clock_for_tests(ms)` / `reset_clock_for_tests()`. Both
+setters refuse to run in a non-test process (fail closed, the constraint they
+were reached from fails), and the config validator names them with that
+warning - a user config cannot reprogram the product clock.
 
 Lane usage: a `clock(ms)` stimulus (or `contract.set_clock(ms)` /
 `contract.reset_clock()`) pins and restores the product clock. `ms` shares the

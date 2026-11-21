@@ -155,7 +155,8 @@ def clock(ms):
     date()/date_time() (datetime), and the pump's one-time TIME_DIFF
     calibration, answer `ms` instead of wall time. Arms no OS clock; a no-op
     for the stream itself. Arm it as the FIRST stimulus to put TIME_DIFF on
-    the same axis (arm value - 1001, the synthetic tick base)."""
+    the same axis (arm value - 1001, the synthetic tick base) - a late arm
+    raises (Contract_Lane.set_clock: TIME_DIFF was already calibrated)."""
     return Stimulus('clock', name=str(int(ms)))
 
 
@@ -317,6 +318,9 @@ class Contract_Lane:
         generation id (a rejected load does not replace it)."""
         if config_text is not None:
             self.write_config(config_text)
+        # 15CLOCK (reviewer P2): a fresh load never inherits a clock pinned
+        # by an earlier leg - only an explicit arm inside this run pins it
+        self.reset_clock()
         self.kb.focus_manager.FOCUS_APP_NAME = ''
         self.kb.update_args_and_groups('', startup=True)
         return self.kb._runtime.gen_id
@@ -373,6 +377,11 @@ class Contract_Lane:
         # 15CLOCK: restore the real-time providers - a clock pinned by an
         # earlier run never leaks into the next (lane isolation rule)
         self.reset_clock()
+        # 15CLOCK (reviewer P2): arming must precede the first key event -
+        # the pump's one-time TIME_DIFF calibration runs on whatever clock
+        # is live at that event, so a late arm would mix two time axes
+        self._clock_armed = False
+        self._unarmed_events = False
 
     # -- 15CLOCK clock seam driver (decision 15=a) ---------------------------
 
@@ -385,9 +394,18 @@ class Contract_Lane:
         `ms` shares the axis of the synthetic win32 event times (the tick
         counter starts at 1001), so a clock armed at the tick base leaves
         TIME_DIFF at 0. No OS clock is touched. Pair every pin with the
-        real-time default by arming no clock (run_contract restores it)."""
+        real-time default by arming no clock (run_contract restores it). Arm
+        it BEFORE the first driven key event (a clock(ms) stimulus first):
+        after an un-armed event the pump has already calibrated TIME_DIFF on
+        the real clock, so a late arm raises instead of mixing two axes."""
         import fst_manager
+        if getattr(self, '_unarmed_events', False):
+            raise ValueError(
+                '15CLOCK: clock(ms)/set_clock must come before the first '
+                'driven key event - TIME_DIFF was already calibrated on the '
+                'real clock, a late arm would mix two time axes')
         fst_manager.set_clock_for_tests(ms)
+        self._clock_armed = True
 
     def reset_clock(self):
         """Restore the production real-time providers (idempotent; called by
@@ -401,6 +419,8 @@ class Contract_Lane:
 
     def _drive_key(self, key, is_press):
         """One synthetic KBDLLHOOKSTRUCT-shaped event into the pynput entry."""
+        if not getattr(self, '_clock_armed', False):
+            self._unarmed_events = True  # 15CLOCK: closes the late-arm case
         # the product's own key resolver - same names and int strings, same
         # ConfigError the config side raises for an unresolvable name
         vk_code = self.kb.convert_to_vk_code(str(key))
