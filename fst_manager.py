@@ -947,17 +947,23 @@ class Output_Manager():
             print(f'"{pasted_text}" pasted from clipboard')
             return pasted_text
 
-        def save_into_file(text, time_stamp=get_time(), mode='w', file_path='output.txt'):
+        # 462 write-stamp (maintainer ruling 2026-11-23): time_stamp defaults
+        # to the None sentinel - an omitted stamp is taken at WRITE time
+        # inside _work (the lane worker that executes the write), not at def
+        # time on every constraint re-evaluation. A delayed or retried leg
+        # stamps its own execution time; a pass with no file leg performs
+        # zero clock reads. An explicit time_stamp behaves as ever.
+        def save_into_file(text, time_stamp=None, mode='w', file_path='output.txt'):
             def _work():
+                stamp = get_time() if time_stamp is None else time_stamp
                 with open(file_path, mode) as file:
-                    file.write(f"{time_stamp}: {text}\n")
-                print(f'"{time_stamp}: {text}" saved into {file_path}')
+                    file.write(f"{stamp}: {text}\n")
+                print(f'"{stamp}: {text}" saved into {file_path}')
                 return True
-            # U364/#360: file I/O leg off the pump -> loop lane (the
-            # time_stamp default still stamps at CALL time on the caller)
+            # U364/#360: file I/O leg off the pump -> loop lane
             return self.pump_lane(_work, 'save_into_file')
 
-        def append_to_file(text, time_stamp=get_time(), file_path='output.txt'):
+        def append_to_file(text, time_stamp=None, file_path='output.txt'):
             return save_into_file(text, time_stamp, mode='a', file_path=file_path)
 
         def empty_file(file_path='output.txt'):

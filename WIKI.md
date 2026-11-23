@@ -240,6 +240,11 @@ Every key event supports prefixes **prefix/modifier**
         playback belongs to, the pending delay is dropped and a key the playback
         still owed is released immediately - a late segment never fires into the
         newly active program.
+  - **the shipped DEFAULT delay pair is 2-10 ms** (maintainer decision 16,
+    2026-11-23): the pair sits BELOW the ~15.6 ms Windows clock tick, so every
+    inter-key gap quantizes to ONE tick - default playback is effectively
+    immediate (a long string lands as a burst). For a visible per-key rhythm,
+    state a pair ABOVE the tick, e.g. `-macrodelay=25,15`.
 
 ### [Suffix/Evaluation] updated to V1.1.3
 
@@ -403,6 +408,7 @@ The functions of the following sections are resolved by the same suffix evaluati
 
 - relative file paths are resolved against the program's working directory
 - `|(save_into_file('text', *time stamp*, *mode*, *file path*))`: write the text to the file as "*time stamp*: *text*" - defaults: file `output.txt`, mode `'w'` (overwrite), time stamp `get_time()`
+  - an omitted *time stamp* is taken at the moment the line is WRITTEN, not when the constraint is evaluated (ruling 2026-11-23): a delayed or retried write stamps its own execution time, and a constraint pass that never reaches the write never reads the clock
 - `|(append_to_file('text', ...))`: same as `save_into_file`, mode `'a'` (append)
 - `|(empty_file('file path'))`: truncate the file - default `output.txt`
 
