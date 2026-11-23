@@ -1,4 +1,4 @@
-# Internals - focus polling contract
+# Internals - why the behavior is what it is
 
 > Part of the FST docs: [index](README.md) - [features & install](../README.md)
 
@@ -51,3 +51,9 @@ moved from `prefixes-suffixes.md` ([Suffix/Delays]):
 moved from `groups-macros.md` ([Macros]):
 
 - will be played as asyncio tasks (interruptible, non-blocking) to not interfere with real input while waiting for the delays
+
+### [Overlay geometry limits]
+
+moved from `overlay.md` ([Toast boxes]):
+
+- the row lives in a fixed 500 px transparent window anchored at the cycle, so on very narrow displays (roughly under 1000 px logical width) its far edge can pass the screen edge - pre-existing on the right half, mirrored on the left since #464

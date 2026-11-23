@@ -29,6 +29,5 @@
   - a cycle centered exactly on the screen midline counts as the right half
 - the TEXT ALIGNMENT mirrors the same side: right-bounded text while the cycle is on the right (the text hugs the cycle), left-bounded while it is on the left - direction and alignment always flip together
 - a resolution or scale change re-anchors the row under the moved indicator and re-mirrors the live toasts to the new side
-- the row lives in a fixed 500 px transparent window anchored at the cycle, so on very narrow displays (roughly under 1000 px logical width) its far edge can pass the screen edge - pre-existing on the right half, mirrored on the left since #464
 
 
