@@ -10,8 +10,10 @@ Per-chunk runs are reliably green, because a chunk holds a smaller graph.
 
 WHAT IT DOES. Collects once, splits ``tests/**/test_*.py`` (in pytest's own
 order) into chunks of about ``--chunk-target`` tests, runs each chunk in its
-own pytest process, prints one line per chunk plus an aggregate, and exits
-nonzero if any chunk fails, aborts, collects nothing, or times out. This is the
+own pytest process, prints one line per chunk plus an aggregate (a non-green
+chunk first echoes its full captured output - a CI runner log alone must be
+enough to debug a red chunk, #465), and exits nonzero if any chunk fails,
+aborts, collects nothing, or times out. This is the
 repo's gate command for a full-suite verification.
 
 PROCESS SAFETY (a rule, not a preference, and pinned in
@@ -112,7 +114,13 @@ def run_chunk(chunk: list[str], root: Path, timeout: int) -> tuple[int, str]:
         env=child_env())
     try:
         out, _ = child.communicate(timeout=timeout)
-        return child.returncode, summarize(out or '')
+        code = child.returncode
+        if not chunk_is_ok(code):
+            # (#465) a red chunk on a CI runner must be debuggable from the
+            # Actions log alone: echo the chunk's FULL captured output, not
+            # just the 80-char summary line
+            print(out, flush=True)
+        return code, summarize(out or '')
     except subprocess.TimeoutExpired:
         child.terminate()
         try:

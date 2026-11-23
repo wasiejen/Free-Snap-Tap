@@ -136,6 +136,36 @@ class TestLaneProcessSafety:
         assert "QT_QPA_PLATFORM" in self.SOURCE
 
 
+class TestChunkFailureVisibility:
+    def test_a_failing_chunk_echoes_its_full_output(self, tmp_path, capsys):
+        # CONTRACT (#465): a red chunk on the CI runner must be debuggable
+        # from the Actions log alone - the FULL captured output of every
+        # non-green chunk goes to the lane's own stdout at run time
+        tests = tmp_path / 'tests'
+        tests.mkdir()
+        (tests / 'test_red.py').write_text(
+            'def test_fails():\n    raise AssertionError("u465-red-probe")\n',
+            encoding='utf-8')
+        code, _summary = suite_lane.run_chunk(
+            ['tests/test_red.py'], tmp_path, 300)
+        out = capsys.readouterr().out
+        assert code != 0, code
+        assert 'u465-red-probe' in out
+
+    def test_a_green_chunk_stays_one_quiet_line(self, tmp_path, capsys):
+        # CONTRACT (#465): quiet success is what keeps the runner log and the
+        # aggregate lines parseable - run_chunk itself prints nothing green
+        tests = tmp_path / 'tests'
+        tests.mkdir()
+        (tests / 'test_green.py').write_text(
+            'def test_ok():\n    assert True\n', encoding='utf-8')
+        code, _summary = suite_lane.run_chunk(
+            ['tests/test_green.py'], tmp_path, 300)
+        out = capsys.readouterr().out
+        assert code == 0, code
+        assert out == ''
+
+
 class TestFb8GuardStaysInPlace:
     def test_the_gc_guard_and_its_sweep_are_still_installed(self):
         # CONTRACT: ABORT2 measured that the F-B8 guard does NOT cover this
