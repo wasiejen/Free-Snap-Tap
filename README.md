@@ -44,7 +44,7 @@ FST runs one instance at a time - starting a second one exits with a notice.
     - double left mouse click or middle mouse click will open the config file
 13. **[Crosshair]** `<arg>-crosshair` or `<arg>-crosshair=*pixel delta x*,*pixel delta y*`
     - displays a simple crosshair as overlay and can be controlled on a per game basis
-14. **[Extra Start Arguments]** `<arg>` arguments that control runtime behavior (usable as default or per focus group)
+14. **[Extra Start Arguments]** `<arg>` arguments that control runtime behavior (usable as default or per focus group) - this list is a short overview; the complete reference is the Wiki **\[Start Arguments\]** page
     - `-delay` / `-nodelay`: re-enable / disable the delays (arguments are processed in order, later overrides earlier)
     - `-exec_one_macro`: only the first macro triggered by one real key event is played
     - `-debug_numpad`: enables the ALT+NUM1..NUM8 numpad debug combos

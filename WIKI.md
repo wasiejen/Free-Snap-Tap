@@ -499,6 +499,8 @@ Only the startargument `-file="filename" should now be used as start argument in
 Everything else should be put in the config file and then can be applied on a per Game based as needed.
 - use the same arguments in the config just instead with \<arg> in front. See above example.
 
+> Ownership: this section is the complete start-argument reference. The README `[Extra Start Arguments]` list is a short overview that points here - each flag is documented once, here.
+
 -  `<arg>-nomenu` skips the menu and will be directly active
 -  `<arg>-file="filename"`: (with or without "): custom save file
 -  `<arg>-debug`: print out some debug info
@@ -518,9 +520,12 @@ Everything else should be put in the config file and then can be applied on a pe
 - `<arg>-delay`: re-enable the delays - the delays are active on default, so this is only meaningful after an earlier `-nodelay`
 - `<arg>-exec_one_macro`: of all macros triggered by one real key event only the FIRST is played
 - `<arg>-debug_numpad`: enable the numpad debug combos (see [Numpad debug combos])
+- `<arg>-log=<debug|info|warning|error>`: set the area-logging level of `fst.log`; an invalid value is ignored and a warning names the valid levels (area-based logging, V1.3.0)
+- `<arg>-flow`: enable the per-key flow stream to its own `fst_flow.log` (one line per filter leg of a key event); also toggled at runtime by `ALT + NUM4` and console menu option 0
 - `<arg>-drop_watch`: enable the drop-watch lane (U345, #291 H1) - filter legs that die mid-event land named drop lines in `fst_drop.log` + `fst.log`; `ALT + NUM6` toggles it at runtime
 - `<arg>-no_toast_offload`: restore the direct toast bridge emit (default is the offload queue + asyncio pump, U345 H2 - A/B switch for the stuck-key hunt)
 - `<arg>-always_active`: if no focus app matches, the default groups stay active instead of the filter being paused - the status indicator shows blue while in this default-active state
+- `<arg>-default_always_active`: set the always-active state from within a section's argument list (the same runtime flag as `-always_active`, applied when that section's args load and reset on every focus change)
 - `<arg>-default_off` (`-default-off`): deactivate the default group LINES for that focus group - the group builds from its own lines only, so global default conveniences (tap keys, status rebinds) cannot collide inside a game profile. Default START ARGUMENTS are still merged (overwrite the ones you need in the focus section); the focus-loss behavior of `-always_active` is unaffected. Set it in the default section to switch every focus group off (TODO #403, proposal 2026-10-31)
 - `<arg>-default_on` (`-default-on`): RETIRED (TODO #423) - shipped and retired the same day; setting it does nothing and the config validation prints a WARNING. The settled model: the default group IS merged into every focus group; `-default_off` is the only opt-out (TODO #418 resolution)
 - `<arg>-tray_icon`: start the GUI loop with a tray icon (with or without status indicator) - the tray menu offers Open config / Reload / Toggle Pause / Return to Menu / Toggle Indicator / Toggle Crosshair / Toggle Console / Exit
