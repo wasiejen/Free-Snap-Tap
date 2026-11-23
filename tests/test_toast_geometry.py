@@ -18,7 +18,7 @@ midline counts as the RIGHT half - today's leftward extension is preserved.
 """
 from types import SimpleNamespace
 
-from PySide6.QtCore import QRect, Qt
+from PySide6.QtCore import QPoint, QRect, Qt
 from PySide6.QtGui import QFontMetrics
 
 import fst_overlay
@@ -78,6 +78,10 @@ def test_tiny_text_gets_small_box(qtbot):
     # the maintainer case: 'mm' gets a small box, not the 480 px box
     assert toast.label.width() < TOAST_TEXT_MAX_WIDTH
     assert toast.label.width() == floor
+    # reviewer P2-9 companion: a host-independent band, so a constant edit
+    # cannot silently move the floor (64 px = 8 chars at 7 px + buffers on
+    # the live Consolas, 104 px measured on the offscreen fallback font)
+    assert 64 <= toast.label.width() <= 160
 
 
 def test_long_text_caps_at_max_and_wraps(qtbot):
@@ -125,11 +129,13 @@ def test_toast_screen_right_helper_half_boundary():
 
 def make_manager(qtbot, monkeypatch, rect, screen=SCREEN):
     """Real ToastManager on a geometry-holder overlay + a faked current
-    screen (the FakeScreen pattern of tests/test_resolution_reposition.py)."""
+    screen (the FakeScreen pattern of tests/test_resolution_reposition.py;
+    patched on the get_screen_at seam the manager resolves the CYCLE's
+    screen through, #464 reviewer P2-4)."""
     state = {'rect': QRect(rect)}
     overlay = SimpleNamespace(user_padding=4, geometry=lambda: state['rect'])
-    monkeypatch.setattr(fst_overlay, 'get_current_screen',
-                        lambda: FakeScreen(screen))
+    monkeypatch.setattr(fst_overlay, 'get_screen_at',
+                        lambda point: FakeScreen(screen))
     fst = SimpleNamespace(arg_manager=SimpleNamespace(STATUS_INDICATOR=True))
     manager = ToastManager(fst, overlay)
     qtbot.addWidget(manager)
@@ -165,6 +171,8 @@ def test_add_toast_mirrors_box_and_text_per_side(qtbot, monkeypatch):
     # left-bounded) and the box hugs the right (cycle) side
     assert right.active_toasts['hello'].label.alignment() \
         == Qt.AlignRight | Qt.AlignVCenter
+    # (the right-half item flag pre-dates #464 - a regression pin: it now
+    # flips with the side, the left leg below is the discriminating one)
     assert right.main_layout.itemAt(0).alignment() & Qt.AlignRight
 
     left, _ = make_manager(qtbot, monkeypatch, QRect(100, 200, 20, 20))
@@ -182,6 +190,7 @@ def test_resolution_flip_remirrors_live_toasts(qtbot, monkeypatch):
     manager.add_toast('hello', 3, 12, 'rgba(40, 40, 40, 200)', 'white')
     assert manager.active_toasts['hello'].label.alignment() \
         == Qt.AlignRight | Qt.AlignVCenter
+    assert manager.main_layout.itemAt(0).alignment() & Qt.AlignRight
 
     state['rect'] = QRect(100, 200, 20, 20)  # the cycle now sits left
     manager.update_position()
@@ -190,3 +199,45 @@ def test_resolution_flip_remirrors_live_toasts(qtbot, monkeypatch):
     assert manager.active_toasts['hello'].label.alignment() \
         == Qt.AlignLeft | Qt.AlignVCenter
     assert manager.main_layout.alignment() & Qt.AlignLeft
+    # reviewer P1 companion: the PER-ITEM flag is what places the fixed-width
+    # box inside the 500 px window - the layout flag alone never moves it
+    assert manager.main_layout.itemAt(0).alignment() & Qt.AlignLeft
+    assert not manager.main_layout.itemAt(0).alignment() & Qt.AlignRight
+
+
+# ------------------------------------------------- dismiss re-fit + screen seam
+
+def test_dismiss_refits_the_box_to_the_delete_text(qtbot):
+    # reviewer P2-5: ' | DELETE ' outgrows a shrunk build-time box - the
+    # pre-fix code set it raw and wordWrap grew the box to two lines for the
+    # 1 s farewell (reviewer measured label h 12 -> 26 on 'mm'); dismiss now
+    # re-wraps and re-fits, so the DELETE line stays one line
+    toast = ToastWidget('mm', 3, 12, 'rgba(40, 40, 40, 200)', 'white')
+    qtbot.addWidget(toast)
+    toast.show()
+    build_width = toast.label.width()
+
+    toast.dismiss(0)
+    toast.master_timer.stop()  # keep the widget alive for teardown
+
+    assert 'DELETE' in toast.label.text()
+    assert '\n' not in toast.label.text()
+    assert toast.label.width() > build_width  # grew to fit, not wrapped
+
+
+def test_get_screen_at_prefers_the_cycle_screen(monkeypatch):
+    # reviewer P2-4: the side follows the screen the CYCLE is on, not the
+    # cursor's screen - Qt resolves the point, the cursor-based
+    # get_current_screen() stays the fallback for the None case
+    from PySide6.QtWidgets import QApplication
+
+    widget_screen = FakeScreen(SCREEN)
+    monkeypatch.setattr(QApplication, 'screenAt',
+                        staticmethod(lambda point: widget_screen))
+    assert fst_overlay.get_screen_at(QPoint(500, 500)) is widget_screen
+
+    monkeypatch.setattr(QApplication, 'screenAt',
+                        staticmethod(lambda point: None))
+    fallback = FakeScreen(QRect(0, 0, 800, 600))
+    monkeypatch.setattr(fst_overlay, 'get_current_screen', lambda: fallback)
+    assert fst_overlay.get_screen_at(QPoint(500, 500)) is fallback
