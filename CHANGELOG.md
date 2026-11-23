@@ -13,12 +13,14 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   2026-11-23): omitting the *time stamp* of `save_into_file`/`append_to_file`
   now stamps the line when the write EXECUTES on its lane, not when the
   constraint is evaluated - a delayed or retried write carries its own honest
-  time, and a constraint pass that runs no file leg never touches the clock.
-  An explicit *time stamp* behaves exactly as before.
+  time, and the file-leg stamp default reads the clock no time at all while
+  no file write executes. An explicit *time stamp* - positional, keyword or
+  an explicit `None` (stamps the literal "None") - behaves exactly as before.
 - WIKI [Suffix/Delays] documents the shipped default delay pair 2-10 ms
   against the ~15.6 ms Windows clock tick (decision 16, 2026-11-23): the pair
-  is one tick, so default playback is effectively immediate; a pair above the
-  tick (e.g. `-macrodelay=25,15`) gives a visible per-key rhythm.
+  is one tick, so default playback is effectively immediate; a pair whose
+  lower bound is above the tick (e.g. `-macrodelay=25,20`) gives a visible
+  per-key rhythm.
 
 ### Fixed
 - The default config file is now found on every launch route (#461, maintainer

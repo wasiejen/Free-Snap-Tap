@@ -244,7 +244,8 @@ Every key event supports prefixes **prefix/modifier**
     2026-11-23): the pair sits BELOW the ~15.6 ms Windows clock tick, so every
     inter-key gap quantizes to ONE tick - default playback is effectively
     immediate (a long string lands as a burst). For a visible per-key rhythm,
-    state a pair ABOVE the tick, e.g. `-macrodelay=25,15`.
+    state a pair whose LOWER bound is above the tick (the parser sorts the
+    pair), e.g. `-macrodelay=25,20`.
 
 ### [Suffix/Evaluation] updated to V1.1.3
 
@@ -408,7 +409,8 @@ The functions of the following sections are resolved by the same suffix evaluati
 
 - relative file paths are resolved against the program's working directory
 - `|(save_into_file('text', *time stamp*, *mode*, *file path*))`: write the text to the file as "*time stamp*: *text*" - defaults: file `output.txt`, mode `'w'` (overwrite), time stamp `get_time()`
-  - an omitted *time stamp* is taken at the moment the line is WRITTEN, not when the constraint is evaluated (ruling 2026-11-23): a delayed or retried write stamps its own execution time, and a constraint pass that never reaches the write never reads the clock
+  - an omitted *time stamp* is taken at the moment the line is WRITTEN, not when the constraint is evaluated (ruling 2026-11-23): a delayed or retried write stamps its own execution time, and while no file-leg write executes the stamp default performs no clock read
+  - an explicit *time stamp* stamps what you give it - an explicit `None` stamps the literal `None`, so pass it only deliberately
 - `|(append_to_file('text', ...))`: same as `save_into_file`, mode `'a'` (append)
 - `|(empty_file('file path'))`: truncate the file - default `output.txt`
 

@@ -375,6 +375,14 @@ class CONSTANTS():
     MENU_Combination = ["alt", "page_down"]
 
 
+# 462 write-stamp sentinel (maintainer ruling 2026-11-23): "time_stamp
+# omitted" must stay DISTINCT from an explicit None - an explicit None
+# writes the string "None" into the line exactly as pre-462, only the
+# OMITTED default stamps the clock at write time. Module-level so the
+# nested file-leg defs in constraint_evaluation close over one identity.
+_STAMP_AT_WRITE = object()
+
+
 class Output_Manager():
     '''
     This class is responsible for sending key events to the system and evaluating constraints for key events.
@@ -948,14 +956,15 @@ class Output_Manager():
             return pasted_text
 
         # 462 write-stamp (maintainer ruling 2026-11-23): time_stamp defaults
-        # to the None sentinel - an omitted stamp is taken at WRITE time
-        # inside _work (the lane worker that executes the write), not at def
-        # time on every constraint re-evaluation. A delayed or retried leg
+        # to the _STAMP_AT_WRITE sentinel - an omitted stamp is taken at WRITE
+        # time inside _work (the lane worker that executes the write), not at
+        # def time on every constraint re-evaluation. A delayed or retried leg
         # stamps its own execution time; a pass with no file leg performs
-        # zero clock reads. An explicit time_stamp behaves as ever.
-        def save_into_file(text, time_stamp=None, mode='w', file_path='output.txt'):
+        # zero clock reads. An explicit time_stamp - including an explicit
+        # None - behaves exactly as pre-462.
+        def save_into_file(text, time_stamp=_STAMP_AT_WRITE, mode='w', file_path='output.txt'):
             def _work():
-                stamp = get_time() if time_stamp is None else time_stamp
+                stamp = get_time() if time_stamp is _STAMP_AT_WRITE else time_stamp
                 with open(file_path, mode) as file:
                     file.write(f"{stamp}: {text}\n")
                 print(f'"{stamp}: {text}" saved into {file_path}')
@@ -963,7 +972,7 @@ class Output_Manager():
             # U364/#360: file I/O leg off the pump -> loop lane
             return self.pump_lane(_work, 'save_into_file')
 
-        def append_to_file(text, time_stamp=None, file_path='output.txt'):
+        def append_to_file(text, time_stamp=_STAMP_AT_WRITE, file_path='output.txt'):
             return save_into_file(text, time_stamp, mode='a', file_path=file_path)
 
         def empty_file(file_path='output.txt'):
