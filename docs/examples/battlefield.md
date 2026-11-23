@@ -43,10 +43,10 @@ key reaches the game untouched
 
 ```bash
 #set classes
--num1|(set("laser", 0))|(show_message("auto_t_OFF"))|(set("zoom",1))|(set("marking", 0))|(set('class', 0))|(set("weapon", 0))|(set("burst", 0))|(show_message("sturm-soldat"))|(False) : -None
--num2|(set("laser", 0))|(show_message("auto_t_OFF"))|(set("zoom",1))|(set("marking", 0))|(set('class', 1))|(set("weapon", 0))|(set("burst", 0))|(show_message("pioneer"))|(False) : -None
--num3|(set("laser", 0))|(show_message("auto_t_OFF"))|(set("zoom",1))|(set("marking", 0))|(set('class', 2))|(set("weapon", 0))|(set("burst", 0))|(show_message("versorger/medic"))|(False) : -None
--num4|(set("laser", 0))|(show_message("auto_t_OFF"))|(set("zoom",0))|(set("marking", 0))|(set('class', 3))|(set("weapon", 0))|(set("burst", 0))|(show_message("scharfschuetze"))|(False) : -None
+-num1|(set("laser", 0))|(show_message("auto_t_OFF"))|(set("zoom",1))|(set("marking", 0))|(set('class', 0))|(set("weapon", 0))|(set("burst", 0))|(show_message("Assault"))|(False) : -None
+-num2|(set("laser", 0))|(show_message("auto_t_OFF"))|(set("zoom",1))|(set("marking", 0))|(set('class', 1))|(set("weapon", 0))|(set("burst", 0))|(show_message("Engineer"))|(False) : -None
+-num3|(set("laser", 0))|(show_message("auto_t_OFF"))|(set("zoom",1))|(set("marking", 0))|(set('class', 2))|(set("weapon", 0))|(set("burst", 0))|(show_message("Support"))|(False) : -None
+-num4|(set("laser", 0))|(show_message("auto_t_OFF"))|(set("zoom",0))|(set("marking", 0))|(set('class', 3))|(set("weapon", 0))|(set("burst", 0))|(show_message("Recon"))|(False) : -None
 ```
 
 The same idiom tracks the weapon slot on the number keys, and the gadget slot
@@ -55,7 +55,7 @@ stores 1):
 
 ```bash
 # set weapons
--1|(set("weapon",0))|(check("ha"))|(stop_repeat('<halbautomatik>'))|(clear("ha"))|(False) : -None
+-1|(set("weapon",0))|(check("ha"))|(stop_repeat('<automatic_fire>'))|(clear("ha"))|(False) : -None
 -2|(set("weapon",1))|(False) : -None
 -3|(set("weapon",2))|(False) : -None
 -4|(set("weapon",3))|(False) : -None
@@ -91,11 +91,11 @@ check("ha")`). `start_repeat` takes the alias name in quotes plus the interval
 in ms ([invocations.md - Repetition of Aliases](../invocations.md)).
 
 ```bash
-<halbautomatik> -ml|60,+ml
+<automatic_fire> -ml|60,+ml
 <salve> -ml|150,+ml
 <burst> -ml|200,+ml
-<halbautomatic_start> _|(not check("ha"))|(start_repeat('<halbautomatik>',100))|(set("ha"))
-<halbautomatic_end> _|(stop_repeat('<halbautomatik>'))|(clear("ha"))
+<automatic_fire_start> _|(not check("ha"))|(start_repeat('<automatic_fire>',100))|(set("ha"))
+<automatic_fire_end> _|(stop_repeat('<automatic_fire>'))|(clear("ha"))
 <salve_start> _|(not check("ha"))|(start_repeat('<salve>',240))|(set("salve"))
 <salve_end> _|(stop_repeat('<salve>'))|(clear("salve"))
 ```
@@ -108,9 +108,9 @@ dropped only when its own segment starts with `#` - `-ml :: <a>, #_|100, #+ml`
 plays nothing after the alias.
 
 ```bash
-#pistol mit auto zoom
--ml|(check("weapon",1)), +mr :: <laser_start>, <zoom_start>, <halbautomatic_start> #, _|100, +ml
-+ml|(check("weapon",1))|(check("ha")), +mr :: <halbautomatic_end>, <zoom_end>, <laser_end>, _|20, +ml
+#pistol with auto zoom
+-ml|(check("weapon",1)), +mr :: <laser_start>, <zoom_start>, <automatic_fire_start> #, _|100, +ml
++ml|(check("weapon",1))|(check("ha")), +mr :: <automatic_fire_end>, <zoom_end>, <laser_end>, _|20, +ml
 ```
 
 Burst fire instead of full auto - the same lane, chosen by the `burst` variable.
@@ -119,9 +119,9 @@ parenthesised number, not a tuple - membership would need `(0,3)` or `[0,3]`
 ([invocations.md - Variable system](../invocations.md)).
 
 ```bash
-# alternativer burst automatic fire button
--mm|(check("weapon",(0)))|(check("burst", 0)), -mr :: <halbautomatic_start>
-+mm|(check ("ha")):: <halbautomatic_end>, +ml
+# alternative burst automatic fire button
+-mm|(check("weapon",(0)))|(check("burst", 0)), -mr :: <automatic_fire_start>
++mm|(check ("ha")):: <automatic_fire_end>, +ml
 
 -mm|(check("weapon",(0)))|(check("burst", 1)), -mr :: _|(start_repeat('<burst>',350))|(set("ha2"))
 +mm|(check("ha2")) :: _|(stop_repeat('<burst>'))|(clear("ha2")), +ml
@@ -164,7 +164,7 @@ keys around it are plain mode switches with a toast as the only feedback.
 -num6 :: _|(set("laser", 1))|(show_message("auto_laser_ON")), t
 -num8 :: _|(set("zoom", 0))|(show_message("auto_zoom_OFF"))
 -num9 :: _|(set("zoom", 1))|(show_message("auto_zoom_ON"))
--num7 :: _|(set("burst", 0))|(show_message("halbautomatic")) : _|(set("burst", 1))|(show_message("burst 2"))
+-num7 :: _|(set("burst", 0))|(show_message("automatic_fire")) : _|(set("burst", 1))|(show_message("burst 2"))
 -divide :: _|(clear("marking"))|(show_message("marking_OFF"))
 -multiply :: _|(set("marking"))|(show_message("marking_ON"))
 ```
@@ -178,11 +178,10 @@ pairing lets the press act and suppresses the release. Mouse-button key strings
 ([invocations.md - Mouse keys](../invocations.md)).
 
 ```bash
-# naga trinity
+# naga trinity (naga keys mapped to F13 to F24)
 (1) naga1, +rm : g
 (1-rm) naga1, -rm : y
 (2) naga2: f
-(2-rm) f, -rm : y
 (3) naga3, +rm : mx1
 (4) naga4 : f1
 (6) naga6 : mx2
@@ -190,7 +189,7 @@ pairing lets the press act and suppresses the release. Mouse-button key strings
 (9) naga9 : 5
 (10) naga10 : m
 (12) naga12 : 6
-(7-) -naga7|(set("laser", 0))|(show_message("auto_t_OFF"))|(set("zoom",1))|(set("marking"))|(set('class', 2))|(set("weapon",0))|(set("burst",0))|(show_message("versorger/medic"))|(False) :: -None
+(7-) -naga7|(set("laser", 0))|(show_message("auto_t_OFF"))|(set("zoom",1))|(set("marking"))|(set('class', 2))|(set("weapon",0))|(set("burst",0))|(show_message("Support"))|(False) :: -None
 (7+) +naga7 : suppress
 ```
 
@@ -202,7 +201,7 @@ repeat, releases every simulated key, and clears every variable
 ([invocations.md - General key control](../invocations.md)).
 
 ```bash
--esc|(set("laser", 0))|(show_message("auto_t_OFF"))|(set("zoom",0))|(set('class', 0))|(set("weapon",0))|(show_message("keine Klasse gesetzt"))|(clear("marking"))|(!) :: -esc
+-esc|(set("laser", 0))|(show_message("auto_t_OFF"))|(set("zoom",0))|(set('class', 0))|(set("weapon",0))|(show_message("no class set"))|(clear("marking"))|(!) :: -esc
 +esc|(stop_all_repeat())|(release_all_keys())|(clear_all_variables())|(!) :: +esc
 ```
 
