@@ -6,6 +6,7 @@ overview, install, and build steps stay in the [README](../README.md).
 
 | Question | Page |
 |---|---|
+| I am new: teach me step by step, from the first start to a working profile. | [tutorial.md](tutorial.md) |
 | What is FST and what do the terms mean (key_event, key_group, trigger_group, vk_code, focus app...)? | [concepts.md](concepts.md) |
 | How do I pause, stop, or return to the menu - and what are the ALT+NUM debug combos? | [controls.md](controls.md) |
 | How do I report a bug? (the `fst_status.log` status dump) | [controls.md](controls.md) |
@@ -16,6 +17,7 @@ overview, install, and build steps stay in the [README](../README.md).
 | Which invocations exist (repeats, variables, typing, mouse, clipboard, file ops, backups, toasts, misc)? | [invocations.md](invocations.md) |
 | How is the config file structured - `<focus>` groups, `<arg>` lines, continuation lines? | [config-file.md](config-file.md) |
 | What does each `<arg>` start argument do? | [start-arguments.md](start-arguments.md) |
+| What does a complete live profile look like (Battlefield, Counter-Strike)? | [examples/battlefield.md](examples/battlefield.md) - [examples/counterstrike.md](examples/counterstrike.md) |
 
 Start-argument ownership: [start-arguments.md](start-arguments.md) is the
 complete reference; the README `[Extra Start Arguments]` list is a short
