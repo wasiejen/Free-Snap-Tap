@@ -132,10 +132,16 @@ def make_manager(qtbot, monkeypatch, rect, screen=SCREEN):
     screen (the FakeScreen pattern of tests/test_resolution_reposition.py;
     patched on the get_screen_at seam the manager resolves the CYCLE's
     screen through, #464 reviewer P2-4)."""
-    state = {'rect': QRect(rect)}
+    state = {'rect': QRect(rect), 'seen': []}
     overlay = SimpleNamespace(user_padding=4, geometry=lambda: state['rect'])
-    monkeypatch.setattr(fst_overlay, 'get_screen_at',
-                        lambda point: FakeScreen(screen))
+
+    def fake_screen_at(point):
+        # review recheck: the POINT is part of the contract - _screen_right
+        # must resolve the CYCLE center, never a cursor position
+        state['seen'].append(QPoint(point))
+        return FakeScreen(screen)
+
+    monkeypatch.setattr(fst_overlay, 'get_screen_at', fake_screen_at)
     fst = SimpleNamespace(arg_manager=SimpleNamespace(STATUS_INDICATOR=True))
     manager = ToastManager(fst, overlay)
     qtbot.addWidget(manager)
@@ -199,6 +205,9 @@ def test_resolution_flip_remirrors_live_toasts(qtbot, monkeypatch):
     assert manager.active_toasts['hello'].label.alignment() \
         == Qt.AlignLeft | Qt.AlignVCenter
     assert manager.main_layout.alignment() & Qt.AlignLeft
+    # the side query runs against the CYCLE center of the overlay geometry
+    # (recheck P2: a regression to a cursor-based point stays green otherwise)
+    assert state['seen'][-1] == QRect(100, 200, 20, 20).center()
     # reviewer P1 companion: the PER-ITEM flag is what places the fixed-width
     # box inside the 500 px window - the layout flag alone never moves it
     assert manager.main_layout.itemAt(0).alignment() & Qt.AlignLeft

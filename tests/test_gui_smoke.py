@@ -262,8 +262,11 @@ def test_update_position_anchors_to_overlay(qtbot, monkeypatch):
     overlay = IndicatorOverlay()
     overlay.move(1000, 200)
     overlay.resize(100, 60)
-    monkeypatch.setattr(fst_overlay, 'get_current_screen',
-                        lambda: FakeScreen())
+    # patched on get_screen_at - the seam _screen_right actually resolves
+    # (patching get_current_screen would only reach it via the None
+    # fallback, leaving the half environment-dependent)
+    monkeypatch.setattr(fst_overlay, 'get_screen_at',
+                        lambda point: FakeScreen())
     fst = SimpleNamespace(arg_manager=SimpleNamespace(STATUS_INDICATOR=True))
     manager = ToastManager(fst, overlay)
 
