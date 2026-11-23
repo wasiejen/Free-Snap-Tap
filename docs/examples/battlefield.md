@@ -103,8 +103,9 @@ in ms ([invocations.md - Repetition of Aliases](../invocations.md)).
 Pistol with automatic zoom: the press of the left button arms the repeat and the
 zoom helper, the release tears everything down again. The `#` in that line is a
 per-segment comment: it drops only the `#` segment itself, the `_|100` wait and
-the `+ml` release after the following commas still play - a comment that should
-end the line must therefore sit before any key that follows it.
+the `+ml` release after the following commas still play. A following key is
+dropped only when its own segment starts with `#` - `-ml :: <a>, #_|100, #+ml`
+plays nothing after the alias.
 
 ```bash
 #pistol mit auto zoom

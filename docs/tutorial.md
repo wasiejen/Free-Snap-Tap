@@ -112,8 +112,8 @@ Reference: [config-file.md](config-file.md).
 turn it off.
 
 ```bash
-<arg>-tapdelay=8,2       # tap groups: random gap between 2 and 8 ms
-<arg>-macrodelay=10,4    # macros/aliases: default gap 4-10 ms
+<arg>-tapdelay=2,8       # tap groups: random gap between 2 and 8 ms
+<arg>-macrodelay=4,10    # macros/aliases: default gap 4-10 ms
 <arg>-crossover=40       # 40% chance that press and release overlap
 #<arg>-nodelay           # uncomment to switch delays and crossover off
 ```
@@ -128,7 +128,7 @@ immediately and the crossover is off.
 **Classic pitfall.** The shipped default pair is 2-10 ms - that sits BELOW the
 ~15.6 ms Windows clock tick, so every gap quantizes to one tick and playback is
 effectively immediate. For a rhythm you can actually hear or see, pick a pair
-whose LOWER bound is above the tick, e.g. `-macrodelay=25,20`. And remember:
+whose LOWER bound is above the tick, e.g. `-macrodelay=20,25`. And remember:
 tap groups only obey these arguments - a `key|100` suffix there is invalid.
 
 Reference: [prefixes-suffixes.md - Suffix/Delays](prefixes-suffixes.md),
