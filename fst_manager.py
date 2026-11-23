@@ -293,20 +293,24 @@ def get_app_directory():
     '''The directory of the REAL executable/script - never the CWD.
 
     PyInstaller-frozen safe: sys.frozen + sys.executable = the exe.
-    Nuitka-onefile safe: the bootstrap exports NUITKA_ONEFILE_BINARY (the
-    path of the ORIGINAL onefile exe) before the extracted child starts, so
-    the anchor stays next to the exe even though __file__ can point into the
-    temp-extract dir. Nuitka-standalone and dev runs resolve through the
-    entry script (__main__.__file__), with sys.argv[0] as the last belt.'''
+    Nuitka-onefile safe: the bootstrap exports NUITKA_ONEFILE_DIRECTORY (the
+    directory of the ORIGINAL onefile exe - nuitka/build/static_src/
+    OnefileBootstrap.c, installed 4.2.2) before the extracted child starts,
+    so the anchor stays next to the exe even though __file__ points into the
+    temp-extract dir; the older NUITKA_ONEFILE_BINARY (full exe path, pre-
+    4.x spellings) is honoured as a twin for ancient builds. Dev runs and
+    Nuitka-standalone resolve through this module's own __file__ (the repo/
+    dist root - deterministic under pytest too, where __main__ is pytest);
+    no argv[0] belt - a bare argv[0] would re-open the CWD hole.'''
     if getattr(sys, 'frozen', False):
         return os.path.dirname(os.path.abspath(sys.executable))
+    onefile_directory = os.environ.get('NUITKA_ONEFILE_DIRECTORY')
+    if onefile_directory:
+        return os.path.abspath(onefile_directory)
     onefile_binary = os.environ.get('NUITKA_ONEFILE_BINARY')
     if onefile_binary:
         return os.path.dirname(os.path.abspath(onefile_binary))
-    main_file = getattr(sys.modules.get('__main__'), '__file__', None)
-    if main_file:
-        return os.path.dirname(os.path.abspath(main_file))
-    return os.path.dirname(os.path.abspath(sys.argv[0]))
+    return os.path.dirname(os.path.abspath(__file__))
 
 
 def default_config_path(file_name=DEFAULT_CONFIG_FILE_NAME):

@@ -12,7 +12,9 @@ import datetime
 import gc
 
 from fst_keyboard import FST_Keyboard
-from fst_manager import CONSTANTS, setup_fst_logging, handle_elevate_flag, default_config_path, startup_decision_trace
+from fst_manager import (CONSTANTS, setup_fst_logging, handle_elevate_flag,
+                         default_config_path, startup_decision_trace,
+                         DEFAULT_CONFIG_FILE_NAME)
 from fst_single_instance import handle_single_instance_guard
 from fst_data_types import ConfigError, Lifecycle_State
 from fst_overlay import GUI_Manager, set_console_visibility, ToastBridge
@@ -56,7 +58,7 @@ CURRENT_DATE_TIME = datetime.datetime.now().strftime("%y%m%d-%H%M")
 # never the CWD (a boot route without a working folder used to miss the
 # config and start deactivated). The comment-switch below keeps working: the
 # alternate name is anchored the same way.
-CONSTANTS.FILE_NAME = default_config_path('FSTconfig.txt')
+CONSTANTS.FILE_NAME = default_config_path(DEFAULT_CONFIG_FILE_NAME)
 # CONSTANTS.FILE_NAME = default_config_path('FSTconfig_test.txt')
 
 # Control key combinations (vk_code and/or key_string)

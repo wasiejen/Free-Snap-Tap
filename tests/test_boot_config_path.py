@@ -31,9 +31,10 @@ def _fake_pyinstaller(monkeypatch, exe_path):
 
 
 def _clear_build_anchors(monkeypatch):
-    """Neutralize the frozen and the Nuitka-onefile anchor so the
-    script/argv0 fallbacks are reached."""
+    """Neutralize the frozen and the Nuitka-onefile anchors so the
+    module-file fallback is reached."""
     monkeypatch.delattr(fst_manager.sys, 'frozen', raising=False)
+    monkeypatch.delenv('NUITKA_ONEFILE_DIRECTORY', raising=False)
     monkeypatch.delenv('NUITKA_ONEFILE_BINARY', raising=False)
 
 
@@ -56,18 +57,31 @@ class TestGetAppDirectory:
 
     def test_nuitka_onefile_env_anchor_beats_the_extract_dir(self, tmp_path,
                                                              monkeypatch):
-        # the onefile bootstrap exports NUITKA_ONEFILE_BINARY (the ORIGINAL
-        # exe) before the extracted child starts, and __main__.__file__ can
-        # point into the temp-extract dir - the env anchor must win
+        # Nuitka 4.x (the installed build, built_nuitka.bat route): the
+        # onefile bootstrap exports NUITKA_ONEFILE_DIRECTORY - the
+        # DIRECTORY of the original exe (OnefileBootstrap.c:1377) - and
+        # __main__.__file__ / module __file__ point into the temp-extract
+        # dir, so the env anchor must win
         _clear_build_anchors(monkeypatch)
         real_dir = tmp_path / 'progra~1'
         real_dir.mkdir()
         extract_dir = tmp_path / 'tmp' / 'onefile_123'
         extract_dir.mkdir(parents=True)
+        monkeypatch.setenv('NUITKA_ONEFILE_DIRECTORY', str(real_dir))
+        monkeypatch.setattr(fst_manager, '__file__',
+                            str(extract_dir / 'fst_manager.py'))
+        _foreign_cwd(tmp_path, monkeypatch)
+        assert get_app_directory() == str(real_dir)
+
+    def test_legacy_onefile_binary_env_is_still_honoured(self, tmp_path,
+                                                         monkeypatch):
+        # pre-4.x Nuitka spellings exported NUITKA_ONEFILE_BINARY (the
+        # full exe path); the twin branch keeps ancient builds anchored
+        _clear_build_anchors(monkeypatch)
+        real_dir = tmp_path / 'progra~1'
+        real_dir.mkdir()
         monkeypatch.setenv('NUITKA_ONEFILE_BINARY',
                            str(real_dir / 'free_snap_tap_nuitka.exe'))
-        monkeypatch.setattr(fst_manager.sys.modules['__main__'], '__file__',
-                            str(extract_dir / 'free_snap_tap.py'))
         _foreign_cwd(tmp_path, monkeypatch)
         assert get_app_directory() == str(real_dir)
 
@@ -75,24 +89,22 @@ class TestGetAppDirectory:
         _clear_build_anchors(monkeypatch)
         repo = tmp_path / 'repo'
         repo.mkdir()
-        monkeypatch.setattr(fst_manager.sys.modules['__main__'], '__file__',
-                            str(repo / 'free_snap_tap.py'))
+        monkeypatch.setattr(fst_manager, '__file__',
+                            str(repo / 'fst_manager.py'))
         _foreign_cwd(tmp_path, monkeypatch)
         assert get_app_directory() == str(repo)
 
-    def test_compiled_main_without_file_falls_back_to_argv0(self, tmp_path,
-                                                            monkeypatch):
-        # Nuitka-standalone belt: __main__.__file__ absent -> argv[0] is the
-        # exe, its dirname is the app dir
+    def test_under_the_test_runner_the_anchor_is_the_repo_not_a_venv_path(
+            self, tmp_path, monkeypatch):
+        # the review P1-3 regression: the fallback is this MODULE's file,
+        # never __main__ (under pytest __main__ is the pytest package in
+        # the venv - anchoring there made the kb_env fixtures load from
+        # the venv and auto-create a config inside site-packages)
         _clear_build_anchors(monkeypatch)
-        exe_dir = tmp_path / 'standalone'
-        exe_dir.mkdir()
-        monkeypatch.setattr(fst_manager.sys.modules['__main__'], '__file__',
-                            None, raising=False)
-        monkeypatch.setattr(fst_manager.sys, 'argv',
-                            [str(exe_dir / 'free_snap_tap.exe')])
-        _foreign_cwd(tmp_path, monkeypatch)
-        assert get_app_directory() == str(exe_dir)
+        foreign = _foreign_cwd(tmp_path, monkeypatch)
+        assert get_app_directory() == os.path.dirname(
+            os.path.abspath(fst_manager.__file__))
+        assert list(foreign.iterdir()) == []
 
 
 class TestDefaultConfigPath:
@@ -114,6 +126,21 @@ class TestDefaultConfigPath:
         _foreign_cwd(tmp_path, monkeypatch)
         assert default_config_path('FSTconfig_test.txt') == os.path.join(
             str(exe_dir), 'FSTconfig_test.txt')
+
+
+class TestEntryWiring:
+    # the #461 WIRING pin (review P2-4): the module-level assignment in
+    # free_snap_tap.py (what every exe/dev boot runs) is pinned end-to-end -
+    # reverting CONSTANTS.FILE_NAME to a bare relative name fails this
+
+    def test_importing_the_entry_module_leaves_an_anchored_absolute_name(self):
+        import importlib
+        importlib.import_module('free_snap_tap')  # cached import = the wiring
+        file_name = fst_manager.CONSTANTS.FILE_NAME
+        assert os.path.isabs(file_name)
+        assert os.path.dirname(file_name) == os.path.dirname(
+            os.path.abspath(fst_manager.__file__))
+        assert os.path.basename(file_name) == 'FSTconfig.txt'
 
 
 class TestConfigOpenUnderForeignCwd:
