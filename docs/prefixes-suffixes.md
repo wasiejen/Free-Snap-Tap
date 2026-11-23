@@ -40,8 +40,10 @@ Every key event supports prefixes **prefix/modifier**
   - **A segment delay is deliberately UNBOUNDED** (maintainer decision 12, 
     2026-11-17): a macro may have to wait seconds or minutes for the program in
     front of it, so no limit is imposed on *time*. The delay KNOBS (`-tapdelay`,
-    `-macrodelay`, `-sequencedelay`, bound 0..1000 ms) are a different concept -
-    they set the random delay a line gets when it states none. Two rules come
+    `-macrodelay`, bound 0..1000 ms) are a different concept -
+    they set the random delay a line gets when it states none. There is no
+    `-sequencedelay` start argument: a per-segment wait uses the `key|*time*`
+    suffix, a per-line default uses `-macrodelay`. Two rules come
     with the unbounded value:
       - the config check asks about an obviously large one: above 30000 ms the
         load reports `very long delay (45000 ms) in a|45000 - intentional?` as a

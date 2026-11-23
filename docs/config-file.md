@@ -20,7 +20,6 @@
 ### Counter Strike focus group
 <focus>Counter
 
-#<arg>-debug
 #<arg>-crossover=40
 <arg>-tapdelay=6,4
 <arg>-aliasdelay=6,4

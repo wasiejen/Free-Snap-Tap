@@ -29,7 +29,7 @@ It interpretes the real input (of keyboard and mouse) and according to defined r
   - **suffix/delays** `ke|*time in ms*` time after a key_event that will be waited before next will be played. Delay is defined by if the suffix is a number (time in ms for delay) or can be evaluated to a number.
   - **suffix/constraints** `ke|(-ke)|(+ke)` defines when to trigger or send a key_event based on True or False statements
   - **suffix/evaluations** `ke|(evaluation)` can result in a constraint if evaluated to True/False or as delay when evaluated to a number
-  - **suffix/function invocation** `ke1 :: ke2|(repeat_toggle(10000))` a function that will always evaluate to True - the suffixed key_event is still played as usual, and the function defined in the invocation will be started
+  - **suffix/function invocation** `ke1 :: ke2|(toggle_repeat(10000))` a function that will always evaluate to True - the suffixed key_event is still played as usual, and the function defined in the invocation will be started
     - in this example: trigger `ke1` will start a repeated sending of the `ke2` every 10 seconds until ```ke1` is pressed again and stop it
 - **focus app name** is a part or the full name of the active window the program will be looking for to activate or change tap groups, rebinds and macros
   - the match is a case-sensitive substring: `<focus>Counter` matches a window named "Counter-Strike" but not "counter-strike"

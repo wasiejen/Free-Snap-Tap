@@ -12,7 +12,6 @@ Everything else should be put in the config file and then can be applied on a pe
 
 -  `<arg>-nomenu` skips the menu and will be directly active
 -  `<arg>-file="filename"`: (with or without "): custom save file
--  `<arg>-debug`: print out some debug info
 -  `<arg>-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  
 -  `<arg>-tapdelay="number, number"`: sets the default min and max delay of "number,number" ms for Tap_Groups
 -  `<arg>-aliasdelay="number, number"`: sets the default min and max delay of "number,number" ms for Macros/Aliases
