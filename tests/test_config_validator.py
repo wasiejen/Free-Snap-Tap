@@ -725,6 +725,8 @@ class TestGuiBranchWiring:
             # the startup freeze is a step of the entry block, so an exec harness of that block
             # must supply it (decision 10, 2026-11-17)
             'freeze_startup_heap': lambda: None,
+            # #460: the startup decision line is a step of the entry block
+            'startup_decision_trace': lambda cm, hidden: 'startup trace stub',
         }
         with pytest.raises(SystemExit):
             exec(code, globs)

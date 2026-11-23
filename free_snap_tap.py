@@ -12,7 +12,7 @@ import datetime
 import gc
 
 from fst_keyboard import FST_Keyboard
-from fst_manager import CONSTANTS, setup_fst_logging, handle_elevate_flag, default_config_path
+from fst_manager import CONSTANTS, setup_fst_logging, handle_elevate_flag, default_config_path, startup_decision_trace
 from fst_single_instance import handle_single_instance_guard
 from fst_data_types import ConfigError, Lifecycle_State
 from fst_overlay import GUI_Manager, set_console_visibility, ToastBridge
@@ -544,6 +544,19 @@ if __name__ == "__main__":
     # this is the last quiet point to freeze the startup heap - the collector
     # keeps working normally over everything allocated from here on.
     freeze_startup_heap()
+
+    # BOOT TRACE (#460, maintainer live report 2026-11-23): ONE INFO line for
+    # fst.log + a console echo, naming the resolved config path, whether the
+    # config was found at load, and the FINAL console decision. The decision
+    # reads the merged start-arg state: -hide_cmd_window can arrive from BOTH
+    # the command line (a launcher bat - the 2026-11-23 confusion) and the
+    # config <arg> lines. The echo lands BEFORE any hide so it stays readable
+    # in the cmd window.
+    startup_trace = startup_decision_trace(
+        fst_keyboard.config_manager,
+        fst_keyboard.arg_manager.CMD_WINDOW_HIDDEN)
+    logger.info(startup_trace)
+    print(f"[FST] {startup_trace}")
 
     # -hide_cmd_window, decided ONCE here - AFTER the config parse (CMDHIDE
     # ruling 2026-11-21: the OFF switch has to work). Flag ON: hide the

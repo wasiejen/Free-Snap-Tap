@@ -317,6 +317,25 @@ def default_config_path(file_name=DEFAULT_CONFIG_FILE_NAME):
     return os.path.join(get_app_directory(), file_name)
 
 
+def startup_decision_trace(config_manager, cmd_window_hidden):
+    '''The #460 startup decision line - ONE INFO string for fst.log AND the
+    console echo, naming the resolved config path (abs), whether the config
+    was PRESENT when the loader opened it, and the FINAL console decision.
+
+    exists= comes from config_file_found (the load decision), NOT an
+    isfile() of the trace moment: a missing config has already been
+    auto-created by create_new_group_file when this runs, and 'exists=False'
+    is the honest signal that the user's config was NOT found (the #461
+    symptom). cmd_window= reads arg_manager.CMD_WINDOW_HIDDEN after the
+    whole start-arg pipeline, so it reports the merged truth: the flag can
+    arrive from BOTH the command line and the config <arg> lines (the
+    2026-11-23 confusion: a launcher bat passed it as an argv argument while
+    the config line sat commented out).'''
+    return (f"config_file={os.path.abspath(config_manager.file_name)} "
+            f"exists={bool(config_manager.config_file_found)} "
+            f"cmd_window={'hidden' if cmd_window_hidden else 'visible'}")
+
+
 class CONSTANTS():
 
     # safety gate: only run the numpad debug-combination checks when enabled

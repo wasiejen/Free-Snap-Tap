@@ -73,6 +73,10 @@ class StubKeyboard:
         self._steps = steps
         self.arg_manager = types.SimpleNamespace(
             CMD_WINDOW_HIDDEN=cmd_window_hidden)
+        # the #460 boot trace reads these (the block now calls
+        # startup_decision_trace through the namespace stub)
+        self.config_manager = types.SimpleNamespace(
+            file_name='FSTconfig.txt', config_file_found=True)
 
     def set_sys_start_arguments(self, args):
         self._steps.append('keyboard.sys_args')
@@ -105,6 +109,9 @@ def run_entry_block(cmd_window_hidden, steps, visibility_calls):
         'MainLogic': lambda keyboard: steps.append('logic') or object(),
         'sleep': lambda seconds: steps.append('settle'),
         'freeze_startup_heap': lambda: steps.append('freeze'),
+        # #460: the startup decision line now precedes the visibility call -
+        # stub it so this harness stays about the visibility contract only
+        'startup_decision_trace': lambda cm, hidden: 'startup trace stub',
         'sys': types.SimpleNamespace(argv=['free_snap_tap.py'],
                                      exit=lambda code=0: None),
         'ConfigError': ConfigError,

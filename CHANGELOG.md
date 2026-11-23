@@ -9,6 +9,22 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 ## [Unreleased]
 
 ### Fixed
+- The default config file is now found on every launch route (#461, maintainer
+  report 2026-11-23): "FSTconfig.txt" resolves against the executable/script
+  folder, never the working directory, so a boot route without a working
+  folder (a startup shortcut landing in `C:\Windows\System32`) no longer
+  starts FST deactivated with an empty auto-created config. Nuitka-onefile
+  exes, PyInstaller builds and a plain `python free_snap_tap.py` dev run each
+  get their own anchor; an explicit `-file=` override is taken exactly as
+  before.
+- Startup decision trace (#460, maintainer live report 2026-11-23): ONE INFO
+  line in `fst.log` - echoed to the console before any hide - now names the
+  resolved config path (`config_file=`), whether the config was there when
+  the loader opened it (`exists=`), and the final console decision
+  (`cmd_window=hidden/visible`). It makes the hidden-window confusion
+  self-reading: `-hide_cmd_window` can arrive from the command line (a
+  launcher bat) AND from config `<arg>` lines alike, and the line states the
+  merged decision.
 - `-hide_cmd_window` has an off switch again. The startup path decides
   console visibility ONCE, after the config has loaded: with the flag the
   console is hidden quietly at start (the old "attention, the window will
