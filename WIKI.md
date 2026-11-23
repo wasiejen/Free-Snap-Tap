@@ -520,8 +520,9 @@ Everything else should be put in the config file and then can be applied on a pe
 - `<arg>-delay`: re-enable the delays - the delays are active on default, so this is only meaningful after an earlier `-nodelay`
 - `<arg>-exec_one_macro`: of all macros triggered by one real key event only the FIRST is played
 - `<arg>-debug_numpad`: enable the numpad debug combos (see [Numpad debug combos])
+- `<arg>-no_warnings`: silence the config-validation warnings for the section it is set in (per-scope suppression) - the runtime takes no action
 - `<arg>-log=<debug|info|warning|error>`: set the area-logging level of `fst.log`; an invalid value is ignored and a warning names the valid levels (area-based logging, V1.3.0)
-- `<arg>-flow`: enable the per-key flow stream to its own `fst_flow.log` (one line per filter leg of a key event); also toggled at runtime by `ALT + NUM4` and console menu option 0
+- `<arg>-flow`: enable the per-key flow stream to its own `fst_flow.log` (one line per filter leg of a key event); also toggled at runtime by `ALT + NUM4` and the console menu's "Toggle debugging output" entry (option 0)
 - `<arg>-drop_watch`: enable the drop-watch lane (U345, #291 H1) - filter legs that die mid-event land named drop lines in `fst_drop.log` + `fst.log`; `ALT + NUM6` toggles it at runtime
 - `<arg>-no_toast_offload`: restore the direct toast bridge emit (default is the offload queue + asyncio pump, U345 H2 - A/B switch for the stuck-key hunt)
 - `<arg>-always_active`: if no focus app matches, the default groups stay active instead of the filter being paused - the status indicator shows blue while in this default-active state
