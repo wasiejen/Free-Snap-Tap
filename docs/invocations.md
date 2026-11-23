@@ -23,6 +23,7 @@
     - delays between the played keys are defined 
   - `(start_repeat('<*name of alias>', *repeat time in ms*))`
     ```bash
+    <scan> v
     w|(start_repeat('<scan>', 5000)) : w
     ```
   - `(stop_repeat('<*name of alias>'))`   
@@ -54,7 +55,7 @@
     - `|(name)` on a macro name interrupts a started macro playback - it stops as soon as possible (normally in < 10 ms) and does not reset anything
     - `|(name)` on a sequence name resets the sequence counter only - the currently in-flight playback is not interrupted
     - `|(reset('name'))` on a sequence name resets the counter; on a non-sequence name it logs "no macro sequence with name ... - reset failed" and does nothing else (it does not interrupt a macro)
-    - an unknown name is a silent no-op (evaluates to True)
+    - an unknown name logs "constraint ... not recognized - ignored" and is a no-op (evaluates to True)
   - resetting of a sequence will let the next playback of the sequence start again on the first key group
 
 #### [General key control]
@@ -120,7 +121,7 @@ The functions of the following sections are resolved by the same suffix evaluati
     ```
   - `|(get_var('name'))`: evaluates to the stored text - an unknown name is created with the text "None" and returns it
     ```bash
-    w|(get_var('who')) : w
+    w|(cli(get_var('who'))) : w
     ```
 - text and integer variables share the same name space - a name stored with `set_var` is visible to the integer accessors (`is_set` evaluates to True for a stored text, since a text is never equal to 0)
 - `|(print_all_variables())`: print all variables to the console
@@ -191,7 +192,7 @@ The functions of the following sections are resolved by the same suffix evaluati
   ```
 - `|(mouse_get_pos())`: evaluates to the current mouse position as a tuple - the position is additionally copied to the clipboard as text
   ```bash
-  w|(mouse_get_pos()) : w
+  w|(cli(mouse_get_pos())) : w
   ```
 - `|(mouse_save_to_var('name'))`: save the current mouse position under *name*
   ```bash
@@ -235,7 +236,7 @@ The functions of the following sections are resolved by the same suffix evaluati
   ```bash
   w|(save_into_file('done')) : w
   ```
-- `|(append_to_file('text', ...))`: same as `save_into_file`, mode `'a'` (append)
+- `|(append_to_file('text', ...))`: same as `save_into_file` with mode `'a'` (append) fixed - its own slots are *time stamp* and *file path* (no *mode* slot)
   ```bash
   w|(append_to_file('done', get_time(), 'notes.txt')) : w
   ```
@@ -280,6 +281,7 @@ The functions of the following sections are resolved by the same suffix evaluati
   ```
 - `|(is_repeat_active('name'))`: (an evaluation, not an invocation) evaluates to True iff the repeat handle with the given name is still active - unknown names evaluate to False
   ```bash
+  <scan> v
   w|(is_repeat_active('<scan>')) : w
   ```
 

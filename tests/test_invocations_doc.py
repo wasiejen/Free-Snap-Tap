@@ -4,19 +4,23 @@ product Config_Validator - the doc's copy-paste promise, pinned.
 Each example line is validated as a STANDALONE config (that is what
 copy-paste-ready means), with a '<scan> v' alias-definition preamble so
 the alias references of the repetition examples resolve in the same
-section they are used in - mirroring the worked blocks.
+section they are used in - mirroring the worked blocks. The alias-using
+fences carry their own '<scan> v' line, so they paste standalone too.
 """
+import re
 from pathlib import Path
 
-from fst_manager import Config_Manager, Config_Validator
+from fst_manager import CONSTRAINT_FUNCTIONS, Config_Manager, Config_Validator
 
 DOC = Path(__file__).resolve().parents[1] / 'docs' / 'invocations.md'
 
+# an entry of the form `|(name(...)...)` outside the example fences
+ENTRY_FORM = re.compile(r'\|\((\w+)\(')
 
-def fenced_example_lines(text):
-    """non-comment, non-blank lines inside ```bash fences,
-    as (doc_line_number, raw_line) tuples"""
-    out, in_block = [], False
+
+def split_fenced(text):
+    """(prose_lines, fenced_lines) - fenced lines are (line_no, raw)"""
+    prose, fenced, in_block = [], [], False
     for n, raw in enumerate(text.splitlines(), 1):
         stripped = raw.strip()
         if not in_block and stripped.startswith('```bash'):
@@ -25,9 +29,15 @@ def fenced_example_lines(text):
         if in_block and stripped.startswith('```'):
             in_block = False
             continue
-        if in_block and stripped and not stripped.startswith('#'):
-            out.append((n, raw))
-    return out
+        if in_block:
+            fenced.append((n, raw))
+        else:
+            prose.append(raw)
+    return prose, fenced
+
+
+def example_function_names(fenced):
+    return {name for _, raw in fenced for name in re.findall(r'\b(\w+)\(', raw)}
 
 
 def violations_of(content):
@@ -38,22 +48,29 @@ def violations_of(content):
 
 
 class TestInvocationsDocExamples:
-    def test_examples_found(self):
-        """extraction works - a fence-format change must fail loudly here,
-        not silently shrink the validated set"""
-        lines = fenced_example_lines(DOC.read_text(encoding='utf-8'))
-        assert len(lines) >= 49, f'only {len(lines)} example lines found'
+    def test_every_documented_entry_has_an_example(self):
+        """the per-entry contract: every config function this doc shows an
+        `|(name(...))` entry for must appear in at least one example fence -
+        a new entry without an example, or a deleted fence, fails here"""
+        prose, fenced = split_fenced(DOC.read_text(encoding='utf-8'))
+        entry_names = {n for line in prose for n in ENTRY_FORM.findall(line)}
+        entry_names &= set(CONSTRAINT_FUNCTIONS)
+        missing = entry_names - example_function_names(fenced)
+        assert missing == set(), f'doc entries without an example: {missing}'
 
     def test_every_example_line_validates_standalone(self):
         """zero violations per example line: no unknown function, no arity
         error, no vk error - every example parses and resolves"""
-        lines = fenced_example_lines(DOC.read_text(encoding='utf-8'))
+        _, fenced = split_fenced(DOC.read_text(encoding='utf-8'))
         found = []
-        for n, line in lines:
-            content = (line if line.strip().startswith('<scan> ')
+        for n, line in fenced:
+            stripped = line.strip()
+            if not stripped or stripped.startswith('#'):
+                continue
+            content = (line if stripped.startswith('<scan> ')
                        else '<scan> v\n' + line)
             for v in violations_of(content):
-                found.append((n, line.strip(), v.severity, v.rule, v.message))
+                found.append((n, stripped, v.severity, v.rule, v.message))
         assert found == []
 
     def test_harness_rejects_a_bogus_function(self):
