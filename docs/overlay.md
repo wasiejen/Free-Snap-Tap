@@ -7,7 +7,7 @@
 - `<arg>-status_indicator=*size in pixel*`
 - can be used as default argument and in focus groups - per-focus values are applied while the GUI loop is running
   - the GUI loop itself only starts if `-status_indicator` or `-tray_icon` is enabled at startup
-  - see picture above - just a small dot that changes based on being active to green and on incative to red
+  - see picture above - just a small dot that changes based on being active to green and on inactive to red
   - right mouse click opens the menu
   - double left mouse click or middle mouse click will open the config file
   - left mouse drag moves it anywhere; a resolution or scale change keeps that RELATIVE position (the same fraction of the screen, clamped fully on-screen) - never dragged, it stays at the startup top-right corner
