@@ -417,7 +417,8 @@ class TestRelativePosition:
         assert geo.left() >= 0 and geo.right() <= 1919
         assert geo.top() >= 0 and geo.bottom() <= 1079
 
-    def test_relative_position_clamps_fully_on_screen(            self, qtbot, overlay_fst, on_old_screen, monkeypatch):
+    def test_relative_position_clamps_fully_on_screen(
+            self, qtbot, overlay_fst, on_old_screen, monkeypatch):
         """Edge clamp case (spec acceptance): a drag to (3820, 2130) -
         flush bottom-right on 3840x2160 - lands clamped on 1920x1080,
         box fully on-screen (right/bottom edges flush with the new
