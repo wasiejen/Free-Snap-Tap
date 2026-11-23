@@ -12,7 +12,7 @@
       - for Keys with delays, the delay will be executed after the press AND the release
     - default delays for Macros are changeable via the start argument `-macrodelay=*min_delay*,*max_delay*`
   - delay can be suppressed entirely with the start argument `-nodelay`
-For further functionality of how it will be triggered, usage of constraints, evaluation and function invocation see [Rebinds + Macros + Macro_Sequences]
+For further functionality of how it will be triggered, usage of constraints, evaluation and function invocation see [Rebinds + Macros + Macro_Sequences](groups-macros.md)
 
 ## On Prefixes and Suffixes
 
@@ -37,6 +37,9 @@ Every key event supports prefixes **prefix/modifier**
 
 - every key_event supports **suffixes** (constraints, evaluation, function invocation)
   - a suffix segment is either a delay number or a parenthesized expression `(...)` - a bare segment is parsed as a delay number, so `ke1|-ke2` is rejected
+
+### [Suffix/Constraints]
+
   - as constraints: `(-ke)`, `(+ke)`/`(!ke)`: e.g. `ke1|(-ke2)|(-ke3) : ...` is functionally the same as trigger group: `ke1, -ke2, -ke3 : ...`
     - inside the parentheses the sign names the state to check: `(-ke)` is True while ke is pressed, `(+ke)`/`(!ke)` while ke is not pressed (real and simulated state)
     ```bash

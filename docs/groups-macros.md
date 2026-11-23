@@ -61,8 +61,7 @@ For further functionality of how it will be triggered, usage of constraints, eva
     - `key_event/Key|*time*` -> will result in a static delay of length *time* in ms
     - `key_event/Key|*time1*|*time2*` -> will result in a random delay of length between *time1* and *time2* in ms
 - support of key_groups (multiple Keys and/or key_events) to be played
-- will be played as asyncio tasks (interruptible, non-blocking) to not interfere with real input while waiting for the delays
-  - macro playback WILL BE INTERRUPTED by retriggering of the macro if it is still in playback and waiting for a delay, the old playback will be stopped and replaced by the new retriggered macro playback
+- macro playback WILL BE INTERRUPTED by retriggering of the macro if it is still in playback and waiting for a delay, the old playback will be stopped and replaced by the new retriggered macro playback
 - Only supports notation for the trigger of the trigger_group as key_event, to prevent double triggering with one key_tap
   - if a `Key` is given it will be interpreted as a pressed key_event `-key_event` 
 - can be named by putting`(*name of the macro*)` in front of the macro definition

@@ -45,3 +45,9 @@ moved from `prefixes-suffixes.md` ([Suffix/Delays]):
     immediate (a long string lands as a burst). For a visible per-key rhythm,
     state a pair whose LOWER bound is above the tick (the parser sorts the
     pair), e.g. `-macrodelay=25,20`.
+
+### [Macro playback design]
+
+moved from `groups-macros.md` ([Macros]):
+
+- will be played as asyncio tasks (interruptible, non-blocking) to not interfere with real input while waiting for the delays
