@@ -49,9 +49,17 @@ def _lane_steps(lines):
 
 
 def _pytest_lines(lines):
-    '''Non-comment lines mentioning pytest - a flat run anywhere in CI.'''
+    '''Non-comment lines invoking pytest flat ('pytest' or 'py.test').
+
+    Deliberately broad (#465, review P2-3): ANY future non-comment CI line
+    mentioning pytest - even a benign one such as a plugin install - must
+    force a conscious edit of this pin; a flat run may never return.
+    Comment lines are exempt here, but step attribution (P2-4) reads whole
+    blocks: an inter-step comment must not mention 'suite_lane.py' or
+    'continue-on-error: true', or a pin misattributes the step.'''
     return [line.strip() for line in lines
-            if "pytest" in line and not line.strip().startswith("#")]
+            if ('pytest' in line or 'py.test' in line)
+            and not line.strip().startswith("#")]
 
 
 def test_ci_workflow_exists():

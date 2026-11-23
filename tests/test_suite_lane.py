@@ -165,6 +165,51 @@ class TestChunkFailureVisibility:
         assert code == 0, code
         assert out == ''
 
+    def test_the_failing_chunk_dump_is_labelled(self, tmp_path, capsys):
+        # CONTRACT (#465, review P2-2): in a multi-chunk Actions log the dump
+        # must announce itself - an unlabelled multi-hundred-line block is
+        # not parseable around the one line that names the chunk
+        tests = tmp_path / 'tests'
+        tests.mkdir()
+        (tests / 'test_red2.py').write_text(
+            'def test_fails():\n    raise AssertionError("u462-red2")\n',
+            encoding='utf-8')
+        suite_lane.run_chunk(['tests/test_red2.py'], tmp_path, 300)
+        out = capsys.readouterr().out
+        assert 'output of the failing chunk' in out
+
+    def test_a_timed_out_chunk_echoes_its_partial_output(self, monkeypatch,
+                                                         capsys):
+        # CONTRACT (#465, review P2-1): a timed-out chunk is a red chunk too -
+        # whatever the child managed to print before wedging must reach the
+        # log. Deterministic fake child (a real wedged pytest keeps its -q
+        # output inside its own capture, so no live fixture can pin this).
+        import subprocess
+
+        class FakeChild:
+            returncode = None
+            killed = False
+
+            def communicate(self, timeout=None):
+                if self.killed:
+                    return '', None
+                raise subprocess.TimeoutExpired(
+                    cmd='pytest', timeout=timeout or 1,
+                    output='u465-timeout-probe')
+
+            def terminate(self):
+                pass
+
+            def kill(self):
+                self.killed = True
+
+        monkeypatch.setattr(subprocess, 'Popen', lambda *a, **k: FakeChild())
+        code, summary = suite_lane.run_chunk(['tests/x.py'], None, 600)
+        out = capsys.readouterr().out
+        assert code == 124, code
+        assert 'CHUNK TIMEOUT' in summary
+        assert 'u465-timeout-probe' in out
+
 
 class TestFb8GuardStaysInPlace:
     def test_the_gc_guard_and_its_sweep_are_still_installed(self):

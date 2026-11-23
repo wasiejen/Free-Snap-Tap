@@ -105,6 +105,15 @@ def chunk_is_ok(code: int) -> bool:
     return code == 0
 
 
+def _echo_chunk_output(label: str, text: str) -> None:
+    """(#465) a red chunk on a CI runner must be debuggable from the Actions
+    log alone: dump what the child captured. The per-chunk summary line
+    printed right below names which chunk this output belongs to."""
+    if text:
+        print(f'--- {label} (the chunk line below names it) ---', flush=True)
+        print(text, flush=True)
+
+
 def run_chunk(chunk: list[str], root: Path, timeout: int) -> tuple[int, str]:
     """run one chunk in ITS OWN process; only our own handle is ever touched"""
     child = subprocess.Popen(
@@ -116,18 +125,21 @@ def run_chunk(chunk: list[str], root: Path, timeout: int) -> tuple[int, str]:
         out, _ = child.communicate(timeout=timeout)
         code = child.returncode
         if not chunk_is_ok(code):
-            # (#465) a red chunk on a CI runner must be debuggable from the
-            # Actions log alone: echo the chunk's FULL captured output, not
-            # just the 80-char summary line
-            print(out, flush=True)
+            # (#465) echo the chunk's FULL captured output, not just the
+            # 80-char summary line
+            _echo_chunk_output('output of the failing chunk', out or '')
         return code, summarize(out or '')
-    except subprocess.TimeoutExpired:
+    except subprocess.TimeoutExpired as exc:
+        # (#465) a timed-out chunk is red too: echo what it printed before
+        # wedging (review P2-1) - the handle we created is all we touch
+        partial = exc.output if isinstance(exc.output, str) else ''
         child.terminate()
         try:
-            child.communicate(timeout=30)
+            tail = child.communicate(timeout=30)[0] or ''
         except subprocess.TimeoutExpired:
             child.kill()
-            child.communicate()
+            tail = child.communicate()[0] or ''
+        _echo_chunk_output('output of the timed-out chunk', partial + tail)
         return 124, f'CHUNK TIMEOUT after {timeout}s (terminated our own child)'
 
 
