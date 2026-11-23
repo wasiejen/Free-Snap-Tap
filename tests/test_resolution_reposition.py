@@ -417,8 +417,7 @@ class TestRelativePosition:
         assert geo.left() >= 0 and geo.right() <= 1919
         assert geo.top() >= 0 and geo.bottom() <= 1079
 
-    def test_relative_position_clamps_fully_on_screen(
-            self, qtbot, overlay_fst, on_old_screen, monkeypatch):
+    def test_relative_position_clamps_fully_on_screen(            self, qtbot, overlay_fst, on_old_screen, monkeypatch):
         """Edge clamp case (spec acceptance): a drag to (3820, 2130) -
         flush bottom-right on 3840x2160 - lands clamped on 1920x1080,
         box fully on-screen (right/bottom edges flush with the new
@@ -436,4 +435,28 @@ class TestRelativePosition:
         geo = overlay.geometry()
         assert geo.topLeft() == QPoint(1900, 1060)
         assert geo.right() == 1919 and geo.bottom() == 1079
+
+    def test_plain_click_keeps_the_never_dragged_default(
+            self, qtbot, overlay_fst, on_old_screen, monkeypatch):
+        """P1 recheck pin (review of 85bda0d): press + release with ZERO
+        cursor movement is not a drag - _rel_frac must stay None and a
+        later resolution change must land the pinned startup corner
+        (right() - x_size, the 1px convention), NOT a baked corner
+        fraction. RED before the movement gate (measured): the release
+        stored (3819/3840, 0); the remap rule gives round(0.99453125 *
+        1920) = round(1909.5) = 1910 -> clamp(1900) -> top-left
+        (1900, 0), while the never-dragged default lands (1899, 0)."""
+        overlay = StatusOverlay(overlay_fst)
+        qtbot.addWidget(overlay)
+        assert overlay.geometry().topLeft() == QPoint(3819, 0)
+
+        qtbot.mousePress(overlay, Qt.LeftButton)
+        qtbot.mouseRelease(overlay, Qt.LeftButton)
+
+        assert overlay._rel_frac is None
+
+        self._change_to_new_screen(monkeypatch, overlay)
+
+        geo = overlay.geometry()
+        assert geo.topLeft() == QPoint(NEW_SCREEN.right() - 20, 0)  # (1899, 0)
 

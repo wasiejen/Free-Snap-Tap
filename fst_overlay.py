@@ -618,6 +618,10 @@ class StatusOverlay(QWidget):
         # dragged -> the resolution-change remap keeps the startup
         # corner anchor); see set_window_size_and_position(relative=True)
         self._rel_frac = None
+        # #463: True once the CURRENT left-button press actually moved
+        # the widget - a plain click (press, zero movement, release) is
+        # NOT a drag and must never capture a fraction (review P1)
+        self._drag_moved = False
 
         # Build menu
         self.context_menu = QMenu(self)
@@ -761,6 +765,8 @@ class StatusOverlay(QWidget):
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            # #463 (review P1): a press alone is not a drag yet
+            self._drag_moved = False
             self.screen_changed = False
             self.counter = 10
         event.accept()
@@ -780,6 +786,8 @@ class StatusOverlay(QWidget):
             new_left = new_center_x - self.x_size // 2
             new_top = new_center_y - self.y_size // 2
             self.move(new_left, new_top)
+            # #463 (review P1): the press turned into a real drag here
+            self._drag_moved = True
             
             # also drag the toast manager if it's visible
             if hasattr(self.parent(), 'toast_manager'):
@@ -819,7 +827,10 @@ class StatusOverlay(QWidget):
                 self.set_window_size_and_position()  # Resize and recenter
                 logger_state.debug(f"Overlay moved to screen: {self._current_screen_name}")
                 self.screen_changed = False
-            if dragging:
+            if dragging and self._drag_moved:
+                # #463 (review P1): capture only when this press actually
+                # moved the box - a plain click keeps the never-dragged
+                # default state (_rel_frac stays None)
                 self._capture_relative_position()
         event.accept()
 
