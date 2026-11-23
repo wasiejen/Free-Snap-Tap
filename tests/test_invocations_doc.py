@@ -4,13 +4,21 @@ product Config_Validator - the doc's copy-paste promise, pinned.
 Each fence is validated AS ONE CONFIG (that is what a fence is when you
 paste it - no injected preambles), so an alias-using fence must carry
 its own alias definition, exactly like the worked blocks do.
+
+U-M2 extends the same convention to docs/start-arguments.md (every
+start argument of the START_ARG tables carries one example line, every
+bash fence validates with zero violations) and docs/prefixes-suffixes.md
+(every prefix/delay/constraint/evaluation FORM carries one example).
 """
 import re
 from pathlib import Path
 
-from fst_manager import CONSTRAINT_FUNCTIONS, Config_Manager, Config_Validator
+from fst_manager import (CONSTRAINT_FUNCTIONS, Config_Manager, Config_Validator,
+                         START_ARG_FLAGS, START_ARG_VALUES)
 
 DOC = Path(__file__).resolve().parents[1] / 'docs' / 'invocations.md'
+DOC_START = Path(__file__).resolve().parents[1] / 'docs' / 'start-arguments.md'
+DOC_PFX = Path(__file__).resolve().parents[1] / 'docs' / 'prefixes-suffixes.md'
 
 # an entry of the form `(name(...)...)` outside the example fences - the
 # entry spelling is `|(name(...))` for invocations and `(name(...))` for
@@ -18,13 +26,14 @@ DOC = Path(__file__).resolve().parents[1] / 'docs' / 'invocations.md'
 ENTRY_FORM = re.compile(r'\((\w+)\(')
 
 
-def split_fenced(text):
-    """(prose_lines, fenced_blocks) - one block per ```bash fence,
-    each block a list of (line_no, raw) tuples"""
+def split_fenced(text, langs=('bash',)):
+    """(prose_lines, fenced_blocks) - one block per fence whose info string
+    starts with one of langs, each block a list of (line_no, raw) tuples"""
     prose, blocks, block, in_block = [], [], None, False
     for n, raw in enumerate(text.splitlines(), 1):
         stripped = raw.strip()
-        if not in_block and stripped.startswith('```bash'):
+        if (not in_block and stripped.startswith('```')
+                and any(stripped[3:].startswith(lang) for lang in langs)):
             in_block, block = True, []
             continue
         if in_block and stripped.startswith('```'):
@@ -81,3 +90,85 @@ class TestInvocationsDocExamples:
         vs = violations_of('<scan> v\nw|(no_such_fn_xyz(1)) : w\n')
         assert any(v.severity == Config_Validator.WARNING
                    and 'unknown function' in v.message for v in vs)
+
+
+# --- U-M2: the same convention for start-arguments.md and prefixes-suffixes.md
+
+# every start argument of the runtime vocabulary tables plus the one
+# command-line-only spelling - each must appear in an example fence
+START_ARG_EXAMPLES = sorted(START_ARG_FLAGS | START_ARG_VALUES | {'--elevate'})
+
+# the forms docs/prefixes-suffixes.md teaches, each pinned by the exact
+# token shape its example line uses
+PREFIX_SUFFIX_FORMS = (
+    ('press prefix -ke', r'(?m)^\s*-v : '),
+    ('release prefix +ke', r'(?m)^\s*\+v : '),
+    ('release prefix !ke', r'(?m)^\s*!v : '),
+    ('toggle prefix ^Key', r'\^caps_lock'),
+    ('constraint suffix (-ke)', r'\|\(\-a\)\|\(\-s\)'),
+    ('static delay suffix', r'\|250\b'),
+    ('random delay suffix', r'\|50\|120\b'),
+    ('int-delay evaluation |(fn())', r'\|\(tr\("w"\)\)'),
+    ('bool evaluation comparison', r"\|\(dc\('y'\) < 500\)"),
+    ('always-False form |(!)', r'\|\(!\)'),
+)
+
+
+def fence_text(blocks):
+    return '\n'.join(raw for block in blocks for _, raw in block)
+
+
+def fence_violations(blocks):
+    """every violation of every fence validated as ONE config, as
+    (first line number, severity, rule, message) tuples"""
+    found = []
+    for block in blocks:
+        content = '\n'.join(raw for _, raw in block) + '\n'
+        for v in violations_of(content):
+            found.append((block[0][0], v.severity, v.rule, v.message))
+    return found
+
+
+class TestStartArgumentsDocExamples:
+    def test_every_start_arg_has_an_example(self):
+        """the per-entry contract: every name of the runtime START_ARG
+        tables (plus --elevate) appears in an example fence - a new
+        argument without an example, or a deleted example, fails here"""
+        _, blocks = split_fenced(DOC_START.read_text(encoding='utf-8'),
+                                 langs=('bash', 'bat'))
+        text = fence_text(blocks)
+        assert text, 'no example fences found - extraction broken?'
+        missing = [name for name in START_ARG_EXAMPLES if name not in text]
+        assert missing == [], f'start arguments without an example: {missing}'
+
+    def test_every_start_arg_fence_validates(self):
+        """every bash fence (config-form examples) parses as one config
+        with ZERO violations - no unknown start argument, no arity error"""
+        _, blocks = split_fenced(DOC_START.read_text(encoding='utf-8'))
+        assert blocks, 'no example fences found - extraction broken?'
+        assert fence_violations(blocks) == []
+
+    def test_harness_rejects_a_bogus_start_arg(self):
+        """negative control: the same pipeline flags an unknown <arg>
+        line, so the pin above cannot pass vacuously"""
+        vs = violations_of('<arg>-totally_bogus_arg\n')
+        assert any(v.severity == Config_Validator.WARNING
+                   and 'unknown start argument' in v.message for v in vs)
+
+
+class TestPrefixSuffixDocExamples:
+    def test_every_documented_form_has_a_pinned_example(self):
+        """the per-form contract: each prefix/delay/constraint/evaluation
+        form this doc teaches appears in an example fence - deleting one
+        example fails here naming the form"""
+        _, blocks = split_fenced(DOC_PFX.read_text(encoding='utf-8'))
+        text = fence_text(blocks)
+        missing = [label for label, rx in PREFIX_SUFFIX_FORMS
+                   if not re.search(rx, text)]
+        assert missing == []
+
+    def test_every_prefix_suffix_fence_validates(self):
+        """every example fence parses as one config with zero violations"""
+        _, blocks = split_fenced(DOC_PFX.read_text(encoding='utf-8'))
+        assert blocks, 'no example fences found - extraction broken?'
+        assert fence_violations(blocks) == []
