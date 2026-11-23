@@ -22,6 +22,9 @@
     - one press+release will start a repeat of ke/Key it is suffixed to and the second will stop the repeat
     - delays between the played keys are defined 
   - `(start_repeat('<*name of alias>', *repeat time in ms*))`
+    ```bash
+    w|(start_repeat('<scan>', 5000)) : w
+    ```
   - `(stop_repeat('<*name of alias>'))`   
   - `(reset_repeat('<*name of alias>'))`  resets the interval of the ke/Key and starts the interval anew
 
@@ -43,18 +46,27 @@
 
 #### [Reset of Sequences and Interrupt of Macro]
 
-- to reset a sequence or interrupt a playing macro the invocation `|(*name of the macro*)`  or `|reset('(*name of the macro*)')`can be used
+- to reset a sequence or interrupt a playing macro the invocation `|(*name of the macro*)` or `|(reset('(*name of the macro*)'))` can be used
+  ```bash
+  w|(reset('mysq')) : w
+  ```
   - the semantics differ by the type of the name:
     - `|(name)` on a macro name interrupts a started macro playback - it stops as soon as possible (normally in < 10 ms) and does not reset anything
     - `|(name)` on a sequence name resets the sequence counter only - the currently in-flight playback is not interrupted
-    - `|(reset('name'))` on a sequence name resets the counter; on a non-sequence name it prints "No Macro Sequence with name ... - reset failed" and does nothing else (it does not interrupt a macro)
+    - `|(reset('name'))` on a sequence name resets the counter; on a non-sequence name it logs "no macro sequence with name ... - reset failed" and does nothing else (it does not interrupt a macro)
     - an unknown name is a silent no-op (evaluates to True)
   - resetting of a sequence will let the next playback of the sequence start again on the first key group
 
 #### [General key control]
 
 - `|(stop_all_repeat())` - will stop all active repeats
+  ```bash
+  w|(stop_all_repeat()) : w
+  ```
 - `|(release_all_keys())` - will release all currently simulated keys that are pressed
+  ```bash
+  w|(release_all_keys()) : w
+  ```
 
 #### [Function results in general]
 
@@ -62,50 +74,133 @@ The functions of the following sections are resolved by the same suffix evaluati
 - a bool result acts as a constraint (True plays, False blocks)
 - an int result is used as a delay (in ms) after the key event
 - a None result passes (True)
-- any other result prints "! Constraint ... not valid" and passes
+- any other result logs "constraint ... is not valid" and passes
 
 #### [Variable system]
 
 - variables are kept in memory only - they are not saved with the config or the save file and start empty on every start of the program
 - **integer variables**:
   - `|(set('name', *value*))`: set the variable *name* to *value* - a True/False *value* is stored as 1/0; without *value* the variable is set to 1
+    ```bash
+    w|(set('n', 5)) : w
+    ```
   - `|(is_set('name'))`: evaluates to True iff the variable holds a value other than 0 - unknown names evaluate to False
+    ```bash
+    w|(is_set('n')) : w
+    ```
   - `|(get('name'))`: evaluates to the current value as an int (usable as a delay) - an unknown name is created with 0 and evaluates to 0
+    ```bash
+    w|(get('n')) : w
+    ```
   - `|(check('name', *value*))`: evaluates to True iff the variable matches *value* - an int *value* is compared for equality, a list/tuple checks membership; unknown names evaluate to False
     - a *value* that is neither an int nor a list/tuple makes the check pass (True)
+    ```bash
+    w|(check('n', 5)) : w
+    ```
   - `|(incr('name'))`: increase the variable by 1 - an unknown name is created at 1
+    ```bash
+    w|(incr('n')) : w
+    ```
   - `|(decr('name'))`: decrease the variable by 1 - an unknown name is created at 0
+    ```bash
+    w|(decr('n')) : w
+    ```
   - `|(clear('name'))`: set the variable to 0
+    ```bash
+    w|(clear('n')) : w
+    ```
   - `|(clear_all_variables())`: remove ALL integer variables
+    ```bash
+    w|(clear_all_variables()) : w
+    ```
 - **text variables** (for text values, in contrast to the integer variables):
   - `|(set_var('name', 'text'))`: store the text under *name*
+    ```bash
+    w|(set_var('who', 'editor')) : w
+    ```
   - `|(get_var('name'))`: evaluates to the stored text - an unknown name is created with the text "None" and returns it
+    ```bash
+    w|(get_var('who')) : w
+    ```
 - text and integer variables share the same name space - a name stored with `set_var` is visible to the integer accessors (`is_set` evaluates to True for a stored text, since a text is never equal to 0)
-- `|(print_all_variables())`: print all integer variables to the console
+- `|(print_all_variables())`: print all variables to the console
+  ```bash
+  w|(print_all_variables()) : w
+  ```
 
 #### [Typing]
 
 - `|(type('text'))`: type the given text - all currently pressed modifier keys are released before typing starts
+  ```bash
+  w|(type('hello')) : w
+  ```
 - `|(write('text'))`: alias of `type`
+  ```bash
+  w|(write('hello')) : w
+  ```
 - `|(release_modifier())`: release all currently pressed modifier keys (left/right Shift, Ctrl, Alt) without typing anything
+  ```bash
+  w|(release_modifier()) : w
+  ```
 
 #### [Toasts]
 
-- requires GUI mode (status indicator and/or tray icon) - in headless mode these invocations raise an error
+- requires GUI mode (status indicator and/or tray icon) - in headless mode (no GUI bridge wired) the toasts are drop-counted no-ops
 - `|(show_message('text', *display time in s*, *font size*))`: show a toast message in the status indicator - defaults: 3 s display time, font size 12, green background with white text
+  ```bash
+  w|(show_message('hello', 5, 14)) : w
+  ```
 - `|(show_timer('text', ...))`: same as `show_message`, the default background is yellow
+  ```bash
+  w|(show_timer('break', 5, 14)) : w
+  ```
 - `|(remove_toast('text'))`: remove the toast with the given text - the `immediately` parameter (default 0) is accepted but currently ignored
+  ```bash
+  w|(remove_toast('hello')) : w
+  ```
 - `|(remove_all_toasts())`: remove all toasts - the `immediately` parameter (default 0) is accepted but currently ignored
+  ```bash
+  w|(remove_all_toasts()) : w
+  ```
 
 #### [Mouse control]
 
-- `|(scroll_up(*amount*))`, `|(scroll_down(*amount*))`: send vertical wheel events (up / down)
-- `|(scroll_right(*amount*))`, `|(scroll_left(*amount*))`: send horizontal wheel events (right / left)
+- `|(scroll_up(*amount*))`: send vertical wheel events up
+  ```bash
+  w|(scroll_up(3)) : w
+  ```
+- `|(scroll_down(*amount*))`: send vertical wheel events down
+  ```bash
+  w|(scroll_down(3)) : w
+  ```
+- `|(scroll_right(*amount*))`: send horizontal wheel events right
+  ```bash
+  w|(scroll_right(3)) : w
+  ```
+- `|(scroll_left(*amount*))`: send horizontal wheel events left
+  ```bash
+  w|(scroll_left(3)) : w
+  ```
 - `|(mouse_move_abs(*x*, *y*))`: move the mouse to the absolute screen position (*x*, *y*)
+  ```bash
+  w|(mouse_move_abs(500, 300)) : w
+  ```
 - `|(mouse_move(*dx*, *dy*))`: move the mouse relatively by (*dx*, *dy*)
+  ```bash
+  w|(mouse_move(20, -20)) : w
+  ```
 - `|(mouse_get_pos())`: evaluates to the current mouse position as a tuple - the position is additionally copied to the clipboard as text
+  ```bash
+  w|(mouse_get_pos()) : w
+  ```
 - `|(mouse_save_to_var('name'))`: save the current mouse position under *name*
-- `|(mouse_move_to_var('name'))`: move the mouse to the position saved under *name* - evaluates to False (blocks the key event) if the variable is unknown or does not hold a 2-tuple position
+  ```bash
+  w|(mouse_save_to_var('pos')) : w
+  ```
+- `|(mouse_move_to_var('name'))`: move the mouse to the position saved under *name* - evaluates to False (blocks the key event) if the variable is unknown or does not hold a 2-tuple position (inline path - on the pump path the leg returns True at schedule time like every other routed action leg)
+  ```bash
+  w|(mouse_move_to_var('pos')) : w
+  ```
 
 #### [Mouse keys]
 
@@ -123,7 +218,13 @@ The functions of the following sections are resolved by the same suffix evaluati
 #### [Clipboard]
 
 - `|(copy_to_clipboard('text'))`: copy the text to the clipboard - a toast confirms the copy
+  ```bash
+  w|(copy_to_clipboard('hello')) : w
+  ```
 - `|(paste())`: evaluates to the current clipboard text - usable as a text value; used bare (not as a value) it passes like any other non-bool/non-int result
+  ```bash
+  w|(type(paste())) : w
+  ```
 
 #### [File operations]
 
@@ -131,22 +232,56 @@ The functions of the following sections are resolved by the same suffix evaluati
 - `|(save_into_file('text', *time stamp*, *mode*, *file path*))`: write the text to the file as "*time stamp*: *text*" - defaults: file `output.txt`, mode `'w'` (overwrite), time stamp `get_time()`
   - an omitted *time stamp* is taken at the moment the line is WRITTEN, not when the constraint is evaluated (ruling 2026-11-23): a delayed or retried write stamps its own execution time, and while no file-leg write executes the stamp default performs no clock read
   - an explicit *time stamp* stamps what you give it - an explicit `None` stamps the literal `None`, so pass it only deliberately
+  ```bash
+  w|(save_into_file('done')) : w
+  ```
 - `|(append_to_file('text', ...))`: same as `save_into_file`, mode `'a'` (append)
+  ```bash
+  w|(append_to_file('done', get_time(), 'notes.txt')) : w
+  ```
 - `|(empty_file('file path'))`: truncate the file - default `output.txt`
+  ```bash
+  w|(empty_file('notes.txt')) : w
+  ```
 
 #### [Misc]
 
 - `|(cli('text'))`: print the text to the console
+  ```bash
+  w|(cli('hello')) : w
+  ```
 - `|(date())`: evaluates to the current date as a "YYMMDD" string
+  ```bash
+  w|(save_into_file('run ' + date())) : w
+  ```
 - `|(date_time())`: evaluates to the current date and time as a "YYMMDD-HHMM" string
+  ```bash
+  w|(save_into_file('run ' + date_time())) : w
+  ```
 - `|(get_time())`: evaluates to the current time as an int of milliseconds since the epoch
+  ```bash
+  w|(set('t', get_time())) : w
+  ```
 - `|(make_backup(*save dir*, *backup root dir*))` and `|(restore_backup(*save dir*, *backup root dir*))`:
   - `make_backup` copies the save dir into a timestamped backup folder named `save-YYMMDD-HHMMSS` (a counter is appended when a backup of the same second already exists)
   - `restore_backup` replaces the save dir with the newest backup; the swap is atomic - if the restore cannot finish, the current save dir is left intact or renamed back, never lost
   - both print to the console and show a toast (so they need GUI mode for the toast part)
   - the default directories are the `-save_dir=` / `-backup_root_dir=` start arguments - without them the call fails with a FileNotFoundError
+  ```bash
+  w|(make_backup()) : w
+  ```
+
+  ```bash
+  w|(restore_backup()) : w
+  ```
 - `|(clear_console())`: clear the console window
+  ```bash
+  w|(clear_console()) : w
+  ```
 - `|(is_repeat_active('name'))`: (an evaluation, not an invocation) evaluates to True iff the repeat handle with the given name is still active - unknown names evaluate to False
+  ```bash
+  w|(is_repeat_active('<scan>')) : w
+  ```
 
 #### [None / empty '' key event for invocations]
 
