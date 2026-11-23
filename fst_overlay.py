@@ -380,9 +380,13 @@ class GUI_Manager(QWidget):
         x_size) and its top-right anchor are STALE - the root cause of
         the cycle clipping bottom-right (protocol Leg 0). Order:
         1. overlay recompute FIRST: set_window_size_and_position(
-           init=True) re-derives the DPR sizes and re-anchors to the
-           CURRENT screen top-right (the startup anchor - Leg 0
-           reviewer ruling: the product's own anchor, not center).
+           relative=True) re-derives the DPR sizes and replays the
+           user-dragged RELATIVE position on the new geometry (#463,
+           maintainer ruling 2026-11-23 - supersedes the Leg-1
+           "re-anchor to the startup corner": a dragged box keeps its
+           fraction of the screen, clamped fully on-screen; never
+           dragged -> the startup corner anchor stays, the startup
+           default behavior unchanged).
            Unconditional: a hidden indicator must be correct when the
            next show_indicator lands it.
         2. crosshair re-center ONLY while visible (a hidden one
@@ -390,7 +394,7 @@ class GUI_Manager(QWidget):
         3. toast manager re-anchor AFTER the overlay (it anchors to the
            overlay geometry - protocol reviewer P2-4).'''
         if self.overlay is not None:
-            self.overlay.set_window_size_and_position(init=True)
+            self.overlay.set_window_size_and_position(relative=True)
         if self.crosshair is not None and self.crosshair.isVisible():
             self.crosshair.update_position()
         if self.toast_manager is not None and self.toast_manager.isVisible():
@@ -609,6 +613,11 @@ class StatusOverlay(QWidget):
         self.color_name = "red"
         self.color = QColor(self.color_name)
         self._drag_offset = None
+        # #463: (frac_x, frac_y) top-left position of the screen the
+        # overlay sits on, captured while the user drags (None = never
+        # dragged -> the resolution-change remap keeps the startup
+        # corner anchor); see set_window_size_and_position(relative=True)
+        self._rel_frac = None
 
         # Build menu
         self.context_menu = QMenu(self)
@@ -627,7 +636,18 @@ class StatusOverlay(QWidget):
         self.show()
 
     # Trigger a repaint to reflect the new size
-    def set_window_size_and_position(self, init=False):
+    def set_window_size_and_position(self, init=False, relative=False):
+        '''Anchor modes (sizes re-derive in EVERY mode):
+        - init=True: startup placement - top-right corner (the pinned
+          default anchor).
+        - relative=True (#463, the resolution-change handler): replay
+          the user-dragged relative position - the stored top-left
+          fractions of the OLD screen geometry (captured at drag time,
+          _capture_relative_position) applied to the NEW geometry,
+          clamped fully on-screen; never dragged (_rel_frac is None) ->
+          the startup corner above, the #463 "startup default
+          unchanged" contract.
+        - default (drag paths): recenter at the cursor.'''
         user_size = self._fst.arg_manager.STATUS_INDICATOR_SIZE
 
         #padding = self.padding
@@ -645,11 +665,31 @@ class StatusOverlay(QWidget):
         x_size = dpadding + self.user_size
         y_size = dpadding + self.user_size
 
-        if init :
-            # On init, place at top-right corner of primary screen
-            scr_geom = screen.geometry()
+        scr_geom = screen.geometry()
+
+        if init or (relative and self._rel_frac is None):
+            # On init - or a resolution/scale change of an overlay the
+            # user never moved (#463 default case) - place at the
+            # top-right corner of the current screen
             top_left_x = scr_geom.right() - x_size
             top_left_y = scr_geom.top()
+        elif relative:
+            # #463 (maintainer ruling 2026-11-23): the user-dragged
+            # position survives the geometry change at the SAME
+            # relative spot - the old-screen fractions of the NEW
+            # geometry - then clamped so the box stays fully
+            # on-screen (bound left/top + screen_size - box_size; the
+            # corner anchor above keeps its own pre-#463 1px right-gap
+            # convention, reviewer P2-7)
+            frac_x, frac_y = self._rel_frac
+            target_x = scr_geom.left() + int(round(frac_x * scr_geom.width()))
+            target_y = scr_geom.top() + int(round(frac_y * scr_geom.height()))
+            max_x = max(scr_geom.left(),
+                        scr_geom.left() + scr_geom.width() - x_size)
+            max_y = max(scr_geom.top(),
+                        scr_geom.top() + scr_geom.height() - y_size)
+            top_left_x = min(max(target_x, scr_geom.left()), max_x)
+            top_left_y = min(max(target_y, scr_geom.top()), max_y)
         else:
             # During drag or resizing, always recenter at cursor
             cursor_pos = QCursor.pos()
@@ -666,6 +706,26 @@ class StatusOverlay(QWidget):
         
         self.update()  # Trigger repaint
         
+    def _capture_relative_position(self):
+        '''#463: store the top-left position as a fraction of the screen
+        the overlay sits on - the user-drag intent the resolution-change
+        remap (set_window_size_and_position(relative=True)) replays on
+        the new geometry. Called from the drag paths ONLY, so a never-
+        dragged overlay keeps _rel_frac None and the startup default.
+        The screen is the existing cursor-screen selection
+        (_current_screen, kept current by the drag path); degenerate
+        geometry (zero/negative extent) stores nothing (no division).'''
+        screen = (self._current_screen if self._current_screen is not None
+                  else get_current_screen())
+        if screen is None:
+            return
+        geo = screen.geometry()
+        if geo.width() <= 0 or geo.height() <= 0:
+            return
+        pos = self.geometry().topLeft()
+        self._rel_frac = ((pos.x() - geo.left()) / geo.width(),
+                          (pos.y() - geo.top()) / geo.height())
+
     def _cycle_rect(self):
         '''U388 (#388 Leg 2): the widget-local rect the colored cycle
         (status dot) is drawn into - cycle extent s = user_size (the
@@ -739,10 +799,19 @@ class StatusOverlay(QWidget):
                     self.screen_changed = False
                 else:
                     self.counter -= 1   
+            # #463: keep the stored fraction current DURING the drag (a
+            # resolution change between two moves replays the latest
+            # spot); after any screen-change recenter above
+            self._capture_relative_position()
         event.accept()
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
+            # #463: a drag actually in progress ends here - capture the
+            # final fraction (after any screen-change recenter below);
+            # a stray release without a drag must not switch a
+            # never-dragged overlay out of its default state
+            dragging = self._drag_offset is not None
             self._drag_offset = None
             # After drag completes, check if the screen changed.
             # Only now, resize/recenter if needed — this avoids feedback loops!
@@ -750,7 +819,8 @@ class StatusOverlay(QWidget):
                 self.set_window_size_and_position()  # Resize and recenter
                 logger_state.debug(f"Overlay moved to screen: {self._current_screen_name}")
                 self.screen_changed = False
-                
+            if dragging:
+                self._capture_relative_position()
         event.accept()
 
     def contextMenuEvent(self, event):

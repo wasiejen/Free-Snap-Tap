@@ -9,6 +9,14 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 ## [Unreleased]
 
 ### Changed
+- A resolution or scale change now KEEPS the user-dragged overlay
+  position (#463, maintainer ruling 2026-11-23): the display-change
+  handler replays the status indicator's top-left FRACTION of the old
+  screen geometry on the new geometry (clamped fully on-screen) instead
+  of re-anchoring it to the startup top-right corner; an overlay the
+  user never dragged keeps that startup corner behavior. The position
+  fractions are captured during the drag and at drag end; the toast row
+  keeps re-anchoring to the moved indicator (#398 behavior unchanged).
 - File-leg timestamps are taken at WRITE time (#462, maintainer ruling
   2026-11-23): omitting the *time stamp* of `save_into_file`/`append_to_file`
   now stamps the line when the write EXECUTES on its lane, not when the

@@ -79,6 +79,7 @@ You can change the control key combinations in the py file under # Control key c
   - see picture above - just a small dot that changes based on being active to green and on incative to red
   - right mouse click opens the menu
   - double left mouse click or middle mouse click will open the config file
+  - left mouse drag moves it anywhere; a resolution or scale change keeps that RELATIVE position (the same fraction of the screen, clamped fully on-screen) - never dragged, it stays at the startup top-right corner
 
 #### [Crosshair] as function of the GUI overlay
 - `<arg>-crosshair` or `<arg>-crosshair=*pixel delta x*,*pixel delta y*`

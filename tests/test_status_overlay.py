@@ -125,6 +125,11 @@ def test_drag_repositions_parent_toast_manager(qtbot, fst):
 
 def test_screen_change_counter_decrements(qtbot, overlay, monkeypatch):
     fake_screen = MagicMock()
+    # #463: the drag path also captures the relative position from the
+    # screen geometry - give the stub the QScreen shape the product
+    # reads (a real QRect, like tests/test_resolution_reposition.py's
+    # FakeScreen), the counter assertions below are unchanged
+    fake_screen.geometry.return_value = QRect(0, 0, 1920, 1080)
     monkeypatch.setattr(fst_overlay, 'get_current_screen', lambda: fake_screen)
 
     qtbot.mousePress(overlay, Qt.LeftButton)
