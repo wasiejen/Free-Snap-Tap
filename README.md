@@ -5,7 +5,7 @@
 A minimalistic Python-based Snap Tapping program compatible with all keyboards and supports:
 
 ## General (very short) overview of functionalities
-For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
+For more info see the [documentation](docs/README.md)
 
 FST runs one instance at a time - starting a second one exits with a notice.
 
@@ -44,7 +44,7 @@ FST runs one instance at a time - starting a second one exits with a notice.
     - double left mouse click or middle mouse click will open the config file
 13. **[Crosshair]** `<arg>-crosshair` or `<arg>-crosshair=*pixel delta x*,*pixel delta y*`
     - displays a simple crosshair as overlay and can be controlled on a per game basis
-14. **[Extra Start Arguments]** `<arg>` arguments that control runtime behavior (usable as default or per focus group) - this list is a short overview; the complete reference is the Wiki [Start Arguments](https://github.com/wasiejen/Free-Snap-Tap/wiki) page
+14. **[Extra Start Arguments]** `<arg>` arguments that control runtime behavior (usable as default or per focus group) - this list is a short overview; the complete reference is the [Start Arguments](docs/start-arguments.md) page
     - `-delay` / `-nodelay`: re-enable / disable the delays (arguments are processed in order, later overrides earlier)
     - `-exec_one_macro`: only the first macro triggered by one real key event is played
     - `-debug_numpad`: enables the ALT+NUM1..NUM8 numpad debug combos
@@ -62,7 +62,7 @@ FST runs one instance at a time - starting a second one exits with a notice.
     - overwritten atomically in the program's working directory, right next to `fst.log` - attach the file to a bug report and the moment is captured
     - a ticket that stays open longer than `CONSTANTS.STUCK_TICKET_MS` (default 5000 ms, `fst_manager.py`) is named by a `[StuckKeyWatch]` line in the artifact and in `fst.log`
    
-Function Documentation V1.4.0 now in the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
+Function Documentation V1.4.0 now in the [docs](docs/README.md).
 
 ## Example for a config file:
 
@@ -209,7 +209,7 @@ v : suppress              # v will always suppressed
 
 ```
 
-## For function documentation and usage see the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
+## For function documentation and usage see the [docs](docs/README.md)
 
 ## How Free Snap Tap Works 
 
@@ -311,4 +311,5 @@ If you have wishes or ideas what to add, just `create a issue` or `start a discu
 ## Version History
 
 Changes since V1.2.0 are listed in [CHANGELOG.md](CHANGELOG.md).
-Earlier releases are listed in the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
+Earlier releases (v1.2.0 and below) are listed on the
+[GitHub Releases](https://github.com/wasiejen/Free-Snap-Tap/releases) page.

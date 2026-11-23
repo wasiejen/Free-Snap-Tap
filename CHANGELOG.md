@@ -3,8 +3,9 @@
 All notable changes to Free-Snap-Tap are documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Earlier releases (v1.2.0 and below) are listed in the version history on the
-[Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
+This file and the per-release `RELEASE_NOTES_*.md` files are the version-history
+home (v1.3.0 up are listed below). Earlier releases (v1.2.0 and below) are on the
+[GitHub Releases](https://github.com/wasiejen/Free-Snap-Tap/releases) page.
 
 ## [Unreleased]
 
