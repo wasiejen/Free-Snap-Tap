@@ -66,6 +66,7 @@ For further functionality of how it will be triggered, usage of constraints, eva
   - if a `Key` is given it will be interpreted as a pressed key_event `-key_event` 
 - can be named by putting`(*name of the macro*)` in front of the macro definition
   - on usage of `|(*name of the macro*)` the playback of a started macro can be interrupted from anywhere - nothing is reset (unknown names are a silent no-op)
+- why playback never blocks real input (the asyncio task design) is in [internals.md](internals.md)
 
 For further functionality of how it will be triggered, usage of constraints, evaluation and function invocation see [Rebinds + Macros + Macro_Sequences]
 

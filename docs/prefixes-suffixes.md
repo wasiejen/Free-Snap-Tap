@@ -37,6 +37,7 @@ Every key event supports prefixes **prefix/modifier**
 
 - every key_event supports **suffixes** (constraints, evaluation, function invocation)
   - a suffix segment is either a delay number or a parenthesized expression `(...)` - a bare segment is parsed as a delay number, so `ke1|-ke2` is rejected
+- suffixes in trigger_group will only be checked/activated when trigger and constraints all check for True
 
 ### [Suffix/Constraints]
 
@@ -46,7 +47,6 @@ Every key event supports prefixes **prefix/modifier**
     w|(-a)|(-s) : x   # constraint suffixes on w
     w, -a, -s : x     # the same condition as a trigger group
     ```
-- suffixes in trigger_group will only be checked/activated when trigger and constraints all check for True
 
 ### [Suffix/Delays]
 
@@ -57,6 +57,7 @@ Every key event supports prefixes **prefix/modifier**
     w :: a|250, b      # static: wait 250 ms after a
     w :: a|50|120, b   # random: wait between 50 and 120 ms after a
     ```
+- the rulings behind these delays (unbounded segment delays, the shipped default pair) are in [internals.md](internals.md)
 
 ### [Suffix/Evaluation] updated to V1.1.3
 
