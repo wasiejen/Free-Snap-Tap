@@ -6,12 +6,12 @@
   - default delay for Tap_Groups and Macros is set to a random time between 2 and 10 ms
   - in Tap_Groups: 
     - used for simulated keys that would idealized be executed together - to get a more natural input behavior
-    - default delays for Tap_Groups are changeable via the start argument `-tap_delay=*min_delay*,*max_delay*`
+    - default delays for Tap_Groups are changeable via the start argument `-tapdelay=*min_delay*,*max_delay*`
   - in Macros/Macro_Sequences: 
     - custom delay usable for each key of a key_group that will be executed AFTER the key_event
       - for Keys with delays, the delay will be executed after the press AND the release
-    - default delays for Macros are changeable via the start argument `-macro_delay=*min_delay*,*max_delay*`
-  - delay can be suppressed entirely with the start argument `-no_delay`
+    - default delays for Macros are changeable via the start argument `-macrodelay=*min_delay*,*max_delay*`
+  - delay can be suppressed entirely with the start argument `-nodelay`
 For further functionality of how it will be triggered, usage of constraints, evaluation and function invocation see [Rebinds + Macros + Macro_Sequences]
 
 ## On Prefixes and Suffixes
@@ -19,9 +19,19 @@ For further functionality of how it will be triggered, usage of constraints, eva
 ## [Prefixes]
 Every key event supports prefixes **prefix/modifier**
   - `-key_event`: defines the pressed (down) state of a key
+    ```bash
+    -v : a    # fires on the press leg of v only
+    ```
   - `+key_event` and `!key_event` - defines the released (up) state of a key
+    ```bash
+    +v : a    # fires on the release leg of v
+    !v : a    # "!" is the same release form
+    ```
   - `^Key`: toggle a key - on key press key will be toggled between press and release; key release will be suppressed
     - key after prefix `^` will always be interpreted as a Key instead of a key_event
+    ```bash
+    f : ^caps_lock    # f toggles caps_lock on and off
+    ```
 
 ## [Suffixes]
 
@@ -29,6 +39,10 @@ Every key event supports prefixes **prefix/modifier**
   - a suffix segment is either a delay number or a parenthesized expression `(...)` - a bare segment is parsed as a delay number, so `ke1|-ke2` is rejected
   - as constraints: `(-ke)`, `(+ke)`/`(!ke)`: e.g. `ke1|(-ke2)|(-ke3) : ...` is functionally the same as trigger group: `ke1, -ke2, -ke3 : ...`
     - inside the parentheses the sign names the state to check: `(-ke)` is True while ke is pressed, `(+ke)`/`(!ke)` while ke is not pressed (real and simulated state)
+    ```bash
+    w|(-a)|(-s) : x   # constraint suffixes on w
+    w, -a, -s : x     # the same condition as a trigger group
+    ```
 - suffixes in trigger_group will only be checked/activated when trigger and constraints all check for True
 
 ### [Suffix/Delays]
@@ -36,6 +50,10 @@ Every key event supports prefixes **prefix/modifier**
   - Notation: 
     - `key_event/Key|*time*` -> will result in a static delay of length *time* in ms
     - `key_event/Key|*time1*|*time2*` -> will result in a random delay of length between *time1* and *time2* ms
+    ```bash
+    w :: a|250, b      # static: wait 250 ms after a
+    w :: a|50|120, b   # random: wait between 50 and 120 ms after a
+    ```
 
   - **A segment delay is deliberately UNBOUNDED** (maintainer decision 12, 
     2026-11-17): a macro may have to wait seconds or minutes for the program in
@@ -62,6 +80,8 @@ Every key event supports prefixes **prefix/modifier**
 
 ### [Suffix/Evaluation] updated to V1.1.3
 
+The invocation grammar `|(...)` is owned by [invocations.md](invocations.md) - this section owns the evaluation functions that resolve inside a constraint `(...)`.
+
 - supports evaluation as suffix
   - **evaluation to an integer** which will be used as a constant delay (all following function returns a length of time in ms)
     - `|(tr("ke"))`: timing of length of time for presses and releases of **Real** key events
@@ -76,6 +96,11 @@ Every key event supports prefixes **prefix/modifier**
     - `|(cs("key"))`: counterstrafing especially for CounterStrike: returns a time of length a key must pressed based on the pressed key to return the optimal time of length for a counterstrafe to come to a stop. Uses an internal function to approximate the acceleration time of the counter movement key.
     - `|(csl("ke"))`: some as above only uses a linear function to estimate the counter strafing time
 
+    ```bash
+    w|(tr("w")) : a      # a waits the measured press-to-release timing of w
+    x|(last('q')) : b    # b waits the time since q's last press or release
+    ```
+
   - **evaluation to bool (True/False)**
     - supports standard python notation and inbuilt functions
       - use of `,` commas in multi parameter functions is supported since V1.1.2 (e.g. pow(20,3) does now work)
@@ -88,8 +113,17 @@ Every key event supports prefixes **prefix/modifier**
     - `ap('key_string')`: (all keys press) returns True if the real key or a simulated key defined by key_string is pressed
     - `ar('key_string')`: (all keys release)
 
+    ```bash
+    w|(p('a')) : x        # x plays only while a is really pressed
+    y|(dc('y') < 500) : z # z plays only after a double click of y below 500 ms
+    ```
+
   - **evaluation to False**
     - `|(False)` = `|(!)` = `|()` are equivalent and will always return False
+
+    ```bash
+    w|(!) : a    # blocks the rebind - same as |(False) and |()
+    ```
 
   - **evaluation to True**
     - all following invocations will always result in True
