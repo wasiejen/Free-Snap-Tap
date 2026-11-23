@@ -148,6 +148,17 @@ class TestStartArgumentsDocExamples:
         assert blocks, 'no example fences found - extraction broken?'
         assert fence_violations(blocks) == []
 
+    def test_bare_flag_example_lines_exist(self):
+        """a flag that also has a value form must carry its own bare
+        example line - substring coverage alone would be satisfied by
+        the '=value' twin"""
+        _, blocks = split_fenced(DOC_START.read_text(encoding='utf-8'),
+                                 langs=('bash', 'bat'))
+        text = fence_text(blocks)
+        for name in ('-crossover', '-crosshair', '-status_indicator'):
+            assert re.search(rf'(?m)^\s*<arg>{re.escape(name)}$', text), \
+                f'no bare <arg>{name} example line'
+
     def test_harness_rejects_a_bogus_start_arg(self):
         """negative control: the same pipeline flags an unknown <arg>
         line, so the pin above cannot pass vacuously"""

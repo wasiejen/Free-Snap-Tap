@@ -7,7 +7,7 @@
 Only the startargument `-file="filename" should now be used as start argument in the batch or in link. 
 Everything else should be put in the config file and then can be applied on a per Game based as needed.
 - use the same arguments in the config, just with `<arg>` in front - drop the `<arg>` prefix to use the same token on the command line
-- each entry below carries one copy-paste example: a bash fence is a config `<arg>` line, a bat fence is a command line; dashed spellings are accepted (`-exec-one-macro` == `-exec_one_macro` - the name matches with `-` read as `_`, the value after `=` stays verbatim)
+- each live entry below carries one copy-paste example (the retired `-default_on` carries none by design): a bash fence is a config `<arg>` line, a bat fence is a command line; dashed spellings are accepted (`-exec-one-macro` == `-exec_one_macro` - the name matches with `-` read as `_`, the value after `=` stays verbatim)
 
 > Ownership: this section is the complete start-argument reference. The README `[Extra Start Arguments]` list is a short overview that points here - each flag is documented once, here.
 
@@ -16,8 +16,8 @@ Everything else should be put in the config file and then can be applied on a pe
    <arg>-nomenu
    ```
 -  `<arg>-file="filename"`: (with or without "): custom save file
-   ```bash
-   <arg>-file="my_save.json"
+   ```bat
+   free_snap_tap.exe -file="my_save.json"
    ```
 -  `<arg>-nocontrols`: to start it without the controls on `DEL`, `END` and `PAGE_DOWN`keys enabled- start -  
    ```bash
@@ -33,7 +33,7 @@ Everything else should be put in the config file and then can be applied on a pe
    ```
 -  `<arg>-macrodelay="number, number"`: sets the default min and max delay of "number,number" ms for Macros/Aliases - the same knob as `-aliasdelay` (both spellings set the macro delay pair)
    ```bash
-   <arg>-macrodelay=25,20
+   <arg>-macrodelay=20,25
    ```
 -  `<arg>-crossover="number"`: sets the probability of "number" percent for a crossover (can be set in a range of 0-100); a bare `-crossover` enables crossover with the probability in effect (default 50)
    - A crossover is key event reversal with delay - press and release are overlapping the time of delay
