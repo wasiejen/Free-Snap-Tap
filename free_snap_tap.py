@@ -12,7 +12,7 @@ import datetime
 import gc
 
 from fst_keyboard import FST_Keyboard
-from fst_manager import CONSTANTS, setup_fst_logging, handle_elevate_flag
+from fst_manager import CONSTANTS, setup_fst_logging, handle_elevate_flag, default_config_path
 from fst_single_instance import handle_single_instance_guard
 from fst_data_types import ConfigError, Lifecycle_State
 from fst_overlay import GUI_Manager, set_console_visibility, ToastBridge
@@ -52,8 +52,12 @@ CURRENT_DATE_TIME = datetime.datetime.now().strftime("%y%m%d-%H%M")
 
 # Define File name for saving of everything, can be any filetype
 # But .txt or .cfg recommended for easier editing
-CONSTANTS.FILE_NAME = 'FSTconfig.txt'
-# CONSTANTS.FILE_NAME = 'FSTconfig_test.txt'
+# #461: default_config_path() anchors the bare name next to the exe/script -
+# never the CWD (a boot route without a working folder used to miss the
+# config and start deactivated). The comment-switch below keeps working: the
+# alternate name is anchored the same way.
+CONSTANTS.FILE_NAME = default_config_path('FSTconfig.txt')
+# CONSTANTS.FILE_NAME = default_config_path('FSTconfig_test.txt')
 
 # Control key combinations (vk_code and/or key_string)
 # (1,2 or more keys possible - depends on rollover of your keyboard)

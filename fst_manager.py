@@ -275,6 +275,48 @@ def is_any_debug_active():
                for name in AREA_LOGGER_NAMES + ('fst.flow',))
 
 
+# ---------------------------------------------------------------------------
+# boot config path (#461, maintainer report 2026-11-23): the default config
+# name 'FSTconfig.txt' was opened bare, so open() resolved it against the
+# process CWD - a boot route without a working folder (startup shortcut ->
+# CWD C:\Windows\System32) missed the user's config and FST started
+# deactivated, and the missing-file recovery could even write an empty config
+# into the foreign directory. The default now anchors to the app directory,
+# never the CWD. The '-file' override does NOT pass through here: its string
+# enters the config manager exactly as given (unchanged override semantics).
+# ---------------------------------------------------------------------------
+
+DEFAULT_CONFIG_FILE_NAME = 'FSTconfig.txt'
+
+
+def get_app_directory():
+    '''The directory of the REAL executable/script - never the CWD.
+
+    PyInstaller-frozen safe: sys.frozen + sys.executable = the exe.
+    Nuitka-onefile safe: the bootstrap exports NUITKA_ONEFILE_BINARY (the
+    path of the ORIGINAL onefile exe) before the extracted child starts, so
+    the anchor stays next to the exe even though __file__ can point into the
+    temp-extract dir. Nuitka-standalone and dev runs resolve through the
+    entry script (__main__.__file__), with sys.argv[0] as the last belt.'''
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    onefile_binary = os.environ.get('NUITKA_ONEFILE_BINARY')
+    if onefile_binary:
+        return os.path.dirname(os.path.abspath(onefile_binary))
+    main_file = getattr(sys.modules.get('__main__'), '__file__', None)
+    if main_file:
+        return os.path.dirname(os.path.abspath(main_file))
+    return os.path.dirname(os.path.abspath(sys.argv[0]))
+
+
+def default_config_path(file_name=DEFAULT_CONFIG_FILE_NAME):
+    '''Absolute default config path: the bare config name next to
+    get_app_directory(). free_snap_tap.py sets CONSTANTS.FILE_NAME through
+    this, and the maintainer's comment-switch line passes the alternate
+    name through the same anchor.'''
+    return os.path.join(get_app_directory(), file_name)
+
+
 class CONSTANTS():
 
     # safety gate: only run the numpad debug-combination checks when enabled
@@ -1821,6 +1863,11 @@ class Config_Manager():
         self._rebinds_hr = []
         self._macros_hr = []
         self._alias_hr = []
+        # #460/#461: did the config EXIST when the loader last opened it?
+        # load_config re-saves it every load; the startup decision trace
+        # reports exists= from this flag (False until a load has run - the
+        # safe side: a never-loaded config is never claimed as found)
+        self.config_file_found = False
         # validator violations of the last load_config that only warn
         self.config_warnings = []
         # SILENT scopes of the last load_config: sections carrying
@@ -1863,9 +1910,16 @@ class Config_Manager():
     def load_config(self):
         # try loading  from file
         try:
-            return self._parse_lines_for_focus_manager(self._open_config_file())
+            file_lines = self._open_config_file()
+            # #460 partner signal: the startup trace reports exists= from
+            # THIS flag (was the config there when the loader opened it),
+            # never from an isfile() of the trace moment - the recovery
+            # branch below lands a file on disk either way
+            self.config_file_found = True
+            return self._parse_lines_for_focus_manager(file_lines)
         # if no file exist create new one and load it
         except FileNotFoundError:
+            self.config_file_found = False
             self.create_new_group_file()
             return self._parse_lines_for_focus_manager(self._open_config_file())
 
