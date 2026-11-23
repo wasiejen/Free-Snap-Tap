@@ -7,6 +7,8 @@ A minimalistic Python-based Snap Tapping program compatible with all keyboards a
 ## General (very short) overview of functionalities
 For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
 
+FST runs one instance at a time - starting a second one exits with a notice.
+
 <img src="https://github.com/user-attachments/assets/c730d4ed-d16c-43ca-8368-409fb661b399" alt="crosshair" width="200"/>
 <img src="https://github.com/user-attachments/assets/abbed088-8271-4160-98b6-ca770d12757c" alt="crosshair" width="250"/>
 
@@ -17,6 +19,7 @@ For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
     - delays for simulanious key events are applied on default
 2.  **[Rebinds]** `trigger_group : replacement key_event or  Key`: when a trigger_group is activated the key_event / Key will be played instead of trigger
     - The important destinctions from Macros are that Rebinds only support a single Key or key_event as the played part (output part) and that this resulting output (key_event) will be able to trigger macros
+    - Trigger precedence: when one trigger has BOTH a rebind and a macro (same trigger, any definition order, default group or focus group), the rebind wins - its replacement is played instead and the macro does not fire; a macro only fires for triggers no rebind claims
 3.  **[Macros]** `trigger_group :: key_group`: the key_group will be played when the trigger_group is activated; trigger will be suppressed
     - delay per key setable
     - interrupts itself on replay
@@ -45,12 +48,21 @@ For more info see [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki)
     - `-delay` / `-nodelay`: re-enable / disable the delays (arguments are processed in order, later overrides earlier)
     - `-exec_one_macro`: only the first macro triggered by one real key event is played
     - `-debug_numpad`: enables the ALT+NUM1..NUM8 numpad debug combos
+    - `-drop_watch`: drop-watch lane (#291 H1) - filter legs that die mid-event land named drop lines in `fst_drop.log`/`fst.log`, `ALT+NUM6` toggles at runtime
+    - `-no_toast_offload`: restores the direct toast bridge emit (default = toast offload queue + asyncio pump, #291 H2)
     - `-always_active`: the default groups stay active when no focus app matches
+    - `-default_off` / `-default-off`: the focus section (or the default section) runs ONLY its own group lines - the default group's GROUP LINES are not merged into that focus group. Default START ARGUMENTS stay merged; `-always_active` behavior is unchanged (proposal 2026-10-31, TODO #403)
+    - `-default_on` / `-default-on`: RETIRED (TODO #423, same day as its debut) - setting it does nothing; config validation prints a WARNING (silenceable with `-no_warnings`) and start-argument use prints a line: the default group is always added to every focus group, `-default_off` is the only opt-out
     - `-tray_icon` / `-hide_cmd_window`: start the GUI loop with a tray icon / keep the console window hidden after start-up
     - `-save_dir=*dir*` / `-backup_root_dir=*dir*`: the directories used by the `make_backup` / `restore_backup` invocations
     - **deprecated:** `-focusapp=` prints a warning and exits with error code 1 (use `<focus>` in the config file instead)
+
+15. **[Status dump - THE bug-report artifact]** `fst_status.log`
+    - written at every start-up and on every successful config reload (there is deliberately no hotkey for it): the effective start arguments, the lifecycle state, the active focus scope, the group counts, the tap / hold / toggle states, the open ticket ledger, and the path of every log file
+    - overwritten atomically in the program's working directory, right next to `fst.log` - attach the file to a bug report and the moment is captured
+    - a ticket that stays open longer than `CONSTANTS.STUCK_TICKET_MS` (default 5000 ms, `fst_manager.py`) is named by a `[StuckKeyWatch]` line in the artifact and in `fst.log`
    
-Function Documentation V1.2.0 now in the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
+Function Documentation V1.4.0 now in the [Wiki](https://github.com/wasiejen/Free-Snap-Tap/wiki).
 
 ## Example for a config file:
 
@@ -222,7 +234,7 @@ Snap Tapping is a feature that enhances your keyboard's responsiveness by priori
 
 ## Installation
 
-1. **Install Python:** Ensure Python 3.12 is installed on your system. You can download it from [python.org](https://www.python.org/).
+1. **Install Python:** Ensure Python 3.12 or newer is installed on your system (the code uses Python 3.12 syntax and will not start on older versions). You can download it from [python.org](https://www.python.org/).
 2. **Install `pynput and pygetwindow` Package:** Open your terminal or command prompt and run:
 
 ```bash
@@ -251,13 +263,37 @@ or navigate to the Free-Snap-Tap repo folder and type in:
 python ./free_snap_tap.py
 ```
 
+## Building your own executable
+
+Both build paths are maintained (ruling D2): Nuitka is the primary build path for the released exe, and PyInstaller stays as the simpler alternative for users building their own exe. Both scripts need the repo virtual environment with the build tools installed (`pip install -r requirements-build.txt`).
+
+### Nuitka (primary build path)
+
+Run `built_nuitka.bat` from the repo root. The build options live as `nuitka-project` directives at the top of `free_snap_tap.py` (standalone, onefile, LTO, PySide6 plugin, icon), so the bat only invokes `python -m nuitka free_snap_tap.py`. Output: `free_snap_tap_nuitka_<date-time>.exe` in the repo root.
+
+Note: this is a heavy build (C compilation of the bundled Qt) - it runs locally, not in CI (see `release.yml`).
+
+### PyInstaller (simpler alternative for users building their own exe)
+
+Run `built_pyinstaller.bat` from the repo root (onefile, windowed, PyQt5 excluded, keyboard icon). Output: `free_snap_tap_pyinst_<date-time>.exe` in the repo root.
+
+The tag build job in CI (`release.yml`) builds this path on every `v*` tag so the command stays verified; the exe is uploaded as a workflow artifact, not attached to the release.
+
 ## Running the tests
 
-The test suite needs the repo virtual environment (system Python has no pytest):
+The test suite needs the repo virtual environment (system Python has no pytest). The full-suite gate is the chunked lane - it exits 0 only when every chunk is green:
 
 ```bash
-.venv/Scripts/python.exe -m pytest tests -q
+.venv/Scripts/python.exe suite_lane.py
 ```
+
+For focused work, run one file or one directory directly:
+
+```bash
+.venv/Scripts/python.exe -m pytest tests/test_foo.py -q
+```
+
+Do not run the whole suite in one process (`pytest tests -q`): it aborts the Python process natively on this platform (an upstream PySide6/shiboken6 hazard that fires once the session's Qt object graph is large - the guard in `tests/conftest.py` covers one member of that family, not this one). The measurement record, the falsified fix attempts, and the repro commands are in [tests/README.md](tests/README.md).
 
 ## On Linux 
 

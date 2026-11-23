@@ -4,17 +4,24 @@ last updated: 250724-1434
 '''
 
 import sys
+import os
+import re
 from PySide6.QtWidgets import QWidget, QApplication, QMenu, QSystemTrayIcon, QLabel, QVBoxLayout, QFrame
-from PySide6.QtCore import QObject, Qt, qInstallMessageHandler, Signal, QTimer
-from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont
+from PySide6.QtCore import QObject, Qt, qInstallMessageHandler, Signal, QTimer, QFileSystemWatcher, QRect
+from PySide6.QtGui import QPainter, QColor, QPen, QCursor, QIcon, QPixmap, QFont, QFontMetrics
 
 import ctypes
 
 from fst_data_types import ConfigError
+# FST-417 (#417): one palette owner - the overlay renders the colors defined
+# in fst_keyboard.py and never names an rgba literal itself
+from fst_keyboard import TOAST_NEUTRAL, TOAST_RED
 
 import logging
 # Use __name__ to automatically label logs with the filename
 logger = logging.getLogger(__name__)
+# GUI diagnostics ride the existing FST area tree (fst.state - no new channel)
+logger_state = logging.getLogger('fst.state')
 
 # suppress warnings about setGeometry when changing screens and drawn geometry gets out of bound
 def customMessageHandler(mode, context, message):
@@ -69,6 +76,16 @@ def get_current_screen():
     if not screen:
         screen = QApplication.primaryScreen()
     return screen  
+
+def get_screen_at(point):
+    # #464: the screen a WIDGET sits on (the toast mirror asks "which half
+    # is the cycle in", not "where is the cursor") - Qt resolves the point
+    # to none in odd states, then fall back to the cursor screen (the
+    # module's long-standing screen choice)
+    screen = QApplication.screenAt(point)
+    if screen is None:
+        screen = get_current_screen()
+    return screen
             
 def get_device_pixel_ratio(screen):
     return screen.devicePixelRatio() 
@@ -100,6 +117,12 @@ def get_device_pixel_ratio(screen):
     
     
     
+
+# Eval-on-save debounce window (ms) - one editor save fires a burst of Qt
+# fileChanged events (save-via-rename), the burst coalesces into ONE reload
+# (P1 U290R). Keep above the burst spacing and below the human re-save cadence.
+CONFIG_RELOAD_DEBOUNCE_MS = 400
+
 
 class GUI_Manager(QWidget):
     def __init__(self, fst_keyboard, app):
@@ -136,6 +159,25 @@ class GUI_Manager(QWidget):
         self.tray_icon.signal_toggle_crosshair.connect(self.toggle_crosshair) 
         self.overlay.signal_toggle_crosshair.connect(self.toggle_crosshair) 
 
+        # eval-on-save: watch the config file. A save in the user's editor
+        # fires the watcher -> the coalesced reload -> the validator pass runs
+        # at load (facade load_config); violations surface through the existing
+        # red/consolidated toast, a clean pass lands the green OK result
+        # toast from the facade. Qt drops a watched path on Windows after a
+        # save-via-rename event, so the flush re-arms it.
+        self.config_watcher = QFileSystemWatcher(self)
+        self.config_watcher.fileChanged.connect(self._on_config_file_changed)
+        # P1 (U290R): Qt fires fileChanged MULTIPLE times per in-place editor
+        # save (rename-save event burst), so a direct reload in the handler
+        # runs a reload chain per save - group rebuilds, released-key side
+        # effects and result toasts per event. A single-shot debounce timer
+        # coalesces the burst of one save into exactly ONE reload; every
+        # event restarts the window, the flush re-arms the watch and reloads.
+        self._config_reload_timer = QTimer(self)
+        self._config_reload_timer.setSingleShot(True)
+        self._config_reload_timer.timeout.connect(self._flush_config_reload)
+        self.watch_config_file()
+        
         self.update_timer = QTimer()
         self.update_timer.timeout.connect(self.perform_periodic_update)
         
@@ -156,6 +198,9 @@ class GUI_Manager(QWidget):
 
     def start(self):
         self.start_update_timer()  # Start the periodic update timer
+        # U388 (#388, priority item 1): screen watch wired right before
+        # entering the Qt event loop (see _watch_screen_geometry)
+        self._watch_screen_geometry()
         self._app.exec()  # Start the Qt event loop
         
     def start_update_timer(self):
@@ -163,7 +208,10 @@ class GUI_Manager(QWidget):
         self.update_timer.start(500)
         
     def perform_periodic_update(self):
-               
+        # arm-on-create: a config file created after construction (first-run
+        # template write) has no watch until this hook arms it
+        self.ensure_config_watch()
+
         if self.status != self._fst.arg_manager.STATUS_INDICATOR:
             self.status = self._fst.arg_manager.STATUS_INDICATOR
             if self.status:
@@ -222,13 +270,65 @@ class GUI_Manager(QWidget):
         try:
             self._fst.reload_from_file()
         except ConfigError as error:
-            self._fst.toast_callback(str(error), 5, 12, "rgba(200, 40, 40, 200)", "white")
+            self._fst.surface_config_error(error)
+
+    def watch_config_file(self):
+        '''(re-)arm the file watch on the config file; a not-yet-existing
+        file (created at first load) has nothing to watch'''
+        file_name = self._fst.config_manager.file_name
+        if not file_name:
+            return
+        path = os.path.abspath(file_name)
+        if os.path.exists(path) and path not in self.config_watcher.files():
+            self.config_watcher.addPath(path)
+
+    def ensure_config_watch(self):
+        '''arm-on-create hook (U290R): the startup arm only sees a config
+        file that already exists - a first-run config is created AFTER the
+        GUI is built, which left eval-on-save dead. The periodic update runs
+        this hook; it is a no-op (no stat) while a path is already watched'''
+        if not self.config_watcher.files():
+            self.watch_config_file()
+
+    def _config_file_present(self):
+        file_name = self._fst.config_manager.file_name
+        return bool(file_name) and os.path.exists(os.path.abspath(file_name))
+
+    def _on_config_file_changed(self, path):
+        # debounce: Qt emits fileChanged several times per in-place save and
+        # the watcher engine drops the path after the save-via-rename event.
+        # (Re)start the single-shot window on every event of the burst; the
+        # flush runs once, after the last event.
+        self._config_reload_timer.start(CONFIG_RELOAD_DEBOUNCE_MS)
+
+    def _flush_config_reload(self):
+        # the coalesced reload of ONE editor save: re-arm the watch (the
+        # engine dropped the path), then run the validator pass through the
+        # existing reload wrapper (red toast on ConfigError)
+        self.watch_config_file()
+        if not self._config_file_present():
+            # the event came from a DELETED config (editor temp cleanup, user
+            # removed the file): the reload would hit the load_config
+            # FileNotFoundError branch and silently recreate the default
+            # template, wiping the user's setup - the event surfaces through
+            # the standard red toast (GUI mode hides the console, the log
+            # line alone is invisible there), the next save re-arms and
+            # reloads through the arm-on-create hook
+            logger.warning("config file deleted - reload skipped "
+                           "(no default-template rewrite)")
+            # the red report goes through the palette owner (FST-417); the
+            # context names the deleted config path (reviewer P1-2 cure)
+            self._fst.surface_config_error(
+                ConfigError("config file deleted - reload skipped",
+                            self._fst.config_manager.file_name))
+            return
+        self.reload_from_file()
 
     def toggle_pause(self):
         try:
             self._fst.control_toggle_pause()
         except ConfigError as error:
-            self._fst.toast_callback(str(error), 5, 12, "rgba(200, 40, 40, 200)", "white")
+            self._fst.surface_config_error(error)
 
     def return_to_menu(self):
         self._fst.control_return_to_menu()
@@ -266,7 +366,50 @@ class GUI_Manager(QWidget):
             # overlay.hide_indicator()
         else:
             self._fst.arg_manager.CROSSHAIR_ENABLED = True
-        
+
+    # --- Screen geometry watch (U388, #388 - resolution change) ---
+    def _connect_screen_geometry(self, screen):
+        # U388: one connect per screen; QScreen.geometryChanged(QRect)
+        # fires when that screen's resolution changes (also on a scale
+        # change that alters the logical geometry). Delivered on the
+        # GUI thread = the widget-owning thread, no hop.
+        screen.geometryChanged.connect(self.on_screen_geometry_changed)
+
+    def _watch_screen_geometry(self):
+        # U388: wire every present screen + late monitors (screenAdded).
+        # Called from start() right before app.exec(). Stubbed test apps
+        # (MagicMock screens() -> empty iterable) keep this inert.
+        for screen in self._app.screens():
+            self._connect_screen_geometry(screen)
+        self._app.screenAdded.connect(self._connect_screen_geometry)
+
+    def on_screen_geometry_changed(self, *_):
+        '''U388 (#388): display-change handler - one call per changed
+        screen (single-monitor case = exactly once per event). After a
+        resolution change the overlay box state (user_size, paddings,
+        x_size) and its top-right anchor are STALE - the root cause of
+        the cycle clipping bottom-right (protocol Leg 0). Order:
+        1. overlay recompute FIRST: set_window_size_and_position(
+           relative=True) re-derives the DPR sizes and replays the
+           user-dragged RELATIVE position on the new geometry (#463,
+           maintainer ruling 2026-11-23 - supersedes the Leg-1
+           "re-anchor to the startup corner": a dragged box keeps its
+           fraction of the screen, clamped fully on-screen; never
+           dragged -> the startup corner anchor stays, the startup
+           default behavior unchanged).
+           Unconditional: a hidden indicator must be correct when the
+           next show_indicator lands it.
+        2. crosshair re-center ONLY while visible (a hidden one
+           already recomputes at show_crosshair - "if enabled").
+        3. toast manager re-anchor AFTER the overlay (it anchors to the
+           overlay geometry - protocol reviewer P2-4).'''
+        if self.overlay is not None:
+            self.overlay.set_window_size_and_position(relative=True)
+        if self.crosshair is not None and self.crosshair.isVisible():
+            self.crosshair.update_position()
+        if self.toast_manager is not None and self.toast_manager.isVisible():
+            self.toast_manager.update_position()
+
             
     # def add_toast(self, text, **kwargs):
     #     self.toast_manager.add_toast(text, **kwargs)
@@ -399,16 +542,16 @@ class CrosshairOverlay(QWidget):
         # size_multiplier = calc_size_multiplier(screen)
         size_multiplier =  1 / get_device_pixel_ratio(screen)
         
-        print(f"Screen geometry: {screen.size()}, Device Pixel Ratio: {get_device_pixel_ratio(screen)}, Size multiplier: {size_multiplier}")
+        logger_state.debug(f"Screen geometry: {screen.size()}, Device Pixel Ratio: {get_device_pixel_ratio(screen)}, Size multiplier: {size_multiplier}")
         
         
         self.size_multiplier = size_multiplier  # Store for later use in paintEvent
         self.crosshair_size = int(self._crosshair_size * size_multiplier)  # Span of the crosshair overlay
         self.thickness = int(self._thickness * size_multiplier)
         
-        print(f"Crosshair size: {self.crosshair_size}, Thickness: {self.thickness}")
+        logger_state.debug(f"Crosshair size: {self.crosshair_size}, Thickness: {self.thickness}")
         
-        print(f"Crosshair added: Device Pixel Ratio: {get_device_pixel_ratio(screen)}, Size multiplier: {size_multiplier}")
+        logger_state.debug(f"Crosshair added: Device Pixel Ratio: {get_device_pixel_ratio(screen)}, Size multiplier: {size_multiplier}")
         dx = getattr(self._fst.arg_manager, "CROSSHAIR_DELTA_X", 0)
         dy = getattr(self._fst.arg_manager, "CROSSHAIR_DELTA_Y", 0)
         x = screen_center.x() + int(dx * size_multiplier) - self.crosshair_size//2
@@ -480,6 +623,15 @@ class StatusOverlay(QWidget):
         self.color_name = "red"
         self.color = QColor(self.color_name)
         self._drag_offset = None
+        # #463: (frac_x, frac_y) top-left position of the screen the
+        # overlay sits on, captured while the user drags (None = never
+        # dragged -> the resolution-change remap keeps the startup
+        # corner anchor); see set_window_size_and_position(relative=True)
+        self._rel_frac = None
+        # #463: True once the CURRENT left-button press actually moved
+        # the widget - a plain click (press, zero movement, release) is
+        # NOT a drag and must never capture a fraction (review P1)
+        self._drag_moved = False
 
         # Build menu
         self.context_menu = QMenu(self)
@@ -498,7 +650,18 @@ class StatusOverlay(QWidget):
         self.show()
 
     # Trigger a repaint to reflect the new size
-    def set_window_size_and_position(self, init=False):
+    def set_window_size_and_position(self, init=False, relative=False):
+        '''Anchor modes (sizes re-derive in EVERY mode):
+        - init=True: startup placement - top-right corner (the pinned
+          default anchor).
+        - relative=True (#463, the resolution-change handler): replay
+          the user-dragged relative position - the stored top-left
+          fractions of the OLD screen geometry (captured at drag time,
+          _capture_relative_position) applied to the NEW geometry,
+          clamped fully on-screen; never dragged (_rel_frac is None) ->
+          the startup corner above, the #463 "startup default
+          unchanged" contract.
+        - default (drag paths): recenter at the cursor.'''
         user_size = self._fst.arg_manager.STATUS_INDICATOR_SIZE
 
         #padding = self.padding
@@ -516,11 +679,31 @@ class StatusOverlay(QWidget):
         x_size = dpadding + self.user_size
         y_size = dpadding + self.user_size
 
-        if init :
-            # On init, place at top-right corner of primary screen
-            scr_geom = screen.geometry()
+        scr_geom = screen.geometry()
+
+        if init or (relative and self._rel_frac is None):
+            # On init - or a resolution/scale change of an overlay the
+            # user never moved (#463 default case) - place at the
+            # top-right corner of the current screen
             top_left_x = scr_geom.right() - x_size
             top_left_y = scr_geom.top()
+        elif relative:
+            # #463 (maintainer ruling 2026-11-23): the user-dragged
+            # position survives the geometry change at the SAME
+            # relative spot - the old-screen fractions of the NEW
+            # geometry - then clamped so the box stays fully
+            # on-screen (bound left/top + screen_size - box_size; the
+            # corner anchor above keeps its own pre-#463 1px right-gap
+            # convention, reviewer P2-7)
+            frac_x, frac_y = self._rel_frac
+            target_x = scr_geom.left() + int(round(frac_x * scr_geom.width()))
+            target_y = scr_geom.top() + int(round(frac_y * scr_geom.height()))
+            max_x = max(scr_geom.left(),
+                        scr_geom.left() + scr_geom.width() - x_size)
+            max_y = max(scr_geom.top(),
+                        scr_geom.top() + scr_geom.height() - y_size)
+            top_left_x = min(max(target_x, scr_geom.left()), max_x)
+            top_left_y = min(max(target_y, scr_geom.top()), max_y)
         else:
             # During drag or resizing, always recenter at cursor
             cursor_pos = QCursor.pos()
@@ -537,20 +720,63 @@ class StatusOverlay(QWidget):
         
         self.update()  # Trigger repaint
         
+    def _capture_relative_position(self):
+        '''#463: store the top-left position as a fraction of the screen
+        the overlay sits on - the user-drag intent the resolution-change
+        remap (set_window_size_and_position(relative=True)) replays on
+        the new geometry. Called from the drag paths ONLY, so a never-
+        dragged overlay keeps _rel_frac None and the startup default.
+        The screen is the existing cursor-screen selection
+        (_current_screen, kept current by the drag path); degenerate
+        geometry (zero/negative extent) stores nothing (no division).'''
+        screen = (self._current_screen if self._current_screen is not None
+                  else get_current_screen())
+        if screen is None:
+            return
+        geo = screen.geometry()
+        if geo.width() <= 0 or geo.height() <= 0:
+            return
+        pos = self.geometry().topLeft()
+        self._rel_frac = ((pos.x() - geo.left()) / geo.width(),
+                          (pos.y() - geo.top()) / geo.height())
+
+    def _cycle_rect(self):
+        '''U388 (#388 Leg 2): the widget-local rect the colored cycle
+        (status dot) is drawn into - cycle extent s = user_size (the
+        DPR-correct size, recomputed by set_window_size_and_position in
+        the Leg-1 resolution-change handler), CENTER derived from the
+        REAL widget size:
+            x = (width() - s) // 2  (same for y)
+        The old math anchored at the stored box vars
+        (drawEllipse(x_size - p - s, p, s, s)) - symmetric margins ONLY
+        while those vars match the real box; a display change drifts
+        the box (Qt DPI re-scale) and the cycle clipped bottom-right
+        (maintainer report). Appearance-parity while the vars match:
+        x_size = 2p+s -> (x_size - s)//2 == p == x_size - p - s, so
+        this is not a look change - a look-preservation proof is pinned
+        in tests/test_cycle_clip.py.'''
+        s = self.user_size
+        return QRect((self.width() - s) // 2,
+                     (self.height() - s) // 2,
+                     s, s)
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setBrush(self.color)
         painter.setPen(Qt.NoPen)
-        p = self.user_padding
-        s = self.user_size
-        painter.drawEllipse(self.x_size - p - s, p, s, s)
+        # U388 (#388 Leg 2): draw from the derived rect (real-size
+        # center) - no bottom-right clip after a box drift / resolution
+        # change
+        painter.drawEllipse(self._cycle_rect())
         #print(f"Painting overlay at: {self.geometry()} with size ({self.x_size}, {self.y_size}) and padding {p}")      
 
     # --- Mouse drag and menu events ---
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self._drag_offset = event.globalPosition().toPoint() - self.frameGeometry().topLeft()
+            # #463 (review P1): a press alone is not a drag yet
+            self._drag_moved = False
             self.screen_changed = False
             self.counter = 10
         event.accept()
@@ -570,6 +796,8 @@ class StatusOverlay(QWidget):
             new_left = new_center_x - self.x_size // 2
             new_top = new_center_y - self.y_size // 2
             self.move(new_left, new_top)
+            # #463 (review P1): the press turned into a real drag here
+            self._drag_moved = True
             
             # also drag the toast manager if it's visible
             if hasattr(self.parent(), 'toast_manager'):
@@ -585,22 +813,35 @@ class StatusOverlay(QWidget):
             if self.screen_changed:
                 if self.counter == 0:
                     self.set_window_size_and_position()
-                    print(f"Overlay moved to screen: {self._current_screen_name}")
+                    logger_state.debug(f"Overlay moved to screen: {self._current_screen_name}")
                     self.screen_changed = False
                 else:
                     self.counter -= 1   
+            # #463: keep the stored fraction current DURING the drag (a
+            # resolution change between two moves replays the latest
+            # spot); after any screen-change recenter above
+            self._capture_relative_position()
         event.accept()
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.LeftButton:
+            # #463: a drag actually in progress ends here - capture the
+            # final fraction (after any screen-change recenter below);
+            # a stray release without a drag must not switch a
+            # never-dragged overlay out of its default state
+            dragging = self._drag_offset is not None
             self._drag_offset = None
             # After drag completes, check if the screen changed.
             # Only now, resize/recenter if needed — this avoids feedback loops!
             if self.screen_changed:
                 self.set_window_size_and_position()  # Resize and recenter
-                print(f"Overlay moved to screen: {self._current_screen_name}")
+                logger_state.debug(f"Overlay moved to screen: {self._current_screen_name}")
                 self.screen_changed = False
-                
+            if dragging and self._drag_moved:
+                # #463 (review P1): capture only when this press actually
+                # moved the box - a plain click keeps the never-dragged
+                # default state (_rel_frac stays None)
+                self._capture_relative_position()
         event.accept()
 
     def contextMenuEvent(self, event):
@@ -613,7 +854,7 @@ class StatusOverlay(QWidget):
         try:
             self._fst.control_toggle_pause()
         except ConfigError as error:
-            self._fst.toast_callback(str(error), 5, 12, "rgba(200, 40, 40, 200)", "white")
+            self._fst.surface_config_error(error)
 
     def return_to_menu(self):
         self._fst.control_return_to_menu()
@@ -632,7 +873,7 @@ class StatusOverlay(QWidget):
         try:
             self._fst.reload_from_file()
         except ConfigError as error:
-            self._fst.toast_callback(str(error), 5, 12, "rgba(200, 40, 40, 200)", "white")
+            self._fst.surface_config_error(error)
 
     def close_overlay(self):
         self.close()
@@ -670,8 +911,137 @@ class StatusOverlay(QWidget):
         
            
            
+# Toast text rendering width: the label wraps at this width so long toast
+# texts render fully in multiple lines - the ToastManager box is fixed at
+# 500 px and self-drawn text that is wider is cut off (maintainer: text cut
+# at window width). Keep this below the ToastManager fixed width (500).
+TOAST_TEXT_MAX_WIDTH = 480
+
+# #464 content-fit width: the toast box shrinks to its measured text width
+# plus a per-side pixel buffer (room for the rounded border), clamped to
+# [TOAST_TEXT_MIN_CHARS chars at text_size, TOAST_TEXT_MAX_WIDTH]. The char
+# floor scales with text_size like the metrics do: at the default 12 px
+# Consolas the floor is ~64 px (8 chars x ~7 px + the buffers; ~104 px with
+# the offscreen fallback font) - the maintainer's 'mm' message gets a small
+# box while long texts still wrap at the max.
+TOAST_TEXT_SIDE_PAD = 4      # px buffer on each side of the measured text
+TOAST_TEXT_MIN_CHARS = 8     # short-line width floor, in monospace chars
+
+# Toast label font chain, single-sourced (U290R): the stylesheet chain below
+# resolves family by family, so the QFontMetrics that pre-wraps the text must
+# carry the SAME chain - a Consolas-only metrics font measured a font the
+# stylesheet can fall away from (no Consolas on the machine: the label renders
+# 'Courier New' / monospace at a different advance width, and the pre-wrapped
+# lines no longer matched the rendered text).
+TOAST_FONT_FAMILIES = ('Consolas', 'Courier New', 'monospace')
+TOAST_QSS_FONT_FAMILIES = ', '.join(f"'{family}'" for family in TOAST_FONT_FAMILIES)
+
+
+def toast_font(text_size):
+    '''the toast label font: bold at a pixel size, with the full family chain
+    of the stylesheet (mirrors TOAST_FONT_FAMILIES) so the wrap-time metrics
+    and the rendered text resolve to the same font'''
+    font = QFont()
+    font.setFamilies(list(TOAST_FONT_FAMILIES))
+    font.setPixelSize(text_size)
+    font.setBold(True)
+    return font
+
+
+def wrap_toast_text(text, max_width, font_metrics):
+    '''greedy-fill word wrap at max_width pixels; a single word longer than
+    the width is hard-broken, embedded newlines (paragraphs) are preserved
+    line by line. Whitespace fidelity (U290R): the fits path returns the
+    paragraph verbatim, so the wrap path keeps a space run of any length (the
+    old split-on-space token loop dropped the empty tokens and collapsed
+    "a  b" to "a b"), joins a leading run to its first word, keeps the
+    paragraph's trailing run while the last line still fits, and consumes
+    only the run that causes a break. A leading space run that cannot join is
+    dropped, so no whitespace-only line opens at a break; the space-only
+    PARAGRAPH case keeps its verbatim line (fits-path fidelity)'''
+    lines = []
+    for paragraph in text.split('\n'):
+        if font_metrics.horizontalAdvance(paragraph) <= max_width:
+            # fits: return it exactly (whitespace preserved)
+            lines.append(paragraph)
+            continue
+        current = ''
+        pending_space = ''
+        leading_run = ''  # the spaces-only run kept at a line start
+        # the split keeps each space run as a token: fidelity for runs > 1
+        for token in re.split('( +)', paragraph):
+            if token == '':
+                continue  # split artifacts at the paragraph ends
+            if token[0] == ' ':
+                if current == '':
+                    # leading run: kept, it joins the first word when it fits
+                    current = token
+                    leading_run = token
+                    pending_space = ''
+                else:
+                    pending_space += token
+                continue
+            if font_metrics.horizontalAdvance(
+                    current + pending_space + token) > max_width:
+                if current and current != leading_run:
+                    lines.append(current)
+                # a spaces-only leading run is dropped with the break - it
+                # would render as a blank line in the toast; the droppable
+                # rule is for SPACE runs, so a tab-word (a word token) stays
+                current = ''
+                leading_run = ''
+                pending_space = ''  # the break consumes the separator run
+                if font_metrics.horizontalAdvance(token) > max_width:
+                    # over-long word: hard-break at the width
+                    chunk = ''
+                    for char in token:
+                        if font_metrics.horizontalAdvance(chunk + char) > max_width and chunk:
+                            lines.append(chunk)
+                            chunk = char
+                        else:
+                            chunk += char
+                    current = chunk
+                    continue
+            current += pending_space + token
+            pending_space = ''
+        # the paragraph's trailing space run stays on the last line while the
+        # line still fits (the fits path keeps trailing whitespace verbatim);
+        # a run that would over-widen the last line is consumed (U290R)
+        if pending_space and font_metrics.horizontalAdvance(
+                current + pending_space) > max_width:
+            pending_space = ''
+        lines.append(current + pending_space)
+    return '\n'.join(lines)
+
+
+def toast_box_width(display_text, font_metrics):
+    '''content-fit label width (#464): the widest measured line of the
+    (already wrapped) display text plus the per-side buffer, clamped to
+    [the TOAST_TEXT_MIN_CHARS floor, TOAST_TEXT_MAX_WIDTH]. Call it AFTER
+    wrap_toast_text capped the lines at the max width - no line can then
+    exceed the box, so wordWrap stays the insurance it always was'''
+    widest = max(font_metrics.horizontalAdvance(line)
+                 for line in display_text.split('\n'))
+    floor = (font_metrics.horizontalAdvance('x' * TOAST_TEXT_MIN_CHARS)
+             + 2 * TOAST_TEXT_SIDE_PAD)
+    return max(floor, min(widest + 2 * TOAST_TEXT_SIDE_PAD,
+                          TOAST_TEXT_MAX_WIDTH))
+
+
+def toast_screen_right(overlay_geo, screen_geo):
+    '''single source of the #464 toast mirror: True when the overlay cycle
+    sits on the RIGHT half of its screen (cycle center x >= screen center x).
+    RIGHT half: the toast box extends LEFTWARD from the cycle and the text is
+    right-aligned (it hugs the cycle side, as the boxes always did). LEFT
+    half: direction and alignment flip together - the box extends RIGHT, the
+    text left-aligns. Boundary ruling (stated per spec): a cycle centered
+    exactly on the screen midline counts as the RIGHT half, which preserves
+    the pre-#464 placement there'''
+    return overlay_geo.center().x() >= screen_geo.center().x()
+
+
 class ToastWidget(QFrame):
-    def __init__(self, text, duration=3.0, text_size=12, bg_color="rgba(40, 40, 40, 200)", text_color="white", timer=0, parent=None):
+    def __init__(self, text, duration=3.0, text_size=12, bg_color=TOAST_NEUTRAL, text_color="white", timer=0, parent=None, screen_right=True):
         super().__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.ToolTip | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -693,7 +1063,7 @@ class ToastWidget(QFrame):
             }}
             QLabel {{ 
                 background: {bg_color}; 
-                font-family: 'Consolas', 'Courier New', monospace; 
+                font-family: {TOAST_QSS_FONT_FAMILIES}; 
                 font-size: {text_size}px; 
                 font-weight: bold; 
             }}
@@ -705,12 +1075,23 @@ class ToastWidget(QFrame):
         
 
 
-        # Set the initial text
+        # Set the initial text, pre-wrapped near the manager box width (the
+        # self-drawn text was cut at the window width; the metrics font is
+        # toast_font - it mirrors the stylesheet chain above exactly)
         if self.use_timer_display:
-            self.label = QLabel(self.get_display_text())
+            display_text = self.get_display_text()
         else:
-            self.label = QLabel(f" {text} ")
+            display_text = f" {text} "
+        self._metrics = QFontMetrics(toast_font(text_size))
+        self.label = QLabel()
+        # insurance: QLabel word wrap + the content-fit box width (#464: a
+        # short text gets a small box, a long one still wraps at the max)
+        self.label.setWordWrap(True)
+        self._set_fitted_text(display_text)
         layout.addWidget(self.label)
+        # #464 mirror: the text hugs the cycle side (the manager passes its
+        # screen-half computation; standalone builds keep the right side)
+        self.set_screen_right(screen_right)
 
         # 2. Single Master Timer
         # This handles both the countdown AND the eventual destruction
@@ -724,6 +1105,25 @@ class ToastWidget(QFrame):
 
     def __eq__(self, other) -> bool:
         return (self.id == other.id) and (self.duration is other.duration)
+    
+    def set_screen_right(self, screen_right):
+        '''#464 mirror: the text hugs the cycle side - right-aligned when the
+        overlay cycle sits on the RIGHT half of its screen, left-aligned on
+        the left half. ToastManager.update_position re-applies it, so a
+        resolution change re-mirrors live toasts instead of stranding them'''
+        self.label.setAlignment((Qt.AlignRight if screen_right
+                                 else Qt.AlignLeft) | Qt.AlignVCenter)
+    
+    def _set_fitted_text(self, text):
+        '''wrap at the max width and re-fit the box to the result (#464).
+        Used at build and by dismiss(): the " | DELETE " text outgrows a
+        shrunk build-time width, so a short toast would otherwise re-wrap
+        and jump in height for its 1 s farewell. handle_tick needs no
+        re-fit: the countdown field has a constant width ("| %5.1fs"), so
+        the build-time measurement already covers every tick (measured)'''
+        wrapped = wrap_toast_text(text, TOAST_TEXT_MAX_WIDTH, self._metrics)
+        self.label.setText(wrapped)
+        self.label.setFixedWidth(toast_box_width(wrapped, self._metrics))
     
     def get_display_text(self):
         """Standardizes the countdown format."""
@@ -747,16 +1147,16 @@ class ToastWidget(QFrame):
         if immediately:
             self.deleteLater()
         else:
-            self.label.setText(f" {self.base_text} | DELETE ")
+            self._set_fitted_text(f" {self.base_text} | DELETE ")
             self.setStyleSheet(f"""
                 QFrame {{
-                    background-color: rgba(200, 40, 40, 200);
+                    background-color: {TOAST_RED};
                     color: {self.text_color};
                     border-radius: 8px;
                     padding: 0px;
                 }}
                 QLabel {{ 
-                    font-family: 'Consolas'; 
+                    font-family: {TOAST_QSS_FONT_FAMILIES}; 
                     font-size: {self.text_size}px; 
                     font-weight: bold; 
                 }}
@@ -794,13 +1194,14 @@ class ToastManager(QWidget):
         if self._fst.arg_manager.STATUS_INDICATOR:
             self.remove_toast(text, immediately=1)
             
-            toast = ToastWidget(text, duration, text_size, bg_color, text_color, timer)
+            screen_right = self._screen_right()  # the #464 side, one source
+            toast = ToastWidget(text, duration, text_size, bg_color, text_color, timer, screen_right=screen_right)
             self.active_toasts[text] = toast
             
             # Auto-cleanup: remove from dict when the widget is deleted
             toast.destroyed.connect(lambda: self._handle_destruction(toast))
                               
-            self.main_layout.addWidget(toast, alignment=Qt.AlignRight)
+            self.main_layout.addWidget(toast, alignment=Qt.AlignRight if screen_right else Qt.AlignLeft)
             
             self.update_position()
             self.show()
@@ -847,16 +1248,61 @@ class ToastManager(QWidget):
             # at app shutdown) - nothing left to update
             pass
 
+    def _screen_right(self):
+        '''the #464 side the overlay cycle sits on, on the screen the CYCLE
+        is on (reviewer P2-4: not the cursor's screen - the cursor can be
+        parked on another monitor while the indicator drives the layout) -
+        the toast_screen_right helper is the single source both the placement
+        and the text/column alignment read from'''
+        overlay_geo = self.parent_overlay.geometry()
+        return toast_screen_right(
+            overlay_geo, get_screen_at(overlay_geo.center()).geometry())
+
     def update_position(self):
         overlay_geo = self.parent_overlay.geometry()
         parent_padding = self.parent_overlay.user_padding
+        screen_right = self._screen_right()
         
-        # Anchor the RIGHT edge of our 500px box to the RIGHT edge of the indicator
-        x = overlay_geo.right() - self.width() - parent_padding
+        # #464 side-aware anchor: on the RIGHT half of its screen keep the
+        # RIGHT edge of our 500px box on the RIGHT edge of the indicator (the
+        # box extends LEFT, as it always did); on the LEFT half mirror it -
+        # the box LEFT edge anchors to the indicator LEFT edge and the box
+        # extends RIGHT, away from the screen edge
+        if screen_right:
+            x = overlay_geo.right() - self.width() - parent_padding
+        else:
+            x = overlay_geo.left() + parent_padding
         # Anchor the TOP edge of our toasts just below the indicator
         y = overlay_geo.bottom()
         
         self.move(x, y)
+        self._apply_side(screen_right)
+
+    def _apply_side(self, screen_right):
+        '''#464: the toast column and every live toast hug the cycle side.
+        A resolution change can flip the side under a shown manager (the
+        #463 re-anchor drives update_position AFTER the overlay moved) - the
+        live toasts re-mirror with it instead of stranding. The PER-ITEM
+        alignment is what places the fixed-width box inside the 500 px
+        window (reviewer P1): the layout-level flag alone never moves it, so
+        both flags and an invalidate() are needed'''
+        align = Qt.AlignRight if screen_right else Qt.AlignLeft
+        self.main_layout.setAlignment(Qt.AlignTop | align)
+        # the dict is the synchronous source of truth (repo gotcha): walking
+        # the LAYOUT here hands out the untrusted placeholder QWidget of a
+        # just-destroyed toast - indexOf over the dict entries does not
+        for toast in list(self.active_toasts.values()):
+            try:
+                toast.set_screen_right(screen_right)
+                idx = self.main_layout.indexOf(toast)
+                if idx >= 0 and self.main_layout.itemAt(idx) is not None:
+                    self.main_layout.itemAt(idx).setAlignment(
+                        align | Qt.AlignTop)
+            except RuntimeError:
+                # C++ side gone (a toast destroyed while its item is still
+                # in the layout) - the item goes away with the toast
+                continue
+        self.main_layout.invalidate()
 
     def check_empty(self):
         # The dict is the synchronous source of truth: the layout may still

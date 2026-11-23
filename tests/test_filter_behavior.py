@@ -161,6 +161,8 @@ class TestRebindRepeat:
         # maintainer ruling 2026-09-15: a rebind trigger that is also in a
         # tap group keeps the current (suppressed) repeat behaviour - it must
         # NOT auto-repeat its replacement (the failed first attempt's area)
+        # event-stream idealization (U301 reversal): tap-group states are fed
+        # by the event stream only.
         kb = kb_env_ns.kb
         build(kb, taps=[['(TAP_1)', ['a', 'b']]],
               rebinds=[['(r)', [['a'], 'c']]])
@@ -256,6 +258,8 @@ class TestMacroFiring:
 
 class TestTapGroupFilter:
     def test_snap_tap_idealization_sequence(self, kb_env_ns):
+        # event-stream idealization (U301 reversal): tap-group states are fed
+        # by the event stream only, no OS truth in the harness
         kb = kb_env_ns.kb
         build(kb, taps=[['(TAP_1)', ['a', 'b']]])
         down(kb, VK_A, 1000)
@@ -320,7 +324,14 @@ class TestMacroPlayback:
         await asyncio.sleep(0.01)
         # b was sent before the delay; c was cancelled away with the delay
         assert kb_env_ns.kb_mock.press.call_count == 1
-        assert kb_env_ns.kb_mock.release.call_count == 0
+        # F-A7 (ladder R2, the delegated semantics migration): the interrupt
+        # now drains b's OWED release, so the cancel path emits exactly one
+        # release. This assertion read `== 0` before R2 - i.e. it pinned the
+        # stuck-key behaviour the research doc item 7 named as the defect.
+        # Edited here WITH that justification and filed ruled-open for
+        # maintainer confirmation (handover + plan status + todo_inbox); every
+        # other statement in this test is unchanged.
+        assert kb_env_ns.kb_mock.release.call_count == 1
 
 
 VK_ALT = 0xA4

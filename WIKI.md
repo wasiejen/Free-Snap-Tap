@@ -1,7 +1,7 @@
 
 
 
-# Function documentation (Version 1.2.0):
+# Function documentation (Version 1.4.0):
 
 ## General overview
 
@@ -25,7 +25,7 @@ It interpretes the real input (of keyboard and mouse) and according to defined r
 - **prefix/modifier** `-key_event`, `+key_event`, `!key_event`, `^Key`: the prefix is the sign before a key_event or Key. If `-`, `-`, `!` are present it will define a key_event of press or release. `^` defines a toggled Key and is the only prefix for a Key. If there is no prefix, it will be handled as a Key (press + release).
 - **suffix** `key_event|suffix|suffix|...` are written behind key_events or Keys and are interpreted as:
   - **suffix/delays** `ke|*time in ms*` time after a key_event that will be waited before next will be played. Delay is defined by if the suffix is a number (time in ms for delay) or can be evaluated to a number.
-  - **suffix/constraints** `ke|-ke|+ke`defines when to trigger or send a key_event based on True or False statements
+  - **suffix/constraints** `ke|(-ke)|(+ke)` defines when to trigger or send a key_event based on True or False statements
   - **suffix/evaluations** `ke|(evaluation)` can result in a constraint if evaluated to True/False or as delay when evaluated to a number
   - **suffix/function invocation** `ke1 :: ke2|(repeat_toggle(10000))` a function that will always evaluate to True - the suffixed key_event is still played as usual, and the function defined in the invocation will be started
     - in this example: trigger `ke1` will start a repeated sending of the `ke2` every 10 seconds until ```ke1` is pressed again and stop it
@@ -47,9 +47,29 @@ You can change the control key combinations in the py file under # Control key c
 - only active with the start argument `<arg>-debug_numpad`
 - `ALT + NUM1` to `ALT + NUM4` toggle the internal debug outputs DEBUG, DEBUG2, DEBUG3 and DEBUG4
 - `ALT + NUM5` prints the internal representation of all groups
-- `ALT + NUM6` is unassigned (reserved)
+- `ALT + NUM6` toggles the drop-watch lane (U345, #291 H1): filter legs that
+  die mid-event land named, ASCII-safe drop lines in the append-only
+  `fst_drop.log` (and in `fst.log`); the raw-event ring rides always (µs
+  cost) - `ALT + NUM6` on adds the ring tail + the dedicated file
 - `ALT + NUM7` prints the real pressed-key states
 - `ALT + NUM8` prints all pressed-key states (real and simulated)
+
+### [Status dump - THE bug-report artifact]
+
+- `fst_status.log` in the program's working directory (next to `fst.log`) is
+  the ONE supported snapshot surface - written at every start-up and on every
+  successful config reload, overwritten atomically, so it always matches the
+  moment it was asked for. Attach it to a bug report.
+- Sections: effective start arguments (post-validation) - lifecycle state -
+  focus scope - group counts - tap / hold / toggle states (typed vk codes, no
+  object reprs) - the ticket ledger - paths.
+- The ledger section lists the open tickets (`seq vk kind state source_kind
+  source_id gen mouse age_ms`) with counts by class, and names any ticket
+  older than `CONSTANTS.STUCK_TICKET_MS` (default 5000 ms) with a
+  `[StuckKeyWatch]` line - that line also lands in `fst.log` at WARNING.
+- The dump renders on the asyncio loop thread, never on the keyboard hook
+  pump, and has no hotkey of its own (the numpad combos above stay the
+  ad-hoc live inspection surface).
 
 ### [Status Indicator - simple overlay for in game control]
 
@@ -59,12 +79,26 @@ You can change the control key combinations in the py file under # Control key c
   - see picture above - just a small dot that changes based on being active to green and on incative to red
   - right mouse click opens the menu
   - double left mouse click or middle mouse click will open the config file
+  - left mouse drag moves it anywhere; a resolution or scale change keeps that RELATIVE position (the same fraction of the screen, clamped fully on-screen) - never dragged, it stays at the startup top-right corner
 
 #### [Crosshair] as function of the GUI overlay
 - `<arg>-crosshair` or `<arg>-crosshair=*pixel delta x*,*pixel delta y*`
   - displays a simple crosshair as overlay and can be controlled on a per game basis
 - needs the GUI loop to be started at startup - via `-status_indicator` or via `-tray_icon` alone
   - the tray icon menu offers "Toggle Crosshair", so it can also be toggled without a status indicator
+
+#### [Toast boxes] - geometry of the toast messages
+- the toast row hangs below the status indicator; the toast BOX WIDTH fits its text (#464)
+  - the width source is the measured text (the same font metrics the wrapping uses) plus a 4 px buffer on each side, clamped to `[8 characters, 480 px]`
+  - so a short message like `mm` gets a small box; a long text grows to the 480 px cap and WRAPS into multiple lines there
+  - the minimum is 8 monospace characters of the toast font, so it scales with the font size; 480 px is the `TOAST_TEXT_MAX_WIDTH` cap
+- the EXTEND DIRECTION follows the screen half the cycle sits on
+  - cycle on the RIGHT half: the box extends LEFT from it (the long-standing behavior)
+  - cycle on the LEFT half: the box extends RIGHT, away from the screen edge
+  - a cycle centered exactly on the screen midline counts as the right half
+- the TEXT ALIGNMENT mirrors the same side: right-bounded text while the cycle is on the right (the text hugs the cycle), left-bounded while it is on the left - direction and alignment always flip together
+- a resolution or scale change re-anchors the row under the moved indicator and re-mirrors the live toasts to the new side
+- the row lives in a fixed 500 px transparent window anchored at the cycle, so on very narrow displays (roughly under 1000 px logical width) its far edge can pass the screen edge - pre-existing on the right half, mirrored on the left since #464
 
 
 ## More in depth functionality
@@ -154,6 +188,23 @@ For further functionality of how it will be triggered, usage of constraints, eva
   - trigger and constraints also supports constraints a suffixes: `trigger|constraint_of_trigger|..., constraint_of_trigger|constrain_of_constraint_of_trigger|..., ...`
   - suffixes of trigger and constraints will only be checked/activated if trigger and constraint (without suffix) will in itself check for True, then the suffixes will be checked in order of placement in trigger_group
 
+### [Focus polling contract - designed behavior (Item 14)]
+
+FST observes the foreground window with TWO poll loops - this is the documented decision (architecture review Item 14, unit F-B5):
+
+- **Focus poll** - the asyncio task `Focus_Task.run` (`fst_tasks.py`) runs on the logic loop thread: one active-window title query (pygetwindow -> Win32 `GetForegroundWindow` + `GetWindowTextW`), evaluate focus groups, sleep 0.25 s. Focus transitions of up to 250 ms are accepted product behavior.
+- **GUI timer** - the overlay (`fst_overlay.py`, `perform_periodic_update`) re-reads in-process flags (pause states, focus name, colors) every 500 ms on the Qt thread. It queries NO windows.
+
+Why NOT event-driven (`SetWinEventHook`): a hook adds a thread/callback surface and a new class of bugs; the practical gain over a 250 ms poll is small and the migration cost is disproportionate. Polling stays the design.
+
+Slow or unresponsive foreground apps: the title read sends a message to the window's OWNING thread, so a hung app stalls the query - and macro/toast scheduling shares the logic loop thread, so it is delayed too. UIPI-blocked titles read as empty. This API set has NO timeout variant for the title read, and a watchdog thread was rejected - the poll stays synchronous.
+
+What the query wrapper `_get_active_window_title` guarantees:
+
+- no foreground window -> `"None"` sentinel -> treated as focus lost (input filter pauses, or default groups take over with `-always_active`).
+- a transient raising failure (Win32/ctypes exception) -> the LAST-KNOWN title is kept, so a single bad query can neither kill the focus task (pre-F-B5 it did, and tracking stayed dead until restart) nor toggle the active focus group. An empty last-known title (see UIPI above) degrades to the `"None"` sentinel.
+- a true win32 stall (hung owning thread) can still block one poll cycle - bounded only by the app recovering; this is the documented, accepted limit of the design.
+
 ## Delays in general
   - default delay for Tap_Groups and Macros is set to a random time between 2 and 10 ms
   - in Tap_Groups: 
@@ -178,7 +229,9 @@ Every key event supports prefixes **prefix/modifier**
 ## [Suffixes]
 
 - every key_event supports **suffixes** (constraints, evaluation, function invocation)
-  - as constraints: `-ke`, `+ke`/`!ke`: e.g. `ke1|-ke2|-ke3 : ...` is functionally the same as trigger group: `ke1, -ke2, -ke3 : ...`
+  - a suffix segment is either a delay number or a parenthesized expression `(...)` - a bare segment is parsed as a delay number, so `ke1|-ke2` is rejected
+  - as constraints: `(-ke)`, `(+ke)`/`(!ke)`: e.g. `ke1|(-ke2)|(-ke3) : ...` is functionally the same as trigger group: `ke1, -ke2, -ke3 : ...`
+    - inside the parentheses the sign names the state to check: `(-ke)` is True while ke is pressed, `(+ke)`/`(!ke)` while ke is not pressed (real and simulated state)
 - suffixes in trigger_group will only be checked/activated when trigger and constraints all check for True
 
 ### [Suffix/Delays]
@@ -186,6 +239,27 @@ Every key event supports prefixes **prefix/modifier**
   - Notation: 
     - `key_event/Key|*time*` -> will result in a static delay of length *time* in ms
     - `key_event/Key|*time1*|*time2*` -> will result in a random delay of length between *time1* and *time2* ms
+
+  - **A segment delay is deliberately UNBOUNDED** (maintainer decision 12, 
+    2026-11-17): a macro may have to wait seconds or minutes for the program in
+    front of it, so no limit is imposed on *time*. The delay KNOBS (`-tapdelay`,
+    `-macrodelay`, `-sequencedelay`, bound 0..1000 ms) are a different concept -
+    they set the random delay a line gets when it states none. Two rules come
+    with the unbounded value:
+      - the config check asks about an obviously large one: above 30000 ms the
+        load reports `very long delay (45000 ms) in a|45000 - intentional?` as a
+        WARNING. It never rejects the line and never changes the value;
+      - a wait never outlives its context: when a focus-group change, a macro
+        abort, a pause (ALT+DELETE) or a config reload ends the context a
+        playback belongs to, the pending delay is dropped and a key the playback
+        still owed is released immediately - a late segment never fires into the
+        newly active program.
+  - **the shipped DEFAULT delay pair is 2-10 ms** (maintainer decision 16,
+    2026-11-23): the pair sits BELOW the ~15.6 ms Windows clock tick, so every
+    inter-key gap quantizes to ONE tick - default playback is effectively
+    immediate (a long string lands as a burst). For a visible per-key rhythm,
+    state a pair whose LOWER bound is above the tick (the parser sorts the
+    pair), e.g. `-macrodelay=25,20`.
 
 ### [Suffix/Evaluation] updated to V1.1.3
 
@@ -267,14 +341,14 @@ Every key event supports prefixes **prefix/modifier**
   - the semantics differ by the type of the name:
     - `|(name)` on a macro name interrupts a started macro playback - it stops as soon as possible (normally in < 10 ms) and does not reset anything
     - `|(name)` on a sequence name resets the sequence counter only - the currently in-flight playback is not interrupted
-    - `|reset('name')` on a sequence name resets the counter; on a non-sequence name it prints "No Macro Sequence with name ... - reset failed" and does nothing else (it does not interrupt a macro)
+    - `|(reset('name'))` on a sequence name resets the counter; on a non-sequence name it prints "No Macro Sequence with name ... - reset failed" and does nothing else (it does not interrupt a macro)
     - an unknown name is a silent no-op (evaluates to True)
   - resetting of a sequence will let the next playback of the sequence start again on the first key group
 
 #### [General key control]
 
-- `|stop_all_repeat()` - will stop all active repeats
-- `|release_all_keys()` - will release all currently simulated keys that are pressed
+- `|(stop_all_repeat())` - will stop all active repeats
+- `|(release_all_keys())` - will release all currently simulated keys that are pressed
 
 #### [Function results in general]
 
@@ -349,6 +423,8 @@ The functions of the following sections are resolved by the same suffix evaluati
 
 - relative file paths are resolved against the program's working directory
 - `|(save_into_file('text', *time stamp*, *mode*, *file path*))`: write the text to the file as "*time stamp*: *text*" - defaults: file `output.txt`, mode `'w'` (overwrite), time stamp `get_time()`
+  - an omitted *time stamp* is taken at the moment the line is WRITTEN, not when the constraint is evaluated (ruling 2026-11-23): a delayed or retried write stamps its own execution time, and while no file-leg write executes the stamp default performs no clock read
+  - an explicit *time stamp* stamps what you give it - an explicit `None` stamps the literal `None`, so pass it only deliberately
 - `|(append_to_file('text', ...))`: same as `save_into_file`, mode `'a'` (append)
 - `|(empty_file('file path'))`: truncate the file - default `output.txt`
 
@@ -360,7 +436,7 @@ The functions of the following sections are resolved by the same suffix evaluati
 - `|(get_time())`: evaluates to the current time as an int of milliseconds since the epoch
 - `|(make_backup(*save dir*, *backup root dir*))` and `|(restore_backup(*save dir*, *backup root dir*))`:
   - `make_backup` copies the save dir into a timestamped backup folder named `save-YYMMDD-HHMMSS` (a counter is appended when a backup of the same second already exists)
-  - `restore_backup` replaces the save dir with the newest backup
+  - `restore_backup` replaces the save dir with the newest backup; the swap is atomic - if the restore cannot finish, the current save dir is left intact or renamed back, never lost
   - both print to the console and show a toast (so they need GUI mode for the toast part)
   - the default directories are the `-save_dir=` / `-backup_root_dir=` start arguments - without them the call fails with a FileNotFoundError
 - `|(clear_console())`: clear the console window
@@ -383,7 +459,8 @@ with V1.1.2 a new key_event the `None` or just empty key event can be used in co
 
 ## [Configuration]
 
-- text file can be changed from default "FSTconfig.txt" to any file you want to, with the help of the startargument `-file=*file_name*`
+- The default config file "FSTconfig.txt" lives next to the `.exe`/`.py`: it is resolved against that folder at startup, so it is found on every launch route (boot shortcuts, `.bat` launchers, double-click) - the working directory is never used (#461)
+- text file can be changed from default "FSTconfig.txt" to any file you want to, with the help of the startargument `-file=*file_name*` (this override is taken exactly as given: a relative value resolves against the working directory, as it always did)
 - all startarguments can be used either with a .bat file, by adding them to the link to the .exe or .py file, or by including them in the config file with `<arg>*start_argument*`, e.g. `<arg>-nomenu`
 - focus app names can be defined in the config file via `<focus>*name of the app*`
   - everything BEFORE the first \<focus> will be seen as default start arguments and groupings and applied in general (evene outsite of focus apps) and to all following focus app groupings
@@ -441,12 +518,23 @@ Everything else should be put in the config file and then can be applied on a pe
 - `<arg>-delay`: re-enable the delays - the delays are active on default, so this is only meaningful after an earlier `-nodelay`
 - `<arg>-exec_one_macro`: of all macros triggered by one real key event only the FIRST is played
 - `<arg>-debug_numpad`: enable the numpad debug combos (see [Numpad debug combos])
+- `<arg>-drop_watch`: enable the drop-watch lane (U345, #291 H1) - filter legs that die mid-event land named drop lines in `fst_drop.log` + `fst.log`; `ALT + NUM6` toggles it at runtime
+- `<arg>-no_toast_offload`: restore the direct toast bridge emit (default is the offload queue + asyncio pump, U345 H2 - A/B switch for the stuck-key hunt)
 - `<arg>-always_active`: if no focus app matches, the default groups stay active instead of the filter being paused - the status indicator shows blue while in this default-active state
+- `<arg>-default_off` (`-default-off`): deactivate the default group LINES for that focus group - the group builds from its own lines only, so global default conveniences (tap keys, status rebinds) cannot collide inside a game profile. Default START ARGUMENTS are still merged (overwrite the ones you need in the focus section); the focus-loss behavior of `-always_active` is unaffected. Set it in the default section to switch every focus group off (TODO #403, proposal 2026-10-31)
+- `<arg>-default_on` (`-default-on`): RETIRED (TODO #423) - shipped and retired the same day; setting it does nothing and the config validation prints a WARNING. The settled model: the default group IS merged into every focus group; `-default_off` is the only opt-out (TODO #418 resolution)
 - `<arg>-tray_icon`: start the GUI loop with a tray icon (with or without status indicator) - the tray menu offers Open config / Reload / Toggle Pause / Return to Menu / Toggle Indicator / Toggle Crosshair / Toggle Console / Exit
-- `<arg>-hide_cmd_window`: keep the console window hidden after start-up - it can be re-shown via the tray menu "Toggle Console"
+- `<arg>-hide_cmd_window`: hide the console window at start-up (the decision is taken once, after the config has loaded, and the window is hidden quietly) - without this argument the console window is never touched at start-up. Once hidden it comes back through the tray menu "Toggle Console", which needs `-tray_icon`: started with `-hide_cmd_window` and no tray icon there is no in-app way to show the window again. The flag can arrive from the command line (a launcher bat) AND from config `<arg>` lines - the startup decision line `config_file=*path* exists=*bool* cmd_window=*hidden/visible*` (ONE INFO line in `fst.log`, echoed to the console before any hide) names the final merged decision and the resolved config path, so the "why is my window hidden / why did it not read my config" question is self-reading from the log
 - `<arg>-save_dir=*dir*`: the save dir used by the `make_backup` / `restore_backup` invocations
 - `<arg>-backup_root_dir=*dir*`: the backup root dir used by the `make_backup` / `restore_backup` invocations
 - `<arg>-focusapp=*name*`: **DEPRECATED** - prints a warning and exits the program with error code 1 (the focus app is defined in the config file via `<focus>` instead)
+
+- `--elevate`: **start argument only** (do not put it in the config as `<arg>`). Canonical spelling is `--elevate`; `-elevated` is accepted as an alias, and any elevation spelling placed as a config `<arg>` line now warns `'X' is a start argument for elevation - place it on the command line, not in the config` instead of the generic unknown-argument warning. Self-elevation at startup: if the run is not elevated yet, FST relaunches the same exe through one Windows "run as administrator" prompt, passing along ALL other start arguments (the elevation flag, whichever spelling was used, is stripped in the relaunched child, so no relaunch loop can happen), and the first process exits 0. If the run is already elevated, FST logs one `[Elevation] running elevated` line and starts normally. Running from python.exe (dev mode) never attempts a relaunch - it prints `[Elevation] dev mode - relaunch the exe manually or use scheduled task` and starts normally.
+- **Single instance:** FST runs one instance at a time - starting a second one exits with a notice: it logs `[SingleInstance] another FST is already running - exiting` and exits with code 1. The check runs at startup after the elevation decision and before any UI/hook init; if the mutex API itself fails, FST logs a warning and starts anyway (the guard never blocks a normal start).
+
+**Prompt-free elevated autostart (scheduled task):** run this ONCE from an elevated shell:
+`schtasks /Create /TN "FreeSnapTap" /TR "C:\path\free_snap_tap.exe" /SC ONLOGON /RL HIGHEST`
+(or in Task Scheduler UI check "Run with highest privileges"). The task starts FST elevated at every logon with no UAC prompt - registration is the only elevation moment, and the exe needs no `--elevate` flag there (`/RL HIGHEST` alone carries the elevation; the flag is for manual/relaunch use). (Background and security posture of elevated input: internal research note `agent/research/2026-11-13_elevated-input.md` section 5 - agent repo, not shipped with this one.)
 
 **(deprecated)**
 Start Options: (add to the bat(ch) file or in a link after the *path*\free_snap_tap.exe)

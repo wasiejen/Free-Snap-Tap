@@ -4,19 +4,206 @@ last updated: 241023-1056
 '''
 
 import asyncio
+import threading
+from collections import deque
 
 from pynput import keyboard, mouse
-from time import time # sleep(0.005) = 5 ms
+from pynput._util.win32 import SystemHook  # U365: suppression control-flow class
 from vk_codes import vk_codes_dict  #change the keys you need here in vk_codes_dict.py
 from os import startfile
 
 from fst_data_types import Key_Event, Key_Group, Key, Tap_Group, Rebind, Macro, ConfigError
+from fst_data_types import Lifecycle_State
+from fst_data_types import (Ticket_Ledger, SOURCE_DRAIN, SOURCE_MACRO,
+                            SOURCE_REBIND, SOURCE_TOGGLE, TICKET_INJECTED,
+                            TICKET_PRESS, TICKET_RELEASE, TICKET_SCHEDULED)
+from itertools import count
+import fst_manager  # 15CLOCK: the module-level wall-clock providers (the
+                    # TIME_DIFF calibration leg below reads them through the
+                    # module so a test rebinding is seen - direct attr lookup)
 from fst_manager import CONSTANTS, CLI_menu
 from fst_manager import Output_Manager, Argument_Manager, Focus_Group_Manager
-from fst_manager import Input_State_Manager, Config_Manager
+from fst_manager import Input_State_Manager, Config_Manager, Config_Validator
+from fst_runtime_state import Runtime_Owner
+from fst_manager import Status_Dump
 from fst_manager import (logger, logger_flow, logger_state, logger_macro,
-                         logger_config)
-from fst_manager import toggle_debug_level, toggle_flow
+                         logger_config, logger_drop, DROP_RING_MAXLEN)
+from fst_manager import toggle_debug_level, toggle_flow, toggle_drop_watch
+from fst_manager import is_drop_watch_enabled
+
+# FST-417 (#417): the toast palette. The facade surface_config_* methods
+# below and the GUI layer (fst_overlay.py, imports these) are the only toast
+# color owners that the scan test guards - no rgba string constant may live
+# in fst_overlay.py (tests/test_validation_toast_severity.py
+# ::TestPaletteOwnership; other modules' literals are out of #417's scope).
+# RED     = serious ConfigError report (also the manual-remove DELETE styling)
+# YELLOW  = warnings-only report (U330 ask 1)
+# GREEN   = OK / activation toast (U290T / activation)
+# NEUTRAL = default ToastWidget background
+TOAST_RED = "rgba(200, 40, 40, 200)"
+TOAST_YELLOW = "rgba(200, 180, 0, 200)"
+TOAST_GREEN = "rgba(40, 150, 40, 200)"
+TOAST_NEUTRAL = "rgba(40, 40, 40, 200)"
+
+
+class Toast_Offload:
+    '''U345 H2 fix: move the toast bridge post OFF the LL hook pump.
+
+    H2 investigation (2026-11-04, estate handover_u345.md): the hook pump
+    (pynput listener thread) runs the FST filter synchronously
+    (pynput/_util/win32.py _handler); Windows removes a low-level hook whose
+    callback blocks past LowLevelHooksTimeout (250 ms class) and drops
+    events during removal/reinstall - the repeat-toast gaming scenario
+    (maintainer 2026-11-04: A/D tap-group moves + sidearm '2' triggers
+    <halbautomatic_start> on left_mouse REPEAT, which shows a toast every
+    repeat iteration, fst_tasks.py Macro_Repeat_Task.run) names the toast
+    bridge call as the contender in the repeat path.
+
+    Poster threads (hook pump / asyncio loop) do ONE deque.append (µs cost,
+    GIL-atomic, no lock, no I/O); a pump task on the asyncio loop drains
+    into the bridge (50 ms interval), so the bridge emit NEVER runs on a
+    poster thread. Overflow drops the OLDEST posts (newest wins) and counts
+    them (counters best-effort: read-modify-write on multiple poster threads
+    can drift by small amounts - counts are diagnostics, not control flow).
+    -no_toast_offload (CONSTANTS.TOAST_OFFLOAD, default ON) restores the
+    legacy direct emit. Without a bridge (headless mode, wiring
+    init_toast_offload(None)) posts are drop-counted no-ops - the legacy
+    toast_callback=None TypeError landmine (constraint show_message /
+    repeat overlay headless) is closed on both paths.
+    '''
+    TOAST = 'toast'
+    TIMER = 'timer'
+    REMOVE = 'remove'
+    REMOVE_ALL = 'remove_all'
+
+    def __init__(self, fst_keyboard, maxlen=64):
+        self._queue = deque(maxlen=maxlen)
+        self._bridge = None
+        self._dropped = 0
+
+    @property
+    def dropped(self):
+        return self._dropped
+
+    def attach(self, bridge):
+        self._bridge = bridge
+
+    def _post(self, kind, args):
+        if CONSTANTS.TOAST_OFFLOAD:
+            if len(self._queue) == self._queue.maxlen:
+                self._dropped += 1
+            self._queue.append((kind, args))
+        else:
+            self._direct(kind, args)
+
+    def _direct(self, kind, args):
+        if self._bridge is None:
+            self._dropped += 1
+            return
+        getattr(self._bridge, 'trigger_' + kind)(*args)
+
+    def drain(self):
+        while self._queue:
+            kind, args = self._queue.popleft()
+            self._direct(kind, args)
+
+    def toast(self, text, duration, text_size, bg_color, text_color):
+        self._post(self.TOAST, (text, duration, text_size, bg_color,
+                                text_color))
+
+    def timer(self, text, duration, text_size, bg_color, text_color):
+        self._post(self.TIMER, (text, duration, text_size, bg_color,
+                                text_color))
+
+    def remove(self, text, immediately=0):
+        self._post(self.REMOVE, (text, immediately))
+
+    def remove_all(self, immediately=0):
+        self._post(self.REMOVE_ALL, (immediately,))
+
+
+class Runtime_Snapshot():
+    '''One COMPLETE generation of the filter's runtime state (F-A3, review
+    Item 1: atomic runtime-snapshot swap).
+
+    initialize_groups_from_presorted_lines builds a fresh snapshot OFF TO THE
+    SIDE and FST_Keyboard then binds it with ONE attribute assignment
+    (self._runtime = snapshot). The hook pump therefore only ever reads a
+    generation that is fully old or fully new - never a set of containers that
+    was cleared and is half refilled (the unfiltered-event / suppression-dies-
+    mid-event class this repo hunted in U345/U364/U365/FST-404).
+
+    Swap granularity = the WHOLE generation (all 12 rebuilt containers at
+    once), not one swap per container: the filter reads them as one unit per
+    event (repeat suppression via all_trigger_events, then the rebind lookup
+    rebind_triggers+rebinds_dict, then the macro lookup macros_dict+
+    macro_triggers, then the tap veto tap_groups+tap_owner_by_vk), and a
+    per-container swap could pair NEW tap groups with the OLD owner registry -
+    the torn pairing FST-404's single-owner veto cannot survive.
+
+    Thread safety WITHOUT a read-path lock: the reader binds self._runtime once
+    per event into a local and then touches only that object; the writer never
+    mutates a live container, it only rebinds the attribute. CPython performs
+    an attribute bind as one step under the GIL, so a reader sees either the
+    old or the new snapshot, never a half-bound one, and an event that already
+    bound the old snapshot finishes against a complete view while that object
+    stays referenced (it drops naturally afterwards).
+
+    Rebuilds are NOT serialized with each other: two triggers (focus change on
+    the loop thread, alt+delete on the pump, a tray toggle on the Qt thread)
+    may both build a snapshot and the last bind wins as a complete generation.
+    Marshaling/serializing the rebuild WRITERS is F-A4's work; this unit makes
+    the READS safe only.'''
+
+    __slots__ = ('tap_groups', 'tap_owner_by_vk', 'rebinds_dict',
+                 'rebind_triggers', 'macros_dict', 'macro_triggers',
+                 'all_trigger_events', 'rebinds', 'macros',
+                 'macros_alias_dict', 'macro_sequence_alias_list',
+                 'key_group_by_alias', 'gen_id',
+                 # F-B1: hot-path lookup indices over the trigger identity
+                 # base (vk_code, is_press) - see the build site in
+                 # initialize_groups_from_presorted_lines
+                 'rebind_lookup', 'macro_lookup', 'trigger_event_set')
+
+    def __init__(self):
+        # Tap groups define which keys are mutually exclusive
+        # Key Groups define which key1 will be replaced by key2
+        # if a Key Group has more than 2 keys if will be handled als alias
+        self.tap_groups = []              # [Tap_Groups]
+        # FST-404 (#404): single-owner registry for tap-group keys - vk_code ->
+        # owning Tap_Group (first group wins, mirroring the tap-section break in
+        # _win32_event_filter). Without it a vk declared in two tap groups had
+        # the tap section hand it to the first group while the simulated-key
+        # veto leg let EVERY group containing it veto (two owners / no owner).
+        self.tap_owner_by_vk = {}
+        self.rebinds_dict = {}            # Key_Event : Key_Event
+        self.rebind_triggers = []
+        self.macros_dict = {}             # [Key_Group : Key_Group]
+        self.macro_triggers = []
+        self.all_trigger_events = []
+        # F-B1 hot-path lookup indices (built once per generation at the
+        # end of initialize_groups_from_presorted_lines):
+        # rebind_lookup/macro_lookup: (vk_code, is_press) -> tuple of
+        # (trigger_group, payload) in trigger-list order; trigger_event_set:
+        # the same base pair set over all_trigger_events for the repeated-
+        # press suppression test.
+        self.rebind_lookup = {}
+        self.macro_lookup = {}
+        self.trigger_event_set = set()
+
+        # collector of all rebinds and macros, for display purposes only
+        self.rebinds = []
+        self.macros = []
+        self.macros_alias_dict = {}
+        self.macro_sequence_alias_list = []
+        self.key_group_by_alias = {}
+
+        # F-A6 (ticket ledger, design contract (C)): which generation this is.
+        # Stamped once at build time by FST_Keyboard._gen_ids and never mutated
+        # afterwards, so a ticket's gen_id always names the generation that was
+        # live when the physical event was owed - the ledger itself is
+        # generation-independent and survives every swap.
+        self.gen_id = 0
 
 
 class FST_Keyboard():
@@ -54,6 +241,10 @@ class FST_Keyboard():
         self._output_manager = Output_Manager(self)
         self._state_manager = Input_State_Manager(self)
         self._cli_menu = CLI_menu(self)
+        # F-B4 (review Item 13): the one-shot status artifact writer. Render +
+        # overwrite only - it holds no state and never runs on the hook pump
+        # (request_status_dump routes it to the loop lane).
+        self._status_dump = Status_Dump(self)
 
         self._warned_config_errors = set()
 
@@ -62,28 +253,60 @@ class FST_Keyboard():
         self.remove_callback = None # Will hold bridge.remove_toast
         self.remove_all_callback = None # Will hold bridge.remove_all_toast
 
-        # Tap groups define which keys are mutually exclusive
-        # Key Groups define which key1 will be replaced by key2
-        # if a Key Group has more than 2 keys if will be handled als alias
-        self._tap_groups = []    # [Tap_Groups]
-        self._rebinds_dict = {}       # Key_Event : Key_Event
-        self._rebind_triggers = []
-        self._macros_dict = {}        # [Key_Group : Key_Group]  # triggers are the Keys to the Item Makro
-        self._macro_triggers = []
-        self._all_trigger_events = []
+        # U345 H2: bridge calls ride this offload queue (poster threads do
+        # one deque.append; the asyncio pump task drains into the bridge)
+        self._toast_offload = Toast_Offload(self)
 
+        # U345 H1 drop-watch: bounded raw ring of every filter entry
+        # (no format, no I/O) + cumulative drop counter (named drop lines
+        # land when a filter leg dies - pynput would swallow the exception)
+        self._drop_ring = deque(maxlen=DROP_RING_MAXLEN)
+        self._drop_count = 0
+
+        # F-A3 (review Item 1): ALL rebuilt runtime state lives in ONE
+        # Runtime_Snapshot that initialize_groups_from_presorted_lines replaces
+        # with a fully built new generation in a single bind. The pump binds
+        # self._runtime once per event, so it never sees a cleared/half-refilled
+        # container set; the legacy per-container accessors below stay as
+        # read-only views of the live generation (display, diagnostics, tests).
+        self._runtime = Runtime_Snapshot()
+
+        # F-A6 (ladder R0): the ticket ledger. A SIBLING of _runtime, not part
+        # of it: the runtime owns it for the process lifetime, the ledger NEVER
+        # rebuilds, and a snapshot swap must not touch this reference (design
+        # contract (C) - debt is what does not die with a generation). Shadow
+        # mode in this unit: the drain legs write it, NO decision reads it.
+        # The log callable is the flow lane (lazy %s args: a disabled lane pays
+        # nothing for formatting); fst_data_types must not import fst_manager,
+        # so the lane is injected here.
+        self._ledger = Ticket_Ledger(log=logger_flow.debug)
+        # monotonic generation ids (itertools.count: one C-level call, so
+        # race-free across the pump / lane / Qt rebuild triggers)
+        self._gen_ids = count(1)
+
+        # macro playback bookkeeping is NOT a generation: tasks survive a
+        # rebuild and are cancelled/reset explicitly (U375/U384)
         self._macro_task_dict = {}
-
-        # colletor of all rebinds and macros, not used for anything yet 241011-1117
-        self._rebinds = []
-        self._macros = []
-        self._macros_alias_dict = {}
-        self._macro_sequence_alias_list = []
-        self._key_group_by_alias = {}
+        # R2 (F-A7): the physical presses a macro playback injected and has not
+        # released yet - {alias: {vk: open press Ticket}}. It is the ledger's
+        # fast index (the ledger stays the registry), lives with the task
+        # bookkeeping (NOT with a generation), and is drained by the task's own
+        # cancel/error path and by every quit/pause leg.
+        self._macro_held = {}
 
         self.loop = None
+        # F-A5: the loop's lifecycle machine (set by MainLogic.run()); None
+        # until then - see set_lifecycle / post_lifecycle
+        self._lifecycle = None
         self._mouse_listener = None
         self._listener = None
+
+        # F-A4 (review Item 2): coalescing guard of the reload lane - one
+        # PENDING reload request max. The lock is held only for a flag
+        # test-and-set (microseconds, never across I/O) and is NOT on the
+        # filter read path: the pump keeps its lock-free reads (F-A3).
+        self._reload_lock = threading.Lock()
+        self._reload_pending = False
 
 
     def init_listener(self):
@@ -102,6 +325,50 @@ class FST_Keyboard():
         self._listener.stop()
         self._mouse_listener.stop()
         logger.debug("Keyboard and mouse listeners stopped.")
+        # U345 H1: one summary line per stop - cumulative drop counter
+        # lands in fst.log (INFO) and in fst_drop.log while the watch is on
+        logger_drop.info(f"drop_watch stop drops={self._drop_count}")
+
+    # U345 H2: toast bridge wiring (replaces the direct bridge wiring in
+    # free_snap_tap.py): the four callbacks now post to the offload queue
+    def init_toast_offload(self, bridge):
+        self._toast_offload.attach(bridge)
+        self.toast_callback = self._toast_offload.toast
+        self.timer_callback = self._toast_offload.timer
+        self.remove_callback = self._toast_offload.remove
+        self.remove_all_callback = self._toast_offload.remove_all
+
+    def drain_toast_queue(self):
+        self._toast_offload.drain()
+
+    async def toast_pump(self):
+        '''Drain the toast offload queue on the asyncio loop (pump task
+        started in MainLogic.run - runs in both GUI and headless mode);
+        the drain thread is the loop thread, never a hook pump.'''
+        while True:
+            self.drain_toast_queue()
+            await asyncio.sleep(0.05)
+
+    # U345 H1: named, ASCII-safe drop record (H1 falsifier: an '--> IN'
+    # release with no matching SUPPRESSED/OUT line - now caught at the
+    # filter entry so pynput never sees the exception and the listener
+    # survives; the drop line names the dead leg)
+    def report_event_drop(self, source, vk_code, is_press, is_simulated,
+                          is_mouse, exc):
+        self._drop_count += 1
+        text = (f"event drop {source} vk={vk_code} "
+                f"{'press' if is_press else 'release'}"
+                f"{' simulated' if is_simulated else ''}"
+                f" exc={ascii(exc)} drops={self._drop_count}")
+        if is_drop_watch_enabled():
+            # ring tail: last recorded pump entries, compact ASCII form
+            tail = '|'.join(
+                f"0x{vk:02X}.{'P' if press else 'R'}"
+                f"{'S' if sim else ''}{'M' if mouse else ''}"
+                for vk, press, sim, mouse in list(self._drop_ring)[-12:])
+            text += f" ring_tail={tail}"
+        logger_drop.error(text)
+
 
     # def join_listener(self):
     #     self._listener.join()
@@ -109,6 +376,21 @@ class FST_Keyboard():
     @property
     def focus_manager(self):
         return self._focus_manager
+    @property
+    def runtime_owner(self):
+        '''F-C4 (review Item 8): the documented door to the mutable runtime
+        areas - the machine-readable ownership map (fst_runtime_state.AREAS,
+        checked by tests/test_threading_contract.py) and the one place new code
+        reaches runtime state through, so the writer rule travels with the
+        read. THREADING.md is the prose version of the same map.
+
+        Built on access, deliberately: storing it would make the owner hold the
+        keyboard and the keyboard hold the owner, i.e. a reference cycle in
+        every runtime graph (including each contract-lane graph, which is what
+        the F-B8 teardown doctrine works to avoid). It owns no state, so
+        building one is free, and it is never touched on the pump path.'''
+        return Runtime_Owner(self)
+
     @property
     def state_manager(self):
         return self._state_manager
@@ -132,7 +414,68 @@ class FST_Keyboard():
         return self._macro_sequence_alias_list
     @property
     def key_group_by_alias(self):
-        return self._key_group_by_alias
+        return self._runtime.key_group_by_alias
+
+    # F-A3: read-only views of the LIVE generation. These names are what the
+    # display/diagnostic legs, the startup log line in free_snap_tap and the
+    # test suite read; the filter hot path binds self._runtime directly instead
+    # (one bind per event, so a mid-event swap cannot tear one event's view).
+    # There is deliberately NO setter: the only way to change the live
+    # generation is a complete snapshot bind in
+    # initialize_groups_from_presorted_lines.
+    @property
+    def runtime(self):
+        '''the live generation; bind it locally before walking more than one
+        container (rt = kb.runtime) so the walk is one consistent view'''
+        return self._runtime
+
+    @property
+    def _tap_groups(self):
+        return self._runtime.tap_groups
+
+    @property
+    def _tap_owner_by_vk(self):
+        return self._runtime.tap_owner_by_vk
+
+    @property
+    def _rebinds_dict(self):
+        return self._runtime.rebinds_dict
+
+    @property
+    def _rebind_triggers(self):
+        return self._runtime.rebind_triggers
+
+    @property
+    def _macros_dict(self):
+        return self._runtime.macros_dict
+
+    @property
+    def _macro_triggers(self):
+        return self._runtime.macro_triggers
+
+    @property
+    def _all_trigger_events(self):
+        return self._runtime.all_trigger_events
+
+    @property
+    def _rebinds(self):
+        return self._runtime.rebinds
+
+    @property
+    def _macros(self):
+        return self._runtime.macros
+
+    @property
+    def _macros_alias_dict(self):
+        return self._runtime.macros_alias_dict
+
+    @property
+    def _macro_sequence_alias_list(self):
+        return self._runtime.macro_sequence_alias_list
+
+    @property
+    def _key_group_by_alias(self):
+        return self._runtime.key_group_by_alias
 
     def convert_to_vk_code(self, key):
         '''
@@ -157,9 +500,81 @@ class FST_Keyboard():
         GUI mode (toast bridge wired) -> P08 error toast; headless -> console print
         '''
         if self.toast_callback is not None:
-            self.toast_callback(f"[FST] {error}", 5, 12, "rgba(200, 40, 40, 200)", "white")
+            self.toast_callback(f"[FST] {error}", 5, 12, TOAST_RED, "white")
         else:
             print(f"[FST] {error}")
+
+    def surface_config_warning_report(self, report_text):
+        '''warnings-report surface (U330 ask 1, maintainer 2026-11-03): a
+        warnings-only validation pass is NOT a serious problem - the toast
+        is YELLOW (red keeps the serious ConfigError report); console leg
+        in headless mode names it a warning report, not a config error'''
+        if self.toast_callback is not None:
+            self.toast_callback(f"[FST] {report_text}", 5, 12,
+                                TOAST_YELLOW, "white")
+        else:
+            print(f"[FST] config warning report\n{report_text}")
+
+    def surface_config_ok(self):
+        '''clean validator pass result: one green OK toast in GUI mode,
+        console line in headless mode (compliance toast, U290T)'''
+        if self.toast_callback is not None:
+            self.toast_callback("[FST] config OK - reload valid", 3, 12,
+                                TOAST_GREEN, "white")
+        else:
+            print("[FST] config OK - reload valid")
+
+    def toast_group_activated(self, group_name):
+        '''activation toast naming the focus group that just became active
+        (U290T, maintainer items 8+9); GUI mode only - the headless focus
+        flow already prints through the CLI menu displays'''
+        if self.toast_callback is not None:
+            self.toast_callback(f"[FST] focus group active: {group_name}",
+                                3, 12, TOAST_GREEN, "white")
+
+    def toast_startup_activation(self):
+        '''startup activation pass, post-load (U330 ask 2): the startup load
+        activates the scope (focus groups by the focus task, the default
+        sections when nothing was matched); once the toast bridge exists the
+        activated scope announces itself - a focus group by name, the
+        default sections as 'default groups' (the maintainer's 'auto
+        activated' info). GUI mode only: the headless startup announces
+        through the CLI menu displays (display_default_active /
+        display_focus_names), so the toast leg stays quiet'''
+        if self.toast_callback is None:
+            return
+        # reviewer P2 (U330): a config with focus apps hands the announce to
+        # the focus task (it announces per window match, ask 3 gated) - the
+        # startup pass announces ONLY the scope the startup load activated
+        # (the auto-activated default sections, no focus apps configured),
+        # so the startup scope announces exactly once
+        if self._focus_manager.multi_focus_dict_keys:
+            return
+        scope = self._focus_manager.FOCUS_APP_NAME
+        # ask 3: a SILENT scope (-no_warnings section, the default scope
+        # counts as a section) announces nothing - its warnings are
+        # suppressed, so the activation toast has nothing to show
+        if self._scope_of_focus_name(scope) in \
+                self._config_manager.config_suppressed_scopes:
+            return
+        self.toast_group_activated(scope or 'default groups')
+
+    def _scope_of_focus_name(self, focus_name):
+        '''the validator scope of a focus name: a multi-name section is
+        scoped by its FIRST cleaned name, the runtime maps every name of the
+        section to the same group lines - the load stores this name -> scope
+        map (U330 reviewer P1: the scoped report and the silent check
+        resolve every name of a section, not only its first name)'''
+        return self._config_manager.config_focus_scopes.get(
+            focus_name, focus_name)
+
+    def is_silent_focus_group(self, scope):
+        '''True for a focus group (or the default scope) carrying
+        -no_warnings: a SILENT section - the activation toast skips it
+        (U330 ask 3); the load stores the suppressed scopes, and every
+        name of a multi-name section resolves to the section scope'''
+        return self._scope_of_focus_name(scope) in \
+            self._config_manager.config_suppressed_scopes
 
     def initialize_groups_from_presorted_lines(self):
         '''
@@ -168,18 +583,26 @@ class FST_Keyboard():
         key_group are a list of Key_Event, Keys
         macros are Key_Group : key_Groups
         '''
-        self._tap_groups = []
-        self._rebinds_dict = {}
-        self._rebind_triggers = []
-        self._macros_dict = {}
-        self._macro_triggers = []
-        self._all_trigger_events = []
+        # FST-404 (#404): release-before-drop. A group swap (focus change,
+        # config reload, pause-resume) drops the Tap_Group objects that own the
+        # app-level holds; without this the app keeps a pressed key no record
+        # claims anymore. At startup / on a clean config this emits nothing
+        # (no group holds anything). It runs FIRST and against the LIVE (old)
+        # generation, exactly as before F-A3, so the synchronous release sends
+        # keep the values and timing they had.
+        self._release_tap_group_holds()
 
-        self._key_group_by_alias = {}
-
-        # only for display purposes
-        self._rebinds = []
-        self._macros = []
+        # F-A3 (review Item 1): the new generation is built OFF TO THE SIDE.
+        # Nothing below touches the containers the pump is dereferencing per
+        # event; the live generation is replaced once, at the end of this
+        # method, by this complete object (single attribute bind). Readers that
+        # are mid-event keep walking the old snapshot - a complete, consistent
+        # view - and it drops naturally when they are done.
+        rt = Runtime_Snapshot()
+        # F-A6 (R0): stamp the generation id from the runtime's monotonic
+        # counter. Tickets carry it, so debt owed under this generation stays
+        # nameable after it retires. Nothing else about the build changed.
+        rt.gen_id = next(self._gen_ids)
 
         def extract_data_from_key(key_string):
             #separate delay info from string
@@ -248,7 +671,7 @@ class FST_Keyboard():
             for key_string in list_of_strings:
                 if key_string.startswith('<'):
                     try:
-                        key_group = key_group + self._key_group_by_alias[key_string]
+                        key_group = key_group + rt.key_group_by_alias[key_string]
                     except KeyError:
                         raise KeyError(f"Alias {key_string} is not known")
                 else:
@@ -270,7 +693,7 @@ class FST_Keyboard():
 
         try:
             for alias, group in self._config_manager.alias_hr:
-                self._key_group_by_alias[alias] = convert_key_string_group(group)
+                rt.key_group_by_alias[alias] = convert_key_string_group(group)
 
         except ConfigError as error:
             logger_config.error(f"{error} -> in Alias: {group}")
@@ -286,7 +709,12 @@ class FST_Keyboard():
                 for key_string in group:
                     key = self.convert_to_vk_code(key_string)
                     keys.append(Key(key, key_string=key_string))
-                self._tap_groups.append(Tap_Group(keys))
+                rt.tap_groups.append(group_obj := Tap_Group(keys))
+                # FST-404 (#404): first group containing a vk owns it (the tap
+                # section hands a vk event to the FIRST match, so a later group
+                # stays inert for that vk instead of vetoing it)
+                for key in keys:
+                    rt.tap_owner_by_vk.setdefault(key.vk_code, group_obj)
         except ConfigError as error:
             logger_config.error(f"{error} -> in Tap Group: {group}")
             raise
@@ -325,9 +753,9 @@ class FST_Keyboard():
                     new_rebind = Rebind(trigger_group, replacement_key)
 
                     #260426-1931
-                    if trigger_group not in self._rebinds_dict.keys():
-                        self._rebind_triggers.append(trigger_group)
-                    self._rebinds_dict[trigger_group] = new_rebind
+                    if trigger_group not in rt.rebinds_dict.keys():
+                        rt.rebind_triggers.append(trigger_group)
+                    rt.rebinds_dict[trigger_group] = new_rebind
 
                 # if both are Keys then create 2 Key_Event: Key_Event rebind sinstead
                 else:
@@ -338,16 +766,16 @@ class FST_Keyboard():
                         new_rebind = Rebind(trigger_group, replacement_events[index])
 
                         #260426-1931
-                        # if a trigger is already existing do not add another trigger in self._rebind_triggers
+                        # if a trigger is already existing do not add another trigger in rt.rebind_triggers
                         # maybe better to replace with check if trigger_group in self._rebind_dict.keys()?
-                        if new_rebind.trigger_group not in self._rebinds_dict.keys():
-                            self._rebind_triggers.append(new_rebind.trigger_group)
-                        self._rebinds_dict[new_rebind.trigger_group] = new_rebind
+                        if new_rebind.trigger_group not in rt.rebinds_dict.keys():
+                            rt.rebind_triggers.append(new_rebind.trigger_group)
+                        rt.rebinds_dict[new_rebind.trigger_group] = new_rebind
 
 
-            # 260426-1920: collect self._rebinds for printout after loop to prevent multiple cases of the same trigger before being able to be recognised in loop
-            for rebind in self._rebinds_dict.values():
-                self._rebinds.append(rebind)
+            # 260426-1920: collect rt.rebinds for printout after loop to prevent multiple cases of the same trigger before being able to be recognised in loop
+            for rebind in rt.rebinds_dict.values():
+                rt.rebinds.append(rebind)
 
         except ConfigError as error:
             logger_config.error(f"{error} -> in Rebind: {rebind}")
@@ -372,16 +800,16 @@ class FST_Keyboard():
                 new_macro.alias = alias[1:-1]
 
                 if new_macro.num_sequences > 1:
-                    self._macros_alias_dict[new_macro.alias] = new_macro
+                    rt.macros_alias_dict[new_macro.alias] = new_macro
 
-                #self._macros.append(new_macro)
-                if new_macro.trigger_group not in self._macros_dict.keys():
-                    self._macro_triggers.append(new_macro.trigger_group)
-                self._macros_dict[new_macro.trigger_group] = new_macro
+                #rt.macros.append(new_macro)
+                if new_macro.trigger_group not in rt.macros_dict.keys():
+                    rt.macro_triggers.append(new_macro.trigger_group)
+                rt.macros_dict[new_macro.trigger_group] = new_macro
 
-            #260426-1935 collect self._macros for printout after loop to prevent multiple cases of the same trigger before being able to be recognised in loop
-            for macro in self._macros_dict.values():
-                self._macros.append(macro)
+            #260426-1935 collect rt.macros for printout after loop to prevent multiple cases of the same trigger before being able to be recognised in loop
+            for macro in rt.macros_dict.values():
+                rt.macros.append(macro)
 
         except ConfigError as error:
             logger_config.error(f"{error} -> in Macro: {macro}")
@@ -390,16 +818,74 @@ class FST_Keyboard():
             logger_config.error(f"{error} -> in Macro: {macro}")
             raise Exception(error)
 
-        logger_config.debug(f"config loaded: {len(self._tap_groups)} tap groups, "
-                            f"{len(self._rebinds)} rebinds, {len(self._macros)} macros, "
-                            f"{len(self._macros_alias_dict)} macro sequences")
+        logger_config.debug(f"config loaded: {len(rt.tap_groups)} tap groups, "
+                            f"{len(rt.rebinds)} rebinds, {len(rt.macros)} macros, "
+                            f"{len(rt.macros_alias_dict)} macro sequences")
 
         # extract all triggers for suppression of repeated keys: test V1.0.2.1 Bugfix
-        all_triggers = self._rebind_triggers + self._macro_triggers
+        all_triggers = rt.rebind_triggers + rt.macro_triggers
         for trigger_group in all_triggers:
-            self._all_trigger_events.append(trigger_group.get_trigger())#
+            rt.all_trigger_events.append(trigger_group.get_trigger())#
 
-        self._macro_sequence_alias_list = self._macros_alias_dict.keys()
+        # F-B1 (review Item 6, D1): the hot-path lookup indices. Keyed by
+        # the (vk_code, is_press) BASE of the typed Trigger_Key identity -
+        # the event side knows only the base; the constraint-carrying
+        # variants live as bucket entries and their payload evaluation is
+        # the filter's existing is_trigger_activated leg (unchanged).
+        # Built ONCE per generation from the final dict+list state
+        # (validate time), so the filter replaces the old per-keystroke
+        # full-list scan + repr-hashed Key_Group dict get with one int/bool
+        # tuple dict get per lane. Bucket order is the TRIGGER-LIST order
+        # and the payload is the last-written dict entry for that trigger
+        # - byte-for-byte the candidate order and payload the old scan+get
+        # produced, which is what tests/test_identity_priority_pins.py locks.
+        def build_trigger_index(trigger_list, payload_dict):
+            index = {}
+            for trigger_group in trigger_list:
+                trigger = trigger_group.get_trigger()
+                index.setdefault((trigger.vk_code, trigger.is_press),
+                                 []).append((trigger_group,
+                                             payload_dict[trigger_group]))
+            return {base: tuple(bucket) for base, bucket in index.items()}
+
+        rt.rebind_lookup = build_trigger_index(rt.rebind_triggers,
+                                               rt.rebinds_dict)
+        rt.macro_lookup = build_trigger_index(rt.macro_triggers,
+                                              rt.macros_dict)
+        rt.trigger_event_set = {(trigger.vk_code, trigger.is_press)
+                                for trigger in rt.all_trigger_events}
+
+        rt.macro_sequence_alias_list = rt.macros_alias_dict.keys()
+
+        # F-A3: the ONLY mutation of the live generation - ONE attribute bind
+        # of a fully built snapshot. Runtime_Snapshot.__doc__ states why this
+        # granularity is race-free for the pump without a read-path lock, and
+        # why the swap is per generation rather than per container. The
+        # generation this replaces keeps serving every event that bound it
+        # before the bind, then drops naturally with the last reference.
+        # F-A6 (R0 invariant check, debug-only): a generation must not die
+        # OWNING open tickets. The ledger is generation-INDEPENDENT and the
+        # swap never touches a ledger reference (pin (b) proves the identity);
+        # this line only NAMES the debt of the generation being retired, so the
+        # shadow phase can see whether the bookkeeping matches reality. It
+        # decides nothing.
+        ledger = self._ticket_store()
+        if ledger is not None:
+            # F-A7 (reviewer P2-5): the classifier is used HERE too. A
+            # generation retire never owns a task or a latch - macro playbacks
+            # and toggle latches survive a rebuild by design (U375/U384), so
+            # their debt is expected at this point and must not be reported as
+             # a retirement violation. Since F-A9 (R4) a DRAIN release ticket
+             # open here is EXPECTED too: the hold drain emits under the old
+             # generation and its ticket closes at DELIVERY, which lands on the
+             # pump after this audit - the [StuckKeyWatch] aging lane owns the
+             # undelivered case (the filed drain-side compaction). A tap ticket
+             # still open here IS a violation (it belonged to an emission the
+             # generation just finished).
+             ledger.audit('snapshot_retire', gen_id=self._runtime.gen_id,
+                          expected_source_kinds=(SOURCE_TOGGLE, SOURCE_MACRO,
+                                                 SOURCE_DRAIN))
+        self._runtime = rt
 
     def apply_focus_groups(self, focus_name = ''):
         default_lines = self._focus_manager.default_group_lines
@@ -407,27 +893,92 @@ class FST_Keyboard():
             if focus_name not in self._focus_manager.multi_focus_dict:
                 raise ConfigError(f"focus group '{focus_name}' not found - renamed or removed in config?", focus_name)
             _, focus_group_lines = self._focus_manager.multi_focus_dict[focus_name]
+            if self._arg_manager.DEFAULT_OFF:
+                # (#403) approved proposal 2026-10-31: this focus group runs
+                # ONLY its own group lines - the default group lines are not
+                # merged in. Default START ARGUMENTS stay merged (ruling b),
+                # and the focus-loss branch (focus_name '') never hits here,
+                # so -always_active behavior is unchanged (ruling c).
+                logger_config.debug(f"default group lines deactivated for focus group '{focus_name}' (-default_off)")
+                default_lines = self._config_manager.alias_definition_lines(default_lines)
         else:
             _, focus_group_lines = [],[]
         self._config_manager.presort_lines(default_lines + focus_group_lines)
         self.initialize_groups_from_presorted_lines()
 
-    def update_focus_groups(self):
+    def update_focus_groups(self, scoped=False):
+        '''(re)load the focus groups from the config; scoped=True (U330
+        ask 4, the focus-change leg) surfaces only the activated scope's
+        warnings; scoped=False (startup load, config save, menu reload)
+        surfaces the FULL report'''
         self._focus_manager.update_groups_from_config(self._config_manager.load_config())
+        self.surface_config_warnings(
+            scope=self._focus_manager.FOCUS_APP_NAME if scoped else None)
+
+    def surface_config_warnings(self, scope=None):
+        '''validator warnings that do not block the load surface through the
+        same user-facing channel (GUI toast / headless console print); the
+        startup load runs in GUI mode BEFORE the toast bridge is wired, so
+        free_snap_tap re-surfaces the stored warnings once the bridge exists
+        (U290R: they were console-only there). U330 ask 1: the warnings-only
+        report is YELLOW - red marks the serious ConfigError report.
+        U330 ask 4: scope=None surfaces the FULL report (start + config
+        save); a scope surfaces only that section's warnings plus the
+        default section (the default lines are part of every activated
+        group) - an empty scoped set surfaces nothing (silent/quiet group)'''
+        warnings = self._config_manager.config_warnings
+        if scope is not None:
+            section_scope = self._scope_of_focus_name(scope)
+            warnings = [v for v in warnings if v.scope in (section_scope, '')]
+        if warnings:
+            self.surface_config_warning_report(
+                Config_Validator.format_report(warnings))
 
     def update_args_and_groups(self, focus_name = '', startup=True):
         self.release_all_currently_pressed_simulated_keys()
         self._state_manager.stop_all_repeating_keys()
+        # Decision 12 (E3): the current context just ended - a macro sleeping on
+        # an unbounded segment delay must not wake up into the new group.
+        self.flush_pending_macro_playbacks('context_switch')
         self._arg_manager.reset_global_variable_changes()
         # reset all lists to make sure nothing remains from previous focus groups
         self._state_manager.reset_all_lists()
         # if not startup:
         #     self.remove_all_callback()
-        self.apply_start_args_by_focus_name(focus_name)
+        # U330 ask 4: the focus-change leg (startup=False) shows ONLY the
+        # activated group's warnings; startup and the config-save reload run
+        # the validator pass and show the FULL report
+        self.apply_start_args_by_focus_name(focus_name, scoped=not startup)
         self.apply_focus_groups(focus_name)
 
     def set_loop(self, loop):
         self.loop = loop
+
+    def set_lifecycle(self, machine):
+        '''F-A5 (review Item 3): handle of the loop's Lifecycle_Machine, wired
+        by MainLogic.run() on the loop thread. Legs that run on other threads
+        (the hook pump, the Qt thread, the CLI menu) POST a request into it and
+        return; they never write lifecycle state themselves.
+
+        None (unwired - tests, or a direct call before the loop runs) means
+        "flags only", which is exactly the pre-F-A5 behavior, so every existing
+        caller keeps working.'''
+        self._lifecycle = machine
+
+    def post_lifecycle(self, state, reason):
+        '''Post a lifecycle request; True when a machine was wired to receive
+        it. Never blocks and never raises into a pump leg: the machine applies
+        the change on the loop thread (or inline when no loop is wired). The
+        requesting thread is named in the transition log line, because these
+        requests arrive from the hook pump, Qt and the menu alike.'''
+        machine = getattr(self, '_lifecycle', None)
+        if machine is None:
+            logger.debug(f"[Lifecycle] no machine wired - request {state.value} "
+                         f"({reason}) stayed a flag write")
+            return False
+        machine.post_transition(state, reason,
+                                source=f"thread '{threading.current_thread().name}'")
+        return True
 
     # def mouse_task(self, msg, data):
     #     '''
@@ -533,7 +1084,23 @@ class FST_Keyboard():
             is_simulated = is_simulated_key_event(data.flags)
             is_mouse_event = True
             if vk_code is not None:
-                self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event)
+                # U345 H1 drop-watch: ring tuple + entry-level catch (the
+                # pynput _handler swallows filter exceptions - a mouse
+                # release that dies mid-leg leaks unfiltered, H1 class).
+                # U365 #364/#365: SuppressException (the suppression control
+                # flow) is reported AND re-raised here too - same rule as
+                # the keyboard pump entry below.
+                self._drop_ring.append(
+                    (vk_code, is_keydown, bool(is_simulated), True))
+                try:
+                    self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event)
+                except SystemHook.SuppressException as exc:
+                    self.report_event_drop('mouse', vk_code, is_keydown,
+                                           is_simulated, True, exc)
+                    raise
+                except Exception as exc:
+                    self.report_event_drop('mouse', vk_code, is_keydown,
+                                           is_simulated, True, exc)
                 # self.loop.call_soon_threadsafe(self._win32_event_filter, vk_code, key_event_time, is_keydown, is_simulated, is_mouse_event)
             else:
                 self._mouse_listener.suppress_event()
@@ -542,6 +1109,12 @@ class FST_Keyboard():
     def keyboard_win32_event_filter(self, msg, data):
 
         def is_simulated_key_event(flags):
+            # LLKHF_INJECTED = 0x10 (bit 4) per the win32 KBDLLHOOKSTRUCT
+            # contract (U359 review: the U345-era note claiming 0x04 was
+            # falsified - 0x04 is a RESERVED bit; ALTDOWN = 0x20, UP = 0x80).
+            # Every FST-injected keyboard event (macro write chars, rebind
+            # replacement, tap snap send, modifier release) is classified
+            # SIMULATED and runs the simulated leg of _win32_event_filter.
             return flags & 0x10
 
         def is_press(msg):
@@ -554,7 +1127,29 @@ class FST_Keyboard():
         key_event_time = data.time
         is_keydown = is_press(msg)
         is_simulated = is_simulated_key_event(data.flags)
-        self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated)
+        # U345 H1 drop-watch: one raw ring tuple per pump entry (bounded
+        # deque, no format, no I/O - the pump cost stays microseconds)
+        self._drop_ring.append((vk_code, is_keydown, bool(is_simulated), False))
+        # U345 H1: catch a leg exception AT the entry: pynput's _handler
+        # would swallow it and pass the event UNFILTERED (dropped-release
+        # stuck class); the named drop line makes the death visible.
+        # U365 #364/#365: SuppressException is NOT a leg death - it is
+        # pynput's suppression control flow (suppress_event raises it; only
+        # SystemHook._handler seeing it returns 1 = consume). Swallowing it
+        # here let every "suppressed" event pass UNFILTERED while the sim
+        # replacement still fired (tap-group double-send, held-trigger
+        # repeat leak, app-shortcut fire from the leaked combo press).
+        # Report it (drop-watch keeps counting) AND re-raise; only genuine
+        # leg exceptions stay swallowed.
+        try:
+            self._win32_event_filter(vk_code, key_event_time, is_keydown, is_simulated)
+        except SystemHook.SuppressException as exc:
+            self.report_event_drop('key', vk_code, is_keydown,
+                                   is_simulated, False, exc)
+            raise
+        except Exception as exc:
+            self.report_event_drop('key', vk_code, is_keydown,
+                                   is_simulated, False, exc)
 
     # repeated real press of a REBIND trigger may be let through so the
     # replacement re-fires (proposal 2026-09-12; maintainer ruling 2026-09-15):
@@ -562,18 +1157,24 @@ class FST_Keyboard():
     # no tap group. Macro/toggle triggers and tap-group keys stay suppressed.
     # Base only: constraints are decided by the rebind loop in
     # _win32_event_filter, exactly as for the first press.
-    def _rebind_repeat_let_through(self, current_ke):
-        for trigger_group in self._rebind_triggers:
-            trigger = trigger_group.get_trigger()
-            if current_ke.vk_code != trigger.vk_code or current_ke.is_press != trigger.is_press:
-                continue
-            if any(current_ke.vk_code in tg.get_vk_codes() for tg in self._tap_groups):
+    def _rebind_repeat_let_through(self, current_ke, rt=None):
+        '''rt: the generation the CALLING event bound (F-A3) - one event must
+        never mix two generations. Falls back to the live snapshot for callers
+        outside the filter.
+
+        F-B1: the scan runs over the (vk_code, is_press) bucket of the trigger
+        index instead of the full rebind_triggers list; the first bucket entry
+        is the first list-order base match the old scan hit, and the payload
+        resolves at build time from the same rebinds_dict the old per-event
+        get consulted - the conservative KeyError leg is structurally gone
+        (the index and the dict are built from one state).'''
+        rt = rt if rt is not None else self._runtime
+        for trigger_group, rebind in rt.rebind_lookup.get(
+                (current_ke.vk_code, current_ke.is_press), ()):
+            if any(current_ke.vk_code in tg.get_vk_codes() for tg in rt.tap_groups):
                 return False
-            try:
-                replacement_vk = self._rebinds_dict[trigger_group].replacement.vk_code
-            except KeyError:
-                return False  # conservative: no replacement known -> suppress
-            if any(replacement_vk in tg.get_vk_codes() for tg in self._tap_groups):
+            replacement_vk = rebind.replacement.vk_code
+            if any(replacement_vk in tg.get_vk_codes() for tg in rt.tap_groups):
                 return False
             return True
         return False
@@ -582,9 +1183,6 @@ class FST_Keyboard():
         """
         Filter and handle keyboard and mouse events.
         """
-
-        def time_in_millisec():
-            return int(time() * 1000)
 
         def is_trigger_activated(current_ke, trigger_group):
             keys = trigger_group.get_key_events()
@@ -615,16 +1213,39 @@ class FST_Keyboard():
         real_input_repeated = False
         to_be_suppressed = False
 
+        # F-A3: bind the live generation ONCE per event. Every runtime
+        # container read below goes through this local, so a rebuild swapping
+        # in a new snapshot on another thread (focus change, tray toggle) can
+        # never split one event across two generations - the event finishes
+        # against the complete view it started on (see Runtime_Snapshot).
+        rt = self._runtime
+
         current_ke = Key_Event(vk_code, is_keydown)
 
         # get the time difference from system time to the key_event_time
+        # (15CLOCK: this one-time calibration read goes through the module
+        # provider - the production default is the pre-seam int(time()*1000);
+        # the contract lane pins it together with the eval-leg reads)
         if FST_Keyboard.TIME_DIFF is None:
-            FST_Keyboard.TIME_DIFF = time_in_millisec() - key_event_time
+            FST_Keyboard.TIME_DIFF = fst_manager._wall_ms() - key_event_time
             FST_Keyboard.START_TIME = key_event_time
             # set all key_times to starting time
             self._state_manager.init_all_key_times_to_starting_time(key_event_time)
 
         logger_flow.debug(f"--> {'-- | ' if is_simulated else ''}IN ({key_event_time - FST_Keyboard.START_TIME}) {'sim' if is_simulated else 'real'} {current_ke}")
+
+        # F-A8 (ladder R3): the ARRIVAL of a simulated event is the delivery
+        # classification for one of our INJECTED rebind sends of (vk, kind)
+        # (a receipt still SCHEDULED is never closed here - see
+        # `record_rebind_delivery`). It closes the receipt HERE, at
+        # classification, not at the tail: a replacement the filter later
+        # SUPPRESSES was still physically delivered (the hook saw it), and
+        # its pairing must close. Ledger read only (one dict get + bounded
+        # bucket scan, lock-free); this is a receipt-close leg, NOT the
+        # sim-release veto (R4 consults the ledger in the veto section below -
+        # a different leg with a different ticket class and its own close).
+        if is_simulated and vk_code > 0:
+            self.record_rebind_delivery(vk_code, is_keydown)
 
         # to help identify vk_codes on key presses
         if self._arg_manager.PRINT_VK_CODES:
@@ -640,17 +1261,18 @@ class FST_Keyboard():
                 press_state = self._state_manager.get_real_key_press_state(vk_code)
                 if press_state == current_ke.is_press:
                     # if the key is repeated and is a trigger, it will be suppressed
-                    # compare base only: runtime events carry no key_string/constraints
-                    if any(current_ke.vk_code == trigger.vk_code
-                           and current_ke.is_press == trigger.is_press
-                           for trigger in self._all_trigger_events):
+                    # F-B1: membership in the trigger-base set (the
+                    # (vk_code, is_press) projection of the typed identity)
+                    # replaces the old manual base-only scan over
+                    # all_trigger_events - same predicate, O(1)
+                    if (current_ke.vk_code, current_ke.is_press) in rt.trigger_event_set:
                         # repeated REBIND triggers not in a tap group are let
                         # through so they re-fire their replacement below: macro
                         # and toggle repeats stay suppressed (the 'STOP REPEATED
                         # KEYS FROM HERE' guard), and a replacement that the tap
                         # section would consume keeps the suppression (not
                         # covered by the proposal - conservative)
-                        if not self._rebind_repeat_let_through(current_ke):
+                        if not self._rebind_repeat_let_through(current_ke, rt):
                             logger_flow.debug(f"repeated key suppressed: {current_ke}")
                             to_be_suppressed = True
                         else:
@@ -685,18 +1307,19 @@ class FST_Keyboard():
                 if not to_be_suppressed:
                     'REBINDS HANDLING'
                     # check for rebinds and replace current key event with replacement key event
-                    for trigger_group in self._rebind_triggers:
+                    # F-B1: scan the (vk_code, is_press) bucket of the
+                    # trigger index - list-order and payload identical to
+                    # the old full-list scan + repr-hashed dict get (see
+                    # the build site); the old KeyError warning leg is
+                    # structurally gone with the build-time pairing.
+                    for trigger_group, rebind in rt.rebind_lookup.get(
+                            (current_ke.vk_code, current_ke.is_press), ()):
 
                         if is_trigger_activated(current_ke, trigger_group):
-                            try:
-                                rebind = self._rebinds_dict[trigger_group]
-                                replacement_ke = rebind.replacement
-                                old_ke = current_ke
-                                current_ke = replacement_ke
-                                key_replaced = True
-                            except KeyError as error:
-                                logger_flow.warning(f"rebind not found: {error}")
-                                logger_flow.debug(f"rebinds dict: {self._rebinds_dict}")
+                            replacement_ke = rebind.replacement
+                            old_ke = current_ke
+                            current_ke = replacement_ke
+                            key_replaced = True
 
                             if key_replaced:
                                 # if key is supressed
@@ -741,12 +1364,14 @@ class FST_Keyboard():
                             self._state_manager.set_toggle_state_to_curr_ke(current_ke)
 
                         'MACROS HERE'
-                        for trigger_group in self._macro_triggers:
+                        # F-B1: bucket scan, same order and payload as the
+                        # old full-list scan + repr-hashed dict get
+                        for trigger_group, macro in rt.macro_lookup.get(
+                                (current_ke.vk_code, current_ke.is_press), ()):
                             if is_trigger_activated(current_ke, trigger_group):
                                 alias_fired = True
 
                                 # macro sequence handling is internal in class Macro
-                                macro = self._macros_dict[trigger_group]
                                 key_sequence = macro.get_key_events_of_current_sequence()
 
                                 'MACRO playback'
@@ -772,7 +1397,9 @@ class FST_Keyboard():
                 if not self._arg_manager.WIN32_FILTER_PAUSED and not self._arg_manager.PRINT_VK_CODES:
                     vk_code, is_keydown, _ = current_ke.get_all()
                     logger_flow.debug("tap group #0")
-                    for tap_group in self._tap_groups:
+                    for tap_group in rt.tap_groups:
+                        if rt.tap_owner_by_vk.get(vk_code) is not tap_group:
+                            continue  # FST-404: only the owner accounts a vk
                         if vk_code in tap_group.get_vk_codes():
                             logger_flow.debug(f"tap group {vk_code}")
                             if key_replaced is True:
@@ -783,6 +1410,11 @@ class FST_Keyboard():
                             self._output_manager.send_keys_for_tap_group(tap_group)
                             #XXX 260428-2341
                             #self.loop.create_task(self._output_manager.send_keys_for_tap_group(tap_group))
+                            # U364/#360: the CONTROLLER sends now run on the loop
+                            # lane inside send_keys_for_tap_group (pump_lane) - the
+                            # CALL stays on the pump because tap-group state
+                            # (set_last_key_send) must stay synchronous for the
+                            # hold-repeat decision below (260428-2341).
                             # to allow repeated keys from hold, key_to_send is a vk_code
                             if tap_group.get_active_key() != vk_code or not trigger_key_repeated:
                                 to_be_suppressed = True
@@ -791,14 +1423,71 @@ class FST_Keyboard():
 
                 # if replacement happened suppress source key event
                 if key_replaced is True and not to_be_suppressed:
+                    # F-A8 (ladder R3): the replacement send opens its ledger
+                    # receipt HERE, at inject-SCHEDULE time, on the pump. The
+                    # receipt - not this event's locals - is what answers "is
+                    # this replacement in flight?" (research inventory item 10:
+                    # that answer used to die with the scheduling event). The
+                    # ticket object travels with the send as the inject leg's
+                    # fast path; it is a PROJECTION of the ledger entry, never
+                    # a parallel truth: the leg flips ONE state attribute
+                    # (`mark`), and the delivery classification at the tail of
+                    # this filter closes it (`record_rebind_delivery`). Source
+                    # suppression below stays filter-local policy - the ledger
+                    # never decides (research (D): evidence, not policy).
+                    receipt = self.open_rebind_ticket(
+                        current_ke.vk_code, current_ke.is_press,
+                        current_ke.key_string or str(current_ke.vk_code),
+                        is_mouse=(self._output_manager
+                                  .check_for_mouse_vk_code(
+                                      current_ke.vk_code)))
                     # 260907-1027: if it is a rebind from a mouse key to another mouse key starte it async to no interfere with the syncronous hook
                     if is_mouse_event and self._output_manager.check_for_mouse_vk_code(current_ke.vk_code):
+                        # The mouse leg marks its receipt injected when the
+                        # lane STARTS emitting: the wrapper's one store runs
+                        # on the loop thread immediately before the SHARED
+                        # execute_key_event coroutine (widening that
+                        # coroutine's contract for the macro lane is outside
+                        # R3). A hand-off that dies before the coroutine
+                        # starts leaves the receipt SCHEDULED - never
+                        # closable, visible as scheduled debt until the
+                        # filed drain-side compaction settles it: exactly
+                        # the scheduled-but-lost class R3 names.
+                        async def _mouse_rebind_inject(ke=current_ke, tk=receipt):
+                            self.mark_rebind_injected(tk)
+                            await self._output_manager.execute_key_event(ke, with_delay=False)
                         try:
-                            asyncio.run_coroutine_threadsafe(self._output_manager.execute_key_event(current_ke, with_delay=False), self.loop)
+                            asyncio.run_coroutine_threadsafe(_mouse_rebind_inject(), self.loop)
                         except Exception as e:
                             logger_flow.error(f"Error occurred while calling async execute_keys_event in mouse_key to mouse_key rebind: {e}")
                     else:
-                        self._output_manager.send_key_event(current_ke)
+                        # U364/#360: same lane rule as the mouse leg above -
+                        # the replacement send runs on the loop lane, the
+                        # hook pump never waits on SendInput (FIFO within
+                        # the lane; inline fallback when no loop is wired).
+                        # Suppression of the source event below stays
+                        # synchronous on the pump.
+                        def _rebind_inject(ke=current_ke, tk=receipt):
+                            # the inject leg - loop lane, or inline below:
+                            # ONE attribute store (never read-modify-write),
+                            # then the send itself
+                            self.mark_rebind_injected(tk)
+                            self._output_manager.send_key_event(ke)
+                        if self._output_manager.pump_lane(
+                                _rebind_inject, 'rebind_send') is False:
+                            # pump_lane returns False ONLY when scheduling failed
+                            # (loop gone); inline runs return the send's None ->
+                            # send inline here so the replacement is never lost
+                            # behind the synchronous suppression below
+                            # (reviewer P1-4: a key LOST on a dead loop was new).
+                            # The bool is the ONE fast-path local that stays:
+                            # "scheduling accepted" cannot be read off the
+                            # receipt without a race (a SCHEDULED ticket cannot
+                            # tell "the lane will run it" from "the lane is
+                            # gone"). The resend reuses the SAME closure, so
+                            # one receipt gets exactly one inject flip - no
+                            # second send-pair truth.
+                            _rebind_inject()
 
                     to_be_suppressed = True
 
@@ -811,8 +1500,22 @@ class FST_Keyboard():
         if is_simulated:
             vk_code, is_keydown, _ = current_ke.get_all()
 
+            # F-A9 (ladder R4, maintainer ruling 2026-11-16): the sim-release
+            # veto consults the ticket ledger FIRST. An OPEN release ticket
+            # (ledger semantics: scheduled|injected) for this vk means this
+            # arriving simulated release IS a physical release FST owes, so
+            # the veto must never eat it; the consult also CLOSES the ticket -
+            # delivery is the completion. No ticket -> every decision below is
+            # byte-identical to the pre-R4 leg (third-party/echo handling).
+            # The consult returns the closed ticket or None.
+            owed_release = None
+            if not is_keydown and not is_mouse_event and vk_code > 0:
+                owed_release = self.take_owed_release_ticket(vk_code)
+
             key_is_in_tap_groups = False
-            for tap_group in self._tap_groups:
+            for tap_group in rt.tap_groups:
+                if rt.tap_owner_by_vk.get(vk_code) is not tap_group:
+                    continue  # FST-404: only the owner may veto a vk
                 vk_codes = tap_group.get_vk_codes()
                 if vk_code in vk_codes:
                     key_is_in_tap_groups = True
@@ -824,8 +1527,21 @@ class FST_Keyboard():
                         if active_key == vk_code:
                             # is active key -> only press allowed
                             if not is_keydown:
-                                to_be_suppressed = True
-                                break
+                                if owed_release is None:
+                                    to_be_suppressed = True
+                                    break
+                                # F-A9: this is the release the ledger says we
+                                # owe (e.g. a drain's held-key release while a
+                                # real pump event re-armed active_key mid-drain
+                                # - the F-A4 P1-1 window, closed here): DELIVER,
+                                # never suppress. The consult closed its ticket
+                                # at delivery (FIFO, oldest-first, this leg).
+                                # Cross-leg note: an arrival settles at most one
+                                # ticket PER leg (the R3 entry leg has its own);
+                                # with (vk,kind) granularity only, a simultaneous
+                                # double debt settles BOTH on one arrival - the
+                                # accepted dwExtraInfo attribution residual,
+                                # pinned in tests/test_veto_ledger_pins.py.
                         # not the active key -> only release allowed
                         else:
                             if is_keydown:
@@ -922,6 +1638,121 @@ class FST_Keyboard():
             logger_macro.debug(f"no macro task found for {alias_name} - maybe just the first start of it")
 
 
+    # -- macro task debt (F-A7, ladder R2) --------------------------------
+
+    def _macro_press_recorded(self, alias_name, key_event):
+        '''The macro lane saw a PRESS of key_event leave: remember it as owed
+        until the matching release plays or the playback is aborted. The ledger
+        owns the ticket (R2: a macro ticket is an OWNERSHIP record, kind=press,
+        source_kind=macro, source_id=the alias); `_macro_held` is only the
+        per-alias index the drain walks.'''
+        if self._ticket_store() is None:
+            return
+        held = self._macro_held.setdefault(alias_name, {})
+        previous = held.get(key_event.vk_code)
+        if previous is not None:
+            # a second press of the same vk inside one playback supersedes the
+            # older record (one physical key is held once); close it so the
+            # ledger cannot report phantom debt
+            self.close_ticket(previous)
+            logger_macro.debug(f"macro {alias_name}: press of {key_event.vk_code}"
+                               " superseded, ticket closed")
+        held[key_event.vk_code] = self.open_press_ticket(
+            key_event.vk_code, SOURCE_MACRO, str(alias_name))
+
+    def _macro_release_recorded(self, alias_name, vk_code):
+        '''The macro lane played the release: the press it owed is settled.'''
+        held = self._macro_held.get(alias_name)
+        if not held:
+            return
+        ticket = held.pop(vk_code, None)
+        if ticket is not None:
+            self.close_ticket(ticket)
+        if not held:
+            # keep the index tidy: an alias with nothing owed is not tracked
+            self._macro_held.pop(alias_name, None)
+
+    def drain_macro_debt(self, alias=None, context='macro_debt'):
+        '''R2: emit the releases a cancelled/aborted macro playback left owed,
+        one per held vk, in press order, then close the tickets. This is where
+        the ladder says the invariant first becomes TRUE instead of hopeful
+        (research (D) R2): previously a cancel emitted NOTHING and the app kept
+        the key pressed until some later sweep happened to run.
+
+        `alias=None` drains every playback (the quit / pause / menu legs).
+        The global simulated-key record is cleared with each release, exactly
+        like the FST-404 hold drain, so the Input_State_Manager sweep cannot
+        re-emit it. Runs on the caller's thread: the macro legs live on the
+        loop thread, the quit/pause legs keep their synchronous-release ruling.
+
+        Concurrency (F-A7 reviewer P1): a drain CLAIMS an alias's whole dict
+        with ONE `pop` instead of mutating it in place. A playback leg recording
+        a press concurrently then re-creates a fresh tracked dict through
+        `setdefault` - it can neither be dropped by this drain nor make this
+        drain's iteration raise, and only one drain ever sees a given entry.
+        The still-running playback is also cancelled first: `send_key_event` has
+        no release veto, so without the cancel a queued release of the playback
+        could land after the drain's release (reviewer P2-2). The cancel reuses
+        the pre-existing `interrupt_macro_by_name` pattern (the same cross-thread
+        handle.cancel the repeat lane already performs) - no new mechanism.'''
+        aliases = list(self._macro_held) if alias is None else [alias]
+        released = []
+        for name in aliases:
+            if name in self._macro_held:
+                self.interrupt_macro_by_name(name)
+            held = self._macro_held.pop(name, None)   # claim: one dict pop
+            if not held:
+                continue
+            for vk_code, ticket in held.items():
+                logger_macro.debug(f"draining macro debt {name}: release {vk_code}"
+                                   f" ({context})")
+                self._output_manager.send_key_event(Key_Event(vk_code, False))
+                self._state_manager.set_simulated_key_press_state(vk_code, False)
+                self.close_ticket(ticket)
+                released.append(vk_code)
+        return released
+
+    def flush_pending_macro_playbacks(self, context):
+        '''Decision 12 (maintainer 2026-11-17, E3): the pending-delay invariant.
+
+        Segment delays stay UNBOUNDED on purpose - a macro timeline may wait
+        minutes for the app in front of it. The ruling's price is this: when the
+        CURRENT CONTEXT ends (focus-group change, macro abort, lifecycle pause,
+        config reload), a playback that is sleeping toward its next segment must
+        not survive it. Two properties, in this order:
+
+        OWED   every release a playback already owes goes up now, on this
+               thread, through the existing drain (`drain_macro_debt`: cancel +
+               one release per held vk + close the press ticket), and
+        PENDING  every playback still registered gets cancelled, including the
+               ones that owe nothing yet - a sleeping segment that fires after
+               the group changed would type into the wrong app (a ghost
+               injection).
+
+        Who closes the debt: the drain above emits the owed releases ITSELF,
+        synchronously, for every alias it can see. The `macro_task`
+        CancelledError arm is the backstop for a press recorded after that scan
+        - it runs when the loop next turns, which for a handle cancelled from
+        the hook pump or the Qt thread can be a little later (measured by the
+        ABORT2-era reviewer: the arm does not run while the loop is parked). The
+        two together leave no window where the segment fires: a cancelled
+        coroutine cannot resume, so the ghost injection is impossible the moment
+        the cancel is accepted.
+
+        No new mechanism: the drain is the F-A7 (ladder R2) one, the cancel is
+        the `interrupt_macro_by_name` handle pattern. Runs on the caller's
+        thread like the drain does. Measured holes this closes (probe at
+        `8a566a9`): focus change and config reload left the playback alive with
+        its press still owed; pause left a nothing-owed playback alive.'''
+        self.drain_macro_debt(context=context)
+        for name, handle in list(self._macro_task_dict.items()):
+            try:
+                if not handle.done():
+                    handle.cancel()
+            except Exception as error:
+                # a dead or foreign handle must not stop the rest of the flush
+                logger_macro.debug(f"flush {context}: cancel of {name} failed: {error}")
+
     async def macro_task(self, key_group, alias_name):
         '''execute the macro/alias - can be stopped by using cancel on the handle of the asyncio task from the outside'''
 
@@ -935,11 +1766,40 @@ class FST_Keyboard():
 
                     if key_event.is_toggle:
                         key_event = self._state_manager.get_next_toggle_state_key_event(key_event)
+                    elif key_event.vk_code > 0:
+                        # R2 (F-A7): track what this playback owes from the
+                        # moment the event is about to leave. A cancel inside
+                        # the delay below then has something to drain (the
+                        # app-level debt research item 7 named).
+                        if key_event.is_press:
+                            self._macro_press_recorded(alias_name, key_event)
+                        else:
+                            self._macro_release_recorded(alias_name,
+                                                         key_event.vk_code)
                     # send key event and handles interruption of delay
                     await self._output_manager.execute_key_event(key_event, delay_times, with_delay=True)
 
+        except asyncio.CancelledError:
+            # R2 (ladder R2, research (D)): the cancel lands in a delay, often
+            # right after a press left. Emit the owed releases BEFORE returning
+            # - this is the semantics migration for macros: a release is emitted
+            # where previously none was. The drain must not pre-empt the
+            # cancellation contract (F-A7 reviewer P2-7): a drain failure is
+            # logged, the CancelledError still propagates.
+            try:
+                self.drain_macro_debt(alias=alias_name, context='macro_cancel')
+            except Exception as error:
+                logger_macro.exception(f"macro debt drain failed for {alias_name}:"
+                                      f" {error}")
+            raise
         except Exception as error:
             logger_macro.exception(f"Error in macro playback of {alias_name}: {key_group} | {error}")
+            # an errored playback aborted too - same debt, same drain
+            try:
+                self.drain_macro_debt(alias=alias_name, context='macro_error')
+            except Exception as drain_error:
+                logger_macro.exception(f"macro debt drain failed for {alias_name}:"
+                                      f" {drain_error}")
 
 
 
@@ -997,11 +1857,156 @@ class FST_Keyboard():
             toggle_flow()
         if self.check_for_combination(['alt','num5']):
             self.display_internal_repr_groups()
+        if self.check_for_combination(['alt','num6']):
+            # U345 H1 drop-watch toggle (-drop_watch sets it at startup).
+            # CAUTION: the ON leg does a synchronous FileHandler open on
+            # the LL keyboard pump thread (toggle-time only, gated by
+            # -debug_numpad, rare) - the per-event legs stay I/O-free.
+            toggle_drop_watch()
         if self.check_for_combination(['alt','num7']):
             logger_state.debug(f"real_key_state: {self._state_manager._real_key_press_states_dict}")
             logger_state.debug(f"sim_key_state: {self._state_manager._simulated_key_press_states_dict}")
         if self.check_for_combination(['alt','num8']):
             logger_state.debug(f"all_key_state: {self._state_manager._all_key_press_states_dict}")
+
+    # ------------------------------------------------------------------
+    # F-A4 (review Item 2): the loop lane for legs that are NOT suppression
+    # decisions. A LL-hook pump that blocks past LowLevelHooksTimeout loses the
+    # hook silently, so everything that is not an immediate filter answer (config
+    # file I/O, the group rebuild, the CLI redraw, pynput listener stops) moves
+    # to the asyncio loop thread; the pump returns in microseconds and the
+    # result is eventually consistent on the ms scale.
+    # ------------------------------------------------------------------
+    def _run_on_loop_or_inline(self, work, leg_name='lane leg'):
+        '''Route a blocking, non-suppressing leg to the loop thread.
+
+        Same routing shape as Output_Manager.pump_lane (the U364/#360 contract
+        documented at fst_manager.py:876-888): FIFO on the loop ready queue,
+        INLINE when the caller already IS the loop thread, INLINE when no loop
+        is wired (legacy/headless/tests keep the old synchronous behavior).
+
+        Why not pump_lane itself: pump_lane is the ACTION-leg router of the
+        suppression contract - its return value is the pump-side True that tells
+        pynput the event was handled, and it schedules a coroutine. The reload
+        lane answers no event and its work blocks (file read + rebuild), so it
+        belongs in a plain callback via loop.call_soon_threadsafe, not in a
+        coroutine that would sit on the loop. Failure reporting follows the same
+        rule as pump_lane's check_result: a failed leg is named in the log, it
+        is never a silent "scheduled = success".'''
+        loop = self.loop
+        if loop is None:
+            work()
+            return True
+        try:
+            on_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            on_loop = None
+        if on_loop is loop:
+            # already on the lane (macro playback / GUI / loop-thread callers)
+            work()
+            return True
+        try:
+            loop.call_soon_threadsafe(self._run_lane_leg, work, leg_name)
+            return True
+        except RuntimeError as error:
+            # the loop is gone (quit race): run inline so the leg is never lost
+            logger_flow.error(f"loop lane unavailable for {leg_name}: {error} "
+                              "- running inline")
+            work()
+            return False
+
+    def _run_lane_leg(self, work, leg_name):
+        '''loop-thread wrapper: a raising leg names itself in the log instead of
+        dying inside the loop's exception handler.'''
+        try:
+            work()
+        except Exception as error:
+            logger_flow.error(f"loop lane leg failed: {leg_name}: {ascii(error)}")
+
+    def _stop_listeners_on_lane(self):
+        '''F-A4: the pynput listener stops are marshaled to the loop thread.
+        The release sweeps that PRECEDE them stay synchronous on the caller -
+        the FST-404 ruling: the quit paths must not hop a release behind a
+        lane boundary or the app keeps a pressed key.'''
+        self._run_on_loop_or_inline(self._stop_listeners, 'listener_stop')
+
+    def _stop_listeners(self):
+        self._mouse_listener.stop()
+        self._listener.stop()
+
+    def _schedule_reload(self):
+        '''Coalescing reload lane (F-A4): ONE pending request max.
+
+        While a reload is scheduled, further requests (alt+delete on the pump,
+        a focus change on the loop thread, a tray toggle on the Qt thread)
+        collapse into it: a reload always re-reads the current config file and
+        the current focus app, so a coalesced request loses nothing - it would
+        repeat identical work. The pending flag clears when the work STARTS, so
+        a request arriving during a long reload schedules one further pass
+        instead of being dropped: bounded to one pass in flight plus one
+        queued, and the final state always matches the config on disk.'''
+        with self._reload_lock:
+            if self._reload_pending:
+                logger_flow.debug("reload already pending - request coalesced")
+                return
+            self._reload_pending = True
+        try:
+            self._run_on_loop_or_inline(self._reload_lane, 'resume_reload')
+        except Exception as error:
+            # A scheduling failure must not latch the lane off (F-A4 reviewer
+            # P1-2): with the flag left True every later request would be
+            # coalesced away and the config would never reload again. The flag
+            # goes back to False and the failure is named; the next request
+            # tries again. Swallowed on purpose: this leg runs on the hook pump
+            # and must not push an exception into the filter's drop arm.
+            with self._reload_lock:
+                self._reload_pending = False
+            logger_flow.error(f"reload scheduling failed: {ascii(error)}")
+
+    def _reload_lane(self):
+        with self._reload_lock:
+            self._reload_pending = False
+        try:
+            self._reload_now()
+        except ConfigError as error:
+            # check_control_actions' except arm cannot see this exception any
+            # more (the leg no longer runs on the pump), so the recovery it used
+            # to run is reproduced here in the same order and values.
+            self.surface_config_error(error)
+            self.update_args_and_groups('')
+            self._arg_manager.WIN32_FILTER_PAUSED = False
+            self._arg_manager.MANUAL_PAUSED = False
+
+    def _reload_now(self):
+        '''The reload body: byte-identical to the pre-F-A4 resume leg of
+        control_toggle_pause (same calls, same print text and order), only no
+        longer executed on the hook pump.
+
+        Decision 12 (E3) is the one addition: the reload replaces the generation
+        a running timeline was built for, so its playbacks and repeats are
+        flushed first - otherwise the old generation keeps typing into whatever
+        the reloaded config now activates, and a key it still owed stays down.'''
+        self._state_manager.stop_all_repeating_keys()
+        self.flush_pending_macro_playbacks('config_reload')
+        self._arg_manager.reset_global_variable_changes()
+        self.apply_start_args_by_focus_name(self._focus_manager.FOCUS_APP_NAME)
+        self.apply_focus_groups(self._focus_manager.FOCUS_APP_NAME)
+        self._cli_menu.clear_cli()
+        self._config_manager.display_groups()
+        print("\n--- reloaded sucessfully ---")
+        print('--- manuelly resumed ---\n')
+        if self._arg_manager.CONTROLS_ENABLED:
+            self._cli_menu.display_control_text()
+        # with paused_lock:
+        self._arg_manager.WIN32_FILTER_PAUSED = False
+        self._arg_manager.MANUAL_PAUSED = False
+        # F-A5: the resume completes on the lane, so the RUNNING request is
+        # posted here (once the new generation is bound and the filter is live
+        # again), not from the pump at keypress time.
+        self.post_lifecycle(Lifecycle_State.RUNNING, 'alt+DELETE resume reloaded')
+        # F-B4: the artifact refreshes with the NEW generation it just bound -
+        # already on the lane, so this stays inline (no re-post).
+        self.request_status_dump('reload')
 
     def control_return_to_menu(self):
         self._arg_manager.MENU_ENABLED = True
@@ -1009,43 +2014,81 @@ class FST_Keyboard():
         print('--- Stopping - Return to menu ---')
         logger.info("return to menu")
         logger_state.debug(f"return to menu with pressed keys: {self._state_manager._real_key_press_states_dict}")
-        self.release_all_currently_pressed_simulated_keys()
+        # F-A7 (L1 + R2): the leg NAMES its drain (attribution is a parameter,
+        # not shared state), and macro debt drains first so the sweeps below do
+        # not double-release what the macro leg owns. Release order/count for a
+        # playback that owes nothing is unchanged.
+        self.drain_macro_debt(context='return_to_menu')
+        self.release_all_currently_pressed_simulated_keys('return_to_menu')
         self._state_manager.stop_all_repeating_keys()
-        self._mouse_listener.stop()
-        self._listener.stop()
+        # Decision 12 (E3): the menu is a context end too - the drain above only
+        # reaches playbacks that already owe, so a queued segment of a
+        # nothing-owed playback would otherwise fire into whatever is in front
+        # while the user reads the menu.
+        self.flush_pending_macro_playbacks('return_to_menu')
+        self._stop_listeners_on_lane()
+        # F-A5: the MENU request is POSTED last, so the loop thread re-enters
+        # the menu only after the release sweeps ran and the listener stops were
+        # ordered. This is what actually reaches the loop now: MENU_ENABLED alone
+        # never did (it is already True after the startup menu - the Item 3
+        # write-only-flag defect).
+        self.post_lifecycle(Lifecycle_State.MENU, 'alt+PAGE_DOWN return to menu')
 
     def control_exit_program(self, source = ""):
         print('--- Stopping execution --- ' + source)
-        self.release_all_currently_pressed_simulated_keys()
+        # F-A4: stops on the lane, releases synchronous (see
+        # _stop_listeners_on_lane); STOPPED stays the LAST statement so a
+        # reader of the flag never sees it set before the shutdown was ordered.
+        # F-A7 (L1 + R2): the leg NAMES its drain (a parameter, not shared
+        # state) and the macro task debt drains first, so the simulated sweep
+        # below does not double-release what the macro leg owns.
+        self.drain_macro_debt(context='exit_program')
+        self.release_all_currently_pressed_simulated_keys('exit_program')
         self._state_manager.stop_all_repeating_keys()
-        self._mouse_listener.stop()
-        self._listener.stop()
+        # Decision 12 (E3): same shape as the menu leg - a queued segment must
+        # not be the last thing the process injects (the reviewer measured it).
+        self.flush_pending_macro_playbacks('exit_program')
+        self._stop_listeners_on_lane()
         self._arg_manager.STOPPED = True
+        # F-A5 (Item 3, and no direct sys.exit from the hook pump): alt+END
+        # POSTS the stop. The loop thread observes it, returns from run(), and
+        # the ONE cleanup path (MainLogic.cleanup, exactly-once guard) tears
+        # down - headless then exits 0, GUI unwinds through logic.shutdown().
+        self.post_lifecycle(Lifecycle_State.STOPPING,
+                            'alt+END exit request' + (f' ({source})' if source else ''))
         # if source != "icon":
         #     exit()
 
     def control_toggle_pause(self):
         if self._arg_manager.WIN32_FILTER_PAUSED:
-            self._arg_manager.reset_global_variable_changes()
-            self.apply_start_args_by_focus_name(self._focus_manager.FOCUS_APP_NAME)
-            self.apply_focus_groups(self._focus_manager.FOCUS_APP_NAME)
-            self._cli_menu.clear_cli()
-            self._config_manager.display_groups()
-            print("\n--- reloaded sucessfully ---")
-            print('--- manuelly resumed ---\n')
-            if self._arg_manager.CONTROLS_ENABLED:
-                self._cli_menu.display_control_text()
-            # with paused_lock:
-            self._arg_manager.WIN32_FILTER_PAUSED = False
-            self._arg_manager.MANUAL_PAUSED = False
+            # F-A4 (review Item 2): the resume leg IS the reload lane - config
+            # file read + clean/validate + the snapshot rebuild + the CLI
+            # redraw (system('cls||clear')). All of it moves to the loop thread
+            # (coalescing, see _schedule_reload), so alt+delete answers the hook
+            # immediately. The un-pause flags flip inside that lane work, i.e.
+            # exactly when the new generation is in place - the pump keeps
+            # filtering with the previous complete generation until then (F-A3).
+            self._schedule_reload()
 
         else:
             print('--- manually paused ---')
             # with paused_lock:
             self._arg_manager.WIN32_FILTER_PAUSED = True
             self._arg_manager.MANUAL_PAUSED = True
-            self.release_all_currently_pressed_simulated_keys()
+            # F-A7 (L1 + R2): named drain (parameter, not shared state); macro
+            # debt first. NOTE (honest scope): the F-A4 RELOAD lane itself
+            # (_reload_now) still emits no releases at all, so it owes nothing -
+            # this pause leg is the alt+DELETE drain path.
+            self.drain_macro_debt(context='pause_toggle')
+            self.release_all_currently_pressed_simulated_keys('pause_toggle')
             self._state_manager.stop_all_repeating_keys()
+            # Decision 12 (E3): the drain above only reaches playbacks that
+            # already owe a release; a paused product must also drop a queued
+            # segment that owes nothing.
+            self.flush_pending_macro_playbacks('pause_toggle')
+            # F-A5: the loop records the pause (the listeners stay live - a
+            # paused filter still answers events, it just lets them through)
+            self.post_lifecycle(Lifecycle_State.PAUSED, 'alt+DELETE pause')
 
 
     def reset_macro_sequence_by_name(self, alias_name, current_ke = ''):
@@ -1056,19 +2099,20 @@ class FST_Keyboard():
         ###self.interrupt_macro_by_name(alias_name)
 
         ### +
+        rt = self._runtime  # bind once: two property reads could straddle a swap
         try:
-            macro_to_reset = self._macros_alias_dict[alias_name]
+            macro_to_reset = rt.macros_alias_dict[alias_name]
             ###XXX 241014-1952 only reset if not already resetted or unused
             if macro_to_reset.get_sequence_counter() > 0:
                 macro_to_reset.reset_sequence_counter()
                 logger_macro.debug(f"-- Macro ({alias_name}) reseted successfully by {current_ke}")
         except KeyError:
             logger_macro.warning(f"no macro sequence with name {alias_name} - reset failed "
-                                f"(all sequence names: {list(self._macros_alias_dict.keys())})")
+                                f"(all sequence names: {list(rt.macros_alias_dict.keys())})")
 
-    def apply_start_args_by_focus_name(self, focus_name = ''):
+    def apply_start_args_by_focus_name(self, focus_name = '', scoped=False):
         self._arg_manager.apply_start_arguments(self._arg_manager._sys_start_args)
-        self.update_focus_groups()
+        self.update_focus_groups(scoped=scoped)
         # needs to be done after reloading of file or else it will not have the actual data
         if focus_name != '':
             if focus_name not in self._focus_manager.multi_focus_dict:
@@ -1076,32 +2120,359 @@ class FST_Keyboard():
             focus_start_arguments, _ = self._focus_manager.multi_focus_dict[focus_name]
         else:
             focus_start_arguments, _ = [],[]
-        self._arg_manager.apply_start_arguments(self._focus_manager.default_start_arguments + focus_start_arguments)
+        # (#423) single pass restored: the default-vs-focus pass split of
+        # U418 only existed for the now-retired -default_on override lane;
+        # every other start argument is order-independent (U418 review)
+        # from_config=True: these tokens come from config <arg> lines, which the
+        # validator already reported (decision 11=a, 2026-11-17)
+        self._arg_manager.apply_start_arguments(
+            self._focus_manager.default_start_arguments + focus_start_arguments,
+            from_config=True)
 
     def set_sys_start_arguments(self, sys_args):
         self._arg_manager.sys_start_args = sys_args
 
-    def release_all_currently_pressed_simulated_keys(self):
-        self._state_manager.release_all_currently_pressed_simulated_keys()
+    # -- ticket ledger helpers (ladder R0/R1/R2 recording + R3 rebind pairing
+    #    + R4 veto consult) ------------------------------------------------
+    # R3 (F-A8) lands the pairing's delivery classification: the entry leg of a
+    # simulated event closes that event's rebind receipt. R4 (F-A9) adds the
+    # veto leg's owed-release consult (take_owed_release_ticket) - the ladder's
+    # last rung, maintainer-ruled 2026-11-16. Owner legs read nothing new.
+    # Design contract: estate research 2026-11-16_fst-ticket-ledger (C)/(B).
+    # Transitions are single stores (see Ticket_Ledger's discipline rule); the
+    # `injected` state belongs to the R3 rebind pairing: a ticket opens at
+    # SCHEDULE time on the pump, the inject leg flips it on the loop lane.
+
+    def current_gen_id(self):
+        '''The live generation's id (one attribute read). Tickets carry it so
+        debt owed under a retired generation is nameable.'''
+        return self._runtime.gen_id
+
+    def _ticket_store(self):
+        '''The ledger, or None when the object has no real one (a partially
+        built stand-in): the guard is a getattr so a missing attribute can never
+        turn bookkeeping into an AttributeError on a send path
+        (F-A6 reviewer P2-2).'''
+        ledger = getattr(self, '_ledger', None)
+        return ledger if isinstance(ledger, Ticket_Ledger) else None
+
+    def open_release_ticket(self, vk_code, source_kind=SOURCE_DRAIN,
+                            source_id=None, is_mouse=False):
+        '''Open a ticket for a release the calling leg is about to emit.
+        `source_id` is passed IN by the leg (F-A7 L1: attribution travels with
+        the call, it is not read from shared state - see `open_press_ticket`
+        for the hold flavour). Returns the Ticket, or None when no real ledger
+        is wired (a stand-in keyboard in a test) - every caller must tolerate
+        None, because bookkeeping must never block or alter a send.
+
+        A ticket that is left open because its send RAISED is left open on
+        purpose: the release is still owed, and naming that debt is the whole
+        point of the ledger.'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        return ledger.open(vk_code, source_kind,
+                           'drain' if source_id is None else source_id,
+                           TICKET_RELEASE, self.current_gen_id(),
+                           is_mouse=is_mouse)
+
+    def open_press_ticket(self, vk_code, source_kind, source_id):
+        '''Open a LONG-LIVED ownership ticket: FST injected a press of this vk
+        and now owes the release (R2 task debt - a macro that dies mid-press, a
+        latched toggle). Idempotent per (vk, source_kind): a latch that is
+        written True again returns the ticket already open instead of minting a
+        second owner for one physical key. Returns None without a real ledger.'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        for ticket in ledger.open_tickets(kind=TICKET_PRESS):
+            if ticket.vk == vk_code and ticket.source_kind == source_kind:
+                return ticket
+        return ledger.open(vk_code, source_kind, source_id, TICKET_PRESS,
+                           self.current_gen_id())
+
+    def close_hold_ticket(self, vk_code, source_kind):
+        '''Close the open ownership ticket this vk's release settles (the one
+        for this source_kind, newest first). No matching ticket -> no-op: the
+        release may also be the sweep of a state that was never owned here.'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        open_now = ledger.open_tickets(kind=TICKET_PRESS)
+        for ticket in reversed(open_now):
+            if ticket.vk == vk_code and ticket.source_kind == source_kind:
+                return ledger.close(ticket)
+        return None
+
+    def close_ticket(self, ticket):
+        '''Close a ticket once its physical event actually left (one store).'''
+        if ticket is None:
+            return None
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        return ledger.close(ticket)
+
+    def take_owed_release_ticket(self, vk_code):
+        '''F-A9 (ladder R4): the sim-release veto's consult - the OLDEST OPEN
+        release ticket for this vk (ledger semantics: scheduled|injected),
+        CLOSED by this call: the arriving simulated release is that ticket's
+        physical delivery, and delivery is the completion (FIFO - sends to one
+        vk leave in issue order, so the oldest owed is the first to arrive).
+        None when nothing is owed (or no real ledger): the veto then decides
+        exactly as it always did, byte-identical. Rebind receipts are EXCLUDED:
+        R3 owns their closes at filter ENTRY with the INJECTED-only gate (a
+        foreign arrival settling a receipt before its inject leg is the F-A8
+        reviewer P1-1 class this exclusion preserves).
+        Hot path (research (B) hard constraint, pinned): ONE dict get
+        (tickets(vk=..)) plus a copy of that vk's bounded bucket - no new lock;
+        the close is the single-attribute store the lock-free read rule
+        demands. Accepted (vk, kind)-granularity residual, sibling of the F-A8
+        one: a FOREIGN injected release of the same vk, arriving while our
+        release is owed, settles OUR ticket (identity attribution needs the
+        dwExtraInfo leg - future rung, filed). Cross-leg form of the same
+        residual: one arrival can settle a rebind receipt (R3 entry leg) AND an
+        owed release ticket (this leg) - at most one ticket per leg, both on the
+        first evidence; pinned as the collision contract in
+        tests/test_veto_ledger_pins.py.'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        for ticket in ledger.tickets(vk=vk_code, kind=TICKET_RELEASE,
+                                     state=(TICKET_SCHEDULED,
+                                            TICKET_INJECTED)):
+            if ticket.source_kind == SOURCE_REBIND:
+                continue
+            if ticket.is_mouse:
+                continue  # this consult serves the KEYBOARD veto (mouse gate
+                          # at the call site; mouse tickets are never eligible)
+            return ledger.close(ticket)
+        return None
+
+    # -- R3 rebind pairing (F-A8) ------------------------------------------
+    # The single-store protocol design report (B) names for the ONE PARTIAL
+    # consumer that needed it: a rebind ticket's life crosses exactly two
+    # threads, and every touch is a single store - `open` is the pump's dict
+    # store at inject-SCHEDULE time, `mark` is the inject leg's one attribute
+    # flip (loop lane or inline), `record_rebind_delivery` is the pump's close
+    # when the delivery classification arrives. No thread ever reads a ticket
+    # and writes back two fields. The close accepts INJECTED tickets ONLY:
+    # nothing of ours may count as delivered before an inject leg of ours ran
+    # (an unrelated injected arrival - another process, or the tap/macro/drain
+    # lane of the same vk - must never settle a send that has not left). With
+    # that gate the mark can also never resurrect a closed receipt: each
+    # receipt's inject leg runs exactly once (pump_lane's three outcomes cover
+    # schedule / inline / resend, never two), it flips BEFORE its send, so the
+    # first ticket that can ever be closed is already past its only mark.
+
+    def open_rebind_ticket(self, vk_code, is_press, source_id,
+                           is_mouse=False):
+        '''Open the ledger RECEIPT for a rebind replacement send, at the moment
+        the leg SCHEDULES the inject (design report item 10 / ladder R3: the
+        scheduled-but-lost class becomes nameable from this instant).
+        `source_id` is the rebind key name; `kind` follows the event. state
+        starts SCHEDULED. None-tolerant like every ticket helper.'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        return ledger.open(vk_code, SOURCE_REBIND, source_id,
+                           TICKET_PRESS if is_press else TICKET_RELEASE,
+                           self.current_gen_id(), is_mouse=is_mouse)
+
+    def mark_rebind_injected(self, ticket):
+        '''The inject leg's single attribute store: the replacement send is
+        leaving (loop lane, inline fallback, or dead-loop resend). None- and
+        no-ledger-tolerant; the flip is observational - completion belongs to
+        the delivery classification, never to this leg.'''
+        if ticket is None:
+            return None
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        return ledger.mark(ticket, TICKET_INJECTED)
+
+    def record_rebind_delivery(self, vk_code, is_press):
+        '''Close the oldest INJECTED rebind receipt of (vk, kind): the arriving
+        simulated event classifies as the delivery of exactly one of our
+        replacement sends, FIFO (sends to one vk leave in issue order). A
+        receipt still SCHEDULED is never closed here - nothing of ours counts
+        as delivered before one of our inject legs ran, so an unrelated
+        injected arrival (another process, or the tap/macro/drain lane's send
+        of the same vk) cannot settle a send that has not left (reviewer
+        P1-1/P1-2 cure; the drain-compaction and identity-attribution
+        follow-ups are filed to the estate todo_inbox). Residual, accepted: at
+        (vk, kind) granularity the pairing cannot tell our arrival from a
+        foreign injected event of the same key AFTER our inject - identity
+        attribution needs the dwExtraInfo leg (future rung, filed). Returns
+        the closed ticket, or None when nothing was owed (the tap/macro/drain
+        sim legs own their records elsewhere - this leg is a no-op for them).
+        Hot-path shape: one dict get (tickets(vk=..)) + a copy of that vk's
+        bounded bucket (closed tickets are kept up to MAX_PER_VK there until
+        the filed drain-side compaction lands; a vk that never held a ticket
+        pays the dict get only).'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return None
+        kind = TICKET_PRESS if is_press else TICKET_RELEASE
+        for ticket in ledger.tickets(vk=vk_code, kind=kind,
+                                     state=TICKET_INJECTED):
+            if ticket.source_kind == SOURCE_REBIND:
+                return ledger.close(ticket)
+        return None
+
+    def ledger_open_count(self, gen_id=None, expected_source_kinds=()):
+        '''A PURE query for tests and teardown audits: how many open tickets are
+        VIOLATIONS (open, optionally of one generation, and not of an
+        `expected_source_kinds` class). It scans and returns a number only - no
+        logging, no mutation; `Ticket_Ledger.audit` is the version that NAMES
+        them (F-A7 reviewer P2-4).'''
+        ledger = self._ticket_store()
+        if ledger is None:
+            return 0
+        expected = tuple(expected_source_kinds)
+        return len([t for t in ledger.open_tickets(gen_id=gen_id)
+                    if t.source_kind not in expected])
+
+    def _release_tap_group_holds(self, drain_id=None):
+        '''FST-404 (#404): release the app-level hold each tap group owns.
+
+        Order matters. Tap_Group.release_hold() clears states/active_key/
+        last_key_send FIRST, so the group's own injected release is not eaten
+        by the simulated-key veto leg (which suppresses a release of the key a
+        group still has active - that veto made the old global sweep a silent
+        no-op for tap keys while it cleared the global record anyway). The
+        release is emitted SYNCHRONOUSLY in the caller context: the quit paths
+        (control_return_to_menu / control_exit_program) stop the listeners
+        right after this call, so a pump_lane hop would lose the release. The
+        global simulated-key record is cleared here too, so the
+        Input_State_Manager sweep cannot re-emit a release for a vk the owner
+        already released (hook-thread timing cannot be relied on).
+
+        F-A4 (the generation question F-A3 handed over): this sweep runs against
+        the CURRENT generation (it binds self._runtime's tap_groups at call
+        time), and in a rebuild that current generation is the OLD one - the new
+        snapshot is not bound yet and its groups hold nothing, so "release the
+        new generation instead" is not a meaningful route. What remains is the
+        mutation of old-generation Tap_Group objects while a pump event may be
+        mid-decision on them. That mutation is state-legal, not lucky:
+        release_hold() clears active_key/last_key_send/states with single
+        attribute stores (atomic under the GIL) and never unbinds the owner
+        registry, so a concurrent pump leg sees either the held or the cleared
+        state of the SAME object - never a half-built generation.
+        HONEST LIMIT of that argument (F-A4 reviewer P1-1) was the window between
+        release_hold() returning and the caller's send below: a real pump event
+        could re-arm active_key (update_tap_states sets it) and the veto leg then
+        suppressed the very injected release this method emitted - the app kept
+        the key pressed. CLOSED BY F-A9 (ladder R4, maintainer ruling GO
+        2026-11-16): the release ticket opens BEFORE the send and stays open
+        across it, and the sim-release veto consults the ledger first, so a
+        mid-drain re-arm can no longer hide the owed release from the veto. The
+        FST-404 release ORDERING was not moved (the release is still emitted
+        synchronously in the caller context, as above) - only the veto's data
+        source gained the ledger, which is what the ruling approved. Pinned in
+        tests/test_veto_ledger_pins.py (the concurrent seam race); the older
+        TestP5HoldReleaseGeneration pair still pins the no-ticket veto.'''
+        for tap_group in self.runtime.tap_groups:
+            vk_code = tap_group.release_hold()
+            if vk_code is None:
+                continue
+            # F-A7 (L1): the drain id arrives as a parameter - attribution is
+            # written once, at open, and never read from shared state, so two
+            # legs on different threads cannot swap labels. Order and count of
+            # the sends are unchanged; a send that raises leaves the ticket
+            # OPEN (the release is still owed).
+            self.open_release_ticket(vk_code, SOURCE_DRAIN,
+                    'tap_group_holds' if drain_id is None
+                    else f"{drain_id}.tap_group_holds")
+            # F-A9 (ladder R4): the ticket STAYS open across the send. The
+            # close moved from here to DELIVERY: the sim-release veto leg
+            # consults the ledger first, and this very release closing its own
+            # ticket is the completion (tests/test_veto_ledger_pins.py). The
+            # old close-at-send made the ticket invisible to that consult -
+            # shadow-mode bookkeeping (R0/R1); R4 turns the record into the
+            # veto's data source. Honest residual (research TOP-3 risk 3, the
+            # filed drain-side compaction): if this release never re-enters the
+            # pump (the quit legs stop the listeners right after this call),
+            # the ticket stays open as named scheduled debt and the F-B4
+            # [StuckKeyWatch] ages it - debt that cannot close must stay
+            # nameable, it must never silently vanish. A leaked ticket is also
+            # a one-shot delivery credit: the next release of that vk (after a
+            # menu resume restarts the listeners, a foreign injected event)
+            # settles it at the veto - bounded, named, superseded by the filed
+            # compaction.
+            self._output_manager.send_key_event(Key_Event(vk_code, False))
+            self._state_manager.set_simulated_key_press_state(vk_code, False)
+
+    def release_all_currently_pressed_simulated_keys(self, drain_id=None):
+        # F-A7 (L1): drain_id threads through - the leg that asked for the
+        # drain names the tickets its emissions create (approved signature
+        # change, tests/test_output_manager.py repinned in the same commit).
+        self._release_tap_group_holds(drain_id)
+        self._state_manager.release_all_currently_pressed_simulated_keys(drain_id)
         self._output_manager.clear_all_variables()
 
     def display_internal_repr_groups(self):
 
+        rt = self._runtime  # bind once: the dump is one consistent generation
         print("Aliases")
-        for alias, group in self._key_group_by_alias.items():
+        for alias, group in rt.key_group_by_alias.items():
             print(f"{alias} {group}")
         print("\n# Tap Groups")
-        for group in self._tap_groups:
+        for group in rt.tap_groups:
             print(f"{group}")
         print("\n# Rebinds")
-        for rebind in self._rebinds:
+        for rebind in rt.rebinds:
             print(f"{rebind}")
         print("\n# Macros")
-        for macro in self._macros:
+        for macro in rt.macros:
             print(f"{macro}")
         print("\n# Macro Sequences")
-        for alias, group in self._macros_alias_dict.items():
+        for alias, group in rt.macros_alias_dict.items():
             print(f"{group}")
+
+    # ------------------------------------------------------------------
+    # F-B4 (review Item 13): the one-shot status dump - THE bug-report
+    # artifact. Item 13 asked for ONE supported snapshot surface instead of
+    # the ad-hoc repr dumps above; there is deliberately NO hotkey and NO
+    # numpad trigger for it (a product ruling, and the F-A4 rule: a dump is
+    # file I/O, the LL-hook pump never does file I/O).
+    # ------------------------------------------------------------------
+    def request_status_dump(self, reason='startup'):
+        '''Write fst_status.log - effective args, lifecycle state (F-A5),
+        focus scope, group counts, tap/hold/toggle states, the ticket ledger
+        with its [StuckKeyWatch] aging lines, and the paths to attach.
+
+        THREADING: the render reads live containers, so it runs on the asyncio
+        loop thread through the F-A4 lane helper (_run_on_loop_or_inline -
+        posted from any other thread, inline only where the F-A4 contract
+        already says inline: no loop wired, or the caller IS the loop thread).
+        The hook pump has no path here at all.
+
+        FAIL-SAFE: a diagnostic artifact never breaks the leg that asked for
+        it. A render or write failure is named at WARNING (the F-A4 leg rule:
+        a failed leg is named, never a silent scheduled-ok); the previous
+        artifact is left intact by the atomic write. Returns the absolute path
+        written, or None when the leg failed or is still queued on the lane
+        (a queued leg reports nothing - the [StatusDump] log line names it).'''
+        result = {}
+
+        def leg():
+            try:
+                result['path'] = self._status_dump.write(reason=reason)
+            except Exception as error:
+                logger.warning(f"[StatusDump] dump failed reason={reason}: "
+                               f"{type(error).__name__}: {ascii(str(error))}")
+                logger.debug("[StatusDump] dump failure detail",
+                             exc_info=True)
+
+        self._run_on_loop_or_inline(leg, 'status_dump')
+        return result.get('path')
+
+    def render_status_dump(self, reason='startup', now=None):
+        '''The artifact text WITHOUT the file write - the seam a test or a
+        future menu uses. Same thread contract as request_status_dump when
+        called on the lane; `now` fakes the age anchor (see Status_Dump.render).'''
+        return self._status_dump.render(reason=reason, now=now)
 
     def open_config_file(self):
         startfile(self._config_manager.file_name)
@@ -1111,3 +2482,12 @@ class FST_Keyboard():
         self.update_args_and_groups(self._focus_manager.FOCUS_APP_NAME)
         self._cli_menu.update_group_display()
         print(f'\n>>> file reloaded for focus app: {self._focus_manager.FOCUS_APP_NAME}\n')
+        # compliance result (U290T): the validator ran at load; warnings, if
+        # any, were already surfaced by update_focus_groups - a clean pass
+        # gets the single green OK toast (errors raised before this point)
+        if not self._config_manager.config_warnings:
+            self.surface_config_ok()
+        # F-B4: this is the tray/menu "Reload from file" leg - it runs on the
+        # Qt thread, so request_status_dump posts the dump to the loop lane
+        # (never writes from the caller's thread).
+        self.request_status_dump('reload_from_file')

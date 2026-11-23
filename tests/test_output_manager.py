@@ -193,13 +193,17 @@ class TestConstraintChaining:
         ke = Key_Event(VK_A, constraints=["p('a')", 'release_all_keys()'])
         fulfilled, _ = om_env.om.check_constraint_fulfillment(ke, get_also_delays=True)
         assert fulfilled is True
-        om_env.fst.release_all_currently_pressed_simulated_keys.assert_called_once_with()
+        # F-A7 (L1, maintainer-approved signature edit): the invocation names
+        # its drain leg, so the ticket its emissions carry is attributable
+        om_env.fst.release_all_currently_pressed_simulated_keys.assert_called_once_with('constraint_action')
 
 
 class TestInvocations:
     def test_release_all_keys(self, om_env):
         assert om_env.om.constraint_evaluation('release_all_keys()', make_ke()) is True
-        om_env.fst.release_all_currently_pressed_simulated_keys.assert_called_once_with()
+        # F-A7 (L1, maintainer-approved signature edit): the invocation names
+        # its drain leg, so the ticket its emissions carry is attributable
+        om_env.fst.release_all_currently_pressed_simulated_keys.assert_called_once_with('constraint_action')
 
     def test_sequence_name_invocation_resets_sequence(self, om_env):
         om_env.fst.macro_sequence_alias_list = ['my_seq']
@@ -596,6 +600,135 @@ class TestFileConstraints:
         assert om_env.om.constraint_evaluation("append_to_file('more')", ke) is True
         assert om_env.om.constraint_evaluation("empty_file()", ke) is True
         assert (tmp_path / 'output.txt').read_text() == ''
+
+
+class TestFileTimeStampLeg:
+    """462 write-stamp (maintainer ruling 2026-11-23): the `time_stamp`
+    default of save_into_file/append_to_file is the module sentinel
+    `_STAMP_AT_WRITE` - an omitted stamp is taken at WRITE time inside the
+    lane worker that executes the write. A constraint pass with no file leg
+    performs ZERO clock reads from these defaults; a delayed or retried
+    write stamps its own execution time, not the evaluation time. An
+    explicit time_stamp - positional, keyword, or an explicit None (writes
+    the literal "None") - keeps today's behavior byte for byte.
+
+    RED-before (pre-change tree): the write-stamp/zero-read pins FAIL - the
+    def-time `get_time()` defaults read the clock twice per re-evaluation
+    (save+append defs) and stamp evaluation time. The explicit-stamp content
+    legs are green pre-change by design (contract lock); its zero-read
+    assertion discriminates."""
+
+    @pytest.fixture
+    def clock_reads(self, monkeypatch):
+        """Counting _wall_ms fake: reads = every value the legs read, holder
+        = the mutable instant - pins WHEN and HOW OFTEN the clock is read."""
+        reads = []
+        holder = {'t': 0}
+
+        def _fake():
+            reads.append(holder['t'])
+            return holder['t']
+
+        monkeypatch.setattr(fst_manager, '_wall_ms', _fake)
+        return SimpleNamespace(reads=reads, holder=holder)
+
+    def test_no_file_leg_performs_no_clock_reads(self, om_env, clock_reads):
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("cli('hi')", ke) is True
+        assert om_env.om.constraint_evaluation("cli('again')", ke) is True
+        # 462: the nested defs carry no def-time clock defaults anymore -
+        # a non-file pass reads the clock NEVER (pre-change: twice per eval)
+        assert clock_reads.reads == []
+
+    def test_default_stamp_taken_at_write_time_on_lane(self, om_env,
+                                                       clock_reads, tmp_path,
+                                                       monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        loop = asyncio.new_event_loop()
+        try:
+            # un-spun loop = deterministic lane deferral: the write can only
+            # land inside the explicit run_until_complete below
+            monkeypatch.setattr(om_env.fst, 'loop', loop)
+            clock_reads.holder['t'] = 1000
+            ke = make_ke()
+            assert om_env.om.constraint_evaluation("save_into_file('x')", ke) is True
+            assert not (tmp_path / 'output.txt').exists()  # leg deferred
+            clock_reads.holder['t'] = 2000  # the eval window closes here
+            loop.run_until_complete(asyncio.sleep(0.05))
+        finally:
+            loop.close()
+        # stamp = EXECUTION time of the lane worker, not evaluation time
+        assert (tmp_path / 'output.txt').read_text() == '2000: x\n'
+        # exactly one clock read - at the write itself (pre-change: two
+        # def-time reads at 1000 and the eval-time stamp 1000 in the file)
+        assert clock_reads.reads == [2000]
+
+    def test_default_stamp_inline_path_single_read(self, om_env, clock_reads,
+                                                   tmp_path, monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        clock_reads.holder['t'] = 5000
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("save_into_file('x')", ke) is True
+        assert (tmp_path / 'output.txt').read_text() == '5000: x\n'
+        # pre-change: two def-time reads (5000, 5000), none at the write
+        assert clock_reads.reads == [5000]
+
+    def test_append_default_stamps_each_executed_write(self, om_env,
+                                                       clock_reads, tmp_path,
+                                                       monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        loop = asyncio.new_event_loop()
+        try:
+            # same deterministic lane deferral as pin 2 - each write's stamp
+            # must be its OWN execution time, not the eval time of its leg
+            monkeypatch.setattr(om_env.fst, 'loop', loop)
+            ke = make_ke()
+            clock_reads.holder['t'] = 1000
+            assert om_env.om.constraint_evaluation("append_to_file('x')", ke) is True
+            clock_reads.holder['t'] = 2000
+            loop.run_until_complete(asyncio.sleep(0.05))
+            clock_reads.holder['t'] = 3000
+            assert om_env.om.constraint_evaluation("append_to_file('x')", ke) is True
+            clock_reads.holder['t'] = 4000
+            loop.run_until_complete(asyncio.sleep(0.05))
+        finally:
+            loop.close()
+        # one honest stamp per executed write - a retried write stamps its
+        # own write, not its eval (pre-change: def-time stamps 1000/3000
+        # and four def-time clock reads, none at the writes)
+        assert (tmp_path / 'output.txt').read_text() == '2000: x\n4000: x\n'
+        assert clock_reads.reads == [2000, 4000]
+
+    def test_explicit_time_stamp_unchanged_no_clock_read(self, om_env,
+                                                         clock_reads, tmp_path,
+                                                         monkeypatch):
+        monkeypatch.chdir(tmp_path)
+        clock_reads.holder['t'] = 1000  # never used by these legs
+        ke = make_ke()
+        assert om_env.om.constraint_evaluation("save_into_file('a', 777)", ke) is True
+        assert om_env.om.constraint_evaluation("save_into_file('b', time_stamp=888)", ke) is True
+        assert om_env.om.constraint_evaluation("append_to_file('c', 999)", ke) is True
+        # explicit stamp = today's behavior, positional and keyword alike
+        # (green pre-change by design; save mode 'w' truncates the first line)
+        assert (tmp_path / 'output.txt').read_text() == '888: b\n999: c\n'
+        # an explicit None is NOT the omitted default: it stamps the literal
+        # "None" into the line exactly as pre-462 (462 sentinel)
+        assert om_env.om.constraint_evaluation("save_into_file('e', None)", ke) is True
+        assert (tmp_path / 'output.txt').read_text() == 'None: e\n'
+        # an explicit stamp survives lane deferral unchanged (reviewer P2-3)
+        loop = asyncio.new_event_loop()
+        try:
+            monkeypatch.setattr(om_env.fst, 'loop', loop)
+            assert om_env.om.constraint_evaluation("save_into_file('d', 555)", ke) is True
+            assert (tmp_path / 'output.txt').read_text() == 'None: e\n'  # write deferred
+            clock_reads.holder['t'] = 2000  # an explicit stamp never reads the clock
+            loop.run_until_complete(asyncio.sleep(0.05))
+        finally:
+            loop.close()
+        assert (tmp_path / 'output.txt').read_text() == '555: d\n'
+        # and no explicit-stamp leg read the clock (pre-change: the def-time
+        # defaults read it on every eval anyway)
+        assert clock_reads.reads == []
 
 
 class TestConstraintResultTypes:

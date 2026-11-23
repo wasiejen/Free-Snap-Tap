@@ -1,6 +1,9 @@
+import ctypes
+import gc
 import logging
 import os
 import sys
+import traceback
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -15,6 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+import fst_manager  # noqa: E402
 from fst_data_types import ConfigError  # noqa: E402
 from fst_keyboard import FST_Keyboard  # noqa: E402
 from fst_manager import CONSTANTS  # noqa: E402
@@ -80,8 +84,19 @@ class FakeFST(SimpleNamespace):
 
 
 @pytest.fixture(autouse=True)
+def redirect_status_file(monkeypatch, tmp_path):
+    """F-B4: the status dump (product default: CWD-relative fst_status.log,
+    same convention as fst.log) is redirected to tmp_path for EVERY test -
+    a suite run never leaves an artifact in the repo root. A test that reads
+    the artifact reads fst_manager.STATUS_FILE or patches its own path."""
+    monkeypatch.setattr(fst_manager, 'STATUS_FILE',
+                        str(tmp_path / 'fst_status.log'))
+
+
+@pytest.fixture(autouse=True)
 def restore_constants():
-    attrs = ['DEBUG_NUMPAD', 'FILE_NAME',
+    attrs = ['DEBUG_NUMPAD', 'TOAST_OFFLOAD', 'DROP_WATCH', 'FILE_NAME',
+             'STUCK_TICKET_MS',
              'EXIT_Combination', 'TOGGLE_ON_OFF_Combination', 'MENU_Combination']
     saved = {attr: getattr(CONSTANTS, attr) for attr in attrs}
     yield
@@ -93,7 +108,8 @@ def restore_constants():
 def restore_fst_loggers():
     """Save/restore the FST area-logger levels, propagate flags and handlers
     so logging toggles in one test never leak into the next."""
-    names = ['fst', 'fst.flow', 'fst.eval', 'fst.state', 'fst.macro', 'fst.config']
+    names = ['fst', 'fst.flow', 'fst.eval', 'fst.state', 'fst.macro', 'fst.config',
+             'fst.drop']
     saved = {}
     for name in names:
         lg = logging.getLogger(name)
@@ -182,3 +198,215 @@ def kb_env_plain(monkeypatch):
     yield keyboard
     FST_Keyboard.TIME_DIFF = None
     FST_Keyboard.START_TIME = None
+
+
+# --- F-B7 test-isolation tripwire (2026-11-16) --------------------------------
+#
+# PREVENTIVE HARDENING (reported incident RETRACTED): a "pytest emits real
+# input into the live desktop" report was investigated; the cause turned out
+# to be the maintainer's own rotated-tablet buttons pressed under his arm
+# during WTD testing, not the suite. The tripwire still guards the hazard
+# class: a session-scoped autouse patch makes every real OS input/launch
+# primitive raise (TestIsolationViolation + call stack) instead of typing
+# into the desktop. Any offender the tripwire names must be converted to the
+# fake harness (fake_fst / kb_env_* / mock_pynput_controllers, or synthetic
+# event objects routed through the filter entry). Escape hatches:
+#   @pytest.mark.allow_real_input - tripwire off for one test (justify it);
+#   @pytest.mark.live_desktop     - skipped unless FST_RUN_LIVE_DESKTOP=1.
+
+
+class TestIsolationViolation(RuntimeError):
+    """A test reached a real OS input/launch primitive while tripwired."""
+
+    __test__ = False  # not a test class - imported by test modules
+
+
+_TRIPWIRE_ALLOW = {'allow': False}
+
+
+def _make_tripwire(label, original):
+    """Wrap one real primitive; raise unless the test opted out."""
+    def _tripwire(*args, **kwargs):
+        if _TRIPWIRE_ALLOW['allow']:
+            return original(*args, **kwargs)
+        stack = ''.join(traceback.format_stack()[:-1])
+        raise TestIsolationViolation(
+            f'F-B7 TestIsolationViolation: {label} was called by the test '
+            f'process - this path emits REAL OS input/launches. Convert it '
+            f'to the fake harness.\nCall stack:\n{stack}'
+        )
+    return _tripwire
+
+
+@pytest.fixture(scope='session', autouse=True)
+def os_input_tripwire():
+    """Patch the real OS input primitives for the whole suite run (F-B7).
+
+    Pinned sites (the choke points of every pynput/ctypes.windll send):
+    - pynput keyboard/mouse win32 backends + pynput._util.win32 SendInput
+    - pynput.mouse win32 Controller SetCursorPos (class-bound at import)
+    - ctypes.windll.user32: SendInput/keybd_event/mouse_event/SetCursorPos/
+      SetForegroundWindow
+    - ctypes.windll.shell32.ShellExecuteW (elevate relaunch leg)
+
+    Accepted gaps (reviewer P2, 2026-11-16): a separate module-level
+    ctypes.WinDLL('user32') instance (fst_overlay.py) is NOT covered - it
+    only calls window-visibility APIs today; extend this list if a future
+    direct WinDLL input call lands. _TRIPWIRE_ALLOW is process-global (not
+    thread-local): an allow_real_input window also unlocks concurrent
+    background threads - accepted blast radius (armed by default, tests).
+    """
+    import pynput._util.win32 as pwu
+    import pynput.keyboard._win32 as kw
+    import pynput.mouse._win32 as mw
+
+    patches = []
+
+    def _patch(obj, attr, label, wrap=None):
+        original = getattr(obj, attr)
+        replacement = _make_tripwire(label, original)
+        if wrap is not None:
+            replacement = wrap(replacement)
+        setattr(obj, attr, replacement)
+        patches.append((obj, attr, original))
+
+    user32 = ctypes.windll.user32
+    for _name in ('SendInput', 'keybd_event', 'mouse_event', 'SetCursorPos',
+                  'SetForegroundWindow'):
+        _patch(user32, _name, f'ctypes.windll.user32.{_name}')
+    _patch(ctypes.windll.shell32, 'ShellExecuteW',
+           'ctypes.windll.shell32.ShellExecuteW')
+    _patch(kw, 'SendInput', 'pynput.keyboard._win32.SendInput')
+    _patch(mw, 'SendInput', 'pynput.mouse._win32.SendInput')
+    _patch(pwu, 'SendInput', 'pynput._util.win32.SendInput')
+    # pynput.mouse binds SetCursorPos as a name-mangled class attr at import;
+    # the ctypes FuncPtr is not a descriptor, so keep the wrapper static
+    _patch(mw.Controller, '_Controller__SetCursorPos',
+           'pynput.mouse._win32.Controller.__SetCursorPos', staticmethod)
+    yield
+    for _obj, _attr, _original in reversed(patches):
+        setattr(_obj, _attr, _original)
+
+
+@pytest.fixture(autouse=True)
+def tripwire_allow_list(request):
+    """Honor the allow_real_input marker for one test (F-B7)."""
+    was_allowed = _TRIPWIRE_ALLOW['allow']
+    _TRIPWIRE_ALLOW['allow'] = (
+        request.node.get_closest_marker('allow_real_input') is not None)
+    yield
+    _TRIPWIRE_ALLOW['allow'] = was_allowed
+
+
+def pytest_collection_modifyitems(config, items):
+    """Skip live_desktop tests by default (F-B7): they need real OS input.
+
+    With FST_RUN_LIVE_DESKTOP=1 they run but the tripwire stays armed - a
+    live_desktop test must ALSO carry @pytest.mark.allow_real_input."""
+    if os.environ.get('FST_RUN_LIVE_DESKTOP') == '1':
+        return
+    skip_live = pytest.mark.skip(
+        reason='live_desktop: needs real OS input on a live desktop '
+               '(set FST_RUN_LIVE_DESKTOP=1 to run)')
+    for item in items:
+        if 'live_desktop' in item.keywords:
+            item.add_marker(skip_live)
+
+
+# --- F-B8 suite-abort guard (2026-11-16) -------------------------------------
+#
+# ROOT CAUSE (measured, branch u-fb8-suiteabort): PySide6 6.11.2 / shiboken6
+# abort natively (SIGABRT or SIGSEGV, often with NO faulthandler dump) when a
+# Python GC sweep runs while a Qt C++ frame is on the stack - Qt forbids
+# destroying objects during event processing, Python's GC does not know.
+# pytest-qt 4.5 calls app.processEvents() at five sites around every test
+# phase and qtbot.wait() runs a nested QEventLoop, so every test after the
+# first Qt test is an event-processing window - this explains the historical
+# abort positions 23%..98% and both recorded stack signatures (tray-fixture
+# teardown exec; post-call _process_events).
+# Discriminator (2026-11-16): the stress harness tests/fb8_gc_stress.py +
+# full suite = 6/6 pre-guard native aborts on UNCHANGED trees, clean with
+# this guard (the post-guard stress run is inert by construction - the guard
+# disables what the harness tunes). Isolated orphan-wrapper patterns never
+# crash - the crash needs the session-wide Qt object graph. The underlying
+# GC-during-Qt-event hazard is an upstream shiboken6 class: repro recorded
+# via todo_inbox 2026-11-16 (worker F-B8); accepted side effect - suite runs
+# go blind to the class on product Qt paths.
+# Guard: no automatic GC for the run; sweep each test's fresh gen-0 garbage
+# at a safe point (after all five pytest-qt pumps of that test, no Qt frame
+# on the stack); promoted cycles wait for the session-finish sweep (measured
+# bounded: +3 percent gc objects vs automatic GC, reviewer probe). Pinned by
+# tests/test_suite_gc_pin.py and by the per-test latch below.
+# Related class (separate fix): a widget built before any QApplication also
+# aborts the process - Qt routes the fatal message to the debugger and the
+# abort bypasses buffered output, so the run dies with no message. Only
+# suite exposure: tests/test_toast_rendering.py's first widget test without
+# qtbot - fixed with qtbot + addWidget.
+# SCOPE (measured 2026-11-17, unit ABORT2, tip e2c9e02): this guard covers the
+# GC-during-Qt-event-window class ONLY. It does NOT prevent the second member of
+# the family - a full single-process run now aborts deterministically at ~92% in
+# pytest-qt's wait() pump during tests/test_tray_icon.py's fixture teardown
+# (graph-teardown variant, upstream). Removing, narrowing, or relocating the
+# session-finish sweep below changes nothing (4/4 aborts each), so do not "fix"
+# this abort by deleting the guard: it still earns its keep against the class it
+# was built for. The usable full-suite gate is `python suite_lane.py`; the whole
+# measurement record, including what was falsified, is in tests/README.md.
+
+
+def pytest_configure(config):
+    """F-B8: no automatic GC sweep can land inside a Qt event window."""
+    gc.disable()
+
+
+def pytest_unconfigure(config):
+    """F-B8: restore the collector for any in-process pytest.main() caller."""
+    gc.enable()
+
+
+@pytest.hookimpl(trylast=True)
+def pytest_runtest_logfinish(nodeid, location):
+    """F-B8: sweep this test's fresh gen-0 garbage at the post-test safe point."""
+    gc.collect(0)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """F-B8: last safe-point full sweep while the interpreter is fully alive."""
+    gc.collect()
+
+
+@pytest.fixture(autouse=True)
+def gc_disabled_latch():
+    """F-B8 per-test latch: a later plugin cannot silently re-enable GC."""
+    assert not gc.isenabled(), (
+        'F-B8: automatic GC was re-enabled mid-run - sweeps can land inside '
+        'Qt event windows and abort the suite natively; see the F-B8 section '
+        'in tests/conftest.py')
+    yield
+
+
+# --- F-C1 contract lane (2026-11-16) -----------------------------------------
+#
+# The lane API `run_contract(config_text, stimulus_events) ->
+# InjectedEventStream` (full machinery in tests/contract_lane.py, goldens in
+# tests/test_contract_lane.py): CONFIG TEXT in, INJECTED SEQUENCE out. It
+# drives the real pipeline end to end (load_config clean+validate -> focus
+# dicts -> presort_lines -> Runtime_Snapshot build -> keyboard_win32_event_filter
+# with synthetic msg/data objects) and captures the emit-leg's injected events
+# through recorder pynput controllers - no OS input, so the F-B7 tripwire
+# above stays armed and green over every lane run. The lane wires the asyncio
+# loop lane and pumps it to quiescence per stimulus (deterministic FIFO send
+# order, U364/#360), and collapses the random delays to zero (clock seam).
+# Stimulus builders (down/up/tap/combo/focus/focus_lost) import from
+# tests.contract_lane like the kb_helpers shorthands.
+
+
+@pytest.fixture
+def contract(monkeypatch, tmp_path):
+    """F-C1 contract lane fixture - see the section comment above."""
+    # imported in the fixture body: the tests/ dir is on sys.path only after
+    # collection (same non-package import mechanism kb_helpers relies on)
+    from contract_lane import Contract_Lane
+    lane = Contract_Lane(monkeypatch, tmp_path)
+    yield lane
+    lane.close()
+

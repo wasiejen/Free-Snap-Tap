@@ -32,6 +32,8 @@ def make_fst(focus_names=(), always_active=False, win32_paused=False,
         ),
         update_args_and_groups=MagicMock(),
         cli_menu=MagicMock(),
+        toast_group_activated=MagicMock(),
+        is_silent_focus_group=MagicMock(return_value=False),
     )
 
 
@@ -81,7 +83,7 @@ async def test_focus_found_resumes_groups(monkeypatch):
     await task.run()
 
     assert fst.focus_manager.FOCUS_APP_NAME == 'CS2'
-    fst.update_args_and_groups.assert_called_once_with('CS2')
+    fst.update_args_and_groups.assert_called_once_with('CS2', startup=False)  # focus-change leg: scoped report
     fst.cli_menu.update_group_display.assert_called_once_with()
     fst.cli_menu.display_focus_found.assert_called_once_with('CS2 2024')
     assert fst.arg_manager.WIN32_FILTER_PAUSED is False
@@ -112,7 +114,7 @@ async def test_focus_matching_is_case_sensitive_substring(monkeypatch):
     await task.run()
 
     assert fst.focus_manager.FOCUS_APP_NAME == ''
-    fst.update_args_and_groups.assert_called_once_with()  # fall back to default groups
+    fst.update_args_and_groups.assert_called_once_with(startup=False)  # fall back to default groups (scoped leg)
     fst.cli_menu.display_focus_not_found.assert_called_once_with()
     assert fst.arg_manager.WIN32_FILTER_PAUSED is True
 
@@ -157,7 +159,7 @@ async def test_no_match_pauses_filter(monkeypatch):
     await task.run()
 
     assert fst.focus_manager.FOCUS_APP_NAME == ''
-    fst.update_args_and_groups.assert_called_once_with()
+    fst.update_args_and_groups.assert_called_once_with(startup=False)  # default-groups leg: scoped report
     fst.cli_menu.display_focus_not_found.assert_called_once_with()
     assert fst.arg_manager.WIN32_FILTER_PAUSED is True
 
@@ -186,9 +188,108 @@ async def test_always_active_uses_default_groups(monkeypatch):
     await task.run()
 
     assert fst.focus_manager.FOCUS_APP_NAME == ''
-    fst.update_args_and_groups.assert_called_once_with()
+    fst.update_args_and_groups.assert_called_once_with(startup=False)  # default-groups leg: scoped report
     fst.cli_menu.display_default_active.assert_called_once_with()
     assert fst.arg_manager.WIN32_FILTER_PAUSED is False
+    fst.toast_group_activated.assert_called_once_with('default groups')
+
+
+@pytest.mark.asyncio
+async def test_activation_toast_names_the_group(monkeypatch):
+    # U290T: activation of a focus group toasts its name (maintainer 8+9)
+    fst = make_fst(focus_names=['CS2'], win32_paused=True)
+    fake_windows(monkeypatch, ['CS2 2024'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    fst.toast_group_activated.assert_called_once_with('CS2')
+
+
+@pytest.mark.asyncio
+async def test_activation_toast_not_repeated_for_same_group(monkeypatch):
+    fst = make_fst(focus_names=['CS2'])
+    fake_windows(monkeypatch, ['CS2 A', 'CS2 B'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=4)
+
+    await task.run()
+
+    fst.toast_group_activated.assert_called_once_with('CS2')  # one activation
+
+
+@pytest.mark.asyncio
+async def test_activation_toast_skips_silent_focus_group(monkeypatch):
+    """U330 ask 3: a focus group carrying -no_warnings is SILENT - the
+    activation toast skips it; the groups still resume (the skip is a toast
+    rule, not an activation rule)."""
+    fst = make_fst(focus_names=['CS2'], win32_paused=True)
+    fst.is_silent_focus_group = MagicMock(return_value=True)
+    fake_windows(monkeypatch, ['CS2 2024'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    fst.is_silent_focus_group.assert_called_once_with('CS2')
+    fst.update_args_and_groups.assert_called_once_with('CS2', startup=False)  # focus-change leg: scoped report
+    fst.toast_group_activated.assert_not_called()
+    assert fst.arg_manager.WIN32_FILTER_PAUSED is False  # still resumed
+
+
+@pytest.mark.asyncio
+async def test_default_groups_activation_toast_skips_silent_default(monkeypatch):
+    # the ALWAYS_ACTIVE default-groups branch carries the same skip: the
+    # default scope ('') is silent when it carries -no_warnings
+    fst = make_fst(focus_names=[], always_active=True, win32_paused=True)
+    fst.is_silent_focus_group = MagicMock(return_value=True)
+    fake_windows(monkeypatch, ['Unknown Window'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    fst.is_silent_focus_group.assert_called_once_with('')
+    fst.update_args_and_groups.assert_called_once_with(startup=False)  # default-groups leg: scoped report
+    fst.toast_group_activated.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_silent_guard_failure_kills_only_the_announce(monkeypatch, capsys):
+    # U330 reviewer P2 (the U290R defect class): the silent guard sits in the
+    # toast handler, so a raise there names a toast failure, NOT a group
+    # reload failure, and never exits the focus poll loop
+    fst = make_fst(focus_names=['CS2'], win32_paused=True)
+    fst.is_silent_focus_group = MagicMock(side_effect=RuntimeError('guard-broke'))
+    fake_windows(monkeypatch, ['CS2 2024'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    out = capsys.readouterr().out
+    assert 'guard-broke' in out
+    assert 'focus activation toast failed' in out
+    assert 'reloading of groups files failed' not in out
+    fst.toast_group_activated.assert_not_called()
+    assert fst.arg_manager.WIN32_FILTER_PAUSED is False  # groups stay resumed
+
+
+@pytest.mark.asyncio
+async def test_default_branch_guard_failure_kills_only_the_announce(monkeypatch, capsys):
+    # the ALWAYS_ACTIVE default-groups branch carries the same handler rule
+    fst = make_fst(focus_names=[], always_active=True, win32_paused=True)
+    fst.is_silent_focus_group = MagicMock(side_effect=RuntimeError('guard-broke'))
+    fake_windows(monkeypatch, ['Unknown Window'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    out = capsys.readouterr().out
+    assert 'guard-broke' in out
+    assert 'focus activation toast failed' in out
 
 
 @pytest.mark.asyncio
@@ -206,7 +307,7 @@ async def test_manually_paused_gates_until_resumed(monkeypatch):
 
     # while manually paused the window was ignored; after resume it is picked up
     assert fst.focus_manager.FOCUS_APP_NAME == 'CS2'
-    fst.update_args_and_groups.assert_called_once_with('CS2')
+    fst.update_args_and_groups.assert_called_once_with('CS2', startup=False)  # focus-change leg: scoped report
     assert fst.arg_manager.WIN32_FILTER_PAUSED is False
 
 
@@ -262,3 +363,45 @@ def test_stop_method_stops_the_run_loop():
     assert task._stop is False
     task.stop()
     assert task._stop is True
+
+
+@pytest.mark.asyncio
+async def test_reload_failure_names_the_reload_cause(monkeypatch, capsys):
+    """U290R: the group-reload failure handler keeps its own message - and the
+    activation toast is out of that handler, so a toast failure can never
+    print a reload failure there (see the next test)."""
+    fst = make_fst(focus_names=['CS2'], win32_paused=True)
+    fst.update_args_and_groups.side_effect = RuntimeError('boom-config')
+    fake_windows(monkeypatch, ['CS2 2024'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    out = capsys.readouterr().out
+    assert 'reloading of groups files failed' in out
+    assert 'boom-config' in out
+    assert 'toast' not in out
+    fst.toast_group_activated.assert_not_called()  # toast skipped on reload fail
+
+
+@pytest.mark.asyncio
+async def test_toast_failure_not_reported_as_reload_failure(monkeypatch, capsys):
+    """U290R: the activation toast used to sit INSIDE the reload handler, so
+    a failing toast printed 'reloading of groups files failed' and left the
+    user thinking the config reload broke. The toast now has its own handler:
+    its failure is named as a toast failure, the groups stay resumed."""
+    fst = make_fst(focus_names=['CS2'], win32_paused=True)
+    fst.toast_group_activated.side_effect = RuntimeError('toast-broke')
+    fake_windows(monkeypatch, ['CS2 2024'])
+    task = Focus_Task(fst)
+    driving_sleep(monkeypatch, task, ticks=2)
+
+    await task.run()
+
+    out = capsys.readouterr().out
+    assert 'focus activation toast failed' in out
+    assert 'toast-broke' in out
+    assert 'reloading of groups files failed' not in out
+    fst.update_args_and_groups.assert_called_once_with('CS2', startup=False)  # focus-change leg: scoped report
+    assert fst.arg_manager.WIN32_FILTER_PAUSED is False  # groups stay resumed

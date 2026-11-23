@@ -123,6 +123,22 @@ def test_unknown_argument_logs_warning(am_env, caplog):
     assert any(record.levelno == logging.WARNING for record in caplog.records)
 
 
+def test_default_always_active_sets_always_active(am_env):
+    # U290T focus-section arg: default groups stay active with this group
+    am_env.am.apply_start_arguments(['-default_always_active'])
+    assert am_env.am.ALWAYS_ACTIVE is True
+    am_env.am.reset_global_variable_changes()
+    assert am_env.am.ALWAYS_ACTIVE is False  # resets on focus change
+
+
+def test_no_warnings_runtime_is_noop(am_env, caplog):
+    # U290T: the check-suppression arg is consumed by the validator; the
+    # runtime apply accepts it silently (no unknown-argument warning)
+    am_env.am.apply_start_arguments(['-no_warnings'])
+    assert am_env.am.ALWAYS_ACTIVE is False
+    assert 'unknown start argument' not in caplog.text
+
+
 def test_multiple_arguments_applied_in_order(am_env):
     am_env.am.apply_start_arguments(['-tapdelay=8,2', '-crossover=40', '-nomenu'])
     assert am_env.am.ACT_MIN_DELAY_IN_MS == 2
@@ -267,6 +283,28 @@ class TestRemainingStartArguments:
         assert am_env.am.CMD_WINDOW_HIDDEN is True
 
 
+class TestEmptyArgvElement:
+    """U366 (TODO #362, ruling A 2026-11-06): an empty argv element used to
+    raise IndexError at the loop head (arg[0] on ''); it now takes the SAME
+    path as an unknown argument - exactly one 'unknown start argument: '
+    warning with the empty element echoed, startup continues."""
+
+    def test_empty_element_warns_exactly_like_unknown_argument(self, am_env, caplog):
+        am_env.am.apply_start_arguments([''])  # must not raise
+        warns = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert warns == ['unknown start argument: ']
+
+    def test_empty_element_does_not_block_later_arguments(self, am_env, caplog):
+        am_env.am.apply_start_arguments(['', '-nomenu'])
+        assert am_env.am.MENU_ENABLED is False
+        assert 'unknown start argument: ' in caplog.text
+
+    def test_control_nonempty_unknown_argument_behaviour_unchanged(self, am_env, caplog):
+        am_env.am.apply_start_arguments(['-no_such_argument'])
+        warns = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+        assert warns == ['unknown start argument: -no_such_argument']
+
+
 class TestSysStartArgsProperty:
     def test_getter_and_setter(self, am_env):
         assert am_env.am.sys_start_args == []
@@ -288,3 +326,65 @@ class TestFocusGroupManagerDataHolders:
         fm = Focus_Group_Manager(SimpleNamespace())
         fm.default_group_lines = [('', 'a')]
         assert fm.default_group_lines == [('', 'a')]
+
+
+class TestDashedStartArgNames:
+    """U361 (TODO #356, ruling A 2026-11-04): '-' and '_' are interchangeable
+    in start-arg NAMES: '-always-active' == '-always_active'. The text after
+    '=' stays verbatim (dashes inside values survive); truly-unknown args
+    still warn, echoing the original spelling."""
+
+    def test_dashed_flags_match_underscore_twins(self, am_env, caplog,
+                                                  monkeypatch, tmp_path):
+        # -drop-watch would open fst_drop.log in the suite cwd (repo
+        # convention: monkeypatch DROP_LOG_FILE, test_drop_watch.py:119)
+        monkeypatch.setattr(fst_manager, 'DROP_LOG_FILE',
+                            str(tmp_path / 'fst_drop.log'))
+        am_env.am.apply_start_arguments([
+            '-always-active', '-debug-numpad', '-exec-one-macro',
+            '-tray-icon', '-hide-cmd-window', '-status-indicator',
+            '-no-warnings', '-drop-watch', '-no-toast-offload',
+        ])
+        assert am_env.am.ALWAYS_ACTIVE is True
+        assert CONSTANTS.DEBUG_NUMPAD is True
+        assert am_env.am.EXEC_ONLY_ONE_TRIGGERED_MACRO is True
+        assert am_env.am.TRAY_ICON is True
+        assert am_env.am.CMD_WINDOW_HIDDEN is True
+        assert am_env.am.STATUS_INDICATOR is True
+        assert 'unknown start argument' not in caplog.text
+
+    def test_dashed_default_always_active(self, am_env):
+        am_env.am.apply_start_arguments(['-default-always-active'])
+        assert am_env.am.ALWAYS_ACTIVE is True
+
+    def test_dashed_value_args_keep_value_verbatim(self, am_env):
+        am_env.am.apply_start_arguments(['-save-dir=C:/my-dir/x',
+                                         '-backup-root-dir=D:/my-backup',
+                                         '-status-indicator=20',
+                                         '-file=a=b=c'])
+        # dashes inside the value text stay untouched (name-only normalize);
+        # the value keeps everything after the FIRST '=' verbatim
+        assert am_env.am.SAVE_DIR == 'C:/my-dir/x'
+        assert am_env.am.BACKUP_ROOT_DIR == 'D:/my-backup'
+        assert am_env.am.STATUS_INDICATOR_SIZE == 20
+        assert am_env.fst.config_manager.file_name == 'a=b=c'
+
+    def test_non_dash_starting_names_are_not_rewritten(self, am_env, caplog):
+        # ruling A scope: normalization applies to '-'-prefixed names only -
+        # the validator twin REJECTS '.nomenu'/'xlog=debug' (must start with
+        # '-'), the parser must not rewrite them into valid args (U361 review P1)
+        am_env.am.apply_start_arguments(['.nomenu', 'xlog=debug'])
+        assert am_env.am.MENU_ENABLED is True
+        assert 'unknown start argument' in caplog.text
+
+    def test_dashed_unknown_still_warns_with_original_spelling(self, am_env, caplog):
+        am_env.am.apply_start_arguments(['-not-an-arg'])
+        assert 'unknown start argument' in caplog.text
+        assert '-not-an-arg' in caplog.text
+
+    def test_dashed_spellings_are_normalized_not_dash_stripped(self, am_env, caplog):
+        # '-focus-app' normalizes to '-focus_app'; the canonical name is
+        # '-focusapp' (no underscore) - so it stays an unknown argument:
+        # normalization is dash->underscore on NAME matching, never dash removal
+        am_env.am.apply_start_arguments(['-focus-app=cs2'])
+        assert 'unknown start argument' in caplog.text

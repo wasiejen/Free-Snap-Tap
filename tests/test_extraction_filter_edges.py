@@ -1,9 +1,10 @@
 """Task-11 remainder: convert_to_vk_code numeric/invalid branches,
 extract_data_from_key bare-int delay and '!' modifier, config exception
 paths (alias/tap-group/rebind) and the remaining _win32_event_filter
-branches (rebind dict KeyError, unfulfilled replacement constraint, empty
-macro, EXEC_ONLY_ONE_TRIGGERED_MACRO, tap-loop edge breaks, mouse-rebind
-scheduling error).
+branches (unfulfilled replacement constraint, empty macro,
+EXEC_ONLY_ONE_TRIGGERED_MACRO, tap-loop edge breaks, mouse-rebind
+scheduling error; the old rebind-dict KeyError branch was retired by F-B1's
+build-time trigger index - see TestFilterEdges).
 Real FST_Keyboard with mocked pynput controllers - no live input.
 """
 import asyncio
@@ -13,10 +14,10 @@ from unittest.mock import MagicMock
 import pytest
 from pynput import keyboard as pynput_keyboard
 
-from fst_data_types import Key_Event, Key_Group, Macro, ConfigError
+from fst_data_types import ConfigError
 from fst_keyboard import FST_Keyboard
 
-from kb_helpers import build, down
+from kb_helpers import build, down, hold_keys
 
 VK_A = 0x41
 VK_B = 0x42
@@ -56,6 +57,17 @@ class TestKeyExtraction:
         build(kb, rebinds=[['(r)', [['a'], 'e']]])
         assert len(kb._rebinds_dict) == 2
 
+    def test_suffix_constraint_needs_parentheses(self, kb_env_ns):
+        # U90 docs-vs-runtime pin (#270): extract_data_from_key int()s every
+        # bare suffix segment - the documented constraint form is parenthesized
+        # and stored as a string constraint, a bare state segment raises.
+        kb = kb_env_ns.kb
+        build(kb, rebinds=[['(r)', [['-a|(-shift)'], 'b']]])
+        trigger_ke = kb._rebind_triggers[0].get_key_events()[0]
+        assert trigger_ke.constraints == ['-shift']
+        with pytest.raises(Exception, match='invalid literal'):
+            build(kb, rebinds=[['(r)', [['-a|-shift'], 'b']]])
+
 
 class TestConfigExceptionPaths:
     def test_alias_referencing_unknown_alias_raises(self, kb_env_ns):
@@ -75,13 +87,14 @@ class TestConfigExceptionPaths:
 
 
 class TestFilterEdges:
-    def test_rebind_trigger_missing_from_dict_is_swallowed(self, kb_env_ns):
-        kb = kb_env_ns.kb
-        build(kb, rebinds=[['(r)', [['a'], 'b']]])
-        del kb._rebinds_dict[kb._rebind_triggers[0]]
-        down(kb, VK_A, 1000)
-        assert kb_env_ns.kb_mock.press.call_count == 0
-        assert kb._listener.suppress_event.call_count == 0
+    # F-B1 retired test_rebind_trigger_missing_from_dict_is_swallowed: the
+    # filter's per-event dict get (and its swallow-with-warning branch) is
+    # gone - the trigger index pairs (trigger_group, payload) once at build
+    # time from one state, so a trigger present in the scan without a dict
+    # payload is structurally unreachable. The paired positive legs (firing
+    # pins in test_filter_behavior.py / test_identity_priority_pins.py)
+    # cover the surviving path.
+    pass
 
     def test_replacement_constraint_not_fulfilled_suppresses(self, kb_env_ns):
         kb = kb_env_ns.kb
@@ -106,16 +119,14 @@ class TestFilterEdges:
         played = []
         monkeypatch.setattr(FST_Keyboard, 'start_macro_playback',
                             lambda self, alias, seq: played.append(alias))
-        build(kb)
-        g1 = Key_Group([Key_Event(VK_A, True)])
-        g2 = Key_Group([Key_Event(VK_A, True), Key_Event(VK_B, True)])
-        m1 = Macro(g1, [Key_Group([Key_Event(VK_B, True)])])
-        m2 = Macro(g2, [Key_Group([Key_Event(VK_B, True)])])
-        m1.alias, m2.alias = 'm1', 'm2'
-        kb._macro_triggers.extend([g1, g2])
-        kb._macros_dict[g1] = m1
-        kb._macros_dict[g2] = m2
-        kb.state_manager.set_real_key_press_state(VK_B, True)  # hold b
+        # F-B1: driven through the config builder - the filter scans the
+        # build-time trigger index, and hand-injected containers would not
+        # be seen (this replaced the old manual _macro_triggers/_macros_dict
+        # surgery). A plain trigger and an 'a while b held' trigger both
+        # match this event.
+        build(kb, macros=[['(m1)', [['a'], ['b']]],
+                          ['(m2)', [['a', '-b'], ['c']]]])
+        hold_keys(kb, VK_B)  # hold b so m2's second key is fulfilled
         down(kb, VK_A, 1000)
         # both triggers fire on this event, the flag stops playback after the first
         assert played == ['m1']
@@ -126,20 +137,16 @@ class TestFilterEdges:
         played = []
         monkeypatch.setattr(FST_Keyboard, 'start_macro_playback',
                             lambda self, alias, seq: played.append(alias))
-        build(kb)
-        g1 = Key_Group([Key_Event(VK_A, True)])
-        g2 = Key_Group([Key_Event(VK_A, True), Key_Event(VK_B, True)])
-        m1 = Macro(g1, [Key_Group([Key_Event(VK_B, True)])])
-        m2 = Macro(g2, [Key_Group([Key_Event(VK_B, True)])])
-        m1.alias, m2.alias = 'm1', 'm2'
-        kb._macro_triggers.extend([g1, g2])
-        kb._macros_dict[g1] = m1
-        kb._macros_dict[g2] = m2
-        kb.state_manager.set_real_key_press_state(VK_B, True)  # hold b
+        # F-B1: builder route, see the sibling test above
+        build(kb, macros=[['(m1)', [['a'], ['b']]],
+                          ['(m2)', [['a', '-b'], ['c']]]])
+        hold_keys(kb, VK_B)
         down(kb, VK_A, 1000)
         assert played == ['m1', 'm2']
 
     def test_rebind_into_tap_group_resets_key_replaced(self, kb_env_ns):
+        # event-stream idealization (U301 reversal): tap-group states are fed
+        # by the event stream only, the harness OS has no say here
         kb = kb_env_ns.kb
         build(kb, taps=[['(TAP_1)', ['b', 'c']]],
               rebinds=[['(r)', [['-a'], '-b']]])
@@ -151,6 +158,8 @@ class TestFilterEdges:
         assert kb._listener.suppress_event.call_count == 1
 
     def test_repeated_active_tap_trigger_breaks_without_resend(self, kb_env_ns, monkeypatch):
+        # the active-key resend break (260428) is event-stream semantics:
+        # tap-group states are fed by the event stream only (U301 reversal)
         kb = kb_env_ns.kb
         played = []
         monkeypatch.setattr(FST_Keyboard, 'start_macro_playback',

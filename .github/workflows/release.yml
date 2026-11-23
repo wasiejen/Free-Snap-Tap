@@ -1,0 +1,67 @@
+name: Release build
+
+# Packaging unit F-B3 (estate plan 2026-11-15 / review Item 12 / ruling D2):
+# a v* tag builds the Windows exe and uploads it as a build artifact.
+# Build-only - no test re-run: the push/pull_request job in ci.yml already
+# runs the suite on the same commit.
+#
+# Nuitka is the PRIMARY build path (ruling D2) but its full PySide6
+# standalone + LTO + onefile compile is far too heavy for CI runner time,
+# so the Nuitka build stays documented-local (README, built_nuitka.bat) and
+# this job verifies the simpler PyInstaller backup path instead.
+#
+# The workflow never creates or pushes a tag - tagging stays the
+# maintainer's action. workflow_dispatch exists to smoke-test this job
+# without minting a real tag (the exe then gets the branch name in its file
+# name). The trigger shape, the build-only nature and the python pin are
+# pinned by tests/test_ci_packaging_floor.py; other steps are not pinned.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    # Windows-only project (pynput selective suppression, msvcrt) - the
+    # runner MUST be Windows, same reasoning as the test job in ci.yml.
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Runtime deps MUST be installed too: built_pyinstaller.bat builds in
+      # the fully-populated local .venv (runtime + build), and PyInstaller
+      # exits 0 with warnings when the app's imports are missing - a
+      # build-requirements-only venv would upload a non-runnable exe.
+      - name: Install runtime and build requirements
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-build.txt
+
+      # Same command shape as built_pyinstaller.bat; --exclude-module is the
+      # canonical flag (the bat's "--exclude" works only via argparse
+      # prefix-matching), --noconfirm keeps the build non-interactive on CI.
+      # The repo .spec is gitignored, so CI builds from the CLI flags like
+      # the bat does.
+      - name: Build the executable with PyInstaller
+        run: >
+          pyinstaller --noconfirm --onefile --windowed
+          --exclude-module=PyQt5 --icon=./icons/keyboard.ico free_snap_tap.py
+
+      # Paths quoted: github.ref_name is interpolated into this script, so
+      # quotes keep shell metacharacters in a tag name inert.
+      - name: Name the executable for the tag
+        shell: bash
+        run: |
+          cp "dist/free_snap_tap.exe" "dist/free_snap_tap_${{ github.ref_name }}_win64.exe"
+
+      - name: Upload the executable as a build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: free_snap_tap_win64
+          path: dist/free_snap_tap_${{ github.ref_name }}_win64.exe

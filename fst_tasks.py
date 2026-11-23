@@ -4,10 +4,16 @@ last updated: 241105-2004
 '''
 
 import asyncio
+import queue
+import threading
 import pygetwindow as gw
-import re #regular expression
+# F-C2 (review Item 4): re/FOCUS_NAME_ILLEGAL left this file with the focus
+# sanitizer - the window title now goes through the parser's
+# sanitize_focus_text, the ONE rule the config side uses too (#399)
 
 import logging
+
+from fst_config_parser import sanitize_focus_text
 # the macro-area logger of the FST logger tree (same cached instance as
 # fst_manager's logger_macro - no circular import, fst_manager imports us)
 logger_macro = logging.getLogger('fst.macro')
@@ -28,7 +34,6 @@ class Macro_Repeat_Task:
 
     async def run(self):
         logger_macro.debug(f"Macro_Repeat_Task started for {self.alias_name} with repeat time {self.repeat_time} ms")
-        print(f"START REPEAT: {self.alias_name} with interval of {self.repeat_time} ms")
 
         while not self.stop_event.is_set():
             if self.with_overlay:
@@ -40,7 +45,7 @@ class Macro_Repeat_Task:
             except asyncio.TimeoutError:
                 pass
             if self.reset_event.is_set():
-                print(f"Resetting repeat task for {self.alias_name}")
+                logger_macro.debug(f"Resetting repeat task for {self.alias_name}")
                 self.reset_event.clear()
 
     def cancel_playback(self):
@@ -55,6 +60,110 @@ class Macro_Repeat_Task:
         self.reset_event.set()
         self._handle.cancel()
 
+# F-B5 (reviewer P2-2): a persistent query failure repeats at the 4 Hz poll
+# rate, so only the FIRST failure of a streak logs a WARNING (the rest stay
+# debug); the next successful query re-arms the warning.
+_query_streak_warned = False
+
+
+_QUERY_WORKER = None
+_QUERY_JOB = None
+
+
+def _ensure_query_worker(loop):
+    '''One persistent DAEMON worker for the active-window read (MACROBURST).
+
+    `loop.run_in_executor(None, ...)` was the obvious shape and is what the
+    first draft used, but on this Python the default executor's workers are
+    NON-daemon and joined at interpreter exit - so a `GetWindowTextW` that
+    never returns would now hold FST's exit, a worse failure than the timing
+    hole it fixes. The thread this replaces was a daemon (free_snap_tap.py), so
+    daemon behaviour is what the product has always had: at exit, a stuck read
+    is dropped, not waited for.
+    '''
+    global _QUERY_WORKER, _QUERY_JOB
+    if _QUERY_WORKER is not None and _QUERY_WORKER.is_alive():
+        return _QUERY_JOB
+    job = queue.SimpleQueue()
+
+    def worker():
+        while True:
+            stale, fut, fut_loop = job.get()
+            try:
+                result = _get_active_window_title(stale)
+            except BaseException as error:      # a worker must never die
+                fut_loop.call_soon_threadsafe(_set_future_exception, fut, error)
+            else:
+                fut_loop.call_soon_threadsafe(_set_future_result, fut, result)
+
+    _QUERY_JOB = job
+    _QUERY_WORKER = threading.Thread(target=worker, name='FST-focus-query',
+                                     daemon=True)
+    _QUERY_WORKER.start()
+    return _QUERY_JOB
+
+
+def _set_future_result(fut, result):
+    if not fut.done():          # the poll may have been cancelled meanwhile
+        fut.set_result(result)
+
+
+def _set_future_exception(fut, error):
+    if not fut.done():
+        fut.set_exception(error)
+
+
+async def _query_active_window_off_thread(stale_title):
+    '''The active-window read, performed on the daemon worker above, awaited as
+    a future on the caller's loop. One query in flight at a time (the poll
+    awaits each before starting the next).'''
+    loop = asyncio.get_running_loop()
+    job = _ensure_query_worker(loop)
+    fut = loop.create_future()
+    job.put((stale_title, fut, loop))
+    return await fut
+
+
+def _get_active_window_title(stale_title):
+    '''Timeout-tolerant active-window query (F-B5, review Item 14).
+
+    Single production call site: Focus_Task.run below. Failure-mode map:
+    - query OK -> the title string (normal path, behavior unchanged).
+    - no foreground window (GetForegroundWindow() == 0 -> getActiveWindow()
+      returns None -> AttributeError on .title): return the "None" sentinel,
+      exactly the pre-F-B5 except-AttributeError branch.
+    - any OTHER raising failure (pygetwindow.PyGetWindowException, ctypes
+      OSError, ...): return stale_title, or the "None" sentinel while no
+      successful poll happened yet. Pre-F-B5 these exceptions escaped the
+      loop and killed the focus task - tracking then stayed dead until the
+      task was restarted manually. An EMPTY last-known title (UIPI-blocked
+      titles read as empty) degrades to the same sentinel - the poll loop
+      cannot tell it apart from "no successful poll yet".
+    NOT covered: a hung window-owning thread blocks the win32 read itself
+    (no timeout variant in this API set) - see the POLL CONTRACT in run().
+    Since MACROBURST the CALLER awaits this function in a worker thread, so
+    such a stall no longer stops the asyncio loop it is polled from.
+    '''
+    global _query_streak_warned
+    try:
+        title = gw.getActiveWindow().title
+    except AttributeError:
+        return "None"
+    except Exception as error:
+        if _query_streak_warned:
+            logger_macro.debug(
+                f"active-window query still failing, keeping last title "
+                f"'{stale_title or 'None'}': {error!r}")
+        else:
+            _query_streak_warned = True
+            logger_macro.warning(
+                f"active-window query failed, keeping last title "
+                f"'{stale_title or 'None'}': {error!r}")
+        return stale_title or "None"
+    _query_streak_warned = False
+    return title
+
+
 class Focus_Task:
     '''
     Async Task for observing the active window and pause toggle the evaluation of key events
@@ -67,6 +176,43 @@ class Focus_Task:
         self.FOCUS_THREAD_PAUSED = False
 
     async def run(self):
+        '''POLL CONTRACT (F-B5, review Item 14 - documented decision): the
+        0.25 s window poll is the design; an event-driven SetWinEventHook
+        migration was evaluated and rejected (thread/callback surface and a
+        new bug class for a gain under 250 ms).
+
+        Caller/frequency: Focus_Manager.start_focus_task (fst_manager.py)
+        starts this coroutine on MainLogic's asyncio loop thread
+        (free_snap_tap.py); each iteration runs ONE
+        _get_active_window_title() query, then asyncio.sleep(0.25)
+        (the focus-not-found leg adds one inner asyncio.sleep(0.2) before
+        flipping WIN32_FILTER_PAUSED).
+        Macro and toast scheduling share this loop thread. The query itself
+        therefore runs in a worker thread (MACROBURST, maintainer bug report
+        2026-11-21): a slow foreground app must not freeze the timeline that
+        shares this loop. Measured effect of a shared thread (41addc0): the read
+        punches ONE hole of its own length into a running macro (a 500 ms read
+        left a 531 ms gap between two injections; a 1200 ms read, 1250 ms) and
+        the sequence then continues spaced - a stalled read CANNOT re-batch a
+        single macro, because that macro has only one timer pending at a time.
+        The reported "everything at once" shape is a different cause (the small
+        default delay pair; see the MACROBURST block in the improvement plan).
+        The poll still runs ONE query at a time (the await is sequential), so
+        the cadence and the focus-detection latency are unchanged. The GUI-side
+        500 ms timer (fst_overlay.py perform_periodic_update) only re-reads
+        in-process flags and queries no windows.
+
+        Slow/unresponsive foreground apps: the title read sends a message to
+        the window's owning thread (GetWindowTextW behind pygetwindow), so a
+        hung app STALLS the query and UIPI-blocked titles read as empty;
+        this API set (GetForegroundWindow + GetWindowTextW) has no timeout
+        variant and a watchdog thread is rejected. What changed (MACROBURST):
+        the read is awaited off this thread, so a stall delays FOCUS DETECTION
+        only - it no longer delays the macro timeline that shares the loop.
+        _get_active_window_title bounds the RAISING failures (stale-title
+        fallback); it still cannot time-bound a true win32 stall.
+        WIKI: "[Focus polling contract - designed behavior (Item 14)]".
+        '''
         last_active_window = ''
         found_valid_focus_name = False
         manually_paused = False
@@ -75,16 +221,31 @@ class Focus_Task:
         old_focus_name = "None"
         focus_name_changed = False
         while not self._stop:
-            try:
-                active_window = gw.getActiveWindow().title
-            except AttributeError:
-                active_window = "None"
+            # MACROBURST (maintainer bug report 2026-11-21): the read is awaited
+            # off this coroutine's own thread. GetWindowTextW messages the
+            # FOREGROUND app's owning thread, so a busy window stalls the read -
+            # and while this coroutine held the loop thread for it, a macro
+            # playing on the same loop froze for that duration (measured: a
+            # 500 ms read left a 531 ms hole mid-sequence). The hop below keeps
+            # the loop free for the macro and toast lanes; the poll still runs
+            # ONE query at a time and the failure map is unchanged.
+            # It is NOT the only blocking call this thread can make: the
+            # injections themselves call SendInput here, and pump_lane runs
+            # file-I/O legs with sleep retries. What this hop removes is the one
+            # call whose duration is decided by SOME OTHER PROGRAM's responsiveness.
+            active_window = await _query_active_window_off_thread(
+                last_active_window)
             # when windows name changed
             if active_window != last_active_window or manually_paused:
                 if active_window != last_active_window:
                     last_active_window = active_window
-                # #only allow letters, numbers and spaces in active window name
-                active_window = re.sub(r'[^a-zA-Z0-9_. ]', '', active_window)
+                # sanitize the window title with the SAME rule the config side
+                # uses (fst_config_parser.sanitize_focus_text -> FST's
+                # FOCUS_NAME_ILLEGAL, #399): matching is
+                # cleaned_title.find(config_name), so a different pattern here
+                # silently disables every focus group whose name keeps a legal
+                # char this strip would remove
+                active_window = sanitize_focus_text(active_window)
                 # if not one of my own spawned windows
                 if active_window not in ["FST Status Indicator", "FST Crosshair", "FST_Overlay"]:
                     if not self.FOCUS_THREAD_PAUSED and not self._fst.arg_manager.MANUAL_PAUSED:
@@ -106,13 +267,28 @@ class Focus_Task:
                         if found_valid_focus_name and focus_name_changed:
                             try:
                                 default_active = False
-                                self._fst.update_args_and_groups(focus_name)
+                                self._fst.update_args_and_groups(focus_name, startup=False)
                                 self._fst.cli_menu.update_group_display()
                                 self._fst.cli_menu.display_focus_found(active_window)
                                 self._fst.arg_manager.WIN32_FILTER_PAUSED = False
                             except Exception as error:
                                 print('--- reloading of groups files failed - not resumed, still paused ---')
                                 print(f" -> aborted reloading due to: {error}")
+                            else:
+                                # activation toast names the group (U290T); OUT of
+                                # the reload handler (U290R): a toast failure is not
+                                # a group-reload failure - report it as its own cause.
+                                # U330 ask 3: a SILENT focus group (-no_warnings)
+                                # is skipped - its warnings are suppressed, so
+                                # there is nothing for the toast to show. The silent
+                                # guard rides the SAME handler (U330 reviewer P2):
+                                # a guard raise names a toast failure, never kills
+                                # the focus poll loop
+                                try:
+                                    if not self._fst.is_silent_focus_group(focus_name):
+                                        self._fst.toast_group_activated(focus_name)
+                                except Exception as error:
+                                    print(f" -> focus activation toast failed: {error}")
                         elif found_valid_focus_name and not focus_name_changed:
                             pass
                         # if not found a focus group set input filter to paused
@@ -121,16 +297,28 @@ class Focus_Task:
                             if self._fst.arg_manager.ALWAYS_ACTIVE:
                                 if not default_active:
                                     default_active = True
-                                    self._fst.update_args_and_groups()
+                                    self._fst.update_args_and_groups(startup=False)  # U330 ask 4: scoped report leg
                                     self._fst.cli_menu.update_group_display()
                                     self._fst.cli_menu.display_default_active()
                                     self._fst.arg_manager.WIN32_FILTER_PAUSED = False
+                                    # default groups activated (U290T); a toast
+                                    # failure must not kill the focus poll loop
+                                    # (U290R, same defect class as the focus branch)
+                                    # U330 ask 3: a SILENT default scope
+                                    # (-no_warnings in the default section) skips
+                                    # the activation toast; the silent guard rides
+                                    # the same handler (U330 reviewer P2)
+                                    try:
+                                        if not self._fst.is_silent_focus_group(''):
+                                            self._fst.toast_group_activated('default groups')
+                                    except Exception as error:
+                                        print(f" -> focus activation toast failed: {error}")
                             else:
                                 if self._fst.arg_manager.WIN32_FILTER_PAUSED:
                                     print(f"> Active Window: {active_window}")
                                     pass
                                 else:
-                                    self._fst.update_args_and_groups()
+                                    self._fst.update_args_and_groups(startup=False)  # U330 ask 4: scoped report leg
                                     self._fst.cli_menu.update_group_display()
                                     self._fst.cli_menu.display_focus_not_found()
                                     ###XXX give chance to the controller to release the pressed keys

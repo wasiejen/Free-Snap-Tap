@@ -9,15 +9,37 @@ from os import system, startfile # to use clearing of CLI for better menu usage 
 import sys # to get start arguments
 import msvcrt # to flush input stream
 from random import randint # randint(3, 9))
-from time import time # sleep(0.005) = 5 ms
-from fst_data_types import Key_Event, type_check, ConfigError
+from time import time, monotonic # sleep(0.005) = 5 ms; monotonic = F-B4 age anchor
+from fst_data_types import (Key_Event, type_check, ConfigError,
+                            FOCUS_NAME_ILLEGAL, Lifecycle_State,
+                            SOURCE_DRAIN, SOURCE_TAP, SOURCE_TOGGLE,
+                            TICKET_COMPLETED, TICKET_STATES)
 from fst_tasks import Focus_Task, Macro_Repeat_Task
+# F-C2 (review Item 4): the config line grammar lives in ONE module; this file
+# is a CONSUMER (validator rules + runtime containers), never a second parser
+from fst_config_parser import (split_key_group, clean_comment_lines,
+                               combine_multiline_continuations,
+                               clean_focus_header, focus_scope_of,
+                               normalize_start_arg_name, parse_int_list,
+                               classify_groups, LineNamer,
+                               arg_value, prefix_matches, split_item_prefix,
+                               START_ARG_FLAGS, START_ARG_VALUES,
+                               KIND_TAP, KIND_REBIND, KIND_MACRO, KIND_SEQUENCE,
+                               DELAY_RANGE, RUNTIME_DELAY_RANGE,
+                               is_elevation_config_arg, SEGMENT_DELAY_WARN_MS)
 import datetime
 import re #regular expression
+import ast # structural constraint check (Config_Validator)
+from collections import namedtuple
+from vk_codes import vk_codes_dict
 from fst_save_file_handler import make_backup as mb, restore_backup as rb
 import pyperclip # to copy mouse position to clipboard for easier pasting
 import asyncio
 import copy
+import os # --elevate lane: basename of sys.executable (dev-mode detection)
+import threading # F-B4: the status dump names the thread that wrote it
+import ctypes # --elevate lane: shell32 IsUserAnAdmin + ShellExecuteW runas
+import subprocess # --elevate lane: list2cmdline argv quoting for lpParameters
 
 import logging
 # FST area-logger tree (design 2026-10-01_fst-logging-design.md §3):
@@ -27,15 +49,28 @@ import logging
 #   fst.state     key-state dicts, press/release tracking, timings
 #   fst.macro     macro/repeat task lifecycle
 #   fst.config    start-arg parsing, config load
+#   fst.drop      named event-drop records (U345 H1 drop-watch lane)
 logger = logging.getLogger('fst')
 logger_flow = logging.getLogger('fst.flow')
 logger_eval = logging.getLogger('fst.eval')
 logger_state = logging.getLogger('fst.state')
 logger_macro = logging.getLogger('fst.macro')
 logger_config = logging.getLogger('fst.config')
+logger_drop = logging.getLogger('fst.drop')
 
 MAIN_LOG_FILE = 'fst.log'
 FLOW_LOG_FILE = 'fst_flow.log'
+# drop-watch lane (U345 H1): named release-event drop records land in
+# the dedicated append-only file while the watch is on (records ride
+# fst.log + console at WARNING+ via propagation, like the flow channel)
+DROP_LOG_FILE = 'fst_drop.log'
+# bounded raw-event ring (U345 H1): filter entries append a raw tuple
+# (no format, no I/O); flush writes only when a drop happens (rare)
+DROP_RING_MAXLEN = 200
+# F-B4 (review Item 13): THE bug-report artifact - one-shot status dump,
+# same directory convention as the other FST files (CWD-relative, like the
+# log files above); overwritten atomically at startup and at every reload
+STATUS_FILE = 'fst_status.log'
 
 # -log=LEVEL start argument values -> logging levels
 LOG_LEVELS = {'debug': logging.DEBUG, 'info': logging.INFO,
@@ -44,6 +79,91 @@ LOG_LEVELS = {'debug': logging.DEBUG, 'info': logging.INFO,
 # area loggers covered by the root debug level (-log=LEVEL, alt+num1/2/3);
 # fst.flow is on its own channel (-flow / alt+num4 / menu option 0)
 AREA_LOGGER_NAMES = ('fst', 'fst.eval', 'fst.state', 'fst.macro', 'fst.config')
+
+
+# ---------------------------------------------------------------------------
+# 15CLOCK wall-clock seam (maintainer decision 15=a, 2026-11-17: product-side
+# injectable clock). Every wall-clock read whose value can reach a constraint
+# evaluation leg goes through the two module-level providers below:
+#   - Output_Manager.constraint_evaluation (this file): last()/get_time() in
+#     ms, date()/date_time() as a datetime;
+#   - the one-time TIME_DIFF domain calibration of the first hook event
+#     (fst_keyboard.py): it maps the wall-clock axis onto the win32
+#     event-time axis last() measures, so a last()-driven stream is
+#     deterministic only when both reads share one clock.
+# The production defaults ARE the pre-seam reads, byte for byte
+# (int(time() * 1000) / datetime.datetime.now() on the module globals the
+# unit layer's freezegun pins already freeze); production code never rebinds
+# them. Tests pin and restore them with set_clock_for_tests() /
+# reset_clock_for_tests() - the contract lane's set_clock drives both
+# (tests/contract_lane.py). Call sites read the providers through a direct
+# module/global lookup: one function call, no wrapper object, no per-read
+# hop beyond the closure call the pre-seam code already performed.
+# ---------------------------------------------------------------------------
+def _real_wall_ms():
+    return int(time() * 1000)
+
+
+def _real_wall_datetime():
+    return datetime.datetime.now()
+
+
+_wall_ms = _real_wall_ms
+_wall_datetime = _real_wall_datetime
+
+
+def _refuse_outside_tests(name):
+    '''15CLOCK guard (reviewer P1): a user config CAN reach a module global
+    through the bare eval() of a constraint (a pre-existing property of the
+    constraint sandbox), so the two seam setters below refuse to run outside
+    a test process instead of reprogramming the product clock for good. They
+    FAIL CLOSED (return True = refused, the setter does nothing, the
+    constraint gets False) rather than raise: a raising leg dies inside the
+    pump and the keystroke passes UNFILTERED (the U345/U365 dropped-stuck
+    class) - a wrong-but-safe constraint verdict is the lesser evil.'''
+    if 'pytest' in sys.modules:
+        return False
+    logger_config.warning('15CLOCK: %s is a test seam - refused outside a '
+                          'test process, the product wall clock stays real',
+                          name)
+    return True
+
+
+def set_clock_for_tests(ms):
+    '''Test seam (15CLOCK, decision 15=a): pin the two providers above to the
+    instant `ms` (int ms since the epoch - the same axis the win32 event
+    times live on). The datetime provider is derived from `ms` in local time,
+    so date()/date_time() answer the pinned instant too. NEVER call from
+    production: no product lane does, the product always runs on the
+    real-time defaults, and a config that reaches this name through eval()
+    gets the _refuse_outside_tests guard (refused, constraint fails).'''
+    global _wall_ms, _wall_datetime
+    if _refuse_outside_tests('set_clock_for_tests'):
+        return False
+    pinned_ms = int(ms)
+    pinned_dt = datetime.datetime.fromtimestamp(pinned_ms / 1000)
+
+    def _pinned_ms():
+        return pinned_ms
+
+    def _pinned_datetime():
+        return pinned_dt
+
+    _wall_ms = _pinned_ms
+    _wall_datetime = _pinned_datetime
+    return True
+
+
+def reset_clock_for_tests():
+    '''Test seam (15CLOCK): restore the real-time defaults (idempotent; the
+    contract lane calls it per run so a pinned clock never leaks). Same
+    guard as set_clock_for_tests.'''
+    global _wall_ms, _wall_datetime
+    if _refuse_outside_tests('reset_clock_for_tests'):
+        return False
+    _wall_ms = _real_wall_ms
+    _wall_datetime = _real_wall_datetime
+    return True
 
 
 def setup_fst_logging():
@@ -103,6 +223,46 @@ def toggle_flow():
     set_flow_enabled(not is_flow_enabled())
 
 
+def is_drop_watch_enabled():
+    '''Drop-watch lane state (U345 H1): the ring at the filter entries is
+    always recording (cheap raw tuples); this flag gates the dedicated
+    fst_drop.log handler and the ring tail appended to drop lines.'''
+    return CONSTANTS.DROP_WATCH
+
+
+def set_drop_watch_enabled(enabled):
+    '''Enable/disable the drop-watch lane (U345 H1): ON -> dedicated
+    append-only fst_drop.log handler on the fst.drop logger (records
+    propagate to fst.log + console at WARNING+, like the flow channel);
+    OFF -> handler removed. Idempotent on focus-change re-applies
+    (apply_start_arguments re-runs).'''
+    drop = logging.getLogger('fst.drop')
+    if enabled:
+        if is_drop_watch_enabled() and drop.handlers:
+            return  # already on
+        drop.setLevel(logging.DEBUG)
+        drop.propagate = True
+        drop_handler = logging.FileHandler(DROP_LOG_FILE, mode='a')
+        drop_handler.setFormatter(logging.Formatter(
+            '%(asctime)s %(levelname)s %(message)s'))
+        drop.addHandler(drop_handler)
+        CONSTANTS.DROP_WATCH = True
+    else:
+        for handler in drop.handlers[:]:
+            drop.removeHandler(handler)
+            handler.close()
+        # INFO level kept (unlike the flow channel's WARNING-off): the
+        # stop-summary INFO line must reach fst.log even after an ON->OFF
+        # cycle - the cumulative drop counter is the point of the hunt
+        drop.setLevel(logging.INFO)
+        drop.propagate = True
+        CONSTANTS.DROP_WATCH = False
+
+
+def toggle_drop_watch():
+    set_drop_watch_enabled(not is_drop_watch_enabled())
+
+
 def toggle_debug_level():
     '''Toggle the root debug level between DEBUG and INFO (alt+num1/2/3).'''
     current = logging.getLogger('fst').level
@@ -115,11 +275,94 @@ def is_any_debug_active():
                for name in AREA_LOGGER_NAMES + ('fst.flow',))
 
 
+# ---------------------------------------------------------------------------
+# boot config path (#461, maintainer report 2026-11-23): the default config
+# name 'FSTconfig.txt' was opened bare, so open() resolved it against the
+# process CWD - a boot route without a working folder (startup shortcut ->
+# CWD C:\Windows\System32) missed the user's config and FST started
+# deactivated, and the missing-file recovery could even write an empty config
+# into the foreign directory. The default now anchors to the app directory,
+# never the CWD. The '-file' override does NOT pass through here: its string
+# enters the config manager exactly as given (unchanged override semantics).
+# ---------------------------------------------------------------------------
+
+DEFAULT_CONFIG_FILE_NAME = 'FSTconfig.txt'
+
+
+def get_app_directory():
+    '''The directory of the REAL executable/script - never the CWD.
+
+    PyInstaller-frozen safe: sys.frozen + sys.executable = the exe.
+    Nuitka-onefile safe: the bootstrap exports NUITKA_ONEFILE_DIRECTORY (the
+    directory of the ORIGINAL onefile exe - nuitka/build/static_src/
+    OnefileBootstrap.c, installed 4.2.2) before the extracted child starts,
+    so the anchor stays next to the exe even though __file__ points into the
+    temp-extract dir; the NUITKA_ONEFILE_BINARY spelling (full exe path) is
+    honoured as a harmless twin (branch pinned, its history not asserted).
+    Dev runs and
+    Nuitka-standalone resolve through this module's own __file__ (the repo/
+    dist root - deterministic under pytest too, where __main__ is pytest);
+    no argv[0] belt - a bare argv[0] would re-open the CWD hole.'''
+    if getattr(sys, 'frozen', False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    onefile_directory = os.environ.get('NUITKA_ONEFILE_DIRECTORY')
+    if onefile_directory:
+        return os.path.abspath(onefile_directory)
+    onefile_binary = os.environ.get('NUITKA_ONEFILE_BINARY')
+    if onefile_binary:
+        return os.path.dirname(os.path.abspath(onefile_binary))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def default_config_path(file_name=DEFAULT_CONFIG_FILE_NAME):
+    '''Absolute default config path: the bare config name next to
+    get_app_directory(). free_snap_tap.py sets CONSTANTS.FILE_NAME through
+    this, and the maintainer's comment-switch line passes the alternate
+    name through the same anchor.'''
+    return os.path.join(get_app_directory(), file_name)
+
+
+def startup_decision_trace(config_manager, cmd_window_hidden):
+    '''The #460 startup decision line - ONE INFO string for fst.log AND the
+    console echo, naming the resolved config path (abs), whether the config
+    was PRESENT when the loader opened it, and the FINAL console decision.
+
+    exists= comes from config_file_found (the load decision), NOT an
+    isfile() of the trace moment: a missing config has already been
+    auto-created by create_new_group_file when this runs, and 'exists=False'
+    is the honest signal that the user's config was NOT found (the #461
+    symptom). cmd_window= reads arg_manager.CMD_WINDOW_HIDDEN after the
+    whole start-arg pipeline, so it reports the merged truth: the flag can
+    arrive from BOTH the command line and the config <arg> lines (the
+    2026-11-23 confusion: a launcher bat passed it as an argv argument while
+    the config line sat commented out).'''
+    return (f"config_file={os.path.abspath(config_manager.file_name)} "
+            f"exists={bool(config_manager.config_file_found)} "
+            f"cmd_window={'hidden' if cmd_window_hidden else 'visible'}")
+
+
 class CONSTANTS():
 
     # safety gate: only run the numpad debug-combination checks when enabled
     # (so alt+num* is not swallowed while gaming)
     DEBUG_NUMPAD = False
+
+    # U345 H2: toast bridge calls ride the offload queue + asyncio pump task
+    # (the hook-pump leg becomes one deque append; the bridge emit never runs
+    # on a poster thread). -no_toast_offload restores the direct emit path
+    # (A/B switch for the maintainer's gaming test).
+    TOAST_OFFLOAD = True
+
+    # U345 H1 drop-watch: gates the dedicated fst_drop.log flush + ring tail
+    # on drop lines (-drop_watch start arg / alt+num6 numpad toggle); the
+    # ring recording itself is always on (raw tuples, no format, no I/O).
+    DROP_WATCH = False
+
+    # F-B4 (review Item 13): the ticket-aging warning threshold of the status
+    # dump's LEDGER section (design report TOP-3 risk 3: a ticket open longer
+    # than this is debt worth naming). An open ticket older than this many ms
+    # gets a [StuckKeyWatch] line in the dump and in the log at WARNING.
+    STUCK_TICKET_MS = 5000
 
     # Define File name for saving of everything, can be any filetype
     # But .txt or .cfg recommended for easier editing
@@ -130,6 +373,14 @@ class CONSTANTS():
     EXIT_Combination = ["alt", "end"]
     TOGGLE_ON_OFF_Combination = ["alt", "delete"]
     MENU_Combination = ["alt", "page_down"]
+
+
+# 462 write-stamp sentinel (maintainer ruling 2026-11-23): "time_stamp
+# omitted" must stay DISTINCT from an explicit None - an explicit None
+# writes the string "None" into the line exactly as pre-462, only the
+# OMITTED default stamps the clock at write time. Module-level so the
+# nested file-leg defs in constraint_evaluation close over one identity.
+_STAMP_AT_WRITE = object()
 
 
 class Output_Manager():
@@ -239,8 +490,10 @@ class Output_Manager():
 
     def constraint_evaluation(self, constraint_to_evaluate, current_ke):
 
-        def time_in_millisec():
-            return int(time() * 1000)
+        # 15CLOCK: the wall reads below (last()/get_time() -> _wall_ms,
+        # date()/date_time() -> _wall_datetime) go through the module clock
+        # providers - production default is the pre-seam read itself
+        # (see the 15CLOCK seam block above the imports end)
 
         # first get vk_code and is_press
         def get_vk_code_and_press_from_keystring(key_string):
@@ -345,9 +598,9 @@ class Output_Manager():
             time_last_pressed, time_last_released, _, _ = time_list
             vk_code, is_press = get_vk_code_and_press_from_keystring(key_string)
             try:
-                logger_state.debug(f"{time_in_millisec() - self._fst.TIME_DIFF}")
+                logger_state.debug(f"{_wall_ms() - self._fst.TIME_DIFF}")
                 logger_state.debug(f"{time_last_pressed[vk_code]}")
-                current_time = time_in_millisec() - self._fst.TIME_DIFF
+                current_time = _wall_ms() - self._fst.TIME_DIFF
                 return current_time - time_last_pressed[vk_code] if is_press else current_time - time_last_released[vk_code]
             except KeyError:
                 return 0
@@ -447,14 +700,21 @@ class Output_Manager():
             return True
 
         def release_all_keys():
-            self._fst.release_all_currently_pressed_simulated_keys()
-            logger_eval.debug("-- Eval: released all keys")
-            return True
+            def _work():
+                self._fst.release_all_currently_pressed_simulated_keys('constraint_action')
+                logger_eval.debug("-- Eval: released all keys")
+                return True
+            # U364/#360: SendInput leg off the pump -> loop lane
+            return self.pump_lane(_work, 'release_all_keys')
 
         def type(key_string):
-            release_modifier()
-            self._keyboard_controller.type(key_string)
-            return True
+            def _work():
+                release_modifier()
+                self._keyboard_controller.type(key_string)
+                return True
+            # U364/#360: SendInput typing leg off the pump -> loop lane;
+            # the macro-playback caller is ON the loop lane and runs inline
+            return self.pump_lane(_work, 'type')
 
         def write(key_string):
             return type(key_string)
@@ -535,58 +795,85 @@ class Output_Manager():
             return True
 
         def date():
-            current_date = datetime.datetime.now().strftime("%y%m%d")
+            current_date = _wall_datetime().strftime("%y%m%d")
             return current_date
 
         def date_time():
-            current_date_time = datetime.datetime.now().strftime("%y%m%d-%H%M")
+            current_date_time = _wall_datetime().strftime("%y%m%d-%H%M")
             return current_date_time
 
         #get current time in ms since epoch
         def get_time():
-            current_time = int(time() * 1000)
+            current_time = _wall_ms()
             return current_time
 
         def release_modifier():
-            self._fst.state_manager.release_all_modifier_keys()
+            def _work():
+                self._fst.state_manager.release_all_modifier_keys()
+                return True
+            # U364/#360: SendInput leg off the pump -> loop lane; returns
+            # True on BOTH paths (was None inline - eval treated it as
+            # not-a-bool and logged a bogus "constraint is not valid"
+            # warning, reviewer P2-6)
+            return self.pump_lane(_work, 'release_modifier')
 
         def make_backup(save_dir=self._fst.arg_manager.SAVE_DIR, backup_root_dir=self._fst.arg_manager.BACKUP_ROOT_DIR):
-            backup_path, backup_name = mb(save_dir, backup_root_dir)
-            print(f"Made backup to {backup_path}")
-            show_message(f"Made backup to {backup_name}", d=5., ts=10, bgc="rgba(40, 150, 40, 200)")
-            logger.info(f"made backup to {backup_path}")
-            return True
+            def _work():
+                backup_path, backup_name = mb(save_dir, backup_root_dir)
+                print(f"Made backup to {backup_path}")
+                show_message(f"Made backup to {backup_name}", d=5., ts=10, bgc="rgba(40, 150, 40, 200)")
+                logger.info(f"made backup to {backup_path}")
+                return True
+            # U364/#360: file I/O leg off the pump -> loop lane
+            return self.pump_lane(_work, 'make_backup')
 
         def restore_backup(save_dir=self._fst.arg_manager.SAVE_DIR, backup_root_dir=self._fst.arg_manager.BACKUP_ROOT_DIR):
-            restored_path, restored_name = rb(save_dir, backup_root_dir)
-            print(f"Restored backup from {restored_path}")
-            show_message(f"Restored backup from {restored_name}", d=5., ts=10, bgc="rgba(150, 40, 40, 200)")
-            logger.info(f"restored backup from {restored_path}")
-            return True
+            def _work():
+                restored_path, restored_name = rb(save_dir, backup_root_dir)
+                print(f"Restored backup from {restored_path}")
+                show_message(f"Restored backup from {restored_name}", d=5., ts=10, bgc="rgba(150, 40, 40, 200)")
+                logger.info(f"restored backup from {restored_path}")
+                return True
+            # U364/#360: file I/O leg off the pump -> loop lane
+            return self.pump_lane(_work, 'restore_backup')
 
+        # U364/#360: the mouse-send legs below (scroll_*, mouse_move*) are
+        # SendInput legs -> pump_lane (loop lane off-pump, inline on-loop/legacy)
         def scroll_up(value):
-            self._mouse_controller.scroll(0, value)
-            return True
+            def _work():
+                self._mouse_controller.scroll(0, value)
+                return True
+            return self.pump_lane(_work, 'scroll_up')
 
         def scroll_down(value):
-            self._mouse_controller.scroll(0, -value)
-            return True
+            def _work():
+                self._mouse_controller.scroll(0, -value)
+                return True
+            return self.pump_lane(_work, 'scroll_down')
 
         def scroll_right(value):
-            self._mouse_controller.scroll(value, 0)
-            return True
+            def _work():
+                self._mouse_controller.scroll(value, 0)
+                return True
+            return self.pump_lane(_work, 'scroll_right')
 
         def scroll_left(value):
-            self._mouse_controller.scroll(-value, 0)
-            return True
+            def _work():
+                self._mouse_controller.scroll(-value, 0)
+                return True
+            return self.pump_lane(_work, 'scroll_left')
 
         def mouse_move_abs(dx, dy):
-            self._mouse_controller.position = (dx, dy)
-            return True
+            def _work():
+                self._mouse_controller.position = (dx, dy)
+                return True
+            return self.pump_lane(_work, 'mouse_move_abs')
 
         def mouse_move(dx, dy):
-            self._mouse_controller.move(dx, dy)
-            return True
+            def _work():
+                self._mouse_controller.move(dx, dy)
+                return True
+            return self.pump_lane(_work, 'mouse_move')
 
         def mouse_get_pos():
             position = self._mouse_controller.position
@@ -600,18 +887,25 @@ class Output_Manager():
             return True
 
         def mouse_move_to_var(key_string):
-            try:
-                position = self.variables[key_string]
-                if isinstance(position, tuple) and len(position) == 2:
-                    self._mouse_controller.position = position
-                    print(f'mouse moved to position {position} from variable {key_string}')
-                    return True
-                else:
-                    print(f'variable {key_string} does not contain a valid position')
+            def _work():
+                try:
+                    position = self.variables[key_string]
+                    if isinstance(position, tuple) and len(position) == 2:
+                        self._mouse_controller.position = position
+                        print(f'mouse moved to position {position} from variable {key_string}')
+                        return True
+                    else:
+                        print(f'variable {key_string} does not contain a valid position')
+                        return False
+                except KeyError:
+                    print(f'variable {key_string} not found')
                     return False
-            except KeyError:
-                print(f'variable {key_string} not found')
-                return False
+            # U364/#360: the position SET is a SendInput leg -> pump_lane
+            # (reviewer P1-1: the sibling of mouse_move/mouse_move_abs).
+            # On the lane path the caller gets True at SCHEDULE time (the
+            # outcome is not known to the pump - same semantics as every
+            # other action leg); the inline path keeps the old False returns.
+            return self.pump_lane(_work, 'mouse_move_to_var')
 
         # show_message(*text*, *duration in s*, *text_size in px*, *background_color*, *text_color*)
         def show_message(text, d=3., ts=12, bgc="rgba(40, 150, 40, 200)", tc="white"):
@@ -645,28 +939,49 @@ class Output_Manager():
                 return self.variables[key_string]
 
         def copy_to_clipboard(key_string):
-            pyperclip.copy(key_string)
-            show_message(f'"{key_string}" copied to clipboard')
-            return True
+            def _work():
+                pyperclip.copy(key_string)
+                show_message(f'"{key_string}" copied to clipboard')
+                return True
+            # U364/#360: clipboard write leg off the pump -> loop lane
+            return self.pump_lane(_work, 'copy_to_clipboard')
 
         def paste():
+            # sync data leg (U364/#360): the eval caller needs the pasted
+            # VALUE back, so this clipboard READ stays on the calling thread
+            # (no flow-log evidence of a paste stall; a value-passing lane
+            # would be a redesign - see handover_u364)
             pasted_text = pyperclip.paste()
             print(f'"{pasted_text}" pasted from clipboard')
             return pasted_text
 
-        def save_into_file(text, time_stamp=get_time(), mode='w', file_path='output.txt'):
-            with open(file_path, mode) as file:
-                file.write(f"{time_stamp}: {text}\n")
-            print(f'"{time_stamp}: {text}" saved into {file_path}')
-            return True
+        # 462 write-stamp (maintainer ruling 2026-11-23): time_stamp defaults
+        # to the _STAMP_AT_WRITE sentinel - an omitted stamp is taken at WRITE
+        # time inside _work (the lane worker that executes the write), not at
+        # def time on every constraint re-evaluation. A delayed or retried leg
+        # stamps its own execution time; a pass with no file leg performs
+        # zero clock reads. An explicit time_stamp - including an explicit
+        # None - behaves exactly as pre-462.
+        def save_into_file(text, time_stamp=_STAMP_AT_WRITE, mode='w', file_path='output.txt'):
+            def _work():
+                stamp = get_time() if time_stamp is _STAMP_AT_WRITE else time_stamp
+                with open(file_path, mode) as file:
+                    file.write(f"{stamp}: {text}\n")
+                print(f'"{stamp}: {text}" saved into {file_path}')
+                return True
+            # U364/#360: file I/O leg off the pump -> loop lane
+            return self.pump_lane(_work, 'save_into_file')
 
-        def append_to_file(text, time_stamp=get_time(), file_path='output.txt'):
+        def append_to_file(text, time_stamp=_STAMP_AT_WRITE, file_path='output.txt'):
             return save_into_file(text, time_stamp, mode='a', file_path=file_path)
 
         def empty_file(file_path='output.txt'):
-            open(file_path, 'w').close()
-            print(f'{file_path} has been emptied')
-            return True
+            def _work():
+                open(file_path, 'w').close()
+                print(f'{file_path} has been emptied')
+                return True
+            # U364/#360: file I/O leg off the pump -> loop lane
+            return self.pump_lane(_work, 'empty_file')
 
         def print_all_variables():
             if self.variables:
@@ -678,11 +993,14 @@ class Output_Manager():
             return True
 
         def clear_console():
-            if sys.platform.startswith('win'):
-                system('cls')
-            else:
-                system('clear')
-            return True
+            def _work():
+                if sys.platform.startswith('win'):
+                    system('cls')
+                else:
+                    system('clear')
+                return True
+            # U364/#360: shell spawn leg off the pump -> loop lane
+            return self.pump_lane(_work, 'clear_console')
 
 
         # ---------------------------
@@ -751,6 +1069,39 @@ class Output_Manager():
     def check_for_mouse_vk_code(self, vk_code):
         return vk_code in self._mouse_vk_codes
 
+    # U364/#360: lane routing for blocking legs. A LL-hook pump that blocks
+    # past LowLevelHooksTimeout gets the hook silently removed -> events pass
+    # UNFILTERED (suppression dies mid-macro; maintainer fst_flow.log
+    # evidence 2026-11-04). pump_lane schedules the blocking work on the
+    # asyncio loop lane (FIFO = loop ready queue) and the pump caller returns
+    # True immediately; it runs work() INLINE when the caller is already on
+    # the loop thread (macro playback lane) or when no loop is wired
+    # (headless/legacy/tests = old synchronous behavior, contract locked in
+    # tests/test_pump_async_lane.py::TestFallbackContract; since U375 the
+    # headless mode runs the owned MainLogic.loop too, so the inline path
+    # there is the safety net only). Every routed leg
+    # is an action leg whose success value is True, so the pump-side True is
+    # the same value the inline path returns.
+    def pump_lane(self, work, leg_name='leg'):
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            loop = getattr(self._fst, 'loop', None)
+            if loop is not None:
+                async def _run_on_lane():
+                    work()
+                try:
+                    _handle = asyncio.run_coroutine_threadsafe(_run_on_lane(), loop)
+                    # repo convention (start_macro_playback/start_repeat): a
+                    # raising lane leg surfaces through check_result - never a
+                    # silent "scheduled = success" (reviewer P1-3)
+                    _handle.add_done_callback(self._fst.check_result)
+                    return True
+                except Exception as error:
+                    logger_flow.error(f"pump lane scheduling failed for {leg_name}: {error}")
+                    return False
+        return work()
+
     def send_key_event(self, key_event):
         vk_code, is_press, _ = key_event.get_all()
         is_mouse_key = self.check_for_mouse_vk_code(vk_code)
@@ -770,7 +1121,50 @@ class Output_Manager():
             else:
                 self._controller_dict[is_mouse_key].release(key_code)
 
+    def _tap_source_id(self, tap_group):
+        '''F-A10 attribution for a tap release ticket: the group's own key
+        strings (the group "a,d" -> "a,d"), so the flow-log TICKET line names
+        the emitting group the way the maintainer reads it. Key objects carry
+        key_string; a plain-label test member falls back to its vk code. The
+        ticket already carries the vk, so the id names the GROUP, not the key.'''
+        names = []
+        for key in getattr(tap_group, 'keys', ()):
+            key_string = getattr(key, 'key_string', None)
+            names.append(key_string if key_string
+                         else str(getattr(key, 'vk_code', key)))
+        return ','.join(names) if names else 'tap'
+
+    def _open_tap_release_ticket(self, vk_code, tap_group):
+        '''F-A10 (the stuck-'a' fix, ladder R4 sibling): open the ledger release
+        receipt for a tap-snap-send release leg the moment it is SCHEDULED on
+        the pump, before the leg leaves the thread, so the sim-release veto's
+        R4 consult (FST_Keyboard.take_owed_release_ticket) serves the tap UP
+        like every other emitter's: ticket open => deliver, never suppress.
+        Closes W1 (the ticketless-UP-eaten-by-the-veto window) by construction.
+        source_kind=SOURCE_TAP, source_id names the group, and the ledger stamps
+        the global monotonic seq (the multi-key sequence position). The ticket
+        closes at DELIVERY (the veto-leg close), exactly like the drain's
+        (F-A9) - this method only opens it and never closes it.
+
+        Only the RELEASE legs are ticketed. An arriving tap press is never
+        eaten (the veto allows presses on the active key), so a press ticket
+        would have no delivery-close path and would age as false tap debt; the
+        holders that own a long press (macro/toggle) use open_press_ticket for
+        that different hold-ownership shape. The snap tap owes an UP, not a
+        hold. None-tolerant like every ticket helper: bookkeeping must never
+        block or alter a send, and a stand-in keyboard without the helper is a
+        no-op (the send proceeds exactly as before).'''
+        opener = getattr(self._fst, 'open_release_ticket', None)
+        if opener is None:
+            return None
+        return opener(vk_code, SOURCE_TAP, self._tap_source_id(tap_group))
+
     # 260429-1441 - added crossover and delay for tap groups as async coroutines - everything else runs without async directly in the listener thread
+    # U364/#360: the sync legs go through pump_lane (loop lane FIFO when a
+    # loop is wired, inline fallback when not); tap-group state
+    # (set_last_key_send) STAYS on the caller thread so hold-repeat
+    # decisions (260428-2341) never read delayed state, and the lane keeps
+    # the send step order FIFO (tests/test_pump_async_lane.py).
     def send_keys_for_tap_group(self, tap_group):
         """
         Send the specified key and release the last key if necessary.
@@ -807,26 +1201,690 @@ class Output_Manager():
 
         # only send if key to send is not the same as last key send
         if key_to_send != last_key_send:
+            def _release_last_key():
+                self._keyboard_controller.release(key_code_last_key_send)
+
+            def _press_new_key():
+                self._keyboard_controller.press(key_code_to_send)
+
+            def _switch_keys():
+                self._keyboard_controller.release(key_code_last_key_send)
+                self._keyboard_controller.press(key_code_to_send)
+
             if key_to_send is None:
                 if last_key_send is not None:
-                    self._keyboard_controller.release(key_code_last_key_send)
+                    # F-A10: the settle release opens its tap release ticket at
+                    # SCHEDULE time, before the leg leaves the pump, so the R4
+                    # sim-release veto serves the tap UP (ticket open => deliver).
+                    self._open_tap_release_ticket(last_key_send, tap_group)
+                    if self.pump_lane(_release_last_key, 'tap_release') is False:
+                        # W3: the lane is gone (dead loop) - the owed UP must
+                        # still reach the app, so emit it inline (rebind-leg
+                        # sibling, F-A9 reviewer P1-4: a key LOST on a dead loop).
+                        _release_last_key()
                 tap_group.set_last_key_send(None)
             else:
                 if last_key_send is not None:
+                    # F-A10: the switch's release-of-last_key_send leg opens its
+                    # tap release ticket at SCHEDULE time (before the lane hop),
+                    # covering W1 (the re-arm race) and the crossover tail; the
+                    # ticket closes at delivery via the R4 consult.
+                    self._open_tap_release_ticket(last_key_send, tap_group)
                     if not self._fst.arg_manager.ACT_DELAY and not self._fst.arg_manager.ACT_CROSSOVER:
-                        self._keyboard_controller.release(key_code_last_key_send)
-                        self._keyboard_controller.press(key_code_to_send)
+                        if self.pump_lane(_switch_keys, 'tap_switch') is False:
+                            # W3 dead lane: still owe the UP, so run the switch
+                            # inline (the release closes at delivery).
+                            _switch_keys()
                     else:
                         try:
                             asyncio.run_coroutine_threadsafe(send_async(key_to_send, last_key_send, key_code_to_send, key_code_last_key_send), self._fst.loop)
                         except Exception as e:
                             logger_flow.error(f"Error occurred while calling send_keys_with_delay: {e}")
+                            # W3 delay/crossover: the schedule died - still owe
+                            # the UP of the held key, so emit it inline.
+                            _release_last_key()
                 else:
-                    self._keyboard_controller.press(key_code_to_send)
+                    self.pump_lane(_press_new_key, 'tap_press')
                 tap_group.set_last_key_send(key_to_send)
 
     def clear_all_variables(self):
         self.variables = {}
+
+
+# ---------------------------------------------------------------------------
+# Config validation (U69, proposal 2026-10-31_fst-config-validator a,b,c,d)
+#
+# ONE pass over the CLEANED config lines (after _clean_comments_numbered /
+# _combine_multilines_numbered) that collects ALL violations before any group is
+# built; nothing is evaluated and eval() is untouched. Each violation is a
+# (line number, item alias, rule, message, severity) record.
+#
+# severity ERROR: the line cannot build a correct group or would crash the
+#   hot path at eval time -> load_config raises one consolidated ConfigError.
+# severity WARNING: the line runs today through a silent no-op or a silent
+#   strip -> it is reported through the same surface channel and the load
+#   proceeds, so valid configs keep their exact behavior.
+# ---------------------------------------------------------------------------
+
+Config_Violation = namedtuple('Config_Violation',
+                               'line item rule message severity scope')
+
+
+# constraint-expression functions and their positional-argument arity
+# (mirrors the nested helpers of Output_Manager.constraint_evaluation)
+CONSTRAINT_FUNCTIONS = {
+    # time / state queries
+    'tr': (1, 1), 'ts': (1, 1), 'ta': (1, 1),
+    'cs': (1, 1), 'csl': (1, 1),
+    'p': (1, 1), 'r': (1, 1), 'ap': (1, 1), 'ar': (1, 1),
+    'last': (1, 2), 'dc': (0, 2),
+    # alias repetition + macro/sequence control
+    'start_repeat': (2, 3), 'stop_repeat': (1, 1), 'toggle_repeat': (2, 2),
+    'is_repeat_active': (1, 1), 'reset_repeat': (1, 1), 'stop_all_repeat': (0, 0),
+    'reset': (1, 1), 'release_all_keys': (0, 0),
+    # typing
+    'type': (1, 1), 'write': (1, 1), 'release_modifier': (0, 0),
+    # integer variables
+    'set': (1, 2), 'is_set': (1, 1), 'get': (1, 1), 'check': (1, 2),
+    'clear': (1, 1), 'clear_all_variables': (0, 0), 'incr': (1, 1), 'decr': (1, 1),
+    # text variables and misc
+    'set_var': (2, 2), 'get_var': (1, 1), 'cli': (1, 1),
+    'date': (0, 0), 'date_time': (0, 0), 'get_time': (0, 0),
+    'make_backup': (0, 2), 'restore_backup': (0, 2),
+    # mouse
+    'scroll_up': (1, 1), 'scroll_down': (1, 1),
+    'scroll_right': (1, 1), 'scroll_left': (1, 1),
+    'mouse_move_abs': (2, 2), 'mouse_move': (2, 2), 'mouse_get_pos': (0, 0),
+    'mouse_save_to_var': (1, 1), 'mouse_move_to_var': (1, 1),
+    # toasts
+    'show_message': (1, 4), 'show_timer': (1, 4),
+    'remove_toast': (0, 1), 'remove_all_toasts': (0, 1),
+    # clipboard / files
+    'copy_to_clipboard': (1, 1), 'paste': (0, 0),
+    'save_into_file': (1, 4), 'append_to_file': (1, 3), 'empty_file': (0, 1),
+    'print_all_variables': (0, 0), 'clear_console': (0, 0),
+}
+
+# python builtins resolvable inside eval() of a constraint expression
+CONSTRAINT_BUILTINS = frozenset({
+    'abs', 'all', 'any', 'bin', 'bool', 'bytes', 'callable', 'chr', 'dict',
+    'divmod', 'enumerate', 'filter', 'float', 'format', 'frozenset', 'hex',
+    'int', 'isinstance', 'len', 'list', 'map', 'max', 'min', 'ord', 'pow',
+    'range', 'reversed', 'round', 'set', 'sorted', 'str', 'sum', 'tuple',
+    'zip', 'print',
+})
+
+# module roots whose dotted attribute chains resolve inside eval() of a
+# constraint expression (imported at the top of this module, so the module
+# globals hold them) - their attributes are NOT checked as unknown functions
+CONSTRAINT_MODULES = frozenset({'datetime'})
+
+# 15CLOCK (reviewer P1): the two test-seam names ARE module globals, so a
+# config constraint reaches them the same way it reaches any other - the
+# generic 'unknown function ... no-op' warning would be FALSE for them (they
+# rebind state), so they get their own warning naming the real behavior: the
+# product call is refused by _refuse_outside_tests and the constraint fails.
+CONSTRAINT_TEST_SEAMS = frozenset({'set_clock_for_tests',
+                                   'reset_clock_for_tests'})
+
+# invocations whose first string argument is an alias <name> reference
+ALIAS_ARG_FUNCTIONS = ('start_repeat', 'stop_repeat', 'toggle_repeat',
+                       'is_repeat_active', 'reset_repeat')
+
+# key-string prefixes carrying a press/release/toggle meaning
+KEY_MODIFIER_PREFIXES = '-+!^'
+
+# focus-name sanitizer rule: ONE pattern, defined in fst_data_types (neutral
+# module - fst_tasks needs it too and fst_manager imports fst_tasks) and
+# imported above, so the config strip, the validator mirror and the
+# active-window TITLE strip in Focus_Task can never drift apart (#399).
+
+# start arguments: valueless switches and value-taking arguments
+# F-C3 (review Item 4 inventory): the start-argument vocabulary lives in
+# fst_config_parser (START_ARG_FLAGS / START_ARG_VALUES) and is imported at
+# the top of this file - the config validator below is its only consumer;
+# the command-line chain in Argument_Manager keeps its own (lenient) matching
+
+# elevation names in a config <arg> line (pair-approved 2026-11-16, after
+# the maintainer's live confusion): the elevation flag is a START argument
+# only - the startup lane strips it from argv before the pipeline - so a
+# config line carrying any elevation spelling is always the wrong place.
+# The validator answers ALL four dash-count/tense spellings ('-elevate',
+# '--elevate', '-elevated', '--elevated') with the specific start-argument
+# hint instead of the generic unknown-arg warning (checked on the name
+# part: lowercased, leading dashes stripped)
+# ELEVATE_CONFIG_NAMES and the spelling test itself live in fst_config_parser
+# (decision 11=a, 2026-11-17: one grammar owner - the validator hint below and
+# the runtime suppression in apply_start_arguments ask the same question).
+
+# delay values accepted by Argument_Manager.extract_delays
+# F-C2 (review Item 4): the bracket-aware splitter and the delay bounds moved
+# to fst_config_parser.py - the config grammar has ONE home. Both names are
+# imported at the top of this file, so every call site below is unchanged.
+
+
+class Config_Validator():
+    '''
+    structural evaluation of the cleaned config lines - collects ALL
+    violations (not fail-fast); no group building and no constraint eval
+    '''
+
+    ERROR = 'error'
+    WARNING = 'warning'
+
+    def __init__(self):
+        self.violations = []
+        # F-C4 (decision 9b): ONE numbering - every line of a type
+        # advances the counter, declared name or not, and presort_lines
+        # builds the containers with the same policy, so the number this
+        # report shows for a line is the number its container is keyed by
+        # (within one config section - a '<focus>' section is presorted
+        # from the default lines plus its own, see the LineNamer docstring)
+        self._namer = LineNamer()
+        # scope of the line currently checked (violations record it)
+        self._current_scope = ''
+        # the SILENT sections (U330 ask 3): scopes whose warnings are
+        # suppressed - the activation toast skips them. U355 edge 4: ONE
+        # live set, public so the load copies it
+        # (Config_Manager.config_suppressed_scopes) - the private
+        # _suppress_scopes twin and its end-of-validate mirror are gone,
+        # a reused instance cannot report stale silent scopes
+        self.suppressed_scopes = set()
+
+    def validate(self, numbered_lines):
+        '''numbered_lines: list of (line_number, cleaned_line) tuples'''
+        self._collect_alias_definitions(numbered_lines)
+        # FST-404 (#404) D1: vk -> (line, item) of the FIRST tap group that
+        # declares it, per effective scope (a focus section also runs the
+        # default-section groups, so its index starts as a copy of the default)
+        self._tap_vk_index = {'': {}}
+        scope = ''
+        aliases_by_scope = self._aliases_by_scope
+        self.suppressed_scopes = set()
+        for line_number, line in numbered_lines:
+            if line.startswith('<focus>'):
+                # ruling A (maintainer 2026-11-03, TODO #300): the <focus>
+                # header line belongs to ITS OWN new section - take the scope
+                # from the header BEFORE recording its warnings, so the
+                # header's warnings land in the new section and that
+                # section's -no_warnings can suppress them (the previous
+                # section no longer leaks them)
+                scope = self._focus_scope_of(line)
+                self._current_scope = scope
+                self._tap_vk_index.setdefault(scope, dict(self._tap_vk_index['']))
+                self._check_focus_line(line_number, line)
+                continue
+            self._current_scope = scope
+            if line.startswith('<arg>'):
+                self._check_arg_line(line_number, line, scope)
+                continue
+            self._check_group_line(line_number, line, scope,
+                                   aliases_by_scope.get(scope, set()))
+        # check-suppression (-no_warnings): drop WARNING violations of the
+        # suppressed sections (the default scope '' counts as a section);
+        # ERROR severity is never suppressed
+        if self.suppressed_scopes:
+            self.violations = [v for v in self.violations
+                               if not (v.severity == self.WARNING
+                                       and v.scope in self.suppressed_scopes)]
+        return self.violations
+
+    # -- reporting helpers ---------------------------------------------------
+
+    def _add(self, line_number, item, rule, message, severity):
+        self.violations.append(
+            Config_Violation(line_number, item, rule, message, severity,
+                             self._current_scope))
+
+    def _error(self, line_number, item, rule, message):
+        self._add(line_number, item, rule, message, self.ERROR)
+
+    def _warn(self, line_number, item, rule, message):
+        self._add(line_number, item, rule, message, self.WARNING)
+
+    @staticmethod
+    def format_report(violations):
+        '''one consolidated user-facing report text'''
+        errors = sum(1 for v in violations if v.severity == Config_Validator.ERROR)
+        warnings = len(violations) - errors
+        lines = [f'{len(violations)} config violation(s) '
+                 f'({errors} error(s), {warnings} warning(s)):']
+        for v in violations:
+            lines.append(f'  line {v.line} {v.item or "(unnamed)"} '
+                         f'[{v.rule}] {v.severity}: {v.message}')
+        return '\n'.join(lines)
+
+    # -- scope / alias definitions -------------------------------------------
+
+    def _collect_alias_definitions(self, numbered_lines):
+        '''alias <name> definitions per scope (default + each focus section)'''
+        self._aliases_by_scope = {'': set()}
+        scope = ''
+        for _, line in numbered_lines:
+            if line.startswith('<focus>'):
+                scope = self._focus_scope_of(line)
+                # a focus section sees the default aliases plus its own ones
+                if scope not in self._aliases_by_scope:
+                    self._aliases_by_scope[scope] = set(
+                        self._aliases_by_scope.get('', set()))
+            else:
+                # F-C3: same split_item_prefix rule as _check_group_line;
+                # only an '<...>' prefix is an alias DEFINITION here (a
+                # '(*name*)' prefix names a group, it defines no alias)
+                declared, _, _ = split_item_prefix(line)
+                if declared.startswith('<'):
+                    self._aliases_by_scope.setdefault(scope, set()).add(
+                        declared)
+
+    @staticmethod
+    def _focus_scope_of(line):
+        '''F-C2 (review Item 4): the scope rule is fst_config_parser.
+        focus_scope_of - the runtime's focus map (Config_Manager.
+        _focus_scope_map_from_lines) uses the same cleaning, so a section can
+        no longer scope differently in the report than at runtime'''
+        return focus_scope_of(line)
+
+    # -- focus and argument lines --------------------------------------------
+
+    def _check_focus_line(self, line_number, line):
+        name = line.replace('<focus>', '')
+        stripped = clean_focus_header(line)
+        if not stripped.strip(', ').strip():
+            self._error(line_number, '(focus)', 'focus',
+                        'empty focus name - add the window name after <focus>')
+            return
+        if stripped != name:
+            removed = ''.join(sorted(set(re.findall(FOCUS_NAME_ILLEGAL, name))))
+            self._warn(line_number, '(focus)', 'focus',
+                       f'invalid focus-name characters removed: {name!r} -> {stripped!r} '
+                       f'(removed: {removed!r})')
+
+    def _check_arg_line(self, line_number, line, scope):
+        arg = line.replace('<arg>', '').strip().lower()
+        if not arg or arg[0] in (':', '#'):
+            return
+        if arg[0] != '-':
+            self._warn(line_number, '(arg)', 'arg',
+                       f'start argument {arg!r} must start with "-"')
+            return
+        name, _, value = arg.partition('=')
+        if is_elevation_config_arg(arg):
+            # self-explaining rejection (pair-approved 2026-11-16): any
+            # elevation spelling here gets the specific hint, not the
+            # generic unknown-arg warning below; the echo carries the
+            # whole (already lowercased) arg like the generic warning does
+            self._warn(line_number, '(arg)', 'arg',
+                       f"'{arg}' is a start argument for elevation - "
+                       'place it on the command line, not in the config')
+            return
+        # U361 (TODO #356, ruling A 2026-11-04): dashed spellings are
+        # accepted - normalize '-' -> '_' in the NAME part for matching
+        # ('-always-active' == '-always_active'); the value stays verbatim
+        # and the messages below echo the original spelling
+        match_name = normalize_start_arg_name(name)
+        if match_name == '-no_warnings':
+            # check-suppression arg (maintainer observation 1): warnings of
+            # this section are dropped from the report; the section carries
+            # the flag - a bare <arg>-no_warnings in the default scope
+            # suppresses the default group's warnings
+            self.suppressed_scopes.add(scope)
+        has_value = value != ''
+        if match_name == '-default_on' and not has_value:
+            # (#423) retired the same day it shipped (U418/321a893): settled
+            # model (maintainer 2026-11-11, TODO #418 resolution) - the
+            # default group IS merged into every focus group; -default_off
+            # is the ONLY opt-out, so -default_on has no valid function.
+            # WARNING (suppressible with the section's -no_warnings) - the
+            # flag does nothing at runtime anymore. Dashed twin included
+            # (U361 normalization above). The VALUE form falls through to
+            # the generic unknown-argument warning - the parser branch
+            # (exact '-default_on' match) reports it unknown too, so both
+            # lanes stay consistent (U423 review P2-4)
+            self._warn(line_number, '(arg)', 'arg',
+                       '-default_on is retired - the default group is always '
+                       'added to every focus group; use -default_off to opt out')
+            return
+        if has_value:
+            if match_name in START_ARG_VALUES:
+                self._check_arg_value(line_number, match_name, value)
+            elif match_name in START_ARG_FLAGS:
+                self._error(line_number, '(arg)', 'arg',
+                            f'{name} takes no value - remove the "=" part')
+            else:
+                self._warn(line_number, '(arg)', 'arg',
+                           f'unknown start argument: {arg}')
+            return
+        if match_name in START_ARG_FLAGS:
+            return
+        if match_name in START_ARG_VALUES:
+            self._error(line_number, '(arg)', 'arg',
+                        f'{name} needs a value after "="')
+            return
+        self._warn(line_number, '(arg)', 'arg',
+                   f'unknown start argument: {arg}')
+
+    def _check_arg_value(self, line_number, name, value):
+        if name == '-log':
+            if value not in LOG_LEVELS:
+                self._error(line_number, '(arg)', 'arg',
+                            f'invalid log level {value!r} - use debug, info, warning or error')
+        elif name == '-focusapp':
+            self._error(line_number, '(arg)', 'arg',
+                        '-focusapp is removed since V1.0.0 - use <focus>name in the config')
+        elif name in ('-tapdelay', '-aliasdelay', '-macrodelay'):
+            delays = parse_int_list(value)
+            if delays is None:
+                self._error(line_number, '(arg)', 'arg',
+                            f'invalid delay {value!r} - needs number(s) separated by comma')
+                return
+            if len(delays) > 2:
+                self._warn(line_number, '(arg)', 'arg',
+                           f'{name} gets {len(delays)} values - only the first two are used')
+            for delay in delays:
+                if not DELAY_RANGE[0] <= delay <= DELAY_RANGE[1]:
+                    self._error(line_number, '(arg)', 'arg',
+                                f'delay {delay} not in range {DELAY_RANGE[0]}<=delay<={DELAY_RANGE[1]} ms')
+        elif name == '-crossover':
+            crossover = parse_int_list(value)
+            if crossover is None or len(crossover) != 1:
+                self._error(line_number, '(arg)', 'arg',
+                            f'invalid probability {value!r} - needs one number')
+            elif not 0 <= crossover[0] <= 100:
+                self._error(line_number, '(arg)', 'arg',
+                            f'probability {crossover[0]} not in range 0<=prob<=100 %')
+        elif name == '-status_indicator':
+            size = parse_int_list(value)
+            if size is None or len(size) != 1 or size[0] <= 0:
+                self._error(line_number, '(arg)', 'arg',
+                            f'invalid indicator size {value!r} - needs one number > 0')
+        elif name == '-crosshair':
+            delta = parse_int_list(value)
+            if delta is None or len(delta) != 2:
+                self._error(line_number, '(arg)', 'arg',
+                            f'invalid crosshair delta {value!r} - needs two numbers, e.g. -crosshair=5,-10')
+
+    # F-C2 (review Item 4): the int-list parse of the value arguments moved to
+    # fst_config_parser.parse_int_list - the ONE place a delay/probability/
+    # size value is turned into ints for the report (the runtime parses its
+    # own copy in extract_delays, which is a behavior decision, see there)
+
+    # -- group lines: arity per item type ------------------------------------
+
+    def _check_group_line(self, line_number, line, scope, aliases):
+        # F-C3 (review Item 4 inventory): the declared-name prefix rule is
+        # fst_config_parser.split_item_prefix - the same rule the alias
+        # collection walk applies below, so the two validator walks cannot
+        # disagree about where a name ends and the body starts
+        alias, body, is_alias_line = split_item_prefix(line)
+        # F-C4 (the prefix-cut hole filed in F-C3): a declared name that shows
+        # up AGAIN inside its own line is a hole, not a key. The runtime cuts
+        # the prefix with replace() (every occurrence), so the second copy
+        # would silently become an EMPTY component in the container - measured
+        # on '<w> a, <w>, d': the container held ['a', '', 'd']. Rejected here,
+        # where the user sees it; the runtime keeps a belt (see
+        # Config_Manager._key_parts).
+        if alias and alias in body:
+            self._error(line_number, alias, 'hole',
+                        f'{alias} repeats inside its own line - the name cut '
+                        'leaves an empty key where the repeat stood')
+        if is_alias_line and not re.fullmatch(r'<[A-Za-z0-9_]+>', alias):
+            self._error(line_number, alias, 'alias',
+                        f'invalid alias name {alias} - letters, numbers and "_" only')
+
+        if is_alias_line:
+            if not body:
+                self._warn(line_number, alias, 'alias', 'alias without keys - nothing to insert')
+            self._check_key_group(line_number, alias, body, aliases, 'group')
+            return
+
+        # F-C2 (review Item 4): ONE classification - fst_config_parser.
+        # classify_groups is the same rule presort_lines runs, so a line the
+        # validator calls a macro can never be a tap group at runtime
+        kind, groups = classify_groups(body)
+
+        if kind == KIND_TAP:
+            item = self._namer.report_label(kind, alias)
+            if groups[0].count('(') == groups[0].count(')') and len(split_key_group(groups[0])) < 2:
+                self._warn(line_number, item, 'arity',
+                           'tap group needs 2 or more keys')
+            self._check_key_group(line_number, item, groups[0], aliases, 'tap')
+            self._check_tap_group_ownership(line_number, item, groups[0])
+        elif kind == KIND_REBIND:
+            item = self._namer.report_label(kind, alias)
+            key_group = split_key_group(groups[1])
+            if not any(k for k in split_key_group(groups[0])):
+                self._error(line_number, item, 'shape',
+                            'rebind without trigger key - add the trigger before ":"')
+            if groups[1].count('(') == groups[1].count(')') and len(key_group) != 1:
+                self._error(line_number, item, 'arity',
+                            f'{key_group} is not a valid rebind (only one key_event/key allowed) '
+                            '- use "::" instead of ":" to declare it as a macro')
+            self._check_key_group(line_number, item, groups[0], aliases, 'trigger')
+            self._check_key_group(line_number, item, groups[1], aliases, 'group')
+        elif kind in (KIND_MACRO, KIND_SEQUENCE):
+            if kind == KIND_SEQUENCE:
+                item = self._namer.report_label(kind, alias)
+                key_groups = groups[2:]
+                if len(key_groups) < 2:
+                    self._error(line_number, item, 'arity',
+                                'macro sequence needs 2 or more key groups')
+            else:
+                item = self._namer.report_label(kind, alias)
+                key_groups = [groups[2]]
+            if not any(k for k in split_key_group(groups[0])):
+                self._error(line_number, item, 'shape',
+                            'macro without trigger key - add the trigger before "::"')
+            self._check_key_group(line_number, item, groups[0], aliases, 'trigger')
+            for key_group in key_groups:
+                self._check_key_group(line_number, item, key_group, aliases, 'group')
+        else:
+            # presort_lines drops this line today: the middle group is not empty
+            self._error(line_number, alias or '(unnamed)', 'dropped',
+                        'line dropped - ":" after a "::" group needs an empty '
+                        'middle group (use "a :: b : c" for a macro sequence)')
+
+    def _check_tap_group_ownership(self, line_number, item, group_text):
+        '''FST-404 (#404), ruling protocol D1: one vk may be owned by only ONE
+        tap group per effective scope. The runtime hands a vk event to the
+        FIRST group declaring it (owner registry, FST_Keyboard.
+        _tap_owner_by_vk), so a second declaration is dead config -> WARNING.
+        An ERROR would reject existing user configs (maintainer's included) =
+        observable behavior change, so it stays a warning.'''
+        if not group_text or group_text.count('(') != group_text.count(')'):
+            return
+        index = self._tap_vk_index.setdefault(self._current_scope, {})
+        for key_string in split_key_group(group_text):
+            base = key_string.split('|')[0].strip()
+            vk = self._tap_vk_of(base)
+            if vk is None:
+                continue
+            first = index.get(vk)
+            if first is not None and first[0] != line_number:
+                self._warn(line_number, item, 'tap-dup',
+                           f"key '{base}' is already in tap group {first[1]} "
+                           f"(line {first[0]}) - only the first group owns it")
+                continue
+            index[vk] = (line_number, item)
+
+    @staticmethod
+    def _tap_vk_of(base):
+        if base in vk_codes_dict:
+            return vk_codes_dict[base]
+        try:
+            vk = int(base)
+        except ValueError:
+            return None
+        return vk if 0 <= vk < 256 else None
+
+    def _check_key_group(self, line_number, item, group_text, aliases, kind):
+        '''one key group: unbalanced brackets drop it in presort_lines'''
+        if not group_text:
+            return
+        if group_text.count('(') != group_text.count(')'):
+            self._error(line_number, item, 'parens',
+                        f'unbalanced parentheses in "{group_text}" - group dropped')
+            return
+        for key_string in split_key_group(group_text):
+            # the EMPTY-component class is refused where it is produced -
+            # a declared name that repeats inside its own line (see
+            # _check_group_line's 'hole' rule); a plain stray comma is
+            # normalized away by the line cleaner and stays accepted,
+            # because FSTconfig_test.txt relies on that today
+            self._check_key_string(line_number, item, key_string, aliases, kind)
+
+    # -- key strings and constraint expressions ------------------------------
+
+    def _check_key_string(self, line_number, item, key_string, aliases, kind):
+        segments = key_string.split('|')
+        base = segments[0]
+
+        if kind == 'tap':
+            if len(base) > 1 and base[0] in KEY_MODIFIER_PREFIXES:
+                self._error(line_number, item, 'shape',
+                            f'tap group key {base} must be a plain key (no -/+ ! ^ prefix)')
+                return
+            if len(segments) > 1:
+                self._error(line_number, item, 'shape',
+                            f'tap group key {base} must be a plain key (no delay suffix)')
+                return
+            self._check_vk_resolvable(line_number, item, base)
+            return
+
+        if base.startswith('<'):
+            # groups resolve a "<name>" string through the alias dict only
+            if base not in aliases:
+                self._error(line_number, item, 'alias',
+                            f'alias {base} is not defined in this focus section')
+            if len(segments) > 1:
+                self._warn(line_number, item, 'suffix',
+                           f'suffixes on the alias {base} are ignored')
+            return
+
+        if len(base) > 1 and base[0] in KEY_MODIFIER_PREFIXES:
+            base = base[1:]
+        self._check_vk_resolvable(line_number, item, base)
+
+        for segment in segments[1:]:
+            self._check_constraint_segment(line_number, item, segment, aliases)
+            self._check_segment_delay_size(line_number, item, base, segment)
+
+    def _check_segment_delay_size(self, line_number, item, base, segment):
+        '''Decision 12 (E2 authoring warning, maintainer 2026-11-17): a macro
+        segment delay (''key|<ms>'') stays UNBOUNDED by ruling - a timeline may
+        legitimately wait minutes for the app in front of it. What the ruling
+        asked for instead is that an obviously large value ASKS: one WARNING per
+        offending segment above SEGMENT_DELAY_WARN_MS, value accepted.
+
+        Scope, measured before writing this (so nothing else moved): segment
+        delays are only reachable in macro / sequence / rebind / alias groups -
+        a tap group rejects any delay suffix (''must be a plain key''), and a
+        non-numeric constraint is already an error. Negative and small values
+        were silent before and stay silent: this method only ever adds a
+        WARNING for large positive numbers, never an error, never a rewrite.
+        '''
+        try:
+            delay_ms = int(segment)
+        except ValueError:
+            return      # a constraint expression - _check_constraint_segment owns it
+        if delay_ms > SEGMENT_DELAY_WARN_MS:
+            self._warn(line_number, item, 'delay',
+                       f'very long delay ({delay_ms} ms) in {base}|{delay_ms} '
+                       '- intentional? a segment delay is unbounded on purpose '
+                       '(a macro may wait for the app to finish); the delay '
+                       f'knobs -tapdelay/-macrodelay/-sequencedelay (0-'
+                       f'{DELAY_RANGE[1]} ms) are a different thing')
+
+    def _check_vk_resolvable(self, line_number, item, key):
+        if key in vk_codes_dict:
+            return
+        try:
+            valid = 0 <= int(key) < 256
+        except ValueError:
+            valid = False
+        if not valid:
+            self._error(line_number, item, 'vk',
+                        f'key {key!r} does not resolve to a vk code')
+
+    def _check_constraint_segment(self, line_number, item, segment, aliases):
+        if segment.startswith('('):
+            inner = segment[1:-1]
+            if not segment.endswith(')') or inner.count('(') != inner.count(')'):
+                self._error(line_number, item, 'constraint',
+                            f'unbalanced parentheses in constraint {segment}')
+                return
+            self._check_constraint_expression(line_number, item, inner, aliases)
+            return
+        try:
+            int(segment)
+        except ValueError:
+            self._error(line_number, item, 'constraint',
+                        f'constraint {segment!r} needs to be a delay number or "(...)"')
+
+    @staticmethod
+    def _module_root_of(func):
+        '''root module name of a dotted call chain, crossing calls on the way:
+        datetime.datetime.now().strftime -> 'datetime' (a chain not rooted at a
+        module name - a helper-call result, a subscript - yields '')'''
+        node = func
+        while True:
+            if isinstance(node, ast.Attribute):
+                node = node.value
+            elif isinstance(node, ast.Call) and isinstance(
+                    node.func, (ast.Name, ast.Attribute)):
+                node = node.func
+            else:
+                break
+        return node.id if isinstance(node, ast.Name) else ''
+
+    def _check_constraint_expression(self, line_number, item, expression, aliases):
+        '''structural pass over one "(...)" constraint - no evaluation'''
+        if expression in ('', '!', 'True', 'False', 'None'):
+            return
+        try:
+            tree = ast.parse(expression, mode='eval')
+        except SyntaxError as error:
+            self._error(line_number, item, 'constraint',
+                        f'constraint ({expression}) is not a valid expression: {error.msg}')
+            return
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            if isinstance(node.func, ast.Name):
+                name = node.func.id
+            elif isinstance(node.func, ast.Attribute):
+                if self._module_root_of(node.func) in CONSTRAINT_MODULES:
+                    continue
+                name = node.func.attr
+            else:
+                continue
+            args = node.args
+            if name in CONSTRAINT_FUNCTIONS:
+                min_args, max_args = CONSTRAINT_FUNCTIONS[name]
+                if not min_args <= len(args) <= max_args:
+                    self._error(line_number, item, 'constraint',
+                                f'{name}() takes {min_args}-{max_args} arguments, got {len(args)}')
+                if name in ALIAS_ARG_FUNCTIONS and args and isinstance(args[0], ast.Constant) \
+                        and isinstance(args[0].value, str):
+                    self._check_alias_argument(line_number, item, args[0].value, aliases)
+            elif name in CONSTRAINT_TEST_SEAMS:
+                self._warn(line_number, item, 'constraint',
+                           f'{name}() is the 15CLOCK test seam - a product '
+                           'call is refused and the constraint fails; it is '
+                           'not a config function')
+            elif name not in CONSTRAINT_BUILTINS:
+                self._warn(line_number, item, 'constraint',
+                           f'unknown function {name}() - evaluates to True (no-op)')
+
+    @staticmethod
+    def _alias_reference_in_text(text):
+        match = re.search(r'<[A-Za-z0-9_]+>', text)
+        return match.group(0) if match else ''
+
+    def _check_alias_argument(self, line_number, item, text, aliases):
+        reference = self._alias_reference_in_text(text)
+        if reference and reference not in aliases:
+            self._error(line_number, item, 'alias',
+                        f'alias {reference} is not defined in this focus section')
 
 
 class Config_Manager():
@@ -844,6 +1902,22 @@ class Config_Manager():
         self._rebinds_hr = []
         self._macros_hr = []
         self._alias_hr = []
+        # #460/#461: did the config EXIST when the loader last opened it?
+        # load_config re-saves it every load; the startup decision trace
+        # reports exists= from this flag (False until a load has run - the
+        # safe side: a never-loaded config is never claimed as found)
+        self.config_file_found = False
+        # validator violations of the last load_config that only warn
+        self.config_warnings = []
+        # SILENT scopes of the last load_config: sections carrying
+        # -no_warnings (U330 ask 3) - the activation toast skips them
+        self.config_suppressed_scopes = set()
+        # cleaned focus name -> validator scope of the last load_config:
+        # a multi-name section is scoped by its FIRST cleaned name, and the
+        # runtime maps EVERY name of the section to the same group lines
+        # (U330 reviewer P1: the scoped report and the silent check resolve
+        # every name through this map)
+        self.config_focus_scopes = {}
 
     @property
     def file_name(self):
@@ -875,80 +1949,82 @@ class Config_Manager():
     def load_config(self):
         # try loading  from file
         try:
-            return self._parse_lines_for_focus_manager(self._open_config_file())
+            file_lines = self._open_config_file()
+            # #460 partner signal: the startup trace reports exists= from
+            # THIS flag (was the config there when the loader opened it),
+            # never from an isfile() of the trace moment - the recovery
+            # branch below lands a file on disk either way
+            self.config_file_found = True
+            return self._parse_lines_for_focus_manager(file_lines)
         # if no file exist create new one and load it
         except FileNotFoundError:
+            self.config_file_found = False
             self.create_new_group_file()
             return self._parse_lines_for_focus_manager(self._open_config_file())
 
 
     def _clean_comments(self, lines):
-        comments_cleaned_lines = []
-        for line in lines:
-            ###XXX 241029-0711 strip to allow whitespaces in front
-            line = line.replace('\n', '').replace('\t', '').strip()
-            if not line:
+        return [cleaned for _, cleaned in self._clean_comments_numbered(lines)]
+
+    def _clean_comments_numbered(self, lines):
+        '''F-C2 (review Item 4): the comment/inline-comment grammar lives in
+        fst_config_parser.clean_comment_lines - the validator walks this same
+        output, so the rule has ONE home'''
+        return clean_comment_lines(lines)
+
+    def _combine_multilines_numbered(self, numbered_lines):
+        '''F-C2 (review Item 4): the ':' continuation join lives in
+        fst_config_parser.combine_multiline_continuations'''
+        return combine_multiline_continuations(numbered_lines)
+
+    def _focus_scope_map_from_lines(self, cleaned_lines):
+        '''every cleaned name of every focus section -> the validator scope
+        of that section (Config_Validator._focus_scope_of: the cleaned
+        header's split(',')[0].strip() - a blank first name ('<focus>
+        ,Alpha') scopes the section to '' = the default scope). Built from
+        the cleaned lines so the map refreshes BEFORE the ConfigError
+        check (U355 edge 2) and scopes sections exactly as the validator
+        does (U330 reviewer P1, U355 edge 1)'''
+        focus_scopes = {}
+        for _, line in cleaned_lines:
+            if not line.startswith('<focus>'):
                 continue
-            if line.startswith('<focus>'):
-                cleaned_line = '<focus>'
-                ##260426-1838 multiple focus groups seperated by comma
-                focus_group_names = line[7:].split('#')[0].split(',')
-                if len(focus_group_names) > 1:
-                    # strip whitespace from focus group names and join them with comma again
-                    focus_group_names = ",".join([name.strip() for name in focus_group_names])
-                else:
-                    focus_group_names = focus_group_names[0].strip()
-                cleaned_line += focus_group_names
-                comments_cleaned_lines.append(cleaned_line)
-            elif line.startswith('<arg>'):
-                cleaned_line = '<arg>'
-                cleaned_line += line[5:].split('#')[0].strip()
-                comments_cleaned_lines.append(cleaned_line)
-            elif line[0] == '#':
+            cleaned = clean_focus_header(line)
+            names = [name.strip() for name in cleaned.split(',')
+                     if name.strip()]
+            if not names:
                 continue
-            else:
-                ###XXX 241028-1224: commented out to make eval with spaces possible
-                # line = line.replace(" ","")
-                cleaned_group = []
-                for key in line.split(','):
-                    # ignore fully commented out keys
-                    if key.strip().startswith('#'):
-                        # if commented out key before :, add :
-                        if key.find(':') >= 0:
-                            cleaned_group.append(':')
-                    else:
-                        # ignore comments after keys
-                        cleaned_key = key.split('#')[0].strip()
-                        if cleaned_key:
-                            cleaned_group.append(cleaned_key)
-                cleaned_line = ','.join(cleaned_group)
-                if cleaned_line:
-                    comments_cleaned_lines.append(cleaned_line)
-
-        return comments_cleaned_lines
-
-    def _combine_multilines(self, cleaned_lines):
-        # clean multiline macro sequences and joins them together
-        multiline_cleaned_lines = []
-        for line in cleaned_lines:
-            if len(line) > 1 and line[0] == ':':
-                # add multiline to last multiline sequence
-                multiline_cleaned_lines[-1] += line
-            else:
-                multiline_cleaned_lines.append(line)
-
-        return multiline_cleaned_lines
-
-    def parse_line(self, line):
-        pass
+            scope = cleaned.split(',')[0].strip()
+            for name in names:
+                focus_scopes[name] = scope
+        return focus_scopes
 
     def _parse_lines_for_focus_manager(self, file_lines):
         '''
         reads in the file and removes the commented out lines, keys and inline comments;
         joins multiline macro sequences;
+        validates the cleaned lines before any group is built
         '''
 
-        cleaned_lines = self._combine_multilines(self._clean_comments(file_lines) )
+        cleaned_lines = self._combine_multilines_numbered(self._clean_comments_numbered(file_lines))
+
+        validator = Config_Validator()
+        violations = validator.validate(cleaned_lines)
+        self.config_warnings = [v for v in violations
+                                if v.severity == Config_Validator.WARNING]
+        # the silent sections of THIS load (U330 ask 3): re-saved every load,
+        # never carried over from a previous one
+        self.config_suppressed_scopes = set(validator.suppressed_scopes)
+        # U355 edge 2: the focus name->scope map refreshes in the SAME load
+        # as warnings/suppressed - built from the cleaned lines BEFORE the
+        # ConfigError raise, so a rejected load leaves no stale map behind
+        self.config_focus_scopes = self._focus_scope_map_from_lines(cleaned_lines)
+        if any(v.severity == Config_Validator.ERROR for v in violations):
+            logger_config.error(f"config violations:\n{Config_Validator.format_report(violations)}")
+            raise ConfigError(Config_Validator.format_report(violations),
+                              'config file')
+
+        group_lines = [line for _, line in cleaned_lines]
 
         focus_name = ''
         multi_focus_dict = {}
@@ -956,11 +2032,11 @@ class Config_Manager():
         default_group_lines = []
         extra_focus_names = []
 
-        for line in cleaned_lines:
+        for line in group_lines:
             if line.startswith('<focus>'):
-                focus_name = line.replace('<focus>', '')
                 # #only allow letters, numbers and spaces in focus_name
-                focus_name = re.sub(r'[^a-zA-Z0-9,_. ]', '', focus_name)
+                # (F-C2: the SAME cleaning the validator scopes with)
+                focus_name = clean_focus_header(line)
 
                 ##260426-1851 allow multiple focus groups seperated by comma
                 focus_group_names = focus_name.split(',')
@@ -1039,168 +2115,105 @@ class Config_Manager():
             #     # TODO: to adapt to save key sequences - necessary - mainly used to create new file if none found
             #     file.write(' :: '.join([', '.join(macro[0]),', '.join(macro[1])]))
 
+    def alias_definition_lines(self, lines):
+        '''FST-403 (#403): the default lines a focus section still needs when
+        -default_off drops the default GROUP LINES - the alias DEFINITION
+        entries. A collected group line is a [line_name, line] pair
+        (_parse_lines_for_focus_manager), and an alias definition carries its
+        name token in line_name ('<world>'); presort_lines routes those into
+        the alias dict, and a focus-section macro/rebind resolves '<name>'
+        through that dict AT BUILD TIME, so dropping them aborts the whole
+        group build (KeyError 'Alias <x> is not known' -> bare Exception).
+        Tap groups, rebinds, macros and macro sequences are group lines and
+        stay dropped (approved proposal 2026-10-31, ruling b).'''
+        kept = []
+        for item in lines:
+            line_name = item[0] if isinstance(item, (list, tuple)) and item else ''
+            if line_name.startswith('<') and line_name.endswith('>') \
+                    and line_name not in ('<arg>', '<focus>'):
+                kept.append(item)
+        return kept
+
+    def _key_parts(self, group_text, what):
+        '''F-C4 belt: a container never holds an empty key component.
+        Config_Validator refuses such a line (rule 'hole') before this
+        point is ever reached, so an empty part here means a path that
+        skipped validation - drop the empty part and log it as a
+        violation-classified line instead of handing a phantom member
+        to the runtime'''
+        parts = split_key_group(group_text)
+        kept = [part for part in parts if part]
+        if len(kept) != len(parts):
+            # a plain stray comma reaches this point legitimately (the
+            # line cleaner accepts 'a,,d' shapes and FSTconfig_test.txt
+            # uses them), so this is a WARNING naming the dropped part -
+            # only a repeated declared name is refused upstream (rule
+            # 'hole'), and nothing here accuses the validator
+            logger_config.warning(
+                f'[hole] empty key component in "{group_text}" ({what}) '
+                '- the empty part is dropped')
+        return kept
+
     def presort_lines(self, lines):
         '''
         saves cleaned lines according to formatting in different containers;
         saved in variable_hr (human readable)
+
+        a line with >2 groups and a non-empty middle group is dropped here;
+        Config_Validator reports it as rule "dropped" before load_config
+        returns, so it is never silently lost anymore
+
+        F-C2 (review Item 4): the item TYPE comes from
+        fst_config_parser.classify_groups - the SAME rule the validator applies
+        when it reports that line, so the two lanes cannot disagree about what
+        a line is; the default names come from the parser's LineNamer - the
+        same one numbering policy the violation report uses (F-C4).
         '''
-
-        def split_ignore_brackets2(group):
-            '''
-            splits the group but ignoring the commas that are in brackets
-            used for evaluations that use commas to deliver 2 or more parameters
-            '''
-            # when no open bracket in group, then just use default split
-            if group.find('(') == -1:
-                return group.split(',')
-
-            key_string = group
-            valid_commas = []
-            start_pos = 0
-
-            open_count = 0
-
-            next_comma = key_string.find(',', start_pos)
-            next_open = key_string.find('(', start_pos)
-            next_close = key_string.find(')', start_pos)
-
-            # next_by_symbol = {',': next_comma, '(': next_open, ')': next_close}
-
-            while True:
-                if open_count == 0:
-                    if next_comma == -1:
-                        valid_commas.append(len(key_string))
-                        break
-                    elif next_open == -1:
-                        first = next_comma
-                        valid_commas.append(next_comma)
-                    else:
-                        first = min(next_comma, next_open)
-                        if first == next_comma:
-                            valid_commas.append(next_comma)
-                            # next comma
-                            symbol = ','
-                        else:
-                            open_count += 1
-                            # next open
-                            symbol = '('
-                elif open_count > 0:
-                    if next_open == -1:
-                        first = next_close
-                        open_count -= 1
-                        # next close
-                        symbol = ')'
-                    else:
-                        first = min(next_open, next_close)
-                        if first == next_close:
-                            open_count -= 1
-                            #next close
-                            symbol = ')'
-                        else:
-                            open_count += 1
-                            #next open
-                            symbol = '('
-                # print(f"count: {open_count} , start_pos: {start_pos} , first: {first}")
-                # print(f"valid commas: {valid_commas}")
-                start_pos = first+1
-
-                if symbol == ',':
-                    next_comma = key_string.find(',', start_pos)
-                if symbol == '(':
-                    next_open = key_string.find('(', start_pos)
-                else:
-                    next_close = key_string.find(')', start_pos)
-                    if open_count == 0:
-                        next_comma = key_string.find(',', start_pos)
-
-
-            split_group = []
-            start = 0
-            for comma in valid_commas:
-                split_group.append(key_string[start:comma])
-                start = comma+1
-
-            return split_group
-
-        def split_ignore_brackets(group):
-            split_group = group.split(',')
-            count_open = []
-            new_group = []
-
-            for el in split_group:
-                count_open.append(el.count('(') - el.count(')'))
-
-            temp = ''
-            sum = 0
-            for el, count in zip(split_group, count_open):
-                if temp == '':
-                    temp += el
-                else:
-                    temp += ', ' + el
-                sum += count
-                if sum == 0:
-                    new_group.append(temp)
-                    temp = ''
-
-            return new_group
-
-
         self._tap_groups_hr = []
         self._rebinds_hr = []
         self._macros_hr = []
         self._alias_hr = []
 
-        count_tap = 1
-        count_rebind = 1
-        count_macro = 1
-        count_macro_sequence = 1
+        namer = LineNamer()
         # sort the lines into their categories for later initialization
         for line in lines:
 
             alias, line = line
             if alias.startswith('<'):
-                self._alias_hr.append([alias, split_ignore_brackets(line)])
+                self._alias_hr.append([alias, self._key_parts(line, 'alias')])
             else:
-                ###XXX 241028-1243 added strip()
-                groups = [x.strip() for x in line.split(':')]
+                kind, groups = classify_groups(line)
                 # tap groups
-                if len(groups) == 1:
+                if kind == KIND_TAP:
                     # generate default names for Tap Groups
-                    if alias == '':
-                        alias = f"(TAP_{count_tap})"
-                        count_tap += 1
-                    self._tap_groups_hr.append([alias, split_ignore_brackets(groups[0])])
+                    alias = namer.name_for(kind, alias)
+                    self._tap_groups_hr.append(
+                        [alias, self._key_parts(groups[0], 'tap group')])
                 # rebinds
-                elif len(groups) == 2:
-                    trigger_group = split_ignore_brackets(groups[0])
-                    key_group = split_ignore_brackets(groups[1])
+                elif kind == KIND_REBIND:
+                    trigger_group = self._key_parts(groups[0], 'rebind trigger')
+                    key_group = self._key_parts(groups[1], 'rebind key')
                     # generate default names for Rebinds
-                    if alias == '':
-                        alias = f"(REB_{count_rebind})"
-                        count_rebind += 1
+                    alias = namer.name_for(kind, alias)
                     if len(key_group) == 1:
                         self._rebinds_hr.append([alias, [trigger_group, key_group[0]]])
-                    else:
-                        print(f"{key_group} is not a valid rebind (only one key_event/key allowed")
-                        print("   use :: instead of : to declare it as a macro")
+                    # the multi-key replacement is reported by Config_Validator
+                    # (rule "arity") before this point is ever reached
                     # macro
-                elif len(groups) > 2 and len(groups[1]) == 0:
-                    trigger_group = split_ignore_brackets(groups[0])
-                    if len(groups) > 3:
+                elif kind in (KIND_MACRO, KIND_SEQUENCE):
+                    trigger_group = self._key_parts(groups[0], 'macro trigger')
+                    if kind == KIND_SEQUENCE:
                         # generate default names for Macro Sequences
-                        if alias == '':
-                            alias = f"(SEQ_{count_macro_sequence})"
-                            count_macro_sequence += 1
-
-                        key_groups = [split_ignore_brackets(group) for group in groups[2:]]
+                        alias = namer.name_for(kind, alias)
+                        key_groups = [self._key_parts(group, 'macro sequence')
+                                    for group in groups[2:]]
                         self._macros_hr.append([alias, [trigger_group] + key_groups])
                     else:
                         # generate default names for Macros
-                        if alias == '':
-                            alias = f"(MAC_{count_macro})"
-                            count_macro += 1
-                        key_group = split_ignore_brackets(groups[2])
+                        alias = namer.name_for(kind, alias)
+                        key_group = self._key_parts(groups[2], 'macro')
                         self._macros_hr.append([alias, [trigger_group, key_group]])
+                # KIND_DROPPED: no container - the validator named it already
 
     # def display_groups(self):
     #     """
@@ -1282,6 +2295,156 @@ class Config_Manager():
         self.add_group(['w','s'], self._tap_groups_hr)
         self._write_out_new_file()
 
+# ---------------------------------------------------------------------------
+# --elevate startup lane (maintainer decision 2026-11-16 item 2; posture
+# approved item 3; route = research estate 2026-11-13_elevated-input.md
+# section 5 lane 1): a frozen exe given --elevate self-elevates through ONE
+# runas relaunch of itself, strips the flag from the child's args (loop
+# guard) and exits 0. free_snap_tap.py __main__ calls handle_elevate_flag
+# BEFORE any UI/hook init and feeds the returned args into the start-arg
+# pipeline - the flag never reaches apply_start_arguments, so existing
+# parsing/validation is undisturbed (see tests/test_elevate_flag.py).
+# ---------------------------------------------------------------------------
+
+ELEVATE_FLAG = '--elevate'
+
+# accepted startup spellings (pair-approved 2026-11-16, WTD mirror):
+# '-elevated' is WTD's spelling - cross-product vocabulary parity.
+# '--elevate' stays the canonical spelling everywhere (docs, messages,
+# pins); the alias only enters through the startup lane, where BOTH
+# spellings are stripped from the child's argv (loop guard)
+ELEVATE_START_FLAGS = (ELEVATE_FLAG, '-elevated')
+
+ELEVATE_DEV_MESSAGE = ('[Elevation] dev mode - relaunch the exe manually '
+                       'or use scheduled task')
+
+# ShellExecuteW failure band labels (cross-product polish 2026-11-16, WTD
+# mirror): the documented <= 32 return values are error codes, and the
+# shipped failure line carried only the number, so a declined UAC prompt (5)
+# and a missing exe (2) looked identical in fst.log. Values verified against
+# the installed Windows SDK: SE_ERR_* in um/shellapi.h, ERROR_BAD_FORMAT in
+# shared/winerror.h (2026-11-16).
+SE_ERR_NAMES = {
+    2: 'SE_ERR_FNF',
+    3: 'SE_ERR_PNF',
+    5: 'SE_ERR_ACCESSDENIED',
+    8: 'SE_ERR_OOM',
+    11: 'ERROR_BAD_FORMAT',
+    26: 'SE_ERR_SHARE',
+    27: 'SE_ERR_ASSOCINCOMPLETE',
+    28: 'SE_ERR_DDETIMEOUT',
+    29: 'SE_ERR_DDEFAIL',
+    30: 'SE_ERR_DDEBUSY',
+    31: 'SE_ERR_NOASSOC',
+    32: 'SE_ERR_DLLNOTFOUND',
+}
+
+
+def _se_err_name(code):
+    '''readable label for a ShellExecuteW failure code; a code the SDK table
+    above does not name keeps its number (never an invented symbol)'''
+    name = SE_ERR_NAMES.get(code)
+    return name if name is not None else f'code {code}'
+
+
+def _shell32_is_user_an_admin():
+    '''the bare ctypes seam for IsUserAnAdmin (tests patch this)'''
+    return bool(ctypes.windll.shell32.IsUserAnAdmin())
+
+
+def _shell32_runas_relaunch(exe_path, parameters, work_dir):
+    '''the bare ctypes seam for ShellExecuteW(NULL, "runas", ...) (tests
+    patch this); returns the HINSTANCE int (<= 32 = SE_ERR_* failure).
+    restype is pinned to c_void_p (cross-product polish 2026-11-16): the
+    documented return is an HINSTANCE-cast INT_PTR, so ctypes' default c_int
+    truncates the high dword on x64 and a healthy relaunch could read as a
+    failure; c_void_p hands the whole value back as an int (NULL arrives as
+    None -> 0 = the failure band). work_dir pins the child's CWD to the
+    parent's so relative -save_dir= / -backup_root_dir= / -file= values
+    resolve on the same footing as they would without the relaunch (reviewer
+    P2 2026-11-16: lpDirectory was left NULL and the child CWD unpinned)'''
+    shell32 = ctypes.windll.shell32
+    shell32.ShellExecuteW.restype = ctypes.c_void_p
+    return int(shell32.ShellExecuteW(None, 'runas', exe_path, parameters,
+                                     work_dir, 1) or 0)
+
+
+def _is_process_elevated():
+    '''wrapped admin-state check: True = high IL already. A win32 failure
+    is named in a warning and treated as NOT elevated - the honest runas
+    prompt beats a false '[Elevation] running elevated' claim'''
+    try:
+        return _shell32_is_user_an_admin()
+    except Exception as error:
+        logger.warning(f"[Elevation] IsUserAnAdmin failed: {error!r} - "
+                       "treating the process as not elevated")
+        return False
+
+
+def _is_dev_python():
+    '''dev-mode detection via sys.executable NAME: a source/pytest run
+    lives under python.exe; a frozen build (Nuitka/PyInstaller) runs its
+    own exe, so its basename never starts with 'python' (spec 2026-11-16)'''
+    return os.path.basename(sys.executable).lower().startswith('python')
+
+
+def _build_runas_parameters(args):
+    '''join the flag-free argv into the ONE lpParameters string ShellExecuteW
+    wants. list2cmdline applies the exact MSVC argv-quoting rules the child's
+    C runtime reverses (reviewer P1 2026-11-16: hand-rolled space-quoting
+    corrupts spaced args with trailing backslashes or embedded quotes);
+    order preserved'''
+    return subprocess.list2cmdline(args)
+
+
+def handle_elevate_flag(argv):
+    '''the --elevate startup lane - returns the args to continue with.
+
+    no flag: argv comes back untouched (zero behavior change, no win32
+    call at all).
+    already elevated: ONE '[Elevation] running elevated' log line, the
+    run continues with the flag stripped.
+    not elevated + dev run (python.exe): log ELEVATE_DEV_MESSAGE at WARNING
+    (console + fst.log) and continue - no ShellExecute attempt, so no prompt
+    and no loop.
+    not elevated + frozen exe: ONE runas relaunch of sys.executable with
+    the original args WITHOUT the flag (the child never sees it = loop
+    guard), then exit 0 via SystemExit.
+    '-elevated' is an accepted alias of '--elevate' (pair-approved
+    2026-11-16, ELEVATE_START_FLAGS): it triggers the same lane and is
+    stripped exactly like the canonical spelling.'''
+    if not any(flag in argv for flag in ELEVATE_START_FLAGS):
+        return argv
+    rest = [arg for arg in argv if arg not in ELEVATE_START_FLAGS]
+    if _is_process_elevated():
+        logger.info('[Elevation] running elevated')
+        return rest
+    if _is_dev_python():
+        # user-facing instruction (F-B2 class: stays console-visible) AND
+        # mirrored to fst.log (polish P2, WTD mirror): the 'fst' console
+        # handler shows WARNING+, so the hint rides WARNING to reach BOTH
+        # channels - a print() here would vanish with no console at all
+        # (pythonw.exe) and never appear in the log the maintainer hunts in.
+        logger.warning(ELEVATE_DEV_MESSAGE)
+        return rest
+    logger.info('[Elevation] relaunching elevated via runas')
+    se_result = _shell32_runas_relaunch(sys.executable,
+                                        _build_runas_parameters(rest),
+                                        os.getcwd())
+    if se_result <= 32:
+        # SE_ERR_* (5 = the declined UAC prompt): the exit code stays 0 per
+        # spec, but the failure gets a named warning line - a silent exit
+        # would leave the log indistinguishable from a successful relaunch.
+        # The polish unit adds the SE_ERR_* name so the log says WHICH
+        # failure happened; the 'runas relaunch returned N' phrase stays
+        # because the shipped lane pins it.
+        logger.warning(f'[Elevation] runas relaunch returned {se_result} '
+                       f'({_se_err_name(se_result)}) - no elevated instance '
+                       'started; launch the exe as administrator manually '
+                       'if none appeared')
+    sys.exit(0)
+
+
 class Argument_Manager():
     '''
     manages the global variables and start arguments
@@ -1309,6 +2472,10 @@ class Argument_Manager():
     EXEC_ONLY_ONE_TRIGGERED_MACRO = False
 
     ALWAYS_ACTIVE = False
+    # (#403) approved proposal 2026-10-31_fst-default-focus-group-deactivation
+    # (maintainer comments a+b): a focus section can drop the default GROUP
+    # LINES with -default_off; start arguments stay merged
+    DEFAULT_OFF = False
     CMD_WINDOW_HIDDEN = False
 
     # AntiCheat testing (ACT)
@@ -1358,11 +2525,23 @@ class Argument_Manager():
         self.CROSSHAIR_DELTA_X = Argument_Manager.CROSSHAIR_DELTA_X
         self.CROSSHAIR_DELTA_Y = Argument_Manager.CROSSHAIR_DELTA_Y
         self.ALWAYS_ACTIVE = Argument_Manager.ALWAYS_ACTIVE
+        self.DEFAULT_OFF = Argument_Manager.DEFAULT_OFF
         self.SAVE_DIR = Argument_Manager.SAVE_DIR
         self.BACKUP_ROOT_DIR = Argument_Manager.BACKUP_ROOT_DIR
 
     'start argument handling'
-    def apply_start_arguments(self, argv):
+    def apply_start_arguments(self, argv, from_config=False):
+        '''Apply start-argument tokens.
+
+        ``from_config`` marks tokens that came from config ``<arg>`` lines
+        (they were already validated and reported by Config_Validator), as
+        opposed to the real command line. Decision 11=a (maintainer
+        2026-11-17) uses that difference: an elevation spelling in a config
+        line already got the specific hint there, so the generic
+        'unknown start argument' line is suppressed for it here - while the
+        same spelling on the command line keeps reporting unknown, because no
+        validator hint ever covered it.
+        '''
         print(f"apply arguments: {argv}")
 
         def extract_delays(arg):
@@ -1376,10 +2555,17 @@ class Argument_Manager():
                 delays = delays[:2] # keep only first 2 numbers
             valid_delays = []
             for delay in delays:
-                if 0 < delay <= 1000:
+                # F-C4 (decision 9a=a): ONE bound for both worlds - the
+                # parser's DELAY_RANGE, inclusive: 0 <= delay <= 1000. The
+                # runtime used to keep 0 < delay <= 1000 and SILENTLY rewrote
+                # '-tapdelay=0,10' to (10, 10); that rewrite is gone - a value
+                # that is in range lands as written (delay 0 means 0 ms, and
+                # (0, 0) genuinely means no delay at all). Only values outside
+                # the range are dropped, and that still says so here.
+                if RUNTIME_DELAY_RANGE[0] <= delay <= RUNTIME_DELAY_RANGE[1]:
                     valid_delays.append(delay)
                 else:
-                    print("delay not in range 0<delay<=1000 ms")
+                    print("delay not in range 0<=delay<=1000 ms")
             valid_delays = sorted(valid_delays)
             if len(valid_delays) == 1:
                 # single delay value applies to min and max
@@ -1391,27 +2577,45 @@ class Argument_Manager():
 
         for arg in argv:
             # if commented out do nothing
-            if arg[0] in (':', '#'):
+            # U366 (TODO #362 ruling A 2026-11-06): arg[:1] not arg[0] - an
+            # empty argv element must not raise IndexError; it falls through
+            # the branch chain to the unknown-argument warning below
+            if arg[:1] in (':', '#'):
                 continue
             logger_config.debug(f"start argument: {arg}")
+            # U361 (TODO #356, ruling A 2026-11-04): dashed spellings are
+            # accepted - normalize '-' -> '_' in the arg NAME part for
+            # matching ('-always-active' == '-always_active'); the text
+            # after '=' stays verbatim; the unknown-arg warning below
+            # echoes the original spelling. Names NOT starting with '-'
+            # stay untouched (ruling scope: the validator twin rejects
+            # them, parser must not rewrite them into valid args)
+            original_arg = arg
+            arg = normalize_start_arg_name(arg)
             # log level control: -log=debug/info/warning/error
-            if arg[:5] == '-log=' and len(arg) > 5:
-                level = arg[5:].lower()
+            if arg_value(arg, '-log') is not None:
+                level = arg_value(arg, '-log').lower()
                 if level in LOG_LEVELS:
                     set_area_log_level(LOG_LEVELS[level])
                 else:
-                    logger_config.warning(f"invalid log level: {arg[5:]} - use debug, info, warning or error")
+                    logger_config.warning(f"invalid log level: {arg_value(arg, '-log')} - use debug, info, warning or error")
             # enable the per-key flow stream -> fst_flow.log
             elif arg == "-flow":
                 set_flow_enabled(True)
             elif arg == "-debug_numpad":
                 CONSTANTS.DEBUG_NUMPAD = True
+            # drop-watch lane -> named drop records in fst_drop.log (U345 H1)
+            elif arg == "-drop_watch":
+                set_drop_watch_enabled(True)
+            # restore the direct toast bridge emit (U345 H2 A/B switch)
+            elif arg == "-no_toast_offload":
+                CONSTANTS.TOAST_OFFLOAD = False
             # start directly without showing the menu
             elif arg == "-nomenu":
                 self.MENU_ENABLED = False
             # use custom tap groups file for loading and saving
-            elif arg[:6] == '-file=' and len(arg) > 6:
-                file_name = arg[6:]
+            elif arg_value(arg, '-file') is not None:
+                file_name = arg_value(arg, '-file')
                 logger_config.info(f"config file set to: {file_name}")
                 self._fst.config_manager.file_name = file_name
             # Start with controls disabled
@@ -1419,25 +2623,25 @@ class Argument_Manager():
                 self.CONTROLS_ENABLED = False
             elif arg == "-delay":
                 self.ACT_DELAY = True
-            elif arg[:10] == "-tapdelay=" and len(arg) > 10:
+            elif arg_value(arg, '-tapdelay') is not None:
                 self.ACT_DELAY = True
-                delays = extract_delays(arg[10:])
+                delays = extract_delays(arg_value(arg, '-tapdelay'))
                 if delays is not None:
                     self.ACT_MIN_DELAY_IN_MS, self.ACT_MAX_DELAY_IN_MS = delays
                     print(f"Tap delays set to: min:{self.ACT_MIN_DELAY_IN_MS}, max:{self.ACT_MAX_DELAY_IN_MS}")
                 else:
                     print("no valid tap delay - delay range unchanged")
-            elif arg[:12] == "-aliasdelay=" and len(arg) > 12:
+            elif arg_value(arg, '-aliasdelay') is not None:
                 self.ACT_DELAY = True
-                delays = extract_delays(arg[12:])
+                delays = extract_delays(arg_value(arg, '-aliasdelay'))
                 if delays is not None:
                     self.MACRO_MIN_DELAY_IN_MS, self.MACRO_MAX_DELAY_IN_MS = delays
                     print(f"Macro delays set to: min:{self.MACRO_MIN_DELAY_IN_MS}, max:{self.MACRO_MAX_DELAY_IN_MS}")
                 else:
                     print("no valid alias delay - delay range unchanged")
-            elif arg[:12] == "-macrodelay=" and len(arg) > 12:
+            elif arg_value(arg, '-macrodelay') is not None:
                 self.ACT_DELAY = True
-                delays = extract_delays(arg[12:])
+                delays = extract_delays(arg_value(arg, '-macrodelay'))
                 if delays is not None:
                     self.MACRO_MIN_DELAY_IN_MS, self.MACRO_MAX_DELAY_IN_MS = delays
                     print(f"Macro delays set to: min:{self.MACRO_MIN_DELAY_IN_MS}, max:{self.MACRO_MAX_DELAY_IN_MS}")
@@ -1445,11 +2649,11 @@ class Argument_Manager():
                     print("no valid macro delay - delay range unchanged")
             elif arg == "-crossover":
                 self.ACT_CROSSOVER = True
-            elif arg[:11] == "-crossover=" and len(arg) > 11:
+            elif arg_value(arg, '-crossover') is not None:
                 self.ACT_CROSSOVER = True
                 probability = None
                 try:
-                    probability = int(arg[11:])
+                    probability = int(arg_value(arg, '-crossover'))
                 except Exception:
                     print("invalid probability - needs to be a number")
                 if probability is not None and 0 <= probability <= 100:
@@ -1460,7 +2664,7 @@ class Argument_Manager():
                 self.ACT_DELAY = False
                 self.ACT_CROSSOVER = False
                 print("delay+crossover deactivated")
-            elif arg[:10] == "-focusapp="  and len(arg) > 10:
+            elif arg_value(arg, '-focusapp') is not None:
                 #FOCUS_APP_NAME = arg[10:]
                 #print(f"focusapp active: looking for: {FOCUS_APP_NAME}")
                 print("Do not use the -focusapp start argument with V1.0.0+, use instead <focus>*name* directly in config!")
@@ -1470,35 +2674,68 @@ class Argument_Manager():
             elif arg == "-status_indicator":
                 self.STATUS_INDICATOR = True
                 print(f"set indicator to: {self.STATUS_INDICATOR}")
-            elif arg[:18] == "-status_indicator="  and len(arg) > 18:
+            elif arg_value(arg, '-status_indicator') is not None:
                 self.STATUS_INDICATOR = True
-                self.STATUS_INDICATOR_SIZE = int(arg[18:])
+                self.STATUS_INDICATOR_SIZE = int(arg_value(arg, '-status_indicator'))
                 print(f"set indicator size to: {self.STATUS_INDICATOR_SIZE}")
             elif arg == "-crosshair":
                 self.CROSSHAIR_ENABLED = True
                 print(f"set crosshair to: {self.CROSSHAIR_ENABLED}")
-            elif arg[:11] == "-crosshair="  and len(arg) > 11:
+            elif arg_value(arg, '-crosshair') is not None:
                 self.CROSSHAIR_ENABLED = True
                 try:
-                    x, y = arg[11:].strip().replace(' ', '').split(',')
+                    x, y = arg_value(arg, '-crosshair').strip().replace(' ', '').split(',')
                     self.CROSSHAIR_DELTA_X, self.CROSSHAIR_DELTA_Y = int(x), int(y)
                     print(f"set crosshair delta is set to: {self.CROSSHAIR_DELTA_X}, {self.CROSSHAIR_DELTA_Y}")
                 except Exception:
                     print("invalid crosshair delta - needs to be two numbers, e.g. -crosshair=5,-10")
-            elif arg[:14] == "-always_active":
+            elif prefix_matches(arg, '-always_active'):
                 self.ALWAYS_ACTIVE = True
-            elif arg[:10] == "-tray_icon":
+            elif arg == "-no_warnings":
+                # consumed by the config validator (per-scope warning
+                # suppression, U290T) - nothing to do at runtime
+                pass
+            elif arg == "-default_off":
+                # (#403) approved proposal 2026-10-31 part (b): drop the default
+                # GROUP LINES for the applied focus group only - start arguments
+                # stay merged and -always_active (focus-loss behavior) is
+                # untouched; DEFAULT_OFF resets on every focus change like
+                # ALWAYS_ACTIVE (reset_global_variable_changes)
+                self.DEFAULT_OFF = True
+                print(f"set default group lines off for this focus group: {self.DEFAULT_OFF}")
+            elif arg == "-default_on":
+                # (#423) retired the same day it shipped (U418/321a893):
+                # settled model (maintainer 2026-11-11, TODO #418 resolution) -
+                # the default group IS merged into every focus group and
+                # -default_off is the ONLY opt-out, so -default_on does
+                # NOTHING here (the config validator surfaces the same
+                # retirement WARNING for config sections)
+                print("-default_on is retired - the default group is always "
+                      "added; use -default_off to opt out")
+            elif arg == "-default_always_active":
+                # focus-section arg: the default groups stay active whenever
+                # this group's args are applied (ALWAYS_ACTIVE resets on
+                # every focus change, reset_global_variable_changes)
+                self.ALWAYS_ACTIVE = True
+                print(f"set default always active to: {self.ALWAYS_ACTIVE}")
+            elif prefix_matches(arg, '-tray_icon'):
                 self.TRAY_ICON = True
-            elif arg[:16] == "-hide_cmd_window":
+            elif prefix_matches(arg, '-hide_cmd_window'):
                 self.CMD_WINDOW_HIDDEN = True
-            elif arg[:10] == "-save_dir=" and len(arg) > 10:
-                self.SAVE_DIR = arg[10:].strip()
+            elif arg_value(arg, '-save_dir') is not None:
+                self.SAVE_DIR = arg_value(arg, '-save_dir').strip()
                 print(f"set save directory to: {self.SAVE_DIR}")
-            elif arg[:17] == "-backup_root_dir=" and len(arg) > 17:
-                self.BACKUP_ROOT_DIR = arg[17:].strip()
+            elif arg_value(arg, '-backup_root_dir') is not None:
+                self.BACKUP_ROOT_DIR = arg_value(arg, '-backup_root_dir').strip()
                 print(f"set backup root directory to: {self.BACKUP_ROOT_DIR}")
+            elif from_config and is_elevation_config_arg(original_arg):
+                # Decision 11=a (2026-11-17): the config validator already
+                # answered this line with the specific 'is a start argument for
+                # elevation - place it on the command line' hint, so a second
+                # generic line here would be a double message for one line.
+                pass
             else:
-                logger_config.warning(f"unknown start argument: {arg}")
+                logger_config.warning(f"unknown start argument: {original_arg}")
 
 class Focus_Group_Manager():
     '''
@@ -1694,6 +2931,20 @@ class Input_State_Manager():
             return False
     def set_toggle_state(self, vk_code, is_press):
         self._toggle_states_dict[vk_code] = is_press
+        # F-A7 (ladder R2, shadow for toggles): the latch IS the ownership
+        # record of a latched-down key - engaged opens a long-lived press
+        # ticket, released closes it. Release BEHAVIOR is byte-identical (this
+        # adds no send); it makes toggle debt visible and countable.
+        # source_kind='toggle', source_id='toggle:<vk>' - the latch state has no
+        # alias name, the vk is the toggle key's identity.
+        if is_press:
+            opener = getattr(self._fst, 'open_press_ticket', None)
+            if opener is not None:
+                opener(vk_code, SOURCE_TOGGLE, f'toggle:{vk_code}')
+        else:
+            closer = getattr(self._fst, 'close_hold_ticket', None)
+            if closer is not None:
+                closer(vk_code, SOURCE_TOGGLE)
 
     @property
     def toggle_states_dict_keys(self):
@@ -1745,10 +2996,23 @@ class Input_State_Manager():
             if not _handle.done():
                 repeat_task.cancel_playback()
                 _handle.cancel()
+            # F-A7 (ladder R2): the repeat lane drives a macro playback of the
+            # same alias, and cancelling the repeat task does NOT cancel that
+            # playback's physical debt. Drain it here, before returning, so a
+            # repeat cancel cannot leave a key held (research (D) R2).
+            drainer = getattr(self._fst, 'drain_macro_debt', None)
+            if drainer is not None:
+                drainer(alias=repeat_task.alias_name, context='repeat_cancel')
 
-    def release_all_toggles(self):
+    def release_all_toggles(self, drain_id=None):
         for vk_code in self._toggle_states_dict_keys:
+            # F-A7: the toggle latch drain gets its own emission ticket
+            # (source_kind 'toggle'); the ownership ticket the engage opened is
+            # closed by the set_toggle_state(False) below. Sends unchanged.
+            ticket = self._open_release_ticket(vk_code, SOURCE_TOGGLE,
+                                               drain_id, 'toggle_sweep')
             self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
+            self._close_ticket(ticket)
             self.set_toggle_state(vk_code, False)
 
     def reset_all_lists(self):
@@ -1764,13 +3028,29 @@ class Input_State_Manager():
 
 ###XXX 241014-1926 changed
 
-    def release_all_currently_pressed_simulated_keys(self):
+    def _open_release_ticket(self, vk_code, source_kind, drain_id, sweep):
+        '''F-A7 (L1): build the ticket's source_id from the CALL's attribution
+        (`<drain_id>.<sweep>`, or the bare sweep when the caller has no leg
+        label) and hand it to the keyboard's ledger. The attribution arrives as
+        a parameter - nothing reads shared state, so two drain legs running on
+        different threads cannot swap labels. A stand-in keyboard without the
+        helper (tests) returns None and the release proceeds unchanged.'''
+        opener = getattr(self._fst, 'open_release_ticket', None)
+        if opener is None:
+            return None
+        source = sweep if not drain_id else f"{drain_id}.{sweep}"
+        return opener(vk_code, source_kind, source)
+
+    def _close_ticket(self, ticket):
+        if ticket is None:
+            return None
+        closer = getattr(self._fst, 'close_ticket', None)
+        if closer is None:
+            return None
+        return closer(ticket)
+
+    def release_all_currently_pressed_simulated_keys(self, drain_id=None):
         # print(f"pressed keys on release: {self._pressed_keys}")
-        active_keys = []
-        for key, item in self._simulated_key_press_states_dict.items():
-            if item is True:
-             active_keys.append(key)
-        # print(f"pressed simulated keys on release: {active_keys}")
 
         ###XXX 241009-1049 do not release real keys, 241009-1100 now again release all keys - works better
         logger_state.debug("releasing all keys")
@@ -1781,11 +3061,18 @@ class Input_State_Manager():
             if is_press:
                 # only reset simulated keys
                 logger_state.debug(f"released key: {vk_code}")
+                # F-A6 (R1 as scoped for this unit): shadow-record the release
+                # this brute sweep emits. Same sends, same order, same count -
+                # the sweep semantics are unchanged (R2+ is where a drain asks
+                # the ledger for the list instead of inferring it).
+                ticket = self._open_release_ticket(vk_code, SOURCE_DRAIN,
+                                                   drain_id, 'simulated_sweep')
                 self._fst.output_manager.send_key_event(Key_Event(vk_code, False))
+                self._close_ticket(ticket)
 
         # self.release_all_modifier_keys()
 
-        self.release_all_toggles()
+        self.release_all_toggles(drain_id)
         self.reset_states_dicts()
 
     def release_all_modifier_keys(self):
@@ -1899,12 +3186,25 @@ class CLI_menu():
                 self._fst.arg_manager.PRINT_VK_CODES = True
                 break
             elif choice == '4':
-                exit()
+                # F-A5 (Item 3): no bare exit() inside the loop task. A
+                # SystemExit raised here was swallowed by no one and unwound
+                # the asyncio task weirdly (the half-dead process of Item 3);
+                # the menu now orders the stop (the flag every observer reads)
+                # and POSTS STOPPING into the loop's machine, then returns
+                # 'stop' so the caller does not start the listeners it was
+                # about to start (F-A5 reviewer P0).
+                self._fst.arg_manager.STOPPED = True
+                self._fst.post_lifecycle(Lifecycle_State.STOPPING,
+                                         'menu choice 4 - End the program')
+                return 'stop'
             elif choice == '':
                 break
             else:
                 text = "Error: Invalid input."
                 invalid_input = True
+
+        # a start choice ('' or '3'): the caller continues into the listeners
+        return 'start'
 
     def display_control_text(self):
         print('\n--- toggle PAUSED with ALT + DELETE ---')
@@ -1937,3 +3237,309 @@ class CLI_menu():
         # Try to flush the buffer
         while msvcrt.kbhit():
             msvcrt.getch()
+
+# ---------------------------------------------------------------------------
+# F-B4 (review Item 13): the one-shot status dump - THE bug-report artifact.
+# ---------------------------------------------------------------------------
+
+# The effective start arguments the artifact reports, in render order: the
+# post-validation values the pump actually runs on (Argument_Manager instance
+# attributes, class-attribute fallback via getattr). A bug report must say what
+# the filter was told to do, so the list is fixed (a stable public surface of
+# the artifact - review Item 13's "small public surface to keep stable").
+STATUS_ARG_NAMES = (
+    'WIN32_FILTER_PAUSED', 'MANUAL_PAUSED', 'STOPPED', 'MENU_ENABLED',
+    'CONTROLS_ENABLED', 'PRINT_VK_CODES', 'EXEC_ONLY_ONE_TRIGGERED_MACRO',
+    'ALWAYS_ACTIVE', 'DEFAULT_OFF', 'CMD_WINDOW_HIDDEN',
+    'TRAY_ICON', 'STATUS_INDICATOR', 'STATUS_INDICATOR_SIZE',
+    'CROSSHAIR_ENABLED', 'CROSSHAIR_DELTA_X', 'CROSSHAIR_DELTA_Y',
+    'ACT_DELAY', 'ACT_MIN_DELAY_IN_MS', 'ACT_MAX_DELAY_IN_MS',
+    'ACT_CROSSOVER', 'ACT_CROSSOVER_PROPABILITY_IN_PERCENT',
+    'MACRO_MIN_DELAY_IN_MS', 'MACRO_MAX_DELAY_IN_MS',
+    'SAVE_DIR', 'BACKUP_ROOT_DIR',
+)
+
+
+def _status_text(value):
+    '''A name or user-text field for the artifact: ASCII-escaped (a non-ASCII
+    focus name or source id must not mangle a reporter\'s paste), None
+    collapsed to '-', everything stringified through ascii(). Numeric fields
+    and the path lines render raw on purpose - a path has to stay copy-paste
+    able, and a vk or seq has to stay greppable.'''
+    if value is None:
+        return '-'
+    return ascii(str(value))
+
+
+def _status_num(value):
+    '''An int-or-None field (a vk code): '-' instead of Python\'s None.'''
+    return '-' if value is None else value
+
+
+class Status_Dump():
+    '''F-B4 (review Item 13): render + write one whole snapshot of what the
+    filter is IN right now - the single artifact a bug report attaches.
+
+    Sections, in order: effective args (post-validation) | lifecycle state
+    (F-A5) | focus scope | group counts | tap / hold / toggle states (read
+    from the F-B1 typed values, never from an object repr) | the ticket
+    ledger (F-A6/A7/A8) with the [StuckKeyWatch] aging detector | paths.
+
+    The file (fst_status.log, same CWD-relative directory convention as
+    fst.log) is OVERWRITTEN, atomically: render into a temp sibling, then one
+    os.replace. A reporter therefore never attaches a half-written file, and
+    a failed overwrite never destroys the artifact of the last good moment.
+
+    THREAD RULE (Item 13's named downside, answered by F-A4/F-A5): the render
+    reads live containers, so it runs on the asyncio loop thread - the lane
+    F-A4 built for the reload leg (FST_Keyboard.request_status_dump routes
+    through _run_on_loop_or_inline). The hook pump has NO dump trigger and no
+    dump path: a dump is file I/O, and a LL-hook pump that blocks past
+    LowLevelHooksTimeout loses the hook silently.
+
+    READ RULE (F-A3 discipline): bind the generation once, copy every live
+    container with list()/dict() before iterating, mutate nothing. The reads
+    tolerate a concurrent swap or append exactly like the pump\'s own reads.
+
+    A section that raises renders `unavailable: <Type>: <message>` and the
+    rest still lands: the artifact exists for the broken case most of all.
+    Only the write itself is allowed to raise - the caller names it (the F-A4
+    leg failure rule: a failed leg is named, never a silent scheduled-ok).'''
+
+    HEADER = '# FST status dump v1'
+    FOOTER = '# end of FST status dump v1'
+
+    def __init__(self, fst_keyboard):
+        self._fst = fst_keyboard
+
+    # -- the two entry points ------------------------------------------------
+
+    def render(self, reason='startup', now=None):
+        '''The whole artifact as one string - no ARTIFACT file I/O (the
+        aging detector below does log, so a re-render re-emits a live
+        warning; only `write` touches fst_status.log). `now` is the
+        monotonic anchor the ledger ages are measured against - pass it in a
+        test to fake the clock (no sleeps in the suite); None reads the
+        clock once, so every ticket in this render ages from ONE instant.'''
+        now = monotonic() if now is None else now
+        lines = [self.HEADER]
+        lines += self._header_lines(reason)
+        lines += self._section('Effective args (post-validation)',
+                               self._args_lines)
+        lines += self._section('Lifecycle', self._lifecycle_lines)
+        lines += self._section('Focus scope', self._focus_lines)
+        lines += self._section('Group counts', self._count_lines)
+        lines += self._section('Tap hold toggle', self._tap_lines)
+        lines += self._section('Ledger', lambda: self._ledger_lines(now))
+        lines += self._section('Paths', self._path_lines)
+        lines.append(self.FOOTER)
+        return '\n'.join(lines) + '\n'
+
+    def write(self, reason='startup', now=None):
+        '''Render, then overwrite the artifact atomically. Returns the
+        absolute path written. Raises OSError when the file could not be
+        replaced (a locked or unwritable directory) - after the previous
+        artifact was left intact, which is the point of the temp + replace.'''
+        text = self.render(reason=reason, now=now)
+        target = STATUS_FILE
+        tmp = f'{target}.tmp-{os.getpid()}'
+        try:
+            with open(tmp, 'w', encoding='utf-8', newline='\n') as handle:
+                handle.write(text)
+            os.replace(tmp, target)
+        except OSError:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass  # nothing else to do with a temp we cannot delete
+            raise
+        path = os.path.abspath(target)
+        logger.info(f"[StatusDump] wrote={path} reason={reason} "
+                    f"pid={os.getpid()}")
+        return path
+
+    # -- header / section plumbing ------------------------------------------
+
+    def _header_lines(self, reason):
+        # timestamp + pid identify WHICH run wrote the file; the thread names
+        # which leg wrote it - the F-B4 thread contract (loop thread, never
+        # the pump) is then visible in the artifact itself
+        return [
+            f"written={datetime.datetime.now().isoformat(timespec='microseconds')}",
+            f"pid={os.getpid()}",
+            f"thread={ascii(threading.current_thread().name)}",
+            f"reason={_status_text(reason)}",
+        ]
+
+    def _section(self, header, builder):
+        lines = ['', f'## {header}']
+        try:
+            lines += builder()
+        except Exception as error:
+            # named, not silent: an artifact that hides a broken section
+            # teaches the reporter the wrong thing
+            lines.append(f"unavailable: {type(error).__name__}: "
+                         f"{ascii(str(error))}")
+        return lines
+
+    # -- sections -------------------------------------------------------------
+
+    def _args_lines(self):
+        am = self._fst.arg_manager
+        lines = [f"{name.lower()}={getattr(am, name, None)}"
+                 for name in STATUS_ARG_NAMES]
+        lines.append(f"sys_start_args={ascii(list(am.sys_start_args))}")
+        # the observability state belongs in the artifact too: a report must
+        # say whether the flow log / drop watch were even on, and which level
+        # the root logger actually answers at (an unconfigured tree answers at
+        # the effective level, NOT at the unset level 0)
+        lines.append("log_root_level="
+                     f"{logging.getLevelName(logger.getEffectiveLevel())}")
+        lines.append(f"flow_enabled={is_flow_enabled()}")
+        lines.append(f"drop_watch_enabled={is_drop_watch_enabled()}")
+        lines.append(f"debug_numpad={CONSTANTS.DEBUG_NUMPAD}")
+        return lines
+
+    def _lifecycle_lines(self):
+        machine = getattr(self._fst, '_lifecycle', None)
+        state = getattr(machine, 'state', None)
+        value = getattr(state, 'value', None)
+        return [f"state={value if value is not None else 'not-attached'}"]
+
+    def _focus_lines(self):
+        fm = self._fst.focus_manager
+        declared = sorted(str(name)
+                          for name in list(fm.multi_focus_dict_keys))
+        active = str(fm.FOCUS_APP_NAME)
+        scope = (self._fst._scope_of_focus_name(active) if active else '-')
+        return [
+            f"focus_active={bool(fm.focus_active)}",
+            f"focus_app_name={_status_text(active or None)}",
+            f"scope={_status_text(scope)}",
+            f"declared_scopes={len(declared)}",
+            f"declared_scope_names={ascii(declared)}",
+        ]
+
+    def _count_lines(self):
+        rt = self._runtime()
+        return [
+            f"gen_id={rt.gen_id}",
+            f"tap_groups={len(rt.tap_groups)}",
+            f"rebinds={len(rt.rebinds)}",
+            f"macros={len(rt.macros)}",
+            f"macro_sequences={len(rt.macro_sequence_alias_list)}",
+            f"key_groups={len(rt.key_group_by_alias)}",
+            f"triggers={len(rt.all_trigger_events)}",
+            f"rebind_triggers={len(rt.rebind_triggers)}",
+            f"macro_triggers={len(rt.macro_triggers)}",
+            f"tap_owned_vks={len(rt.tap_owner_by_vk)}",
+        ]
+
+    def _tap_lines(self):
+        # F-B1 typed values only: vk codes and latched bools. No object repr
+        # ever reaches this artifact - Item 13 filed the alt+num5 repr dump
+        # as the thing a bug report must not have to read.
+        rt = self._runtime()
+        lines = []
+        for index, group in enumerate(list(rt.tap_groups)):
+            states = dict(getattr(group, 'states', None) or {})
+            # str-keyed sort: a synthetic group may carry label members (F-B1
+            # allows any hashable), and the artifact must render, not raise
+            states_text = ','.join(f"{vk}:{int(bool(state))}"
+                                   for vk, state
+                                   in sorted(states.items(),
+                                             key=lambda kv: str(kv[0])))
+            lines.append(
+                f"tap[{index}] alias={_status_text(getattr(group, 'alias', '') or None)} "
+                f"keys={','.join(str(vk) for vk in group.get_vk_codes())} "
+                f"states={states_text or '-'} "
+                f"last_pressed={_status_num(getattr(group, 'last_key_pressed', None))} "
+                f"hold_send={_status_num(getattr(group, 'last_key_send', None))} "
+                f"active_key={_status_num(getattr(group, 'active_key', None))}")
+        if not lines:
+            lines.append('tap_groups: none')
+        sm = self._fst.state_manager
+        toggles = dict(getattr(sm, '_toggle_states_dict', None) or {})
+        latched = sorted((vk for vk, on in toggles.items() if on), key=str)
+        lines.append(f"toggle_tracked={len(toggles)}")
+        lines.append(f"toggle_latched={','.join(str(vk) for vk in latched) or '-'}")
+        held = dict(getattr(self._fst, '_macro_held', None) or {})
+        lines.append(f"macro_holds={len(held)}")
+        for alias in sorted(str(a) for a in held):
+            # the inner dict is live too (the READ RULE): copy before sorting
+            vks = ','.join(str(vk) for vk in sorted(dict(held[alias]), key=str))
+            lines.append(f"macro_hold alias={_status_text(alias)} vks={vks}")
+        return lines
+
+    def _ledger_lines(self, now):
+        ledger = getattr(self._fst, '_ledger', None)
+        if ledger is None:
+            return ['ledger: none']
+        # ONE snapshot scan serves every number in this section: open_tickets()
+        # plus counts() would be two scans, and a ticket whose state flipped in
+        # between could make open=, counts_state= and the rows disagree - the
+        # exact one-scan rule open_tickets documents (F-A6 reviewer P2-3 family)
+        scanned = ledger.tickets()
+        counts = {state: 0 for state in TICKET_STATES}
+        for ticket in scanned:
+            counts[ticket.state] = counts.get(ticket.state, 0) + 1
+        open_now = [t for t in scanned if t.state != TICKET_COMPLETED]
+        threshold = CONSTANTS.STUCK_TICKET_MS
+        by_source = {}
+        for ticket in open_now:
+            by_source[ticket.source_kind] = by_source.get(ticket.source_kind,
+                                                          0) + 1
+        lines = [
+            f"high_seq={ledger.high_seq()}",
+            f"total={len(scanned)}",
+            f"open={len(open_now)}",
+            'counts_state=' + ' '.join(f"{state}={counts.get(state, 0)}"
+                                       for state in sorted(counts)),
+            'counts_open_by_source=' + ' '.join(
+                f"{kind}={by_source[kind]}" for kind in sorted(by_source)),
+            'open_tickets seq vk kind state source_kind source_id gen mouse age_ms',
+        ]
+        stuck = []
+        for ticket in sorted(open_now, key=lambda t: t.seq):
+            age_ms = int((now - ticket.created_at) * 1000)
+            lines.append(f"  {ticket.seq} {ticket.vk} {ticket.kind} "
+                         f"{ticket.state} {ticket.source_kind} "
+                         f"{_status_text(ticket.source_id)} {ticket.gen_id} "
+                         f"{int(bool(ticket.is_mouse))} {age_ms}")
+            if age_ms > threshold:
+                stuck.append((ticket, age_ms))
+        if len(open_now) == 0:
+            lines.append('  none')
+        # the named aging detector of the design report (TOP-3 risk 3): debt
+        # that never closes must be nameable without reading the table by eye
+        for ticket, age_ms in stuck:
+            line = (f"[StuckKeyWatch] seq={ticket.seq} vk={ticket.vk} "
+                    f"kind={ticket.kind} state={ticket.state} "
+                    f"source_kind={ticket.source_kind} "
+                    f"source_id={_status_text(ticket.source_id)} "
+                    f"gen={ticket.gen_id} age_ms={age_ms} "
+                    f"threshold_ms={threshold}")
+            lines.append(line)
+            logger.warning(line)
+        return lines
+
+    def _path_lines(self):
+        lines = [
+            f"status_file={os.path.abspath(STATUS_FILE)}",
+            f"log_file={os.path.abspath(MAIN_LOG_FILE)}",
+            f"flow_log={os.path.abspath(FLOW_LOG_FILE)}",
+            f"flow_enabled={is_flow_enabled()}",
+            f"drop_log={os.path.abspath(DROP_LOG_FILE)}",
+            f"drop_watch_enabled={is_drop_watch_enabled()}",
+            f"config_file={os.path.abspath(self._fst.config_manager.file_name)}",
+            f"cwd={ascii(os.getcwd())}",
+        ]
+        return lines
+
+    # -- internals -----------------------------------------------------------
+
+    def _runtime(self):
+        '''ONE bind of the live generation (F-A3): the whole artifact is
+        consistent to a single generation, never a torn pair of them.'''
+        return self._fst._runtime
+

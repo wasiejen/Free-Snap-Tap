@@ -1,20 +1,24 @@
 """GUI_Manager unit tests (offscreen): construction with a stand-in fst
 (doubles as an integration check of its four children), perform_periodic_update
 called DIRECTLY (update_timer is never started), color logic and tray/overlay
-sync, signal wiring, delegation methods, exit_program and start with a
-mocked QApplication (app.exec() is mocked, the real loop is never entered)."""
+sync, signal wiring, delegation methods, eval-on-save config watcher
+(U290T: file save -> validator pass + result toast via the facade reload),
+exit_program and start with a mocked QApplication (app.exec() is mocked,
+the real loop is never entered)."""
+import os
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
 import fst_overlay
+from fst_keyboard import FST_Keyboard
 from fst_overlay import CrosshairOverlay, GUI_Manager, StatusOverlay, ToastManager, Tray_Icon
 
 
 @pytest.fixture
 def fst():
-    return SimpleNamespace(
+    ns = SimpleNamespace(
         arg_manager=SimpleNamespace(
             MANUAL_PAUSED=False,
             WIN32_FILTER_PAUSED=False,
@@ -25,13 +29,21 @@ def fst():
             STATUS_INDICATOR_SIZE=10,
         ),
         focus_manager=SimpleNamespace(FOCUS_APP_NAME=''),
+        config_manager=SimpleNamespace(file_name=''),
         open_config_file=MagicMock(),
         reload_from_file=MagicMock(),
         control_toggle_pause=MagicMock(),
         control_return_to_menu=MagicMock(),
         control_exit_program=MagicMock(),
         display_internal_repr_groups=MagicMock(),
+        toast_callback=MagicMock(),
     )
+    # FST-417 (#417): the config-error toast legs delegate to the palette
+    # owner - wire the REAL facade body onto the stand-in (call-tracked) so
+    # the bridge leg stays exercised rather than a copy of the toast call
+    ns.surface_config_error = MagicMock(
+        side_effect=lambda error: FST_Keyboard.surface_config_error(ns, error))
+    return ns
 
 
 @pytest.fixture
@@ -237,3 +249,147 @@ def test_start_starts_timer_and_event_loop(qtbot, fst, app_mock):
     assert m.update_timer.isActive()
     app_mock.exec.assert_called_once()
     m.update_timer.stop()
+
+
+class TestEvalOnSaveWatcher:
+    """U290T(2): a config file save triggers the validator pass (facade
+    reload -> load_config validates at load) and the result toast path.
+    The watcher lives on GUI_Manager: registration, the change handler and
+    the signal->slot wiring are pinned deterministically; the Qt watcher
+    ENGINE's live event delivery is platform timing (offscreen) - acceptance
+    on the maintainer's machine is pending-hardware.
+
+    U290R(P1): Qt fires fileChanged MULTIPLE times per in-place editor save
+    (save-via-rename burst), so the direct reload used to chain one reload
+    per event - group rebuilds, released-key side effects, result-toast
+    spam per save. A single-shot debounce timer coalesces the burst of ONE
+    save into exactly ONE reload; the flush re-arms the watch (Windows drops
+    the path on a rename-save). The burst pins drive the watcher signal and
+    the flush directly; the live timer leg is pinned through qtbot.wait."""
+
+    def make_config(self, tmp_path):
+        cfg = tmp_path / 'FSTconfig_watch.txt'
+        cfg.write_text('a, b\n', encoding='utf-8')
+        return cfg
+
+    def test_config_file_watched_at_startup(self, qtbot, fst, app_mock, tmp_path):
+        cfg = self.make_config(tmp_path)
+        fst.config_manager.file_name = str(cfg)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+
+        assert os.path.abspath(str(cfg)) in m.config_watcher.files()
+
+    def test_empty_file_name_watches_nothing(self, qtbot, fst, app_mock):
+        m = GUI_Manager(fst, app_mock)  # fixture: file_name '' (no config set)
+        qtbot.addWidget(m)
+        assert m.config_watcher.files() == []
+
+    def test_missing_file_watches_nothing(self, qtbot, fst, app_mock, tmp_path):
+        fst.config_manager.file_name = str(tmp_path / 'not_created_yet.txt')
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        assert m.config_watcher.files() == []
+
+    def test_burst_of_events_coalesces_to_one_reload(self, qtbot, fst, app_mock, tmp_path):
+        cfg = self.make_config(tmp_path)
+        fst.config_manager.file_name = str(cfg)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        m.reload_from_file = MagicMock()
+        path = os.path.abspath(str(cfg))
+
+        for _ in range(3):  # the rename-save burst of ONE editor save
+            m.config_watcher.fileChanged.emit(path)
+        m._flush_config_reload()
+
+        m.reload_from_file.assert_called_once()  # ONE reload per save
+        assert path in m.config_watcher.files()
+
+    def test_event_arms_single_shot_debounce(self, qtbot, fst, app_mock, tmp_path):
+        cfg = self.make_config(tmp_path)
+        fst.config_manager.file_name = str(cfg)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        m.reload_from_file = MagicMock()
+
+        m.config_watcher.fileChanged.emit(os.path.abspath(str(cfg)))
+
+        assert m._config_reload_timer.isSingleShot() is True
+        assert m._config_reload_timer.isActive() is True
+        m.reload_from_file.assert_not_called()  # coalesced, not one per event
+        qtbot.wait(fst_overlay.CONFIG_RELOAD_DEBOUNCE_MS + 250)  # live leg
+        m.reload_from_file.assert_called_once()
+        assert not m._config_reload_timer.isActive()
+
+    def test_debounce_flush_rearms_watch_and_reloads(self, qtbot, fst, app_mock, tmp_path):
+        cfg = self.make_config(tmp_path)
+        fst.config_manager.file_name = str(cfg)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        m.reload_from_file = MagicMock()
+        path = os.path.abspath(str(cfg))
+        m.config_watcher.removePath(path)  # simulate the rename-save drop
+
+        m._on_config_file_changed(path)  # the handler arms the debounce only
+        m._flush_config_reload()
+
+        assert path in m.config_watcher.files()  # the flush re-arms
+        m.reload_from_file.assert_called_once()  # validator pass + result toast
+
+    def test_fileChanged_signal_routes_to_flush(self, qtbot, fst, app_mock, tmp_path):
+        # the signal->slot wiring a live fileChanged event rides: the event
+        # arms the debounce, the timer flush runs the single reload
+        cfg = self.make_config(tmp_path)
+        fst.config_manager.file_name = str(cfg)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        m.reload_from_file = MagicMock()
+
+        m.config_watcher.fileChanged.emit(os.path.abspath(str(cfg)))
+        qtbot.wait(fst_overlay.CONFIG_RELOAD_DEBOUNCE_MS + 250)
+
+        m.reload_from_file.assert_called_once()
+
+    def test_delete_event_skips_reload_and_keeps_file_gone(self, qtbot, fst, app_mock, tmp_path):
+        # U290R: a watcher event of a DELETED config must not reload - the
+        # facade load_config recreates the default template on
+        # FileNotFoundError, which silently wiped the user's setup
+        cfg = self.make_config(tmp_path)
+        fst.config_manager.file_name = str(cfg)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        m.reload_from_file = MagicMock()
+        path = os.path.abspath(str(cfg))
+        cfg.unlink()  # the user removed the config file
+
+        m._on_config_file_changed(path)
+        m._flush_config_reload()
+
+        m.reload_from_file.assert_not_called()
+        assert not cfg.exists()  # no default-template rewrite
+        # the event surfaces visibly - via the palette owner (FST-417)
+        fst.surface_config_error.assert_called_once()
+        fst.toast_callback.assert_called_once()  # exactly one toast (P2-7)
+        toast_args = fst.toast_callback.call_args.args
+        assert 'config file deleted' in toast_args[0]
+        # the synthesized ConfigError names the deleted path as context (P1-2)
+        assert str(cfg) in toast_args[0]
+        assert toast_args[3] == 'rgba(200, 40, 40, 200)'  # red arrives via the facade
+        # (the watcher engine's own drop of the deleted path is live-event
+        # platform timing - the re-arm attempt above is a no-op while gone)
+
+    def test_watch_arms_when_config_created_after_construction(self, qtbot, fst, app_mock, tmp_path):
+        # U290R: construction with a missing config file left the watcher
+        # empty and eval-on-save dead; the periodic-update hook arms the
+        # watch once the first-run config is created
+        late = tmp_path / 'FSTconfig_late.txt'
+        fst.config_manager.file_name = str(late)
+        m = GUI_Manager(fst, app_mock)
+        qtbot.addWidget(m)
+        assert m.config_watcher.files() == []
+
+        late.write_text('a, b\n', encoding='utf-8')  # the created config
+        m.perform_periodic_update()
+
+        assert os.path.abspath(str(late)) in m.config_watcher.files()
