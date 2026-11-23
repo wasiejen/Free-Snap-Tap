@@ -907,6 +907,16 @@ class StatusOverlay(QWidget):
 # at window width). Keep this below the ToastManager fixed width (500).
 TOAST_TEXT_MAX_WIDTH = 480
 
+# #464 content-fit width: the toast box shrinks to its measured text width
+# plus a per-side pixel buffer (room for the rounded border), clamped to
+# [TOAST_TEXT_MIN_CHARS chars at text_size, TOAST_TEXT_MAX_WIDTH]. The char
+# floor scales with text_size like the metrics do: at the default 12 px
+# Consolas the floor is ~64 px (8 chars x ~7 px + the buffers; ~104 px with
+# the offscreen fallback font) - the maintainer's 'mm' message gets a small
+# box while long texts still wrap at the max.
+TOAST_TEXT_SIDE_PAD = 4      # px buffer on each side of the measured text
+TOAST_TEXT_MIN_CHARS = 8     # short-line width floor, in monospace chars
+
 # Toast label font chain, single-sourced (U290R): the stylesheet chain below
 # resolves family by family, so the QFontMetrics that pre-wraps the text must
 # carry the SAME chain - a Consolas-only metrics font measured a font the
@@ -994,8 +1004,34 @@ def wrap_toast_text(text, max_width, font_metrics):
     return '\n'.join(lines)
 
 
+def toast_box_width(display_text, font_metrics):
+    '''content-fit label width (#464): the widest measured line of the
+    (already wrapped) display text plus the per-side buffer, clamped to
+    [the TOAST_TEXT_MIN_CHARS floor, TOAST_TEXT_MAX_WIDTH]. Call it AFTER
+    wrap_toast_text capped the lines at the max width - no line can then
+    exceed the box, so wordWrap stays the insurance it always was'''
+    widest = max(font_metrics.horizontalAdvance(line)
+                 for line in display_text.split('\n'))
+    floor = (font_metrics.horizontalAdvance('x' * TOAST_TEXT_MIN_CHARS)
+             + 2 * TOAST_TEXT_SIDE_PAD)
+    return max(floor, min(widest + 2 * TOAST_TEXT_SIDE_PAD,
+                          TOAST_TEXT_MAX_WIDTH))
+
+
+def toast_screen_right(overlay_geo, screen_geo):
+    '''single source of the #464 toast mirror: True when the overlay cycle
+    sits on the RIGHT half of its screen (cycle center x >= screen center x).
+    RIGHT half: the toast box extends LEFTWARD from the cycle and the text is
+    right-aligned (it hugs the cycle side, as the boxes always did). LEFT
+    half: direction and alignment flip together - the box extends RIGHT, the
+    text left-aligns. Boundary ruling (stated per spec): a cycle centered
+    exactly on the screen midline counts as the RIGHT half, which preserves
+    the pre-#464 placement there'''
+    return overlay_geo.center().x() >= screen_geo.center().x()
+
+
 class ToastWidget(QFrame):
-    def __init__(self, text, duration=3.0, text_size=12, bg_color=TOAST_NEUTRAL, text_color="white", timer=0, parent=None):
+    def __init__(self, text, duration=3.0, text_size=12, bg_color=TOAST_NEUTRAL, text_color="white", timer=0, parent=None, screen_right=True):
         super().__init__(parent)
         self.setWindowFlags(Qt.FramelessWindowHint | Qt.ToolTip | Qt.WindowStaysOnTopHint)
         self.setAttribute(Qt.WA_TranslucentBackground)
@@ -1036,13 +1072,18 @@ class ToastWidget(QFrame):
             display_text = self.get_display_text()
         else:
             display_text = f" {text} "
+        metrics = QFontMetrics(toast_font(text_size))
         display_text = wrap_toast_text(display_text, TOAST_TEXT_MAX_WIDTH,
-                                       QFontMetrics(toast_font(text_size)))
+                                       metrics)
         self.label = QLabel(display_text)
-        # insurance: QLabel word wrap + the fixed box width
+        # insurance: QLabel word wrap + the content-fit box width (#464: a
+        # short text gets a small box, a long one still wraps at the max)
         self.label.setWordWrap(True)
-        self.label.setFixedWidth(TOAST_TEXT_MAX_WIDTH)
+        self.label.setFixedWidth(toast_box_width(display_text, metrics))
         layout.addWidget(self.label)
+        # #464 mirror: the text hugs the cycle side (the manager passes its
+        # screen-half computation; standalone builds keep the right side)
+        self.set_screen_right(screen_right)
 
         # 2. Single Master Timer
         # This handles both the countdown AND the eventual destruction
@@ -1056,6 +1097,14 @@ class ToastWidget(QFrame):
 
     def __eq__(self, other) -> bool:
         return (self.id == other.id) and (self.duration is other.duration)
+    
+    def set_screen_right(self, screen_right):
+        '''#464 mirror: the text hugs the cycle side - right-aligned when the
+        overlay cycle sits on the RIGHT half of its screen, left-aligned on
+        the left half. ToastManager.update_position re-applies it, so a
+        resolution change re-mirrors live toasts instead of stranding them'''
+        self.label.setAlignment((Qt.AlignRight if screen_right
+                                 else Qt.AlignLeft) | Qt.AlignVCenter)
     
     def get_display_text(self):
         """Standardizes the countdown format."""
@@ -1126,13 +1175,14 @@ class ToastManager(QWidget):
         if self._fst.arg_manager.STATUS_INDICATOR:
             self.remove_toast(text, immediately=1)
             
-            toast = ToastWidget(text, duration, text_size, bg_color, text_color, timer)
+            screen_right = self._screen_right()  # the #464 side, one source
+            toast = ToastWidget(text, duration, text_size, bg_color, text_color, timer, screen_right=screen_right)
             self.active_toasts[text] = toast
             
             # Auto-cleanup: remove from dict when the widget is deleted
             toast.destroyed.connect(lambda: self._handle_destruction(toast))
                               
-            self.main_layout.addWidget(toast, alignment=Qt.AlignRight)
+            self.main_layout.addWidget(toast, alignment=Qt.AlignRight if screen_right else Qt.AlignLeft)
             
             self.update_position()
             self.show()
@@ -1179,16 +1229,42 @@ class ToastManager(QWidget):
             # at app shutdown) - nothing left to update
             pass
 
+    def _screen_right(self):
+        '''the #464 side the overlay cycle sits on, on its current screen -
+        the toast_screen_right helper is the single source both the placement
+        and the text/column alignment read from'''
+        return toast_screen_right(self.parent_overlay.geometry(),
+                                  get_current_screen().geometry())
+
     def update_position(self):
         overlay_geo = self.parent_overlay.geometry()
         parent_padding = self.parent_overlay.user_padding
+        screen_right = self._screen_right()
         
-        # Anchor the RIGHT edge of our 500px box to the RIGHT edge of the indicator
-        x = overlay_geo.right() - self.width() - parent_padding
+        # #464 side-aware anchor: on the RIGHT half of its screen keep the
+        # RIGHT edge of our 500px box on the RIGHT edge of the indicator (the
+        # box extends LEFT, as it always did); on the LEFT half mirror it -
+        # the box LEFT edge anchors to the indicator LEFT edge and the box
+        # extends RIGHT, away from the screen edge
+        if screen_right:
+            x = overlay_geo.right() - self.width() - parent_padding
+        else:
+            x = overlay_geo.left() + parent_padding
         # Anchor the TOP edge of our toasts just below the indicator
         y = overlay_geo.bottom()
         
         self.move(x, y)
+        self._apply_side(screen_right)
+
+    def _apply_side(self, screen_right):
+        '''#464: the toast column and every live toast hug the cycle side.
+        A resolution change can flip the side under a shown manager (the
+        #463 re-anchor drives update_position AFTER the overlay moved) - the
+        live toasts re-mirror with it instead of stranding'''
+        align = Qt.AlignRight if screen_right else Qt.AlignLeft
+        self.main_layout.setAlignment(Qt.AlignTop | align)
+        for toast in list(self.active_toasts.values()):
+            toast.set_screen_right(screen_right)
 
     def check_empty(self):
         # The dict is the synchronous source of truth: the layout may still

@@ -87,6 +87,18 @@ You can change the control key combinations in the py file under # Control key c
 - needs the GUI loop to be started at startup - via `-status_indicator` or via `-tray_icon` alone
   - the tray icon menu offers "Toggle Crosshair", so it can also be toggled without a status indicator
 
+#### [Toast boxes] - geometry of the toast messages
+- the toast row hangs below the status indicator; the toast BOX WIDTH fits its text (#464)
+  - the width source is the measured text (the same font metrics the wrapping uses) plus a 4 px buffer on each side, clamped to `[8 characters, 480 px]`
+  - so a short message like `mm` gets a small box; a long text grows to the 480 px cap and WRAPS into multiple lines there
+  - the minimum is 8 monospace characters of the toast font, so it scales with the font size; 480 px is the `TOAST_TEXT_MAX_WIDTH` cap
+- the EXTEND DIRECTION follows the screen half the cycle sits on
+  - cycle on the RIGHT half: the box extends LEFT from it (the long-standing behavior)
+  - cycle on the LEFT half: the box extends RIGHT, away from the screen edge
+  - a cycle centered exactly on the screen midline counts as the right half
+- the TEXT ALIGNMENT mirrors the same side: right-bounded text while the cycle is on the right (the text hugs the cycle), left-bounded while it is on the left - direction and alignment always flip together
+- a resolution or scale change re-anchors the row under the moved indicator and re-mirrors the live toasts to the new side
+
 
 ## More in depth functionality
 

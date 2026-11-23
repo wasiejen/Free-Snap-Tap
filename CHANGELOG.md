@@ -9,6 +9,14 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 ## [Unreleased]
 
 ### Changed
+- Toast boxes now fit their content and mirror the indicator side (#464,
+  maintainer request 2026-11-23): the box width is the measured text width
+  plus a 4 px per-side buffer, clamped to `[8 characters, 480 px]` - a short
+  message gets a small box while long texts still wrap at the 480 px cap.
+  When the status indicator sits on the LEFT half of its screen the toast row
+  extends RIGHT from it (the RIGHT half keeps the leftward extension), and
+  the text alignment mirrors the side: right-bounded on the right,
+  left-bounded on the left. A resolution change re-mirrors live toasts.
 - A resolution or scale change now KEEPS the user-dragged overlay
   position (#463, maintainer ruling 2026-11-23): the display-change
   handler replays the status indicator's top-left FRACTION of the old

@@ -246,10 +246,24 @@ def test_bridge_remove_all_toasts_signal(qtbot):
     assert manager.main_layout.count() == 0
 
 
-def test_update_position_anchors_to_overlay(qtbot):
+def test_update_position_anchors_to_overlay(qtbot, monkeypatch):
+    # the RIGHT-half case of the #464 side-aware anchor: the box keeps
+    # extending LEFT from the indicator (the mirror + the screen-half
+    # boundary are pinned in tests/test_toast_geometry.py). The half is
+    # pinned with an explicit FakeScreen - the ambient offscreen screen
+    # made the side environment-dependent before #464 introduced it.
+    import fst_overlay
+    from PySide6.QtCore import QRect
+
+    class FakeScreen:
+        def geometry(self):
+            return QRect(0, 0, 1920, 1080)
+
     overlay = IndicatorOverlay()
-    overlay.move(300, 200)
+    overlay.move(1000, 200)
     overlay.resize(100, 60)
+    monkeypatch.setattr(fst_overlay, 'get_current_screen',
+                        lambda: FakeScreen())
     fst = SimpleNamespace(arg_manager=SimpleNamespace(STATUS_INDICATOR=True))
     manager = ToastManager(fst, overlay)
 

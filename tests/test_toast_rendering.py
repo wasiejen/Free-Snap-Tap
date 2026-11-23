@@ -2,17 +2,20 @@
 
 The ToastManager box is fixed at 500 px and the toast text is self-drawn by
 the ToastWidget label - text wider than the box used to be cut at the window
-width (maintainer observation). Fix: the label wraps near the box width
-(wordWrap on, fixed width TOAST_TEXT_MAX_WIDTH < 500) and honors embedded
-newlines. The wrapped height comes from the height-for-width layout, so
+width (maintainer observation). Fix: the label wraps at TOAST_TEXT_MAX_WIDTH
+and its box fits the content (#464: clamp(measured + buffer, 8-char floor,
+TOAST_TEXT_MAX_WIDTH), wordWrap on) and honors embedded newlines. The wrapped height comes from the height-for-width layout, so
 these pins SHOW the widget (offscreen activation computes geometry
 synchronously) and assert shape-based (height growth, width bounds) - no
 exact pixel/font assumptions, the offscreen font is the fallback font.
 """
 from types import SimpleNamespace
 
+from PySide6.QtGui import QFontMetrics
+
 from fst_overlay import (TOAST_FONT_FAMILIES, TOAST_QSS_FONT_FAMILIES,
-                         TOAST_TEXT_MAX_WIDTH, ToastManager, ToastWidget,
+                         TOAST_TEXT_MAX_WIDTH, TOAST_TEXT_MIN_CHARS,
+                         TOAST_TEXT_SIDE_PAD, ToastManager, ToastWidget,
                          toast_font, wrap_toast_text)
 
 
@@ -90,9 +93,14 @@ def make_toast(qtbot, text, timer=0):
 
 def test_label_wordwrap_at_box_width(qtbot):
     toast = make_toast(qtbot, 'hi')
+    metrics = QFontMetrics(toast_font(12))
+    floor = (metrics.horizontalAdvance('x' * TOAST_TEXT_MIN_CHARS)
+             + 2 * TOAST_TEXT_SIDE_PAD)
 
     assert toast.label.wordWrap() is True
-    assert toast.label.width() == TOAST_TEXT_MAX_WIDTH
+    # #464 SUPERSESSION of the old fixed-width pin: 'hi' is a short text, so
+    # the box shrinks to the content-fit floor instead of the 480 px box
+    assert toast.label.width() == floor < TOAST_TEXT_MAX_WIDTH
     assert TOAST_TEXT_MAX_WIDTH < 500  # must fit inside the manager box
 
 
