@@ -15,7 +15,7 @@ Everything else should be put in the config file and then can be applied on a pe
    ```bash
    <arg>-nomenu
    ```
--  `<arg>-file="filename"`: (with or without "): custom save file
+-  `<arg>-file="filename"`: (with or without " - quotes are command-line only, a config `<arg>` line keeps them verbatim): custom save file
    ```bat
    free_snap_tap.exe -file="my_save.json"
    ```
