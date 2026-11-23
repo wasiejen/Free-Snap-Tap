@@ -8,6 +8,8 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-11-23
+
 ### Changed
 - Toast boxes now fit their content and mirror the indicator side (#464,
   maintainer request 2026-11-23): the box width is the measured text width
@@ -163,8 +165,6 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   hung window owner stalls one poll - no timeout variant exists for the
   title read) are documented in `Focus_Task.run` and the WIKI section
   "[Focus polling contract - designed behavior (Item 14)]".
-
-## [1.4.0] - 2026-11-15 (release tag pending)
 
 ### Changed (F-C4, maintainer rulings of 2026-11-16)
 
