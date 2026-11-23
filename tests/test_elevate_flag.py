@@ -27,7 +27,8 @@ from fst_manager import (ELEVATE_FLAG, ELEVATE_DEV_MESSAGE,
                          handle_elevate_flag)
 
 ELEVATED_LINE = '[Elevation] running elevated'
-# byte literal on purpose (reviewer P2 2026-11-16): the WIKI documents this
+# byte literal on purpose (reviewer P2 2026-11-16): the docs
+# (docs/start-arguments.md, --elevate) document this
 # exact hint; pinning the literal keeps code and docs byte-locked
 DEV_HINT = ('[Elevation] dev mode - relaunch the exe manually or use '
             'scheduled task')

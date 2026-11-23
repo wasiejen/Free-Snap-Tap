@@ -107,7 +107,7 @@ class TestTapGroupIdealization:
 
 class TestConstraintGates:
     """Constraint kinds: a modifier-state trigger gate and a replacement-side
-    evaluation gate (WIKI 'Rebinds': a failing replacement constraint still
+    evaluation gate (docs/groups-macros.md '[Rebinds]': a failing replacement constraint still
     swallows the trigger; a failing trigger constraint lets the key pass)."""
 
     def test_modifier_gate_fires_the_rebind_while_shift_is_held(self, contract):
