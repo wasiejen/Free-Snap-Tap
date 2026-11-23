@@ -12,13 +12,13 @@
   - double left mouse click or middle mouse click will open the config file
   - left mouse drag moves it anywhere; a resolution or scale change keeps that RELATIVE position (the same fraction of the screen, clamped fully on-screen) - never dragged, it stays at the startup top-right corner
 
-#### [Crosshair] as function of the GUI overlay
+### [Crosshair] as function of the GUI overlay
 - `<arg>-crosshair` or `<arg>-crosshair=*pixel delta x*,*pixel delta y*`
   - displays a simple crosshair as overlay and can be controlled on a per game basis
 - needs the GUI loop to be started at startup - via `-status_indicator` or via `-tray_icon` alone
   - the tray icon menu offers "Toggle Crosshair", so it can also be toggled without a status indicator
 
-#### [Toast boxes] - geometry of the toast messages
+### [Toast boxes] - geometry of the toast messages
 - the toast row hangs below the status indicator; the toast BOX WIDTH fits its text (#464)
   - the width source is the measured text (the same font metrics the wrapping uses) plus a 4 px buffer on each side, clamped to `[8 characters, 480 px]`
   - so a short message like `mm` gets a small box; a long text grows to the 480 px cap and WRAPS into multiple lines there
