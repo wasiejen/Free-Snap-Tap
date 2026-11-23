@@ -55,7 +55,7 @@
     - `|(name)` on a macro name interrupts a started macro playback - it stops as soon as possible (normally in < 10 ms) and does not reset anything
     - `|(name)` on a sequence name resets the sequence counter only - the currently in-flight playback is not interrupted
     - `|(reset('name'))` on a sequence name resets the counter; on a non-sequence name it logs "no macro sequence with name ... - reset failed" and does nothing else (it does not interrupt a macro)
-    - an unknown name logs "constraint ... not recognized - ignored" and is a no-op (evaluates to True)
+    - an unknown name is a no-op (evaluates to True): the bare `|(name)` form logs "constraint ... not recognized - ignored", the `|(reset('name'))` form logs the reset-failed line above
   - resetting of a sequence will let the next playback of the sequence start again on the first key group
 
 #### [General key control]
