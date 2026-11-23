@@ -1,0 +1,95 @@
+# Delays, Prefixes, Suffixes
+
+> Part of the FST docs: [index](README.md) - [features & install](../README.md)
+
+## Delays in general
+  - default delay for Tap_Groups and Macros is set to a random time between 2 and 10 ms
+  - in Tap_Groups: 
+    - used for simulated keys that would idealized be executed together - to get a more natural input behavior
+    - default delays for Tap_Groups are changeable via the start argument `-tap_delay=*min_delay*,*max_delay*`
+  - in Macros/Macro_Sequences: 
+    - custom delay usable for each key of a key_group that will be executed AFTER the key_event
+      - for Keys with delays, the delay will be executed after the press AND the release
+    - default delays for Macros are changeable via the start argument `-macro_delay=*min_delay*,*max_delay*`
+  - delay can be suppressed entirely with the start argument `-no_delay`
+For further functionality of how it will be triggered, usage of constraints, evaluation and function invocation see [Rebinds + Macros + Macro_Sequences]
+
+## On Prefixes and Suffixes
+
+## [Prefixes]
+Every key event supports prefixes **prefix/modifier**
+  - `-key_event`: defines the pressed (down) state of a key
+  - `+key_event` and `!key_event` - defines the released (up) state of a key
+  - `^Key`: toggle a key - on key press key will be toggled between press and release; key release will be suppressed
+    - key after prefix `^` will always be interpreted as a Key instead of a key_event
+
+## [Suffixes]
+
+- every key_event supports **suffixes** (constraints, evaluation, function invocation)
+  - a suffix segment is either a delay number or a parenthesized expression `(...)` - a bare segment is parsed as a delay number, so `ke1|-ke2` is rejected
+  - as constraints: `(-ke)`, `(+ke)`/`(!ke)`: e.g. `ke1|(-ke2)|(-ke3) : ...` is functionally the same as trigger group: `ke1, -ke2, -ke3 : ...`
+    - inside the parentheses the sign names the state to check: `(-ke)` is True while ke is pressed, `(+ke)`/`(!ke)` while ke is not pressed (real and simulated state)
+- suffixes in trigger_group will only be checked/activated when trigger and constraints all check for True
+
+### [Suffix/Delays]
+
+  - Notation: 
+    - `key_event/Key|*time*` -> will result in a static delay of length *time* in ms
+    - `key_event/Key|*time1*|*time2*` -> will result in a random delay of length between *time1* and *time2* ms
+
+  - **A segment delay is deliberately UNBOUNDED** (maintainer decision 12, 
+    2026-11-17): a macro may have to wait seconds or minutes for the program in
+    front of it, so no limit is imposed on *time*. The delay KNOBS (`-tapdelay`,
+    `-macrodelay`, `-sequencedelay`, bound 0..1000 ms) are a different concept -
+    they set the random delay a line gets when it states none. Two rules come
+    with the unbounded value:
+      - the config check asks about an obviously large one: above 30000 ms the
+        load reports `very long delay (45000 ms) in a|45000 - intentional?` as a
+        WARNING. It never rejects the line and never changes the value;
+      - a wait never outlives its context: when a focus-group change, a macro
+        abort, a pause (ALT+DELETE) or a config reload ends the context a
+        playback belongs to, the pending delay is dropped and a key the playback
+        still owed is released immediately - a late segment never fires into the
+        newly active program.
+  - **the shipped DEFAULT delay pair is 2-10 ms** (maintainer decision 16,
+    2026-11-23): the pair sits BELOW the ~15.6 ms Windows clock tick, so every
+    inter-key gap quantizes to ONE tick - default playback is effectively
+    immediate (a long string lands as a burst). For a visible per-key rhythm,
+    state a pair whose LOWER bound is above the tick (the parser sorts the
+    pair), e.g. `-macrodelay=25,20`.
+
+### [Suffix/Evaluation] updated to V1.1.3
+
+- supports evaluation as suffix
+  - **evaluation to an integer** which will be used as a constant delay (all following function returns a length of time in ms)
+    - `|(tr("ke"))`: timing of length of time for presses and releases of **Real** key events
+        - for tr("-ke") get the length of time of a key press to release (read like: when I press ke (-ke) then give me the length of time since the last ke release)
+        - for tr("+ke") returns the length of time from last key press to actual key release
+    - `|(ts("ke"))`: timing of length of time for presses and releases of **Simulated** key events (also includes Tap Groups due to handling of them internally)
+    - `|(ta("ke"))`: timing of length of time for presses and releases of **All** key events
+    - `ke1|(last("ke2"))`: timing of length since last `-ke` press or `+ke` release (especially useful to check on other keys than the suffixed key)
+    - `|(dc("ke"))`: dc short for double click: return the time between two press events or between two release events of the key
+      - the sign of the key argument carries no meaning (`dc("-ke")` and `dc("+ke")` return the same value)
+      - returns 9999 ms if the key has no previous events
+    - `|(cs("key"))`: counterstrafing especially for CounterStrike: returns a time of length a key must pressed based on the pressed key to return the optimal time of length for a counterstrafe to come to a stop. Uses an internal function to approximate the acceleration time of the counter movement key.
+    - `|(csl("ke"))`: some as above only uses a linear function to estimate the counter strafing time
+
+  - **evaluation to bool (True/False)**
+    - supports standard python notation and inbuilt functions
+      - use of `,` commas in multi parameter functions is supported since V1.1.2 (e.g. pow(20,3) does now work)
+    - **every above time function can be used as a comparison evaluate it to bool**
+      - e.g. (dc("-ke") < 500) -> results to True if a double click (as time of the press) was made in less than 500 ms, else it will evaluate to False
+    - `p('key_string')`: (real key press) returns True if the real key defined by key_string is pressed
+      - the press state is read AFTER the current event already updated it - so on a trigger `-ke|(p('ke'))` is always True and `+ke|(p('ke'))` is always False; the sign of the argument is ignored
+      - the key must be given as a quoted string - an unquoted name is evaluated as a python variable and unknown names silently evaluate to True
+    - `r('key_string')`: (real keys release)
+    - `ap('key_string')`: (all keys press) returns True if the real key or a simulated key defined by key_string is pressed
+    - `ar('key_string')`: (all keys release)
+
+  - **evaluation to False**
+    - `|(False)` = `|(!)` = `|()` are equivalent and will always return False
+
+  - **evaluation to True**
+    - all following invocations will always result in True
+
+
