@@ -23,7 +23,7 @@
 - it will just insert the key_group at the position it is used
 
 ### [Tap_Groups]
-- Notation: `a, d` simple listing of Keys seperated by commas 
+- Notation: `a, d` simple listing of Keys separated by commas 
 - 2 or more Keys usable
 - only plain key strings are accepted - key_event notation like `-a, -d` or per-key delays like `a|10` are not valid in Tap_Groups and will raise an error at group init
 - delays are usable via the start argument `-tapdelay=min_time,max_time`

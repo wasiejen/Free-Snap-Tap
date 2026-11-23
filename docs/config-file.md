@@ -8,7 +8,7 @@
 - text file can be changed from default "FSTconfig.txt" to any file you want to, with the help of the startargument `-file=*file_name*` (this override is taken exactly as given: a relative value resolves against the working directory, as it always did)
 - all startarguments can be used either with a .bat file, by adding them to the link to the .exe or .py file, or by including them in the config file with `<arg>*start_argument*`, e.g. `<arg>-nomenu`
 - focus app names can be defined in the config file via `<focus>*name of the app*`
-  - everything BEFORE the first \<focus> will be seen as default start arguments and groupings and applied in general (evene outsite of focus apps) and to all following focus app groupings
+  - everything BEFORE the first \<focus> will be seen as default start arguments and groupings and applied in general (even outside of focus apps) and to all following focus app groupings
   - everything following this \<focus> definition up until the next \<focus> will be applied when the focus app name given is found in the current active window
   - multiple focus names on one line: `<focus>CS2, cs2 alt` - the names after the first comma are aliases of the same focus group: the start arguments and groups are defined under the first name and SHARED by all names, and matching ANY of the names activates that one group
   - focus names only keep letters, numbers, spaces, `_`, `.`, `,`, `-` and `:` (the `FOCUS_NAME_ILLEGAL` pattern in `fst_data_types.py`) - any other character is stripped at parse time
