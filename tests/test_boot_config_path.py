@@ -75,8 +75,9 @@ class TestGetAppDirectory:
 
     def test_legacy_onefile_binary_env_is_still_honoured(self, tmp_path,
                                                          monkeypatch):
-        # pre-4.x Nuitka spellings exported NUITKA_ONEFILE_BINARY (the
-        # full exe path); the twin branch keeps ancient builds anchored
+        # the legacy NUITKA_ONEFILE_BINARY spelling (full exe path) keeps a
+        # twin branch - the branch is pinned here, its Nuitka-version history
+        # is not asserted
         _clear_build_anchors(monkeypatch)
         real_dir = tmp_path / 'progra~1'
         real_dir.mkdir()

@@ -297,8 +297,9 @@ def get_app_directory():
     directory of the ORIGINAL onefile exe - nuitka/build/static_src/
     OnefileBootstrap.c, installed 4.2.2) before the extracted child starts,
     so the anchor stays next to the exe even though __file__ points into the
-    temp-extract dir; the older NUITKA_ONEFILE_BINARY (full exe path, pre-
-    4.x spellings) is honoured as a twin for ancient builds. Dev runs and
+    temp-extract dir; the NUITKA_ONEFILE_BINARY spelling (full exe path) is
+    honoured as a harmless twin (branch pinned, its history not asserted).
+    Dev runs and
     Nuitka-standalone resolve through this module's own __file__ (the repo/
     dist root - deterministic under pytest too, where __main__ is pytest);
     no argv[0] belt - a bare argv[0] would re-open the CWD hole.'''
