@@ -16,7 +16,8 @@ from pathlib import Path
 from fst_config_parser import DELAY_RANGE, SEGMENT_DELAY_WARN_MS
 from fst_manager import Config_Manager, Config_Validator
 
-DOCS = Path(__file__).resolve().parents[1] / 'docs' / 'prefixes-suffixes.md'
+DOCS = Path(__file__).resolve().parents[1] / 'docs' / 'internals.md'
+DOCS_MARKER = '### [Delay timing rulings - segment delay and the default pair]'
 
 
 def violations_of(content):
@@ -105,11 +106,12 @@ class TestUnrelatedValidationIsUnmoved:
 class TestTheRulingIsDocumented:
     def test_the_docs_state_the_unbounded_ruling_and_its_two_safety_rules(self):
         # CONTRACT: the ruling is only "deliberate" if the user can read it. The
-        # [Suffix/Delays] section carries: unbounded on purpose, the authoring
-        # warning bound, and the pending-delay flush that makes a long wait safe.
+        # internals.md [Delay timing rulings] section carries: unbounded on
+        # purpose, the authoring warning bound, and the pending-delay flush that
+        # makes a long wait safe. (Text moved out of prefixes-suffixes.md in M3.)
         text = DOCS.read_text(encoding='utf-8')
-        start = text.index('### [Suffix/Delays]')
-        rest = text[start + len('### [Suffix/Delays]'):]
+        start = text.index(DOCS_MARKER)
+        rest = text[start + len(DOCS_MARKER):]
         cut = rest.index('\n###') if '\n###' in rest else len(rest)
         # wrap-tolerant: the doc may re-flow, the claims must survive it
         section = ' '.join(rest[:cut].split())

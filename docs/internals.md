@@ -19,3 +19,29 @@ What the query wrapper `_get_active_window_title` guarantees:
 - a transient raising failure (Win32/ctypes exception) -> the LAST-KNOWN title is kept, so a single bad query can neither kill the focus task (pre-F-B5 it did, and tracking stayed dead until restart) nor toggle the active focus group. An empty last-known title (see UIPI above) degrades to the `"None"` sentinel.
 - a true win32 stall (hung owning thread) can still block one poll cycle - bounded only by the app recovering; this is the documented, accepted limit of the design.
 
+### [Delay timing rulings - segment delay and the default pair]
+
+moved from `prefixes-suffixes.md` ([Suffix/Delays]):
+
+  - **A segment delay is deliberately UNBOUNDED** (maintainer decision 12, 
+    2026-11-17): a macro may have to wait seconds or minutes for the program in
+    front of it, so no limit is imposed on *time*. The delay KNOBS (`-tapdelay`,
+    `-macrodelay`, bound 0..1000 ms) are a different concept -
+    they set the random delay a line gets when it states none. There is no
+    `-sequencedelay` start argument: a per-segment wait uses the `key|*time*`
+    suffix, a per-line default uses `-macrodelay`. Two rules come
+    with the unbounded value:
+      - the config check asks about an obviously large one: above 30000 ms the
+        load reports `very long delay (45000 ms) in a|45000 - intentional?` as a
+        WARNING. It never rejects the line and never changes the value;
+      - a wait never outlives its context: when a focus-group change, a macro
+        abort, a pause (ALT+DELETE) or a config reload ends the context a
+        playback belongs to, the pending delay is dropped and a key the playback
+        still owed is released immediately - a late segment never fires into the
+        newly active program.
+  - **the shipped DEFAULT delay pair is 2-10 ms** (maintainer decision 16,
+    2026-11-23): the pair sits BELOW the ~15.6 ms Windows clock tick, so every
+    inter-key gap quantizes to ONE tick - default playback is effectively
+    immediate (a long string lands as a burst). For a visible per-key rhythm,
+    state a pair whose LOWER bound is above the tick (the parser sorts the
+    pair), e.g. `-macrodelay=25,20`.
