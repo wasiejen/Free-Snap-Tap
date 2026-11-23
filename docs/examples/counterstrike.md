@@ -73,6 +73,12 @@ num1 :: b, 4, 3
 - `<focus>Counter-Strike` matches any window whose title contains
   "Counter-Strike" - a case-sensitive substring
   ([config-file.md](../config-file.md)).
+- `<,left_control` is quoted exactly as the live file writes it: it sits under
+  the `# Rebinds` comment, but without a `:` before the second key the parser
+  reads it as a tap group of `<` and `left_control`. A rebind of `<` to
+  left ctrl would need `left_windows : left_control` - the commented
+  `#left_windows, left_control` line above it in the live file shows the same
+  trap with a comma.
 - `shift : left_control` and `caps_lock : shift` rebind whole Keys; `v: suppress`
   and `left_windows : suppress` drop the key entirely
   ([groups-macros.md - Rebinds](../groups-macros.md)).

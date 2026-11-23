@@ -12,9 +12,9 @@ chains that end in `|(False)` / `|(!)` so the real key passes through, aliases
 as shared state blocks, `start_repeat` / `stop_repeat` lanes, multi-key trigger
 groups, toasts as mode feedback, and the escape-key reset.
 
-The extract is the focus section as configured: leading indentation and the
-commented-out experiment blocks are dropped, the leading indentation is normalized; live lines and their section comments are unmodified
-written.
+The extract is the focus section as configured: leading indentation is
+normalized, the commented-out experiment blocks are dropped, and every live line
+and its own section comment is unmodified.
 
 ## The focus section
 
@@ -101,8 +101,10 @@ in ms ([invocations.md - Repetition of Aliases](../invocations.md)).
 ```
 
 Pistol with automatic zoom: the press of the left button arms the repeat and the
-zoom helper, the release tears everything down again. The trailing `#, _|100,
-+ml` is an inline comment - the part after `#` is not played.
+zoom helper, the release tears everything down again. The `#` in that line is a
+per-segment comment: it drops only the `#` segment itself, the `_|100` wait and
+the `+ml` release after the following commas still play - a comment that should
+end the line must therefore sit before any key that follows it.
 
 ```bash
 #pistol mit auto zoom
@@ -110,8 +112,10 @@ zoom helper, the release tears everything down again. The trailing `#, _|100,
 +ml|(check("weapon",1))|(check("ha")), +mr :: <halbautomatic_end>, <zoom_end>, <laser_end>, _|20, +ml
 ```
 
-Burst fire instead of full auto - the same lane, chosen by the `burst` variable,
-and `check("weapon",(0))` shows that a tuple argument checks membership:
+Burst fire instead of full auto - the same lane, chosen by the `burst` variable.
+Note that `check("weapon",(0))` is still an int equality check: `(0)` is a
+parenthesised number, not a tuple - membership would need `(0,3)` or `[0,3]`
+([invocations.md - Variable system](../invocations.md)).
 
 ```bash
 # alternativer burst automatic fire button
@@ -167,8 +171,9 @@ keys around it are plain mode switches with a toast as the only feedback.
 ## The Naga side grid
 
 Names in parentheses label the bindings in the console output; the `-`/`+`
-pairing lets the press act and suppresses the release. A scroll-wheel key
-(`rm`, `mx1`, `mx2`) is a valid key string
+pairing lets the press act and suppresses the release. Mouse-button key strings
+(`rm`, `mx1`, `mx2`) are as valid as keyboard keys - `rm` is the right button and
+`mx1`/`mx2` the two side buttons; the scroll wheels are `scroll_y`/`scroll_x`
 ([invocations.md - Mouse keys](../invocations.md)).
 
 ```bash

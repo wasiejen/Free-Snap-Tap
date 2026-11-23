@@ -19,7 +19,7 @@ The two supported start routes are the release `.exe`
 ([releases](https://github.com/wasiejen/Free-Snap-Tap/releases)) or the Python
 source. For the source you need Python 3.12 or newer and two packages:
 
-```bash
+```console
 pip install pynput pygetwindow
 python ./free_snap_tap.py
 ```
@@ -99,8 +99,8 @@ focus group activates and its lines apply on top of the default part. Switch
 away and FST is back to the default part.
 
 **Classic pitfall.** The match is a **case-sensitive substring**:
-`<focus>Counter` matches "Counter-Strike" but not "counter-strike". Characters
-outside letters, numbers, spaces, `_`, `.`, `,` are stripped at parse time, and
+`<focus>Counter` matches "Counter-Strike" but not "counter-strike". Characters outside letters, numbers, spaces, `_`, `.`, `,`, `-` and `:` are
+stripped at parse time, and
 `<focus>CS2, cs2 alt` defines one group with two matching names - the lines
 below the first name are shared by all of them.
 
@@ -118,7 +118,8 @@ turn it off.
 #<arg>-nodelay           # uncomment to switch delays and crossover off
 ```
 
-The pair is `max,min`; the parser sorts it, so `8,2` and `2,8` mean the same.
+The documented order is `min,max`; the parser sorts the pair, so `8,2` and `2,8`
+mean the same.
 
 **What you should see.** With `-tapdelay` the counter-strafe switch in step 2
 lands a few ms later instead of instantly. With `-nodelay` everything fires
@@ -187,16 +188,19 @@ Reference: [groups-macros.md - Macros](groups-macros.md),
 
 **Goal.** Control whether a Key or a single key_event is meant.
 
-```bash
--a            # press only
-+a            # release only
-!a            # release too - and the "not pressed" form in a constraint
-^a            # a toggled Key - the only prefix allowed on a Key
-a             # a Key: press + release  (= -a, +a)
+```text
+-a   press only
++a   release only
+!a   release too - and the "not pressed" form in a constraint
+^a   a toggled Key - the only prefix allowed on a Key
+a    a Key: press + release  (the same as -a followed by +a)
+```
 
-# used in a config:
-f : ^caps_lock                 # f toggles caps lock
--v, -shift :: c                # the macro on the press of v, while shift is pressed
+Used in a config:
+
+```bash
+f : ^caps_lock        # f toggles caps lock
+-v, -shift :: c       # the press of v while shift is pressed
 ```
 
 **What you should see.** Prefixes pick the granularity: a rebind on `-v` fires
