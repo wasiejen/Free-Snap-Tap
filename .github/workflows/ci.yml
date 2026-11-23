@@ -22,8 +22,12 @@ jobs:
           python -m pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run test suite
-        # tests/conftest.py pins QT_QPA_PLATFORM=offscreen - no display server needed
-        run: python -m pytest -q
+        # the chunked lane is the repo's full-suite gate (#465): one isolated
+        # test process per chunk - the flat single-process run aborts natively
+        # at ~85% of this suite (ABORT2 hazard, see tests/README.md). A red
+        # chunk exits nonzero and fails this step; a red chunk also echoes its
+        # full output into this log. conftest pins QT_QPA_PLATFORM=offscreen.
+        run: python suite_lane.py
 
       # hard gate (F-B2): the 6 pre-existing F findings are cleared (TODO.md #2),
       # so the F gate now fails the build - do not re-add continue-on-error

@@ -39,6 +39,12 @@ Earlier releases (v1.2.0 and below) are listed in the version history on the
   per-key rhythm.
 
 ### Fixed
+- The GitHub CI test step now runs the chunked lane (#465): CI executes
+  `python suite_lane.py` instead of a flat single-process `python -m pytest -q`,
+  curing the `Fatal Python error: Aborted` in the pytest-qt teardown that
+  killed every push at ~85% of the suite since 2026-11-16 - CI now shares the
+  local gate's process-isolation mitigation (ABORT2). A red chunk also echoes
+  its full output into the Actions log.
 - The default config file is now found on every launch route (#461, maintainer
   report 2026-11-23): "FSTconfig.txt" resolves against the executable/script
   folder, never the working directory, so a boot route without a working

@@ -33,6 +33,11 @@ same `QT_QPA_PLATFORM` as the chunks.
 A single file or a single directory works exactly as before for focused work:
 `.venv/Scripts/python.exe -m pytest tests/test_foo.py -q`.
 
+GitHub Actions (`.github/workflows/ci.yml`) runs the same gate on its Windows
+runner - `python suite_lane.py` with the runner Python on PATH (#465, 2026-11-23:
+this replaced the flat `python -m pytest -q`, which aborted every CI run at
+~85% of the suite in the pytest-qt teardown).
+
 `QT_QPA_PLATFORM=offscreen` is set by the lane for every chunk; set it yourself
 for manual single-file runs (the widget tests need it on a headless session).
 
